@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "toolcalling"
+version = "0.1.0"
+description = "Provider-agnostic tool-calling library with pluggable adapters."
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{name = "Backtrack", email = "engineering@backtrack.app"}]
+dependencies = [
+    "openai>=1.0.0",
+    "Pillow>=10.0.0",
+]
+keywords = ["llm", "tools", "ai", "openai", "agent"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0.0"]
+
+[project.scripts]
+toolcalling = "toolcalling.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["toolcalling", "toolcalling.providers", "toolcalling.examples"]
