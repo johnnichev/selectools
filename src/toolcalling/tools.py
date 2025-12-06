@@ -5,11 +5,13 @@ Tool metadata, schemas, and runtime validation.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import inspect
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 
 JsonSchema = Dict[str, Any]
 ParameterValue = Union[str, int, float, bool, dict, list]
+ParamMetadata = Dict[str, Any]
 
 
 def _python_type_to_json(param_type: type) -> str:
@@ -57,11 +59,16 @@ class Tool:
         description: str,
         parameters: List[ToolParameter],
         function: Callable[..., str],
+        *,
+        injected_kwargs: Optional[Dict[str, Any]] = None,
+        config_injector: Optional[Callable[[], Dict[str, Any]]] = None,
     ):
         self.name = name
         self.description = description
         self.parameters = parameters
         self.function = function
+        self.injected_kwargs = injected_kwargs or {}
+        self.config_injector = config_injector
 
     def schema(self) -> JsonSchema:
         """Return a JSON-schema style dict describing this tool."""
@@ -113,7 +120,114 @@ class Tool:
         is_valid, error = self.validate(params)
         if not is_valid:
             raise ValueError(f"Invalid parameters for tool '{self.name}': {error}")
-        return self.function(**params)
+
+        call_args: Dict[str, Any] = dict(params)
+        call_args.update(self.injected_kwargs)
+        if self.config_injector:
+            call_args.update(self.config_injector() or {})
+
+        return self.function(**call_args)
 
 
-__all__ = ["Tool", "ToolParameter"]
+def _infer_parameters_from_callable(
+    func: Callable[..., Any],
+    param_metadata: Optional[Dict[str, ParamMetadata]] = None,
+) -> List[ToolParameter]:
+    """Create ToolParameter objects from a callable signature and annotations."""
+    param_metadata = param_metadata or {}
+    signature = inspect.signature(func)
+    parameters: List[ToolParameter] = []
+    for name, param in signature.parameters.items():
+        if name.startswith("_"):
+            continue
+        annotation = param.annotation if param.annotation is not inspect._empty else str
+        meta = param_metadata.get(name, {})
+        description = meta.get("description", "")
+        enum = meta.get("enum")
+        required = param.default is inspect._empty
+        parameters.append(
+            ToolParameter(
+                name=name,
+                param_type=annotation if isinstance(annotation, type) else str,
+                description=description or f"Parameter '{name}'",
+                required=required,
+                enum=enum,
+            )
+        )
+    return parameters
+
+
+def tool(
+    *,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    param_metadata: Optional[Dict[str, ParamMetadata]] = None,
+    injected_kwargs: Optional[Dict[str, Any]] = None,
+    config_injector: Optional[Callable[[], Dict[str, Any]]] = None,
+):
+    """
+    Decorator to register a function as a Tool with schema inference.
+
+    Example:
+        @tool(name="search")
+        def search(query: str, count: int = 3) -> str:
+            ...
+    """
+
+    def wrapper(func: Callable[..., str]) -> Tool:
+        params = _infer_parameters_from_callable(func, param_metadata=param_metadata)
+        tool_obj = Tool(
+            name=name or func.__name__,
+            description=description or (func.__doc__ or "").strip() or f"Tool {func.__name__}",
+            parameters=params,
+            function=func,
+            injected_kwargs=injected_kwargs,
+            config_injector=config_injector,
+        )
+        return tool_obj
+
+    return wrapper
+
+
+class ToolRegistry:
+    """Simple registry for reusable tool instances."""
+
+    def __init__(self):
+        self._tools: Dict[str, Tool] = {}
+
+    def register(self, tool_obj: Tool) -> Tool:
+        self._tools[tool_obj.name] = tool_obj
+        return tool_obj
+
+    def tool(
+        self,
+        *,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        param_metadata: Optional[Dict[str, ParamMetadata]] = None,
+        injected_kwargs: Optional[Dict[str, Any]] = None,
+        config_injector: Optional[Callable[[], Dict[str, Any]]] = None,
+    ):
+        """Decorator variant that also registers the tool in this registry."""
+
+        def decorator(func: Callable[..., str]) -> Tool:
+            tool_obj = tool(
+                name=name,
+                description=description,
+                param_metadata=param_metadata,
+                injected_kwargs=injected_kwargs,
+                config_injector=config_injector,
+            )(func)
+            self.register(tool_obj)
+            return tool_obj
+
+        return decorator
+
+    def get(self, name: str) -> Optional[Tool]:
+        return self._tools.get(name)
+
+    def all(self) -> List[Tool]:
+        return list(self._tools.values())
+
+
+__all__ = ["Tool", "ToolParameter", "ToolRegistry", "tool"]

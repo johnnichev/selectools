@@ -17,6 +17,7 @@ Tool call contract:
 - Include every required parameter. Ask for missing details instead of guessing.
 - Wait for tool results before giving a final answer.
 - Do not invent tool outputs; only report what was returned.
+- Keep tool payloads compact (<=8k chars) and emit one tool call at a time.
 """
 
 

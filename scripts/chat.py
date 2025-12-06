@@ -1,7 +1,7 @@
 """
 Bounding Box Detection Demo using the toolcalling library.
 
-- Default run: processes assets/dog.png and writes dog_with_bbox.png.
+- Default run: processes assets/environment.png and writes environment_with_bbox.png.
 - Interactive mode: `python scripts/chat.py --interactive`
 """
 
@@ -73,13 +73,13 @@ def main():
 
     parser = argparse.ArgumentParser(description="Bounding box detection demo")
     parser.add_argument("--interactive", action="store_true", help="Run interactive chat mode")
-    parser.add_argument("--image", help="Path to an image; defaults to assets/dog.png")
+    parser.add_argument("--image", help="Path to an image; defaults to assets/environment.png")
     args = parser.parse_args()
 
     if args.interactive:
         interactive_chat()
     else:
-        image = Path(args.image) if args.image else ASSETS_DIR / "dog.png"
+        image = Path(args.image) if args.image else ASSETS_DIR / "environment.png"
         run_detection(image)
 
 

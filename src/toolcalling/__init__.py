@@ -2,7 +2,7 @@
 
 from .agent import Agent, AgentConfig
 from .types import Message, Role, ToolCall
-from .tools import Tool, ToolParameter
+from .tools import Tool, ToolParameter, ToolRegistry, tool
 from .parser import ToolCallParser
 from .prompt import PromptBuilder
 from .providers.openai_provider import OpenAIProvider
@@ -22,4 +22,6 @@ __all__ = [
     "AnthropicProvider",
     "GeminiProvider",
     "LocalProvider",
+    "ToolRegistry",
+    "tool",
 ]

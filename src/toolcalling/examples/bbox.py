@@ -9,7 +9,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -18,6 +18,7 @@ from ..tools import Tool, ToolParameter
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 ASSETS_DIR = PROJECT_ROOT / "assets"
+BBOX_MOCK_ENV = "TOOLCALLING_BBOX_MOCK_JSON"
 
 
 def _resolve_image_path(image_path: str) -> Path:
@@ -58,53 +59,22 @@ def detect_bounding_box_impl(target_object: str, image_path: str) -> str:
             }
         )
 
-    client = _load_openai_client()
-    image_base64 = base64.b64encode(resolved_path.read_bytes()).decode("utf-8")
+    mock_json = os.getenv(BBOX_MOCK_ENV)
+    if mock_json:
+        detection_data = _load_mock_detection(Path(mock_json))
+    else:
+        detection_data = _call_openai_vision(target_object=target_object, image_path=resolved_path)
 
-    prompt = f"""Analyze this image and locate the {target_object}.
-
-Return ONLY a JSON object with the bounding box coordinates in normalized format (0.0 to 1.0):
-
-{{
-    "found": true/false,
-    "x_min": 0.0-1.0,
-    "y_min": 0.0-1.0,
-    "x_max": 0.0-1.0,
-    "y_max": 0.0-1.0,
-    "confidence": "high/medium/low",
-    "description": "brief description of what you found"
-}}
-
-If the {target_object} is not found, set "found" to false and explain why in the description.
-Coordinates should be normalized (0.0 = left/top edge, 1.0 = right/bottom edge).
-Return ONLY the JSON object, no other text."""
-
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}},
-                    ],
-                }
-            ],
-            max_tokens=500,
-        )
-    except Exception as exc:  # noqa: BLE001
+    if not detection_data:
         return json.dumps(
             {
                 "success": False,
-                "message": f"Vision API error: {exc}",
+                "message": "No detection data returned.",
                 "coordinates": None,
                 "output_path": None,
             }
         )
 
-    response_text = response.choices[0].message.content
-    detection_data = _parse_detection_response(response_text)
     if not detection_data.get("found"):
         return json.dumps(
             {
@@ -120,7 +90,7 @@ Return ONLY the JSON object, no other text."""
     x_max = float(detection_data["x_max"])
     y_max = float(detection_data["y_max"])
 
-    if not (0 <= x_min <= 1 and 0 <= y_min <= 1 and 0 <= x_max <= 1 and 0 <= y_max <= 1):
+    if not _coordinates_valid(x_min, y_min, x_max, y_max):
         return json.dumps(
             {
                 "success": False,
@@ -158,6 +128,63 @@ def _parse_detection_response(response_text: str) -> Dict[str, str]:
     if json_match:
         return json.loads(json_match.group())
     return json.loads(response_text)
+
+
+def _load_mock_detection(mock_path: Path) -> Dict[str, str]:
+    """Load a deterministic mock response for offline testing."""
+    if not mock_path.exists():
+        return {"found": False, "description": f"Mock file not found at {mock_path}"}
+    try:
+        return json.loads(mock_path.read_text())
+    except Exception as exc:  # noqa: BLE001
+        return {"found": False, "description": f"Failed to read mock file: {exc}"}
+
+
+def _call_openai_vision(target_object: str, image_path: Path) -> Optional[Dict[str, str]]:
+    client = _load_openai_client()
+    image_base64 = base64.b64encode(image_path.read_bytes()).decode("utf-8")
+
+    prompt = f"""Analyze this image and locate the {target_object}.
+
+Return ONLY a JSON object with the bounding box coordinates in normalized format (0.0 to 1.0):
+
+{{
+    "found": true/false,
+    "x_min": 0.0-1.0,
+    "y_min": 0.0-1.0,
+    "x_max": 0.0-1.0,
+    "y_max": 0.0-1.0,
+    "confidence": "high/medium/low",
+    "description": "brief description of what you found"
+}}
+
+If the {target_object} is not found, set "found" to false and explain why in the description.
+Coordinates should be normalized (0.0 = left/top edge, 1.0 = right/bottom edge).
+Return ONLY the JSON object, no other text."""
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}},
+                    ],
+                }
+            ],
+            max_tokens=500,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return {"found": False, "description": f"Vision API error: {exc}"}
+
+    response_text = response.choices[0].message.content
+    return _parse_detection_response(response_text)
+
+
+def _coordinates_valid(x_min: float, y_min: float, x_max: float, y_max: float) -> bool:
+    return 0 <= x_min <= 1 and 0 <= y_min <= 1 and 0 <= x_max <= 1 and 0 <= y_max <= 1
 
 
 def _draw_box(image_path: Path, target_object: str, x_min: float, y_min: float, x_max: float, y_max: float):

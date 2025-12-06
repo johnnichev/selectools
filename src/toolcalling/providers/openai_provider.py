@@ -16,6 +16,7 @@ class OpenAIProvider(Provider):
     """Adapter that speaks to OpenAI's Chat Completions API."""
 
     name = "openai"
+    supports_streaming = True
 
     def __init__(self, api_key: str | None = None, default_model: str = "gpt-4o"):
         load_default_env()
@@ -39,6 +40,7 @@ class OpenAIProvider(Provider):
         messages: List[Message],
         temperature: float = 0.0,
         max_tokens: int = 1000,
+        timeout: float | None = None,
     ) -> str:
         formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
 
@@ -48,12 +50,48 @@ class OpenAIProvider(Provider):
                 messages=formatted,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                timeout=timeout,
             )
         except Exception as exc:  # noqa: BLE001
             raise ProviderError(f"OpenAI completion failed: {exc}") from exc
 
         content = response.choices[0].message.content
         return content or ""
+
+    def stream(
+        self,
+        *,
+        model: str,
+        system_prompt: str,
+        messages: List[Message],
+        temperature: float = 0.0,
+        max_tokens: int = 1000,
+        timeout: float | None = None,
+    ):
+        formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
+        try:
+            response = self._client.chat.completions.create(
+                model=model or self.default_model,
+                messages=formatted,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stream=True,
+                timeout=timeout,
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise ProviderError(f"OpenAI streaming failed: {exc}") from exc
+
+        for chunk in response:
+            try:
+                delta = chunk.choices[0].delta
+                if not delta or not delta.content:
+                    continue
+                content = delta.content
+                if isinstance(content, list):
+                    content = "".join([part.text for part in content if getattr(part, "text", None)])
+                yield content
+            except Exception as exc:  # noqa: BLE001
+                raise ProviderError(f"OpenAI stream parsing failed: {exc}") from exc
 
     def _format_messages(self, system_prompt: str, messages: List[Message]):
         payload = [{"role": "system", "content": system_prompt}]
