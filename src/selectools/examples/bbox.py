@@ -18,7 +18,7 @@ from ..tools import Tool, ToolParameter
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 ASSETS_DIR = PROJECT_ROOT / "assets"
-BBOX_MOCK_ENV = "TOOLCALLING_BBOX_MOCK_JSON"
+BBOX_MOCK_ENV = "SELECTOOLS_BBOX_MOCK_JSON"
 
 
 def _resolve_image_path(image_path: str) -> Path:

@@ -1,5 +1,5 @@
 """
-Test Suite for the toolcalling library.
+Test Suite for the selectools library.
 
 These tests avoid real API calls by using fake providers.
 """
@@ -23,12 +23,12 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from agent import Agent, AgentConfig, Message, Role, Tool, ToolParameter
-from toolcalling.tools import ToolRegistry
-from toolcalling.examples.bbox import BBOX_MOCK_ENV, detect_bounding_box_impl
-from toolcalling.parser import ToolCallParser
-from toolcalling.providers.base import ProviderError
-from toolcalling.providers.stubs import AnthropicProvider, GeminiProvider, LocalProvider
-from toolcalling.cli import build_parser, run_agent, _default_tools
+from selectools.tools import ToolRegistry
+from selectools.examples.bbox import BBOX_MOCK_ENV, detect_bounding_box_impl
+from selectools.parser import ToolCallParser
+from selectools.providers.base import ProviderError
+from selectools.providers.stubs import AnthropicProvider, GeminiProvider, LocalProvider
+from selectools.cli import build_parser, run_agent, _default_tools
 
 
 class FakeProvider:

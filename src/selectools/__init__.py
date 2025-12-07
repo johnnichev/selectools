@@ -1,4 +1,4 @@
-"""Public exports for the toolcalling package."""
+"""Public exports for the selectools package."""
 
 from .agent import Agent, AgentConfig
 from .types import Message, Role, ToolCall

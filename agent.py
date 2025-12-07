@@ -1,10 +1,10 @@
 """
 Convenience re-export module for the AI tool calling framework.
 
-Imports surface the library package installed in src/toolcalling.
+Imports surface the library package installed in src/selectools.
 """
 
-from toolcalling import Agent, AgentConfig, Message, Role, Tool, ToolParameter, ToolRegistry, tool
+from selectools import Agent, AgentConfig, Message, Role, Tool, ToolParameter, ToolRegistry, tool
 
 __all__ = [
     "Agent",

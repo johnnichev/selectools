@@ -10,10 +10,10 @@ import argparse
 import json
 from typing import List
 
-from toolcalling import Agent, AgentConfig, Message, Role, ToolRegistry, tool
-from toolcalling.parser import ToolCallParser
-from toolcalling.prompt import PromptBuilder
-from toolcalling.providers.stubs import LocalProvider
+from selectools import Agent, AgentConfig, Message, Role, ToolRegistry, tool
+from selectools.parser import ToolCallParser
+from selectools.prompt import PromptBuilder
+from selectools.providers.stubs import LocalProvider
 
 
 registry = ToolRegistry()

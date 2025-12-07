@@ -1,5 +1,5 @@
 """
-Bounding Box Detection Demo using the toolcalling library.
+Bounding Box Detection Demo using the selectools library.
 
 - Default run: processes assets/environment.png and writes environment_with_bbox.png.
 - Interactive mode: `python scripts/chat.py --interactive`
@@ -15,7 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from agent import Agent, AgentConfig, Message, Role  # noqa: E402
-from toolcalling.examples.bbox import create_bounding_box_tool  # noqa: E402
+from selectools.examples.bbox import create_bounding_box_tool  # noqa: E402
 
 ASSETS_DIR = PROJECT_ROOT / "assets"
 DEFAULT_MODEL = "gpt-4o"

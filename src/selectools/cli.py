@@ -1,10 +1,10 @@
 """
-CLI entrypoint for the toolcalling library.
+CLI entrypoint for the selectools library.
 
 Examples:
-    python -m toolcalling.cli list-tools
-    python -m toolcalling.cli run --provider openai --model gpt-4o --prompt "Search docs" --tool echo
-    python -m toolcalling.cli run --provider openai --prompt "Find the object" --image assets/environment.png --tool detect_bounding_box
+    python -m selectools.cli list-tools
+    python -m selectools.cli run --provider openai --model gpt-4o --prompt "Search docs" --tool echo
+    python -m selectools.cli run --provider openai --prompt "Find the object" --image assets/environment.png --tool detect_bounding_box
 """
 
 from __future__ import annotations
@@ -132,7 +132,7 @@ def interactive_chat(args, tools: Dict[str, Tool]) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Multi-model toolcalling CLI")
+    parser = argparse.ArgumentParser(description="Multi-model selectools CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     list_parser = subparsers.add_parser("list-tools", help="List available tools")

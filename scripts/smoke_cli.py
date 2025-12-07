@@ -47,7 +47,7 @@ def main() -> None:
         cmd = [
             sys.executable,
             "-m",
-            "toolcalling.cli",
+            "selectools.cli",
             "run",
             "--provider",
             name,
