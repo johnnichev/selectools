@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.3.1] - 2025-12-07
+
+### Changed
+- Add automated release scripts and tooling
+
+
 ## 0.3.0 (2025-12-07)
 
 ### 🚨 Breaking Changes

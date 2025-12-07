@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "selectools"
-version = "0.3.0"
+version = "0.3.1"
 description = "Build AI agents that call your custom Python functions. Connect LLMs to tools, APIs, and databases with any provider (OpenAI, Anthropic, Gemini)."
 readme = "README.md"
 requires-python = ">=3.9"
