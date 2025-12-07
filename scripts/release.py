@@ -74,31 +74,31 @@ class ReleaseManager:
         print(f"  Running: {' '.join(cmd)}")
         return subprocess.run(cmd, cwd=self.repo_root, check=check, capture_output=True, text=True)
     
-    def check_git_status(self, dry_run: bool = False) -> None:
+    def check_git_status(self, dry_run: bool = False, skip_confirm: bool = False) -> None:
         """Ensure working directory is clean"""
         result = self.run_command(["git", "status", "--porcelain"])
         if result.stdout.strip():
             print("⚠ Warning: You have uncommitted changes:")
             print(result.stdout)
-            if not dry_run:
+            if not dry_run and not skip_confirm:
                 response = input("Continue anyway? (y/N): ")
                 if response.lower() != 'y':
                     sys.exit(1)
             else:
-                print("(Skipping prompt in dry-run mode)")
+                print("(Skipping prompt in non-interactive mode)")
     
-    def check_on_main_branch(self, dry_run: bool = False) -> None:
+    def check_on_main_branch(self, dry_run: bool = False, skip_confirm: bool = False) -> None:
         """Ensure we're on the main branch"""
         result = self.run_command(["git", "branch", "--show-current"])
         branch = result.stdout.strip()
         if branch != "main":
             print(f"⚠ Warning: You're on branch '{branch}', not 'main'")
-            if not dry_run:
+            if not dry_run and not skip_confirm:
                 response = input("Continue anyway? (y/N): ")
                 if response.lower() != 'y':
                     sys.exit(1)
             else:
-                print("(Skipping prompt in dry-run mode)")
+                print("(Skipping prompt in non-interactive mode)")
     
     def validate_version(self, version: str) -> None:
         """Validate semantic version format"""
@@ -135,7 +135,7 @@ class ReleaseManager:
         self.run_command(["git", "push", "origin", tag])
         print(f"✓ Pushed tag {tag} to origin")
     
-    def release(self, new_version: str, message: str = None, dry_run: bool = False) -> None:
+    def release(self, new_version: str, message: str = None, dry_run: bool = False, skip_confirm: bool = False) -> None:
         """Execute the full release process"""
         print("\n🚀 Starting release process...\n")
         
@@ -149,14 +149,17 @@ class ReleaseManager:
         
         if current_version == new_version:
             print(f"⚠ Warning: Version {new_version} is the same as current version")
-            response = input("Continue anyway? (y/N): ")
-            if response.lower() != 'y':
-                sys.exit(1)
+            if not skip_confirm:
+                response = input("Continue anyway? (y/N): ")
+                if response.lower() != 'y':
+                    sys.exit(1)
+            else:
+                print("(Skipping confirmation in non-interactive mode)")
         
         # Pre-flight checks
         print("Running pre-flight checks...")
-        self.check_on_main_branch(dry_run)
-        self.check_git_status(dry_run)
+        self.check_on_main_branch(dry_run, skip_confirm)
+        self.check_git_status(dry_run, skip_confirm)
         print()
         
         if dry_run:
@@ -175,17 +178,20 @@ class ReleaseManager:
             return
         
         # Confirm
-        print("This will:")
-        print(f"  1. Update version to {new_version}")
-        print(f"  2. Update CHANGELOG.md")
-        print(f"  3. Commit and push changes")
-        print(f"  4. Create and push tag v{new_version}")
-        print(f"  5. Trigger GitHub Actions to publish to PyPI")
-        print()
-        response = input("Proceed? (y/N): ")
-        if response.lower() != 'y':
-            print("Aborted.")
-            sys.exit(0)
+        if not skip_confirm:
+            print("This will:")
+            print(f"  1. Update version to {new_version}")
+            print(f"  2. Update CHANGELOG.md")
+            print(f"  3. Commit and push changes")
+            print(f"  4. Create and push tag v{new_version}")
+            print(f"  5. Trigger GitHub Actions to publish to PyPI")
+            print()
+            response = input("Proceed? (y/N): ")
+            if response.lower() != 'y':
+                print("Aborted.")
+                sys.exit(0)
+        else:
+            print("Proceeding with release (non-interactive mode)...")
         
         print()
         
@@ -247,6 +253,12 @@ Prerequisites:
         help="Show what would be done without making any changes"
     )
     
+    parser.add_argument(
+        "--yes", "-y",
+        action="store_true",
+        help="Skip confirmation prompts (non-interactive mode)"
+    )
+    
     args = parser.parse_args()
     
     # Find repository root
@@ -254,7 +266,7 @@ Prerequisites:
     
     # Execute release
     manager = ReleaseManager(repo_root)
-    manager.release(args.version, args.message, args.dry_run)
+    manager.release(args.version, args.message, args.dry_run, args.yes)
 
 
 if __name__ == "__main__":
