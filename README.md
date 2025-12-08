@@ -444,14 +444,14 @@ def calculate(a: int, b: int) -> str:
 async def main():
     # Conversation memory works with async
     memory = ConversationMemory(max_messages=20)
-    
+
     agent = Agent(
         tools=[fetch_weather, calculate],
         provider=OpenAIProvider(),
         config=AgentConfig(max_iterations=5),
         memory=memory
     )
-    
+
     # Use arun() instead of run()
     response = await agent.arun([
         Message(role=Role.USER, content="What's the weather in Seattle?")
@@ -481,8 +481,9 @@ async def chat(message: str):
 ```
 
 **Key Async Features:**
+
 - `Agent.arun()` for non-blocking execution
-- Async tools with `async def` 
+- Async tools with `async def`
 - All providers support async (OpenAI, Anthropic, Gemini)
 - Concurrent execution with `asyncio.gather()`
 - Works with FastAPI, aiohttp, and async frameworks
@@ -538,342 +539,52 @@ For the full license text, see the [LICENSE](LICENSE) file.
 ## More docs
 
 - Single source of truth is this README.
-- Optional dev helpers: `python scripts/smoke_cli.py` (skips providers missing keys), `python scripts/chat.py` (vision demo), `python examples/search_weather.py` (local mock tools).
+- Examples:
+  - `python examples/search_weather.py` - Simple tool with local mock provider
+  - `python examples/async_agent_demo.py` - Async/await usage with FastAPI patterns
+  - `python examples/conversation_memory_demo.py` - Multi-turn conversation with memory
+- Dev helpers:
+  - `python scripts/smoke_cli.py` - Quick provider smoke tests (skips missing keys)
+  - `python scripts/test_memory_with_openai.py` - Test memory with real OpenAI API
 
 ---
 
-## Roadmap & Future Improvements
+## Roadmap
 
-We're committed to making Selectools the most production-ready, developer-friendly tool-calling library. Here's our roadmap organized by priority and impact.
+We're actively developing new features to make Selectools the most production-ready tool-calling library. See **[ROADMAP.md](ROADMAP.md)** for the complete development roadmap, including:
 
-### 🎯 **Priority 1: Quick Wins** (Coming in v0.4.0 - Next 2 weeks)
+**✅ Completed in v0.4.0:**
 
-These high-impact features can be implemented quickly and will immediately improve the developer experience:
+- Conversation Memory - Multi-turn context management
+- Async Support - `Agent.arun()`, async tools, async providers
+- Real Provider Implementations - Full Anthropic & Gemini SDK integration
 
-#### **Conversation Memory** ⏱️ 2 hours ✅ **Completed in v0.4.0**
-- Simple `ConversationMemory` class for maintaining context
-- Automatic message history management with configurable limits
-- Easy integration: `memory = ConversationMemory(); agent = Agent(..., memory=memory)`
-- **Status**: ✅ Implemented
-- **Why it matters**: Closes a major gap with LangChain, makes multi-turn conversations trivial
+**🟡 Coming in v0.4.x:**
 
-#### **Async Support** ⏱️ 6 hours ✅ **Completed in v0.4.0**
-- `Agent.arun()` for non-blocking agent execution
-- Async tools with `async def` (mixed seamlessly with sync tools)
-- Full async provider support (OpenAI, Anthropic, Gemini)
-- Compatible with FastAPI, asyncio, and other async frameworks
-- **Status**: ✅ Implemented
-- **Why it matters**: Required for high-performance web applications and concurrent operations
+- Better Error Messages - PyTorch-style helpful errors
+- Cost Tracking - Automatic token and cost tracking
+- Pre-built Tool Library - Common tools ready to use
 
-#### **Better Error Messages** ⏱️ 2 hours
-- PyTorch-style helpful error messages with suggestions
-- Clear parameter validation errors with "did you mean?" suggestions
-- Detailed tool execution failure messages
-- **Status**: 🟡 Planned
-- **Why it matters**: Dramatically improves debugging and developer experience
+**🚀 Future (v0.5.0+):**
 
-#### **Cost Tracking** ⏱️ 2 hours
-- Automatic tracking of API costs and token usage
-- Per-tool cost breakdown
-- `agent.total_cost` and `agent.total_tokens` properties
-- **Status**: 🟡 Planned
-- **Why it matters**: Essential for production monitoring and budget control
+- Parallel tool execution
+- Observability hooks
+- Tool composition
+- Advanced context management
+- Local model support (Ollama)
+- And much more...
 
-#### **Pre-built Tool Library** ⏱️ 4 hours
-- `selectools.toolbox` with 5-10 common tools
-- Web search (DuckDuckGo/Brave), HTTP requests, file operations
-- Python REPL, shell commands (sandboxed)
-- **Status**: 🟡 Planned
-- **Why it matters**: Instant productivity, no need to write basic tools from scratch
+See **[ROADMAP.md](ROADMAP.md)** for detailed feature descriptions, status tracking, and implementation notes.
 
-**Total Priority 1: ~13 hours = 1-2 days of focused work**
+### 🤝 Contributing
+
+Want to help build these features? See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. We'd love contributions for:
+
+- Priority 1 features (quick wins)
+- Tool implementations for the toolbox
+- Examples and tutorials
+- Documentation improvements
 
 ---
-
-### 🚀 **Priority 2: High-Impact Features** (v0.5.0 - Next month)
-
-Medium effort, high value features that differentiate us from competitors:
-
-#### **Streaming Tool Results** ⏱️ 3 hours
-- Stream tool output as it's generated (not just LLM responses)
-- `@tool(streaming=True)` decorator for long-running tools
-- Real-time progress updates for better UX
-- **Status**: 🟡 Planned
-
-#### **Parallel Tool Execution** ⏱️ 4 hours
-- Automatically detect and execute independent tools concurrently
-- `AgentConfig(parallel_tools=True)` for 3-5x faster workflows
-- Smart dependency detection
-- **Status**: 🟡 Planned
-
-#### **Observability Hooks** ⏱️ 3 hours
-- `on_tool_start`, `on_tool_end`, `on_error` hooks
-- Easy integration with logging, monitoring, and alerting
-- OpenTelemetry-compatible
-- **Status**: 🟡 Planned
-
-#### **Tool Composition** ⏱️ 4 hours
-- `@compose(tool1, tool2)` decorator for chaining tools
-- Built-in patterns: pipeline, map-reduce, conditional
-- Simplifies complex multi-step operations
-- **Status**: 🟡 Planned
-
-#### **Tool Validation at Registration** ⏱️ 2 hours
-- Catch type errors when defining tools, not at runtime
-- Validate parameter types, descriptions, and schemas
-- Clear error messages for invalid tool definitions
-- **Status**: 🟡 Planned
-
-#### **Interactive Debug Mode** ⏱️ 6 hours
-- `AgentConfig(debug=True)` for step-through debugging
-- Inspect state at each tool call
-- Modify parameters and retry
-- **Status**: 🟡 Planned
-
-**Total Priority 2: ~22 hours = 3-4 days**
-
----
-
-### 💎 **Priority 3: Advanced Features** (v0.6.0+ - Next quarter)
-
-Longer-term features that require more design and implementation:
-
-These planned enhancements will make this library even more powerful than existing alternatives:
-
-#### **🧠 Advanced Context Management**
-
-**Automatic Conversation Summarization** ⏱️ 8 hours
-- Intelligent summarization of long conversations to stay within token limits
-- Configurable summarization strategies (extractive, abstractive, hybrid)
-- Preserve critical context while compressing historical messages
-- **Status**: 🟡 Planned
-- **Why it matters**: Most libraries crash or truncate when hitting context limits. We'll handle it gracefully.
-
-**Sliding Window with Smart Retention** ⏱️ 6 hours
-- Keep recent messages + important historical context
-- Automatic detection of critical information (tool results, user preferences, decisions)
-- Configurable window sizes per provider
-- **Status**: 🟡 Planned
-- **Why it matters**: Better than simple truncation—maintains conversation coherence.
-
-**Multi-Turn Memory System** ⏱️ 12 hours
-- Persistent memory across sessions (key-value store, vector DB integration)
-- Automatic extraction of facts, preferences, and entities
-- Memory retrieval based on relevance to current conversation
-- **Status**: 🟡 Planned
-- **Why it matters**: Build agents that remember users across sessions, unlike stateless alternatives.
-
-#### **🔧 Enhanced Tool Capabilities**
-
-**Dynamic Tool Loading** ⏱️ 8 hours
-- Hot-reload tools without restarting the agent
-- Plugin system for third-party tool packages
-- Tool versioning and compatibility checking
-- **Status**: 🟡 Planned
-- **Why it matters**: Deploy new capabilities without downtime.
-
-**Tool Usage Analytics** ⏱️ 6 hours
-- Track tool invocation frequency, latency, and success rates
-- Automatic performance profiling and bottleneck detection
-- Per-tool cost breakdown (API calls, compute time)
-- **Status**: 🟡 Planned
-- **Why it matters**: Optimize your agent's performance and costs with data.
-
-**Tool Marketplace/Registry** ⏱️ 16 hours
-- `selectools.marketplace.install_tool("weather-api")` for community tools
-- Searchable registry of pre-built tools
-- Version management and dependency resolution
-- **Status**: 🟡 Planned
-- **Why it matters**: Ecosystem growth and community contributions.
-
-#### **🎯 Provider Enhancements**
-
-**Universal Vision Support** ⏱️ 6 hours
-- Unified vision API across all providers (OpenAI, Anthropic, Gemini)
-- Automatic image preprocessing (resize, format conversion, optimization)
-- Multi-image support with spatial reasoning
-- **Status**: 🟡 Planned
-- **Why it matters**: Write vision code once, run on any provider.
-
-**Provider Auto-Selection** ⏱️ 8 hours
-- Automatic provider selection based on task requirements (vision, speed, cost)
-- Fallback chains (try OpenAI, fall back to Anthropic, then Gemini)
-- Load balancing across multiple API keys/accounts
-- **Status**: 🟡 Planned
-- **Why it matters**: Maximum reliability and cost optimization without manual switching.
-
-**Streaming Improvements** ⏱️ 6 hours
-- Server-Sent Events (SSE) support for web applications
-- WebSocket streaming for real-time bidirectional communication
-- Already have partial tool result streaming (see Priority 2)
-- **Status**: 🟡 Planned
-- **Why it matters**: Build more responsive UIs with richer streaming capabilities.
-
-**Local Model Support** ⏱️ 10 hours
-- Integration with Ollama, LM Studio, and other local inference servers
-- Quantization-aware provider selection
-- GPU utilization monitoring and optimization
-- **Status**: 🟡 Planned
-- **Why it matters**: Run powerful agents completely offline with local models.
-
-#### **🛡️ Production Reliability**
-
-**Advanced Error Recovery** ⏱️ 8 hours
-- Automatic retry with exponential backoff ✅ (already implemented)
-- Circuit breaker pattern for failing tools
-- Graceful degradation (disable failing tools, continue with others)
-- Dead letter queue for failed tool executions
-- **Status**: 🟡 Planned (partial ✅)
-- **Why it matters**: Keep agents running even when individual components fail.
-
-**Observability & Debugging** ⏱️ 12 hours
-- OpenTelemetry integration for distributed tracing
-- Structured logging with correlation IDs
-- Agent execution replay for debugging
-- Performance profiling and flame graphs
-- **Status**: 🟡 Planned
-- **Why it matters**: Debug production issues quickly with full visibility.
-
-**Rate Limiting & Quotas** ⏱️ 6 hours
-- Per-tool rate limiting and quota management
-- User-level quotas and fair usage policies
-- Automatic throttling and backpressure
-- **Status**: 🟡 Planned
-- **Why it matters**: Prevent abuse and control costs in multi-tenant environments.
-
-**Security Hardening** ⏱️ 10 hours
-- Tool sandboxing (execute in isolated environments)
-- Input validation and sanitization framework
-- Output filtering for sensitive data (PII, credentials)
-- Audit logging for compliance
-- **Status**: 🟡 Planned
-- **Why it matters**: Deploy agents safely in enterprise environments.
-
-#### **📊 Developer Experience**
-
-**Visual Agent Builder** ⏱️ 24 hours
-- Web-based UI for designing agent workflows
-- Drag-and-drop tool composition
-- Live testing and debugging
-- Export to Python code
-- **Status**: 🟡 Planned
-- **Why it matters**: Faster prototyping and easier onboarding for non-developers.
-
-**Enhanced Testing Framework** ⏱️ 10 hours
-- Snapshot testing for agent conversations
-- Property-based testing for tool schemas
-- Load testing and performance benchmarking
-- Mock provider with configurable behaviors (latency, errors, rate limits)
-- **Status**: 🟡 Planned
-- **Why it matters**: Catch bugs before production with comprehensive testing.
-
-**Documentation Generation** ⏱️ 8 hours
-- Auto-generate API docs from tool definitions
-- Interactive tool playground (try tools in browser)
-- Example generation from tool schemas
-- **Status**: 🟡 Planned
-- **Why it matters**: Better documentation with zero maintenance overhead.
-
-**Type Safety Improvements** ⏱️ 6 hours
-- Full type inference for tool parameters and returns
-- Runtime type checking with detailed error messages
-- Integration with Pydantic for complex schemas
-- **Status**: 🟡 Planned
-- **Why it matters**: Catch type errors at development time, not runtime.
-
-#### **🌐 Ecosystem Integration**
-
-**Framework Integrations** ⏱️ 12 hours
-- FastAPI/Flask middleware for agent endpoints
-- LangChain tool adapter (use LangChain tools in this library)
-- LlamaIndex integration for RAG workflows
-- **Status**: 🟡 Planned
-- **Why it matters**: Seamless integration with popular Python frameworks.
-
-**CRM & Business Tools** ⏱️ 16 hours
-- Pre-built tools for HubSpot, Salesforce, Close
-- Calendar integrations (Google Calendar, Outlook)
-- Communication tools (Slack, Discord, email)
-- **Status**: 🟡 Planned
-- **Why it matters**: Build business automation agents faster with ready-made integrations.
-
-**Data Source Connectors** ⏱️ 20 hours
-- SQL database connectors with query builders
-- Vector database integration (Pinecone, Weaviate, Chroma)
-- Cloud storage (S3, GCS, Azure Blob)
-- APIs (REST, GraphQL) with automatic schema discovery
-- **Status**: 🟡 Planned
-- **Why it matters**: Connect agents to your data without writing boilerplate.
-
-#### **🚀 Performance Optimizations**
-
-**Caching Layer** ⏱️ 10 hours
-- LRU cache for identical tool calls
-- Semantic caching (similar queries return cached results)
-- Distributed caching (Redis, Memcached)
-- Cache invalidation strategies
-- **Status**: 🟡 Planned
-- **Why it matters**: Reduce API costs and latency by 50-80% for repeated queries.
-
-**Batch Processing** ⏱️ 8 hours
-- Batch multiple user requests for efficient processing
-- Automatic request coalescing
-- Priority queues for urgent requests
-- **Status**: 🟡 Planned
-- **Why it matters**: Handle high-throughput scenarios efficiently.
-
-**Prompt Optimization** ⏱️ 6 hours
-- Automatic prompt compression while preserving meaning
-- Token-efficient tool schema serialization
-- Dynamic prompt templating based on provider capabilities
-- **Status**: 🟡 Planned
-- **Why it matters**: Reduce costs and latency with optimized prompts.
-
----
-
-### 📈 **Roadmap Summary**
-
-**Timeline:**
-- **v0.4.0** (Next 2 weeks): Priority 1 features - Conversation Memory, Async, Cost Tracking, Better Errors, Pre-built Tools
-- **v0.5.0** (Next month): Priority 2 features - Streaming Tools, Parallel Execution, Observability, Tool Composition
-- **v0.6.0+** (Next quarter): Priority 3 features - Advanced context, marketplace, visual builder
-
-**Estimated Effort:**
-- Priority 1: ~13 hours (1-2 days)
-- Priority 2: ~22 hours (3-4 days)
-- Priority 3: ~200+ hours (ongoing)
-
-**Status Legend:**
-- ✅ Implemented
-- 🟡 Planned
-- 🔵 In Progress
-- ⏸️ Deferred
-
-### Why These Improvements Matter
-
-While other libraries focus on basic tool calling, these enhancements will make this library the **most production-ready, developer-friendly, and feature-complete** tool-calling framework available:
-
-1. **LangChain**: Great ecosystem but heavy, complex, and opinionated. Our library stays lightweight while adding enterprise features.
-
-2. **OpenAI Function Calling**: Provider-locked and basic. We add provider agnosticism + advanced features.
-
-3. **Anthropic Tool Use**: Same provider lock-in issue. We provide a unified interface.
-
-4. **Haystack**: Focused on RAG/search. We're tool-calling specialists with broader scope.
-
-5. **AutoGPT/BabyAGI**: Autonomous agents but limited tool infrastructure. We provide the robust foundation they need.
-
-Our roadmap focuses on **production reliability**, **developer experience**, and **real-world use cases** that other libraries overlook. We're building the tool-calling library you wish existed.
-
-### 🤝 **Contributing to the Roadmap**
-
-Want to help build these features? See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. Priority 1 features are great for first-time contributors!
-
-**High-impact contributions we'd love:**
-- Implement any Priority 1 feature (2-4 hours each)
-- Add tools to the pre-built toolbox
-- Write examples and tutorials
-- Improve documentation
-- Report bugs and suggest improvements
 
 See the full comparison with LangChain in [docs/LANGCHAIN_COMPARISON.md](docs/LANGCHAIN_COMPARISON.md).
