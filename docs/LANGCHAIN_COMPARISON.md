@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-**Selectools** is a lightweight, production-ready tool-calling library focused on simplicity and reliability.  
+**Selectools** is a lightweight, production-ready tool-calling library focused on simplicity and reliability.
 **LangChain** is a comprehensive framework with a massive ecosystem but higher complexity.
 
 **TL;DR:** Selectools is to LangChain what Flask is to Django, or Express is to NestJS.
@@ -532,8 +532,8 @@ providers = [
 ]
 ```
 
-**Total required:** 2 packages  
-**Total optional:** 2 packages  
+**Total required:** 2 packages
+**Total optional:** 2 packages
 **Install size:** ~50MB
 
 ### LangChain Dependencies
@@ -553,8 +553,8 @@ dependencies = [
 ]
 ```
 
-**Total required:** 50+ packages  
-**Total optional:** 100+ packages  
+**Total required:** 50+ packages
+**Total optional:** 100+ packages
 **Install size:** ~500MB+
 
 **Winner: Selectools** - 10x fewer dependencies
@@ -771,7 +771,7 @@ print(f"Memory: {peak / 1024 / 1024:.1f}MB")
 
 ## Final Verdict
 
-### Choose Selectools if you want:
+### Choose Selectools if you want
 
 - ✅ **Simplicity** - Easy to learn and maintain
 - ✅ **Reliability** - Production-ready error handling
@@ -780,7 +780,7 @@ print(f"Memory: {peak / 1024 / 1024:.1f}MB")
 - ✅ **Testing** - Offline development and testing
 - ✅ **Provider agnostic** - True abstraction
 
-### Choose LangChain if you need:
+### Choose LangChain if you need
 
 - ✅ **Ecosystem** - 100+ pre-built integrations
 - ✅ **RAG pipelines** - Advanced document processing
@@ -830,8 +830,8 @@ response = agent.run([
 print(response.content)
 ```
 
-**Lines of code: 28**  
-**Dependencies: 2**  
+**Lines of code: 28**
+**Dependencies: 2**
 **Complexity: Low**
 
 #### LangChain (More Complex)
@@ -892,8 +892,8 @@ response = agent.run("I can't log in to my account")
 print(response)
 ```
 
-**Lines of code: 52**  
-**Dependencies: 50+**  
+**Lines of code: 52**
+**Dependencies: 50+**
 **Complexity: High**
 
 **Winner: Selectools** - Half the code, clearer intent, easier to maintain

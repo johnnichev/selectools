@@ -50,7 +50,7 @@ class GeminiProvider(Provider):
     ) -> str:
         """
         Call Gemini's generate_content API for a non-streaming completion.
-        
+
         Args:
             model: Model name (e.g., "gemini-1.5-flash")
             system_prompt: System-level instructions
@@ -58,20 +58,20 @@ class GeminiProvider(Provider):
             temperature: Sampling temperature (0.0-1.0)
             max_tokens: Maximum tokens to generate
             timeout: Optional request timeout in seconds
-            
+
         Returns:
             The model's response text
-            
+
         Raises:
             ProviderError: If the API call fails
         """
         model_obj = self._genai.GenerativeModel(model or self.default_model)
-        
+
         # Build a single prompt that includes system instructions and conversation
         prompt_parts = self._build_prompt(system_prompt, messages)
-        
+
         request_options = {"timeout": timeout} if timeout is not None else None
-        
+
         try:
             response = model_obj.generate_content(
                 prompt_parts,
@@ -96,15 +96,15 @@ class GeminiProvider(Provider):
     ) -> Iterable[str]:
         """
         Stream responses from Gemini's generate_content API.
-        
+
         Yields text chunks as they arrive from the API.
         """
         model_obj = self._genai.GenerativeModel(model or self.default_model)
-        
+
         prompt_parts = self._build_prompt(system_prompt, messages)
-        
+
         request_options = {"timeout": timeout} if timeout is not None else None
-        
+
         try:
             stream = model_obj.generate_content(
                 prompt_parts,
@@ -123,7 +123,7 @@ class GeminiProvider(Provider):
     def _build_prompt(self, system_prompt: str, messages: List[Message]):
         """
         Build a complete prompt for Gemini including system instructions and messages.
-        
+
         Gemini doesn't have a system role, so we prepend instructions to the conversation.
         """
         conversation = [system_prompt]
@@ -145,7 +145,7 @@ class GeminiProvider(Provider):
     ) -> str:
         """
         Async version of complete() using ThreadPoolExecutor.
-        
+
         Note: Gemini SDK doesn't natively support async, so we run the
         sync method in a thread pool executor.
         """
@@ -160,7 +160,7 @@ class GeminiProvider(Provider):
                     temperature=temperature,
                     max_tokens=max_tokens,
                     timeout=timeout,
-                )
+                ),
             )
         return result
 
@@ -176,12 +176,12 @@ class GeminiProvider(Provider):
     ):
         """
         Async version of stream() using ThreadPoolExecutor.
-        
+
         Note: Gemini SDK doesn't natively support async streaming, so we
         run chunks in a thread pool executor.
         """
         loop = asyncio.get_event_loop()
-        
+
         # Create a sync generator and wrap it for async iteration
         sync_stream = self.stream(
             model=model,
@@ -191,7 +191,7 @@ class GeminiProvider(Provider):
             max_tokens=max_tokens,
             timeout=timeout,
         )
-        
+
         with ThreadPoolExecutor() as executor:
             for chunk in sync_stream:
                 # Yield each chunk (already in main thread, no executor needed)
@@ -199,4 +199,3 @@ class GeminiProvider(Provider):
 
 
 __all__ = ["GeminiProvider"]
-

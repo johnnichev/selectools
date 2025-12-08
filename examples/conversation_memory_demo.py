@@ -30,44 +30,44 @@ def remember_fact(fact: str) -> str:
 def main():
     # Create a conversation memory with a limit of 20 messages
     memory = ConversationMemory(max_messages=20)
-    
+
     # Create an agent with memory
     agent = Agent(
         tools=[get_info, remember_fact],
         provider=OpenAIProvider(default_model="gpt-4o"),
         config=AgentConfig(max_iterations=5, temperature=0.7),
-        memory=memory  # Pass memory to agent
+        memory=memory,  # Pass memory to agent
     )
-    
+
     print("=== Multi-Turn Conversation Demo ===\n")
-    
+
     # Turn 1: Ask about Python
     print("Turn 1: User asks about Python")
     response1 = agent.run([Message(role=Role.USER, content="Tell me about Python")])
     print(f"Agent: {response1.content}\n")
     print(f"Memory now has {len(memory)} messages\n")
-    
+
     # Turn 2: Follow-up question (memory maintains context)
     print("Turn 2: Follow-up question")
     response2 = agent.run([Message(role=Role.USER, content="What about Selectools?")])
     print(f"Agent: {response2.content}\n")
     print(f"Memory now has {len(memory)} messages\n")
-    
+
     # Turn 3: Reference previous conversation
     print("Turn 3: Reference previous context")
-    response3 = agent.run([
-        Message(role=Role.USER, content="Can you compare the two things we just discussed?")
-    ])
+    response3 = agent.run(
+        [Message(role=Role.USER, content="Can you compare the two things we just discussed?")]
+    )
     print(f"Agent: {response3.content}\n")
     print(f"Memory now has {len(memory)} messages\n")
-    
+
     # Show full conversation history
     print("=== Full Conversation History ===")
     for i, msg in enumerate(memory.get_history(), 1):
         role_name = msg.role.value.upper()
         content_preview = msg.content[:80] + "..." if len(msg.content) > 80 else msg.content
         print(f"{i}. {role_name}: {content_preview}")
-    
+
     # Demonstrate memory serialization
     print("\n=== Memory Serialization ===")
     memory_dict = memory.to_dict()
@@ -78,10 +78,10 @@ def main():
 
 if __name__ == "__main__":
     import os
+
     if not os.getenv("OPENAI_API_KEY"):
         print("Please set OPENAI_API_KEY environment variable")
         print("Example: export OPENAI_API_KEY='your-key-here'")
         exit(1)
-    
-    main()
 
+    main()

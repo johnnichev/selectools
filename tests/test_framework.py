@@ -10,8 +10,8 @@ import json
 import os
 import sys
 import types
-from io import StringIO
 from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 from typing import Dict
 
@@ -24,14 +24,14 @@ if str(SRC_DIR) not in sys.path:
 
 import selectools
 from agent import Agent, AgentConfig, Message, Role, Tool, ToolParameter
-from selectools.tools import ToolRegistry
+from selectools.cli import _default_tools, build_parser, run_agent
 from selectools.memory import ConversationMemory
 from selectools.parser import ToolCallParser
-from selectools.providers.base import ProviderError
 from selectools.providers.anthropic_provider import AnthropicProvider
+from selectools.providers.base import ProviderError
 from selectools.providers.gemini_provider import GeminiProvider
 from selectools.providers.stubs import LocalProvider
-from selectools.cli import build_parser, run_agent, _default_tools
+from selectools.tools import ToolRegistry
 
 
 class FakeProvider:
@@ -44,7 +44,9 @@ class FakeProvider:
         self.responses = responses
         self.calls = 0
 
-    def complete(self, *, model, system_prompt, messages, temperature=0.0, max_tokens=1000, timeout=None):  # noqa: D401
+    def complete(
+        self, *, model, system_prompt, messages, temperature=0.0, max_tokens=1000, timeout=None
+    ):  # noqa: D401
         response = self.responses[min(self.calls, len(self.responses) - 1)]
         self.calls += 1
         return response
@@ -59,7 +61,9 @@ class FakeStreamingProvider(FakeProvider):
         super().__init__(responses=[final_response])
         self.stream_chunks = stream_chunks
 
-    def stream(self, *, model, system_prompt, messages, temperature=0.0, max_tokens=1000, timeout=None):
+    def stream(
+        self, *, model, system_prompt, messages, temperature=0.0, max_tokens=1000, timeout=None
+    ):
         for chunk in self.stream_chunks:
             yield chunk
 
@@ -88,7 +92,12 @@ def test_message_creation_and_image_encoding():
 
 def test_tool_schema_and_validation():
     param = ToolParameter(name="query", param_type=str, description="Search query", required=True)
-    tool = Tool(name="search", description="Search the web", parameters=[param], function=lambda query: query)
+    tool = Tool(
+        name="search",
+        description="Search the web",
+        parameters=[param],
+        function=lambda query: query,
+    )
 
     schema = tool.schema()
     assert schema["name"] == "search"
@@ -105,29 +114,29 @@ def test_tool_schema_and_validation():
 def test_conversation_memory_basic():
     """Test basic ConversationMemory operations."""
     memory = ConversationMemory(max_messages=5)
-    
+
     # Test empty memory
     assert len(memory) == 0
     assert memory.get_history() == []
-    
+
     # Add single message
     msg1 = Message(role=Role.USER, content="Hello")
     memory.add(msg1)
     assert len(memory) == 1
     assert memory.get_history()[0].content == "Hello"
-    
+
     # Add multiple messages
     msg2 = Message(role=Role.ASSISTANT, content="Hi there")
     msg3 = Message(role=Role.USER, content="How are you?")
     memory.add_many([msg2, msg3])
     assert len(memory) == 3
-    
+
     # Test get_recent
     recent = memory.get_recent(2)
     assert len(recent) == 2
     assert recent[0].content == "Hi there"
     assert recent[1].content == "How are you?"
-    
+
     # Test clear
     memory.clear()
     assert len(memory) == 0
@@ -136,7 +145,7 @@ def test_conversation_memory_basic():
 def test_conversation_memory_max_messages():
     """Test that ConversationMemory enforces max_messages limit."""
     memory = ConversationMemory(max_messages=3)
-    
+
     # Add more messages than the limit
     messages = [
         Message(role=Role.USER, content="Message 1"),
@@ -146,7 +155,7 @@ def test_conversation_memory_max_messages():
         Message(role=Role.USER, content="Message 5"),
     ]
     memory.add_many(messages)
-    
+
     # Should only keep the last 3 messages
     assert len(memory) == 3
     history = memory.get_history()
@@ -158,15 +167,10 @@ def test_conversation_memory_max_messages():
 def test_conversation_memory_with_agent():
     """Test Agent integration with ConversationMemory."""
     memory = ConversationMemory(max_messages=10)
-    tool = Tool(
-        name="echo",
-        description="Echo the input",
-        parameters=[],
-        function=lambda: "echoed"
-    )
+    tool = Tool(name="echo", description="Echo the input", parameters=[], function=lambda: "echoed")
     provider = FakeProvider(responses=["Done with that"])
     agent = Agent(tools=[tool], provider=provider, memory=memory)
-    
+
     # First turn
     response1 = agent.run([Message(role=Role.USER, content="Hello")])
     assert response1.content == "Done with that"
@@ -175,7 +179,7 @@ def test_conversation_memory_with_agent():
     assert memory.get_history()[0].role == Role.USER
     assert memory.get_history()[0].content == "Hello"
     assert memory.get_history()[1].role == Role.ASSISTANT
-    
+
     # Second turn - memory should persist
     response2 = agent.run([Message(role=Role.USER, content="Hi again")])
     assert len(memory) == 4  # 2 previous + 2 new
@@ -187,20 +191,15 @@ def test_conversation_memory_with_agent():
 def test_conversation_memory_persistence_across_turns():
     """Test that memory persists across multiple agent turns."""
     memory = ConversationMemory(max_messages=20)
-    tool = Tool(
-        name="counter",
-        description="Count",
-        parameters=[],
-        function=lambda: "counted"
-    )
+    tool = Tool(name="counter", description="Count", parameters=[], function=lambda: "counted")
     provider = FakeProvider(responses=["Response 1", "Response 2", "Response 3"])
     agent = Agent(tools=[tool], provider=provider, memory=memory)
-    
+
     # Multiple turns
     agent.run([Message(role=Role.USER, content="Turn 1")])
     agent.run([Message(role=Role.USER, content="Turn 2")])
     agent.run([Message(role=Role.USER, content="Turn 3")])
-    
+
     # Should have all 6 messages (3 USER + 3 ASSISTANT)
     assert len(memory) == 6
     history = memory.get_history()
@@ -213,7 +212,7 @@ def test_conversation_memory_to_dict():
     """Test ConversationMemory serialization."""
     memory = ConversationMemory(max_messages=5)
     memory.add(Message(role=Role.USER, content="Test"))
-    
+
     data = memory.to_dict()
     assert data["max_messages"] == 5
     assert data["message_count"] == 1
@@ -223,15 +222,10 @@ def test_conversation_memory_to_dict():
 
 def test_conversation_memory_without_memory():
     """Test that Agent works without memory (backward compatibility)."""
-    tool = Tool(
-        name="test",
-        description="Test",
-        parameters=[],
-        function=lambda: "ok"
-    )
+    tool = Tool(name="test", description="Test", parameters=[], function=lambda: "ok")
     provider = FakeProvider(responses=["Done"])
     agent = Agent(tools=[tool], provider=provider)  # No memory
-    
+
     # Should work as before
     response = agent.run([Message(role=Role.USER, content="Test")])
     assert response.content == "Done"
@@ -335,7 +329,9 @@ def test_agent_streaming_handler_and_fallback():
     def handler(chunk: str):
         captured.append(chunk)
 
-    provider = FakeStreamingProvider(stream_chunks=["Hello", " ", "world"], final_response="Hello world")
+    provider = FakeStreamingProvider(
+        stream_chunks=["Hello", " ", "world"], final_response="Hello world"
+    )
     noop_tool = Tool(
         name="noop",
         description="no-op",
@@ -354,7 +350,9 @@ def test_agent_streaming_handler_and_fallback():
 
 def test_agent_retries_on_provider_error():
     class FlakyProvider(FakeProvider):
-        def complete(self, *, model, system_prompt, messages, temperature=0.0, max_tokens=1000, timeout=None):  # noqa: D401
+        def complete(
+            self, *, model, system_prompt, messages, temperature=0.0, max_tokens=1000, timeout=None
+        ):  # noqa: D401
             if self.calls == 0:
                 self.calls += 1
                 raise ProviderError("temporary failure")
@@ -420,7 +418,9 @@ def test_anthropic_provider_with_mocked_client():
         @staticmethod
         def create(**kwargs):
             if kwargs.get("stream"):
-                event = types.SimpleNamespace(type="content_block_delta", delta=types.SimpleNamespace(text="hello anthropic"))
+                event = types.SimpleNamespace(
+                    type="content_block_delta", delta=types.SimpleNamespace(text="hello anthropic")
+                )
                 return [event]
             return types.SimpleNamespace(content=[fake_resp_block])
 
@@ -432,7 +432,9 @@ def test_anthropic_provider_with_mocked_client():
         def __init__(self, api_key=None, base_url=None):
             self.messages = FakeMessages()
 
-    fake_module = types.SimpleNamespace(Anthropic=FakeAnthropicClient, AsyncAnthropic=FakeAsyncAnthropicClient)
+    fake_module = types.SimpleNamespace(
+        Anthropic=FakeAnthropicClient, AsyncAnthropic=FakeAsyncAnthropicClient
+    )
     sys.modules["anthropic"] = fake_module
     try:
         provider = AnthropicProvider()
@@ -471,7 +473,9 @@ def test_gemini_provider_with_mocked_client():
         def __init__(self, model):
             self.model = model
 
-        def generate_content(self, prompt_parts, temperature, max_output_tokens, request_options=None, stream=False):
+        def generate_content(
+            self, prompt_parts, temperature, max_output_tokens, request_options=None, stream=False
+        ):
             if stream:
                 return [FakeStreamChunk("stream-1"), FakeStreamChunk("stream-2")]
             return FakeResponse("gemini-response")
@@ -540,14 +544,14 @@ def test_cli_streaming_with_local_provider():
 async def test_async_agent_basic():
     """Test basic async agent execution."""
     import asyncio
-    
+
     @selectools.tool(description="Async echo tool")
     async def async_echo(text: str) -> str:
         await asyncio.sleep(0.01)  # Simulate async work
         return f"async_echoed: {text}"
-    
+
     agent = Agent(tools=[async_echo], provider=LocalProvider())
-    
+
     response = await agent.arun([Message(role=Role.USER, content="Test async")])
     assert response.role == Role.ASSISTANT
     assert "async_echoed" in response.content or "local provider" in response.content.lower()
@@ -556,36 +560,36 @@ async def test_async_agent_basic():
 async def test_async_tool_execution():
     """Test that both sync and async tools work with async agent."""
     import asyncio
-    
+
     def sync_func(x: int) -> str:
         return f"sync:{x}"
-    
+
     async def async_func(x: int) -> str:
         await asyncio.sleep(0.01)
         return f"async:{x}"
-    
+
     sync_tool = Tool(
         name="sync",
         description="Sync tool",
         parameters=[ToolParameter(name="x", param_type=int, description="Number")],
         function=sync_func,
     )
-    
+
     async_tool = Tool(
         name="async",
         description="Async tool",
         parameters=[ToolParameter(name="x", param_type=int, description="Number")],
         function=async_func,
     )
-    
+
     # Test individual tool execution
     assert sync_tool.is_async is False
     assert async_tool.is_async is True
-    
+
     # Test async execution of both
     sync_result = await sync_tool.aexecute({"x": 5})
     assert sync_result == "sync:5"
-    
+
     async_result = await async_tool.aexecute({"x": 10})
     assert async_result == "async:10"
 
@@ -593,25 +597,25 @@ async def test_async_tool_execution():
 async def test_async_with_memory():
     """Test async agent with conversation memory."""
     from selectools.memory import ConversationMemory
-    
+
     memory = ConversationMemory(max_messages=10)
-    
+
     def simple_tool(x: int) -> str:
         return str(x * 2)
-    
+
     tool = Tool(
         name="double",
         description="Double a number",
         parameters=[ToolParameter(name="x", param_type=int, description="Number")],
         function=simple_tool,
     )
-    
+
     agent = Agent(tools=[tool], provider=LocalProvider(), memory=memory)
-    
+
     # First turn
     response1 = await agent.arun([Message(role=Role.USER, content="Hello 1")])
     assert len(memory) >= 1
-    
+
     # Second turn
     response2 = await agent.arun([Message(role=Role.USER, content="Hello 2")])
     assert len(memory) >= 2
@@ -621,18 +625,18 @@ async def test_async_provider_fallback():
     """Test that agent falls back to sync when provider doesn't support async."""
     # LocalProvider doesn't have async support
     provider = LocalProvider()
-    assert not getattr(provider, 'supports_async', False)
-    
+    assert not getattr(provider, "supports_async", False)
+
     def simple_tool() -> str:
         return "done"
-    
+
     tool = Tool(
         name="test",
         description="Test tool",
         parameters=[],
         function=simple_tool,
     )
-    
+
     agent = Agent(tools=[tool], provider=provider)
     response = await agent.arun([Message(role=Role.USER, content="test")])
     assert response.role == Role.ASSISTANT
@@ -641,19 +645,15 @@ async def test_async_provider_fallback():
 async def test_async_multiple_iterations():
     """Test async agent with multiple tool call iterations."""
     call_count = 0
-    
+
     @selectools.tool(description="Counter tool")
     async def counter() -> str:
         nonlocal call_count
         call_count += 1
         return f"call_{call_count}"
-    
-    agent = Agent(
-        tools=[counter], 
-        provider=LocalProvider(),
-        config=AgentConfig(max_iterations=3)
-    )
-    
+
+    agent = Agent(tools=[counter], provider=LocalProvider(), config=AgentConfig(max_iterations=3))
+
     response = await agent.arun([Message(role=Role.USER, content="Count")])
     assert response.role == Role.ASSISTANT
 
@@ -661,36 +661,37 @@ async def test_async_multiple_iterations():
 def run_async_test(test_func):
     """Helper to run async tests."""
     import asyncio
+
     asyncio.run(test_func())
 
 
 if __name__ == "__main__":
     # Simple runner for environments without pytest
     all_tests = [
-    test_role_enum,
-    test_message_creation_and_image_encoding,
-    test_tool_schema_and_validation,
-    test_conversation_memory_basic,
-    test_conversation_memory_max_messages,
-    test_conversation_memory_with_agent,
-    test_conversation_memory_persistence_across_turns,
-    test_conversation_memory_to_dict,
-    test_conversation_memory_without_memory,
-    test_tool_decorator_and_registry_infer_schema,
-    test_parser_handles_fenced_blocks,
-    test_parser_handles_multiple_candidates_and_mixed_text,
-    test_parser_respects_size_limit,
-    test_parser_handles_mixed_text_json,
-    test_agent_executes_tool_and_returns_final_message,
-    test_agent_streaming_handler_and_fallback,
-    test_agent_retries_on_provider_error,
-    test_local_provider_streams_tokens,
-    test_anthropic_and_gemini_require_api_keys,
-    test_anthropic_provider_with_mocked_client,
-    test_gemini_provider_with_mocked_client,
-    test_cli_streaming_with_local_provider,
+        test_role_enum,
+        test_message_creation_and_image_encoding,
+        test_tool_schema_and_validation,
+        test_conversation_memory_basic,
+        test_conversation_memory_max_messages,
+        test_conversation_memory_with_agent,
+        test_conversation_memory_persistence_across_turns,
+        test_conversation_memory_to_dict,
+        test_conversation_memory_without_memory,
+        test_tool_decorator_and_registry_infer_schema,
+        test_parser_handles_fenced_blocks,
+        test_parser_handles_multiple_candidates_and_mixed_text,
+        test_parser_respects_size_limit,
+        test_parser_handles_mixed_text_json,
+        test_agent_executes_tool_and_returns_final_message,
+        test_agent_streaming_handler_and_fallback,
+        test_agent_retries_on_provider_error,
+        test_local_provider_streams_tokens,
+        test_anthropic_and_gemini_require_api_keys,
+        test_anthropic_provider_with_mocked_client,
+        test_gemini_provider_with_mocked_client,
+        test_cli_streaming_with_local_provider,
     ]
-    
+
     # Async tests run separately
     async_tests = [
         test_async_agent_basic,
@@ -699,7 +700,7 @@ if __name__ == "__main__":
         test_async_provider_fallback,
         test_async_multiple_iterations,
     ]
-    
+
     failures = 0
     for test in all_tests:
         try:
@@ -708,7 +709,7 @@ if __name__ == "__main__":
         except AssertionError as exc:  # noqa: BLE001
             failures += 1
             print(f"✗ {test.__name__}: {exc}")
-    
+
     # Run async tests
     for test in async_tests:
         try:
@@ -717,6 +718,6 @@ if __name__ == "__main__":
         except AssertionError as exc:  # noqa: BLE001
             failures += 1
             print(f"✗ {test.__name__}: {exc}")
-    
+
     if failures:
         raise SystemExit(1)

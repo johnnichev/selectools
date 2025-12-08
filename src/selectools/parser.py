@@ -41,9 +41,13 @@ class ToolCallParser:
             if not tool_data:
                 continue
             tool_name = tool_data.get("tool_name") or tool_data.get("tool") or tool_data.get("name")
-            parameters: Dict[str, Any] = tool_data.get("parameters") or tool_data.get("params") or {}
+            parameters: Dict[str, Any] = (
+                tool_data.get("parameters") or tool_data.get("params") or {}
+            )
             if tool_name:
-                return ParseResult(tool_call=ToolCall(tool_name=tool_name, parameters=parameters), raw_text=text)
+                return ParseResult(
+                    tool_call=ToolCall(tool_name=tool_name, parameters=parameters), raw_text=text
+                )
         return ParseResult(tool_call=None, raw_text=text)
 
     def _extract_candidate_blocks(self, text: str) -> List[str]:

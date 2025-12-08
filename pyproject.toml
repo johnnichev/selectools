@@ -35,7 +35,17 @@ Issues = "https://github.com/johnnichev/selectools/issues"
 Documentation = "https://github.com/johnnichev/selectools#readme"
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0.0", "build>=1.2.1", "twine>=5.0.0"]
+dev = [
+    "pytest>=7.0.0",
+    "build>=1.2.1",
+    "twine>=5.0.0",
+    "pre-commit>=3.6.0",
+    "black>=24.1.0",
+    "isort>=5.13.0",
+    "flake8>=7.0.0",
+    "mypy>=1.8.0",
+    "bandit>=1.7.0",
+]
 
 [project.scripts]
 selectools = "selectools.cli:main"
@@ -43,3 +53,48 @@ selectools = "selectools.cli:main"
 [tool.setuptools]
 package-dir = {"" = "src"}
 packages = ["selectools", "selectools.providers"]
+
+[tool.black]
+line-length = 100
+target-version = ['py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+exclude = [
+    "tests/",
+    "examples/",
+    "build/",
+    "dist/",
+]
+
+[tool.bandit]
+exclude_dirs = ["tests", "examples", "scripts"]
+skips = ["B101", "B601", "B602"]  # Skip assert_used, shell, and subprocess checks
+targets = ["src/"]

@@ -28,7 +28,9 @@ class OpenAIProvider(Provider):
         try:
             from openai import AsyncOpenAI, OpenAI
         except ImportError as exc:
-            raise ProviderError("openai package not installed. Install with `pip install openai`.") from exc
+            raise ProviderError(
+                "openai package not installed. Install with `pip install openai`."
+            ) from exc
 
         self._client = OpenAI(api_key=self.api_key)
         self._async_client = AsyncOpenAI(api_key=self.api_key)
@@ -90,7 +92,9 @@ class OpenAIProvider(Provider):
                     continue
                 content = delta.content
                 if isinstance(content, list):
-                    content = "".join([part.text for part in content if getattr(part, "text", None)])
+                    content = "".join(
+                        [part.text for part in content if getattr(part, "text", None)]
+                    )
                 yield content
             except Exception as exc:  # noqa: BLE001
                 raise ProviderError(f"OpenAI stream parsing failed: {exc}") from exc
@@ -179,7 +183,9 @@ class OpenAIProvider(Provider):
                     continue
                 content = delta.content
                 if isinstance(content, list):
-                    content = "".join([part.text for part in content if getattr(part, "text", None)])
+                    content = "".join(
+                        [part.text for part in content if getattr(part, "text", None)]
+                    )
                 yield content
             except Exception as exc:
                 raise ProviderError(f"OpenAI async stream parsing failed: {exc}") from exc

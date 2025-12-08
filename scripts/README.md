@@ -154,4 +154,3 @@ git push origin v0.3.1
 
 - **`chat.py`**: Interactive chat demo with vision support
 - **`smoke_cli.py`**: Quick smoke tests for different providers
-

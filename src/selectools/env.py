@@ -23,7 +23,7 @@ def load_env_if_present(candidate_paths: Iterable[Path]) -> None:
                 if key and key not in os.environ:
                     os.environ[key] = value
             break
-        except Exception:
+        except Exception:  # nosec B112
             # Fail quietly; explicit environment variables take precedence.
             continue
 

@@ -14,7 +14,8 @@ Requirements:
 
 import asyncio
 import time
-from selectools import Agent, AgentConfig, Message, Role, tool, ConversationMemory, OpenAIProvider
+
+from selectools import Agent, AgentConfig, ConversationMemory, Message, OpenAIProvider, Role, tool
 
 
 # Example 1: Async Tool Functions
@@ -42,19 +43,19 @@ def calculate_sum(a: int, b: int) -> str:
 async def example_basic_async():
     """Basic async agent usage."""
     print("\n=== Example 1: Basic Async Agent ===")
-    
+
     agent = Agent(
         tools=[fetch_weather, calculate_sum],
         provider=OpenAIProvider(),
-        config=AgentConfig(model="gpt-4o-mini", max_iterations=3)
+        config=AgentConfig(model="gpt-4o-mini", max_iterations=3),
     )
-    
+
     start = time.time()
-    response = await agent.arun([
-        Message(role=Role.USER, content="What's the weather in San Francisco?")
-    ])
+    response = await agent.arun(
+        [Message(role=Role.USER, content="What's the weather in San Francisco?")]
+    )
     elapsed = time.time() - start
-    
+
     print(f"Response: {response.content}")
     print(f"Time taken: {elapsed:.2f}s")
 
@@ -62,29 +63,29 @@ async def example_basic_async():
 async def example_concurrent_agents():
     """Run multiple agents concurrently."""
     print("\n=== Example 2: Concurrent Agent Execution ===")
-    
+
     agent1 = Agent(
         tools=[fetch_weather],
         provider=OpenAIProvider(),
-        config=AgentConfig(model="gpt-4o-mini", max_iterations=2)
+        config=AgentConfig(model="gpt-4o-mini", max_iterations=2),
     )
-    
+
     agent2 = Agent(
         tools=[get_user_info],
         provider=OpenAIProvider(),
-        config=AgentConfig(model="gpt-4o-mini", max_iterations=2)
+        config=AgentConfig(model="gpt-4o-mini", max_iterations=2),
     )
-    
+
     start = time.time()
-    
+
     # Run both agents concurrently
     results = await asyncio.gather(
         agent1.arun([Message(role=Role.USER, content="Weather in London?")]),
         agent2.arun([Message(role=Role.USER, content="Get info for user_123")]),
     )
-    
+
     elapsed = time.time() - start
-    
+
     print(f"Agent 1 response: {results[0].content}")
     print(f"Agent 2 response: {results[1].content}")
     print(f"Total time (concurrent): {elapsed:.2f}s")
@@ -93,27 +94,25 @@ async def example_concurrent_agents():
 async def example_async_with_memory():
     """Async agent with conversation memory."""
     print("\n=== Example 3: Async Agent with Memory ===")
-    
+
     memory = ConversationMemory(max_messages=20)
-    
+
     agent = Agent(
         tools=[fetch_weather, calculate_sum],
         provider=OpenAIProvider(),
         config=AgentConfig(model="gpt-4o-mini", max_iterations=3),
         memory=memory,
     )
-    
+
     # Turn 1
-    response1 = await agent.arun([
-        Message(role=Role.USER, content="What's 15 + 27?")
-    ])
+    response1 = await agent.arun([Message(role=Role.USER, content="What's 15 + 27?")])
     print(f"Turn 1: {response1.content}")
     print(f"Memory size: {len(memory)} messages")
-    
+
     # Turn 2 - memory persists
-    response2 = await agent.arun([
-        Message(role=Role.USER, content="Now check the weather in Tokyo")
-    ])
+    response2 = await agent.arun(
+        [Message(role=Role.USER, content="Now check the weather in Tokyo")]
+    )
     print(f"Turn 2: {response2.content}")
     print(f"Memory size: {len(memory)} messages")
 
@@ -121,24 +120,20 @@ async def example_async_with_memory():
 async def example_async_streaming():
     """Async agent with streaming responses."""
     print("\n=== Example 4: Async Agent with Streaming ===")
-    
+
     agent = Agent(
         tools=[fetch_weather],
         provider=OpenAIProvider(),
-        config=AgentConfig(
-            model="gpt-4o-mini",
-            max_iterations=2,
-            stream=True  # Enable streaming
-        )
+        config=AgentConfig(model="gpt-4o-mini", max_iterations=2, stream=True),  # Enable streaming
     )
-    
+
     def stream_handler(chunk: str):
         print(chunk, end="", flush=True)
-    
+
     print("Streaming response: ", end="")
     response = await agent.arun(
         [Message(role=Role.USER, content="What's the weather in Paris?")],
-        stream_handler=stream_handler
+        stream_handler=stream_handler,
     )
     print()  # New line after streaming
 
@@ -146,9 +141,10 @@ async def example_async_streaming():
 async def example_fastapi_integration():
     """Example showing how to use async agent in FastAPI."""
     print("\n=== Example 5: FastAPI Integration Pattern ===")
-    
+
     # This shows the pattern - not running actual FastAPI here
-    print("""
+    print(
+        """
 # FastAPI Integration Example:
 
 from fastapi import FastAPI
@@ -167,30 +163,31 @@ async def chat(message: str):
         tools=[fetch_data],
         provider=OpenAIProvider()
     )
-    
+
     response = await agent.arun([
         Message(role=Role.USER, content=message)
     ])
-    
+
     return {"response": response.content}
-    """)
+    """
+    )
 
 
 async def main():
     """Run all examples."""
     print("Async Selectools Examples")
     print("=" * 50)
-    
+
     try:
         await example_basic_async()
         await example_concurrent_agents()
         await example_async_with_memory()
         await example_async_streaming()
         await example_fastapi_integration()
-        
+
         print("\n" + "=" * 50)
         print("All examples completed!")
-        
+
     except Exception as e:
         print(f"\nError: {e}")
         print("\nMake sure OPENAI_API_KEY is set in your environment.")
@@ -198,4 +195,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

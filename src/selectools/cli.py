@@ -14,14 +14,14 @@ import json
 from typing import Callable, Dict, List, Optional
 
 from .agent import Agent, AgentConfig
-from .prompt import PromptBuilder
 from .parser import ToolCallParser
-from .types import Message, Role
-from .tools import Tool, ToolParameter, ToolRegistry
-from .providers.openai_provider import OpenAIProvider
+from .prompt import PromptBuilder
 from .providers.anthropic_provider import AnthropicProvider
 from .providers.gemini_provider import GeminiProvider
+from .providers.openai_provider import OpenAIProvider
 from .providers.stubs import LocalProvider
+from .tools import Tool, ToolParameter, ToolRegistry
+from .types import Message, Role
 
 
 def _build_provider(name: str, model: str):
@@ -139,33 +139,61 @@ def build_parser() -> argparse.ArgumentParser:
     list_parser.set_defaults(func="list")
 
     run_parser = subparsers.add_parser("run", help="Run the agent once")
-    run_parser.add_argument("--provider", default="openai", help="Provider name (openai|anthropic|gemini|local)")
+    run_parser.add_argument(
+        "--provider", default="openai", help="Provider name (openai|anthropic|gemini|local)"
+    )
     run_parser.add_argument("--model", default="gpt-4o", help="Model name for the provider")
     run_parser.add_argument("--prompt", required=True, help="User prompt")
     run_parser.add_argument("--image", help="Optional image path for vision requests")
     run_parser.add_argument("--tool", help="Restrict to a single tool by name")
     run_parser.add_argument("--temperature", type=float, default=0.0, help="Sampling temperature")
-    run_parser.add_argument("--max-tokens", type=int, default=500, help="Max tokens for the provider")
+    run_parser.add_argument(
+        "--max-tokens", type=int, default=500, help="Max tokens for the provider"
+    )
     run_parser.add_argument("--max-iterations", type=int, default=4, help="Max tool iterations")
     run_parser.add_argument("--verbose", action="store_true", help="Enable verbose agent logging")
-    run_parser.add_argument("--stream", action="store_true", help="Stream provider output to stdout")
-    run_parser.add_argument("--dry-run", action="store_true", help="Print the composed system prompt and exit")
-    run_parser.add_argument("--timeout", type=float, default=30.0, help="Request timeout in seconds")
-    run_parser.add_argument("--retries", type=int, default=2, help="Number of provider retries on failure")
-    run_parser.add_argument("--backoff", type=float, default=1.0, help="Backoff seconds between retries")
+    run_parser.add_argument(
+        "--stream", action="store_true", help="Stream provider output to stdout"
+    )
+    run_parser.add_argument(
+        "--dry-run", action="store_true", help="Print the composed system prompt and exit"
+    )
+    run_parser.add_argument(
+        "--timeout", type=float, default=30.0, help="Request timeout in seconds"
+    )
+    run_parser.add_argument(
+        "--retries", type=int, default=2, help="Number of provider retries on failure"
+    )
+    run_parser.add_argument(
+        "--backoff", type=float, default=1.0, help="Backoff seconds between retries"
+    )
     run_parser.set_defaults(func="run")
 
     chat_parser = subparsers.add_parser("chat", help="Interactive chat with history")
-    chat_parser.add_argument("--provider", default="openai", help="Provider name (openai|anthropic|gemini|local)")
+    chat_parser.add_argument(
+        "--provider", default="openai", help="Provider name (openai|anthropic|gemini|local)"
+    )
     chat_parser.add_argument("--model", default="gpt-4o", help="Model name for the provider")
     chat_parser.add_argument("--temperature", type=float, default=0.0, help="Sampling temperature")
-    chat_parser.add_argument("--max-tokens", type=int, default=500, help="Max tokens for the provider")
-    chat_parser.add_argument("--max-iterations", type=int, default=6, help="Max tool iterations per turn")
+    chat_parser.add_argument(
+        "--max-tokens", type=int, default=500, help="Max tokens for the provider"
+    )
+    chat_parser.add_argument(
+        "--max-iterations", type=int, default=6, help="Max tool iterations per turn"
+    )
     chat_parser.add_argument("--verbose", action="store_true", help="Enable verbose agent logging")
-    chat_parser.add_argument("--stream", action="store_true", help="Stream provider output to stdout")
-    chat_parser.add_argument("--timeout", type=float, default=30.0, help="Request timeout in seconds")
-    chat_parser.add_argument("--retries", type=int, default=2, help="Number of provider retries on failure")
-    chat_parser.add_argument("--backoff", type=float, default=1.0, help="Backoff seconds between retries")
+    chat_parser.add_argument(
+        "--stream", action="store_true", help="Stream provider output to stdout"
+    )
+    chat_parser.add_argument(
+        "--timeout", type=float, default=30.0, help="Request timeout in seconds"
+    )
+    chat_parser.add_argument(
+        "--retries", type=int, default=2, help="Number of provider retries on failure"
+    )
+    chat_parser.add_argument(
+        "--backoff", type=float, default=1.0, help="Backoff seconds between retries"
+    )
     chat_parser.set_defaults(func="chat")
 
     return parser

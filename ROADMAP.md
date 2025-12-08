@@ -256,8 +256,8 @@ Features most requested by users (update as we get feedback):
 
 ## Last Updated
 
-**Date:** 2025-12-08  
-**By:** John (v0.4.0 progress update)  
+**Date:** 2025-12-08
+**By:** John (v0.4.0 progress update)
 **Next Review:** 2025-12-15
 
 **Recent Changes:**

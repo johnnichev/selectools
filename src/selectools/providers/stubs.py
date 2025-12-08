@@ -22,6 +22,7 @@ class LocalProvider(Provider):
 
     name = "local"
     supports_streaming = True
+    supports_async = False  # LocalProvider is sync-only
 
     def complete(
         self,
@@ -57,6 +58,33 @@ class LocalProvider(Provider):
         )
         for token in text.split():
             yield token + " "
+
+    # Async methods not supported for LocalProvider
+    async def acomplete(
+        self,
+        *,
+        model: str,
+        system_prompt: str,
+        messages: List[Message],
+        temperature: float = 0.0,
+        max_tokens: int = 1000,
+        timeout: float | None = None,
+    ) -> str:
+        raise NotImplementedError("LocalProvider does not support async operations")
+
+    def astream(
+        self,
+        *,
+        model: str,
+        system_prompt: str,
+        messages: List[Message],
+        temperature: float = 0.0,
+        max_tokens: int = 1000,
+        timeout: float | None = None,
+    ):
+        raise NotImplementedError("LocalProvider does not support async operations")
+        # Make mypy happy with async generator type
+        yield ""  # pragma: no cover
 
 
 __all__ = ["LocalProvider"]

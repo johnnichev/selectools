@@ -43,7 +43,7 @@ This release brings full async/await support, real provider implementations, con
 ### 🧪 Testing
 - **55 total tests** across 4 test suites (was 27)
 - Added 13 edge case tests
-- Added 8 integration tests  
+- Added 8 integration tests
 - Added 7 high-concurrency stress tests
 - **Validated performance**: 10,000+ req/s throughput
 - **Stress tested**: 100 concurrent users, 1,000+ sustained requests
@@ -160,4 +160,3 @@ from selectools.providers.openai_provider import OpenAIProvider
 - Python version classifiers (3.9, 3.10, 3.11, 3.12)
 - Development status: Beta
 - Pinned provider extras, updated OpenAI minimum version
-

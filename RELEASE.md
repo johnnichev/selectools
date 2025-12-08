@@ -209,4 +209,3 @@ git push origin v0.3.1
 - Check the [scripts/README.md](scripts/README.md) for more details
 - Review the [.github/workflows/ci.yml](.github/workflows/ci.yml) workflow
 - Open an issue if you encounter problems
-

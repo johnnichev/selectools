@@ -13,7 +13,6 @@ import sys
 from pathlib import Path
 from typing import List, Tuple
 
-
 PROVIDERS: List[Tuple[str, str, str, str]] = [
     ("openai", "gpt-4o", "OPENAI_API_KEY", "Hello from OpenAI"),
     ("anthropic", "claude-3-5-sonnet-20240620", "ANTHROPIC_API_KEY", "Hello from Anthropic"),
@@ -27,7 +26,11 @@ def main() -> None:
     # Ensure package is importable in subprocess even if not installed.
     env = os.environ.copy()
     existing_pp = env.get("PYTHONPATH", "")
-    env["PYTHONPATH"] = f"{project_root / 'src'}{os.pathsep}{existing_pp}" if existing_pp else str(project_root / "src")
+    env["PYTHONPATH"] = (
+        f"{project_root / 'src'}{os.pathsep}{existing_pp}"
+        if existing_pp
+        else str(project_root / "src")
+    )
 
     # Load a local .env if present so provider keys are available.
     dot_env = project_root / ".env"
@@ -70,4 +73,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

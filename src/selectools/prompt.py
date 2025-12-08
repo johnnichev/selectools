@@ -9,7 +9,6 @@ from typing import List
 
 from .tools import Tool
 
-
 DEFAULT_SYSTEM_INSTRUCTIONS = """You are an assistant that can call tools when helpful.
 
 Tool call contract:

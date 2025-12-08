@@ -17,7 +17,7 @@ class ProviderError(RuntimeError):
 class Provider(Protocol):
     """
     Interface every provider adapter must satisfy.
-    
+
     Providers implement synchronous methods (complete, stream) and optionally
     async methods (acomplete, astream) for better performance in async contexts.
     """
@@ -70,13 +70,13 @@ class Provider(Protocol):
     ) -> str:
         """
         Async version of complete().
-        
+
         Providers can implement this for native async support. If not implemented,
         the agent will fall back to running the sync version in an executor.
         """
         ...
 
-    async def astream(
+    def astream(
         self,
         *,
         model: str,
@@ -88,8 +88,9 @@ class Provider(Protocol):
     ) -> AsyncIterable[str]:
         """
         Async version of stream().
-        
+
         Providers can implement this for native async streaming support.
+        Returns an async generator (AsyncIterable[str]).
         """
         ...
 

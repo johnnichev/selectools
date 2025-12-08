@@ -24,10 +24,29 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 ```bash
 pip install -e .
-pip install -e ".[dev,providers]"  # Install dev dependencies and all providers
+pip install -e ".[dev]"  # Install dev dependencies
 ```
 
-4. **Set up API keys for testing**
+4. **Set up pre-commit hooks (recommended)**
+
+Pre-commit hooks automatically format code, check for issues, and ensure code quality before each commit:
+
+```bash
+# Install pre-commit hooks
+pre-commit install
+
+# Optionally run on all files to test
+pre-commit run --all-files
+```
+
+The hooks will automatically run on staged files when you commit. They include:
+- **Black** - Code formatting
+- **isort** - Import sorting
+- **flake8** - Linting
+- **mypy** - Type checking
+- **bandit** - Security checks
+
+5. **Set up API keys for testing**
 
 ```bash
 export OPENAI_API_KEY="your-key-here"
@@ -47,12 +66,34 @@ All tests should pass before submitting a pull request.
 
 ## Code Style
 
-We follow standard Python conventions:
+We follow standard Python conventions and use automated tools to enforce consistency:
 
-- **PEP 8** style guide
-- **Type hints** for function signatures
+### Style Guidelines
+
+- **PEP 8** style guide (enforced by flake8)
+- **Type hints** for function signatures (checked by mypy)
 - **Docstrings** for public APIs (Google style preferred)
 - **Clear variable names** over abbreviations
+- **Line length**: 100 characters (configured in Black and isort)
+
+### Automated Formatting
+
+If you installed pre-commit hooks (recommended), your code will be automatically formatted on commit.
+You can also run formatters manually:
+
+```bash
+# Format code with Black
+black src/ tests/ examples/
+
+# Sort imports with isort
+isort src/ tests/ examples/
+
+# Check for linting issues
+flake8 src/
+
+# Type check
+mypy src/
+```
 
 ### Example
 
@@ -60,14 +101,14 @@ We follow standard Python conventions:
 def execute_tool(tool: Tool, arguments: dict[str, Any]) -> str:
     """
     Execute a tool with the provided arguments.
-    
+
     Args:
         tool: The tool to execute
         arguments: Dictionary of argument names to values
-        
+
     Returns:
         The tool's output as a string
-        
+
     Raises:
         ToolExecutionError: If the tool fails to execute
     """
@@ -207,11 +248,11 @@ class YourProvider(Provider):
     def __init__(self, api_key: str = None, default_model: str = "model-name"):
         self.api_key = api_key or os.getenv("YOUR_PROVIDER_API_KEY")
         self.default_model = default_model
-        
+
     def complete(self, messages: list[Message], model: str = None, **kwargs) -> str:
         # Implementation here
         pass
-        
+
     def stream(self, messages: list[Message], model: str = None, **kwargs) -> Iterator[str]:
         # Implementation here
         pass
@@ -285,4 +326,3 @@ By contributing to Selectools, you agree that your contributions will be license
 ---
 
 Thank you for contributing to Selectools! 🎉
-

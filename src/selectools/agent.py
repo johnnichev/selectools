@@ -5,17 +5,17 @@ Provider-agnostic agent loop implementing the TOOL_CALL contract.
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, List, Optional
 
-from .types import Message, Role
-from .tools import Tool
 from .parser import ToolCallParser
 from .prompt import PromptBuilder
 from .providers.base import Provider, ProviderError
 from .providers.openai_provider import OpenAIProvider
+from .tools import Tool
+from .types import Message, Role
 
 if TYPE_CHECKING:
     from .memory import ConversationMemory
@@ -23,7 +23,39 @@ if TYPE_CHECKING:
 
 @dataclass
 class AgentConfig:
-    """Tunable controls for the agent loop."""
+    """
+    Configuration options for customizing agent behavior.
+
+    Controls model selection, retry logic, timeouts, and verbosity for debugging.
+    Sensible defaults are provided for all options.
+
+    Attributes:
+        model: Model identifier to use (e.g., "gpt-4o", "claude-3-5-sonnet-20240620").
+        temperature: LLM temperature (0.0 = deterministic, higher = more creative). Default: 0.0.
+        max_tokens: Maximum tokens in LLM response. Default: 1000.
+        max_iterations: Maximum tool-calling iterations before stopping. Default: 6.
+        verbose: Print detailed logs for debugging. Default: False.
+        stream: Enable streaming responses (if provider supports it). Default: False.
+        request_timeout: Timeout for LLM API requests in seconds. Default: 30.0.
+        max_retries: Maximum retry attempts for failed LLM requests. Default: 2.
+        retry_backoff_seconds: Seconds to wait between retries (multiplied by attempt number). Default: 1.0.
+        rate_limit_cooldown_seconds: Cooldown period after rate limit errors. Default: 5.0.
+        tool_timeout_seconds: Maximum execution time for each tool call. None = no timeout. Default: None.
+
+    Example:
+        >>> # Production config with retries and timeouts
+        >>> config = AgentConfig(
+        ...     model="gpt-4o-mini",
+        ...     temperature=0.3,
+        ...     max_tokens=2000,
+        ...     max_iterations=10,
+        ...     request_timeout=60.0,
+        ...     tool_timeout_seconds=30.0,
+        ... )
+        >>>
+        >>> # Debug config with verbose logging
+        >>> config = AgentConfig(verbose=True, stream=True)
+    """
 
     model: str = "gpt-4o"
     temperature: float = 0.0
@@ -39,7 +71,49 @@ class AgentConfig:
 
 
 class Agent:
-    """Run an iterative tool-calling loop using a pluggable provider."""
+    """
+    Provider-agnostic AI agent that iteratively calls tools to accomplish tasks.
+
+    The Agent manages the loop of:
+    1. Sending conversation history to an LLM
+    2. Parsing the response for tool calls
+    3. Executing requested tools
+    4. Repeating until the task is complete
+
+    Supports both synchronous and asynchronous execution, conversation memory,
+    streaming responses, and multiple LLM providers (OpenAI, Anthropic, Gemini, etc).
+
+    Attributes:
+        tools: List of available tools the agent can use.
+        provider: LLM provider adapter (OpenAI, Anthropic, Gemini, or custom).
+        prompt_builder: Generates system prompts with tool schemas.
+        parser: Extracts tool calls from LLM responses.
+        config: Configuration options for behavior customization.
+        memory: Optional conversation memory for multi-turn dialogues.
+
+    Example:
+        >>> # Basic agent
+        >>> tools = [search_tool, calculator_tool]
+        >>> agent = Agent(tools=tools, provider=OpenAIProvider())
+        >>>
+        >>> response = agent.run([
+        ...     Message(role=Role.USER, content="What's 2+2 and search for Python?")
+        ... ])
+        >>> print(response.content)
+
+        >>> # Agent with memory for multi-turn conversations
+        >>> memory = ConversationMemory(max_messages=20)
+        >>> agent = Agent(tools=tools, provider=provider, memory=memory)
+        >>>
+        >>> # First turn
+        >>> agent.run([Message(role=Role.USER, content="My name is Alice")])
+        >>>
+        >>> # Second turn - context is preserved
+        >>> agent.run([Message(role=Role.USER, content="What's my name?")])
+
+        >>> # Async execution for high-performance applications
+        >>> response = await agent.arun([Message(...)])
+    """
 
     def __init__(
         self,
@@ -50,6 +124,28 @@ class Agent:
         config: Optional[AgentConfig] = None,
         memory: Optional[ConversationMemory] = None,
     ):
+        """
+        Initialize a new Agent instance.
+
+        Args:
+            tools: List of Tool instances the agent can use (minimum 1 required).
+            provider: LLM provider adapter. Defaults to OpenAIProvider().
+            prompt_builder: Custom prompt builder. Defaults to PromptBuilder().
+            parser: Custom tool call parser. Defaults to ToolCallParser().
+            config: Agent configuration options. Defaults to AgentConfig().
+            memory: Optional conversation memory for maintaining history across turns.
+
+        Raises:
+            ValueError: If tools list is empty.
+
+        Example:
+            >>> agent = Agent(
+            ...     tools=[search, calculator],
+            ...     provider=OpenAIProvider(api_key="sk-..."),
+            ...     config=AgentConfig(model="gpt-4o", verbose=True),
+            ...     memory=ConversationMemory(max_messages=20)
+            ... )
+        """
         if not tools:
             raise ValueError("Agent requires at least one tool.")
 
@@ -64,18 +160,20 @@ class Agent:
         self._system_prompt = self.prompt_builder.build(self.tools)
         self._history: List[Message] = []
 
-    def run(self, messages: List[Message], stream_handler: Optional[Callable[[str], None]] = None) -> Message:
+    def run(
+        self, messages: List[Message], stream_handler: Optional[Callable[[str], None]] = None
+    ) -> Message:
         """
         Execute the agent loop with the provided conversation history.
-        
+
         If the agent was initialized with a ConversationMemory, the new messages
         will be appended to the existing memory history, and the final response
         will be automatically saved to memory.
-        
+
         Args:
             messages: New messages for this turn (typically a single user message).
             stream_handler: Optional callback for streaming responses.
-            
+
         Returns:
             The final assistant response message.
         """
@@ -86,7 +184,7 @@ class Agent:
             self.memory.add_many(messages)
         else:
             self._history = list(messages)
-        
+
         iteration = 0
 
         while iteration < self.config.max_iterations:
@@ -152,10 +250,15 @@ class Agent:
             except ProviderError as exc:
                 last_error = str(exc)
                 if self.config.verbose:
-                    print(f"[agent] provider error attempt {attempts}/{self.config.max_retries + 1}: {exc}")
+                    print(
+                        f"[agent] provider error attempt {attempts}/{self.config.max_retries + 1}: {exc}"
+                    )
                 if attempts > self.config.max_retries:
                     break
-                if self._is_rate_limit_error(last_error) and self.config.rate_limit_cooldown_seconds:
+                if (
+                    self._is_rate_limit_error(last_error)
+                    and self.config.rate_limit_cooldown_seconds
+                ):
                     time.sleep(self.config.rate_limit_cooldown_seconds * attempts)
                 if self.config.retry_backoff_seconds:
                     time.sleep(self.config.retry_backoff_seconds * attempts)
@@ -196,10 +299,10 @@ class Agent:
             tool_name=tool_name,
             tool_result=tool_result,
         )
-        
+
         self._history.append(assistant_msg)
         self._history.append(tool_msg)
-        
+
         # Also add to memory if available
         if self.memory:
             self.memory.add_many([assistant_msg, tool_msg])
@@ -225,20 +328,18 @@ class Agent:
 
     # Async methods
     async def arun(
-        self, 
-        messages: List[Message], 
-        stream_handler: Optional[Callable[[str], None]] = None
+        self, messages: List[Message], stream_handler: Optional[Callable[[str], None]] = None
     ) -> Message:
         """
         Async version of run().
-        
+
         Execute the agent loop asynchronously with the provided conversation history.
         Uses provider async methods if available, falls back to sync in executor.
-        
+
         Args:
             messages: New messages for this turn (typically a single user message).
             stream_handler: Optional callback for streaming responses.
-            
+
         Returns:
             The final assistant response message.
         """
@@ -248,7 +349,7 @@ class Agent:
             self.memory.add_many(messages)
         else:
             self._history = list(messages)
-        
+
         iteration = 0
 
         while iteration < self.config.max_iterations:
@@ -303,7 +404,9 @@ class Agent:
                     return await self._astreaming_call(stream_handler=stream_handler)
 
                 # Check if provider has async support
-                if hasattr(self.provider, 'acomplete') and getattr(self.provider, 'supports_async', False):
+                if hasattr(self.provider, "acomplete") and getattr(
+                    self.provider, "supports_async", False
+                ):
                     return await self.provider.acomplete(
                         model=self.config.model,
                         system_prompt=self._system_prompt,
@@ -325,16 +428,21 @@ class Agent:
                                 temperature=self.config.temperature,
                                 max_tokens=self.config.max_tokens,
                                 timeout=self.config.request_timeout,
-                            )
+                            ),
                         )
                     return result
             except ProviderError as exc:
                 last_error = str(exc)
                 if self.config.verbose:
-                    print(f"[agent] provider error attempt {attempts}/{self.config.max_retries + 1}: {exc}")
+                    print(
+                        f"[agent] provider error attempt {attempts}/{self.config.max_retries + 1}: {exc}"
+                    )
                 if attempts > self.config.max_retries:
                     break
-                if self._is_rate_limit_error(last_error) and self.config.rate_limit_cooldown_seconds:
+                if (
+                    self._is_rate_limit_error(last_error)
+                    and self.config.rate_limit_cooldown_seconds
+                ):
                     await asyncio.sleep(self.config.rate_limit_cooldown_seconds * attempts)
                 if self.config.retry_backoff_seconds:
                     await asyncio.sleep(self.config.retry_backoff_seconds * attempts)
@@ -347,17 +455,18 @@ class Agent:
             raise ProviderError(f"Provider {self.provider.name} does not support streaming.")
 
         aggregated: List[str] = []
-        
+
         # Check if provider has async streaming
-        if hasattr(self.provider, 'astream') and getattr(self.provider, 'supports_async', False):
-            async for chunk in self.provider.astream(
+        if hasattr(self.provider, "astream") and getattr(self.provider, "supports_async", False):
+            stream = self.provider.astream(  # type: ignore[attr-defined]
                 model=self.config.model,
                 system_prompt=self._system_prompt,
                 messages=self._history,
                 temperature=self.config.temperature,
                 max_tokens=self.config.max_tokens,
                 timeout=self.config.request_timeout,
-            ):
+            )
+            async for chunk in stream:
                 if chunk:
                     aggregated.append(str(chunk))
                     if stream_handler:
@@ -376,7 +485,7 @@ class Agent:
                     aggregated.append(str(chunk))
                     if stream_handler:
                         stream_handler(str(chunk))
-                    
+
         return "".join(aggregated)
 
     async def _aexecute_tool_with_timeout(self, tool: Tool, parameters: dict) -> str:
@@ -386,8 +495,7 @@ class Agent:
 
         try:
             return await asyncio.wait_for(
-                tool.aexecute(parameters),
-                timeout=self.config.tool_timeout_seconds
+                tool.aexecute(parameters), timeout=self.config.tool_timeout_seconds
             )
         except asyncio.TimeoutError:
             raise TimeoutError(

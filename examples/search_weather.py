@@ -15,13 +15,15 @@ from selectools.parser import ToolCallParser
 from selectools.prompt import PromptBuilder
 from selectools.providers.stubs import LocalProvider
 
-
 registry = ToolRegistry()
 
 
 @registry.tool(description="Return mock search results for a query.")
 def search(query: str, top_k: int = 3) -> str:
-    results = [{"title": f"Result {i+1} for {query}", "url": f"https://example.com/{i+1}"} for i in range(top_k)]
+    results = [
+        {"title": f"Result {i+1} for {query}", "url": f"https://example.com/{i+1}"}
+        for i in range(top_k)
+    ]
     return json.dumps({"results": results})
 
 
@@ -49,7 +51,9 @@ def build_agent() -> Agent:
 
 def main(argv: List[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Search + Weather demo (local provider)")
-    parser.add_argument("--prompt", default="Find weather in Paris and search docs", help="User prompt")
+    parser.add_argument(
+        "--prompt", default="Find weather in Paris and search docs", help="User prompt"
+    )
     args = parser.parse_args(argv)
 
     agent = build_agent()
@@ -59,4 +63,3 @@ def main(argv: List[str] | None = None) -> None:
 
 if __name__ == "__main__":
     main()
-

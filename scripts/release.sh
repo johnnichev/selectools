@@ -88,4 +88,3 @@ echo "GitHub Actions will now build and publish version $VERSION to PyPI."
 echo "Monitor progress at: https://github.com/johnnichev/selectools/actions"
 echo ""
 echo "After publication, install with: pip install --upgrade selectools"
-
