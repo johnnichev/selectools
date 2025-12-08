@@ -421,7 +421,61 @@ response = agent.run([
 print(response.content)
 ```
 
-### 9. **Async Agent: Modern Python with asyncio**
+### 9. **Cost Tracking: Monitor Token Usage & Costs (v0.5.0)**
+
+Track token usage and estimated costs automatically:
+
+```python
+from selectools import Agent, AgentConfig, Message, Role, tool
+from selectools.providers.openai_provider import OpenAIProvider
+
+@tool(description="Search for information")
+def search(query: str) -> str:
+    return f"Results for: {query}"
+
+@tool(description="Summarize text")
+def summarize(text: str) -> str:
+    return f"Summary: {text[:50]}..."
+
+# Enable cost tracking with optional warning threshold
+agent = Agent(
+    tools=[search, summarize],
+    provider=OpenAIProvider(default_model="gpt-4o"),
+    config=AgentConfig(
+        max_iterations=5,
+        cost_warning_threshold=0.10  # Warn if cost exceeds $0.10
+    )
+)
+
+response = agent.run([
+    Message(role=Role.USER, content="Search for Python tutorials and summarize the top result")
+])
+
+# Access usage statistics
+print(f"Total tokens: {agent.total_tokens:,}")
+print(f"Total cost: ${agent.total_cost:.6f}")
+print("\nDetailed breakdown:")
+print(agent.get_usage_summary())
+
+# Output:
+# 📊 Usage Summary
+# Total Tokens: 1,234
+# Total Cost: $0.012345
+#
+# Tool Usage:
+#   - search: 1 calls, 567 tokens
+#   - summarize: 1 calls, 667 tokens
+```
+
+**Key Features:**
+
+- Automatic token counting for all providers
+- Cost estimation for 15+ models (OpenAI, Anthropic, Gemini)
+- Per-tool usage breakdown
+- Configurable cost warnings
+- Reset usage: `agent.reset_usage()`
+
+### 10. **Async Agent: Modern Python with asyncio**
 
 Build high-performance async applications with native async support:
 
@@ -543,6 +597,9 @@ For the full license text, see the [LICENSE](LICENSE) file.
   - `python examples/search_weather.py` - Simple tool with local mock provider
   - `python examples/async_agent_demo.py` - Async/await usage with FastAPI patterns
   - `python examples/conversation_memory_demo.py` - Multi-turn conversation with memory
+  - `python examples/cost_tracking_demo.py` - Token counting and cost tracking (v0.5.0)
+  - `python examples/customer_support_bot.py` - Multi-tool customer support workflow
+  - `python examples/data_analysis_agent.py` - Data exploration and analysis tools
 - Dev helpers:
   - `python scripts/smoke_cli.py` - Quick provider smoke tests (skips missing keys)
   - `python scripts/test_memory_with_openai.py` - Test memory with real OpenAI API
@@ -559,17 +616,21 @@ We're actively developing new features to make Selectools the most production-re
 - Async Support - `Agent.arun()`, async tools, async providers
 - Real Provider Implementations - Full Anthropic & Gemini SDK integration
 
-**🟡 Coming in v0.4.x:**
+**✅ Completed in v0.5.0:**
 
-- Better Error Messages - PyTorch-style helpful errors
-- Cost Tracking - Automatic token and cost tracking
+- Better Error Messages - Custom exceptions with helpful context and suggestions
+- Cost Tracking - Automatic token counting and cost estimation with warnings
+- Gemini SDK Migration - Updated to new google-genai SDK (v1.0+)
+
+**🟡 Coming in v0.6.0:**
+
 - Pre-built Tool Library - Common tools ready to use
+- Parallel Tool Execution - Run multiple tools concurrently
+- Observability Hooks - Track and debug agent behavior
 
-**🚀 Future (v0.5.0+):**
+**🚀 Future (v0.7.0+):**
 
-- Parallel tool execution
-- Observability hooks
-- Tool composition
+- Tool composition and chaining
 - Advanced context management
 - Local model support (Ollama)
 - And much more...
