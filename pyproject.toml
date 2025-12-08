@@ -8,7 +8,7 @@ version = "0.4.0"
 description = "Build AI agents that call your custom Python functions. Connect LLMs to tools, APIs, and databases with any provider (OpenAI, Anthropic, Gemini)."
 readme = "README.md"
 requires-python = ">=3.9"
-license = {text = "LGPL-3.0-or-later"}
+license = "LGPL-3.0-or-later"
 authors = [{name = "John", email = "johnnichev@gmail.com"}]
 dependencies = [
     "openai>=1.30.0,<2.0.0",
@@ -19,7 +19,6 @@ keywords = ["llm", "tools", "ai", "openai", "agent"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -43,4 +42,4 @@ selectools = "selectools.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-packages = ["selectools", "selectools.providers", "selectools.examples"]
+packages = ["selectools", "selectools.providers"]
