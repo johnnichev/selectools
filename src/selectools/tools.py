@@ -4,6 +4,8 @@ Tool metadata, schemas, and runtime validation.
 
 from __future__ import annotations
 
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 import inspect
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -69,6 +71,7 @@ class Tool:
         self.function = function
         self.injected_kwargs = injected_kwargs or {}
         self.config_injector = config_injector
+        self.is_async = inspect.iscoroutinefunction(function)
 
     def schema(self) -> JsonSchema:
         """Return a JSON-schema style dict describing this tool."""
@@ -127,6 +130,35 @@ class Tool:
             call_args.update(self.config_injector() or {})
 
         return self.function(**call_args)
+
+    async def aexecute(self, params: Dict[str, ParameterValue]) -> str:
+        """
+        Async version of execute().
+        
+        If the tool function is async, it will be awaited. If it's sync,
+        it will be run in a thread pool executor to avoid blocking.
+        """
+        is_valid, error = self.validate(params)
+        if not is_valid:
+            raise ValueError(f"Invalid parameters for tool '{self.name}': {error}")
+
+        call_args: Dict[str, Any] = dict(params)
+        call_args.update(self.injected_kwargs)
+        if self.config_injector:
+            call_args.update(self.config_injector() or {})
+
+        if self.is_async:
+            # Directly await async function
+            return await self.function(**call_args)
+        else:
+            # Run sync function in executor to avoid blocking
+            loop = asyncio.get_event_loop()
+            with ThreadPoolExecutor() as executor:
+                result = await loop.run_in_executor(
+                    executor,
+                    lambda: self.function(**call_args)
+                )
+            return result
 
 
 def _infer_parameters_from_callable(

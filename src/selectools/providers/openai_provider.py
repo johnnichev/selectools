@@ -17,6 +17,7 @@ class OpenAIProvider(Provider):
 
     name = "openai"
     supports_streaming = True
+    supports_async = True
 
     def __init__(self, api_key: str | None = None, default_model: str = "gpt-4o"):
         load_default_env()
@@ -25,11 +26,12 @@ class OpenAIProvider(Provider):
             raise ProviderError("OPENAI_API_KEY is not set. Set it in env or pass api_key.")
 
         try:
-            from openai import OpenAI
+            from openai import AsyncOpenAI, OpenAI
         except ImportError as exc:
             raise ProviderError("openai package not installed. Install with `pip install openai`.") from exc
 
         self._client = OpenAI(api_key=self.api_key)
+        self._async_client = AsyncOpenAI(api_key=self.api_key)
         self.default_model = default_model
 
     def complete(
@@ -117,6 +119,70 @@ class OpenAIProvider(Provider):
                 },
             ]
         return message.content
+
+    # Async methods
+    async def acomplete(
+        self,
+        *,
+        model: str,
+        system_prompt: str,
+        messages: List[Message],
+        temperature: float = 0.0,
+        max_tokens: int = 1000,
+        timeout: float | None = None,
+    ) -> str:
+        """Async version of complete() using AsyncOpenAI client."""
+        formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
+
+        try:
+            response = await self._async_client.chat.completions.create(
+                model=model or self.default_model,
+                messages=formatted,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                timeout=timeout,
+            )
+        except Exception as exc:
+            raise ProviderError(f"OpenAI async completion failed: {exc}") from exc
+
+        content = response.choices[0].message.content
+        return content or ""
+
+    async def astream(
+        self,
+        *,
+        model: str,
+        system_prompt: str,
+        messages: List[Message],
+        temperature: float = 0.0,
+        max_tokens: int = 1000,
+        timeout: float | None = None,
+    ):
+        """Async version of stream() using AsyncOpenAI client."""
+        formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
+        try:
+            response = await self._async_client.chat.completions.create(
+                model=model or self.default_model,
+                messages=formatted,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stream=True,
+                timeout=timeout,
+            )
+        except Exception as exc:
+            raise ProviderError(f"OpenAI async streaming failed: {exc}") from exc
+
+        async for chunk in response:
+            try:
+                delta = chunk.choices[0].delta
+                if not delta or not delta.content:
+                    continue
+                content = delta.content
+                if isinstance(content, list):
+                    content = "".join([part.text for part in content if getattr(part, "text", None)])
+                yield content
+            except Exception as exc:
+                raise ProviderError(f"OpenAI async stream parsing failed: {exc}") from exc
 
 
 __all__ = ["OpenAIProvider"]

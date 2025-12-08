@@ -4,30 +4,29 @@ This document tracks the implementation status of all planned features. See [REA
 
 ## Priority 1: Quick Wins (v0.4.0 - Target: 2 weeks)
 
-| Feature                | Effort | Status     | Assignee | PR  | Notes                          |
-| ---------------------- | ------ | ---------- | -------- | --- | ------------------------------ |
-| Conversation Memory    | 2h     | 🟡 Planned | -        | -   | Simple history management      |
-| Async Support          | 3h     | 🟡 Planned | -        | -   | `async def run_async()`        |
-| Better Error Messages  | 2h     | 🟡 Planned | -        | -   | PyTorch-style helpful errors   |
-| Cost Tracking          | 2h     | 🟡 Planned | -        | -   | Track tokens and API costs     |
-| Pre-built Tool Library | 4h     | 🟡 Planned | -        | -   | 5-10 common tools in `toolbox` |
-
-**Total: ~13 hours**
+| Feature                   | Status         | Notes                           |
+| ------------------------- | -------------- | ------------------------------- |
+| Conversation Memory       | ✅ Implemented | Simple history management       |
+| Async Support             | ✅ Implemented | `Agent.arun()`, async tools     |
+| Anthropic Provider (Full) | ✅ Implemented | Real SDK integration with async |
+| Gemini Provider (Full)    | ✅ Implemented | Real SDK integration with async |
+| Remove Pillow Dependency  | ✅ Implemented | Removed bbox example            |
+| Better Error Messages     | 🟡 Planned     | PyTorch-style helpful errors    |
+| Cost Tracking             | 🟡 Planned     | Track tokens and API costs      |
+| Pre-built Tool Library    | 🟡 Planned     | 5-10 common tools in `toolbox`  |
 
 ---
 
 ## Priority 2: High-Impact Features (v0.5.0 - Target: 1 month)
 
-| Feature                         | Effort | Status     | Assignee | PR  | Notes                               |
-| ------------------------------- | ------ | ---------- | -------- | --- | ----------------------------------- |
-| Streaming Tool Results          | 3h     | 🟡 Planned | -        | -   | Stream tool output as generated     |
-| Parallel Tool Execution         | 4h     | 🟡 Planned | -        | -   | Auto-detect independent tools       |
-| Observability Hooks             | 3h     | 🟡 Planned | -        | -   | `on_tool_start`, `on_tool_end`, etc |
-| Tool Composition                | 4h     | 🟡 Planned | -        | -   | `@compose` decorator                |
-| Tool Validation at Registration | 2h     | 🟡 Planned | -        | -   | Catch errors early                  |
-| Interactive Debug Mode          | 6h     | 🟡 Planned | -        | -   | Step-through debugging              |
-
-**Total: ~22 hours**
+| Feature                         | Status     | Notes                               |
+| ------------------------------- | ---------- | ----------------------------------- |
+| Streaming Tool Results          | 🟡 Planned | Stream tool output as generated     |
+| Parallel Tool Execution         | 🟡 Planned | Auto-detect independent tools       |
+| Observability Hooks             | 🟡 Planned | `on_tool_start`, `on_tool_end`, etc |
+| Tool Composition                | 🟡 Planned | `@compose` decorator                |
+| Tool Validation at Registration | 🟡 Planned | Catch errors early                  |
+| Interactive Debug Mode          | 🟡 Planned | Step-through debugging              |
 
 ---
 
@@ -35,62 +34,62 @@ This document tracks the implementation status of all planned features. See [REA
 
 ### Context Management
 
-| Feature                              | Effort | Status     | Assignee | PR  | Notes                           |
-| ------------------------------------ | ------ | ---------- | -------- | --- | ------------------------------- |
-| Automatic Conversation Summarization | 8h     | 🟡 Planned | -        | -   | Handle long conversations       |
-| Sliding Window with Smart Retention  | 6h     | 🟡 Planned | -        | -   | Keep important context          |
-| Multi-Turn Memory System             | 12h    | 🟡 Planned | -        | -   | Persistent cross-session memory |
+| Feature                              | Status     | Notes                           |
+| ------------------------------------ | ---------- | ------------------------------- |
+| Automatic Conversation Summarization | 🟡 Planned | Handle long conversations       |
+| Sliding Window with Smart Retention  | 🟡 Planned | Keep important context          |
+| Multi-Turn Memory System             | 🟡 Planned | Persistent cross-session memory |
 
 ### Tool Capabilities
 
-| Feature                   | Effort | Status     | Assignee | PR  | Notes                     |
-| ------------------------- | ------ | ---------- | -------- | --- | ------------------------- |
-| Dynamic Tool Loading      | 8h     | 🟡 Planned | -        | -   | Hot-reload tools          |
-| Tool Usage Analytics      | 6h     | 🟡 Planned | -        | -   | Track performance metrics |
-| Tool Marketplace/Registry | 16h    | 🟡 Planned | -        | -   | Community tool sharing    |
+| Feature                   | Status     | Notes                     |
+| ------------------------- | ---------- | ------------------------- |
+| Dynamic Tool Loading      | 🟡 Planned | Hot-reload tools          |
+| Tool Usage Analytics      | 🟡 Planned | Track performance metrics |
+| Tool Marketplace/Registry | 🟡 Planned | Community tool sharing    |
 
 ### Provider Enhancements
 
-| Feature                  | Effort | Status     | Assignee | PR  | Notes                         |
-| ------------------------ | ------ | ---------- | -------- | --- | ----------------------------- |
-| Universal Vision Support | 6h     | 🟡 Planned | -        | -   | Unified vision API            |
-| Provider Auto-Selection  | 8h     | 🟡 Planned | -        | -   | Automatic fallback chains     |
-| Streaming Improvements   | 6h     | 🟡 Planned | -        | -   | SSE, WebSocket support        |
-| Local Model Support      | 10h    | 🟡 Planned | -        | -   | Ollama, LM Studio integration |
+| Feature                  | Status     | Notes                         |
+| ------------------------ | ---------- | ----------------------------- |
+| Universal Vision Support | 🟡 Planned | Unified vision API            |
+| Provider Auto-Selection  | 🟡 Planned | Automatic fallback chains     |
+| Streaming Improvements   | 🟡 Planned | SSE, WebSocket support        |
+| Local Model Support      | 🟡 Planned | Ollama, LM Studio integration |
 
 ### Production Reliability
 
-| Feature                   | Effort | Status     | Assignee | PR  | Notes                                 |
-| ------------------------- | ------ | ---------- | -------- | --- | ------------------------------------- |
-| Advanced Error Recovery   | 8h     | 🟡 Planned | -        | -   | Circuit breaker, graceful degradation |
-| Observability & Debugging | 12h    | 🟡 Planned | -        | -   | OpenTelemetry, execution replay       |
-| Rate Limiting & Quotas    | 6h     | 🟡 Planned | -        | -   | Per-tool and user quotas              |
-| Security Hardening        | 10h    | 🟡 Planned | -        | -   | Sandboxing, audit logging             |
+| Feature                   | Status     | Notes                                 |
+| ------------------------- | ---------- | ------------------------------------- |
+| Advanced Error Recovery   | 🟡 Planned | Circuit breaker, graceful degradation |
+| Observability & Debugging | 🟡 Planned | OpenTelemetry, execution replay       |
+| Rate Limiting & Quotas    | 🟡 Planned | Per-tool and user quotas              |
+| Security Hardening        | 🟡 Planned | Sandboxing, audit logging             |
 
 ### Developer Experience
 
-| Feature                    | Effort | Status     | Assignee | PR  | Notes                               |
-| -------------------------- | ------ | ---------- | -------- | --- | ----------------------------------- |
-| Visual Agent Builder       | 24h    | 🟡 Planned | -        | -   | Web UI for agent design             |
-| Enhanced Testing Framework | 10h    | 🟡 Planned | -        | -   | Snapshot testing, load tests        |
-| Documentation Generation   | 8h     | 🟡 Planned | -        | -   | Auto-generate from tool definitions |
-| Type Safety Improvements   | 6h     | 🟡 Planned | -        | -   | Better type inference               |
+| Feature                    | Status     | Notes                               |
+| -------------------------- | ---------- | ----------------------------------- |
+| Visual Agent Builder       | 🟡 Planned | Web UI for agent design             |
+| Enhanced Testing Framework | 🟡 Planned | Snapshot testing, load tests        |
+| Documentation Generation   | 🟡 Planned | Auto-generate from tool definitions |
+| Type Safety Improvements   | 🟡 Planned | Better type inference               |
 
 ### Ecosystem Integration
 
-| Feature                | Effort | Status     | Assignee | PR  | Notes                             |
-| ---------------------- | ------ | ---------- | -------- | --- | --------------------------------- |
-| Framework Integrations | 12h    | 🟡 Planned | -        | -   | FastAPI, Flask, LangChain adapter |
-| CRM & Business Tools   | 16h    | 🟡 Planned | -        | -   | HubSpot, Salesforce, etc          |
-| Data Source Connectors | 20h    | 🟡 Planned | -        | -   | SQL, vector DBs, cloud storage    |
+| Feature                | Status     | Notes                             |
+| ---------------------- | ---------- | --------------------------------- |
+| Framework Integrations | 🟡 Planned | FastAPI, Flask, LangChain adapter |
+| CRM & Business Tools   | 🟡 Planned | HubSpot, Salesforce, etc          |
+| Data Source Connectors | 🟡 Planned | SQL, vector DBs, cloud storage    |
 
 ### Performance Optimizations
 
-| Feature             | Effort | Status     | Assignee | PR  | Notes                              |
-| ------------------- | ------ | ---------- | -------- | --- | ---------------------------------- |
-| Caching Layer       | 10h    | 🟡 Planned | -        | -   | LRU, semantic, distributed caching |
-| Batch Processing    | 8h     | 🟡 Planned | -        | -   | Efficient multi-request handling   |
-| Prompt Optimization | 6h     | 🟡 Planned | -        | -   | Automatic prompt compression       |
+| Feature             | Status     | Notes                              |
+| ------------------- | ---------- | ---------------------------------- |
+| Caching Layer       | 🟡 Planned | LRU, semantic, distributed caching |
+| Batch Processing    | 🟡 Planned | Efficient multi-request handling   |
+| Prompt Optimization | 🟡 Planned | Automatic prompt compression       |
 
 ---
 
@@ -109,10 +108,9 @@ This document tracks the implementation status of all planned features. See [REA
 
 1. **Pick a feature** from Priority 1 or 2 (great for first-time contributors!)
 2. **Comment on the issue** or create one if it doesn't exist
-3. **Assign yourself** in this document (via PR)
-4. **Implement the feature** following [CONTRIBUTING.md](CONTRIBUTING.md)
-5. **Submit a PR** and link it here
-6. **Update status** to 🔵 In Progress, then ✅ Implemented
+3. **Implement the feature** following [CONTRIBUTING.md](CONTRIBUTING.md)
+4. **Submit a PR** with clear description
+5. **Update this roadmap** to mark feature as ✅ Implemented
 
 ---
 
@@ -122,14 +120,17 @@ This document tracks the implementation status of all planned features. See [REA
 
 **Focus:** Developer experience improvements that close gaps with LangChain
 
-**Must-have:**
+**Completed:**
 
 - ✅ Conversation Memory
-- ✅ Async Support
-- ✅ Better Error Messages
+- ✅ Async Support (Agent.arun(), async tools, async providers)
+- ✅ Anthropic Provider (Full SDK integration)
+- ✅ Gemini Provider (Full SDK integration)
+- ✅ Removed Pillow dependency
 
-**Nice-to-have:**
+**Remaining:**
 
+- Better Error Messages
 - Cost Tracking
 - Pre-built Tool Library (at least 3 tools)
 
@@ -255,6 +256,15 @@ Features most requested by users (update as we get feedback):
 
 ## Last Updated
 
-**Date:** 2025-12-07  
-**By:** John
-**Next Review:** 2025-12-14
+**Date:** 2025-12-08  
+**By:** John (v0.4.0 progress update)  
+**Next Review:** 2025-12-15
+
+**Recent Changes:**
+
+- ✅ Completed Conversation Memory feature
+- ✅ Completed full Async Support (Agent.arun, async tools, async providers)
+- ✅ Implemented real Anthropic and Gemini providers with async support
+- ✅ Removed Pillow dependency, cleaned up codebase
+- ✅ Added comprehensive async tests
+- ✅ Created async usage examples

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "selectools"
-version = "0.3.1"
+version = "0.4.0"
 description = "Build AI agents that call your custom Python functions. Connect LLMs to tools, APIs, and databases with any provider (OpenAI, Anthropic, Gemini)."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -12,7 +12,8 @@ license = {text = "LGPL-3.0-or-later"}
 authors = [{name = "John", email = "johnnichev@gmail.com"}]
 dependencies = [
     "openai>=1.30.0,<2.0.0",
-    "Pillow>=10.0.0",
+    "anthropic>=0.28.0,<1.0.0",
+    "google-generativeai>=0.8.3,<1.0.0",
 ]
 keywords = ["llm", "tools", "ai", "openai", "agent"]
 classifiers = [
@@ -36,7 +37,6 @@ Documentation = "https://github.com/johnnichev/selectools#readme"
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0.0", "build>=1.2.1", "twine>=5.0.0"]
-providers = ["anthropic>=0.28.0,<1.0.0", "google-generativeai>=0.8.3,<1.0.0"]
 
 [project.scripts]
 selectools = "selectools.cli:main"

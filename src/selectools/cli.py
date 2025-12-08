@@ -4,7 +4,7 @@ CLI entrypoint for the selectools library.
 Examples:
     python -m selectools.cli list-tools
     python -m selectools.cli run --provider openai --model gpt-4o --prompt "Search docs" --tool echo
-    python -m selectools.cli run --provider openai --prompt "Find the object" --image assets/environment.png --tool detect_bounding_box
+    python -m selectools.cli run --provider openai --prompt "Hello" --tool echo
 """
 
 from __future__ import annotations
@@ -19,8 +19,9 @@ from .parser import ToolCallParser
 from .types import Message, Role
 from .tools import Tool, ToolParameter, ToolRegistry
 from .providers.openai_provider import OpenAIProvider
-from .providers.stubs import AnthropicProvider, GeminiProvider, LocalProvider
-from .examples.bbox import create_bounding_box_tool
+from .providers.anthropic_provider import AnthropicProvider
+from .providers.gemini_provider import GeminiProvider
+from .providers.stubs import LocalProvider
 
 
 def _build_provider(name: str, model: str):
@@ -42,7 +43,6 @@ def _default_tools() -> Dict[str, Tool]:
     def echo(text: str) -> str:
         return json.dumps({"echo": text})
 
-    registry.register(create_bounding_box_tool())
     return {tool.name: tool for tool in registry.all()}
 
 

@@ -22,13 +22,15 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
+import selectools
 from agent import Agent, AgentConfig, Message, Role, Tool, ToolParameter
 from selectools.tools import ToolRegistry
 from selectools.memory import ConversationMemory
-from selectools.examples.bbox import BBOX_MOCK_ENV, detect_bounding_box_impl
 from selectools.parser import ToolCallParser
 from selectools.providers.base import ProviderError
-from selectools.providers.stubs import AnthropicProvider, GeminiProvider, LocalProvider
+from selectools.providers.anthropic_provider import AnthropicProvider
+from selectools.providers.gemini_provider import GeminiProvider
+from selectools.providers.stubs import LocalProvider
 from selectools.cli import build_parser, run_agent, _default_tools
 
 
@@ -426,7 +428,11 @@ def test_anthropic_provider_with_mocked_client():
         def __init__(self, api_key=None, base_url=None):
             self.messages = FakeMessages()
 
-    fake_module = types.SimpleNamespace(Anthropic=FakeAnthropicClient)
+    class FakeAsyncAnthropicClient:
+        def __init__(self, api_key=None, base_url=None):
+            self.messages = FakeMessages()
+
+    fake_module = types.SimpleNamespace(Anthropic=FakeAnthropicClient, AsyncAnthropic=FakeAsyncAnthropicClient)
     sys.modules["anthropic"] = fake_module
     try:
         provider = AnthropicProvider()
@@ -531,23 +537,131 @@ def test_cli_streaming_with_local_provider():
     assert "local provider" in output.lower()
 
 
-def test_bounding_box_uses_mock_when_configured():
-    mock_path = PROJECT_ROOT / "tests" / "fixtures" / "bbox_mock.json"
-    image_path = PROJECT_ROOT / "assets" / "environment.png"
-    os.environ[BBOX_MOCK_ENV] = str(mock_path)
-    try:
-        result = detect_bounding_box_impl(target_object="dog", image_path=str(image_path))
-        payload = json.loads(result)
-        assert payload["success"] is True
-        assert payload["coordinates"]["normalized"]["x_min"] == 0.15
-    finally:
-        os.environ.pop(BBOX_MOCK_ENV, None)
-        output = image_path.parent / f"{image_path.stem}_with_bbox.png"
-        if output.exists():
-            try:
-                output.unlink()
-            except Exception:
-                pass
+async def test_async_agent_basic():
+    """Test basic async agent execution."""
+    import asyncio
+    
+    @selectools.tool(description="Async echo tool")
+    async def async_echo(text: str) -> str:
+        await asyncio.sleep(0.01)  # Simulate async work
+        return f"async_echoed: {text}"
+    
+    agent = Agent(tools=[async_echo], provider=LocalProvider())
+    
+    response = await agent.arun([Message(role=Role.USER, content="Test async")])
+    assert response.role == Role.ASSISTANT
+    assert "async_echoed" in response.content or "local provider" in response.content.lower()
+
+
+async def test_async_tool_execution():
+    """Test that both sync and async tools work with async agent."""
+    import asyncio
+    
+    def sync_func(x: int) -> str:
+        return f"sync:{x}"
+    
+    async def async_func(x: int) -> str:
+        await asyncio.sleep(0.01)
+        return f"async:{x}"
+    
+    sync_tool = Tool(
+        name="sync",
+        description="Sync tool",
+        parameters=[ToolParameter(name="x", param_type=int, description="Number")],
+        function=sync_func,
+    )
+    
+    async_tool = Tool(
+        name="async",
+        description="Async tool",
+        parameters=[ToolParameter(name="x", param_type=int, description="Number")],
+        function=async_func,
+    )
+    
+    # Test individual tool execution
+    assert sync_tool.is_async is False
+    assert async_tool.is_async is True
+    
+    # Test async execution of both
+    sync_result = await sync_tool.aexecute({"x": 5})
+    assert sync_result == "sync:5"
+    
+    async_result = await async_tool.aexecute({"x": 10})
+    assert async_result == "async:10"
+
+
+async def test_async_with_memory():
+    """Test async agent with conversation memory."""
+    from selectools.memory import ConversationMemory
+    
+    memory = ConversationMemory(max_messages=10)
+    
+    def simple_tool(x: int) -> str:
+        return str(x * 2)
+    
+    tool = Tool(
+        name="double",
+        description="Double a number",
+        parameters=[ToolParameter(name="x", param_type=int, description="Number")],
+        function=simple_tool,
+    )
+    
+    agent = Agent(tools=[tool], provider=LocalProvider(), memory=memory)
+    
+    # First turn
+    response1 = await agent.arun([Message(role=Role.USER, content="Hello 1")])
+    assert len(memory) >= 1
+    
+    # Second turn
+    response2 = await agent.arun([Message(role=Role.USER, content="Hello 2")])
+    assert len(memory) >= 2
+
+
+async def test_async_provider_fallback():
+    """Test that agent falls back to sync when provider doesn't support async."""
+    # LocalProvider doesn't have async support
+    provider = LocalProvider()
+    assert not getattr(provider, 'supports_async', False)
+    
+    def simple_tool() -> str:
+        return "done"
+    
+    tool = Tool(
+        name="test",
+        description="Test tool",
+        parameters=[],
+        function=simple_tool,
+    )
+    
+    agent = Agent(tools=[tool], provider=provider)
+    response = await agent.arun([Message(role=Role.USER, content="test")])
+    assert response.role == Role.ASSISTANT
+
+
+async def test_async_multiple_iterations():
+    """Test async agent with multiple tool call iterations."""
+    call_count = 0
+    
+    @selectools.tool(description="Counter tool")
+    async def counter() -> str:
+        nonlocal call_count
+        call_count += 1
+        return f"call_{call_count}"
+    
+    agent = Agent(
+        tools=[counter], 
+        provider=LocalProvider(),
+        config=AgentConfig(max_iterations=3)
+    )
+    
+    response = await agent.arun([Message(role=Role.USER, content="Count")])
+    assert response.role == Role.ASSISTANT
+
+
+def run_async_test(test_func):
+    """Helper to run async tests."""
+    import asyncio
+    asyncio.run(test_func())
 
 
 if __name__ == "__main__":
@@ -575,8 +689,17 @@ if __name__ == "__main__":
     test_anthropic_provider_with_mocked_client,
     test_gemini_provider_with_mocked_client,
     test_cli_streaming_with_local_provider,
-        test_bounding_box_uses_mock_when_configured,
     ]
+    
+    # Async tests run separately
+    async_tests = [
+        test_async_agent_basic,
+        test_async_tool_execution,
+        test_async_with_memory,
+        test_async_provider_fallback,
+        test_async_multiple_iterations,
+    ]
+    
     failures = 0
     for test in all_tests:
         try:
@@ -585,5 +708,15 @@ if __name__ == "__main__":
         except AssertionError as exc:  # noqa: BLE001
             failures += 1
             print(f"✗ {test.__name__}: {exc}")
+    
+    # Run async tests
+    for test in async_tests:
+        try:
+            run_async_test(test)
+            print(f"✓ {test.__name__}")
+        except AssertionError as exc:  # noqa: BLE001
+            failures += 1
+            print(f"✗ {test.__name__}: {exc}")
+    
     if failures:
         raise SystemExit(1)

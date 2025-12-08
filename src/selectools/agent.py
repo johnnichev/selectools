@@ -4,6 +4,7 @@ Provider-agnostic agent loop implementing the TOOL_CALL contract.
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
@@ -221,6 +222,177 @@ class Agent:
     def _is_rate_limit_error(self, message: str) -> bool:
         lowered = message.lower()
         return "rate limit" in lowered or "429" in lowered
+
+    # Async methods
+    async def arun(
+        self, 
+        messages: List[Message], 
+        stream_handler: Optional[Callable[[str], None]] = None
+    ) -> Message:
+        """
+        Async version of run().
+        
+        Execute the agent loop asynchronously with the provided conversation history.
+        Uses provider async methods if available, falls back to sync in executor.
+        
+        Args:
+            messages: New messages for this turn (typically a single user message).
+            stream_handler: Optional callback for streaming responses.
+            
+        Returns:
+            The final assistant response message.
+        """
+        # Load history from memory if available, then append new messages
+        if self.memory:
+            self._history = self.memory.get_history() + list(messages)
+            self.memory.add_many(messages)
+        else:
+            self._history = list(messages)
+        
+        iteration = 0
+
+        while iteration < self.config.max_iterations:
+            iteration += 1
+            response_text = await self._acall_provider(stream_handler=stream_handler)
+            parse_result = self.parser.parse(response_text)
+
+            if not parse_result.tool_call:
+                final_response = Message(role=Role.ASSISTANT, content=response_text)
+                if self.memory:
+                    self.memory.add(final_response)
+                return final_response
+
+            tool_name = parse_result.tool_call.tool_name
+            parameters = parse_result.tool_call.parameters
+
+            if self.config.verbose:
+                print(f"[agent] Iteration {iteration}: tool={tool_name} params={parameters}")
+
+            tool = self._tools_by_name.get(tool_name)
+            if not tool:
+                error_message = f"Unknown tool '{tool_name}'. Available tools: {', '.join(self._tools_by_name.keys())}"
+                self._append_assistant_and_tool(response_text, error_message, tool_name)
+                continue
+
+            try:
+                result = await self._aexecute_tool_with_timeout(tool, parameters)
+            except Exception as exc:
+                error_message = f"Error executing tool '{tool.name}': {exc}"
+                self._append_assistant_and_tool(response_text, error_message, tool.name)
+                continue
+
+            self._append_assistant_and_tool(response_text, result, tool.name, tool_result=result)
+
+        final_response = Message(
+            role=Role.ASSISTANT,
+            content=f"Maximum iterations ({self.config.max_iterations}) reached without resolution.",
+        )
+        if self.memory:
+            self.memory.add(final_response)
+        return final_response
+
+    async def _acall_provider(self, stream_handler: Optional[Callable[[str], None]] = None) -> str:
+        """Async version of _call_provider with retry logic."""
+        attempts = 0
+        last_error: Optional[str] = None
+
+        while attempts <= self.config.max_retries:
+            attempts += 1
+            try:
+                if self.config.stream and getattr(self.provider, "supports_streaming", False):
+                    return await self._astreaming_call(stream_handler=stream_handler)
+
+                # Check if provider has async support
+                if hasattr(self.provider, 'acomplete') and getattr(self.provider, 'supports_async', False):
+                    return await self.provider.acomplete(
+                        model=self.config.model,
+                        system_prompt=self._system_prompt,
+                        messages=self._history,
+                        temperature=self.config.temperature,
+                        max_tokens=self.config.max_tokens,
+                        timeout=self.config.request_timeout,
+                    )
+                else:
+                    # Fallback to sync in executor
+                    loop = asyncio.get_event_loop()
+                    with ThreadPoolExecutor() as executor:
+                        result = await loop.run_in_executor(
+                            executor,
+                            lambda: self.provider.complete(
+                                model=self.config.model,
+                                system_prompt=self._system_prompt,
+                                messages=self._history,
+                                temperature=self.config.temperature,
+                                max_tokens=self.config.max_tokens,
+                                timeout=self.config.request_timeout,
+                            )
+                        )
+                    return result
+            except ProviderError as exc:
+                last_error = str(exc)
+                if self.config.verbose:
+                    print(f"[agent] provider error attempt {attempts}/{self.config.max_retries + 1}: {exc}")
+                if attempts > self.config.max_retries:
+                    break
+                if self._is_rate_limit_error(last_error) and self.config.rate_limit_cooldown_seconds:
+                    await asyncio.sleep(self.config.rate_limit_cooldown_seconds * attempts)
+                if self.config.retry_backoff_seconds:
+                    await asyncio.sleep(self.config.retry_backoff_seconds * attempts)
+
+        return f"Provider error: {last_error or 'unknown error'}"
+
+    async def _astreaming_call(self, stream_handler: Optional[Callable[[str], None]] = None) -> str:
+        """Async version of _streaming_call."""
+        if not getattr(self.provider, "supports_streaming", False):
+            raise ProviderError(f"Provider {self.provider.name} does not support streaming.")
+
+        aggregated: List[str] = []
+        
+        # Check if provider has async streaming
+        if hasattr(self.provider, 'astream') and getattr(self.provider, 'supports_async', False):
+            async for chunk in self.provider.astream(
+                model=self.config.model,
+                system_prompt=self._system_prompt,
+                messages=self._history,
+                temperature=self.config.temperature,
+                max_tokens=self.config.max_tokens,
+                timeout=self.config.request_timeout,
+            ):
+                if chunk:
+                    aggregated.append(str(chunk))
+                    if stream_handler:
+                        stream_handler(str(chunk))
+        else:
+            # Fallback to sync streaming in executor
+            for chunk in self.provider.stream(
+                model=self.config.model,
+                system_prompt=self._system_prompt,
+                messages=self._history,
+                temperature=self.config.temperature,
+                max_tokens=self.config.max_tokens,
+                timeout=self.config.request_timeout,
+            ):
+                if chunk:
+                    aggregated.append(str(chunk))
+                    if stream_handler:
+                        stream_handler(str(chunk))
+                    
+        return "".join(aggregated)
+
+    async def _aexecute_tool_with_timeout(self, tool: Tool, parameters: dict) -> str:
+        """Async version of _execute_tool_with_timeout."""
+        if not self.config.tool_timeout_seconds:
+            return await tool.aexecute(parameters)
+
+        try:
+            return await asyncio.wait_for(
+                tool.aexecute(parameters),
+                timeout=self.config.tool_timeout_seconds
+            )
+        except asyncio.TimeoutError:
+            raise TimeoutError(
+                f"Tool '{tool.name}' timed out after {self.config.tool_timeout_seconds} seconds"
+            )
 
 
 __all__ = ["Agent", "AgentConfig"]

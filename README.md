@@ -421,6 +421,72 @@ response = agent.run([
 print(response.content)
 ```
 
+### 9. **Async Agent: Modern Python with asyncio**
+
+Build high-performance async applications with native async support:
+
+```python
+import asyncio
+from selectools import Agent, AgentConfig, Message, Role, tool, ConversationMemory
+from selectools.providers.openai_provider import OpenAIProvider
+
+# Async tools for I/O-bound operations
+@tool(description="Fetch weather data")
+async def fetch_weather(city: str) -> str:
+    await asyncio.sleep(0.1)  # Simulate async API call
+    return f"Weather in {city}: Sunny, 72°F"
+
+# Sync tools work seamlessly alongside async tools
+@tool(description="Calculate")
+def calculate(a: int, b: int) -> str:
+    return f"{a} + {b} = {a + b}"
+
+async def main():
+    # Conversation memory works with async
+    memory = ConversationMemory(max_messages=20)
+    
+    agent = Agent(
+        tools=[fetch_weather, calculate],
+        provider=OpenAIProvider(),
+        config=AgentConfig(max_iterations=5),
+        memory=memory
+    )
+    
+    # Use arun() instead of run()
+    response = await agent.arun([
+        Message(role=Role.USER, content="What's the weather in Seattle?")
+    ])
+    print(response.content)
+
+asyncio.run(main())
+```
+
+**FastAPI Integration:**
+
+```python
+from fastapi import FastAPI
+from selectools import Agent, Message, Role, tool, OpenAIProvider
+
+app = FastAPI()
+
+@tool(description="Fetch data")
+async def fetch_data(query: str) -> str:
+    return f"Data for {query}"
+
+@app.post("/chat")
+async def chat(message: str):
+    agent = Agent(tools=[fetch_data], provider=OpenAIProvider())
+    response = await agent.arun([Message(role=Role.USER, content=message)])
+    return {"response": response.content}
+```
+
+**Key Async Features:**
+- `Agent.arun()` for non-blocking execution
+- Async tools with `async def` 
+- All providers support async (OpenAI, Anthropic, Gemini)
+- Concurrent execution with `asyncio.gather()`
+- Works with FastAPI, aiohttp, and async frameworks
+
 ## Tool ergonomics
 
 - Use `ToolRegistry` or the `@tool` decorator to infer schemas from function signatures and register tools.
@@ -484,18 +550,19 @@ We're committed to making Selectools the most production-ready, developer-friend
 
 These high-impact features can be implemented quickly and will immediately improve the developer experience:
 
-#### **Conversation Memory** ⏱️ 2 hours
+#### **Conversation Memory** ⏱️ 2 hours ✅ **Completed in v0.4.0**
 - Simple `ConversationMemory` class for maintaining context
 - Automatic message history management with configurable limits
-- Easy integration: `memory = ConversationMemory(); agent.run(memory.get_history())`
-- **Status**: 🟡 Planned
+- Easy integration: `memory = ConversationMemory(); agent = Agent(..., memory=memory)`
+- **Status**: ✅ Implemented
 - **Why it matters**: Closes a major gap with LangChain, makes multi-turn conversations trivial
 
-#### **Async Support** ⏱️ 3 hours
-- `async def run_async()` for modern Python applications
-- Async provider calls and tool execution
+#### **Async Support** ⏱️ 6 hours ✅ **Completed in v0.4.0**
+- `Agent.arun()` for non-blocking agent execution
+- Async tools with `async def` (mixed seamlessly with sync tools)
+- Full async provider support (OpenAI, Anthropic, Gemini)
 - Compatible with FastAPI, asyncio, and other async frameworks
-- **Status**: 🟡 Planned
+- **Status**: ✅ Implemented
 - **Why it matters**: Required for high-performance web applications and concurrent operations
 
 #### **Better Error Messages** ⏱️ 2 hours
