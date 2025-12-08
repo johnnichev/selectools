@@ -7,12 +7,14 @@ This directory contains scripts to help automate the release process for publish
 Before using these scripts, ensure you have:
 
 1. **PyPI API Token configured in GitHub**
+
    - Go to https://pypi.org/manage/account/token/
    - Create a new API token
    - Add it to GitHub repository secrets as `PYPI_API_TOKEN`
    - Go to: https://github.com/johnnichev/selectools/settings/secrets/actions
 
 2. **Clean working directory**
+
    - Commit or stash any uncommitted changes before releasing
 
 3. **On the main branch**
@@ -70,12 +72,14 @@ A simpler bash script for quick releases.
 ## What Happens After Running the Script
 
 1. **Local changes:**
+
    - Version updated in `pyproject.toml`
    - Changes committed
    - Git tag created (e.g., `v0.3.1`)
    - Pushed to GitHub
 
 2. **GitHub Actions automatically:**
+
    - Runs all tests
    - Builds the package (wheel + source distribution)
    - Validates with `twine check`
@@ -83,6 +87,7 @@ A simpler bash script for quick releases.
    - Publishes to TestPyPI (if `TEST_PYPI_API_TOKEN` is set)
 
 3. **Monitor progress:**
+
    - https://github.com/johnnichev/selectools/actions
 
 4. **Verify publication:**
@@ -99,6 +104,7 @@ Follow [Semantic Versioning](https://semver.org/):
 - **PATCH**: Bug fixes (backwards compatible)
 
 Examples:
+
 - `0.3.1` → Bug fixes
 - `0.4.0` → New features
 - `1.0.0` → First stable release
@@ -108,6 +114,7 @@ Examples:
 ### "Permission denied" error
 
 Make the scripts executable:
+
 ```bash
 chmod +x scripts/release.py scripts/release.sh
 ```
@@ -115,6 +122,7 @@ chmod +x scripts/release.py scripts/release.sh
 ### "PYPI_API_TOKEN not found" in GitHub Actions
 
 The publish step will be skipped. Add the token to GitHub secrets:
+
 1. Go to https://github.com/johnnichev/selectools/settings/secrets/actions
 2. Add `PYPI_API_TOKEN` with your PyPI token
 
@@ -125,6 +133,7 @@ PyPI doesn't allow re-uploading the same version. Bump to a new version number.
 ### Tests fail in GitHub Actions
 
 The publish step won't run if tests fail. Fix the tests and push again, or delete the tag and re-release:
+
 ```bash
 git tag -d v0.3.1
 git push origin :refs/tags/v0.3.1
@@ -152,5 +161,5 @@ git push origin v0.3.1
 
 ## Other Scripts
 
-- **`chat.py`**: Interactive chat demo with vision support
 - **`smoke_cli.py`**: Quick smoke tests for different providers
+- **`test_memory_with_openai.py`**: Test conversation memory with OpenAI

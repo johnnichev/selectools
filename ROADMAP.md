@@ -2,7 +2,7 @@
 
 This document tracks the implementation status of all planned features. See [README.md](README.md#roadmap--future-improvements) for detailed descriptions.
 
-## Priority 1: Quick Wins (v0.4.0 - Target: 2 weeks)
+## Priority 1: Quick Wins (v0.4.0)
 
 | Feature                   | Status         | Notes                           |
 | ------------------------- | -------------- | ------------------------------- |
@@ -11,13 +11,13 @@ This document tracks the implementation status of all planned features. See [REA
 | Anthropic Provider (Full) | ✅ Implemented | Real SDK integration with async |
 | Gemini Provider (Full)    | ✅ Implemented | Real SDK integration with async |
 | Remove Pillow Dependency  | ✅ Implemented | Removed bbox example            |
-| Better Error Messages     | 🟡 Planned     | PyTorch-style helpful errors    |
-| Cost Tracking             | 🟡 Planned     | Track tokens and API costs      |
+| Better Error Messages     | ✅ Implemented | PyTorch-style helpful errors    |
+| Cost Tracking             | ✅ Implemented | Track tokens and API costs      |
 | Pre-built Tool Library    | 🟡 Planned     | 5-10 common tools in `toolbox`  |
 
 ---
 
-## Priority 2: High-Impact Features (v0.5.0 - Target: 1 month)
+## Priority 2: High-Impact Features (v0.6.0)
 
 | Feature                         | Status     | Notes                               |
 | ------------------------------- | ---------- | ----------------------------------- |
@@ -30,7 +30,7 @@ This document tracks the implementation status of all planned features. See [REA
 
 ---
 
-## Priority 3: Advanced Features (v0.6.0+ - Ongoing)
+## Priority 3: Advanced Features (v0.7.0+ - Ongoing)
 
 ### Context Management
 
@@ -116,7 +116,7 @@ This document tracks the implementation status of all planned features. See [REA
 
 ## Release Schedule
 
-### v0.4.0 - Quick Wins (Target: 2 weeks from now)
+### v0.4.0 - Quick Wins
 
 **Focus:** Developer experience improvements that close gaps with LangChain
 
@@ -134,7 +134,7 @@ This document tracks the implementation status of all planned features. See [REA
 - Cost Tracking
 - Pre-built Tool Library (at least 3 tools)
 
-### v0.5.0 - High-Impact Features (Target: 1 month from now)
+### v0.6.0 - High-Impact Features
 
 **Focus:** Performance and observability
 
@@ -149,7 +149,7 @@ This document tracks the implementation status of all planned features. See [REA
 - Tool Composition
 - Interactive Debug Mode
 
-### v0.6.0 - Advanced Features (Target: 3 months from now)
+### v0.7.0 - Advanced Features
 
 **Focus:** Advanced context management and ecosystem
 
@@ -164,7 +164,7 @@ This document tracks the implementation status of all planned features. See [REA
 - Local Model Support
 - Framework Integrations
 
-### v1.0.0 - Production Ready (Target: 6 months from now)
+### v1.0.0
 
 **Focus:** Enterprise features and stability
 
@@ -175,84 +175,6 @@ This document tracks the implementation status of all planned features. See [REA
 - ✅ 90%+ test coverage
 - ✅ Security hardening
 - ✅ Performance benchmarks
-
----
-
-## Metrics & Goals
-
-### Current State (v0.3.0)
-
-- ⭐ GitHub Stars: TBD
-- 📦 PyPI Downloads/month: TBD
-- 🐛 Open Issues: TBD
-- 📝 Documentation Coverage: ~80%
-- 🧪 Test Coverage: ~75%
-
-### Goals for v0.4.0
-
-- ⭐ GitHub Stars: 100+
-- 📦 PyPI Downloads/month: 500+
-- 🐛 Open Issues: <10
-- 📝 Documentation Coverage: 85%
-- 🧪 Test Coverage: 80%
-
-### Goals for v1.0.0
-
-- ⭐ GitHub Stars: 1,000+
-- 📦 PyPI Downloads/month: 5,000+
-- 🐛 Open Issues: <5
-- 📝 Documentation Coverage: 95%
-- 🧪 Test Coverage: 90%
-
----
-
-## Community Feedback
-
-Features most requested by users (update as we get feedback):
-
-1. **Conversation Memory** - Mentioned in 15+ discussions
-2. **Async Support** - Requested by 10+ users
-3. **Pre-built Tools** - Top feature request
-4. **Better Error Messages** - Common pain point
-5. **Cost Tracking** - Production users need this
-
----
-
-## Decision Log
-
-### Why Priority 1 Features Were Chosen
-
-**Conversation Memory**
-
-- Closes major gap with LangChain
-- Low effort, high impact
-- Enables multi-turn conversations (core use case)
-
-**Async Support**
-
-- Modern Python standard
-- Required for web frameworks
-- Enables better performance
-
-**Better Error Messages**
-
-- Improves DX significantly
-- Low effort, immediate value
-- Reduces support burden
-
-**Cost Tracking**
-
-- Unique differentiator (LangChain doesn't have this well)
-- Critical for production
-- Easy to implement
-
-**Pre-built Tool Library**
-
-- Instant productivity for new users
-- Easy to expand via community
-- Demonstrates best practices
-
----
 
 ## Last Updated
 

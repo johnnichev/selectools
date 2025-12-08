@@ -10,6 +10,8 @@ import time
 from pathlib import Path
 from typing import List
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -23,6 +25,7 @@ from selectools.memory import ConversationMemory
 from selectools.providers.stubs import LocalProvider
 
 
+@pytest.mark.asyncio
 async def test_100_concurrent_users():
     """Test 100 concurrent users making requests simultaneously."""
     print("  Testing 100 concurrent users...")
@@ -53,6 +56,7 @@ async def test_100_concurrent_users():
     return elapsed, throughput
 
 
+@pytest.mark.asyncio
 async def test_500_rapid_fire_requests():
     """Test 500 rapid-fire requests to a single agent pool."""
     print("  Testing 500 rapid-fire requests...")
@@ -80,6 +84,7 @@ async def test_500_rapid_fire_requests():
     return elapsed, throughput
 
 
+@pytest.mark.asyncio
 async def test_sustained_load_1000_requests():
     """Test sustained load with 1000 requests over time."""
     print("  Testing sustained load (1000 requests)...")
@@ -111,6 +116,7 @@ async def test_sustained_load_1000_requests():
     return elapsed, throughput
 
 
+@pytest.mark.asyncio
 async def test_concurrent_agents_with_memory():
     """Test 50 concurrent agents, each with their own memory."""
     print("  Testing 50 agents with independent memory...")
@@ -149,6 +155,7 @@ async def test_concurrent_agents_with_memory():
     return elapsed, throughput
 
 
+@pytest.mark.asyncio
 async def test_memory_under_load():
     """Test memory behavior under high load."""
     print("  Testing memory stability under load...")
@@ -188,6 +195,7 @@ async def test_memory_under_load():
     return elapsed
 
 
+@pytest.mark.asyncio
 async def test_mixed_workload_realistic():
     """Test mixed workload simulating real production traffic."""
     print("  Testing realistic mixed workload...")
@@ -238,6 +246,7 @@ async def test_mixed_workload_realistic():
     return elapsed, throughput
 
 
+@pytest.mark.asyncio
 async def test_error_handling_under_load():
     """Test error handling with high concurrency and failures."""
     print("  Testing error handling under concurrent load...")

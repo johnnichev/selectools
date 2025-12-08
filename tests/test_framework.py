@@ -15,6 +15,8 @@ from io import StringIO
 from pathlib import Path
 from typing import Dict
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -39,6 +41,7 @@ class FakeProvider:
 
     name = "fake"
     supports_streaming = False
+    supports_async = False
 
     def __init__(self, responses):
         self.responses = responses
@@ -47,9 +50,19 @@ class FakeProvider:
     def complete(
         self, *, model, system_prompt, messages, temperature=0.0, max_tokens=1000, timeout=None
     ):  # noqa: D401
+        from selectools import UsageStats
+
         response = self.responses[min(self.calls, len(self.responses) - 1)]
         self.calls += 1
-        return response
+        usage = UsageStats(
+            prompt_tokens=10,
+            completion_tokens=5,
+            total_tokens=15,
+            cost_usd=0.0001,
+            model=model or "fake",
+            provider="fake",
+        )
+        return response, usage
 
 
 class FakeStreamingProvider(FakeProvider):
@@ -104,11 +117,17 @@ def test_tool_schema_and_validation():
     assert schema["parameters"]["required"] == ["query"]
     assert schema["parameters"]["properties"]["query"]["type"] == "string"
 
-    is_valid, error = tool.validate({"query": "python"})
-    assert is_valid is True and error is None
+    # Valid params should not raise
+    tool.validate({"query": "python"})
 
-    is_valid, error = tool.validate({})
-    assert is_valid is False and "Missing required parameter" in error
+    # Invalid params should raise ToolValidationError
+    from selectools.exceptions import ToolValidationError
+
+    try:
+        tool.validate({})
+        assert False, "Should have raised ToolValidationError"
+    except ToolValidationError as e:
+        assert "Missing required parameter" in str(e)
 
 
 def test_conversation_memory_basic():
@@ -395,24 +414,33 @@ def test_local_provider_streams_tokens():
 
 
 def test_anthropic_and_gemini_require_api_keys():
+    from selectools.exceptions import ProviderConfigurationError
+
     os.environ.pop("ANTHROPIC_API_KEY", None)
     os.environ.pop("GEMINI_API_KEY", None)
+    os.environ.pop("GOOGLE_API_KEY", None)
     try:
         AnthropicProvider()
         assert False, "AnthropicProvider should require an API key"
-    except ProviderError:
+    except (ProviderError, ProviderConfigurationError):
         pass
 
     try:
         GeminiProvider()
         assert False, "GeminiProvider should require an API key"
-    except ProviderError:
+    except (ProviderError, ProviderConfigurationError):
         pass
 
 
 def test_anthropic_provider_with_mocked_client():
+    """Test Anthropic provider using a mocked anthropic package."""
     os.environ["ANTHROPIC_API_KEY"] = "test-key"
     fake_resp_block = types.SimpleNamespace(text="hello anthropic")
+
+    class FakeUsage:
+        def __init__(self):
+            self.input_tokens = 10
+            self.output_tokens = 5
 
     class FakeMessages:
         @staticmethod
@@ -422,7 +450,7 @@ def test_anthropic_provider_with_mocked_client():
                     type="content_block_delta", delta=types.SimpleNamespace(text="hello anthropic")
                 )
                 return [event]
-            return types.SimpleNamespace(content=[fake_resp_block])
+            return types.SimpleNamespace(content=[fake_resp_block], usage=FakeUsage())
 
     class FakeAnthropicClient:
         def __init__(self, api_key=None, base_url=None):
@@ -438,7 +466,7 @@ def test_anthropic_provider_with_mocked_client():
     sys.modules["anthropic"] = fake_module
     try:
         provider = AnthropicProvider()
-        result = provider.complete(
+        result, usage = provider.complete(
             model="claude-mock",
             system_prompt="sys",
             messages=[Message(role=Role.USER, content="hi")],
@@ -459,42 +487,74 @@ def test_anthropic_provider_with_mocked_client():
 
 
 def test_gemini_provider_with_mocked_client():
+    """Test Gemini provider using a mocked google-genai package."""
     os.environ["GEMINI_API_KEY"] = "test-key"
 
     class FakeStreamChunk:
         def __init__(self, text):
             self.text = text
 
+    class FakeUsageMetadata:
+        def __init__(self):
+            self.prompt_token_count = 10
+            self.candidates_token_count = 5
+
     class FakeResponse:
         def __init__(self, text):
             self.text = text
+            self.usage_metadata = FakeUsageMetadata()
 
-    class FakeGenerativeModel:
-        def __init__(self, model):
-            self.model = model
-
-        def generate_content(
-            self, prompt_parts, temperature, max_output_tokens, request_options=None, stream=False
-        ):
-            if stream:
-                return [FakeStreamChunk("stream-1"), FakeStreamChunk("stream-2")]
+    class FakeModels:
+        def generate_content(self, model, contents, config=None):
             return FakeResponse("gemini-response")
 
-    fake_module = types.SimpleNamespace(
-        configure=lambda api_key=None: None,
-        GenerativeModel=FakeGenerativeModel,
-    )
+        def generate_content_stream(self, model, contents, config=None):
+            yield FakeStreamChunk("stream-1")
+            yield FakeStreamChunk("stream-2")
 
+    class FakeClient:
+        def __init__(self, api_key=None):
+            self.models = FakeModels()
+
+    # Mock types module
+    class FakeTypes:
+        class GenerateContentConfig:
+            def __init__(self, **kwargs):
+                pass
+
+        class Part:
+            def __init__(self, text=None, inline_data=None):
+                self.text = text
+
+        class Content:
+            def __init__(self, role=None, parts=None):
+                self.role = role
+                self.parts = parts
+
+        class Blob:
+            def __init__(self, mime_type=None, data=None):
+                pass
+
+    # Create mock module structure
     google_pkg = types.ModuleType("google")
-    genai_pkg = types.ModuleType("google.generativeai")
-    genai_pkg.configure = fake_module.configure
-    genai_pkg.GenerativeModel = fake_module.GenerativeModel
+    genai_pkg = types.ModuleType("google.genai")
+    genai_types_pkg = types.ModuleType("google.genai.types")
+
+    genai_pkg.Client = FakeClient
+    genai_types_pkg.GenerateContentConfig = FakeTypes.GenerateContentConfig
+    genai_types_pkg.Part = FakeTypes.Part
+    genai_types_pkg.Content = FakeTypes.Content
+    genai_types_pkg.Blob = FakeTypes.Blob
+    genai_pkg.types = genai_types_pkg
+
+    google_pkg.genai = genai_pkg
     sys.modules["google"] = google_pkg
-    sys.modules["google.generativeai"] = genai_pkg
+    sys.modules["google.genai"] = genai_pkg
+    sys.modules["google.genai.types"] = genai_types_pkg
 
     try:
         provider = GeminiProvider()
-        result = provider.complete(
+        result, usage = provider.complete(
             model="gemini-mock",
             system_prompt="sys",
             messages=[Message(role=Role.USER, content="hi")],
@@ -511,7 +571,8 @@ def test_gemini_provider_with_mocked_client():
         assert "stream-1" in stream_result
     finally:
         sys.modules.pop("google", None)
-        sys.modules.pop("google.generativeai", None)
+        sys.modules.pop("google.genai", None)
+        sys.modules.pop("google.genai.types", None)
         os.environ.pop("GEMINI_API_KEY", None)
 
 
@@ -541,6 +602,7 @@ def test_cli_streaming_with_local_provider():
     assert "local provider" in output.lower()
 
 
+@pytest.mark.asyncio
 async def test_async_agent_basic():
     """Test basic async agent execution."""
     import asyncio
@@ -557,6 +619,7 @@ async def test_async_agent_basic():
     assert "async_echoed" in response.content or "local provider" in response.content.lower()
 
 
+@pytest.mark.asyncio
 async def test_async_tool_execution():
     """Test that both sync and async tools work with async agent."""
     import asyncio
@@ -594,6 +657,7 @@ async def test_async_tool_execution():
     assert async_result == "async:10"
 
 
+@pytest.mark.asyncio
 async def test_async_with_memory():
     """Test async agent with conversation memory."""
     from selectools.memory import ConversationMemory
@@ -621,6 +685,7 @@ async def test_async_with_memory():
     assert len(memory) >= 2
 
 
+@pytest.mark.asyncio
 async def test_async_provider_fallback():
     """Test that agent falls back to sync when provider doesn't support async."""
     # LocalProvider doesn't have async support
@@ -642,6 +707,7 @@ async def test_async_provider_fallback():
     assert response.role == Role.ASSISTANT
 
 
+@pytest.mark.asyncio
 async def test_async_multiple_iterations():
     """Test async agent with multiple tool call iterations."""
     call_count = 0

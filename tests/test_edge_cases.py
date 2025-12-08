@@ -8,6 +8,8 @@ import asyncio
 import sys
 from pathlib import Path
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -22,6 +24,8 @@ from selectools.providers.stubs import LocalProvider
 from selectools.tools import ToolRegistry
 
 
+@pytest.mark.asyncio
+@pytest.mark.asyncio
 async def test_mixed_sync_async_tools_comprehensive():
     """Test complex scenarios with mixed sync/async tools."""
     call_log = []
@@ -57,6 +61,7 @@ async def test_mixed_sync_async_tools_comprehensive():
     assert len(call_log) >= 0  # May or may not call tools depending on LocalProvider
 
 
+@pytest.mark.asyncio
 async def test_tool_timeout_edge_cases():
     """Test tool timeout behavior in edge cases."""
 
@@ -83,6 +88,7 @@ async def test_tool_timeout_edge_cases():
     assert response.role == Role.ASSISTANT
 
 
+@pytest.mark.asyncio
 async def test_concurrent_agent_execution():
     """Test multiple agents running concurrently."""
 
@@ -108,6 +114,7 @@ async def test_concurrent_agent_execution():
     assert all(r.role == Role.ASSISTANT for r in results)
 
 
+@pytest.mark.asyncio
 async def test_memory_overflow_handling():
     """Test memory behavior when limits are exceeded."""
     memory = ConversationMemory(max_messages=5)
@@ -124,6 +131,7 @@ async def test_memory_overflow_handling():
     assert len(memory) <= 5
 
 
+@pytest.mark.asyncio
 async def test_error_propagation_in_async():
     """Test that errors are properly propagated in async context."""
 
@@ -140,6 +148,7 @@ async def test_error_propagation_in_async():
     assert response.role == Role.ASSISTANT
 
 
+@pytest.mark.asyncio
 async def test_async_with_streaming():
     """Test async agent with streaming enabled."""
     chunks = []
@@ -162,6 +171,7 @@ async def test_async_with_streaming():
     assert len(chunks) > 0
 
 
+@pytest.mark.asyncio
 async def test_complex_multi_turn_async_conversation():
     """Test complex multi-turn conversation with memory and mixed tools."""
     memory = ConversationMemory(max_messages=20)
@@ -194,8 +204,10 @@ async def test_complex_multi_turn_async_conversation():
     assert len(memory) > 5
 
 
+@pytest.mark.asyncio
 async def test_provider_error_recovery():
     """Test recovery from provider errors in async mode."""
+    from selectools import UsageStats
 
     class FailingProvider:
         name = "failing"
@@ -209,10 +221,12 @@ async def test_provider_error_recovery():
                 from selectools.providers.base import ProviderError
 
                 raise ProviderError("Temporary failure")
-            return "Success after retries"
+            usage = UsageStats(prompt_tokens=10, completion_tokens=5)
+            return "Success after retries", usage
 
         def complete(self, **kwargs):
-            return "Sync fallback"
+            usage = UsageStats(prompt_tokens=10, completion_tokens=5)
+            return "Sync fallback", usage
 
     tool = Tool(name="test", description="Test", parameters=[], function=lambda: "ok")
 
@@ -228,6 +242,7 @@ async def test_provider_error_recovery():
     assert provider.call_count >= 2  # Should have retried
 
 
+@pytest.mark.asyncio
 async def test_async_tool_with_sync_provider():
     """Test async tools work with providers that don't support async."""
 
@@ -247,6 +262,7 @@ async def test_async_tool_with_sync_provider():
     assert response.role == Role.ASSISTANT
 
 
+@pytest.mark.asyncio
 async def test_empty_tool_result_handling():
     """Test handling of empty or None tool results."""
 
@@ -268,6 +284,7 @@ async def test_empty_tool_result_handling():
     assert response.role == Role.ASSISTANT
 
 
+@pytest.mark.asyncio
 async def test_large_tool_results():
     """Test handling of large tool results."""
 
@@ -284,6 +301,7 @@ async def test_large_tool_results():
     assert response.role == Role.ASSISTANT
 
 
+@pytest.mark.asyncio
 async def test_memory_with_large_messages():
     """Test memory handling with large messages."""
     memory = ConversationMemory(max_messages=10, max_tokens=1000)
@@ -300,6 +318,7 @@ async def test_memory_with_large_messages():
     assert len(memory) >= 0  # Should not crash
 
 
+@pytest.mark.asyncio
 async def test_rapid_consecutive_calls():
     """Test rapid consecutive agent calls."""
     tool = Tool(name="fast", description="Fast tool", parameters=[], function=lambda: "fast")

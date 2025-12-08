@@ -5,10 +5,13 @@ Tool metadata, schemas, and runtime validation.
 from __future__ import annotations
 
 import asyncio
+import difflib
 import inspect
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+from .exceptions import ToolExecutionError, ToolValidationError
 
 JsonSchema = Dict[str, Any]
 ParameterValue = Union[str, int, float, bool, dict, list]
@@ -179,34 +182,84 @@ class Tool:
             return f"Parameter '{param.name}' must be of type {param.param_type.__name__}, got {type(value).__name__}"
         return None
 
-    def validate(self, params: Dict[str, ParameterValue]) -> Tuple[bool, Optional[str]]:
+    def validate(self, params: Dict[str, ParameterValue]) -> None:
         """
         Validate a parameter dictionary against this tool's schema.
 
-        Returns (is_valid, error_message)
+        Raises ToolValidationError if validation fails with helpful suggestions.
         """
+        expected_params = {p.name for p in self.parameters}
+        provided_params = set(params.keys())
+        extra_params = provided_params - expected_params
+
+        # Check for unexpected parameters (possible typos)
+        if extra_params:
+            suggestions = []
+            for extra in extra_params:
+                # Find closest match using difflib
+                matches = difflib.get_close_matches(extra, expected_params, n=1, cutoff=0.6)
+                if matches:
+                    suggestions.append(f"'{extra}' -> Did you mean '{matches[0]}'?")
+                else:
+                    suggestions.append(f"'{extra}' is not a valid parameter")
+
+            expected_list = ", ".join(f"'{p}'" for p in sorted(expected_params))
+            raise ToolValidationError(
+                tool_name=self.name,
+                param_name=", ".join(sorted(extra_params)),
+                issue="Unexpected parameter(s)",
+                suggestion=f"{'; '.join(suggestions)}\nExpected parameters: {expected_list}",
+            )
+
+        # Check for missing required parameters
         for param in self.parameters:
             if param.required and param.name not in params:
-                return False, f"Missing required parameter: {param.name}"
+                expected_list = ", ".join(f"'{p.name}'" for p in self.parameters if p.required)
+                raise ToolValidationError(
+                    tool_name=self.name,
+                    param_name=param.name,
+                    issue="Missing required parameter",
+                    suggestion=f"Required parameters: {expected_list}",
+                )
+
             if param.name not in params:
                 continue
+
+            # Validate parameter type
             error = self._validate_single(param, params[param.name])
             if error:
-                return False, error
-        return True, None
+                # Provide helpful type conversion suggestions
+                value = params[param.name]
+                type_hint = ""
+                if param.param_type is str and not isinstance(value, str):
+                    type_hint = f"Try: {param.name}=str({repr(value)})"
+                elif param.param_type is int and isinstance(value, str):
+                    type_hint = f"Try: {param.name}=int('{value}')"
+                elif param.param_type is float and isinstance(value, (str, int)):
+                    type_hint = f"Try: {param.name}=float({repr(value)})"
+
+                raise ToolValidationError(
+                    tool_name=self.name,
+                    param_name=param.name,
+                    issue=error,
+                    suggestion=(
+                        type_hint if type_hint else f"Expected type: {param.param_type.__name__}"
+                    ),
+                )
 
     def execute(self, params: Dict[str, ParameterValue]) -> str:
         """Validate parameters then execute the underlying callable."""
-        is_valid, error = self.validate(params)
-        if not is_valid:
-            raise ValueError(f"Invalid parameters for tool '{self.name}': {error}")
+        self.validate(params)
 
         call_args: Dict[str, Any] = dict(params)
         call_args.update(self.injected_kwargs)
         if self.config_injector:
             call_args.update(self.config_injector() or {})
 
-        return self.function(**call_args)
+        try:
+            return self.function(**call_args)
+        except Exception as exc:
+            raise ToolExecutionError(tool_name=self.name, error=exc, params=params) from exc
 
     async def aexecute(self, params: Dict[str, ParameterValue]) -> str:
         """
@@ -215,24 +268,27 @@ class Tool:
         If the tool function is async, it will be awaited. If it's sync,
         it will be run in a thread pool executor to avoid blocking.
         """
-        is_valid, error = self.validate(params)
-        if not is_valid:
-            raise ValueError(f"Invalid parameters for tool '{self.name}': {error}")
+        self.validate(params)
 
         call_args: Dict[str, Any] = dict(params)
         call_args.update(self.injected_kwargs)
         if self.config_injector:
             call_args.update(self.config_injector() or {})
 
-        if self.is_async:
-            # Directly await async function
-            return await self.function(**call_args)  # type: ignore[misc]
-        else:
-            # Run sync function in executor to avoid blocking
-            loop = asyncio.get_event_loop()
-            with ThreadPoolExecutor() as executor:
-                result = await loop.run_in_executor(executor, lambda: self.function(**call_args))
-            return result
+        try:
+            if self.is_async:
+                # Directly await async function
+                return await self.function(**call_args)  # type: ignore[misc]
+            else:
+                # Run sync function in executor to avoid blocking
+                loop = asyncio.get_event_loop()
+                with ThreadPoolExecutor() as executor:
+                    result = await loop.run_in_executor(
+                        executor, lambda: self.function(**call_args)
+                    )
+                return result
+        except Exception as exc:
+            raise ToolExecutionError(tool_name=self.name, error=exc, params=params) from exc
 
 
 def _infer_parameters_from_callable(

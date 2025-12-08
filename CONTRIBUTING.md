@@ -54,12 +54,106 @@ export ANTHROPIC_API_KEY="your-key-here"  # Optional
 export GEMINI_API_KEY="your-key-here"     # Optional
 ```
 
+## Available Scripts
+
+Similar to `npm run` scripts, here are the common commands for this project:
+
+### Testing
+
+```bash
+# Run all tests
+pytest tests/ -v
+
+# Run tests quietly (summary only)
+pytest tests/ -q
+
+# Run specific test file
+pytest tests/test_framework.py -v
+
+# Run tests matching a pattern
+pytest tests/ -k "test_tool" -v
+
+# Run with coverage (if installed)
+pytest tests/ --cov=src/selectools --cov-report=html
+```
+
+### Code Quality
+
+```bash
+# Run all pre-commit hooks on all files
+pre-commit run --all-files
+
+# Run individual tools
+black src/ tests/ examples/          # Format code
+isort src/ tests/ examples/          # Sort imports
+flake8 src/                          # Lint code
+mypy src/                            # Type check
+bandit -r src/                       # Security scan
+```
+
+### Examples
+
+```bash
+# Basic weather search example
+python examples/search_weather.py
+
+# Async agent demo
+python examples/async_agent_demo.py
+
+# Conversation memory demo
+python examples/conversation_memory_demo.py
+
+# Cost tracking demo
+python examples/cost_tracking_demo.py
+
+# Customer support bot example
+python examples/customer_support_bot.py
+
+# Data analysis agent example
+python examples/data_analysis_agent.py
+```
+
+### Development Scripts
+
+```bash
+# Quick smoke test for providers
+python scripts/smoke_cli.py
+
+# Test conversation memory with OpenAI
+python scripts/test_memory_with_openai.py
+```
+
+### Release
+
+```bash
+# Release a new version (recommended)
+python scripts/release.py --version 0.5.1
+
+# Dry run (see what would happen)
+python scripts/release.py --version 0.5.1 --dry-run
+
+# Or use the bash script
+./scripts/release.sh 0.5.1
+```
+
+See `scripts/README.md` for detailed release instructions.
+
+### Building
+
+```bash
+# Build the package
+python -m build
+
+# Check the built package
+twine check dist/*
+```
+
 ## Running Tests
 
 Run the test suite to ensure everything works:
 
 ```bash
-python tests/test_framework.py
+pytest tests/ -v
 ```
 
 All tests should pass before submitting a pull request.
@@ -120,22 +214,43 @@ def execute_tool(tool: Tool, arguments: dict[str, Any]) -> str:
 
 ```
 selectools/
-├── src/selectools/          # Main package
-│   ├── agent.py            # Agent loop and orchestration
-│   ├── parser.py           # TOOL_CALL parser
-│   ├── prompt.py           # Prompt builder
-│   ├── tools.py            # Tool definitions and registry
-│   ├── types.py            # Core types (Message, Role, etc.)
-│   ├── cli.py              # CLI interface
-│   ├── providers/          # LLM provider adapters
-│   │   ├── base.py         # Provider interface
-│   │   ├── openai_provider.py
-│   │   └── stubs.py        # Anthropic, Gemini, Local
-│   └── examples/           # Example tools
-│       └── bbox.py         # Bounding box detection
-├── tests/                  # Test suite
-├── examples/               # Usage examples
-└── scripts/                # Development scripts
+├── src/selectools/              # Main package
+│   ├── __init__.py             # Public exports
+│   ├── agent.py                # Agent loop and orchestration
+│   ├── cli.py                  # CLI interface
+│   ├── env.py                  # Environment variable loading
+│   ├── exceptions.py           # Custom exception classes
+│   ├── parser.py               # TOOL_CALL parser
+│   ├── pricing.py              # LLM pricing data and cost calculation
+│   ├── prompt.py               # Prompt builder
+│   ├── tools.py                # Tool definitions and registry
+│   ├── types.py                # Core types (Message, Role, etc.)
+│   ├── usage.py                # Usage tracking (tokens, costs)
+│   └── providers/              # LLM provider adapters
+│       ├── base.py             # Provider interface
+│       ├── openai_provider.py  # OpenAI implementation
+│       ├── anthropic_provider.py # Anthropic implementation
+│       ├── gemini_provider.py  # Google Gemini implementation
+│       └── stubs.py            # Local/test providers
+├── tests/                      # Test suite
+│   ├── conftest.py             # Pytest configuration
+│   ├── test_framework.py       # Core framework tests
+│   ├── test_better_errors.py   # Error handling tests
+│   ├── test_cost_tracking.py   # Cost tracking tests
+│   └── test_e2e_providers.py   # End-to-end provider tests
+├── examples/                   # Usage examples
+│   ├── search_weather.py       # Basic tool usage
+│   ├── async_agent_demo.py     # Async operations
+│   ├── conversation_memory_demo.py
+│   ├── cost_tracking_demo.py
+│   ├── customer_support_bot.py
+│   └── data_analysis_agent.py
+└── scripts/                    # Development scripts
+    ├── README.md               # Release documentation
+    ├── release.py              # Python release script
+    ├── release.sh              # Bash release script
+    ├── smoke_cli.py            # Provider smoke tests
+    └── test_memory_with_openai.py
 ```
 
 ## How to Contribute
@@ -240,22 +355,49 @@ To add support for a new LLM provider:
 ```python
 # src/selectools/providers/your_provider.py
 
+import os
 from typing import Iterator
-from .base import Provider, ProviderError
+
+from .base import Provider
+from ..exceptions import ProviderConfigurationError
 from ..types import Message
+from ..usage import UsageStats
+from ..pricing import calculate_cost
+
 
 class YourProvider(Provider):
     def __init__(self, api_key: str = None, default_model: str = "model-name"):
         self.api_key = api_key or os.getenv("YOUR_PROVIDER_API_KEY")
+        if not self.api_key:
+            raise ProviderConfigurationError(
+                "API key is required",
+                details={"env_var": "YOUR_PROVIDER_API_KEY"}
+            )
         self.default_model = default_model
 
-    def complete(self, messages: list[Message], model: str = None, **kwargs) -> str:
-        # Implementation here
-        pass
+    def complete(
+        self, messages: list[Message], model: str = None, **kwargs
+    ) -> tuple[str, UsageStats]:
+        model = model or self.default_model
+        # Call your provider's API here
+        # response = your_api_call(...)
 
-    def stream(self, messages: list[Message], model: str = None, **kwargs) -> Iterator[str]:
-        # Implementation here
-        pass
+        # Extract usage stats
+        usage = UsageStats(
+            prompt_tokens=response.usage.prompt_tokens,
+            completion_tokens=response.usage.completion_tokens,
+            model=model,
+            provider="your_provider",
+            cost_usd=calculate_cost(model, prompt_tokens, completion_tokens),
+        )
+        return response.text, usage
+
+    def stream(
+        self, messages: list[Message], model: str = None, **kwargs
+    ) -> Iterator[str]:
+        # Streaming only yields text chunks (no usage stats)
+        for chunk in your_streaming_api_call(...):
+            yield chunk.text
 ```
 
 2. **Add tests**

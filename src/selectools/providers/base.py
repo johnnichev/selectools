@@ -4,9 +4,12 @@ Provider abstraction for model-agnostic tool calling.
 
 from __future__ import annotations
 
-from typing import AsyncIterable, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, AsyncIterable, Protocol, runtime_checkable
 
 from ..types import Message
+
+if TYPE_CHECKING:
+    from ..usage import UsageStats
 
 
 class ProviderError(RuntimeError):
@@ -35,8 +38,13 @@ class Provider(Protocol):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> str:
-        """Return assistant text given conversation state."""
+    ) -> tuple[str, "UsageStats"]:
+        """
+        Return assistant text and usage stats given conversation state.
+
+        Returns:
+            Tuple of (response_text, usage_stats)
+        """
         ...
 
     def stream(
@@ -54,6 +62,9 @@ class Provider(Protocol):
 
         Implementations should raise ProviderError if streaming is not supported
         or fails.
+
+        Note: Streaming methods do not return usage stats due to Python generator
+        limitations. Use complete() if you need usage tracking.
         """
         ...
 
@@ -67,12 +78,15 @@ class Provider(Protocol):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> str:
+    ) -> tuple[str, "UsageStats"]:
         """
         Async version of complete().
 
         Providers can implement this for native async support. If not implemented,
         the agent will fall back to running the sync version in an executor.
+
+        Returns:
+            Tuple of (response_text, usage_stats)
         """
         ...
 
@@ -90,7 +104,9 @@ class Provider(Protocol):
         Async version of stream().
 
         Providers can implement this for native async streaming support.
-        Returns an async generator (AsyncIterable[str]).
+
+        Note: Async streaming methods do not return usage stats due to Python
+        async generator limitations. Use acomplete() if you need usage tracking.
         """
         ...
 

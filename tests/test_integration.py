@@ -9,6 +9,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -22,6 +24,8 @@ from selectools.memory import ConversationMemory
 from selectools.providers.stubs import LocalProvider
 
 
+@pytest.mark.asyncio
+@pytest.mark.asyncio
 async def test_realistic_customer_support_scenario():
     """Simulate a realistic customer support conversation."""
     memory = ConversationMemory(max_messages=30)
@@ -79,6 +83,7 @@ async def test_realistic_customer_support_scenario():
     )
 
 
+@pytest.mark.asyncio
 async def test_concurrent_users_scenario():
     """Simulate multiple users hitting the system concurrently."""
 
@@ -113,6 +118,7 @@ async def test_concurrent_users_scenario():
     print(f"  ✓ Handled 10 concurrent users, each with 3 requests")
 
 
+@pytest.mark.asyncio
 async def test_error_recovery_and_retry():
     """Test the system can recover from various error conditions."""
     failures = []
@@ -139,6 +145,7 @@ async def test_error_recovery_and_retry():
     print(f"  ✓ Recovered from {len(failures)} failures")
 
 
+@pytest.mark.asyncio
 async def test_memory_persistence_across_sessions():
     """Test that memory properly persists state across multiple interactions."""
     memory = ConversationMemory(max_messages=20)
@@ -176,6 +183,7 @@ async def test_memory_persistence_across_sessions():
     print(f"  ✓ Memory persisted across sessions: {initial_memory_size} → {len(memory)} messages")
 
 
+@pytest.mark.asyncio
 async def test_streaming_with_async_and_memory():
     """Test streaming works correctly with async execution and memory."""
     memory = ConversationMemory(max_messages=15)
@@ -206,6 +214,7 @@ async def test_streaming_with_async_and_memory():
     print(f"  ✓ Streamed {len(chunks_collected)} chunks, saved {len(memory)} messages to memory")
 
 
+@pytest.mark.asyncio
 async def test_mixed_tool_types_realistic():
     """Test realistic mix of sync I/O, async I/O, and compute-heavy tools."""
 
@@ -250,6 +259,7 @@ async def test_mixed_tool_types_realistic():
     print("  ✓ Successfully mixed async DB, sync file I/O, compute, and async API calls")
 
 
+@pytest.mark.asyncio
 async def test_tool_timeout_with_graceful_degradation():
     """Test that tool timeouts don't crash the system."""
 
@@ -279,6 +289,7 @@ async def test_tool_timeout_with_graceful_degradation():
     print("  ✓ Handled tool timeout gracefully with fallback")
 
 
+@pytest.mark.asyncio
 async def test_large_scale_conversation():
     """Test system handles large-scale conversations."""
     memory = ConversationMemory(max_messages=50, max_tokens=10000)

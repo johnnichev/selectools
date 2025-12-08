@@ -1,40 +1,56 @@
 """
-Google Gemini provider adapter for the tool-calling library.
+Google Gemini provider adapter using the new google-genai SDK.
+
+This provider uses the new centralized Client API introduced with Gemini 2.0.
+See: https://ai.google.dev/gemini-api/docs/migrate
 """
 
 from __future__ import annotations
 
-import asyncio
 import os
-from concurrent.futures import ThreadPoolExecutor
-from typing import Iterable, List
+from typing import List
 
 from ..env import load_default_env
+from ..exceptions import ProviderConfigurationError
+from ..pricing import calculate_cost
 from ..types import Message, Role
+from ..usage import UsageStats
 from .base import Provider, ProviderError
 
 
 class GeminiProvider(Provider):
-    """Google Gemini adapter using google-generativeai SDK."""
+    """
+    Google Gemini adapter using the new google-genai SDK.
+
+    This implementation uses the centralized Client API pattern:
+    - client.models.generate_content() for non-streaming
+    - client.models.generate_content_stream() for streaming
+    - client.aio.models.generate_content() for async
+    """
 
     name = "gemini"
     supports_streaming = True
     supports_async = True
 
-    def __init__(self, api_key: str | None = None, default_model: str = "gemini-1.5-flash"):
+    def __init__(self, api_key: str | None = None, default_model: str = "gemini-2.0-flash"):
         load_default_env()
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY")
+        self.api_key = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         if not self.api_key:
-            raise ProviderError("GEMINI_API_KEY is not set. Set it in env or pass api_key.")
+            raise ProviderConfigurationError(
+                provider_name="Gemini",
+                missing_config="API key",
+                env_var="GEMINI_API_KEY",
+            )
 
         try:
-            import google.generativeai as genai
+            from google import genai
         except ImportError as exc:
             raise ProviderError(
-                "google-generativeai package not installed. Install with `pip install google-generativeai`."
+                "google-genai package not installed. Install with `pip install google-genai`."
             ) from exc
 
-        genai.configure(api_key=self.api_key)
+        # Create the centralized client
+        self._client = genai.Client(api_key=self.api_key)
         self._genai = genai
         self.default_model = default_model
 
@@ -47,12 +63,12 @@ class GeminiProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> str:
+    ) -> tuple[str, UsageStats]:
         """
         Call Gemini's generate_content API for a non-streaming completion.
 
         Args:
-            model: Model name (e.g., "gemini-1.5-flash")
+            model: Model name (e.g., "gemini-2.0-flash")
             system_prompt: System-level instructions
             messages: Conversation history
             temperature: Sampling temperature (0.0-1.0)
@@ -60,29 +76,47 @@ class GeminiProvider(Provider):
             timeout: Optional request timeout in seconds
 
         Returns:
-            The model's response text
+            Tuple of (response_text, usage_stats)
 
         Raises:
             ProviderError: If the API call fails
         """
-        model_obj = self._genai.GenerativeModel(model or self.default_model)
+        from google.genai import types
 
-        # Build a single prompt that includes system instructions and conversation
-        prompt_parts = self._build_prompt(system_prompt, messages)
+        model_name = model or self.default_model
+        contents = self._format_contents(system_prompt, messages)
 
-        request_options = {"timeout": timeout} if timeout is not None else None
+        config = types.GenerateContentConfig(
+            temperature=temperature,
+            max_output_tokens=max_tokens,
+            system_instruction=system_prompt if system_prompt else None,
+        )
 
         try:
-            response = model_obj.generate_content(
-                prompt_parts,
-                temperature=temperature,
-                max_output_tokens=max_tokens,
-                request_options=request_options,
+            response = self._client.models.generate_content(
+                model=model_name,
+                contents=contents,
+                config=config,
             )
         except Exception as exc:
             raise ProviderError(f"Gemini completion failed: {exc}") from exc
 
-        return response.text or ""
+        content = response.text or ""
+
+        # Extract usage stats from response
+        usage = response.usage_metadata if hasattr(response, "usage_metadata") else None
+        prompt_tokens = usage.prompt_token_count if usage else 0
+        completion_tokens = usage.candidates_token_count if usage else 0
+        usage_stats = UsageStats(
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=prompt_tokens + completion_tokens,
+            cost_usd=calculate_cost(model_name, prompt_tokens, completion_tokens),
+            model=model_name,
+            provider="gemini",
+        )
+
+        return content, usage_stats
 
     def stream(
         self,
@@ -93,46 +127,77 @@ class GeminiProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> Iterable[str]:
+    ):
         """
-        Stream responses from Gemini's generate_content API.
+        Stream responses from Gemini's generate_content_stream API.
 
         Yields text chunks as they arrive from the API.
         """
-        model_obj = self._genai.GenerativeModel(model or self.default_model)
+        from google.genai import types
 
-        prompt_parts = self._build_prompt(system_prompt, messages)
+        model_name = model or self.default_model
+        contents = self._format_contents(system_prompt, messages)
 
-        request_options = {"timeout": timeout} if timeout is not None else None
+        config = types.GenerateContentConfig(
+            temperature=temperature,
+            max_output_tokens=max_tokens,
+            system_instruction=system_prompt if system_prompt else None,
+        )
 
         try:
-            stream = model_obj.generate_content(
-                prompt_parts,
-                temperature=temperature,
-                max_output_tokens=max_tokens,
-                request_options=request_options,
-                stream=True,
+            stream = self._client.models.generate_content_stream(
+                model=model_name,
+                contents=contents,
+                config=config,
             )
         except Exception as exc:
             raise ProviderError(f"Gemini streaming failed: {exc}") from exc
 
         for chunk in stream:
-            if getattr(chunk, "text", None):
+            if chunk.text:
                 yield chunk.text
 
-    def _build_prompt(self, system_prompt: str, messages: List[Message]):
+    def _format_contents(self, system_prompt: str, messages: List[Message]) -> List:
         """
-        Build a complete prompt for Gemini including system instructions and messages.
+        Format messages for Gemini's API.
 
-        Gemini doesn't have a system role, so we prepend instructions to the conversation.
+        Converts our Message format to Gemini's content format.
+        System instructions are handled separately via config.
         """
-        conversation = [system_prompt]
+        from google.genai import types
+
+        contents = []
         for message in messages:
-            prefix = message.role.value.capitalize()
-            conversation.append(f"{prefix}: {message.content}")
-        return "\n".join(conversation)
+            role = message.role.value
+            # Map our roles to Gemini roles
+            if role == Role.ASSISTANT.value or role == Role.TOOL.value:
+                role = "model"
+            elif role == Role.USER.value:
+                role = "user"
+            else:
+                role = "user"  # Default fallback
 
-    # Async methods (using ThreadPoolExecutor since Gemini SDK lacks native async)
+            # Build parts
+            parts = []
+            if message.content:
+                parts.append(types.Part(text=message.content))
+
+            # Handle images if present
+            if message.image_base64:
+                parts.append(
+                    types.Part(
+                        inline_data=types.Blob(
+                            mime_type="image/png",
+                            data=message.image_base64,
+                        )
+                    )
+                )
+
+            contents.append(types.Content(role=role, parts=parts))
+
+        return contents
+
+    # Async methods using client.aio
     async def acomplete(
         self,
         *,
@@ -142,27 +207,49 @@ class GeminiProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> str:
+    ) -> tuple[str, UsageStats]:
         """
-        Async version of complete() using ThreadPoolExecutor.
+        Async version of complete() using client.aio.
 
-        Note: Gemini SDK doesn't natively support async, so we run the
-        sync method in a thread pool executor.
+        Returns:
+            Tuple of (response_text, usage_stats)
         """
-        loop = asyncio.get_event_loop()
-        with ThreadPoolExecutor() as executor:
-            result = await loop.run_in_executor(
-                executor,
-                lambda: self.complete(
-                    model=model,
-                    system_prompt=system_prompt,
-                    messages=messages,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    timeout=timeout,
-                ),
+        from google.genai import types
+
+        model_name = model or self.default_model
+        contents = self._format_contents(system_prompt, messages)
+
+        config = types.GenerateContentConfig(
+            temperature=temperature,
+            max_output_tokens=max_tokens,
+            system_instruction=system_prompt if system_prompt else None,
+        )
+
+        try:
+            response = await self._client.aio.models.generate_content(
+                model=model_name,
+                contents=contents,
+                config=config,
             )
-        return result
+        except Exception as exc:
+            raise ProviderError(f"Gemini async completion failed: {exc}") from exc
+
+        content = response.text or ""
+
+        # Extract usage stats
+        usage = response.usage_metadata if hasattr(response, "usage_metadata") else None
+        prompt_tokens = usage.prompt_token_count if usage else 0
+        completion_tokens = usage.candidates_token_count if usage else 0
+        usage_stats = UsageStats(
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=prompt_tokens + completion_tokens,
+            cost_usd=calculate_cost(model_name, prompt_tokens, completion_tokens),
+            model=model_name,
+            provider="gemini",
+        )
+
+        return content, usage_stats
 
     async def astream(
         self,
@@ -175,27 +262,33 @@ class GeminiProvider(Provider):
         timeout: float | None = None,
     ):
         """
-        Async version of stream() using ThreadPoolExecutor.
+        Async version of stream() using client.aio.
 
-        Note: Gemini SDK doesn't natively support async streaming, so we
-        run chunks in a thread pool executor.
+        Yields text chunks as they arrive from the API.
         """
-        loop = asyncio.get_event_loop()
+        from google.genai import types
 
-        # Create a sync generator and wrap it for async iteration
-        sync_stream = self.stream(
-            model=model,
-            system_prompt=system_prompt,
-            messages=messages,
+        model_name = model or self.default_model
+        contents = self._format_contents(system_prompt, messages)
+
+        config = types.GenerateContentConfig(
             temperature=temperature,
-            max_tokens=max_tokens,
-            timeout=timeout,
+            max_output_tokens=max_tokens,
+            system_instruction=system_prompt if system_prompt else None,
         )
 
-        with ThreadPoolExecutor() as executor:
-            for chunk in sync_stream:
-                # Yield each chunk (already in main thread, no executor needed)
-                yield chunk
+        try:
+            stream = await self._client.aio.models.generate_content_stream(
+                model=model_name,
+                contents=contents,
+                config=config,
+            )
+        except Exception as exc:
+            raise ProviderError(f"Gemini async streaming failed: {exc}") from exc
+
+        async for chunk in stream:
+            if chunk.text:
+                yield chunk.text
 
 
 __all__ = ["GeminiProvider"]

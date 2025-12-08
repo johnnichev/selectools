@@ -8,7 +8,10 @@ import os
 from typing import List
 
 from ..env import load_default_env
+from ..exceptions import ProviderConfigurationError
+from ..pricing import calculate_cost
 from ..types import Message, Role
+from ..usage import UsageStats
 from .base import Provider, ProviderError
 
 
@@ -23,7 +26,11 @@ class OpenAIProvider(Provider):
         load_default_env()
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not self.api_key:
-            raise ProviderError("OPENAI_API_KEY is not set. Set it in env or pass api_key.")
+            raise ProviderConfigurationError(
+                provider_name="OpenAI",
+                missing_config="API key",
+                env_var="OPENAI_API_KEY",
+            )
 
         try:
             from openai import AsyncOpenAI, OpenAI
@@ -45,12 +52,13 @@ class OpenAIProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> str:
+    ) -> tuple[str, UsageStats]:
         formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
+        model_name = model or self.default_model
 
         try:
             response = self._client.chat.completions.create(
-                model=model or self.default_model,
+                model=model_name,
                 messages=formatted,
                 temperature=temperature,
                 max_tokens=max_tokens,
@@ -60,7 +68,23 @@ class OpenAIProvider(Provider):
             raise ProviderError(f"OpenAI completion failed: {exc}") from exc
 
         content = response.choices[0].message.content
-        return content or ""
+
+        # Extract usage stats
+        usage = response.usage
+        usage_stats = UsageStats(
+            prompt_tokens=usage.prompt_tokens if usage else 0,
+            completion_tokens=usage.completion_tokens if usage else 0,
+            total_tokens=usage.total_tokens if usage else 0,
+            cost_usd=calculate_cost(
+                model_name,
+                usage.prompt_tokens if usage else 0,
+                usage.completion_tokens if usage else 0,
+            ),
+            model=model_name,
+            provider="openai",
+        )
+
+        return content or "", usage_stats
 
     def stream(
         self,
@@ -72,10 +96,13 @@ class OpenAIProvider(Provider):
         max_tokens: int = 1000,
         timeout: float | None = None,
     ):
+        """Stream response chunks. Note: Does not return usage stats."""
         formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
+        model_name = model or self.default_model
+
         try:
             response = self._client.chat.completions.create(
-                model=model or self.default_model,
+                model=model_name,
                 messages=formatted,
                 temperature=temperature,
                 max_tokens=max_tokens,
@@ -87,7 +114,7 @@ class OpenAIProvider(Provider):
 
         for chunk in response:
             try:
-                delta = chunk.choices[0].delta
+                delta = chunk.choices[0].delta if chunk.choices else None
                 if not delta or not delta.content:
                     continue
                 content = delta.content
@@ -134,13 +161,14 @@ class OpenAIProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> str:
+    ) -> tuple[str, UsageStats]:
         """Async version of complete() using AsyncOpenAI client."""
         formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
+        model_name = model or self.default_model
 
         try:
             response = await self._async_client.chat.completions.create(
-                model=model or self.default_model,
+                model=model_name,
                 messages=formatted,
                 temperature=temperature,
                 max_tokens=max_tokens,
@@ -150,7 +178,23 @@ class OpenAIProvider(Provider):
             raise ProviderError(f"OpenAI async completion failed: {exc}") from exc
 
         content = response.choices[0].message.content
-        return content or ""
+
+        # Extract usage stats
+        usage = response.usage
+        usage_stats = UsageStats(
+            prompt_tokens=usage.prompt_tokens if usage else 0,
+            completion_tokens=usage.completion_tokens if usage else 0,
+            total_tokens=usage.total_tokens if usage else 0,
+            cost_usd=calculate_cost(
+                model_name,
+                usage.prompt_tokens if usage else 0,
+                usage.completion_tokens if usage else 0,
+            ),
+            model=model_name,
+            provider="openai",
+        )
+
+        return content or "", usage_stats
 
     async def astream(
         self,
@@ -162,15 +206,24 @@ class OpenAIProvider(Provider):
         max_tokens: int = 1000,
         timeout: float | None = None,
     ):
-        """Async version of stream() using AsyncOpenAI client."""
+        """
+        Async version of stream() using AsyncOpenAI client.
+
+        Note: This is an async generator that yields chunks. Due to Python limitations,
+        async generators cannot return values, so usage stats are not returned.
+        Use acomplete() if you need usage stats.
+        """
         formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
+        model_name = model or self.default_model
+
         try:
             response = await self._async_client.chat.completions.create(
-                model=model or self.default_model,
+                model=model_name,
                 messages=formatted,
                 temperature=temperature,
                 max_tokens=max_tokens,
                 stream=True,
+                stream_options={"include_usage": True},  # Get usage stats with streaming
                 timeout=timeout,
             )
         except Exception as exc:
@@ -178,7 +231,7 @@ class OpenAIProvider(Provider):
 
         async for chunk in response:
             try:
-                delta = chunk.choices[0].delta
+                delta = chunk.choices[0].delta if chunk.choices else None
                 if not delta or not delta.content:
                     continue
                 content = delta.content

@@ -16,6 +16,7 @@ from .providers.base import Provider, ProviderError
 from .providers.openai_provider import OpenAIProvider
 from .tools import Tool
 from .types import Message, Role
+from .usage import AgentUsage
 
 if TYPE_CHECKING:
     from .memory import ConversationMemory
@@ -41,6 +42,7 @@ class AgentConfig:
         retry_backoff_seconds: Seconds to wait between retries (multiplied by attempt number). Default: 1.0.
         rate_limit_cooldown_seconds: Cooldown period after rate limit errors. Default: 5.0.
         tool_timeout_seconds: Maximum execution time for each tool call. None = no timeout. Default: None.
+        cost_warning_threshold: Print warning when total cost exceeds this USD amount. None = no warnings. Default: None.
 
     Example:
         >>> # Production config with retries and timeouts
@@ -68,6 +70,7 @@ class AgentConfig:
     retry_backoff_seconds: float = 1.0
     rate_limit_cooldown_seconds: float = 5.0
     tool_timeout_seconds: Optional[float] = None
+    cost_warning_threshold: Optional[float] = None
 
 
 class Agent:
@@ -156,6 +159,7 @@ class Agent:
         self.parser = parser or ToolCallParser()
         self.config = config or AgentConfig()
         self.memory = memory
+        self.usage = AgentUsage()
 
         self._system_prompt = self.prompt_builder.build(self.tools)
         self._history: List[Message] = []
@@ -213,6 +217,15 @@ class Agent:
 
             try:
                 result = self._execute_tool_with_timeout(tool, parameters)
+                # Track tool usage
+                if self.usage.iterations:
+                    last_iteration = self.usage.iterations[-1]
+                    # Update the most recent iteration with the tool name
+                    if tool.name not in self.usage.tool_usage:
+                        self.usage.tool_usage[tool.name] = 0
+                        self.usage.tool_tokens[tool.name] = 0
+                    self.usage.tool_usage[tool.name] += 1
+                    self.usage.tool_tokens[tool.name] += last_iteration.total_tokens
             except Exception as exc:  # noqa: BLE001
                 error_message = f"Error executing tool '{tool.name}': {exc}"
                 self._append_assistant_and_tool(response_text, error_message, tool.name)
@@ -239,7 +252,7 @@ class Agent:
                 if self.config.stream and getattr(self.provider, "supports_streaming", False):
                     return self._streaming_call(stream_handler=stream_handler)
 
-                return self.provider.complete(
+                response_text, usage_stats = self.provider.complete(
                     model=self.config.model,
                     system_prompt=self._system_prompt,
                     messages=self._history,
@@ -247,6 +260,28 @@ class Agent:
                     max_tokens=self.config.max_tokens,
                     timeout=self.config.request_timeout,
                 )
+
+                # Track usage (tool name will be added later after parsing)
+                self.usage.add_usage(usage_stats, tool_name=None)
+
+                # Check cost warning threshold
+                if (
+                    self.config.cost_warning_threshold
+                    and self.usage.total_cost_usd > self.config.cost_warning_threshold
+                ):
+                    print(
+                        f"\n⚠️  Cost Warning: Total cost ${self.usage.total_cost_usd:.6f} "
+                        f"exceeds threshold ${self.config.cost_warning_threshold:.6f}\n"
+                    )
+
+                if self.config.verbose:
+                    print(
+                        f"[agent] tokens: {usage_stats.total_tokens:,} "
+                        f"(prompt: {usage_stats.prompt_tokens:,}, completion: {usage_stats.completion_tokens:,}), "
+                        f"cost: ${usage_stats.cost_usd:.6f}"
+                    )
+
+                return response_text
             except ProviderError as exc:
                 last_error = str(exc)
                 if self.config.verbose:
@@ -269,6 +304,7 @@ class Agent:
         if not getattr(self.provider, "supports_streaming", False):
             raise ProviderError(f"Provider {self.provider.name} does not support streaming.")
 
+        # Note: Streaming does not return usage stats due to Python generator limitations
         aggregated: List[str] = []
         for chunk in self.provider.stream(
             model=self.config.model,
@@ -282,6 +318,7 @@ class Agent:
                 aggregated.append(str(chunk))
                 if stream_handler:
                     stream_handler(str(chunk))
+
         return "".join(aggregated)
 
     def _append_assistant_and_tool(
@@ -407,7 +444,7 @@ class Agent:
                 if hasattr(self.provider, "acomplete") and getattr(
                     self.provider, "supports_async", False
                 ):
-                    return await self.provider.acomplete(
+                    response_text, usage_stats = await self.provider.acomplete(
                         model=self.config.model,
                         system_prompt=self._system_prompt,
                         messages=self._history,
@@ -419,7 +456,7 @@ class Agent:
                     # Fallback to sync in executor
                     loop = asyncio.get_event_loop()
                     with ThreadPoolExecutor() as executor:
-                        result = await loop.run_in_executor(
+                        response_text, usage_stats = await loop.run_in_executor(
                             executor,
                             lambda: self.provider.complete(
                                 model=self.config.model,
@@ -430,7 +467,28 @@ class Agent:
                                 timeout=self.config.request_timeout,
                             ),
                         )
-                    return result
+
+                # Track usage
+                self.usage.add_usage(usage_stats, tool_name=None)
+
+                # Check cost warning threshold
+                if (
+                    self.config.cost_warning_threshold
+                    and self.usage.total_cost_usd > self.config.cost_warning_threshold
+                ):
+                    print(
+                        f"\n⚠️  Cost Warning: Total cost ${self.usage.total_cost_usd:.6f} "
+                        f"exceeds threshold ${self.config.cost_warning_threshold:.6f}\n"
+                    )
+
+                if self.config.verbose:
+                    print(
+                        f"[agent] tokens: {usage_stats.total_tokens:,} "
+                        f"(prompt: {usage_stats.prompt_tokens:,}, completion: {usage_stats.completion_tokens:,}), "
+                        f"cost: ${usage_stats.cost_usd:.6f}"
+                    )
+
+                return response_text
             except ProviderError as exc:
                 last_error = str(exc)
                 if self.config.verbose:
@@ -501,6 +559,36 @@ class Agent:
             raise TimeoutError(
                 f"Tool '{tool.name}' timed out after {self.config.tool_timeout_seconds} seconds"
             )
+
+    # Usage tracking convenience methods
+    @property
+    def total_cost(self) -> float:
+        """Get the total cost in USD for all API calls."""
+        return self.usage.total_cost_usd
+
+    @property
+    def total_tokens(self) -> int:
+        """Get the total number of tokens used across all API calls."""
+        return self.usage.total_tokens
+
+    def get_usage_summary(self) -> str:
+        """
+        Get a formatted summary of token usage and costs.
+
+        Returns:
+            Formatted string with usage statistics including token counts,
+            costs, and per-tool breakdown.
+        """
+        return str(self.usage)
+
+    def reset_usage(self) -> None:
+        """
+        Reset usage tracking statistics.
+
+        Useful when starting a new conversation or session while reusing
+        the same agent instance.
+        """
+        self.usage = AgentUsage()
 
 
 __all__ = ["Agent", "AgentConfig"]

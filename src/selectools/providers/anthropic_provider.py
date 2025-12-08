@@ -8,7 +8,10 @@ import os
 from typing import Iterable, List
 
 from ..env import load_default_env
+from ..exceptions import ProviderConfigurationError
+from ..pricing import calculate_cost
 from ..types import Message, Role
+from ..usage import UsageStats
 from .base import Provider, ProviderError
 
 
@@ -28,7 +31,11 @@ class AnthropicProvider(Provider):
         load_default_env()
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
         if not self.api_key:
-            raise ProviderError("ANTHROPIC_API_KEY is not set. Set it in env or pass api_key.")
+            raise ProviderConfigurationError(
+                provider_name="Anthropic",
+                missing_config="API key",
+                env_var="ANTHROPIC_API_KEY",
+            )
 
         try:
             from anthropic import Anthropic, AsyncAnthropic
@@ -50,7 +57,7 @@ class AnthropicProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> str:
+    ) -> tuple[str, UsageStats]:
         """
         Call Anthropic's messages API for a non-streaming completion.
 
@@ -63,14 +70,15 @@ class AnthropicProvider(Provider):
             timeout: Optional request timeout in seconds
 
         Returns:
-            The assistant's response text
+            Tuple of (response_text, usage_stats)
 
         Raises:
             ProviderError: If the API call fails
         """
         payload = self._format_messages(messages)
+        model_name = model or self.default_model
         request_args = {
-            "model": model or self.default_model,
+            "model": model_name,
             "system": system_prompt,
             "messages": payload,
             "temperature": temperature,
@@ -84,7 +92,24 @@ class AnthropicProvider(Provider):
             raise ProviderError(f"Anthropic completion failed: {exc}") from exc
 
         text_chunks = [block.text for block in response.content if hasattr(block, "text")]
-        return "".join(text_chunks)
+        content = "".join(text_chunks)
+
+        # Extract usage stats
+        usage = response.usage
+        usage_stats = UsageStats(
+            prompt_tokens=usage.input_tokens if usage else 0,
+            completion_tokens=usage.output_tokens if usage else 0,
+            total_tokens=(usage.input_tokens + usage.output_tokens) if usage else 0,
+            cost_usd=calculate_cost(
+                model_name,
+                usage.input_tokens if usage else 0,
+                usage.output_tokens if usage else 0,
+            ),
+            model=model_name,
+            provider="anthropic",
+        )
+
+        return content, usage_stats
 
     def stream(
         self,
@@ -95,15 +120,16 @@ class AnthropicProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> Iterable[str]:
+    ):
         """
         Stream responses from Anthropic's messages API.
 
         Yields text chunks as they arrive from the API.
         """
         payload = self._format_messages(messages)
+        model_name = model or self.default_model
         request_args = {
-            "model": model or self.default_model,
+            "model": model_name,
             "system": system_prompt,
             "messages": payload,
             "temperature": temperature,
@@ -118,7 +144,10 @@ class AnthropicProvider(Provider):
             raise ProviderError(f"Anthropic streaming failed: {exc}") from exc
 
         for event in stream:
-            if getattr(event, "type", None) == "content_block_delta":
+            event_type = getattr(event, "type", None)
+
+            # Extract text deltas
+            if event_type == "content_block_delta":
                 delta = getattr(event, "delta", None)
                 text = getattr(delta, "text", None) if delta else None
                 if text:
@@ -165,11 +194,17 @@ class AnthropicProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> str:
-        """Async version of complete() using AsyncAnthropic client."""
+    ) -> tuple[str, UsageStats]:
+        """
+        Async version of complete() using AsyncAnthropic client.
+
+        Returns:
+            Tuple of (response_text, usage_stats)
+        """
         payload = self._format_messages(messages)
+        model_name = model or self.default_model
         request_args = {
-            "model": model or self.default_model,
+            "model": model_name,
             "system": system_prompt,
             "messages": payload,
             "temperature": temperature,
@@ -183,7 +218,24 @@ class AnthropicProvider(Provider):
             raise ProviderError(f"Anthropic async completion failed: {exc}") from exc
 
         text_chunks = [block.text for block in response.content if hasattr(block, "text")]
-        return "".join(text_chunks)
+        content = "".join(text_chunks)
+
+        # Extract usage stats
+        usage = response.usage
+        usage_stats = UsageStats(
+            prompt_tokens=usage.input_tokens if usage else 0,
+            completion_tokens=usage.output_tokens if usage else 0,
+            total_tokens=(usage.input_tokens + usage.output_tokens) if usage else 0,
+            cost_usd=calculate_cost(
+                model_name,
+                usage.input_tokens if usage else 0,
+                usage.output_tokens if usage else 0,
+            ),
+            model=model_name,
+            provider="anthropic",
+        )
+
+        return content, usage_stats
 
     async def astream(
         self,
@@ -197,8 +249,9 @@ class AnthropicProvider(Provider):
     ):
         """Async version of stream() using AsyncAnthropic client."""
         payload = self._format_messages(messages)
+        model_name = model or self.default_model
         request_args = {
-            "model": model or self.default_model,
+            "model": model_name,
             "system": system_prompt,
             "messages": payload,
             "temperature": temperature,
@@ -213,7 +266,10 @@ class AnthropicProvider(Provider):
             raise ProviderError(f"Anthropic async streaming failed: {exc}") from exc
 
         async for event in stream:
-            if getattr(event, "type", None) == "content_block_delta":
+            event_type = getattr(event, "type", None)
+
+            # Extract text deltas
+            if event_type == "content_block_delta":
                 delta = getattr(event, "delta", None)
                 text = getattr(delta, "text", None) if delta else None
                 if text:

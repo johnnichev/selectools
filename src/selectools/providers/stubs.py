@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Iterable, List
 
 from ..types import Message, Role
+from ..usage import UsageStats
 from .base import Provider
 
 
@@ -33,10 +34,21 @@ class LocalProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> str:
+    ) -> tuple[str, UsageStats]:
         last_user = next((m for m in reversed(messages) if m.role == Role.USER), None)
         user_text = last_user.content if last_user else ""
-        return f"[local provider: {model}] {user_text or 'No user message provided.'}"
+        response = f"[local provider: {model}] {user_text or 'No user message provided.'}"
+
+        # Create dummy usage stats
+        usage_stats = UsageStats(
+            prompt_tokens=0,
+            completion_tokens=0,
+            total_tokens=0,
+            cost_usd=0.0,
+            model=model,
+            provider="local",
+        )
+        return response, usage_stats
 
     def stream(
         self,
@@ -48,7 +60,7 @@ class LocalProvider(Provider):
         max_tokens: int = 1000,
         timeout: float | None = None,
     ):
-        text = self.complete(
+        text, _ = self.complete(
             model=model,
             system_prompt=system_prompt,
             messages=messages,
@@ -69,7 +81,7 @@ class LocalProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> str:
+    ) -> tuple[str, UsageStats]:
         raise NotImplementedError("LocalProvider does not support async operations")
 
     def astream(
