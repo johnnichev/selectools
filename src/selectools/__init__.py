@@ -1,6 +1,7 @@
 """Public exports for the selectools package."""
 
 from .agent import Agent, AgentConfig
+from .memory import ConversationMemory
 from .types import Message, Role, ToolCall
 from .tools import Tool, ToolParameter, ToolRegistry, tool
 from .parser import ToolCallParser
@@ -11,6 +12,7 @@ from .providers.stubs import AnthropicProvider, GeminiProvider, LocalProvider
 __all__ = [
     "Agent",
     "AgentConfig",
+    "ConversationMemory",
     "Message",
     "Role",
     "Tool",

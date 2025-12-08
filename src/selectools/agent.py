@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
-from typing import Callable, List, Optional
+from typing import TYPE_CHECKING, Callable, List, Optional
 
 from .types import Message, Role
 from .tools import Tool
@@ -15,6 +15,9 @@ from .parser import ToolCallParser
 from .prompt import PromptBuilder
 from .providers.base import Provider, ProviderError
 from .providers.openai_provider import OpenAIProvider
+
+if TYPE_CHECKING:
+    from .memory import ConversationMemory
 
 
 @dataclass
@@ -44,6 +47,7 @@ class Agent:
         prompt_builder: Optional[PromptBuilder] = None,
         parser: Optional[ToolCallParser] = None,
         config: Optional[AgentConfig] = None,
+        memory: Optional[ConversationMemory] = None,
     ):
         if not tools:
             raise ValueError("Agent requires at least one tool.")
@@ -54,13 +58,34 @@ class Agent:
         self.prompt_builder = prompt_builder or PromptBuilder()
         self.parser = parser or ToolCallParser()
         self.config = config or AgentConfig()
+        self.memory = memory
 
         self._system_prompt = self.prompt_builder.build(self.tools)
         self._history: List[Message] = []
 
     def run(self, messages: List[Message], stream_handler: Optional[Callable[[str], None]] = None) -> Message:
-        """Execute the agent loop with the provided conversation history."""
-        self._history = list(messages)
+        """
+        Execute the agent loop with the provided conversation history.
+        
+        If the agent was initialized with a ConversationMemory, the new messages
+        will be appended to the existing memory history, and the final response
+        will be automatically saved to memory.
+        
+        Args:
+            messages: New messages for this turn (typically a single user message).
+            stream_handler: Optional callback for streaming responses.
+            
+        Returns:
+            The final assistant response message.
+        """
+        # Load history from memory if available, then append new messages
+        if self.memory:
+            self._history = self.memory.get_history() + list(messages)
+            # Add new user messages to memory
+            self.memory.add_many(messages)
+        else:
+            self._history = list(messages)
+        
         iteration = 0
 
         while iteration < self.config.max_iterations:
@@ -69,7 +94,11 @@ class Agent:
             parse_result = self.parser.parse(response_text)
 
             if not parse_result.tool_call:
-                return Message(role=Role.ASSISTANT, content=response_text)
+                final_response = Message(role=Role.ASSISTANT, content=response_text)
+                # Save final response to memory if available
+                if self.memory:
+                    self.memory.add(final_response)
+                return final_response
 
             tool_name = parse_result.tool_call.tool_name
             parameters = parse_result.tool_call.parameters
@@ -92,10 +121,14 @@ class Agent:
 
             self._append_assistant_and_tool(response_text, result, tool.name, tool_result=result)
 
-        return Message(
+        final_response = Message(
             role=Role.ASSISTANT,
             content=f"Maximum iterations ({self.config.max_iterations}) reached without resolution.",
         )
+        # Save final response to memory if available
+        if self.memory:
+            self.memory.add(final_response)
+        return final_response
 
     def _call_provider(self, stream_handler: Optional[Callable[[str], None]] = None) -> str:
         attempts = 0
@@ -155,15 +188,20 @@ class Agent:
         tool_result: Optional[str] = None,
     ) -> None:
         """Update history with assistant response and tool output."""
-        self._history.append(Message(role=Role.ASSISTANT, content=assistant_content))
-        self._history.append(
-            Message(
-                role=Role.TOOL,
-                content=tool_content,
-                tool_name=tool_name,
-                tool_result=tool_result,
-            )
+        assistant_msg = Message(role=Role.ASSISTANT, content=assistant_content)
+        tool_msg = Message(
+            role=Role.TOOL,
+            content=tool_content,
+            tool_name=tool_name,
+            tool_result=tool_result,
         )
+        
+        self._history.append(assistant_msg)
+        self._history.append(tool_msg)
+        
+        # Also add to memory if available
+        if self.memory:
+            self.memory.add_many([assistant_msg, tool_msg])
 
     def _execute_tool_with_timeout(self, tool: Tool, parameters: dict) -> str:
         """Run tool.execute with optional timeout."""

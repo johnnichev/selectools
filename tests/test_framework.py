@@ -24,6 +24,7 @@ if str(SRC_DIR) not in sys.path:
 
 from agent import Agent, AgentConfig, Message, Role, Tool, ToolParameter
 from selectools.tools import ToolRegistry
+from selectools.memory import ConversationMemory
 from selectools.examples.bbox import BBOX_MOCK_ENV, detect_bounding_box_impl
 from selectools.parser import ToolCallParser
 from selectools.providers.base import ProviderError
@@ -97,6 +98,142 @@ def test_tool_schema_and_validation():
 
     is_valid, error = tool.validate({})
     assert is_valid is False and "Missing required parameter" in error
+
+
+def test_conversation_memory_basic():
+    """Test basic ConversationMemory operations."""
+    memory = ConversationMemory(max_messages=5)
+    
+    # Test empty memory
+    assert len(memory) == 0
+    assert memory.get_history() == []
+    
+    # Add single message
+    msg1 = Message(role=Role.USER, content="Hello")
+    memory.add(msg1)
+    assert len(memory) == 1
+    assert memory.get_history()[0].content == "Hello"
+    
+    # Add multiple messages
+    msg2 = Message(role=Role.ASSISTANT, content="Hi there")
+    msg3 = Message(role=Role.USER, content="How are you?")
+    memory.add_many([msg2, msg3])
+    assert len(memory) == 3
+    
+    # Test get_recent
+    recent = memory.get_recent(2)
+    assert len(recent) == 2
+    assert recent[0].content == "Hi there"
+    assert recent[1].content == "How are you?"
+    
+    # Test clear
+    memory.clear()
+    assert len(memory) == 0
+
+
+def test_conversation_memory_max_messages():
+    """Test that ConversationMemory enforces max_messages limit."""
+    memory = ConversationMemory(max_messages=3)
+    
+    # Add more messages than the limit
+    messages = [
+        Message(role=Role.USER, content="Message 1"),
+        Message(role=Role.ASSISTANT, content="Message 2"),
+        Message(role=Role.USER, content="Message 3"),
+        Message(role=Role.ASSISTANT, content="Message 4"),
+        Message(role=Role.USER, content="Message 5"),
+    ]
+    memory.add_many(messages)
+    
+    # Should only keep the last 3 messages
+    assert len(memory) == 3
+    history = memory.get_history()
+    assert history[0].content == "Message 3"
+    assert history[1].content == "Message 4"
+    assert history[2].content == "Message 5"
+
+
+def test_conversation_memory_with_agent():
+    """Test Agent integration with ConversationMemory."""
+    memory = ConversationMemory(max_messages=10)
+    tool = Tool(
+        name="echo",
+        description="Echo the input",
+        parameters=[],
+        function=lambda: "echoed"
+    )
+    provider = FakeProvider(responses=["Done with that"])
+    agent = Agent(tools=[tool], provider=provider, memory=memory)
+    
+    # First turn
+    response1 = agent.run([Message(role=Role.USER, content="Hello")])
+    assert response1.content == "Done with that"
+    # Should have USER + ASSISTANT in memory
+    assert len(memory) == 2
+    assert memory.get_history()[0].role == Role.USER
+    assert memory.get_history()[0].content == "Hello"
+    assert memory.get_history()[1].role == Role.ASSISTANT
+    
+    # Second turn - memory should persist
+    response2 = agent.run([Message(role=Role.USER, content="Hi again")])
+    assert len(memory) == 4  # 2 previous + 2 new
+    history = memory.get_history()
+    assert history[0].content == "Hello"
+    assert history[2].content == "Hi again"
+
+
+def test_conversation_memory_persistence_across_turns():
+    """Test that memory persists across multiple agent turns."""
+    memory = ConversationMemory(max_messages=20)
+    tool = Tool(
+        name="counter",
+        description="Count",
+        parameters=[],
+        function=lambda: "counted"
+    )
+    provider = FakeProvider(responses=["Response 1", "Response 2", "Response 3"])
+    agent = Agent(tools=[tool], provider=provider, memory=memory)
+    
+    # Multiple turns
+    agent.run([Message(role=Role.USER, content="Turn 1")])
+    agent.run([Message(role=Role.USER, content="Turn 2")])
+    agent.run([Message(role=Role.USER, content="Turn 3")])
+    
+    # Should have all 6 messages (3 USER + 3 ASSISTANT)
+    assert len(memory) == 6
+    history = memory.get_history()
+    assert history[0].content == "Turn 1"
+    assert history[2].content == "Turn 2"
+    assert history[4].content == "Turn 3"
+
+
+def test_conversation_memory_to_dict():
+    """Test ConversationMemory serialization."""
+    memory = ConversationMemory(max_messages=5)
+    memory.add(Message(role=Role.USER, content="Test"))
+    
+    data = memory.to_dict()
+    assert data["max_messages"] == 5
+    assert data["message_count"] == 1
+    assert len(data["messages"]) == 1
+    assert data["messages"][0]["content"] == "Test"
+
+
+def test_conversation_memory_without_memory():
+    """Test that Agent works without memory (backward compatibility)."""
+    tool = Tool(
+        name="test",
+        description="Test",
+        parameters=[],
+        function=lambda: "ok"
+    )
+    provider = FakeProvider(responses=["Done"])
+    agent = Agent(tools=[tool], provider=provider)  # No memory
+    
+    # Should work as before
+    response = agent.run([Message(role=Role.USER, content="Test")])
+    assert response.content == "Done"
+    assert agent.memory is None
 
 
 def test_tool_decorator_and_registry_infer_schema():
@@ -416,19 +553,25 @@ def test_bounding_box_uses_mock_when_configured():
 if __name__ == "__main__":
     # Simple runner for environments without pytest
     all_tests = [
-        test_role_enum,
-        test_message_creation_and_image_encoding,
-        test_tool_schema_and_validation,
-        test_tool_decorator_and_registry_infer_schema,
-        test_parser_handles_fenced_blocks,
-        test_parser_handles_multiple_candidates_and_mixed_text,
-        test_parser_respects_size_limit,
-        test_parser_handles_mixed_text_json,
-        test_agent_executes_tool_and_returns_final_message,
-        test_agent_streaming_handler_and_fallback,
-        test_agent_retries_on_provider_error,
-        test_local_provider_streams_tokens,
-        test_anthropic_and_gemini_require_api_keys,
+    test_role_enum,
+    test_message_creation_and_image_encoding,
+    test_tool_schema_and_validation,
+    test_conversation_memory_basic,
+    test_conversation_memory_max_messages,
+    test_conversation_memory_with_agent,
+    test_conversation_memory_persistence_across_turns,
+    test_conversation_memory_to_dict,
+    test_conversation_memory_without_memory,
+    test_tool_decorator_and_registry_infer_schema,
+    test_parser_handles_fenced_blocks,
+    test_parser_handles_multiple_candidates_and_mixed_text,
+    test_parser_respects_size_limit,
+    test_parser_handles_mixed_text_json,
+    test_agent_executes_tool_and_returns_final_message,
+    test_agent_streaming_handler_and_fallback,
+    test_agent_retries_on_provider_error,
+    test_local_provider_streams_tokens,
+    test_anthropic_and_gemini_require_api_keys,
     test_anthropic_provider_with_mocked_client,
     test_gemini_provider_with_mocked_client,
     test_cli_streaming_with_local_provider,
