@@ -5,7 +5,7 @@ All file operations are relative to the current working directory by default.
 """
 
 from pathlib import Path
-from typing import Optional
+from typing import Generator, Optional
 
 from ..tools import tool
 
@@ -158,3 +158,39 @@ def file_exists(path: str) -> str:
         return f"❌ Error: Permission denied accessing: {path}"
     except Exception as e:
         return f"❌ Error checking path: {e}"
+
+
+@tool(description="Read a file line by line with streaming", streaming=True)
+def read_file_stream(filepath: str, encoding: str = "utf-8") -> Generator[str, None, None]:
+    """
+    Read a file line by line and yield each line progressively.
+
+    This is useful for large files where you want to see results as they're processed.
+
+    Args:
+        filepath: Path to the file to read
+        encoding: Text encoding (default: utf-8)
+
+    Yields:
+        Each line from the file, prefixed with line number
+
+    Raises:
+        FileNotFoundError: If the file doesn't exist
+        PermissionError: If the file can't be read
+    """
+    try:
+        path = Path(filepath)
+        yield f"📄 Reading file: {filepath}\n"
+        yield f"📏 Size: {path.stat().st_size} bytes\n\n"
+
+        with path.open("r", encoding=encoding) as f:
+            for i, line in enumerate(f, 1):
+                yield f"[Line {i:4d}] {line}"
+
+        yield f"\n✅ Finished reading {filepath}\n"
+    except FileNotFoundError:
+        yield f"❌ Error: File not found: {filepath}\n"
+    except PermissionError:
+        yield f"❌ Error: Permission denied reading: {filepath}\n"
+    except Exception as e:
+        yield f"❌ Error reading file: {e}\n"

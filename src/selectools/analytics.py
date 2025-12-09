@@ -17,7 +17,8 @@ class ToolMetrics:
     Metrics for a single tool's usage.
 
     Tracks execution statistics including call counts, success rates,
-    timing information, cost attribution, and parameter usage patterns.
+    timing information, cost attribution, parameter usage patterns,
+    and streaming-specific metrics.
 
     Attributes:
         name: Tool name.
@@ -27,6 +28,8 @@ class ToolMetrics:
         total_duration: Total execution time in seconds.
         total_cost: Total cost attributed to this tool (USD).
         parameter_usage: Frequency count of parameter values used.
+        total_chunks: Total number of chunks streamed (for streaming tools).
+        streaming_calls: Number of calls where tool streamed results.
     """
 
     name: str
@@ -36,6 +39,8 @@ class ToolMetrics:
     total_duration: float = 0.0
     total_cost: float = 0.0
     parameter_usage: Dict[str, Dict[Any, int]] = field(default_factory=dict)
+    total_chunks: int = 0
+    streaming_calls: int = 0
 
     @property
     def success_rate(self) -> float:
@@ -71,6 +76,8 @@ class ToolMetrics:
             "avg_duration": round(self.avg_duration, 4),
             "total_cost": round(self.total_cost, 6),
             "parameter_usage": self.parameter_usage,
+            "total_chunks": self.total_chunks,
+            "streaming_calls": self.streaming_calls,
         }
 
 
@@ -106,6 +113,7 @@ class AgentAnalytics:
         duration: float,
         params: Dict[str, Any],
         cost: float = 0.0,
+        chunk_count: int = 0,
     ) -> None:
         """
         Record a tool execution.
@@ -116,6 +124,7 @@ class AgentAnalytics:
             duration: Execution time in seconds.
             params: Parameters passed to the tool.
             cost: Cost attributed to this tool call (USD).
+            chunk_count: Number of chunks streamed (0 for non-streaming tools).
         """
         if tool_name not in self._metrics:
             self._metrics[tool_name] = ToolMetrics(name=tool_name)
@@ -129,6 +138,11 @@ class AgentAnalytics:
             metrics.successful_calls += 1
         else:
             metrics.failed_calls += 1
+
+        # Track streaming metrics
+        if chunk_count > 0:
+            metrics.streaming_calls += 1
+            metrics.total_chunks += chunk_count
 
         # Track parameter usage
         for param_name, param_value in params.items():
@@ -196,6 +210,12 @@ class AgentAnalytics:
             lines.append(f"  Total duration: {metrics.total_duration:.3f}s")
             if metrics.total_cost > 0:
                 lines.append(f"  Total cost: ${metrics.total_cost:.6f}")
+
+            # Show streaming stats if applicable
+            if metrics.streaming_calls > 0:
+                avg_chunks = metrics.total_chunks / metrics.streaming_calls
+                lines.append(f"  Streaming calls: {metrics.streaming_calls}/{metrics.total_calls}")
+                lines.append(f"  Total chunks: {metrics.total_chunks} (avg: {avg_chunks:.1f}/call)")
 
             # Show most common parameter values
             if metrics.parameter_usage:

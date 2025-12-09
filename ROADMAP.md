@@ -42,12 +42,23 @@ This document tracks the implementation status of all planned features. See [REA
 
 ---
 
+## v0.6.1: Streaming Tools (Completed)
+
+| Feature                | Status       | Notes                                        |
+| ---------------------- | ------------ | -------------------------------------------- |
+| Streaming Tool Results | ✅ v0.6.1    | Tools can yield results progressively        |
+| Async Streaming        | ✅ v0.6.1    | Support for AsyncGenerator return types      |
+| on_tool_chunk Hook     | ✅ v0.6.1    | Real-time chunk callbacks for streaming      |
+| Streaming Analytics    | ✅ v0.6.1    | Track chunk counts and streaming metrics     |
+| Toolbox Streaming      | ✅ v0.6.1    | read_file_stream, process_csv_stream tools   |
+
+---
+
 ## v0.6.x: Upcoming (Planned)
 
-| Feature                | Status     | Effort | Notes                                |
-| ---------------------- | ---------- | ------ | ------------------------------------ |
-| Streaming Tool Results | 🟡 Planned | Medium | Stream tool output as it's generated |
-| Dynamic Tool Loading   | 🟡 Planned | Medium | Hot-reload tools without restart     |
+| Feature              | Status     | Effort | Notes                            |
+| -------------------- | ---------- | ------ | -------------------------------- |
+| Dynamic Tool Loading | 🟡 Planned | Medium | Hot-reload tools without restart |
 
 ---
 

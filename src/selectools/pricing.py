@@ -1,8 +1,11 @@
 """
 Pricing tables for major LLM providers.
 
-Prices in USD per 1M tokens (as of December 2024). - we will update this soon with all 2025 models.
-Prices are subject to change - check provider documentation for current rates.
+Prices in USD per 1M tokens (updated December 2024).
+Prices are subject to change - check provider documentation for current rates:
+- OpenAI: https://openai.com/api/pricing/
+- Anthropic: https://www.anthropic.com/pricing
+- Google: https://ai.google.dev/pricing
 """
 
 from __future__ import annotations
@@ -12,16 +15,82 @@ from typing import Dict
 
 logger = logging.getLogger(__name__)
 
-# Pricing in USD per 1M tokens - will expand pretty soon
+# Pricing in USD per 1M tokens (Standard tier, text tokens)
 PRICING: Dict[str, Dict[str, float]] = {
-    # OpenAI
+    # ===== OpenAI GPT-5 Series (Latest Generation) =====
+    "gpt-5.1": {"prompt": 1.25, "completion": 10.00},
+    "gpt-5": {"prompt": 1.25, "completion": 10.00},
+    "gpt-5-mini": {"prompt": 0.25, "completion": 2.00},
+    "gpt-5-nano": {"prompt": 0.05, "completion": 0.40},
+    "gpt-5.1-chat-latest": {"prompt": 1.25, "completion": 10.00},
+    "gpt-5-chat-latest": {"prompt": 1.25, "completion": 10.00},
+    "gpt-5.1-codex-max": {"prompt": 1.25, "completion": 10.00},
+    "gpt-5.1-codex": {"prompt": 1.25, "completion": 10.00},
+    "gpt-5-codex": {"prompt": 1.25, "completion": 10.00},
+    "gpt-5-pro": {"prompt": 15.00, "completion": 120.00},
+    "gpt-5.1-codex-mini": {"prompt": 0.25, "completion": 2.00},
+    "gpt-5-search-api": {"prompt": 1.25, "completion": 10.00},
+    "codex-mini-latest": {"prompt": 1.50, "completion": 6.00},
+    # ===== OpenAI GPT-4.1 Series =====
+    "gpt-4.1": {"prompt": 2.00, "completion": 8.00},
+    "gpt-4.1-mini": {"prompt": 0.40, "completion": 1.60},
+    "gpt-4.1-nano": {"prompt": 0.10, "completion": 0.40},
+    # ===== OpenAI GPT-4o Series =====
     "gpt-4o": {"prompt": 2.50, "completion": 10.00},
+    "gpt-4o-2024-11-20": {"prompt": 2.50, "completion": 10.00},
+    "gpt-4o-2024-08-06": {"prompt": 2.50, "completion": 10.00},
+    "gpt-4o-2024-05-13": {"prompt": 5.00, "completion": 15.00},
     "gpt-4o-mini": {"prompt": 0.15, "completion": 0.60},
+    "gpt-4o-mini-2024-07-18": {"prompt": 0.15, "completion": 0.60},
+    "gpt-4o-mini-search-preview": {"prompt": 0.15, "completion": 0.60},
+    "gpt-4o-search-preview": {"prompt": 2.50, "completion": 10.00},
+    # ===== OpenAI GPT-4o Realtime/Audio =====
+    "gpt-realtime": {"prompt": 4.00, "completion": 16.00},  # Text tokens
+    "gpt-realtime-mini": {"prompt": 0.60, "completion": 2.40},  # Text tokens
+    "gpt-4o-realtime-preview": {"prompt": 5.00, "completion": 20.00},  # Text tokens
+    "gpt-4o-mini-realtime-preview": {"prompt": 0.60, "completion": 2.40},  # Text tokens
+    "gpt-audio": {"prompt": 2.50, "completion": 10.00},  # Text tokens
+    "gpt-audio-mini": {"prompt": 0.60, "completion": 2.40},  # Text tokens
+    "gpt-4o-audio-preview": {"prompt": 2.50, "completion": 10.00},  # Text tokens
+    "gpt-4o-mini-audio-preview": {"prompt": 0.15, "completion": 0.60},  # Text tokens
+    # ===== OpenAI o-series (Reasoning Models) =====
+    "o1": {"prompt": 15.00, "completion": 60.00},
+    "o1-2024-12-17": {"prompt": 15.00, "completion": 60.00},
+    "o1-pro": {"prompt": 150.00, "completion": 600.00},
+    "o1-mini": {"prompt": 1.10, "completion": 4.40},
+    "o3-pro": {"prompt": 20.00, "completion": 80.00},
+    "o3": {"prompt": 2.00, "completion": 8.00},
+    "o3-deep-research": {"prompt": 10.00, "completion": 40.00},
+    "o3-mini": {"prompt": 1.10, "completion": 4.40},
+    "o4-mini": {"prompt": 1.10, "completion": 4.40},
+    "o4-mini-deep-research": {"prompt": 2.00, "completion": 8.00},
+    # ===== OpenAI GPT-4 Turbo (Legacy) =====
     "gpt-4-turbo": {"prompt": 10.00, "completion": 30.00},
+    "gpt-4-turbo-2024-04-09": {"prompt": 10.00, "completion": 30.00},
     "gpt-4-turbo-preview": {"prompt": 10.00, "completion": 30.00},
+    "gpt-4-0125-preview": {"prompt": 10.00, "completion": 30.00},
+    "gpt-4-1106-preview": {"prompt": 10.00, "completion": 30.00},
+    "gpt-4-1106-vision-preview": {"prompt": 10.00, "completion": 30.00},
+    # ===== OpenAI GPT-4 Classic (Legacy) =====
     "gpt-4": {"prompt": 30.00, "completion": 60.00},
+    "gpt-4-0613": {"prompt": 30.00, "completion": 60.00},
+    "gpt-4-0314": {"prompt": 30.00, "completion": 60.00},
+    "gpt-4-32k": {"prompt": 60.00, "completion": 120.00},
+    # ===== OpenAI GPT-3.5 Turbo (Legacy) =====
     "gpt-3.5-turbo": {"prompt": 0.50, "completion": 1.50},
     "gpt-3.5-turbo-0125": {"prompt": 0.50, "completion": 1.50},
+    "gpt-3.5-turbo-1106": {"prompt": 1.00, "completion": 2.00},
+    "gpt-3.5-turbo-0613": {"prompt": 1.50, "completion": 2.00},
+    "gpt-3.5-0301": {"prompt": 1.50, "completion": 2.00},
+    "gpt-3.5-turbo-instruct": {"prompt": 1.50, "completion": 2.00},
+    "gpt-3.5-turbo-16k": {"prompt": 3.00, "completion": 4.00},
+    "gpt-3.5-turbo-16k-0613": {"prompt": 3.00, "completion": 4.00},
+    # ===== OpenAI Base Models (Legacy) =====
+    "davinci-002": {"prompt": 2.00, "completion": 2.00},
+    "babbage-002": {"prompt": 0.40, "completion": 0.40},
+    # ===== OpenAI Aliases =====
+    "chatgpt-4o-latest": {"prompt": 5.00, "completion": 15.00},
+    "computer-use-preview": {"prompt": 3.00, "completion": 12.00},
     # Anthropic Claude
     "claude-3-5-sonnet-20241022": {"prompt": 3.00, "completion": 15.00},
     "claude-3-5-sonnet-20240620": {"prompt": 3.00, "completion": 15.00},

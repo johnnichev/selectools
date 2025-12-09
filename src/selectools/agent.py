@@ -55,6 +55,7 @@ class AgentConfig:
                - 'on_iteration_start': Called at start of each iteration with (iteration_num, messages)
                - 'on_iteration_end': Called at end of each iteration with (iteration_num, response)
                - 'on_tool_start': Called before tool execution with (tool_name, tool_args)
+               - 'on_tool_chunk': Called for each chunk from streaming tools with (tool_name, chunk)
                - 'on_tool_end': Called after tool execution with (tool_name, result, duration)
                - 'on_tool_error': Called on tool error with (tool_name, error, tool_args)
                - 'on_llm_start': Called before LLM call with (messages, model)
@@ -268,7 +269,15 @@ class Agent:
                 try:
                     start_time = time.time()
                     self._call_hook("on_tool_start", tool_name, parameters)
-                    result = self._execute_tool_with_timeout(tool, parameters)
+
+                    # Create chunk callback for streaming tools
+                    chunk_counter = {"count": 0}
+
+                    def chunk_callback(chunk: str) -> None:
+                        chunk_counter["count"] += 1
+                        self._call_hook("on_tool_chunk", tool_name, chunk)
+
+                    result = self._execute_tool_with_timeout(tool, parameters, chunk_callback)
                     duration = time.time() - start_time
                     self._call_hook("on_tool_end", tool_name, result, duration)
 
@@ -280,6 +289,7 @@ class Agent:
                             duration=duration,
                             params=parameters,
                             cost=0.0,  # TODO: attribute cost per tool in future
+                            chunk_count=chunk_counter["count"],
                         )
 
                     # Track tool usage
@@ -303,6 +313,9 @@ class Agent:
                             duration=duration,
                             params=parameters,
                             cost=0.0,
+                            chunk_count=(
+                                chunk_counter.get("count", 0) if "chunk_counter" in locals() else 0
+                            ),
                         )
 
                     error_message = f"Error executing tool '{tool.name}': {exc}"
@@ -439,13 +452,15 @@ class Agent:
         if self.memory:
             self.memory.add_many([assistant_msg, tool_msg])
 
-    def _execute_tool_with_timeout(self, tool: Tool, parameters: dict) -> str:
-        """Run tool.execute with optional timeout."""
+    def _execute_tool_with_timeout(
+        self, tool: Tool, parameters: dict, chunk_callback: Optional[Callable[[str], None]] = None
+    ) -> str:
+        """Run tool.execute with optional timeout and chunk callback."""
         if not self.config.tool_timeout_seconds:
-            return tool.execute(parameters)
+            return tool.execute(parameters, chunk_callback=chunk_callback)
 
         with ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(tool.execute, parameters)
+            future = executor.submit(tool.execute, parameters, chunk_callback)
             try:
                 return future.result(timeout=self.config.tool_timeout_seconds)
             except TimeoutError:
@@ -518,7 +533,17 @@ class Agent:
                 try:
                     start_time = time.time()
                     self._call_hook("on_tool_start", tool_name, parameters)
-                    result = await self._aexecute_tool_with_timeout(tool, parameters)
+
+                    # Create chunk callback for streaming tools
+                    chunk_counter = {"count": 0}
+
+                    def chunk_callback(chunk: str) -> None:
+                        chunk_counter["count"] += 1
+                        self._call_hook("on_tool_chunk", tool_name, chunk)
+
+                    result = await self._aexecute_tool_with_timeout(
+                        tool, parameters, chunk_callback
+                    )
                     duration = time.time() - start_time
                     self._call_hook("on_tool_end", tool_name, result, duration)
 
@@ -530,6 +555,7 @@ class Agent:
                             duration=duration,
                             params=parameters,
                             cost=0.0,  # TODO: attribute cost per tool in future
+                            chunk_count=chunk_counter["count"],
                         )
                 except Exception as exc:
                     duration = time.time() - start_time
@@ -543,6 +569,9 @@ class Agent:
                             duration=duration,
                             params=parameters,
                             cost=0.0,
+                            chunk_count=(
+                                chunk_counter.get("count", 0) if "chunk_counter" in locals() else 0
+                            ),
                         )
 
                     error_message = f"Error executing tool '{tool.name}': {exc}"
@@ -691,14 +720,17 @@ class Agent:
 
         return "".join(aggregated)
 
-    async def _aexecute_tool_with_timeout(self, tool: Tool, parameters: dict) -> str:
+    async def _aexecute_tool_with_timeout(
+        self, tool: Tool, parameters: dict, chunk_callback: Optional[Callable[[str], None]] = None
+    ) -> str:
         """Async version of _execute_tool_with_timeout."""
         if not self.config.tool_timeout_seconds:
-            return await tool.aexecute(parameters)
+            return await tool.aexecute(parameters, chunk_callback=chunk_callback)
 
         try:
             return await asyncio.wait_for(
-                tool.aexecute(parameters), timeout=self.config.tool_timeout_seconds
+                tool.aexecute(parameters, chunk_callback=chunk_callback),
+                timeout=self.config.tool_timeout_seconds,
             )
         except asyncio.TimeoutError:
             raise TimeoutError(

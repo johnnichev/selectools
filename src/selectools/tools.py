@@ -93,7 +93,8 @@ class Tool:
     Encapsulates a callable tool with validation and schema generation.
 
     A Tool wraps a Python function and adds metadata, parameter validation,
-    and schema generation capabilities. Tools can be sync or async functions.
+    and schema generation capabilities. Tools can be sync or async functions,
+    and can optionally stream results progressively.
 
     Attributes:
         name: Unique identifier for the tool.
@@ -103,6 +104,7 @@ class Tool:
         injected_kwargs: Additional kwargs to pass to the function (not visible to LLM).
         config_injector: Optional callable that returns additional kwargs at execution time.
         is_async: Whether the underlying function is async (detected automatically).
+        streaming: Whether the tool yields results progressively (Generator or AsyncGenerator).
 
     Example:
         >>> def get_weather(location: str, units: str = "celsius") -> str:
@@ -122,6 +124,20 @@ class Tool:
         >>> result = tool.execute({"location": "Paris", "units": "celsius"})
         >>> print(result)
         Weather in Paris: 72°C
+
+        >>> # Streaming tool example
+        >>> from typing import Generator
+        >>> def process_file(filepath: str) -> Generator[str, None, None]:
+        ...     for i, line in enumerate(open(filepath)):
+        ...         yield f"[{i}] {line}"
+        >>>
+        >>> streaming_tool = Tool(
+        ...     name="process_file",
+        ...     description="Process file line by line",
+        ...     parameters=[ToolParameter(name="filepath", param_type=str, description="File path")],
+        ...     function=process_file,
+        ...     streaming=True
+        ... )
     """
 
     def __init__(
@@ -133,6 +149,7 @@ class Tool:
         *,
         injected_kwargs: Optional[Dict[str, Any]] = None,
         config_injector: Optional[Callable[[], Dict[str, Any]]] = None,
+        streaming: bool = False,
     ):
         """
         Initialize a new Tool.
@@ -141,9 +158,10 @@ class Tool:
             name: Unique identifier for the tool.
             description: Description of what the tool does (shown to the LLM).
             parameters: List of ToolParameter definitions.
-            function: Callable that implements the tool logic (must return str).
+            function: Callable that implements the tool logic (must return str or Generator).
             injected_kwargs: Optional kwargs injected at execution (hidden from LLM).
             config_injector: Optional callable returning kwargs to inject at execution time.
+            streaming: Whether this tool yields results progressively (returns Generator).
 
         Raises:
             ToolValidationError: If tool definition is invalid
@@ -154,7 +172,11 @@ class Tool:
         self.function = function
         self.injected_kwargs = injected_kwargs or {}
         self.config_injector = config_injector
-        self.is_async = inspect.iscoroutinefunction(function)
+        # Detect both async functions and async generator functions
+        self.is_async = inspect.iscoroutinefunction(function) or inspect.isasyncgenfunction(
+            function
+        )
+        self.streaming = streaming
 
         # Validate tool definition at registration time
         self._validate_tool_definition()
@@ -249,6 +271,25 @@ class Tool:
                         suggestion="Either mark as optional (required=False) or remove default from function",
                     )
 
+        # Validate streaming tool return type (informational warning, not enforced)
+        if self.streaming:
+            # Check if function has proper return type hint for streaming
+            sig = inspect.signature(self.function)
+            return_annotation = sig.return_annotation
+
+            # For now, just log a note if streaming is set but no Generator annotation
+            # This is informational only, not strictly enforced
+            if return_annotation != inspect.Signature.empty:
+                type_str = str(return_annotation)
+                has_generator = (
+                    "Generator" in type_str
+                    or "AsyncGenerator" in type_str
+                    or "Iterable" in type_str
+                )
+                if not has_generator:
+                    # Don't raise error, just note it - generators work even without type hints
+                    pass
+
     def schema(self) -> JsonSchema:
         """Return a JSON-schema style dict describing this tool."""
         properties = {param.name: param.to_schema() for param in self.parameters}
@@ -277,6 +318,11 @@ class Tool:
         if not isinstance(value, param.param_type):
             return f"Parameter '{param.name}' must be of type {param.param_type.__name__}, got {type(value).__name__}"
         return None
+
+    @property
+    def is_streaming(self) -> bool:
+        """Return whether this tool streams results progressively."""
+        return self.streaming
 
     def validate(self, params: Dict[str, ParameterValue]) -> None:
         """
@@ -343,8 +389,21 @@ class Tool:
                     ),
                 )
 
-    def execute(self, params: Dict[str, ParameterValue]) -> str:
-        """Validate parameters then execute the underlying callable."""
+    def execute(
+        self,
+        params: Dict[str, ParameterValue],
+        chunk_callback: Optional[Callable[[str], None]] = None,
+    ) -> str:
+        """
+        Validate parameters then execute the underlying callable.
+
+        Args:
+            params: Parameter values to pass to the tool.
+            chunk_callback: Optional callback to call for each chunk if tool is streaming.
+
+        Returns:
+            String result from the tool (or accumulated chunks if streaming).
+        """
         self.validate(params)
 
         call_args: Dict[str, Any] = dict(params)
@@ -353,16 +412,39 @@ class Tool:
             call_args.update(self.config_injector() or {})
 
         try:
-            return self.function(**call_args)
+            result = self.function(**call_args)
+
+            # Handle streaming tools (generators)
+            if inspect.isgenerator(result):
+                chunks = []
+                for chunk in result:
+                    chunk_str = str(chunk)
+                    chunks.append(chunk_str)
+                    if chunk_callback:
+                        chunk_callback(chunk_str)
+                return "".join(chunks)
+
+            return str(result)
         except Exception as exc:
             raise ToolExecutionError(tool_name=self.name, error=exc, params=params) from exc
 
-    async def aexecute(self, params: Dict[str, ParameterValue]) -> str:
+    async def aexecute(
+        self,
+        params: Dict[str, ParameterValue],
+        chunk_callback: Optional[Callable[[str], None]] = None,
+    ) -> str:
         """
         Async version of execute().
 
         If the tool function is async, it will be awaited. If it's sync,
         it will be run in a thread pool executor to avoid blocking.
+
+        Args:
+            params: Parameter values to pass to the tool.
+            chunk_callback: Optional callback to call for each chunk if tool is streaming.
+
+        Returns:
+            String result from the tool (or accumulated chunks if streaming).
         """
         self.validate(params)
 
@@ -373,8 +455,22 @@ class Tool:
 
         try:
             if self.is_async:
-                # Directly await async function
-                return await self.function(**call_args)  # type: ignore[misc]
+                # Call the async function
+                result = self.function(**call_args)
+
+                # Check if it's an async generator (returns AsyncGenerator immediately)
+                if inspect.isasyncgen(result):
+                    chunks = []
+                    async for chunk in result:
+                        chunk_str = str(chunk)
+                        chunks.append(chunk_str)
+                        if chunk_callback:
+                            chunk_callback(chunk_str)
+                    return "".join(chunks)
+
+                # Otherwise it's a regular async function, await it
+                result = await result  # type: ignore[misc]
+                return str(result)
             else:
                 # Run sync function in executor to avoid blocking
                 loop = asyncio.get_event_loop()
@@ -382,7 +478,18 @@ class Tool:
                     result = await loop.run_in_executor(
                         executor, lambda: self.function(**call_args)
                     )
-                return result
+
+                # Handle sync streaming in async context
+                if inspect.isgenerator(result):
+                    chunks = []
+                    for chunk in result:
+                        chunk_str = str(chunk)
+                        chunks.append(chunk_str)
+                        if chunk_callback:
+                            chunk_callback(chunk_str)
+                    return "".join(chunks)
+
+                return str(result)
         except Exception as exc:
             raise ToolExecutionError(tool_name=self.name, error=exc, params=params) from exc
 
@@ -422,6 +529,7 @@ def tool(
     param_metadata: Optional[Dict[str, ParamMetadata]] = None,
     injected_kwargs: Optional[Dict[str, Any]] = None,
     config_injector: Optional[Callable[[], Dict[str, Any]]] = None,
+    streaming: bool = False,
 ):
     """
     Decorator to register a function as a Tool with automatic schema inference.
@@ -436,6 +544,7 @@ def tool(
                        containing 'description' and optionally 'enum'.
         injected_kwargs: Optional kwargs to inject at execution (hidden from LLM).
         config_injector: Optional callable returning kwargs to inject at execution.
+        streaming: Whether this tool yields results progressively (Generator/AsyncGenerator).
 
     Returns:
         A Tool instance that wraps the decorated function.
@@ -461,6 +570,13 @@ def tool(
         ...     async with aiohttp.ClientSession() as session:
         ...         async with session.get(url) as resp:
         ...             return await resp.text()
+
+        >>> # Streaming tools
+        ... from typing import Generator
+        ... @tool(name="process_file", streaming=True)
+        ... def process_file(filepath: str) -> Generator[str, None, None]:
+        ...     for i, line in enumerate(open(filepath)):
+        ...         yield f"[{i}] {line}"
     """
 
     def wrapper(func: Callable[..., str]) -> Tool:
@@ -472,6 +588,7 @@ def tool(
             function=func,
             injected_kwargs=injected_kwargs,
             config_injector=config_injector,
+            streaming=streaming,
         )
         return tool_obj
 

@@ -55,6 +55,7 @@ def get_all_tools() -> List[Tool]:
             file_tools.write_file,
             file_tools.list_files,
             file_tools.file_exists,
+            file_tools.read_file_stream,
         ]
     )
 
@@ -69,6 +70,7 @@ def get_all_tools() -> List[Tool]:
             data_tools.csv_to_json,
             data_tools.extract_json_field,
             data_tools.format_table,
+            data_tools.process_csv_stream,
         ]
     )
 
@@ -117,6 +119,7 @@ def get_tools_by_category(category: str) -> List[Tool]:
             file_tools.write_file,
             file_tools.list_files,
             file_tools.file_exists,
+            file_tools.read_file_stream,
         ],
         "web": [web_tools.http_get, web_tools.http_post],
         "data": [
@@ -125,6 +128,7 @@ def get_tools_by_category(category: str) -> List[Tool]:
             data_tools.csv_to_json,
             data_tools.extract_json_field,
             data_tools.format_table,
+            data_tools.process_csv_stream,
         ],
         "datetime": [
             datetime_tools.get_current_time,

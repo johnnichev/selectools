@@ -602,6 +602,39 @@ async def chat(message: str):
 - Inject per-tool config or auth using `injected_kwargs` or `config_injector` when constructing a `Tool`.
 - Type hints map to JSON schema; defaults make parameters optional.
 
+## Streaming Tools
+
+Tools can stream results progressively using Python generators, providing real-time feedback for long-running operations:
+
+```python
+from typing import Generator
+from selectools import tool, Agent, AgentConfig
+
+@tool(description="Process large file line by line", streaming=True)
+def process_file(filepath: str) -> Generator[str, None, None]:
+    """Process file and yield results progressively."""
+    with open(filepath) as f:
+        for i, line in enumerate(f, 1):
+            result = process_line(line)
+            yield f"[Line {i}] {result}\n"
+
+# Display chunks as they arrive
+def on_tool_chunk(tool_name: str, chunk: str):
+    print(f"[{tool_name}] {chunk}", end='', flush=True)
+
+config = AgentConfig(hooks={'on_tool_chunk': on_tool_chunk})
+agent = Agent(tools=[process_file], provider=provider, config=config)
+```
+
+**Features:**
+- ✅ Sync generators (`Generator[str, None, None]`)
+- ✅ Async generators (`AsyncGenerator[str, None]`)
+- ✅ Real-time chunk callbacks via `on_tool_chunk` hook
+- ✅ Analytics tracking for chunk counts and streaming metrics
+- ✅ Toolbox includes `read_file_stream` and `process_csv_stream`
+
+See `examples/streaming_tools_demo.py` for complete examples.
+
 ## Tests
 
 ```bash
@@ -656,6 +689,7 @@ For the full license text, see the [LICENSE](LICENSE) file.
   - `python examples/v0_5_2_demo.py` - Tool validation & observability hooks (v0.5.2)
   - `python examples/ollama_demo.py` - Local LLM execution with Ollama (v0.6.0)
   - `python examples/tool_analytics_demo.py` - Track and analyze tool usage (v0.6.0)
+  - `python examples/streaming_tools_demo.py` - Progressive tool results with streaming (v0.6.1)
   - `python examples/customer_support_bot.py` - Multi-tool customer support workflow
   - `python examples/data_analysis_agent.py` - Data exploration and analysis tools
 - Dev helpers:
@@ -694,9 +728,15 @@ We're actively developing new features to make Selectools the most production-re
 - Local Model Support - Ollama provider for privacy-first, zero-cost local LLM execution
 - Tool Usage Analytics - Track metrics, success rates, execution times, and parameter patterns
 
+**✅ Completed in v0.6.1:**
+
+- Streaming Tool Results - Tools can yield results progressively with Generator/AsyncGenerator
+- Streaming Observability - `on_tool_chunk` hook for real-time chunk callbacks
+- Streaming Analytics - Track chunk counts and streaming-specific metrics
+- Toolbox Streaming Tools - `read_file_stream` and `process_csv_stream` for large files
+
 **🟡 Coming in v0.6.x:**
 
-- Streaming Tool Results - Stream tool output as it's generated
 - Dynamic Tool Loading - Hot-reload tools without restarting the agent
 
 **🚀 Future (v0.7.0+):**

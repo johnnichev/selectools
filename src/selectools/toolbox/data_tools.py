@@ -5,7 +5,8 @@ Data processing tools for JSON, CSV, and data formatting.
 import csv
 import json
 from io import StringIO
-from typing import Optional
+from pathlib import Path
+from typing import Generator, Optional
 
 from ..tools import tool
 
@@ -231,3 +232,50 @@ def format_table(data: str, format_type: str = "simple") -> str:
         return f"❌ Invalid JSON: {e}"
     except Exception as e:
         return f"❌ Error formatting table: {e}"
+
+
+@tool(description="Process a CSV file row by row with streaming", streaming=True)
+def process_csv_stream(
+    filepath: str, delimiter: str = ",", encoding: str = "utf-8"
+) -> Generator[str, None, None]:
+    """
+    Process a CSV file row by row and yield each row progressively.
+
+    This is useful for large CSV files where you want to see results as they're processed.
+
+    Args:
+        filepath: Path to the CSV file
+        delimiter: CSV delimiter (default: comma)
+        encoding: Text encoding (default: utf-8)
+
+    Yields:
+        Each row from the CSV file as a formatted string
+    """
+    try:
+        path = Path(filepath)
+        yield f"📊 Processing CSV file: {filepath}\n"
+        yield f"📏 Size: {path.stat().st_size} bytes\n\n"
+
+        with path.open("r", encoding=encoding, newline="") as f:
+            reader = csv.DictReader(f, delimiter=delimiter)
+
+            # Yield header info
+            if reader.fieldnames:
+                yield f"📋 Columns: {', '.join(reader.fieldnames)}\n\n"
+
+            # Process each row
+            for i, row in enumerate(reader, 1):
+                yield f"--- Row {i} ---\n"
+                for key, value in row.items():
+                    yield f"  {key}: {value}\n"
+                yield "\n"
+
+        yield f"✅ Finished processing {filepath}\n"
+    except FileNotFoundError:
+        yield f"❌ Error: File not found: {filepath}\n"
+    except PermissionError:
+        yield f"❌ Error: Permission denied reading: {filepath}\n"
+    except csv.Error as e:
+        yield f"❌ Error parsing CSV: {e}\n"
+    except Exception as e:
+        yield f"❌ Error processing file: {e}\n"
