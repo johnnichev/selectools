@@ -3,7 +3,7 @@ Text processing and manipulation tools.
 """
 
 import re
-from typing import Optional
+from typing import List, Optional
 
 from ..tools import tool
 
@@ -221,7 +221,7 @@ def convert_case(text: str, case_type: str) -> str:
             return "".join(result)
         elif case_type == "camel":
             # Convert to camelCase
-            words = re.findall(r"[a-zA-Z0-9]+", text)
+            words: List[str] = re.findall(r"[a-zA-Z0-9]+", text)
             if not words:
                 return text
             return words[0].lower() + "".join(w.capitalize() for w in words[1:])

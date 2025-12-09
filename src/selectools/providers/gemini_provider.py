@@ -7,6 +7,7 @@ See: https://ai.google.dev/gemini-api/docs/migrate
 
 from __future__ import annotations
 
+import base64
 import os
 from typing import List
 
@@ -106,8 +107,8 @@ class GeminiProvider(Provider):
 
         # Extract usage stats from response
         usage = response.usage_metadata if hasattr(response, "usage_metadata") else None
-        prompt_tokens = usage.prompt_token_count if usage else 0
-        completion_tokens = usage.candidates_token_count if usage else 0
+        prompt_tokens = (usage.prompt_token_count or 0) if usage else 0
+        completion_tokens = (usage.candidates_token_count or 0) if usage else 0
         usage_stats = UsageStats(
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
@@ -189,7 +190,7 @@ class GeminiProvider(Provider):
                     types.Part(
                         inline_data=types.Blob(
                             mime_type="image/png",
-                            data=message.image_base64,
+                            data=base64.b64decode(message.image_base64),
                         )
                     )
                 )
@@ -239,8 +240,8 @@ class GeminiProvider(Provider):
 
         # Extract usage stats
         usage = response.usage_metadata if hasattr(response, "usage_metadata") else None
-        prompt_tokens = usage.prompt_token_count if usage else 0
-        completion_tokens = usage.candidates_token_count if usage else 0
+        prompt_tokens = (usage.prompt_token_count or 0) if usage else 0
+        completion_tokens = (usage.candidates_token_count or 0) if usage else 0
         usage_stats = UsageStats(
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,

@@ -687,6 +687,333 @@ agent = Agent(tools=[process_file], provider=provider, config=config)
 
 See `examples/streaming_tools_demo.py` for complete examples.
 
+## RAG (Retrieval-Augmented Generation)
+
+**v0.8.0** brings comprehensive RAG support for building agents that answer questions about your documents!
+
+### Quick Start
+
+```python
+from selectools import OpenAIProvider
+from selectools.embeddings import OpenAIEmbeddingProvider
+from selectools.models import OpenAI
+from selectools.rag import RAGAgent, VectorStore
+
+# Set up components
+embedder = OpenAIEmbeddingProvider(model=OpenAI.Embeddings.TEXT_EMBEDDING_3_SMALL.id)
+vector_store = VectorStore.create("memory", embedder=embedder)
+
+# Create RAG agent from your documents
+agent = RAGAgent.from_directory(
+    directory="./docs",
+    glob_pattern="**/*.md",
+    provider=OpenAIProvider(),
+    vector_store=vector_store,
+    chunk_size=1000,
+    top_k=3
+)
+
+# Ask questions about your documents!
+response = agent.run("What are the main features?")
+```
+
+### Embedding Providers
+
+Choose from 4 embedding providers with 10 models:
+
+```python
+from selectools.embeddings import (
+    OpenAIEmbeddingProvider,
+    AnthropicEmbeddingProvider,  # Voyage AI
+    GeminiEmbeddingProvider,
+    CohereEmbeddingProvider
+)
+from selectools.models import OpenAI, Anthropic, Gemini, Cohere
+
+# OpenAI embeddings
+embedder = OpenAIEmbeddingProvider(model=OpenAI.Embeddings.TEXT_EMBEDDING_3_SMALL.id)
+
+# Anthropic/Voyage embeddings
+embedder = AnthropicEmbeddingProvider(model=Anthropic.Embeddings.VOYAGE_3_LITE.id)
+
+# Gemini embeddings (free!)
+embedder = GeminiEmbeddingProvider(model=Gemini.Embeddings.EMBEDDING_004.id)
+
+# Cohere embeddings
+embedder = CohereEmbeddingProvider(model=Cohere.Embeddings.EMBED_V3.id)
+```
+
+### Vector Stores
+
+Choose from 4 vector store backends:
+
+```python
+from selectools.rag import VectorStore
+
+# 1. In-Memory (default, great for prototyping)
+store = VectorStore.create("memory", embedder=embedder)
+
+# 2. SQLite (persistent local storage)
+store = VectorStore.create("sqlite", embedder=embedder, db_path="my_docs.db")
+
+# 3. Chroma (advanced features, requires: pip install chromadb)
+store = VectorStore.create("chroma", embedder=embedder, persist_directory="./chroma_db")
+
+# 4. Pinecone (cloud-hosted, requires: pip install pinecone-client)
+store = VectorStore.create("pinecone", embedder=embedder, index_name="my-index")
+```
+
+### Document Loading
+
+Load documents from various sources:
+
+```python
+from selectools.rag import DocumentLoader, Document
+
+# From text
+docs = DocumentLoader.from_text("content", metadata={"source": "memory"})
+
+# From file
+docs = DocumentLoader.from_file("document.txt")
+
+# From directory
+docs = DocumentLoader.from_directory("./docs", glob_pattern="**/*.md")
+
+# From PDF (requires: pip install pypdf)
+docs = DocumentLoader.from_pdf("manual.pdf")
+
+# Manual creation
+docs = [
+    Document(text="content", metadata={"source": "test.txt"}),
+    Document(text="more content", metadata={"source": "test2.txt"})
+]
+```
+
+### Text Chunking
+
+Split large documents into smaller chunks:
+
+```python
+from selectools.rag import TextSplitter, RecursiveTextSplitter
+
+# Fixed-size chunking
+splitter = TextSplitter(chunk_size=1000, chunk_overlap=200)
+chunks = splitter.split_text(long_text)
+
+# Recursive chunking (respects natural boundaries)
+splitter = RecursiveTextSplitter(
+    chunk_size=1000,
+    chunk_overlap=200,
+    separators=["\n\n", "\n", ". ", " ", ""]
+)
+chunks = splitter.split_text(long_text)
+```
+
+### Cost Tracking for Embeddings
+
+Embedding costs are automatically tracked:
+
+```python
+# Usage stats now include embedding costs
+print(agent.usage)
+
+# Output:
+# 📊 Usage Summary
+# ============================================================
+# Total Tokens: 5,432
+#   - Prompt: 3,210
+#   - Completion: 1,200
+#   - Embeddings: 1,022
+# Total Cost: $0.002150
+#   - LLM: $0.002000
+#   - Embeddings: $0.000150
+# ============================================================
+```
+
+### Complete Example
+
+See `examples/rag_basic_demo.py` for a complete working example that demonstrates:
+
+- Creating and embedding documents
+- Setting up vector stores
+- Building RAG agents
+- Asking questions about documents
+- Cost tracking
+- Different configuration options
+
+### Installation for RAG
+
+```bash
+# Basic RAG with OpenAI embeddings (already included)
+pip install selectools
+
+# Full RAG support with all vector stores
+pip install selectools[rag]
+
+# This includes:
+# - chromadb>=0.4.0
+# - pinecone-client>=3.0.0
+# - voyageai>=0.2.0
+# - cohere>=5.0.0
+# - pypdf>=4.0.0
+```
+
+## RAG Troubleshooting
+
+### Common Issues
+
+#### 1. ImportError: No module named 'numpy'
+
+NumPy is required for RAG features:
+
+```bash
+pip install --upgrade selectools
+```
+
+#### 2. Vector Store Setup
+
+**ChromaDB:**
+
+```bash
+pip install selectools[rag]  # Includes chromadb
+```
+
+If you get `sqlite3` errors on older systems:
+
+```bash
+pip install pysqlite3-binary
+```
+
+**Pinecone:**
+
+```bash
+pip install selectools[rag]
+export PINECONE_API_KEY="your-key"
+export PINECONE_ENVIRONMENT="your-env"
+```
+
+#### 3. Embedding Provider Issues
+
+**OpenAI:**
+
+- Ensure `OPENAI_API_KEY` is set
+- Check quota limits
+- Use `text-embedding-3-small` for cost efficiency
+
+**Gemini (Free):**
+
+- Get API key from https://aistudio.google.com/
+- Set `GEMINI_API_KEY` or `GOOGLE_API_KEY`
+- Free tier has rate limits
+
+**Anthropic/Voyage:**
+
+```bash
+pip install voyageai
+export VOYAGE_API_KEY="your-key"
+```
+
+**Cohere:**
+
+```bash
+pip install cohere
+export COHERE_API_KEY="your-key"
+```
+
+#### 4. PDF Loading Errors
+
+```bash
+pip install pypdf
+```
+
+For complex PDFs with images:
+
+```bash
+pip install pypdf[crypto]
+```
+
+#### 5. Memory Issues with Large Documents
+
+Use persistent storage instead of in-memory:
+
+```python
+# Instead of "memory", use "sqlite"
+store = VectorStore.create("sqlite", embedder=embedder, db_path="docs.db")
+```
+
+Adjust chunk size:
+
+```python
+agent = RAGAgent.from_directory(
+    directory="./docs",
+    chunk_size=500,  # Smaller chunks = less memory
+    top_k=2  # Fewer results
+)
+```
+
+#### 6. Slow Search Performance
+
+**For in-memory store:**
+
+- Consider upgrading to Chroma or Pinecone
+- Reduce document count
+- Use smaller embeddings (text-embedding-3-small)
+
+**For SQLite:**
+
+- Enable WAL mode for better performance
+- Consider Chroma for >10k documents
+
+#### 7. Cost Concerns
+
+Monitor costs:
+
+```python
+print(agent.usage)  # Shows LLM + embedding costs
+```
+
+Use free/cheaper options:
+
+- Gemini embeddings (free)
+- Local Ollama for LLM (free)
+- In-memory or SQLite storage (free)
+
+#### 8. Search Returns Irrelevant Results
+
+Tune parameters:
+
+```python
+rag_tool = RAGTool(
+    vector_store=store,
+    top_k=5,  # More results
+    score_threshold=0.5  # Minimum similarity
+)
+```
+
+Improve chunking:
+
+```python
+splitter = RecursiveTextSplitter(
+    chunk_size=1000,
+    chunk_overlap=200,  # More overlap = better context
+    separators=["\n\n", "\n", ". ", " "]
+)
+```
+
+### Performance Tips
+
+1. **Batch Operations**: Use `embed_texts()` instead of multiple `embed_text()` calls
+2. **Caching**: Keep vector store instance alive between queries
+3. **Chunk Size**: 500-1000 characters is usually optimal
+4. **Top-K**: Start with 3-5, adjust based on results
+5. **Metadata**: Add rich metadata for better filtering
+
+### Getting Help
+
+- 📖 Documentation: [README.md](README.md)
+- 💬 Issues: [GitHub Issues](https://github.com/johnniche/selectools/issues)
+- 💡 Examples: Check `examples/` directory
+
 ## Tests
 
 ```bash
@@ -787,15 +1114,33 @@ We're actively developing new features to make Selectools the most production-re
 - Streaming Analytics - Track chunk counts and streaming-specific metrics
 - Toolbox Streaming Tools - `read_file_stream` and `process_csv_stream` for large files
 
-**🟡 Coming in v0.6.x:**
+**✅ Completed in v0.7.0:**
+
+- Model Registry System - Single source of truth for 120 models with complete metadata
+- Typed Model Constants - IDE autocomplete for all models (OpenAI, Anthropic, Gemini, Ollama)
+- Rich Metadata - Pricing, context windows, max tokens for every model
+- Type Safety - Catch model typos at development time
+- Backward Compatible - Existing code with string model names still works
+
+**🚀 Next: v0.8.0 (Embeddings & RAG):**
+
+- Embedding Models - Add 20+ embedding models to registry (OpenAI, Anthropic, Gemini, Cohere)
+- Vector Stores - Unified interface with 4 backends (in-memory, SQLite, Chroma, Pinecone)
+- Document Processing - Load, chunk, and embed documents automatically
+- RAG Tools - Pre-built tools for retrieval-augmented generation and semantic search
+- Cost Tracking - Extend to track embedding API costs
+
+**🟡 Coming in v0.8.x:**
 
 - Dynamic Tool Loading - Hot-reload tools without restarting the agent
+- Reranking Models - Cohere and Jina rerankers for better RAG results
+- Advanced Chunking - Agentic and contextual chunking strategies
 
-**🚀 Future (v0.7.0+):**
+**🚀 Future (v0.9.0+):**
 
 - Parallel Tool Execution - Run multiple tools concurrently
 - Tool Composition - Chain tools together with `@compose` decorator
-- Advanced context management
+- Advanced context management - Summarization, sliding windows
 - And much more...
 
 See **[ROADMAP.md](ROADMAP.md)** for detailed feature descriptions, status tracking, and implementation notes.

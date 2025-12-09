@@ -58,6 +58,37 @@ def calculate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> fl
     return prompt_cost + completion_cost
 
 
+def calculate_embedding_cost(model: str, tokens: int) -> float:
+    """
+    Calculate cost in USD for embedding token usage.
+
+    Uses the canonical model registry (models.py) for pricing information.
+
+    Args:
+        model: Embedding model name (e.g., "text-embedding-3-small").
+        tokens: Number of tokens embedded.
+
+    Returns:
+        Estimated cost in USD. Returns 0.0 if model pricing is unknown or for free models.
+
+    Note:
+        - Embedding models only have input/prompt cost (no completion cost)
+        - Free models (like Gemini embeddings) return $0.00
+        - Logs a warning if the model is not found in the pricing table
+    """
+    if model not in MODELS_BY_ID:
+        logger.warning(
+            f"⚠️  Unknown embedding model '{model}' - cannot calculate cost. "
+            f"Returning $0.00. Add model to selectools/models.py if known."
+        )
+        return 0.0
+
+    model_info = MODELS_BY_ID[model]
+    embedding_cost = (tokens / 1_000_000) * model_info.prompt_cost
+
+    return embedding_cost
+
+
 def get_model_pricing(model: str) -> Dict[str, float] | None:
     """
     Get pricing information for a specific model (backward compatible).
@@ -76,4 +107,4 @@ def get_model_pricing(model: str) -> Dict[str, float] | None:
     return PRICING.get(model)
 
 
-__all__ = ["PRICING", "calculate_cost", "get_model_pricing"]
+__all__ = ["PRICING", "calculate_cost", "calculate_embedding_cost", "get_model_pricing"]

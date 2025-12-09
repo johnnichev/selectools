@@ -1,7 +1,7 @@
 """Public exports for the selectools package."""
 
-# Toolbox is imported separately to avoid pulling in optional dependencies
-from . import models, toolbox
+# Import submodules (lazy loading for optional dependencies)
+from . import embeddings, models, rag, toolbox
 from .agent import Agent, AgentConfig
 from .analytics import AgentAnalytics, ToolMetrics
 from .exceptions import (
@@ -12,9 +12,9 @@ from .exceptions import (
     ToolValidationError,
 )
 from .memory import ConversationMemory
-from .models import ALL_MODELS, MODELS_BY_ID, Anthropic, Gemini, ModelInfo, Ollama, OpenAI
+from .models import ALL_MODELS, MODELS_BY_ID, Anthropic, Cohere, Gemini, ModelInfo, Ollama, OpenAI
 from .parser import ToolCallParser
-from .pricing import PRICING, calculate_cost, get_model_pricing
+from .pricing import PRICING, calculate_cost, calculate_embedding_cost, get_model_pricing
 from .prompt import PromptBuilder
 from .providers.anthropic_provider import AnthropicProvider
 from .providers.gemini_provider import GeminiProvider
@@ -57,6 +57,7 @@ __all__ = [
     # Pricing
     "PRICING",
     "calculate_cost",
+    "calculate_embedding_cost",
     "get_model_pricing",
     # Model Registry
     "models",
@@ -67,4 +68,9 @@ __all__ = [
     "Anthropic",
     "Gemini",
     "Ollama",
+    "Cohere",
+    # Submodules (for lazy loading)
+    "embeddings",
+    "rag",
+    "toolbox",
 ]

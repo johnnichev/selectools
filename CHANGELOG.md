@@ -5,6 +5,127 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2024-12-10
+
+### Added - RAG & Embeddings 🎉
+
+#### Embedding Providers (4 providers, 10 models)
+
+- **OpenAIEmbeddingProvider** - 3 models
+  - `text-embedding-3-small` ($0.02/1M tokens)
+  - `text-embedding-3-large` ($0.13/1M tokens)
+  - `text-embedding-ada-002` ($0.10/1M tokens)
+- **AnthropicEmbeddingProvider** - 2 models via Voyage AI
+  - `voyage-3` ($0.06/1M tokens)
+  - `voyage-3-lite` ($0.02/1M tokens)
+- **GeminiEmbeddingProvider** - 2 models (FREE!)
+  - `text-embedding-001`
+  - `text-embedding-004`
+- **CohereEmbeddingProvider** - 3 models
+  - `embed-english-v3.0` ($0.10/1M tokens)
+  - `embed-multilingual-v3.0` ($0.10/1M tokens)
+  - `embed-english-light-v3.0` ($0.10/1M tokens)
+
+#### Vector Stores (4 backends)
+
+- **InMemoryVectorStore** - Fast NumPy-based, zero dependencies
+- **SQLiteVectorStore** - Persistent local storage
+- **ChromaVectorStore** - Advanced vector database
+- **PineconeVectorStore** - Cloud-hosted production-ready
+
+#### Document Processing
+
+- **DocumentLoader** - Load from text, files, directories, PDFs
+  - `from_text()` - Create documents from strings
+  - `from_file()` - Load single files (.txt, .md)
+  - `from_directory()` - Load entire directories with glob patterns
+  - `from_pdf()` - Extract text from PDF files (requires pypdf)
+- **TextSplitter** - Fixed-size chunking with overlap
+- **RecursiveTextSplitter** - Smart chunking respecting natural boundaries
+  - Splits on paragraphs, sentences, spaces in order
+  - Preserves document metadata
+
+#### RAG Tools
+
+- **RAGTool** - Pre-built tool for knowledge base search
+  - Automatically embeds queries
+  - Searches vector store for relevant documents
+  - Returns formatted context with sources and scores
+- **SemanticSearchTool** - Pure semantic search without LLM
+- **RAGAgent** - High-level API for creating RAG agents
+  - `from_documents()` - Create from document list
+  - `from_directory()` - Create from document directory
+  - `from_files()` - Create from specific files
+
+#### Cost Tracking for Embeddings
+
+- **Extended UsageStats**
+  - New `embedding_tokens` field
+  - New `embedding_cost_usd` field
+- **Updated AgentUsage**
+  - Tracks total embedding tokens
+  - Tracks total embedding costs
+  - Displays in usage summary with LLM vs embedding breakdown
+- **New pricing function**
+  - `calculate_embedding_cost(model, tokens)` for easy cost estimation
+
+#### Model Registry Additions
+
+- **New Cohere class** with 3 embedding models
+- **Embedding subclasses** for OpenAI, Anthropic, Gemini
+- Updated model count: 130 total models (120 chat + 10 embedding)
+
+### Changed
+
+- **pyproject.toml** version bumped to `0.8.0`
+- **Core dependency added**: `numpy>=1.24.0,<3.0.0` (required for vector operations)
+- **Package structure**: Added `selectools.embeddings`, `selectools.rag`, `selectools.rag.stores`
+
+### Optional Dependencies
+
+New `[rag]` extra for full RAG support:
+
+```bash
+pip install selectools[rag]
+```
+
+Includes:
+- `chromadb>=0.4.0` - ChromaDB vector store
+- `pinecone-client>=3.0.0` - Pinecone cloud vector store
+- `voyageai>=0.2.0` - Voyage AI embeddings
+- `cohere>=5.0.0` - Cohere embeddings
+- `pypdf>=4.0.0` - PDF document loading
+
+### Documentation
+
+- Added comprehensive RAG section to README
+- New example: `examples/rag_basic_demo.py`
+- Basic integration tests: `tests/test_rag_basic.py`
+- Updated installation instructions
+
+### Migration Notes
+
+All changes are **backward compatible**. Existing code continues to work without modification. RAG features are opt-in and require NumPy (automatically installed).
+
+To use RAG features:
+
+```python
+from selectools import OpenAIProvider
+from selectools.embeddings import OpenAIEmbeddingProvider
+from selectools.rag import RAGAgent, VectorStore
+
+embedder = OpenAIEmbeddingProvider()
+vector_store = VectorStore.create("memory", embedder=embedder)
+
+agent = RAGAgent.from_directory(
+    directory="./docs",
+    provider=OpenAIProvider(),
+    vector_store=vector_store
+)
+```
+
+---
+
 ## [0.7.0] - 2024-12-10
 
 ### Added

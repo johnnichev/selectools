@@ -648,6 +648,38 @@ class OpenAI:
         context_window=128000,
     )
 
+    # ===== Embedding Models =====
+    class Embeddings:
+        """OpenAI embedding models."""
+
+        TEXT_EMBEDDING_3_SMALL = ModelInfo(
+            id="text-embedding-3-small",
+            provider="openai",
+            type="embedding",
+            prompt_cost=0.02,
+            completion_cost=0.0,
+            max_tokens=8191,
+            context_window=8191,
+        )
+        TEXT_EMBEDDING_3_LARGE = ModelInfo(
+            id="text-embedding-3-large",
+            provider="openai",
+            type="embedding",
+            prompt_cost=0.13,
+            completion_cost=0.0,
+            max_tokens=8191,
+            context_window=8191,
+        )
+        ADA_002 = ModelInfo(
+            id="text-embedding-ada-002",
+            provider="openai",
+            type="embedding",
+            prompt_cost=0.10,
+            completion_cost=0.0,
+            max_tokens=8191,
+            context_window=8191,
+        )
+
 
 # =============================================================================
 # Anthropic Claude Models (18 total)
@@ -830,6 +862,29 @@ class Anthropic:
         max_tokens=4096,
         context_window=200000,
     )
+
+    # ===== Embedding Models (Voyage AI partnership) =====
+    class Embeddings:
+        """Anthropic/Voyage embedding models."""
+
+        VOYAGE_3 = ModelInfo(
+            id="voyage-3",
+            provider="anthropic",
+            type="embedding",
+            prompt_cost=0.06,
+            completion_cost=0.0,
+            max_tokens=32000,
+            context_window=32000,
+        )
+        VOYAGE_3_LITE = ModelInfo(
+            id="voyage-3-lite",
+            provider="anthropic",
+            type="embedding",
+            prompt_cost=0.02,
+            completion_cost=0.0,
+            max_tokens=32000,
+            context_window=32000,
+        )
 
 
 # =============================================================================
@@ -1079,6 +1134,29 @@ class Gemini:
         context_window=8192,
     )
 
+    # ===== Embedding Models =====
+    class Embeddings:
+        """Google Gemini embedding models."""
+
+        EMBEDDING_001 = ModelInfo(
+            id="text-embedding-001",
+            provider="gemini",
+            type="embedding",
+            prompt_cost=0.0,
+            completion_cost=0.0,
+            max_tokens=2048,
+            context_window=2048,
+        )
+        EMBEDDING_004 = ModelInfo(
+            id="text-embedding-004",
+            provider="gemini",
+            type="embedding",
+            prompt_cost=0.0,
+            completion_cost=0.0,
+            max_tokens=2048,
+            context_window=2048,
+        )
+
 
 # =============================================================================
 # Ollama Local Models (11 total)
@@ -1208,6 +1286,47 @@ class Ollama:
 
 
 # =============================================================================
+# Cohere Models (3 embedding models)
+# =============================================================================
+
+
+class Cohere:
+    """Cohere embedding models."""
+
+    # ===== Embedding Models =====
+    class Embeddings:
+        """Cohere embedding models."""
+
+        EMBED_V3 = ModelInfo(
+            id="embed-english-v3.0",
+            provider="cohere",
+            type="embedding",
+            prompt_cost=0.10,
+            completion_cost=0.0,
+            max_tokens=512,
+            context_window=512,
+        )
+        EMBED_MULTILINGUAL_V3 = ModelInfo(
+            id="embed-multilingual-v3.0",
+            provider="cohere",
+            type="embedding",
+            prompt_cost=0.10,
+            completion_cost=0.0,
+            max_tokens=512,
+            context_window=512,
+        )
+        EMBED_V3_LIGHT = ModelInfo(
+            id="embed-english-light-v3.0",
+            provider="cohere",
+            type="embedding",
+            prompt_cost=0.10,
+            completion_cost=0.0,
+            max_tokens=512,
+            context_window=512,
+        )
+
+
+# =============================================================================
 # Aggregated Model Lists
 # =============================================================================
 
@@ -1216,19 +1335,27 @@ def _collect_all_models() -> List[ModelInfo]:
     """Collect all model definitions from provider classes."""
     models = []
 
-    for provider_class in [OpenAI, Anthropic, Gemini, Ollama]:
+    for provider_class in [OpenAI, Anthropic, Gemini, Ollama, Cohere]:
         for attr_name in dir(provider_class):
             if attr_name.startswith("_"):
                 continue
             attr = getattr(provider_class, attr_name)
             if isinstance(attr, ModelInfo):
                 models.append(attr)
+            # Check for nested Embeddings class
+            elif isinstance(attr, type) and attr_name == "Embeddings":
+                for embed_attr_name in dir(attr):
+                    if embed_attr_name.startswith("_"):
+                        continue
+                    embed_attr = getattr(attr, embed_attr_name)
+                    if isinstance(embed_attr, ModelInfo):
+                        models.append(embed_attr)
 
     return models
 
 
 ALL_MODELS: List[ModelInfo] = _collect_all_models()
-"""Complete list of all 120 models across all providers."""
+"""Complete list of all 130 models across all providers (chat + embedding)."""
 
 MODELS_BY_ID: Dict[str, ModelInfo] = {model.id: model for model in ALL_MODELS}
 """Quick lookup dictionary mapping model ID to ModelInfo."""
@@ -1241,6 +1368,7 @@ __all__ = [
     "Anthropic",
     "Gemini",
     "Ollama",
+    "Cohere",
     "ALL_MODELS",
     "MODELS_BY_ID",
 ]

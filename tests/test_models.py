@@ -39,8 +39,8 @@ class TestModelRegistry:
     """Tests for the complete model registry."""
 
     def test_all_models_count(self):
-        """Test that we have all 120 models."""
-        assert len(ALL_MODELS) == 120
+        """Test that we have all 130 models (120 chat + 10 embedding)."""
+        assert len(ALL_MODELS) == 130
 
     def test_models_by_id_count(self):
         """Test that MODELS_BY_ID has same count as ALL_MODELS."""
@@ -70,9 +70,9 @@ class TestOpenAIModels:
     """Tests for OpenAI model definitions."""
 
     def test_openai_model_count(self):
-        """Test OpenAI has 64 models."""
+        """Test OpenAI has 67 models (64 chat + 3 embedding)."""
         openai_models = [m for m in ALL_MODELS if m.provider == "openai"]
-        assert len(openai_models) == 64
+        assert len(openai_models) == 67
 
     def test_openai_gpt4o(self):
         """Test GPT-4o model definition."""
@@ -104,9 +104,9 @@ class TestAnthropicModels:
     """Tests for Anthropic Claude model definitions."""
 
     def test_anthropic_model_count(self):
-        """Test Anthropic has 18 models."""
+        """Test Anthropic has 20 models (18 chat + 2 embedding)."""
         anthropic_models = [m for m in ALL_MODELS if m.provider == "anthropic"]
-        assert len(anthropic_models) == 18
+        assert len(anthropic_models) == 20
 
     def test_anthropic_sonnet_4_5(self):
         """Test Claude Sonnet 4.5 model definition."""
@@ -138,9 +138,9 @@ class TestGeminiModels:
     """Tests for Google Gemini model definitions."""
 
     def test_gemini_model_count(self):
-        """Test Gemini has 25 models."""
+        """Test Gemini has 27 models (25 chat + 2 embedding)."""
         gemini_models = [m for m in ALL_MODELS if m.provider == "gemini"]
-        assert len(gemini_models) == 25
+        assert len(gemini_models) == 27
 
     def test_gemini_flash_2_0(self):
         """Test Gemini 2.0 Flash model definition."""
@@ -208,7 +208,7 @@ class TestModelMetadataCompleteness:
 
     def test_all_models_have_valid_provider(self):
         """Test that all models have a valid provider."""
-        valid_providers = {"openai", "anthropic", "gemini", "ollama"}
+        valid_providers = {"openai", "anthropic", "gemini", "ollama", "cohere"}
         for model in ALL_MODELS:
             assert model.provider in valid_providers
 

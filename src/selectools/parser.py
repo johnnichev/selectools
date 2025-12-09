@@ -92,7 +92,9 @@ class ToolCallParser:
         ]
         for attempt in attempts:
             try:
-                return json.loads(attempt)
+                result = json.loads(attempt)
+                if isinstance(result, dict):
+                    return result
             except json.JSONDecodeError:
                 continue
         return None

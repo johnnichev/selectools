@@ -145,7 +145,7 @@ class Tool:
         name: str,
         description: str,
         parameters: List[ToolParameter],
-        function: Callable[..., str],
+        function: Callable[..., Any],
         *,
         injected_kwargs: Optional[Dict[str, Any]] = None,
         config_injector: Optional[Callable[[], Dict[str, Any]]] = None,
@@ -530,7 +530,7 @@ def tool(
     injected_kwargs: Optional[Dict[str, Any]] = None,
     config_injector: Optional[Callable[[], Dict[str, Any]]] = None,
     streaming: bool = False,
-):
+) -> Callable[[Callable[..., Any]], Tool]:
     """
     Decorator to register a function as a Tool with automatic schema inference.
 
@@ -579,7 +579,7 @@ def tool(
         ...         yield f"[{i}] {line}"
     """
 
-    def wrapper(func: Callable[..., str]) -> Tool:
+    def wrapper(func: Callable[..., Any]) -> Tool:
         params = _infer_parameters_from_callable(func, param_metadata=param_metadata)
         tool_obj = Tool(
             name=name or func.__name__,
@@ -652,7 +652,7 @@ class ToolRegistry:
     ):
         """Decorator variant that also registers the tool in this registry."""
 
-        def decorator(func: Callable[..., str]) -> Tool:
+        def decorator(func: Callable[..., Any]) -> Tool:
             tool_obj = tool(
                 name=name,
                 description=description,

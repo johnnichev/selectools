@@ -20,6 +20,8 @@ class UsageStats:
         cost_usd: Estimated cost in USD for this call.
         model: Model name used for this call.
         provider: Provider name (openai, anthropic, gemini, etc.).
+        embedding_tokens: Number of tokens used for embeddings (RAG only).
+        embedding_cost_usd: Estimated cost in USD for embeddings (RAG only).
     """
 
     prompt_tokens: int = 0
@@ -28,6 +30,8 @@ class UsageStats:
     cost_usd: float = 0.0
     model: str = ""
     provider: str = ""
+    embedding_tokens: int = 0
+    embedding_cost_usd: float = 0.0
 
     def __post_init__(self):
         """Ensure total_tokens is consistent."""
@@ -48,6 +52,8 @@ class AgentUsage:
         total_completion_tokens: Cumulative completion tokens across all calls.
         total_tokens: Cumulative total tokens across all calls.
         total_cost_usd: Cumulative cost in USD across all calls.
+        total_embedding_tokens: Cumulative embedding tokens (RAG only).
+        total_embedding_cost_usd: Cumulative embedding cost in USD (RAG only).
         tool_usage: Dictionary mapping tool names to call counts.
         tool_tokens: Dictionary mapping tool names to total tokens used.
         iterations: List of UsageStats for each iteration.
@@ -57,6 +63,8 @@ class AgentUsage:
     total_completion_tokens: int = 0
     total_tokens: int = 0
     total_cost_usd: float = 0.0
+    total_embedding_tokens: int = 0
+    total_embedding_cost_usd: float = 0.0
 
     # Per-tool breakdown
     tool_usage: Dict[str, int] = field(default_factory=dict)
@@ -77,6 +85,8 @@ class AgentUsage:
         self.total_completion_tokens += stats.completion_tokens
         self.total_tokens += stats.total_tokens
         self.total_cost_usd += stats.cost_usd
+        self.total_embedding_tokens += stats.embedding_tokens
+        self.total_embedding_cost_usd += stats.embedding_cost_usd
         self.iterations.append(stats)
 
         if tool_name:
@@ -90,7 +100,7 @@ class AgentUsage:
         Returns:
             Dictionary containing all usage statistics.
         """
-        return {
+        result = {
             "total_tokens": self.total_tokens,
             "total_prompt_tokens": self.total_prompt_tokens,
             "total_completion_tokens": self.total_completion_tokens,
@@ -99,6 +109,13 @@ class AgentUsage:
             "tool_tokens": self.tool_tokens,
             "iterations": len(self.iterations),
         }
+
+        # Add embedding stats if present
+        if self.total_embedding_tokens > 0:
+            result["total_embedding_tokens"] = self.total_embedding_tokens
+            result["total_embedding_cost_usd"] = round(self.total_embedding_cost_usd, 6)
+
+        return result
 
     def __str__(self) -> str:
         """
@@ -114,9 +131,19 @@ class AgentUsage:
             f"Total Tokens: {self.total_tokens:,}",
             f"  - Prompt: {self.total_prompt_tokens:,}",
             f"  - Completion: {self.total_completion_tokens:,}",
-            f"Total Cost: ${self.total_cost_usd:.6f}",
-            f"Iterations: {len(self.iterations)}",
         ]
+
+        # Add embedding stats if present
+        if self.total_embedding_tokens > 0:
+            lines.append(f"  - Embeddings: {self.total_embedding_tokens:,}")
+            total_cost = self.total_cost_usd + self.total_embedding_cost_usd
+            lines.append(f"Total Cost: ${total_cost:.6f}")
+            lines.append(f"  - LLM: ${self.total_cost_usd:.6f}")
+            lines.append(f"  - Embeddings: ${self.total_embedding_cost_usd:.6f}")
+        else:
+            lines.append(f"Total Cost: ${self.total_cost_usd:.6f}")
+
+        lines.append(f"Iterations: {len(self.iterations)}")
 
         if self.tool_usage:
             lines.append("\nTool Usage:")

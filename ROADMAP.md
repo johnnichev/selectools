@@ -74,15 +74,65 @@ This document tracks the implementation status of all planned features. See [REA
 
 ---
 
-## v0.7.x: Upcoming (Planned)
+## v0.8.0: Embeddings & RAG (Next Release)
+
+| Feature                   | Status     | Effort | Priority | Notes                                     |
+| ------------------------- | ---------- | ------ | -------- | ----------------------------------------- |
+| Embedding Models Registry | 🟡 Planned | Medium | High     | Add embedding models to models.py         |
+| Embedding Providers       | 🟡 Planned | Medium | High     | Support OpenAI, Anthropic, Gemini, Cohere |
+| Vector Store Abstraction  | 🟡 Planned | High   | High     | Unified interface for vector databases    |
+| Built-in Vector Stores    | 🟡 Planned | High   | Medium   | In-memory, SQLite, Chroma, Pinecone       |
+| Document Loaders          | 🟡 Planned | Medium | Medium   | PDF, TXT, Markdown, HTML parsers          |
+| Text Chunking Strategies  | 🟡 Planned | Medium | Medium   | Fixed, recursive, semantic splitting      |
+| RAG Tool                  | 🟡 Planned | High   | High     | Pre-built tool for document Q&A           |
+| Semantic Search Tool      | 🟡 Planned | Medium | Medium   | Search documents by meaning               |
+| Hybrid Search             | 🟡 Planned | High   | Low      | Combine vector + keyword search           |
+
+**Key Capabilities:**
+
+- **Embedding Support**: Add embedding models to model registry (OpenAI, Anthropic, Gemini, Cohere)
+- **Vector Databases**: Abstract interface + built-in implementations (in-memory, SQLite, Chroma, Pinecone)
+- **Document Processing**: Load, chunk, and embed documents automatically
+- **RAG Tools**: Pre-built tools for retrieval-augmented generation
+- **Cost Tracking**: Extend to track embedding API costs
+
+**Example API:**
+
+```python
+from selectools import Agent, OpenAIProvider
+from selectools.models import OpenAI
+from selectools.embeddings import EmbeddingProvider
+from selectools.rag import VectorStore, DocumentLoader, RAGTool
+
+# Set up embedding provider
+embedder = EmbeddingProvider(model=OpenAI.TEXT_EMBEDDING_3_SMALL)
+
+# Create vector store and load documents
+vector_store = VectorStore.create("chroma", embedder=embedder)
+loader = DocumentLoader.from_directory("./docs")
+vector_store.add_documents(loader.load())
+
+# Create RAG tool
+rag_tool = RAGTool(vector_store=vector_store, top_k=3)
+
+# Use with agent
+agent = Agent(tools=[rag_tool], provider=OpenAIProvider())
+response = agent.run("What are the main features of selectools?")
+```
+
+---
+
+## v0.8.x: Upcoming (Planned)
 
 | Feature              | Status     | Effort | Notes                            |
 | -------------------- | ---------- | ------ | -------------------------------- |
 | Dynamic Tool Loading | 🟡 Planned | Medium | Hot-reload tools without restart |
+| Reranking Models     | 🟡 Planned | Medium | Cohere, Jina rerankers           |
+| Advanced Chunking    | 🟡 Planned | High   | Agentic, contextual chunking     |
 
 ---
 
-## v0.8.0+: Advanced Features (Future)
+## v0.9.0+: Advanced Features (Future)
 
 ### High-Impact Complex Features
 
