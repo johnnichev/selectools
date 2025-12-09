@@ -16,6 +16,7 @@ Run this demo:
 """
 
 from selectools import Agent, AgentConfig, Message, Role, Tool, ToolParameter
+from selectools.models import Ollama
 from selectools.providers import OllamaProvider
 
 # ========================
@@ -125,13 +126,13 @@ try:
     # Initialize Ollama provider
     # You can use different models: llama3.2, llama3.1, mistral, codellama, etc.
     provider = OllamaProvider(
-        model="llama3.2",  # Change to your preferred model
+        model=Ollama.LLAMA_3_2.id,  # Change to your preferred model
         base_url="http://localhost:11434",  # Default Ollama URL
         temperature=0.7,
     )
 
     print(f"✅ Connected to Ollama")
-    print(f"   Model: llama3.2")
+    print(f"   Model: {Ollama.LLAMA_3_2.id}")
     print(f"   URL: http://localhost:11434")
     print()
 

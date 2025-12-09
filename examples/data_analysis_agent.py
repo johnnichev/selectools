@@ -650,7 +650,9 @@ def create_analysis_agent() -> Agent:
         ),
     ]
 
-    provider = OpenAIProvider(default_model="gpt-4o-mini")
+    from selectools.models import OpenAI
+
+    provider = OpenAIProvider(default_model=OpenAI.GPT_4O_MINI.id)
     memory = ConversationMemory(max_messages=20)
 
     config = AgentConfig(

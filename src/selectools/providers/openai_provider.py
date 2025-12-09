@@ -9,6 +9,7 @@ from typing import List
 
 from ..env import load_default_env
 from ..exceptions import ProviderConfigurationError
+from ..models import OpenAI as OpenAIModels
 from ..pricing import calculate_cost
 from ..types import Message, Role
 from ..usage import UsageStats
@@ -22,7 +23,7 @@ class OpenAIProvider(Provider):
     supports_streaming = True
     supports_async = True
 
-    def __init__(self, api_key: str | None = None, default_model: str = "gpt-4o"):
+    def __init__(self, api_key: str | None = None, default_model: str = OpenAIModels.GPT_4O.id):
         load_default_env()
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not self.api_key:

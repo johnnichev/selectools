@@ -16,6 +16,7 @@ import asyncio
 import time
 
 from selectools import Agent, AgentConfig, ConversationMemory, Message, OpenAIProvider, Role, tool
+from selectools.models import OpenAI
 
 
 # Example 1: Async Tool Functions
@@ -47,7 +48,7 @@ async def example_basic_async():
     agent = Agent(
         tools=[fetch_weather, calculate_sum],
         provider=OpenAIProvider(),
-        config=AgentConfig(model="gpt-4o-mini", max_iterations=3),
+        config=AgentConfig(model=OpenAI.GPT_4O_MINI.id, max_iterations=3),
     )
 
     start = time.time()
@@ -67,13 +68,13 @@ async def example_concurrent_agents():
     agent1 = Agent(
         tools=[fetch_weather],
         provider=OpenAIProvider(),
-        config=AgentConfig(model="gpt-4o-mini", max_iterations=2),
+        config=AgentConfig(model=OpenAI.GPT_4O_MINI.id, max_iterations=2),
     )
 
     agent2 = Agent(
         tools=[get_user_info],
         provider=OpenAIProvider(),
-        config=AgentConfig(model="gpt-4o-mini", max_iterations=2),
+        config=AgentConfig(model=OpenAI.GPT_4O_MINI.id, max_iterations=2),
     )
 
     start = time.time()
@@ -100,7 +101,7 @@ async def example_async_with_memory():
     agent = Agent(
         tools=[fetch_weather, calculate_sum],
         provider=OpenAIProvider(),
-        config=AgentConfig(model="gpt-4o-mini", max_iterations=3),
+        config=AgentConfig(model=OpenAI.GPT_4O_MINI.id, max_iterations=3),
         memory=memory,
     )
 
@@ -124,7 +125,9 @@ async def example_async_streaming():
     agent = Agent(
         tools=[fetch_weather],
         provider=OpenAIProvider(),
-        config=AgentConfig(model="gpt-4o-mini", max_iterations=2, stream=True),  # Enable streaming
+        config=AgentConfig(
+            model=OpenAI.GPT_4O_MINI.id, max_iterations=2, stream=True
+        ),  # Enable streaming
     )
 
     def stream_handler(chunk: str):

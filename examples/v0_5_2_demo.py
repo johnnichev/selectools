@@ -22,10 +22,11 @@ from selectools import (
 )
 
 try:
+    from selectools.models import OpenAI
     from selectools.providers.openai_provider import OpenAIProvider
 
-    provider = OpenAIProvider(default_model="gpt-4o-mini")
-    print("Using OpenAI provider (gpt-4o-mini)")
+    provider = OpenAIProvider(default_model=OpenAI.GPT_4O_MINI.id)
+    print(f"Using OpenAI provider ({OpenAI.GPT_4O_MINI.id})")
 except Exception:
     from selectools.providers.stubs import LocalProvider
 

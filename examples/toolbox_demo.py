@@ -17,10 +17,11 @@ from selectools.toolbox import get_all_tools, get_tools_by_category
 
 # Try to use OpenAI if available, otherwise fall back to LocalProvider
 try:
+    from selectools.models import OpenAI
     from selectools.providers.openai_provider import OpenAIProvider
 
-    provider = OpenAIProvider(default_model="gpt-4o-mini")
-    print("Using OpenAI provider (gpt-4o-mini)")
+    provider = OpenAIProvider(default_model=OpenAI.GPT_4O_MINI.id)
+    print(f"Using OpenAI provider ({OpenAI.GPT_4O_MINI.id})")
 except Exception:
     provider = LocalProvider()
     print("Using LocalProvider (no API calls)")

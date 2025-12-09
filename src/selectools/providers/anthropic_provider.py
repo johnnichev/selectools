@@ -9,6 +9,7 @@ from typing import Iterable, List
 
 from ..env import load_default_env
 from ..exceptions import ProviderConfigurationError
+from ..models import Anthropic as AnthropicModels
 from ..pricing import calculate_cost
 from ..types import Message, Role
 from ..usage import UsageStats
@@ -25,7 +26,7 @@ class AnthropicProvider(Provider):
     def __init__(
         self,
         api_key: str | None = None,
-        default_model: str = "claude-3-5-sonnet-20241022",
+        default_model: str = AnthropicModels.SONNET_3_5_20241022.id,
         base_url: str | None = None,
     ):
         load_default_env()

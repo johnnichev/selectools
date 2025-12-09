@@ -392,7 +392,9 @@ def create_support_agent() -> Agent:
     ]
 
     # Create provider
-    provider = OpenAIProvider(default_model="gpt-4o-mini")
+    from selectools.models import OpenAI
+
+    provider = OpenAIProvider(default_model=OpenAI.GPT_4O_MINI.id)
 
     # Create conversation memory (maintain context across turns)
     memory = ConversationMemory(max_messages=20)

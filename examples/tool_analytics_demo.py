@@ -153,8 +153,10 @@ print("=" * 80)
 print()
 
 # IMPORTANT: Enable analytics in config
+from selectools.models import OpenAI
+
 config = AgentConfig(
-    model="gpt-4o-mini",
+    model=OpenAI.GPT_4O_MINI.id,
     max_iterations=8,
     enable_analytics=True,  # 🔑 Enable analytics tracking
     verbose=False,  # Keep output clean for this demo

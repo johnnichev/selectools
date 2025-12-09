@@ -7,6 +7,7 @@ across multiple agent interactions without manually managing message history.
 """
 
 from selectools import Agent, AgentConfig, ConversationMemory, Message, Role, tool
+from selectools.models import OpenAI
 from selectools.providers.openai_provider import OpenAIProvider
 
 
@@ -34,7 +35,7 @@ def main():
     # Create an agent with memory
     agent = Agent(
         tools=[get_info, remember_fact],
-        provider=OpenAIProvider(default_model="gpt-4o"),
+        provider=OpenAIProvider(default_model=OpenAI.GPT_4O.id),
         config=AgentConfig(max_iterations=5, temperature=0.7),
         memory=memory,  # Pass memory to agent
     )

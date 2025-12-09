@@ -100,7 +100,9 @@ search_tool = Tool(
     function=lambda query: f"Results for {query}",
 )
 
-provider = OpenAIProvider(default_model="gpt-4o")
+# Use typed model constants for autocomplete
+from selectools.models import OpenAI
+provider = OpenAIProvider(default_model=OpenAI.GPT_4O.id)
 agent = Agent(tools=[search_tool], provider=provider, config=AgentConfig(max_iterations=4))
 response = agent.run([Message(role=Role.USER, content="Search for Backtrack")])
 print(response.content)
@@ -131,6 +133,42 @@ print(response.content)
 - Streaming: `stream=True` to stream provider deltas; optional `stream_handler` callback.
 - Analytics (v0.6.0): `enable_analytics=True` to track tool usage metrics, success rates, and performance.
 - Observability (v0.5.2): `hooks` dict for lifecycle callbacks (`on_tool_start`, `on_llm_end`, etc.).
+
+## Model Selection with Autocomplete
+
+Use typed model constants for IDE autocomplete and type safety:
+
+```python
+from selectools import Agent, OpenAIProvider
+from selectools.models import OpenAI, Anthropic, Gemini, Ollama
+
+# IDE suggests all available models when you type OpenAI.
+provider = OpenAIProvider(default_model=OpenAI.GPT_4O_MINI.id)
+
+# Or use in AgentConfig
+agent = Agent(
+    tools=[...],
+    provider=provider,
+    config=AgentConfig(model=OpenAI.GPT_4O.id)
+)
+
+# Access model metadata
+model_info = OpenAI.GPT_4O
+print(f"Cost: ${model_info.prompt_cost}/${model_info.completion_cost} per 1M tokens")
+print(f"Context: {model_info.context_window:,} tokens")
+print(f"Max output: {model_info.max_tokens:,} tokens")
+```
+
+**Available model classes:**
+
+- `OpenAI` - 65 models (GPT-5, GPT-4o, o-series, GPT-4, GPT-3.5, etc.)
+- `Anthropic` - 18 models (Claude 4.5, 4.1, 4, 3.7, 3.5, 3)
+- `Gemini` - 26 models (Gemini 3, 2.5, 2.0, 1.5, 1.0, Gemma)
+- `Ollama` - 13 models (Llama, Mistral, Phi, etc.)
+
+All 120 models include pricing, context windows, and max token metadata. See `selectools.models` for the complete registry.
+
+> **Coming in v0.7.0:** Embedding models and RAG support
 
 ## Real-World Examples
 
@@ -191,9 +229,11 @@ def create_ticket(customer_email: str, subject: str, description: str, priority:
         "message": f"Ticket {ticket_id} created successfully"
     })
 
+from selectools.models import OpenAI
+
 agent = Agent(
     tools=registry.all(),
-    provider=OpenAIProvider(default_model="gpt-4o"),
+    provider=OpenAIProvider(default_model=OpenAI.GPT_4O.id),
     config=AgentConfig(max_iterations=5, temperature=0.7)
 )
 
@@ -214,9 +254,11 @@ from selectools.examples.bbox import create_bounding_box_tool
 from selectools.providers.openai_provider import OpenAIProvider
 
 bbox_tool = create_bounding_box_tool()
+from selectools.models import OpenAI
+
 agent = Agent(
     tools=[bbox_tool],
-    provider=OpenAIProvider(default_model="gpt-4o"),
+    provider=OpenAIProvider(default_model=OpenAI.GPT_4O.id),
     config=AgentConfig(max_iterations=5)
 )
 
@@ -266,9 +308,11 @@ def save_findings(filename: str, content: str) -> str:
         f.write(content)
     return f"Saved findings to {filename}"
 
+from selectools.models import OpenAI
+
 agent = Agent(
     tools=[search_papers, extract_insights, save_findings],
-    provider=OpenAIProvider(default_model="gpt-4o"),
+    provider=OpenAIProvider(default_model=OpenAI.GPT_4O.id),
     config=AgentConfig(max_iterations=8, temperature=0.3)
 )
 
@@ -298,9 +342,11 @@ def stream_to_console(chunk: str):
     """Print chunks as they arrive for responsive UX"""
     print(chunk, end='', flush=True)
 
+from selectools.models import OpenAI
+
 agent = Agent(
     tools=[get_time],
-    provider=OpenAIProvider(default_model="gpt-4o"),
+    provider=OpenAIProvider(default_model=OpenAI.GPT_4O.id),
     config=AgentConfig(stream=True, max_iterations=3)
 )
 
@@ -405,11 +451,13 @@ def calculate_interest(principal: float, rate: float, years: int) -> str:
     return f"After {years} years: ${amount:.2f}"
 
 # Choose provider based on environment or preference
+from selectools.models import OpenAI, Anthropic, Gemini
+
 provider_name = os.getenv("LLM_PROVIDER", "openai")
 providers = {
-    "openai": OpenAIProvider(default_model="gpt-4o"),
-    "anthropic": AnthropicProvider(default_model="claude-3-5-sonnet-20241022"),
-    "gemini": GeminiProvider(default_model="gemini-2.0-flash-exp")
+    "openai": OpenAIProvider(default_model=OpenAI.GPT_4O.id),
+    "anthropic": AnthropicProvider(default_model=Anthropic.SONNET_3_5_20241022.id),
+    "gemini": GeminiProvider(default_model=Gemini.FLASH_2_0.id)
 }
 
 agent = Agent(
@@ -441,9 +489,11 @@ def summarize(text: str) -> str:
     return f"Summary: {text[:50]}..."
 
 # Enable cost tracking with optional warning threshold
+from selectools.models import OpenAI
+
 agent = Agent(
     tools=[search, summarize],
-    provider=OpenAIProvider(default_model="gpt-4o"),
+    provider=OpenAIProvider(default_model=OpenAI.GPT_4O.id),
     config=AgentConfig(
         max_iterations=5,
         cost_warning_threshold=0.10  # Warn if cost exceeds $0.10
@@ -627,6 +677,7 @@ agent = Agent(tools=[process_file], provider=provider, config=config)
 ```
 
 **Features:**
+
 - ✅ Sync generators (`Generator[str, None, None]`)
 - ✅ Async generators (`AsyncGenerator[str, None]`)
 - ✅ Real-time chunk callbacks via `on_tool_chunk` hook

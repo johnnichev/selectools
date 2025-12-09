@@ -19,6 +19,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from selectools import Agent, AgentConfig, ConversationMemory, Message, Role, tool
+from selectools.models import OpenAI
 from selectools.providers.openai_provider import OpenAIProvider
 
 
@@ -50,7 +51,7 @@ def test_basic_memory():
     memory = ConversationMemory(max_messages=20)
     agent = Agent(
         tools=[remember_fact, get_weather],
-        provider=OpenAIProvider(default_model="gpt-4o-mini"),  # Using mini for cost
+        provider=OpenAIProvider(default_model=OpenAI.GPT_4O_MINI.id),  # Using mini for cost
         memory=memory,
         config=AgentConfig(max_iterations=5, temperature=0.7, verbose=True),
     )
@@ -88,7 +89,7 @@ def test_multi_turn_context():
     memory = ConversationMemory(max_messages=20)
     agent = Agent(
         tools=[remember_fact, get_weather],
-        provider=OpenAIProvider(default_model="gpt-4o-mini"),
+        provider=OpenAIProvider(default_model=OpenAI.GPT_4O_MINI.id),
         memory=memory,
         config=AgentConfig(max_iterations=5, temperature=0.7),
     )
@@ -133,7 +134,7 @@ def test_memory_without_memory():
 
     agent = Agent(
         tools=[get_weather],
-        provider=OpenAIProvider(default_model="gpt-4o-mini"),
+        provider=OpenAIProvider(default_model=OpenAI.GPT_4O_MINI.id),
         # No memory parameter
         config=AgentConfig(max_iterations=5, temperature=0.7),
     )
@@ -160,7 +161,7 @@ def test_memory_limits():
     memory = ConversationMemory(max_messages=4)  # Very small limit
     agent = Agent(
         tools=[remember_fact],
-        provider=OpenAIProvider(default_model="gpt-4o-mini"),
+        provider=OpenAIProvider(default_model=OpenAI.GPT_4O_MINI.id),
         memory=memory,
         config=AgentConfig(max_iterations=3, temperature=0.7),
     )

@@ -40,8 +40,10 @@ def main():
     print("=" * 60)
 
     # Create agent with cost warning threshold
+    from selectools.models import OpenAI
+
     config = AgentConfig(
-        model="gpt-4o-mini",  # Use cheaper model for demo
+        model=OpenAI.GPT_4O_MINI.id,  # Use cheaper model for demo
         verbose=True,  # Show token counts in real-time
         cost_warning_threshold=0.01,  # Warn if cost exceeds $0.01
         max_iterations=10,

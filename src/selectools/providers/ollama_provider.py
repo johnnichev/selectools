@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import List
 
+from ..models import Ollama as OllamaModels
 from ..types import Message, Role
 from ..usage import UsageStats
 from .base import Provider, ProviderError
@@ -43,7 +44,7 @@ class OllamaProvider(Provider):
 
     def __init__(
         self,
-        model: str = "llama3.2",
+        model: str = OllamaModels.LLAMA_3_2.id,
         base_url: str = "http://localhost:11434",
         temperature: float = 0.7,
     ):

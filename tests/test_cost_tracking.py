@@ -17,6 +17,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from selectools import Agent, AgentConfig, AgentUsage, Message, Role, UsageStats, tool
+from selectools.models import Anthropic, Gemini, OpenAI
 from selectools.pricing import PRICING, calculate_cost, get_model_pricing
 from selectools.providers.stubs import LocalProvider
 
@@ -213,14 +214,14 @@ class TestPricing:
     def test_calculate_cost_gpt4o(self):
         """Test cost calculation for GPT-4o."""
         # GPT-4o: $2.50/1M prompt, $10/1M completion
-        cost = calculate_cost("gpt-4o", prompt_tokens=1000, completion_tokens=500)
+        cost = calculate_cost(OpenAI.GPT_4O.id, prompt_tokens=1000, completion_tokens=500)
         expected = (1000 / 1_000_000) * 2.50 + (500 / 1_000_000) * 10.00
         assert cost == pytest.approx(expected)
 
     def test_calculate_cost_gpt4o_mini(self):
         """Test cost calculation for GPT-4o-mini."""
         # GPT-4o-mini: $0.15/1M prompt, $0.60/1M completion
-        cost = calculate_cost("gpt-4o-mini", prompt_tokens=10000, completion_tokens=5000)
+        cost = calculate_cost(OpenAI.GPT_4O_MINI.id, prompt_tokens=10000, completion_tokens=5000)
         expected = (10000 / 1_000_000) * 0.15 + (5000 / 1_000_000) * 0.60
         assert cost == pytest.approx(expected)
 
@@ -228,7 +229,7 @@ class TestPricing:
         """Test cost calculation for Claude 3.5 Sonnet."""
         # Claude 3.5 Sonnet: $3/1M prompt, $15/1M completion
         cost = calculate_cost(
-            "claude-3-5-sonnet-20241022", prompt_tokens=2000, completion_tokens=1000
+            Anthropic.SONNET_3_5_20241022.id, prompt_tokens=2000, completion_tokens=1000
         )
         expected = (2000 / 1_000_000) * 3.00 + (1000 / 1_000_000) * 15.00
         assert cost == pytest.approx(expected)
@@ -236,7 +237,7 @@ class TestPricing:
     def test_calculate_cost_gemini(self):
         """Test cost calculation for Gemini 1.5 Flash."""
         # Gemini 1.5 Flash: $0.075/1M prompt, $0.30/1M completion
-        cost = calculate_cost("gemini-1.5-flash", prompt_tokens=5000, completion_tokens=2500)
+        cost = calculate_cost(Gemini.FLASH_1_5.id, prompt_tokens=5000, completion_tokens=2500)
         expected = (5000 / 1_000_000) * 0.075 + (2500 / 1_000_000) * 0.30
         assert cost == pytest.approx(expected)
 
@@ -268,7 +269,7 @@ class TestPricing:
 
     def test_zero_tokens(self):
         """Test cost calculation with zero tokens."""
-        cost = calculate_cost("gpt-4o", prompt_tokens=0, completion_tokens=0)
+        cost = calculate_cost(OpenAI.GPT_4O.id, prompt_tokens=0, completion_tokens=0)
         assert cost == 0.0
 
 
