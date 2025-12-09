@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
+from .analytics import AgentAnalytics
 from .parser import ToolCallParser
 from .prompt import PromptBuilder
 from .providers.base import Provider, ProviderError
@@ -98,6 +99,7 @@ class AgentConfig:
     rate_limit_cooldown_seconds: float = 5.0
     tool_timeout_seconds: Optional[float] = None
     cost_warning_threshold: Optional[float] = None
+    enable_analytics: bool = False
     hooks: Optional[Hooks] = None
 
 
@@ -188,6 +190,7 @@ class Agent:
         self.config = config or AgentConfig()
         self.memory = memory
         self.usage = AgentUsage()
+        self.analytics = AgentAnalytics() if self.config.enable_analytics else None
 
         self._system_prompt = self.prompt_builder.build(self.tools)
         self._history: List[Message] = []
@@ -269,6 +272,16 @@ class Agent:
                     duration = time.time() - start_time
                     self._call_hook("on_tool_end", tool_name, result, duration)
 
+                    # Track analytics if enabled
+                    if self.analytics:
+                        self.analytics.record_tool_call(
+                            tool_name=tool.name,
+                            success=True,
+                            duration=duration,
+                            params=parameters,
+                            cost=0.0,  # TODO: attribute cost per tool in future
+                        )
+
                     # Track tool usage
                     if self.usage.iterations:
                         last_iteration = self.usage.iterations[-1]
@@ -279,7 +292,19 @@ class Agent:
                         self.usage.tool_usage[tool.name] += 1
                         self.usage.tool_tokens[tool.name] += last_iteration.total_tokens
                 except Exception as exc:  # noqa: BLE001
+                    duration = time.time() - start_time
                     self._call_hook("on_tool_error", tool.name, exc, parameters)
+
+                    # Track analytics for failed call if enabled
+                    if self.analytics:
+                        self.analytics.record_tool_call(
+                            tool_name=tool.name,
+                            success=False,
+                            duration=duration,
+                            params=parameters,
+                            cost=0.0,
+                        )
+
                     error_message = f"Error executing tool '{tool.name}': {exc}"
                     self._append_assistant_and_tool(response_text, error_message, tool.name)
                     self._call_hook("on_iteration_end", iteration, response_text)
@@ -496,8 +521,30 @@ class Agent:
                     result = await self._aexecute_tool_with_timeout(tool, parameters)
                     duration = time.time() - start_time
                     self._call_hook("on_tool_end", tool_name, result, duration)
+
+                    # Track analytics if enabled
+                    if self.analytics:
+                        self.analytics.record_tool_call(
+                            tool_name=tool.name,
+                            success=True,
+                            duration=duration,
+                            params=parameters,
+                            cost=0.0,  # TODO: attribute cost per tool in future
+                        )
                 except Exception as exc:
+                    duration = time.time() - start_time
                     self._call_hook("on_tool_error", tool.name, exc, parameters)
+
+                    # Track analytics for failed call if enabled
+                    if self.analytics:
+                        self.analytics.record_tool_call(
+                            tool_name=tool.name,
+                            success=False,
+                            duration=duration,
+                            params=parameters,
+                            cost=0.0,
+                        )
+
                     error_message = f"Error executing tool '{tool.name}': {exc}"
                     self._append_assistant_and_tool(response_text, error_message, tool.name)
                     self._call_hook("on_iteration_end", iteration, response_text)
@@ -687,6 +734,24 @@ class Agent:
         the same agent instance.
         """
         self.usage = AgentUsage()
+
+    def get_analytics(self) -> AgentAnalytics | None:
+        """
+        Get analytics tracker with tool usage metrics.
+
+        Returns:
+            AgentAnalytics instance if analytics are enabled, None otherwise.
+
+        Example:
+            >>> config = AgentConfig(enable_analytics=True)
+            >>> agent = Agent(tools=[...], provider=provider, config=config)
+            >>> agent.run([Message(role=Role.USER, content="Search for Python")])
+            >>>
+            >>> analytics = agent.get_analytics()
+            >>> print(analytics.summary())
+            >>> analytics.to_json("analytics.json")
+        """
+        return self.analytics
 
 
 __all__ = ["Agent", "AgentConfig"]

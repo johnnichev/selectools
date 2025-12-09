@@ -3,6 +3,7 @@
 # Toolbox is imported separately to avoid pulling in optional dependencies
 from . import toolbox
 from .agent import Agent, AgentConfig
+from .analytics import AgentAnalytics, ToolMetrics
 from .exceptions import (
     MemoryLimitExceededError,
     ProviderConfigurationError,
@@ -16,6 +17,7 @@ from .pricing import PRICING, calculate_cost, get_model_pricing
 from .prompt import PromptBuilder
 from .providers.anthropic_provider import AnthropicProvider
 from .providers.gemini_provider import GeminiProvider
+from .providers.ollama_provider import OllamaProvider
 from .providers.openai_provider import OpenAIProvider
 from .providers.stubs import LocalProvider
 from .tools import Tool, ToolParameter, ToolRegistry, tool
@@ -25,6 +27,8 @@ from .usage import AgentUsage, UsageStats
 __all__ = [
     "Agent",
     "AgentConfig",
+    "AgentAnalytics",
+    "ToolMetrics",
     "ConversationMemory",
     "Message",
     "Role",
@@ -36,6 +40,7 @@ __all__ = [
     "OpenAIProvider",
     "AnthropicProvider",
     "GeminiProvider",
+    "OllamaProvider",
     "LocalProvider",
     "ToolRegistry",
     "tool",

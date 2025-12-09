@@ -26,6 +26,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "openai: mark test as requiring OpenAI API key")
     config.addinivalue_line("markers", "anthropic: mark test as requiring Anthropic API key")
     config.addinivalue_line("markers", "gemini: mark test as requiring Gemini API key")
+    config.addinivalue_line("markers", "ollama: mark test as requiring Ollama running locally")
 
 
 def pytest_collection_modifyitems(config, items):

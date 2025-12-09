@@ -17,20 +17,50 @@ This document tracks the implementation status of all planned features. See [REA
 
 ---
 
-## Priority 2: High-Impact Features (v0.5.2 - v0.6.0)
+## v0.5.x Series: Production Readiness ✅ COMPLETE
 
-| Feature                         | Status         | Notes                                    |
-| ------------------------------- | -------------- | ---------------------------------------- |
-| Tool Validation at Registration | ✅ Implemented | Validates tools at registration (v0.5.2) |
-| Observability Hooks             | ✅ Implemented | 10 lifecycle hooks for monitoring (v0.5.2)|
-| Streaming Tool Results          | 🟡 Planned     | Stream tool output as generated          |
-| Parallel Tool Execution         | 🟡 Planned     | Auto-detect independent tools            |
-| Tool Composition                | 🟡 Planned     | `@compose` decorator                     |
-| Interactive Debug Mode          | 🟡 Planned     | Step-through debugging                   |
+| Feature                         | Status    | Notes                                        |
+| ------------------------------- | --------- | -------------------------------------------- |
+| Conversation Memory             | ✅ v0.4.0 | Multi-turn context management                |
+| Async Support                   | ✅ v0.4.0 | `Agent.arun()`, async tools, async providers |
+| Anthropic/Gemini Providers      | ✅ v0.4.0 | Full SDK integration                         |
+| Better Error Messages           | ✅ v0.5.0 | Custom exceptions with suggestions           |
+| Cost Tracking                   | ✅ v0.5.0 | Token counting and cost estimation           |
+| Gemini SDK Migration            | ✅ v0.5.0 | Updated to google-genai v1.0+                |
+| Pre-built Tool Library          | ✅ v0.5.1 | 22 tools in 5 categories                     |
+| Tool Validation at Registration | ✅ v0.5.2 | Validates tools at registration              |
+| Observability Hooks             | ✅ v0.5.2 | 10 lifecycle hooks for monitoring            |
 
 ---
 
-## Priority 3: Advanced Features (v0.7.0+ - Ongoing)
+## v0.6.0: Enhanced Capabilities ✅ COMPLETE
+
+| Feature              | Status    | Notes                                     |
+| -------------------- | --------- | ----------------------------------------- |
+| Local Model Support  | ✅ v0.6.0 | Ollama provider for local LLM execution   |
+| Tool Usage Analytics | ✅ v0.6.0 | Track metrics, success rates, export data |
+
+---
+
+## v0.6.x: Upcoming (Planned)
+
+| Feature                | Status     | Effort | Notes                                |
+| ---------------------- | ---------- | ------ | ------------------------------------ |
+| Streaming Tool Results | 🟡 Planned | Medium | Stream tool output as it's generated |
+| Dynamic Tool Loading   | 🟡 Planned | Medium | Hot-reload tools without restart     |
+
+---
+
+## v0.7.0+: Advanced Features (Future)
+
+### High-Impact Complex Features
+
+| Feature                 | Status     | Notes                         |
+| ----------------------- | ---------- | ----------------------------- |
+| Parallel Tool Execution | 🟡 Planned | Auto-detect independent tools |
+| Tool Composition        | 🟡 Planned | `@compose` decorator          |
+
+---
 
 ### Context Management
 
@@ -70,6 +100,7 @@ This document tracks the implementation status of all planned features. See [REA
 
 | Feature                    | Status     | Notes                               |
 | -------------------------- | ---------- | ----------------------------------- |
+| Interactive Debug Mode     | 🟡 Planned | Step-through agent execution        |
 | Visual Agent Builder       | 🟡 Planned | Web UI for agent design             |
 | Enhanced Testing Framework | 🟡 Planned | Snapshot testing, load tests        |
 | Documentation Generation   | 🟡 Planned | Auto-generate from tool definitions |

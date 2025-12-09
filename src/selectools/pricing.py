@@ -36,6 +36,20 @@ PRICING: Dict[str, Dict[str, float]] = {
     "gemini-1.5-flash-latest": {"prompt": 0.075, "completion": 0.30},
     "gemini-1.0-pro": {"prompt": 0.50, "completion": 1.50},
     "gemini-pro": {"prompt": 0.50, "completion": 1.50},
+    # Ollama (Local Models - Free)
+    "llama3.2": {"prompt": 0.00, "completion": 0.00},
+    "llama3.1": {"prompt": 0.00, "completion": 0.00},
+    "llama3": {"prompt": 0.00, "completion": 0.00},
+    "llama2": {"prompt": 0.00, "completion": 0.00},
+    "mistral": {"prompt": 0.00, "completion": 0.00},
+    "mixtral": {"prompt": 0.00, "completion": 0.00},
+    "codellama": {"prompt": 0.00, "completion": 0.00},
+    "phi": {"prompt": 0.00, "completion": 0.00},
+    "neural-chat": {"prompt": 0.00, "completion": 0.00},
+    "starling-lm": {"prompt": 0.00, "completion": 0.00},
+    "qwen": {"prompt": 0.00, "completion": 0.00},
+    "gemma": {"prompt": 0.00, "completion": 0.00},
+    "vicuna": {"prompt": 0.00, "completion": 0.00},
 }
 
 
@@ -49,12 +63,15 @@ def calculate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> fl
         completion_tokens: Number of completion/output tokens.
 
     Returns:
-        Estimated cost in USD. Returns 0.0 if model pricing is unknown.
+        Estimated cost in USD. Returns 0.0 if model pricing is unknown or for local models.
 
     Note:
-        Logs a warning if the model is not found in the pricing table.
+        - Local models (not in PRICING table) are assumed to be free ($0.00)
+        - Logs a warning if the model is not found in the pricing table
     """
     if model not in PRICING:
+        # Don't log warning for obviously local models (will be caught by pattern)
+        # Just return 0.0 since local models are free
         logger.warning(
             f"⚠️  Unknown model '{model}' - cannot calculate cost. "
             f"Returning $0.00. Add pricing to selectools/pricing.py if known."

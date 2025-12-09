@@ -115,10 +115,11 @@ print(response.content)
 
 ## Providers (incl. vision & limits)
 
-- OpenAI: streaming; vision via Chat Completions `image_url` (e.g., `gpt-5`); request timeout default 30s; retries/backoff via `AgentConfig`.
-- Anthropic: streaming; vision model-dependent; set `ANTHROPIC_API_KEY`.
-- Gemini: streaming; vision model-dependent; set `GEMINI_API_KEY`.
-- Local: no network; echoes latest user text; no vision.
+- **OpenAI**: streaming; vision via Chat Completions `image_url` (e.g., `gpt-4o`); request timeout default 30s; retries/backoff via `AgentConfig`.
+- **Anthropic**: streaming; vision model-dependent; set `ANTHROPIC_API_KEY`.
+- **Gemini**: streaming; vision model-dependent; set `GEMINI_API_KEY`.
+- **Ollama** (v0.6.0): local LLM execution; zero cost; privacy-first; supports llama3.2, mistral, codellama, etc.
+- **Local**: no network; echoes latest user text; no vision.
 - Rate limits: agent detects `rate limit`/`429` and backs off + retries.
 - Timeouts: `AgentConfig.request_timeout` (provider) and `tool_timeout_seconds` (per tool).
 
@@ -128,6 +129,8 @@ print(response.content)
 - Reliability: `max_retries`, `retry_backoff_seconds`, rate-limit backoff, `request_timeout`.
 - Execution safety: `tool_timeout_seconds` to bound tool runtime.
 - Streaming: `stream=True` to stream provider deltas; optional `stream_handler` callback.
+- Analytics (v0.6.0): `enable_analytics=True` to track tool usage metrics, success rates, and performance.
+- Observability (v0.5.2): `hooks` dict for lifecycle callbacks (`on_tool_start`, `on_llm_end`, etc.).
 
 ## Real-World Examples
 
@@ -651,6 +654,8 @@ For the full license text, see the [LICENSE](LICENSE) file.
   - `python examples/cost_tracking_demo.py` - Token counting and cost tracking (v0.5.0)
   - `python examples/toolbox_demo.py` - Using pre-built tools from toolbox (v0.5.1)
   - `python examples/v0_5_2_demo.py` - Tool validation & observability hooks (v0.5.2)
+  - `python examples/ollama_demo.py` - Local LLM execution with Ollama (v0.6.0)
+  - `python examples/tool_analytics_demo.py` - Track and analyze tool usage (v0.6.0)
   - `python examples/customer_support_bot.py` - Multi-tool customer support workflow
   - `python examples/data_analysis_agent.py` - Data exploration and analysis tools
 - Dev helpers:
@@ -684,17 +689,21 @@ We're actively developing new features to make Selectools the most production-re
 - Tool Validation at Registration - Catch tool definition errors during development, not production
 - Observability Hooks - 10 lifecycle hooks for monitoring, debugging, and tracking agent behavior
 
-**🟡 Coming in v0.6.0:**
+**✅ Completed in v0.6.0:**
 
-- Parallel Tool Execution - Run multiple tools concurrently
-- Streaming Tool Results - Stream tool output as generated
-- Tool Composition - Chain tools together with `@compose` decorator
+- Local Model Support - Ollama provider for privacy-first, zero-cost local LLM execution
+- Tool Usage Analytics - Track metrics, success rates, execution times, and parameter patterns
+
+**🟡 Coming in v0.6.x:**
+
+- Streaming Tool Results - Stream tool output as it's generated
+- Dynamic Tool Loading - Hot-reload tools without restarting the agent
 
 **🚀 Future (v0.7.0+):**
 
-- Tool composition and chaining
+- Parallel Tool Execution - Run multiple tools concurrently
+- Tool Composition - Chain tools together with `@compose` decorator
 - Advanced context management
-- Local model support (Ollama)
 - And much more...
 
 See **[ROADMAP.md](ROADMAP.md)** for detailed feature descriptions, status tracking, and implementation notes.
