@@ -17,7 +17,7 @@ PROVIDERS: List[Tuple[str, str, str, str]] = [
     ("openai", "gpt-4o", "OPENAI_API_KEY", "Hello from OpenAI"),
     ("anthropic", "claude-3-5-sonnet-20240620", "ANTHROPIC_API_KEY", "Hello from Anthropic"),
     ("gemini", "gemini-1.5-flash", "GEMINI_API_KEY", "Hello from Gemini"),
-    ("local", "local", None, "Hello from Local"),
+    ("local", "local", "", "Hello from Local"),
 ]
 
 
