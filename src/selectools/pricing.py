@@ -1,7 +1,7 @@
 """
 Pricing tables for major LLM providers.
 
-Prices in USD per 1M tokens (as of December 2024).
+Prices in USD per 1M tokens (as of December 2024). - we will update this soon with all 2025 models.
 Prices are subject to change - check provider documentation for current rates.
 """
 

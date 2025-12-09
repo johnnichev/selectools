@@ -7,8 +7,8 @@ from __future__ import annotations
 import asyncio
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, List, Optional
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from .parser import ToolCallParser
 from .prompt import PromptBuilder
@@ -20,6 +20,10 @@ from .usage import AgentUsage
 
 if TYPE_CHECKING:
     from .memory import ConversationMemory
+
+# Hook type definitions
+HookCallable = Callable[..., None]
+Hooks = Dict[str, HookCallable]
 
 
 @dataclass
@@ -43,6 +47,18 @@ class AgentConfig:
         rate_limit_cooldown_seconds: Cooldown period after rate limit errors. Default: 5.0.
         tool_timeout_seconds: Maximum execution time for each tool call. None = no timeout. Default: None.
         cost_warning_threshold: Print warning when total cost exceeds this USD amount. None = no warnings. Default: None.
+        hooks: Optional dict of lifecycle hooks for observability. Default: None.
+               Available hooks:
+               - 'on_agent_start': Called at start of run/arun with (messages,)
+               - 'on_agent_end': Called at end with (response, usage)
+               - 'on_iteration_start': Called at start of each iteration with (iteration_num, messages)
+               - 'on_iteration_end': Called at end of each iteration with (iteration_num, response)
+               - 'on_tool_start': Called before tool execution with (tool_name, tool_args)
+               - 'on_tool_end': Called after tool execution with (tool_name, result, duration)
+               - 'on_tool_error': Called on tool error with (tool_name, error, tool_args)
+               - 'on_llm_start': Called before LLM call with (messages, model)
+               - 'on_llm_end': Called after LLM call with (response, usage)
+               - 'on_error': Called on any error with (error, context)
 
     Example:
         >>> # Production config with retries and timeouts
@@ -57,6 +73,17 @@ class AgentConfig:
         >>>
         >>> # Debug config with verbose logging
         >>> config = AgentConfig(verbose=True, stream=True)
+        >>>
+        >>> # Config with observability hooks
+        >>> def log_tool(name, args):
+        ...     print(f"Calling {name} with {args}")
+        >>>
+        >>> config = AgentConfig(
+        ...     hooks={
+        ...         'on_tool_start': log_tool,
+        ...         'on_tool_end': lambda name, result, dur: print(f"{name} took {dur:.2f}s"),
+        ...     }
+        ... )
     """
 
     model: str = "gpt-4o"
@@ -71,6 +98,7 @@ class AgentConfig:
     rate_limit_cooldown_seconds: float = 5.0
     tool_timeout_seconds: Optional[float] = None
     cost_warning_threshold: Optional[float] = None
+    hooks: Optional[Hooks] = None
 
 
 class Agent:
@@ -164,6 +192,16 @@ class Agent:
         self._system_prompt = self.prompt_builder.build(self.tools)
         self._history: List[Message] = []
 
+    def _call_hook(self, hook_name: str, *args: Any, **kwargs: Any) -> None:
+        """Safely call a hook if it exists, swallowing any exceptions."""
+        if not self.config.hooks or hook_name not in self.config.hooks:
+            return
+        try:
+            self.config.hooks[hook_name](*args, **kwargs)
+        except Exception:  # noqa: BLE001 # nosec B110
+            # Silently ignore hook errors to prevent them from breaking agent execution
+            pass
+
     def run(
         self, messages: List[Message], stream_handler: Optional[Callable[[str], None]] = None
     ) -> Message:
@@ -181,66 +219,89 @@ class Agent:
         Returns:
             The final assistant response message.
         """
-        # Load history from memory if available, then append new messages
-        if self.memory:
-            self._history = self.memory.get_history() + list(messages)
-            # Add new user messages to memory
-            self.memory.add_many(messages)
-        else:
-            self._history = list(messages)
+        # Call on_agent_start hook
+        self._call_hook("on_agent_start", messages)
 
-        iteration = 0
+        try:
+            # Load history from memory if available, then append new messages
+            if self.memory:
+                self._history = self.memory.get_history() + list(messages)
+                # Add new user messages to memory
+                self.memory.add_many(messages)
+            else:
+                self._history = list(messages)
 
-        while iteration < self.config.max_iterations:
-            iteration += 1
-            response_text = self._call_provider(stream_handler=stream_handler)
-            parse_result = self.parser.parse(response_text)
+            iteration = 0
 
-            if not parse_result.tool_call:
-                final_response = Message(role=Role.ASSISTANT, content=response_text)
-                # Save final response to memory if available
-                if self.memory:
-                    self.memory.add(final_response)
-                return final_response
+            while iteration < self.config.max_iterations:
+                iteration += 1
+                self._call_hook("on_iteration_start", iteration, self._history)
 
-            tool_name = parse_result.tool_call.tool_name
-            parameters = parse_result.tool_call.parameters
+                response_text = self._call_provider(stream_handler=stream_handler)
+                parse_result = self.parser.parse(response_text)
 
-            if self.config.verbose:
-                print(f"[agent] Iteration {iteration}: tool={tool_name} params={parameters}")
+                if not parse_result.tool_call:
+                    final_response = Message(role=Role.ASSISTANT, content=response_text)
+                    self._call_hook("on_iteration_end", iteration, response_text)
+                    # Save final response to memory if available
+                    if self.memory:
+                        self.memory.add(final_response)
+                    self._call_hook("on_agent_end", final_response, self.usage)
+                    return final_response
 
-            tool = self._tools_by_name.get(tool_name)
-            if not tool:
-                error_message = f"Unknown tool '{tool_name}'. Available tools: {', '.join(self._tools_by_name.keys())}"
-                self._append_assistant_and_tool(response_text, error_message, tool_name)
-                continue
+                tool_name = parse_result.tool_call.tool_name
+                parameters = parse_result.tool_call.parameters
 
-            try:
-                result = self._execute_tool_with_timeout(tool, parameters)
-                # Track tool usage
-                if self.usage.iterations:
-                    last_iteration = self.usage.iterations[-1]
-                    # Update the most recent iteration with the tool name
-                    if tool.name not in self.usage.tool_usage:
-                        self.usage.tool_usage[tool.name] = 0
-                        self.usage.tool_tokens[tool.name] = 0
-                    self.usage.tool_usage[tool.name] += 1
-                    self.usage.tool_tokens[tool.name] += last_iteration.total_tokens
-            except Exception as exc:  # noqa: BLE001
-                error_message = f"Error executing tool '{tool.name}': {exc}"
-                self._append_assistant_and_tool(response_text, error_message, tool.name)
-                continue
+                if self.config.verbose:
+                    print(f"[agent] Iteration {iteration}: tool={tool_name} params={parameters}")
 
-            self._append_assistant_and_tool(response_text, result, tool.name, tool_result=result)
+                tool = self._tools_by_name.get(tool_name)
+                if not tool:
+                    error_message = f"Unknown tool '{tool_name}'. Available tools: {', '.join(self._tools_by_name.keys())}"
+                    self._append_assistant_and_tool(response_text, error_message, tool_name)
+                    self._call_hook("on_iteration_end", iteration, response_text)
+                    continue
 
-        final_response = Message(
-            role=Role.ASSISTANT,
-            content=f"Maximum iterations ({self.config.max_iterations}) reached without resolution.",
-        )
-        # Save final response to memory if available
-        if self.memory:
-            self.memory.add(final_response)
-        return final_response
+                try:
+                    start_time = time.time()
+                    self._call_hook("on_tool_start", tool_name, parameters)
+                    result = self._execute_tool_with_timeout(tool, parameters)
+                    duration = time.time() - start_time
+                    self._call_hook("on_tool_end", tool_name, result, duration)
+
+                    # Track tool usage
+                    if self.usage.iterations:
+                        last_iteration = self.usage.iterations[-1]
+                        # Update the most recent iteration with the tool name
+                        if tool.name not in self.usage.tool_usage:
+                            self.usage.tool_usage[tool.name] = 0
+                            self.usage.tool_tokens[tool.name] = 0
+                        self.usage.tool_usage[tool.name] += 1
+                        self.usage.tool_tokens[tool.name] += last_iteration.total_tokens
+                except Exception as exc:  # noqa: BLE001
+                    self._call_hook("on_tool_error", tool.name, exc, parameters)
+                    error_message = f"Error executing tool '{tool.name}': {exc}"
+                    self._append_assistant_and_tool(response_text, error_message, tool.name)
+                    self._call_hook("on_iteration_end", iteration, response_text)
+                    continue
+
+                self._append_assistant_and_tool(
+                    response_text, result, tool.name, tool_result=result
+                )
+                self._call_hook("on_iteration_end", iteration, response_text)
+
+            final_response = Message(
+                role=Role.ASSISTANT,
+                content=f"Maximum iterations ({self.config.max_iterations}) reached without resolution.",
+            )
+            # Save final response to memory if available
+            if self.memory:
+                self.memory.add(final_response)
+            self._call_hook("on_agent_end", final_response, self.usage)
+            return final_response
+        except Exception as exc:
+            self._call_hook("on_error", exc, {"messages": messages, "iteration": iteration})
+            raise
 
     def _call_provider(self, stream_handler: Optional[Callable[[str], None]] = None) -> str:
         attempts = 0
@@ -249,8 +310,14 @@ class Agent:
         while attempts <= self.config.max_retries:
             attempts += 1
             try:
+                self._call_hook("on_llm_start", self._history, self.config.model)
+
                 if self.config.stream and getattr(self.provider, "supports_streaming", False):
-                    return self._streaming_call(stream_handler=stream_handler)
+                    response_text = self._streaming_call(stream_handler=stream_handler)
+                    self._call_hook(
+                        "on_llm_end", response_text, None
+                    )  # No usage stats for streaming
+                    return response_text
 
                 response_text, usage_stats = self.provider.complete(
                     model=self.config.model,
@@ -263,6 +330,9 @@ class Agent:
 
                 # Track usage (tool name will be added later after parsing)
                 self.usage.add_usage(usage_stats, tool_name=None)
+
+                # Call on_llm_end hook
+                self._call_hook("on_llm_end", response_text, usage_stats)
 
                 # Check cost warning threshold
                 if (
@@ -380,54 +450,75 @@ class Agent:
         Returns:
             The final assistant response message.
         """
-        # Load history from memory if available, then append new messages
-        if self.memory:
-            self._history = self.memory.get_history() + list(messages)
-            self.memory.add_many(messages)
-        else:
-            self._history = list(messages)
+        self._call_hook("on_agent_start", messages)
 
-        iteration = 0
+        try:
+            # Load history from memory if available, then append new messages
+            if self.memory:
+                self._history = self.memory.get_history() + list(messages)
+                self.memory.add_many(messages)
+            else:
+                self._history = list(messages)
 
-        while iteration < self.config.max_iterations:
-            iteration += 1
-            response_text = await self._acall_provider(stream_handler=stream_handler)
-            parse_result = self.parser.parse(response_text)
+            iteration = 0
 
-            if not parse_result.tool_call:
-                final_response = Message(role=Role.ASSISTANT, content=response_text)
-                if self.memory:
-                    self.memory.add(final_response)
-                return final_response
+            while iteration < self.config.max_iterations:
+                iteration += 1
+                self._call_hook("on_iteration_start", iteration, self._history)
 
-            tool_name = parse_result.tool_call.tool_name
-            parameters = parse_result.tool_call.parameters
+                response_text = await self._acall_provider(stream_handler=stream_handler)
+                parse_result = self.parser.parse(response_text)
 
-            if self.config.verbose:
-                print(f"[agent] Iteration {iteration}: tool={tool_name} params={parameters}")
+                if not parse_result.tool_call:
+                    final_response = Message(role=Role.ASSISTANT, content=response_text)
+                    self._call_hook("on_iteration_end", iteration, response_text)
+                    if self.memory:
+                        self.memory.add(final_response)
+                    self._call_hook("on_agent_end", final_response, self.usage)
+                    return final_response
 
-            tool = self._tools_by_name.get(tool_name)
-            if not tool:
-                error_message = f"Unknown tool '{tool_name}'. Available tools: {', '.join(self._tools_by_name.keys())}"
-                self._append_assistant_and_tool(response_text, error_message, tool_name)
-                continue
+                tool_name = parse_result.tool_call.tool_name
+                parameters = parse_result.tool_call.parameters
 
-            try:
-                result = await self._aexecute_tool_with_timeout(tool, parameters)
-            except Exception as exc:
-                error_message = f"Error executing tool '{tool.name}': {exc}"
-                self._append_assistant_and_tool(response_text, error_message, tool.name)
-                continue
+                if self.config.verbose:
+                    print(f"[agent] Iteration {iteration}: tool={tool_name} params={parameters}")
 
-            self._append_assistant_and_tool(response_text, result, tool.name, tool_result=result)
+                tool = self._tools_by_name.get(tool_name)
+                if not tool:
+                    error_message = f"Unknown tool '{tool_name}'. Available tools: {', '.join(self._tools_by_name.keys())}"
+                    self._append_assistant_and_tool(response_text, error_message, tool_name)
+                    self._call_hook("on_iteration_end", iteration, response_text)
+                    continue
 
-        final_response = Message(
-            role=Role.ASSISTANT,
-            content=f"Maximum iterations ({self.config.max_iterations}) reached without resolution.",
-        )
-        if self.memory:
-            self.memory.add(final_response)
-        return final_response
+                try:
+                    start_time = time.time()
+                    self._call_hook("on_tool_start", tool_name, parameters)
+                    result = await self._aexecute_tool_with_timeout(tool, parameters)
+                    duration = time.time() - start_time
+                    self._call_hook("on_tool_end", tool_name, result, duration)
+                except Exception as exc:
+                    self._call_hook("on_tool_error", tool.name, exc, parameters)
+                    error_message = f"Error executing tool '{tool.name}': {exc}"
+                    self._append_assistant_and_tool(response_text, error_message, tool.name)
+                    self._call_hook("on_iteration_end", iteration, response_text)
+                    continue
+
+                self._append_assistant_and_tool(
+                    response_text, result, tool.name, tool_result=result
+                )
+                self._call_hook("on_iteration_end", iteration, response_text)
+
+            final_response = Message(
+                role=Role.ASSISTANT,
+                content=f"Maximum iterations ({self.config.max_iterations}) reached without resolution.",
+            )
+            if self.memory:
+                self.memory.add(final_response)
+            self._call_hook("on_agent_end", final_response, self.usage)
+            return final_response
+        except Exception as exc:
+            self._call_hook("on_error", exc, {"messages": messages, "iteration": iteration})
+            raise
 
     async def _acall_provider(self, stream_handler: Optional[Callable[[str], None]] = None) -> str:
         """Async version of _call_provider with retry logic."""
@@ -437,8 +528,12 @@ class Agent:
         while attempts <= self.config.max_retries:
             attempts += 1
             try:
+                self._call_hook("on_llm_start", self._history, self.config.model)
+
                 if self.config.stream and getattr(self.provider, "supports_streaming", False):
-                    return await self._astreaming_call(stream_handler=stream_handler)
+                    response_text = await self._astreaming_call(stream_handler=stream_handler)
+                    self._call_hook("on_llm_end", response_text, None)
+                    return response_text
 
                 # Check if provider has async support
                 if hasattr(self.provider, "acomplete") and getattr(
@@ -470,6 +565,9 @@ class Agent:
 
                 # Track usage
                 self.usage.add_usage(usage_stats, tool_name=None)
+
+                # Call on_llm_end hook
+                self._call_hook("on_llm_end", response_text, usage_stats)
 
                 # Check cost warning threshold
                 if (

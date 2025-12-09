@@ -650,6 +650,7 @@ For the full license text, see the [LICENSE](LICENSE) file.
   - `python examples/conversation_memory_demo.py` - Multi-turn conversation with memory
   - `python examples/cost_tracking_demo.py` - Token counting and cost tracking (v0.5.0)
   - `python examples/toolbox_demo.py` - Using pre-built tools from toolbox (v0.5.1)
+  - `python examples/v0_5_2_demo.py` - Tool validation & observability hooks (v0.5.2)
   - `python examples/customer_support_bot.py` - Multi-tool customer support workflow
   - `python examples/data_analysis_agent.py` - Data exploration and analysis tools
 - Dev helpers:
@@ -678,11 +679,16 @@ We're actively developing new features to make Selectools the most production-re
 
 - Pre-built Tool Library - 22 production-ready tools in 5 categories (file, web, data, datetime, text)
 
+**✅ Completed in v0.5.2:**
+
+- Tool Validation at Registration - Catch tool definition errors during development, not production
+- Observability Hooks - 10 lifecycle hooks for monitoring, debugging, and tracking agent behavior
+
 **🟡 Coming in v0.6.0:**
 
 - Parallel Tool Execution - Run multiple tools concurrently
-- Observability Hooks - Track and debug agent behavior
 - Streaming Tool Results - Stream tool output as generated
+- Tool Composition - Chain tools together with `@compose` decorator
 
 **🚀 Future (v0.7.0+):**
 

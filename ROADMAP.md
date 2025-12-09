@@ -4,29 +4,29 @@ This document tracks the implementation status of all planned features. See [REA
 
 ## Priority 1: Quick Wins (v0.4.0 - v0.5.1)
 
-| Feature                   | Status         | Notes                            |
-| ------------------------- | -------------- | -------------------------------- |
-| Conversation Memory       | ✅ Implemented | Simple history management (v0.4) |
-| Async Support             | ✅ Implemented | `Agent.arun()`, async tools (v0.4) |
+| Feature                   | Status         | Notes                                  |
+| ------------------------- | -------------- | -------------------------------------- |
+| Conversation Memory       | ✅ Implemented | Simple history management (v0.4)       |
+| Async Support             | ✅ Implemented | `Agent.arun()`, async tools (v0.4)     |
 | Anthropic Provider (Full) | ✅ Implemented | Real SDK integration with async (v0.4) |
 | Gemini Provider (Full)    | ✅ Implemented | Real SDK integration with async (v0.4) |
-| Remove Pillow Dependency  | ✅ Implemented | Removed bbox example (v0.4)      |
-| Better Error Messages     | ✅ Implemented | PyTorch-style helpful errors (v0.5.0) |
-| Cost Tracking             | ✅ Implemented | Track tokens and API costs (v0.5.0) |
-| Pre-built Tool Library    | ✅ Implemented | 22 tools in 5 categories (v0.5.1) |
+| Remove Pillow Dependency  | ✅ Implemented | Removed bbox example (v0.4)            |
+| Better Error Messages     | ✅ Implemented | PyTorch-style helpful errors (v0.5.0)  |
+| Cost Tracking             | ✅ Implemented | Track tokens and API costs (v0.5.0)    |
+| Pre-built Tool Library    | ✅ Implemented | 22 tools in 5 categories (v0.5.1)      |
 
 ---
 
-## Priority 2: High-Impact Features (v0.6.0)
+## Priority 2: High-Impact Features (v0.5.2 - v0.6.0)
 
-| Feature                         | Status     | Notes                               |
-| ------------------------------- | ---------- | ----------------------------------- |
-| Streaming Tool Results          | 🟡 Planned | Stream tool output as generated     |
-| Parallel Tool Execution         | 🟡 Planned | Auto-detect independent tools       |
-| Observability Hooks             | 🟡 Planned | `on_tool_start`, `on_tool_end`, etc |
-| Tool Composition                | 🟡 Planned | `@compose` decorator                |
-| Tool Validation at Registration | 🟡 Planned | Catch errors early                  |
-| Interactive Debug Mode          | 🟡 Planned | Step-through debugging              |
+| Feature                         | Status         | Notes                                    |
+| ------------------------------- | -------------- | ---------------------------------------- |
+| Tool Validation at Registration | ✅ Implemented | Validates tools at registration (v0.5.2) |
+| Observability Hooks             | ✅ Implemented | 10 lifecycle hooks for monitoring (v0.5.2)|
+| Streaming Tool Results          | 🟡 Planned     | Stream tool output as generated          |
+| Parallel Tool Execution         | 🟡 Planned     | Auto-detect independent tools            |
+| Tool Composition                | 🟡 Planned     | `@compose` decorator                     |
+| Interactive Debug Mode          | 🟡 Planned     | Step-through debugging                   |
 
 ---
 

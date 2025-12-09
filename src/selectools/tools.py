@@ -144,6 +144,9 @@ class Tool:
             function: Callable that implements the tool logic (must return str).
             injected_kwargs: Optional kwargs injected at execution (hidden from LLM).
             config_injector: Optional callable returning kwargs to inject at execution time.
+
+        Raises:
+            ToolValidationError: If tool definition is invalid
         """
         self.name = name
         self.description = description
@@ -152,6 +155,99 @@ class Tool:
         self.injected_kwargs = injected_kwargs or {}
         self.config_injector = config_injector
         self.is_async = inspect.iscoroutinefunction(function)
+
+        # Validate tool definition at registration time
+        self._validate_tool_definition()
+
+    def _validate_tool_definition(self) -> None:
+        """
+        Validate tool definition at registration time to catch errors early.
+
+        Raises:
+            ToolValidationError: If the tool definition is invalid
+        """
+        # Check for empty name
+        if not self.name or not self.name.strip():
+            raise ToolValidationError(
+                tool_name="<unnamed>",
+                param_name="name",
+                issue="Tool name cannot be empty",
+                suggestion="Provide a descriptive name for the tool",
+            )
+
+        # Check for empty or missing description
+        if not self.description or not self.description.strip():
+            raise ToolValidationError(
+                tool_name=self.name,
+                param_name="description",
+                issue="Tool description cannot be empty",
+                suggestion="Provide a clear description explaining what the tool does",
+            )
+
+        # Check for duplicate parameter names
+        param_names = [p.name for p in self.parameters]
+        duplicates = [name for name in param_names if param_names.count(name) > 1]
+        if duplicates:
+            unique_duplicates = sorted(set(duplicates))
+            raise ToolValidationError(
+                tool_name=self.name,
+                param_name=", ".join(unique_duplicates),
+                issue="Duplicate parameter name(s)",
+                suggestion="Each parameter must have a unique name",
+            )
+
+        # Validate parameter types
+        supported_types = {str, int, float, bool, list, dict}
+        for param in self.parameters:
+            if param.param_type not in supported_types:
+                type_list = ", ".join(t.__name__ for t in supported_types)
+                raise ToolValidationError(
+                    tool_name=self.name,
+                    param_name=param.name,
+                    issue=f"Unsupported parameter type: {param.param_type}",
+                    suggestion=f"Use one of: {type_list}",
+                )
+
+        # Validate function signature matches parameters
+        try:
+            sig = inspect.signature(self.function)
+        except (ValueError, TypeError):
+            # Can't inspect signature (built-in function, etc.)
+            return
+
+        func_params = sig.parameters
+        param_names_set = {p.name for p in self.parameters}
+        injected_names = set(self.injected_kwargs.keys())
+
+        # Check that all tool parameters exist in function signature
+        for param in self.parameters:
+            if param.name not in func_params and param.name not in injected_names:
+                func_param_names = [p for p in func_params.keys() if p not in injected_names]
+                suggestion = f"Available function parameters: {', '.join(func_param_names)}"
+                if not func_param_names:
+                    suggestion = "Function has no parameters"
+
+                raise ToolValidationError(
+                    tool_name=self.name,
+                    param_name=param.name,
+                    issue=f"Parameter '{param.name}' not found in function signature",
+                    suggestion=suggestion,
+                )
+
+        # Check that required tool parameters don't have defaults in function
+        for param in self.parameters:
+            if param.required and param.name in func_params:
+                func_param = func_params[param.name]
+                if func_param.default != inspect.Parameter.empty:
+                    raise ToolValidationError(
+                        tool_name=self.name,
+                        param_name=param.name,
+                        issue=(
+                            f"Parameter marked as required but has default value "
+                            f"in function: {func_param.default!r}"
+                        ),
+                        suggestion="Either mark as optional (required=False) or remove default from function",
+                    )
 
     def schema(self) -> JsonSchema:
         """Return a JSON-schema style dict describing this tool."""
