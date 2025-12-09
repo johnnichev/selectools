@@ -6,7 +6,6 @@ from __future__ import annotations
 
 from typing import List
 
-from ..pricing import calculate_cost
 from ..types import Message, Role
 from ..usage import UsageStats
 from .base import Provider, ProviderError
