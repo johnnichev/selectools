@@ -475,7 +475,58 @@ print(agent.get_usage_summary())
 - Configurable cost warnings
 - Reset usage: `agent.reset_usage()`
 
-### 10. **Async Agent: Modern Python with asyncio**
+### 10. **Pre-built Toolbox: Ready-to-Use Tools (v0.5.1)**
+
+Skip the boilerplate and use production-ready tools from the toolbox:
+
+```python
+from selectools import Agent, AgentConfig, Message, Role
+from selectools.providers.openai_provider import OpenAIProvider
+from selectools.toolbox import get_all_tools, get_tools_by_category
+
+# Use all 22 tools from the toolbox
+all_tools = get_all_tools()
+agent = Agent(
+    tools=all_tools,
+    provider=OpenAIProvider(),
+    config=AgentConfig(max_iterations=8)
+)
+
+# Or get specific categories
+file_tools = get_tools_by_category("file")  # read_file, write_file, list_files, file_exists
+data_tools = get_tools_by_category("data")  # parse_json, json_to_csv, csv_to_json, etc.
+text_tools = get_tools_by_category("text")  # count_text, search_text, extract_emails, etc.
+datetime_tools = get_tools_by_category("datetime")  # get_current_time, parse_datetime, etc.
+web_tools = get_tools_by_category("web")  # http_get, http_post
+
+# Complex multi-step task using multiple tool categories
+response = agent.run([
+    Message(
+        role=Role.USER,
+        content="""
+        1. Get the current time in UTC
+        2. Parse this JSON: {"users": [{"name": "Alice", "email": "alice@test.com"}]}
+        3. Extract all email addresses from the JSON
+        4. Write the results to a file called results.txt
+        """
+    )
+])
+print(response.content)
+```
+
+**Available Tool Categories:**
+
+| Category         | Tools                                                                                                          | Description                 |
+| ---------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| **File** (4)     | `read_file`, `write_file`, `list_files`, `file_exists`                                                         | File system operations      |
+| **Data** (5)     | `parse_json`, `json_to_csv`, `csv_to_json`, `extract_json_field`, `format_table`                               | Data parsing and formatting |
+| **Text** (7)     | `count_text`, `search_text`, `replace_text`, `extract_emails`, `extract_urls`, `convert_case`, `truncate_text` | Text processing             |
+| **DateTime** (4) | `get_current_time`, `parse_datetime`, `time_difference`, `date_arithmetic`                                     | Date/time utilities         |
+| **Web** (2)      | `http_get`, `http_post`                                                                                        | HTTP requests               |
+
+See `examples/toolbox_demo.py` for a complete demonstration.
+
+### 11. **Async Agent: Modern Python with asyncio**
 
 Build high-performance async applications with native async support:
 
@@ -598,6 +649,7 @@ For the full license text, see the [LICENSE](LICENSE) file.
   - `python examples/async_agent_demo.py` - Async/await usage with FastAPI patterns
   - `python examples/conversation_memory_demo.py` - Multi-turn conversation with memory
   - `python examples/cost_tracking_demo.py` - Token counting and cost tracking (v0.5.0)
+  - `python examples/toolbox_demo.py` - Using pre-built tools from toolbox (v0.5.1)
   - `python examples/customer_support_bot.py` - Multi-tool customer support workflow
   - `python examples/data_analysis_agent.py` - Data exploration and analysis tools
 - Dev helpers:
@@ -622,11 +674,15 @@ We're actively developing new features to make Selectools the most production-re
 - Cost Tracking - Automatic token counting and cost estimation with warnings
 - Gemini SDK Migration - Updated to new google-genai SDK (v1.0+)
 
+**✅ Completed in v0.5.1:**
+
+- Pre-built Tool Library - 22 production-ready tools in 5 categories (file, web, data, datetime, text)
+
 **🟡 Coming in v0.6.0:**
 
-- Pre-built Tool Library - Common tools ready to use
 - Parallel Tool Execution - Run multiple tools concurrently
 - Observability Hooks - Track and debug agent behavior
+- Streaming Tool Results - Stream tool output as generated
 
 **🚀 Future (v0.7.0+):**
 

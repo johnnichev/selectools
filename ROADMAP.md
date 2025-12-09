@@ -2,18 +2,18 @@
 
 This document tracks the implementation status of all planned features. See [README.md](README.md#roadmap--future-improvements) for detailed descriptions.
 
-## Priority 1: Quick Wins (v0.4.0)
+## Priority 1: Quick Wins (v0.4.0 - v0.5.1)
 
-| Feature                   | Status         | Notes                           |
-| ------------------------- | -------------- | ------------------------------- |
-| Conversation Memory       | ✅ Implemented | Simple history management       |
-| Async Support             | ✅ Implemented | `Agent.arun()`, async tools     |
-| Anthropic Provider (Full) | ✅ Implemented | Real SDK integration with async |
-| Gemini Provider (Full)    | ✅ Implemented | Real SDK integration with async |
-| Remove Pillow Dependency  | ✅ Implemented | Removed bbox example            |
-| Better Error Messages     | ✅ Implemented | PyTorch-style helpful errors    |
-| Cost Tracking             | ✅ Implemented | Track tokens and API costs      |
-| Pre-built Tool Library    | 🟡 Planned     | 5-10 common tools in `toolbox`  |
+| Feature                   | Status         | Notes                            |
+| ------------------------- | -------------- | -------------------------------- |
+| Conversation Memory       | ✅ Implemented | Simple history management (v0.4) |
+| Async Support             | ✅ Implemented | `Agent.arun()`, async tools (v0.4) |
+| Anthropic Provider (Full) | ✅ Implemented | Real SDK integration with async (v0.4) |
+| Gemini Provider (Full)    | ✅ Implemented | Real SDK integration with async (v0.4) |
+| Remove Pillow Dependency  | ✅ Implemented | Removed bbox example (v0.4)      |
+| Better Error Messages     | ✅ Implemented | PyTorch-style helpful errors (v0.5.0) |
+| Cost Tracking             | ✅ Implemented | Track tokens and API costs (v0.5.0) |
+| Pre-built Tool Library    | ✅ Implemented | 22 tools in 5 categories (v0.5.1) |
 
 ---
 

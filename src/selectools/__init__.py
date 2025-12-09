@@ -1,5 +1,7 @@
 """Public exports for the selectools package."""
 
+# Toolbox is imported separately to avoid pulling in optional dependencies
+from . import toolbox
 from .agent import Agent, AgentConfig
 from .exceptions import (
     MemoryLimitExceededError,
