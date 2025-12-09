@@ -91,13 +91,30 @@ PRICING: Dict[str, Dict[str, float]] = {
     # ===== OpenAI Aliases =====
     "chatgpt-4o-latest": {"prompt": 5.00, "completion": 15.00},
     "computer-use-preview": {"prompt": 3.00, "completion": 12.00},
-    # Anthropic Claude
+    # ===== Anthropic Claude 4.5 Series (Latest) =====
+    "claude-opus-4-5": {"prompt": 5.00, "completion": 25.00},
+    "claude-sonnet-4-5": {"prompt": 3.00, "completion": 15.00},
+    "claude-haiku-4-5": {"prompt": 1.00, "completion": 5.00},
+    # ===== Anthropic Claude 4.1 Series =====
+    "claude-opus-4-11": {"prompt": 15.00, "completion": 75.00},
+    # ===== Anthropic Claude 4 Series =====
+    "claude-opus-4-01": {"prompt": 15.00, "completion": 75.00},
+    "claude-sonnet-4-01": {"prompt": 3.00, "completion": 15.00},
+    # ===== Anthropic Claude 3.7 Series =====
+    "claude-3-7-sonnet-latest": {"prompt": 3.00, "completion": 15.00},  # Deprecated
+    # ===== Anthropic Claude 3.5 Series (Legacy) =====
     "claude-3-5-sonnet-20241022": {"prompt": 3.00, "completion": 15.00},
     "claude-3-5-sonnet-20240620": {"prompt": 3.00, "completion": 15.00},
+    "claude-3-5-sonnet-latest": {"prompt": 3.00, "completion": 15.00},
     "claude-3-5-haiku-20241022": {"prompt": 0.80, "completion": 4.00},
+    "claude-3-5-haiku-latest": {"prompt": 0.80, "completion": 4.00},
+    # ===== Anthropic Claude 3 Series (Legacy, Deprecated) =====
     "claude-3-opus-20240229": {"prompt": 15.00, "completion": 75.00},
+    "claude-3-opus": {"prompt": 15.00, "completion": 75.00},
     "claude-3-sonnet-20240229": {"prompt": 3.00, "completion": 15.00},
+    "claude-3-sonnet": {"prompt": 3.00, "completion": 15.00},
     "claude-3-haiku-20240307": {"prompt": 0.25, "completion": 1.25},
+    "claude-3-haiku": {"prompt": 0.25, "completion": 1.25},
     # Google Gemini
     "gemini-1.5-pro": {"prompt": 1.25, "completion": 5.00},
     "gemini-1.5-pro-latest": {"prompt": 1.25, "completion": 5.00},
