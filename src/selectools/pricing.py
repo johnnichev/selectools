@@ -115,13 +115,38 @@ PRICING: Dict[str, Dict[str, float]] = {
     "claude-3-sonnet": {"prompt": 3.00, "completion": 15.00},
     "claude-3-haiku-20240307": {"prompt": 0.25, "completion": 1.25},
     "claude-3-haiku": {"prompt": 0.25, "completion": 1.25},
-    # Google Gemini
+    # ===== Google Gemini 3 Series (Latest) =====
+    "gemini-3-pro-preview": {"prompt": 2.00, "completion": 12.00},  # ≤200k tokens
+    "gemini-3-pro-image-preview": {"prompt": 2.00, "completion": 12.00},  # Text tokens
+    # ===== Google Gemini 2.5 Series =====
+    "gemini-2.5-pro": {"prompt": 1.25, "completion": 10.00},  # ≤200k tokens
+    "gemini-2.5-flash": {"prompt": 0.30, "completion": 2.50},  # Text/image/video
+    "gemini-2.5-flash-preview-09-2025": {"prompt": 0.30, "completion": 2.50},
+    "gemini-2.5-flash-lite": {"prompt": 0.10, "completion": 0.40},
+    "gemini-2.5-flash-lite-preview-09-2025": {"prompt": 0.10, "completion": 0.40},
+    "gemini-2.5-flash-native-audio-preview-09-2025": {"prompt": 0.50, "completion": 2.00},  # Text
+    "gemini-2.5-flash-image": {"prompt": 0.30, "completion": 2.50},  # Text tokens
+    "gemini-2.5-flash-preview-tts": {"prompt": 0.50, "completion": 10.00},
+    "gemini-2.5-pro-preview-tts": {"prompt": 1.00, "completion": 20.00},
+    "gemini-2.5-computer-use-preview-10-2025": {"prompt": 1.25, "completion": 10.00},
+    # ===== Google Gemini 2.0 Series =====
+    "gemini-2.0-flash": {"prompt": 0.10, "completion": 0.40},  # Text/image/video
+    "gemini-2.0-flash-lite": {"prompt": 0.075, "completion": 0.30},
+    "gemini-live-2.5-flash-preview": {"prompt": 0.50, "completion": 2.00},  # Text
+    "gemini-2.0-flash-live-001": {"prompt": 0.35, "completion": 1.50},  # Text
+    # ===== Google Gemini Robotics =====
+    "gemini-robotics-er-1.5-preview": {"prompt": 0.30, "completion": 2.50},
+    # ===== Google Gemini 1.5 Series (Stable) =====
     "gemini-1.5-pro": {"prompt": 1.25, "completion": 5.00},
     "gemini-1.5-pro-latest": {"prompt": 1.25, "completion": 5.00},
     "gemini-1.5-flash": {"prompt": 0.075, "completion": 0.30},
     "gemini-1.5-flash-latest": {"prompt": 0.075, "completion": 0.30},
+    # ===== Google Gemini 1.0 Series (Legacy) =====
     "gemini-1.0-pro": {"prompt": 0.50, "completion": 1.50},
     "gemini-pro": {"prompt": 0.50, "completion": 1.50},
+    # ===== Google Gemma (Open Models - Free on Gemini API) =====
+    "gemma-3": {"prompt": 0.00, "completion": 0.00},
+    "gemma-3n": {"prompt": 0.00, "completion": 0.00},
     # Ollama (Local Models - Free)
     "llama3.2": {"prompt": 0.00, "completion": 0.00},
     "llama3.1": {"prompt": 0.00, "completion": 0.00},
