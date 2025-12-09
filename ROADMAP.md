@@ -44,17 +44,37 @@ This document tracks the implementation status of all planned features. See [REA
 
 ## v0.6.1: Streaming Tools (Completed)
 
-| Feature                | Status       | Notes                                        |
-| ---------------------- | ------------ | -------------------------------------------- |
-| Streaming Tool Results | ✅ v0.6.1    | Tools can yield results progressively        |
-| Async Streaming        | ✅ v0.6.1    | Support for AsyncGenerator return types      |
-| on_tool_chunk Hook     | ✅ v0.6.1    | Real-time chunk callbacks for streaming      |
-| Streaming Analytics    | ✅ v0.6.1    | Track chunk counts and streaming metrics     |
-| Toolbox Streaming      | ✅ v0.6.1    | read_file_stream, process_csv_stream tools   |
+| Feature                | Status    | Notes                                      |
+| ---------------------- | --------- | ------------------------------------------ |
+| Streaming Tool Results | ✅ v0.6.1 | Tools can yield results progressively      |
+| Async Streaming        | ✅ v0.6.1 | Support for AsyncGenerator return types    |
+| on_tool_chunk Hook     | ✅ v0.6.1 | Real-time chunk callbacks for streaming    |
+| Streaming Analytics    | ✅ v0.6.1 | Track chunk counts and streaming metrics   |
+| Toolbox Streaming      | ✅ v0.6.1 | read_file_stream, process_csv_stream tools |
 
 ---
 
-## v0.6.x: Upcoming (Planned)
+## v0.7.0: Model Registry System ✅ COMPLETE
+
+| Feature               | Status    | Notes                                    |
+| --------------------- | --------- | ---------------------------------------- |
+| Model Registry        | ✅ v0.7.0 | Canonical source of truth for 120 models |
+| Typed Model Constants | ✅ v0.7.0 | IDE autocomplete for all models          |
+| Model Metadata        | ✅ v0.7.0 | Pricing, context windows, max tokens     |
+| Provider Integration  | ✅ v0.7.0 | All providers use model constants        |
+| Example Migration     | ✅ v0.7.0 | All examples demonstrate new pattern     |
+
+**Key Improvements:**
+
+- **120 models** with complete metadata (64 OpenAI, 18 Anthropic, 25 Gemini, 13 Ollama)
+- **IDE autocomplete** - Type `OpenAI.` and see all models
+- **Type safety** - Catch typos at dev time
+- **Single source of truth** - Update models.py, propagates everywhere
+- **Ready for embeddings** - Structure prepared for v0.8.0 RAG support
+
+---
+
+## v0.7.x: Upcoming (Planned)
 
 | Feature              | Status     | Effort | Notes                            |
 | -------------------- | ---------- | ------ | -------------------------------- |
@@ -62,7 +82,7 @@ This document tracks the implementation status of all planned features. See [REA
 
 ---
 
-## v0.7.0+: Advanced Features (Future)
+## v0.8.0+: Advanced Features (Future)
 
 ### High-Impact Complex Features
 

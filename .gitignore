@@ -39,3 +39,5 @@ htmlcov/
 
 # Generated demo artifacts
 *_with_bbox.png
+
+.docs

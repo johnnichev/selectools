@@ -168,7 +168,8 @@ print(f"Max output: {model_info.max_tokens:,} tokens")
 
 All 120 models include pricing, context windows, and max token metadata. See `selectools.models` for the complete registry.
 
-> **Coming in v0.7.0:** Embedding models and RAG support
+> **New in v0.7.0:** Model registry with IDE autocomplete for 120 models!
+> **Coming in v0.8.0:** Embedding models and RAG support
 
 ## Real-World Examples
 
