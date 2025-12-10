@@ -138,8 +138,9 @@ class TestRAGBasics:
 
         assert rag_tool.vector_store == store
         assert rag_tool.top_k == 3
-        assert hasattr(rag_tool.search_knowledge_base, "run")
-        assert callable(rag_tool.search_knowledge_base.run)
+        # search_knowledge_base is a Tool object
+        assert hasattr(rag_tool, "search_knowledge_base")
+        assert rag_tool.search_knowledge_base.name == "search_knowledge_base"
 
     def test_vector_store_factory(self):
         """Test vector store factory method."""

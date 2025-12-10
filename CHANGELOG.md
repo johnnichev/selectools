@@ -5,9 +5,13 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.0] - 2024-12-10
+## [0.8.0] - 2025-12-10
 
 ### Added - RAG & Embeddings 🎉
+
+> **Production Polish Update:** Added 3 comprehensive examples, 200+ new tests, complete troubleshooting guide, and v0.9.0+ roadmap.
+>
+> **QA Complete:** All examples tested with real API calls. Fixed 10 bugs in examples and enhanced RAGAgent API with `score_threshold` and `agent_config` parameters.
 
 #### Embedding Providers (4 providers, 10 models)
 
@@ -90,6 +94,7 @@ pip install selectools[rag]
 ```
 
 Includes:
+
 - `chromadb>=0.4.0` - ChromaDB vector store
 - `pinecone-client>=3.0.0` - Pinecone cloud vector store
 - `voyageai>=0.2.0` - Voyage AI embeddings
@@ -102,6 +107,116 @@ Includes:
 - New example: `examples/rag_basic_demo.py`
 - Basic integration tests: `tests/test_rag_basic.py`
 - Updated installation instructions
+
+### Examples & Testing (Production Polish)
+
+#### New Examples (3 comprehensive demos)
+
+- **`examples/rag_advanced_demo.py`** - Advanced RAG workflow
+  - PDFs and persistent SQLite storage
+  - Custom RecursiveTextSplitter with multiple separators
+  - Metadata filtering and enrichment
+  - Cost tracking and analytics integration
+  - 8-step guided demonstration
+- **`examples/semantic_search_demo.py`** - Pure semantic search
+  - Compare OpenAI vs Gemini embedding providers
+  - Analyze similarity scores and performance
+  - Metadata filtering demonstrations
+  - Cost comparison tables
+  - Search quality recommendations
+- **`examples/rag_multi_provider_demo.py`** - Configuration comparison
+  - Embedding provider benchmarks
+  - Vector store performance (memory vs SQLite)
+  - Chunk size impact analysis
+  - Top-K parameter tuning guide
+  - Comprehensive cost breakdown
+
+#### New Test Suite (200+ tests, 7 test files)
+
+- **`tests/test_embedding_providers.py`** - 40+ tests for all 4 embedding providers
+  - Mocked API responses to avoid costs
+  - Batch operations, error handling, retry logic
+  - Interface consistency across providers
+- **`tests/test_vector_stores_crud.py`** - 60+ tests for all 4 vector stores
+  - CRUD operations (add, search, delete, clear)
+  - Cosine similarity accuracy
+  - Metadata filtering
+  - Top-K limiting
+- **`tests/test_document_loaders.py`** - 25+ tests for document loading
+  - Text, file, directory, PDF loading
+  - Metadata preservation
+  - Unicode and encoding support
+  - Error handling
+- **`tests/test_text_chunking.py`** - 35+ tests for chunking strategies
+  - TextSplitter with overlap
+  - RecursiveTextSplitter with hierarchical splitting
+  - Edge cases (empty, long, Unicode text)
+  - Metadata preservation
+- **`tests/test_sqlite_integration.py`** - 20+ tests for persistence
+  - Database reconnection
+  - Concurrent access patterns
+  - Search quality after persistence
+  - Performance benchmarks
+- **`tests/test_rag_workflow.py`** - 25+ tests for complete RAG pipeline
+  - Load → Chunk → Embed → Store → Search workflows
+  - RAGAgent creation from documents and directories
+  - Cost tracking integration
+  - Analytics integration
+- **`tests/test_vector_store_compatibility.py`** - 30+ tests for consistency
+  - All vector stores behave identically
+  - Same data yields same results
+  - API compatibility verification
+  - Performance characteristics
+
+#### Documentation Additions
+
+- **Troubleshooting Guide** - 8 common issues with solutions
+  - ImportError handling
+  - Vector store setup (ChromaDB, Pinecone)
+  - Embedding provider configuration
+  - PDF loading errors
+  - Memory optimization tips
+  - Performance tuning
+  - Cost management
+  - Search relevance tuning
+- **Future Roadmap** - `.docs/v0.9.0-future-enhancements.md`
+  - 6 major features planned for v0.9.0-v0.10.0
+  - Reranking support (Cohere, Jina)
+  - Hybrid search (vector + BM25)
+  - Advanced chunking strategies
+  - Multi-modal RAG (images, tables)
+  - RAG evaluation metrics
+  - Streaming RAG responses
+  - Implementation priorities and timelines
+
+### Fixed
+
+#### Example Bug Fixes (QA Phase)
+
+- **`semantic_search_demo.py`** (2 fixes)
+  - Fixed `TypeError` when calling `semantic_search()` - changed to use `.search()` method
+  - Fixed result object access - changed from dict access to object attributes (`result.score`, `result.document.text`)
+
+- **`rag_advanced_demo.py`** (6 fixes)
+  - Fixed `agent.run()` signature - now properly passes `List[Message]` instead of raw strings
+  - Fixed response handling - now extracts `.content` from returned `Message` object
+  - Fixed `AttributeError` - changed `agent.get_usage()` to `agent.usage` attribute
+  - Fixed cost calculation - compute LLM cost as `total_cost_usd - total_embedding_cost_usd`
+  - Fixed 3 usage display references (2 in queries, 1 in code example)
+
+- **`rag_basic_demo.py`** (2 fixes)
+  - Fixed `agent.run()` signature - now properly passes `List[Message]`
+  - Fixed response handling - now extracts `.content` from returned `Message`
+
+#### API Enhancements
+
+- **`RAGAgent` factory methods** - Added missing parameters to all 3 methods:
+  - Added `score_threshold: float = 0.0` parameter for similarity filtering
+  - Added `agent_config: Optional[AgentConfig] = None` parameter for custom agent configuration
+  - Applies to: `from_documents()`, `from_directory()`, `from_files()`
+
+- **`tests/test_rag_basic.py`** - Fixed test assertion
+  - Changed assertion to check `Tool` object properties instead of attempting to call it
 
 ### Migration Notes
 
@@ -126,7 +241,7 @@ agent = RAGAgent.from_directory(
 
 ---
 
-## [0.7.0] - 2024-12-10
+## [0.7.0] - 2025-12-10
 
 ### Added
 
@@ -167,7 +282,7 @@ agent = RAGAgent.from_directory(
 
 - Test suite updated to handle frozen dataclass immutability correctly
 
-## [0.6.1] - 2024-12-09
+## [0.6.1] - 2025-12-09
 
 ### Added
 
@@ -186,7 +301,7 @@ agent = RAGAgent.from_directory(
 - Analytics now track `total_chunks` and `streaming_calls` for streaming tools
 - Tool execution supports progressive result delivery
 
-## [0.6.0] - 2024-12-08
+## [0.6.0] - 2025-12-08
 
 ### Added
 
@@ -206,7 +321,7 @@ agent = RAGAgent.from_directory(
 
 - Pricing module now includes 13 Ollama models (all free)
 
-## [0.5.2] - 2024-12-07
+## [0.5.2] - 2025-12-07
 
 ### Added
 
@@ -227,7 +342,7 @@ agent = RAGAgent.from_directory(
 - Improved error messages with validation details
 - Tools now validate at creation time, not runtime
 
-## [0.5.1] - 2024-12-06
+## [0.5.1] - 2025-12-06
 
 ### Added
 
@@ -244,7 +359,7 @@ agent = RAGAgent.from_directory(
 
 - All toolbox tools include comprehensive docstrings and examples
 
-## [0.5.0] - 2024-12-05
+## [0.5.0] - 2025-12-05
 
 ### Added
 
@@ -265,7 +380,7 @@ agent = RAGAgent.from_directory(
 - All providers now return `(content, usage_stats)` tuples from `complete()` methods
 - Streaming methods only yield content (no usage stats during streaming)
 
-## [0.4.0] - 2024-11-15
+## [0.4.0] - 2025-11-15
 
 ### Added
 
@@ -287,7 +402,7 @@ agent = RAGAgent.from_directory(
 - All providers support both sync and async operations
 - Improved streaming support across all providers
 
-## [0.3.0] - 2024-11-01
+## [0.3.0] - 2025-11-01
 
 ### Added
 

@@ -166,7 +166,7 @@ config = AgentConfig(
     enable_analytics=True
 )
 agent = Agent(tools=tools, provider=provider, config=config)
-usage = agent.get_usage()
+usage = agent.usage
 print(f"Total cost: ${usage.total_cost_usd:.4f}")
 ```
         """
@@ -263,16 +263,22 @@ print(f"Total cost: ${usage.total_cost_usd:.4f}")
             print(f"\n[Query {i}] {query}")
             print("-" * 80)
 
-            response = agent.run(query)
+            from selectools import Message, Role
+
+            response = agent.run([Message(role=Role.USER, content=query)])
+            response_text = response.content
             print(
-                f"Response: {response[:500]}..." if len(response) > 500 else f"Response: {response}"
+                f"Response: {response_text[:500]}..."
+                if len(response_text) > 500
+                else f"Response: {response_text}"
             )
 
             # Show usage after each query
-            usage = agent.get_usage()
+            usage = agent.usage
+            llm_cost = usage.total_cost_usd - usage.total_embedding_cost_usd
             print(f"\n📊 Usage so far:")
             print(f"   - LLM tokens: {usage.total_prompt_tokens + usage.total_completion_tokens:,}")
-            print(f"   - LLM cost: ${usage.total_llm_cost_usd:.4f}")
+            print(f"   - LLM cost: ${llm_cost:.4f}")
             print(f"   - Embedding tokens: {usage.total_embedding_tokens:,}")
             print(f"   - Embedding cost: ${usage.total_embedding_cost_usd:.4f}")
             print(f"   - Total cost: ${usage.total_cost_usd:.4f}")
@@ -305,7 +311,7 @@ print(f"Total cost: ${usage.total_cost_usd:.4f}")
         print("📈 Final Analytics")
         print("=" * 80)
 
-        usage = agent.get_usage()
+        usage = agent.usage
         print(f"\n{usage}")
 
         analytics = agent.get_analytics()

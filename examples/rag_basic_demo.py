@@ -98,8 +98,10 @@ def main():
         print("-" * 70)
 
         try:
-            response = agent.run(question)
-            print(f"A{i}: {response}\n")
+            from selectools import Message, Role
+
+            response = agent.run([Message(role=Role.USER, content=question)])
+            print(f"A{i}: {response.content}\n")
         except Exception as e:
             print(f"❌ Error: {e}\n")
 

@@ -10,7 +10,7 @@ from .tools import RAGTool, SemanticSearchTool
 from .vector_store import Document, SearchResult, VectorStore
 
 if TYPE_CHECKING:
-    from ..agent import Agent
+    from ..agent import Agent, AgentConfig
     from ..providers.base import Provider
 
 __all__ = [
@@ -61,7 +61,9 @@ class RAGAgent:
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
         top_k: int = 3,
+        score_threshold: float = 0.0,
         additional_tools: Optional[List] = None,
+        agent_config: Optional["AgentConfig"] = None,
     ) -> "Agent":
         """
         Create a RAG agent from a list of documents.
@@ -73,7 +75,9 @@ class RAGAgent:
             chunk_size: Size of text chunks (default: 1000)
             chunk_overlap: Overlap between chunks (default: 200)
             top_k: Number of documents to retrieve per query (default: 3)
+            score_threshold: Minimum similarity score (default: 0.0)
             additional_tools: Optional list of additional tools to add
+            agent_config: Optional agent configuration
 
         Returns:
             Configured Agent with RAG tool
@@ -100,7 +104,7 @@ class RAGAgent:
         vector_store.add_documents(chunked_docs)
 
         # Create RAG tool
-        rag_tool = RAGTool(vector_store=vector_store, top_k=top_k)
+        rag_tool = RAGTool(vector_store=vector_store, top_k=top_k, score_threshold=score_threshold)
 
         # Build tools list
         tools = [rag_tool.search_knowledge_base]
@@ -108,7 +112,7 @@ class RAGAgent:
             tools.extend(additional_tools)
 
         # Create and return agent
-        return Agent(tools=tools, provider=provider)
+        return Agent(tools=tools, provider=provider, config=agent_config)
 
     @staticmethod
     def from_directory(
@@ -119,7 +123,9 @@ class RAGAgent:
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
         top_k: int = 3,
+        score_threshold: float = 0.0,
         additional_tools: Optional[List] = None,
+        agent_config: Optional["AgentConfig"] = None,
     ) -> "Agent":
         """
         Create a RAG agent from a directory of documents.
@@ -132,7 +138,9 @@ class RAGAgent:
             chunk_size: Size of text chunks (default: 1000)
             chunk_overlap: Overlap between chunks (default: 200)
             top_k: Number of documents to retrieve per query (default: 3)
+            score_threshold: Minimum similarity score (default: 0.0)
             additional_tools: Optional list of additional tools to add
+            agent_config: Optional agent configuration
 
         Returns:
             Configured Agent with RAG tool
@@ -160,7 +168,9 @@ class RAGAgent:
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
             top_k=top_k,
+            score_threshold=score_threshold,
             additional_tools=additional_tools,
+            agent_config=agent_config,
         )
 
     @staticmethod
@@ -171,7 +181,9 @@ class RAGAgent:
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
         top_k: int = 3,
+        score_threshold: float = 0.0,
         additional_tools: Optional[List] = None,
+        agent_config: Optional["AgentConfig"] = None,
     ) -> "Agent":
         """
         Create a RAG agent from a list of file paths.
@@ -183,7 +195,9 @@ class RAGAgent:
             chunk_size: Size of text chunks (default: 1000)
             chunk_overlap: Overlap between chunks (default: 200)
             top_k: Number of documents to retrieve per query (default: 3)
+            score_threshold: Minimum similarity score (default: 0.0)
             additional_tools: Optional list of additional tools to add
+            agent_config: Optional agent configuration
 
         Returns:
             Configured Agent with RAG tool
@@ -215,5 +229,7 @@ class RAGAgent:
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
             top_k=top_k,
+            score_threshold=score_threshold,
             additional_tools=additional_tools,
+            agent_config=agent_config,
         )

@@ -170,16 +170,16 @@ def run_search_comparison(queries: List[str]):
 
             # Measure search time
             start_time = time.time()
-            results = provider["tool"].semantic_search(query)
+            results = provider["tool"].search(query)
             elapsed_time = time.time() - start_time
 
             if not results:
                 print("   ❌ No results found above threshold (0.5)")
             else:
                 for i, result in enumerate(results, 1):
-                    score = result["score"]
-                    text = result["text"]
-                    metadata = result["metadata"]
+                    score = result.score
+                    text = result.document.text
+                    metadata = result.document.metadata
 
                     # Determine score quality
                     if score >= 0.8:

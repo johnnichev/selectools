@@ -4,7 +4,7 @@
 [![License: LGPL v3](https://img.shields.io/badge/License-LGPL_v3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 
-**Build AI agents that can call your custom Python functions.** Selectools lets you connect LLMs (OpenAI, Anthropic, Gemini) to your own tools and functions. Define what your agent can do—search databases, call APIs, process images, or anything else—and let the LLM decide when and how to use them. Works with any provider, handles errors gracefully, and includes streaming support.
+**Build AI agents that can call your custom Python functions and search your knowledge bases.** Selectools is a production-ready framework that combines tool calling with RAG (Retrieval-Augmented Generation) to create powerful, context-aware AI agents. Connect LLMs (OpenAI, Anthropic, Gemini, Ollama) to your tools, embed and search your documents, and let the AI retrieve relevant information before answering. Works with any provider, includes 4 vector stores, supports 4 embedding providers, and tracks costs automatically.
 
 ## Why This Library Stands Out
 
@@ -42,29 +42,50 @@ Built for real-world reliability:
 - **Fake providers** included for unit testing your agent logic
 - Clean separation of concerns makes components easy to test in isolation
 
+### 📚 **Comprehensive RAG Support (v0.8.0)**
+
+Built-in Retrieval-Augmented Generation with production-ready components:
+
+- **4 Embedding Providers**: OpenAI, Anthropic/Voyage, Gemini (free!), Cohere
+- **4 Vector Stores**: In-memory (NumPy), SQLite (persistent), Chroma, Pinecone
+- **Smart Document Processing**: Load from text, files, directories, PDFs with intelligent chunking
+- **Pre-built RAG Tools**: Drop-in knowledge base search for your agents
+- **Automatic Cost Tracking**: Monitor both LLM and embedding API costs
+- **High-Level API**: Create RAG agents in 3 lines with `RAGAgent.from_directory()`
+
 ### 📦 **Library-First Design**
 
 Not a framework that takes over your application—a library that integrates into your existing code. Use as much or as little as you need. No magic globals, no hidden state, no framework lock-in.
 
 ## What's Included
 
-- Core package at `src/selectools/` with agent loop, parser, prompt builder, and provider adapters
-- Providers: OpenAI plus Anthropic/Gemini/Local sharing the same interface
-- Library-first examples (see below) and tests with fake providers for schemas, parsing, agent wiring
-- PyPI-ready metadata (`pyproject.toml`) using a src-layout package
+- **Core Agent Framework**: Agent loop, parser, prompt builder, and provider adapters
+- **4 LLM Providers**: OpenAI, Anthropic, Gemini, Ollama with unified interface
+- **4 Embedding Providers**: OpenAI, Anthropic/Voyage, Gemini (free!), Cohere
+- **4 Vector Stores**: In-memory (NumPy), SQLite, Chroma, Pinecone
+- **RAG Components**: Document loaders, text chunking, semantic search tools
+- **120 Model Registry**: Type-safe model constants with pricing and metadata
+- **Pre-built Toolbox**: File operations, web scraping, data processing, and more
+- **Cost Tracking**: Monitor LLM and embedding API costs automatically
+- **Comprehensive Examples**: 13+ examples including RAG, streaming, analytics
+- **Production Testing**: 400+ tests ensuring reliability
 
 ## Install
 
 ### From PyPI (Recommended)
 
 ```bash
+# Core package (includes NumPy for basic RAG)
 pip install selectools
-```
 
-With optional provider dependencies:
+# With all RAG features (ChromaDB, Pinecone, Voyage, Cohere, PyPDF)
+pip install selectools[rag]
 
-```bash
+# With optional provider dependencies
 pip install selectools[providers]  # Includes Anthropic and Gemini
+
+# Everything (recommended for full features)
+pip install selectools[rag,providers]
 ```
 
 ### From Source (Development)
@@ -77,6 +98,37 @@ source .venv/bin/activate
 pip install -e .
 # or: pip install -r requirements.txt
 ```
+
+## Quick Start: RAG in 30 Seconds
+
+```python
+from selectools import OpenAIProvider
+from selectools.embeddings import OpenAIEmbeddingProvider
+from selectools.models import OpenAI
+from selectools.rag import RAGAgent, VectorStore
+
+# 1. Set up embedding and vector store
+embedder = OpenAIEmbeddingProvider(model=OpenAI.Embeddings.TEXT_EMBEDDING_3_SMALL.id)
+vector_store = VectorStore.create("memory", embedder=embedder)
+
+# 2. Create RAG agent from your documents
+agent = RAGAgent.from_directory(
+    directory="./docs",  # Your knowledge base
+    provider=OpenAIProvider(default_model=OpenAI.GPT_4O_MINI.id),
+    vector_store=vector_store,
+    chunk_size=500,
+    top_k=3
+)
+
+# 3. Ask questions
+response = agent.run("What are the main features?")
+print(response)
+
+# 4. Check costs
+print(agent.get_usage())  # Includes LLM + embedding costs
+```
+
+**That's it!** Your AI agent now searches your documents before answering.
 
 ### Set API Keys
 
