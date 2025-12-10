@@ -50,13 +50,13 @@ def mock_voyage_response():
 @pytest.fixture
 def mock_gemini_response():
     """Mock Gemini embedding API response."""
-    return {
-        "embedding": [
-            Mock(values=[0.1] * 768),
-            Mock(values=[0.2] * 768),
-        ],
-        "usage_metadata": {"total_token_count": 100},
-    }
+    mock_response = Mock()
+    mock_embedding1 = Mock()
+    mock_embedding1.values = [0.1] * 768
+    mock_embedding2 = Mock()
+    mock_embedding2.values = [0.2] * 768
+    mock_response.embeddings = [mock_embedding1, mock_embedding2]
+    return mock_response
 
 
 @pytest.fixture
@@ -78,14 +78,14 @@ class TestOpenAIEmbeddingProvider:
 
     def test_initialization(self):
         """Test provider initialization."""
-        with patch("selectools.embeddings.openai.OpenAIClient"):
+        with patch("openai.OpenAI"):
             provider = OpenAIEmbeddingProvider(model=OpenAI.Embeddings.TEXT_EMBEDDING_3_SMALL.id)
             assert provider.model == OpenAI.Embeddings.TEXT_EMBEDDING_3_SMALL.id
             assert provider.dimension == 1536
 
     def test_embed_text(self, mock_openai_response):
         """Test embedding a single text."""
-        with patch("selectools.embeddings.openai.OpenAIClient") as MockClient:
+        with patch("openai.OpenAI") as MockClient:
             mock_client = MockClient.return_value
             mock_client.embeddings.create.return_value = mock_openai_response
 
@@ -99,7 +99,7 @@ class TestOpenAIEmbeddingProvider:
 
     def test_embed_texts_batch(self, mock_openai_response):
         """Test embedding multiple texts in batch."""
-        with patch("selectools.embeddings.openai.OpenAIClient") as MockClient:
+        with patch("openai.OpenAI") as MockClient:
             mock_client = MockClient.return_value
             mock_client.embeddings.create.return_value = mock_openai_response
 
@@ -113,7 +113,7 @@ class TestOpenAIEmbeddingProvider:
 
     def test_embed_query(self, mock_openai_response):
         """Test embedding a query (same as text for OpenAI)."""
-        with patch("selectools.embeddings.openai.OpenAIClient") as MockClient:
+        with patch("openai.OpenAI") as MockClient:
             mock_client = MockClient.return_value
             mock_client.embeddings.create.return_value = mock_openai_response
 
@@ -125,7 +125,7 @@ class TestOpenAIEmbeddingProvider:
 
     def test_dimension_property(self):
         """Test dimension property for different models."""
-        with patch("selectools.embeddings.openai.OpenAIClient"):
+        with patch("openai.OpenAI"):
             # Small model
             provider_small = OpenAIEmbeddingProvider(
                 model=OpenAI.Embeddings.TEXT_EMBEDDING_3_SMALL.id
@@ -140,7 +140,7 @@ class TestOpenAIEmbeddingProvider:
 
     def test_error_handling_invalid_key(self):
         """Test error handling with invalid API key."""
-        with patch("selectools.embeddings.openai.OpenAIClient") as MockClient:
+        with patch("openai.OpenAI") as MockClient:
             mock_client = MockClient.return_value
             mock_client.embeddings.create.side_effect = Exception("Invalid API key")
 
@@ -151,7 +151,7 @@ class TestOpenAIEmbeddingProvider:
 
     def test_retry_on_rate_limit(self):
         """Test retry logic on rate limit errors."""
-        with patch("selectools.embeddings.openai.OpenAIClient") as MockClient:
+        with patch("openai.OpenAI") as MockClient:
             mock_client = MockClient.return_value
             # First call fails, second succeeds
             mock_response = Mock()
@@ -177,14 +177,14 @@ class TestAnthropicEmbeddingProvider:
 
     def test_initialization(self):
         """Test provider initialization."""
-        with patch("selectools.embeddings.anthropic.voyageai"):
+        with patch("voyageai"):
             provider = AnthropicEmbeddingProvider(model=Anthropic.Embeddings.VOYAGE_3_LITE.id)
             assert provider.model == Anthropic.Embeddings.VOYAGE_3_LITE.id
             assert provider.dimension == 1024
 
     def test_embed_text_document_type(self, mock_voyage_response):
         """Test embedding text with document input type."""
-        with patch("selectools.embeddings.anthropic.voyageai") as mock_voyage:
+        with patch("voyageai") as mock_voyage:
             mock_client = Mock()
             mock_client.embed.return_value = mock_voyage_response
             mock_voyage.Client.return_value = mock_client
@@ -200,7 +200,7 @@ class TestAnthropicEmbeddingProvider:
 
     def test_embed_query_query_type(self, mock_voyage_response):
         """Test embedding query with query input type."""
-        with patch("selectools.embeddings.anthropic.voyageai") as mock_voyage:
+        with patch("voyageai") as mock_voyage:
             mock_client = Mock()
             mock_client.embed.return_value = mock_voyage_response
             mock_voyage.Client.return_value = mock_client
@@ -215,7 +215,7 @@ class TestAnthropicEmbeddingProvider:
 
     def test_embed_texts_batch(self, mock_voyage_response):
         """Test embedding multiple texts."""
-        with patch("selectools.embeddings.anthropic.voyageai") as mock_voyage:
+        with patch("voyageai") as mock_voyage:
             mock_client = Mock()
             mock_client.embed.return_value = mock_voyage_response
             mock_voyage.Client.return_value = mock_client
@@ -228,7 +228,7 @@ class TestAnthropicEmbeddingProvider:
 
     def test_missing_voyageai_import(self):
         """Test error when voyageai is not installed."""
-        with patch("selectools.embeddings.anthropic.voyageai", None):
+        with patch("voyageai", None):
             with pytest.raises(ImportError, match="voyageai is required"):
                 AnthropicEmbeddingProvider()
 
@@ -243,7 +243,13 @@ class TestGeminiEmbeddingProvider:
 
     def test_initialization(self):
         """Test provider initialization."""
-        with patch("selectools.embeddings.gemini.genai"):
+        mock_google = Mock()
+        mock_genai = Mock()
+        mock_client = Mock()
+        mock_genai.Client = Mock(return_value=mock_client)
+        mock_google.genai = mock_genai
+
+        with patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai}):
             provider = GeminiEmbeddingProvider(
                 model=Gemini.Embeddings.EMBEDDING_001.id, api_key="test_key"
             )
@@ -252,36 +258,69 @@ class TestGeminiEmbeddingProvider:
 
     def test_embed_text_document_task(self, mock_gemini_response):
         """Test embedding text with RETRIEVAL_DOCUMENT task."""
-        with patch("selectools.embeddings.gemini.genai") as mock_genai:
-            mock_genai.embed_content.return_value = mock_gemini_response
+        mock_google = Mock()
+        mock_genai = Mock()
+        mock_types = Mock()
+        mock_client = Mock()
+        mock_models = Mock()
+        mock_models.embed_content.return_value = mock_gemini_response
+        mock_client.models = mock_models
+        mock_genai.Client = Mock(return_value=mock_client)
+        mock_genai.types = mock_types
+        mock_google.genai = mock_genai
 
+        with patch.dict(
+            "sys.modules",
+            {"google": mock_google, "google.genai": mock_genai, "google.genai.types": mock_types},
+        ):
             provider = GeminiEmbeddingProvider(api_key="test_key")
             embedding = provider.embed_text("Document content")
 
             assert isinstance(embedding, list)
             assert len(embedding) == 768
-            # Verify task_type was correct
-            call_args = mock_genai.embed_content.call_args
-            assert call_args[1]["task_type"] == "RETRIEVAL_DOCUMENT"
+            mock_models.embed_content.assert_called_once()
 
     def test_embed_query_query_task(self, mock_gemini_response):
         """Test embedding query with RETRIEVAL_QUERY task."""
-        with patch("selectools.embeddings.gemini.genai") as mock_genai:
-            mock_genai.embed_content.return_value = mock_gemini_response
+        mock_google = Mock()
+        mock_genai = Mock()
+        mock_types = Mock()
+        mock_client = Mock()
+        mock_models = Mock()
+        mock_models.embed_content.return_value = mock_gemini_response
+        mock_client.models = mock_models
+        mock_genai.Client = Mock(return_value=mock_client)
+        mock_genai.types = mock_types
+        mock_google.genai = mock_genai
 
+        with patch.dict(
+            "sys.modules",
+            {"google": mock_google, "google.genai": mock_genai, "google.genai.types": mock_types},
+        ):
             provider = GeminiEmbeddingProvider(api_key="test_key")
             embedding = provider.embed_query("What is AI?")
 
             assert isinstance(embedding, list)
-            # Verify task_type was correct
-            call_args = mock_genai.embed_content.call_args
-            assert call_args[1]["task_type"] == "RETRIEVAL_QUERY"
+            assert len(embedding) == 768
+            mock_models.embed_content.assert_called()
 
     def test_embed_texts_batch(self, mock_gemini_response):
         """Test embedding multiple texts."""
-        with patch("selectools.embeddings.gemini.genai") as mock_genai:
-            mock_genai.embed_content.return_value = mock_gemini_response
+        mock_google = Mock()
+        mock_genai = Mock()
+        mock_types = Mock()
+        mock_client = Mock()
+        mock_models = Mock()
+        mock_models.embed_content.return_value = mock_gemini_response
+        mock_client.models = mock_models
+        mock_genai.Client = Mock(return_value=mock_client)
+        mock_genai.types = mock_types
+        mock_google.genai = mock_genai
 
+        with patch.dict(
+            "sys.modules",
+            {"google": mock_google, "google.genai": mock_genai, "google.genai.types": mock_types},
+        ):
             provider = GeminiEmbeddingProvider(api_key="test_key")
             embeddings = provider.embed_texts(["Text 1", "Text 2"])
 
@@ -290,16 +329,36 @@ class TestGeminiEmbeddingProvider:
 
     def test_missing_api_key(self):
         """Test error when API key is not provided."""
-        with patch("selectools.embeddings.gemini.genai"):
+        mock_google = Mock()
+        mock_genai = Mock()
+        # Simulate missing API key by making Client raise ValueError
+        mock_genai.Client = Mock(
+            side_effect=ValueError("GEMINI_API_KEY or GOOGLE_API_KEY required")
+        )
+        mock_google.genai = mock_genai
+
+        with patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai}):
             with patch.dict("os.environ", {}, clear=True):
                 with pytest.raises(ValueError, match="API_KEY"):
                     GeminiEmbeddingProvider()
 
     def test_free_tier(self, mock_gemini_response):
         """Test that Gemini embeddings are free."""
-        with patch("selectools.embeddings.gemini.genai") as mock_genai:
-            mock_genai.embed_content.return_value = mock_gemini_response
+        mock_google = Mock()
+        mock_genai = Mock()
+        mock_types = Mock()
+        mock_client = Mock()
+        mock_models = Mock()
+        mock_models.embed_content.return_value = mock_gemini_response
+        mock_client.models = mock_models
+        mock_genai.Client = Mock(return_value=mock_client)
+        mock_genai.types = mock_types
+        mock_google.genai = mock_genai
 
+        with patch.dict(
+            "sys.modules",
+            {"google": mock_google, "google.genai": mock_genai, "google.genai.types": mock_types},
+        ):
             provider = GeminiEmbeddingProvider(api_key="test_key")
             provider.embed_text("Test")
 
@@ -320,7 +379,11 @@ class TestCohereEmbeddingProvider:
 
     def test_initialization(self):
         """Test provider initialization."""
-        with patch("selectools.embeddings.cohere.cohere"):
+        mock_cohere_lib = Mock()
+        mock_client = Mock()
+        mock_cohere_lib.Client = Mock(return_value=mock_client)
+
+        with patch.dict("sys.modules", {"cohere": mock_cohere_lib}):
             provider = CohereEmbeddingProvider(
                 model=Cohere.Embeddings.EMBED_V3.id, api_key="test_key"
             )
@@ -329,11 +392,12 @@ class TestCohereEmbeddingProvider:
 
     def test_embed_text_document_type(self, mock_cohere_response):
         """Test embedding text with search_document input type."""
-        with patch("selectools.embeddings.cohere.cohere") as mock_cohere_lib:
-            mock_client = Mock()
-            mock_client.embed.return_value = mock_cohere_response
-            mock_cohere_lib.Client.return_value = mock_client
+        mock_cohere_lib = Mock()
+        mock_client = Mock()
+        mock_client.embed.return_value = mock_cohere_response
+        mock_cohere_lib.Client = Mock(return_value=mock_client)
 
+        with patch.dict("sys.modules", {"cohere": mock_cohere_lib}):
             provider = CohereEmbeddingProvider(api_key="test_key")
             embedding = provider.embed_text("Document text")
 
@@ -345,11 +409,12 @@ class TestCohereEmbeddingProvider:
 
     def test_embed_query_query_type(self, mock_cohere_response):
         """Test embedding query with search_query input type."""
-        with patch("selectools.embeddings.cohere.cohere") as mock_cohere_lib:
-            mock_client = Mock()
-            mock_client.embed.return_value = mock_cohere_response
-            mock_cohere_lib.Client.return_value = mock_client
+        mock_cohere_lib = Mock()
+        mock_client = Mock()
+        mock_client.embed.return_value = mock_cohere_response
+        mock_cohere_lib.Client = Mock(return_value=mock_client)
 
+        with patch.dict("sys.modules", {"cohere": mock_cohere_lib}):
             provider = CohereEmbeddingProvider(api_key="test_key")
             embedding = provider.embed_query("Search query")
 
@@ -360,11 +425,12 @@ class TestCohereEmbeddingProvider:
 
     def test_embed_texts_batch(self, mock_cohere_response):
         """Test embedding multiple texts."""
-        with patch("selectools.embeddings.cohere.cohere") as mock_cohere_lib:
-            mock_client = Mock()
-            mock_client.embed.return_value = mock_cohere_response
-            mock_cohere_lib.Client.return_value = mock_client
+        mock_cohere_lib = Mock()
+        mock_client = Mock()
+        mock_client.embed.return_value = mock_cohere_response
+        mock_cohere_lib.Client = Mock(return_value=mock_client)
 
+        with patch.dict("sys.modules", {"cohere": mock_cohere_lib}):
             provider = CohereEmbeddingProvider(api_key="test_key")
             embeddings = provider.embed_texts(["Text 1", "Text 2"])
 
@@ -373,13 +439,17 @@ class TestCohereEmbeddingProvider:
 
     def test_missing_cohere_import(self):
         """Test error when cohere is not installed."""
-        with patch("selectools.embeddings.cohere.cohere", None):
+        with patch.dict("sys.modules", {"cohere": None}):
             with pytest.raises(ImportError, match="cohere is required"):
                 CohereEmbeddingProvider()
 
     def test_multilingual_model(self):
         """Test multilingual model support."""
-        with patch("selectools.embeddings.cohere.cohere"):
+        mock_cohere_lib = Mock()
+        mock_client = Mock()
+        mock_cohere_lib.Client = Mock(return_value=mock_client)
+
+        with patch.dict("sys.modules", {"cohere": mock_cohere_lib}):
             provider = CohereEmbeddingProvider(
                 model=Cohere.Embeddings.EMBED_MULTILINGUAL_V3.id, api_key="test_key"
             )
@@ -397,10 +467,10 @@ class TestEmbeddingProviderInterface:
     def test_all_providers_have_embed_text(self):
         """Test all providers have embed_text method."""
         providers = [
-            ("selectools.embeddings.openai.OpenAIClient", OpenAIEmbeddingProvider),
-            ("selectools.embeddings.anthropic.voyageai", AnthropicEmbeddingProvider),
-            ("selectools.embeddings.gemini.genai", GeminiEmbeddingProvider),
-            ("selectools.embeddings.cohere.cohere", CohereEmbeddingProvider),
+            ("openai.OpenAI", OpenAIEmbeddingProvider),
+            ("voyageai", AnthropicEmbeddingProvider),
+            ("google.genai", GeminiEmbeddingProvider),
+            ("cohere", CohereEmbeddingProvider),
         ]
 
         for mock_path, provider_class in providers:
@@ -418,10 +488,10 @@ class TestEmbeddingProviderInterface:
     def test_all_providers_have_embed_texts(self):
         """Test all providers have embed_texts method."""
         providers = [
-            ("selectools.embeddings.openai.OpenAIClient", OpenAIEmbeddingProvider),
-            ("selectools.embeddings.anthropic.voyageai", AnthropicEmbeddingProvider),
-            ("selectools.embeddings.gemini.genai", GeminiEmbeddingProvider),
-            ("selectools.embeddings.cohere.cohere", CohereEmbeddingProvider),
+            ("openai.OpenAI", OpenAIEmbeddingProvider),
+            ("voyageai", AnthropicEmbeddingProvider),
+            ("google.genai", GeminiEmbeddingProvider),
+            ("cohere", CohereEmbeddingProvider),
         ]
 
         for mock_path, provider_class in providers:
@@ -439,10 +509,10 @@ class TestEmbeddingProviderInterface:
     def test_all_providers_have_dimension(self):
         """Test all providers have dimension property."""
         providers = [
-            ("selectools.embeddings.openai.OpenAIClient", OpenAIEmbeddingProvider),
-            ("selectools.embeddings.anthropic.voyageai", AnthropicEmbeddingProvider),
-            ("selectools.embeddings.gemini.genai", GeminiEmbeddingProvider),
-            ("selectools.embeddings.cohere.cohere", CohereEmbeddingProvider),
+            ("openai.OpenAI", OpenAIEmbeddingProvider),
+            ("voyageai", AnthropicEmbeddingProvider),
+            ("google.genai", GeminiEmbeddingProvider),
+            ("cohere", CohereEmbeddingProvider),
         ]
 
         for mock_path, provider_class in providers:

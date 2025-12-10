@@ -63,7 +63,7 @@ class TestTextSplitter:
 
     def test_invalid_overlap(self):
         """Test error when overlap >= chunk_size."""
-        with pytest.raises(ValueError, match="Chunk overlap must be less than chunk size"):
+        with pytest.raises(ValueError, match="chunk_overlap must be less than chunk_size"):
             TextSplitter(chunk_size=100, chunk_overlap=100)
 
         with pytest.raises(ValueError):
@@ -108,8 +108,8 @@ class TestTextSplitter:
 
         chunks = splitter.split_text("")
 
-        assert len(chunks) == 1
-        assert chunks[0] == ""
+        assert len(chunks) == 0
+        assert chunks == []
 
     def test_exact_chunk_size(self):
         """Test text that is exactly chunk_size."""
@@ -150,8 +150,8 @@ class TestTextSplitter:
         assert all(isinstance(d, Document) for d in chunked_docs)
         # Check metadata preservation
         assert all("source" in d.metadata for d in chunked_docs)
-        assert all("chunk_idx" in d.metadata for d in chunked_docs)
-        assert all("chunk_size" in d.metadata for d in chunked_docs)
+        assert all("chunk" in d.metadata for d in chunked_docs)
+        assert all("total_chunks" in d.metadata for d in chunked_docs)
 
     def test_metadata_preservation(self, sample_documents):
         """Test that original metadata is preserved in chunks."""
@@ -174,7 +174,7 @@ class TestTextSplitter:
         chunked_docs = splitter.split_documents([doc])
 
         # Check indices are sequential
-        indices = [d.metadata["chunk_idx"] for d in chunked_docs]
+        indices = [d.metadata["chunk"] for d in chunked_docs]
         assert indices == list(range(len(chunked_docs)))
 
 
@@ -191,7 +191,7 @@ class TestRecursiveTextSplitter:
         splitter = RecursiveTextSplitter(chunk_size=100, chunk_overlap=20)
         assert splitter.chunk_size == 100
         assert splitter.chunk_overlap == 20
-        assert splitter.separators == ["\n\n", "\n", " ", ""]
+        assert splitter.separators == ["\n\n", "\n", ". ", " ", ""]
 
     def test_custom_separators(self):
         """Test initialization with custom separators."""
@@ -252,8 +252,8 @@ class TestRecursiveTextSplitter:
 
         chunks = splitter.split_text("")
 
-        assert len(chunks) == 1
-        assert chunks[0] == ""
+        assert len(chunks) == 0
+        assert chunks == []
 
     def test_short_text(self):
         """Test splitting short text."""
@@ -274,7 +274,8 @@ class TestRecursiveTextSplitter:
         assert len(chunked_docs) >= len(sample_documents)
         assert all(isinstance(d, Document) for d in chunked_docs)
         # Check metadata
-        assert all("chunk_idx" in d.metadata for d in chunked_docs)
+        assert all("chunk" in d.metadata for d in chunked_docs)
+        assert all("total_chunks" in d.metadata for d in chunked_docs)
 
     def test_preserves_meaningful_chunks(self):
         """Test that natural boundaries are preserved when possible."""

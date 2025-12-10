@@ -81,9 +81,11 @@ class TestInMemoryVectorStore:
         """Test store initialization."""
         store = InMemoryVectorStore(embedder=mock_embedder)
         assert store.embedder == mock_embedder
-        assert store._embeddings is None
         assert len(store.documents) == 0
-        assert len(store._ids) == 0
+        # Verify empty store returns no results
+        query_embedding = mock_embedder.embed_query("test")
+        results = store.search(query_embedding, top_k=5)
+        assert len(results) == 0
 
     def test_add_documents(self, mock_embedder, sample_documents):
         """Test adding documents to the store."""
@@ -108,9 +110,11 @@ class TestInMemoryVectorStore:
         doc_ids = store.add_documents(sample_documents, embeddings=embeddings)
 
         assert len(doc_ids) == 3
-        assert store._embeddings is not None
-        # Verify embeddings were used (not recomputed)
-        np.testing.assert_array_equal(store._embeddings[0], embeddings[0])
+        # Verify documents were added by searching
+        query_embedding = embeddings[0]  # Search for first document
+        results = store.search(query_embedding, top_k=1)
+        assert len(results) == 1
+        assert results[0].score > 0.99  # Should be very similar to itself
 
     def test_search_basic(self, mock_embedder, sample_documents):
         """Test basic search functionality."""
@@ -161,7 +165,10 @@ class TestInMemoryVectorStore:
 
         assert len(store.documents) == 2
         assert doc_ids[0] not in store.documents
-        assert store._embeddings.shape == (2, 128)
+        # Verify deletion by searching - should get 2 results now
+        query_embedding = mock_embedder.embed_query("test")
+        results = store.search(query_embedding, top_k=10)
+        assert len(results) == 2
 
     def test_delete_multiple_documents(self, mock_embedder, sample_documents):
         """Test deleting multiple documents."""
@@ -172,7 +179,12 @@ class TestInMemoryVectorStore:
         store.delete([doc_ids[0], doc_ids[2]])
 
         assert len(store.documents) == 1
-        assert doc_ids[1] in store.documents
+        # Verify the remaining document is the second one
+        assert doc_ids[1] in store.ids
+        # Verify via search that only 1 document remains
+        query_embedding = mock_embedder.embed_query("test")
+        results = store.search(query_embedding, top_k=10)
+        assert len(results) == 1
 
     def test_delete_nonexistent_document(self, mock_embedder, sample_documents):
         """Test deleting non-existent document (should not error)."""
@@ -192,8 +204,10 @@ class TestInMemoryVectorStore:
         store.clear()
 
         assert len(store.documents) == 0
-        assert len(store._ids) == 0
-        assert store._embeddings is None
+        # Verify clear by searching - should get no results
+        query_embedding = mock_embedder.embed_query("test")
+        results = store.search(query_embedding, top_k=10)
+        assert len(results) == 0
 
     def test_cosine_similarity_accuracy(self, mock_embedder):
         """Test cosine similarity calculation accuracy."""
@@ -380,7 +394,13 @@ class TestChromaVectorStore:
 
     def test_initialization(self, mock_embedder):
         """Test store initialization."""
-        with patch("selectools.rag.stores.chroma.chromadb"):
+        mock_chroma = MagicMock()
+        mock_client = Mock()
+        mock_collection = Mock()
+        mock_client.get_or_create_collection.return_value = mock_collection
+        mock_chroma.Client.return_value = mock_client
+
+        with patch.dict("sys.modules", {"chromadb": mock_chroma}):
             from selectools.rag.stores.chroma import ChromaVectorStore
 
             store = ChromaVectorStore(embedder=mock_embedder, collection_name="test_collection")
@@ -388,12 +408,13 @@ class TestChromaVectorStore:
 
     def test_add_documents(self, mock_embedder, sample_documents):
         """Test adding documents."""
-        with patch("selectools.rag.stores.chroma.chromadb") as mock_chroma:
-            mock_client = Mock()
-            mock_collection = Mock()
-            mock_client.get_or_create_collection.return_value = mock_collection
-            mock_chroma.Client.return_value = mock_client
+        mock_chroma = MagicMock()
+        mock_client = Mock()
+        mock_collection = Mock()
+        mock_client.get_or_create_collection.return_value = mock_collection
+        mock_chroma.Client.return_value = mock_client
 
+        with patch.dict("sys.modules", {"chromadb": mock_chroma}):
             from selectools.rag.stores.chroma import ChromaVectorStore
 
             store = ChromaVectorStore(embedder=mock_embedder)
@@ -405,21 +426,22 @@ class TestChromaVectorStore:
 
     def test_search_basic(self, mock_embedder):
         """Test basic search."""
-        with patch("selectools.rag.stores.chroma.chromadb") as mock_chroma:
-            mock_client = Mock()
-            mock_collection = Mock()
-            mock_client.get_or_create_collection.return_value = mock_collection
-            mock_chroma.Client.return_value = mock_client
+        mock_chroma = MagicMock()
+        mock_client = Mock()
+        mock_collection = Mock()
+        mock_client.get_or_create_collection.return_value = mock_collection
+        mock_chroma.Client.return_value = mock_client
 
-            # Mock query results
-            mock_collection.query.return_value = {
-                "ids": [["id1", "id2"]],
-                "documents": [["doc1", "doc2"]],
-                "metadatas": [[{"cat": "a"}, {"cat": "b"}]],
-                "distances": [[0.1, 0.3]],
-                "embeddings": [[]],
-            }
+        # Mock query results
+        mock_collection.query.return_value = {
+            "ids": [["id1", "id2"]],
+            "documents": [["doc1", "doc2"]],
+            "metadatas": [[{"cat": "a"}, {"cat": "b"}]],
+            "distances": [[0.1, 0.3]],
+            "embeddings": [[]],
+        }
 
+        with patch.dict("sys.modules", {"chromadb": mock_chroma}):
             from selectools.rag.stores.chroma import ChromaVectorStore
 
             store = ChromaVectorStore(embedder=mock_embedder)
@@ -432,12 +454,13 @@ class TestChromaVectorStore:
 
     def test_delete_documents(self, mock_embedder):
         """Test deleting documents."""
-        with patch("selectools.rag.stores.chroma.chromadb") as mock_chroma:
-            mock_client = Mock()
-            mock_collection = Mock()
-            mock_client.get_or_create_collection.return_value = mock_collection
-            mock_chroma.Client.return_value = mock_client
+        mock_chroma = MagicMock()
+        mock_client = Mock()
+        mock_collection = Mock()
+        mock_client.get_or_create_collection.return_value = mock_collection
+        mock_chroma.Client.return_value = mock_client
 
+        with patch.dict("sys.modules", {"chromadb": mock_chroma}):
             from selectools.rag.stores.chroma import ChromaVectorStore
 
             store = ChromaVectorStore(embedder=mock_embedder)
@@ -457,7 +480,14 @@ class TestPineconeVectorStore:
 
     def test_initialization(self, mock_embedder):
         """Test store initialization."""
-        with patch("selectools.rag.stores.pinecone.Pinecone"):
+        mock_pinecone_module = MagicMock()
+        mock_pinecone = Mock()
+        mock_index = Mock()
+        mock_pinecone.list_indexes.return_value = ["test-index"]
+        mock_pinecone.Index.return_value = mock_index
+        mock_pinecone_module.Pinecone.return_value = mock_pinecone
+
+        with patch.dict("sys.modules", {"pinecone": mock_pinecone_module}):
             from selectools.rag.stores.pinecone import PineconeVectorStore
 
             store = PineconeVectorStore(
@@ -467,13 +497,14 @@ class TestPineconeVectorStore:
 
     def test_add_documents(self, mock_embedder, sample_documents):
         """Test adding documents."""
-        with patch("selectools.rag.stores.pinecone.Pinecone") as mock_pinecone_class:
-            mock_pinecone = Mock()
-            mock_index = Mock()
-            mock_pinecone.list_indexes.return_value = []
-            mock_pinecone.Index.return_value = mock_index
-            mock_pinecone_class.return_value = mock_pinecone
+        mock_pinecone_module = MagicMock()
+        mock_pinecone = Mock()
+        mock_index = Mock()
+        mock_pinecone.list_indexes.return_value = []
+        mock_pinecone.Index.return_value = mock_index
+        mock_pinecone_module.Pinecone.return_value = mock_pinecone
 
+        with patch.dict("sys.modules", {"pinecone": mock_pinecone_module}):
             from selectools.rag.stores.pinecone import PineconeVectorStore
 
             store = PineconeVectorStore(
@@ -487,28 +518,29 @@ class TestPineconeVectorStore:
 
     def test_search_basic(self, mock_embedder):
         """Test basic search."""
-        with patch("selectools.rag.stores.pinecone.Pinecone") as mock_pinecone_class:
-            mock_pinecone = Mock()
-            mock_index = Mock()
-            mock_pinecone.list_indexes.return_value = ["test-index"]
-            mock_pinecone.Index.return_value = mock_index
-            mock_pinecone_class.return_value = mock_pinecone
+        mock_pinecone_module = MagicMock()
+        mock_pinecone = Mock()
+        mock_index = Mock()
+        mock_pinecone.list_indexes.return_value = ["test-index"]
+        mock_pinecone.Index.return_value = mock_index
+        mock_pinecone_module.Pinecone.return_value = mock_pinecone
 
-            # Mock query results
-            mock_match1 = Mock()
-            mock_match1.id = "id1"
-            mock_match1.score = 0.9
-            mock_match1.metadata = {"text": "doc1", "cat": "a"}
+        # Mock query results
+        mock_match1 = Mock()
+        mock_match1.id = "id1"
+        mock_match1.score = 0.9
+        mock_match1.metadata = {"text": "doc1", "cat": "a"}
 
-            mock_match2 = Mock()
-            mock_match2.id = "id2"
-            mock_match2.score = 0.7
-            mock_match2.metadata = {"text": "doc2", "cat": "b"}
+        mock_match2 = Mock()
+        mock_match2.id = "id2"
+        mock_match2.score = 0.7
+        mock_match2.metadata = {"text": "doc2", "cat": "b"}
 
-            mock_results = Mock()
-            mock_results.matches = [mock_match1, mock_match2]
-            mock_index.query.return_value = mock_results
+        mock_results = Mock()
+        mock_results.matches = [mock_match1, mock_match2]
+        mock_index.query.return_value = mock_results
 
+        with patch.dict("sys.modules", {"pinecone": mock_pinecone_module}):
             from selectools.rag.stores.pinecone import PineconeVectorStore
 
             store = PineconeVectorStore(
