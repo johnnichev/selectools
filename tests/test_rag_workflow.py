@@ -67,7 +67,10 @@ def mock_provider():
         messages = kwargs.get("messages", [])
         last_message = messages[-1] if messages else None
 
-        if last_message and "search_knowledge_base" in str(last_message.content):
+        # Handle both string and Message object
+        content = last_message.content if hasattr(last_message, "content") else str(last_message)
+
+        if last_message and "search_knowledge_base" in content:
             # Return tool call response
             return (
                 'TOOL_CALL: {"tool_name": "search_knowledge_base", "parameters": {"query": "test"}}',
@@ -170,6 +173,7 @@ class TestCompleteRAGWorkflow:
             provider=mock_provider,
             vector_store=vector_store,
             chunk_size=100,
+            chunk_overlap=20,
             top_k=2,
         )
 
@@ -370,7 +374,7 @@ class TestRAGTools:
         rag_tool = RAGTool(vector_store=vector_store, top_k=2, score_threshold=0.5)
 
         # Search
-        result = rag_tool.search_knowledge_base("programming")
+        result = rag_tool.search_knowledge_base.run(query="programming")
 
         assert isinstance(result, str)
         assert len(result) > 0
@@ -386,7 +390,7 @@ class TestRAGTools:
         # Create tool with very high threshold
         rag_tool = RAGTool(vector_store=vector_store, top_k=1, score_threshold=0.99)
 
-        result = rag_tool.search_knowledge_base("completely unrelated query")
+        result = rag_tool.search_knowledge_base.run(query="completely unrelated query")
 
         assert "No relevant information found" in result
 
@@ -403,7 +407,7 @@ class TestRAGTools:
         # Create semantic search tool
         search_tool = SemanticSearchTool(vector_store=vector_store, top_k=2, score_threshold=0.5)
 
-        results = search_tool.semantic_search("document")
+        results = search_tool.semantic_search.run(query="document")
 
         assert isinstance(results, list)
         assert len(results) <= 2

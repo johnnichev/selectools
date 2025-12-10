@@ -163,7 +163,9 @@ class TestDocumentLoaderFromDirectory:
 
     def test_load_all_txt_files(self, temp_docs_dir):
         """Test loading all .txt files from directory."""
-        docs = DocumentLoader.from_directory(str(temp_docs_dir), glob_pattern="*.txt")
+        docs = DocumentLoader.from_directory(
+            str(temp_docs_dir), glob_pattern="*.txt", recursive=False
+        )
 
         # Should find test1.txt and test2.txt (not in subdir)
         assert len(docs) == 2
@@ -187,8 +189,12 @@ class TestDocumentLoaderFromDirectory:
     def test_load_multiple_extensions(self, temp_docs_dir):
         """Test loading files with multiple extensions."""
         # Load both .txt and .md files
-        txt_docs = DocumentLoader.from_directory(str(temp_docs_dir), glob_pattern="*.txt")
-        md_docs = DocumentLoader.from_directory(str(temp_docs_dir), glob_pattern="*.md")
+        txt_docs = DocumentLoader.from_directory(
+            str(temp_docs_dir), glob_pattern="*.txt", recursive=False
+        )
+        md_docs = DocumentLoader.from_directory(
+            str(temp_docs_dir), glob_pattern="*.md", recursive=False
+        )
 
         assert len(txt_docs) == 2
         assert len(md_docs) == 1
@@ -203,7 +209,7 @@ class TestDocumentLoaderFromDirectory:
         """Test loading directory with custom metadata."""
         metadata = {"project": "test", "version": "1.0"}
         docs = DocumentLoader.from_directory(
-            str(temp_docs_dir), glob_pattern="*.txt", metadata=metadata
+            str(temp_docs_dir), glob_pattern="*.txt", metadata=metadata, recursive=False
         )
 
         assert len(docs) == 2
@@ -312,8 +318,12 @@ class TestDocumentLoaderIntegration:
     def test_load_mixed_content(self, temp_docs_dir):
         """Test loading different file types from same directory."""
         # Load all files
-        txt_docs = DocumentLoader.from_directory(str(temp_docs_dir), glob_pattern="*.txt")
-        md_docs = DocumentLoader.from_directory(str(temp_docs_dir), glob_pattern="*.md")
+        txt_docs = DocumentLoader.from_directory(
+            str(temp_docs_dir), glob_pattern="*.txt", recursive=False
+        )
+        md_docs = DocumentLoader.from_directory(
+            str(temp_docs_dir), glob_pattern="*.md", recursive=False
+        )
 
         all_docs = txt_docs + md_docs
 
