@@ -74,65 +74,74 @@ This document tracks the implementation status of all planned features. See [REA
 
 ---
 
-## v0.8.0: Embeddings & RAG (Next Release)
+## v0.8.0: Embeddings & RAG ✅ COMPLETE
 
-| Feature                   | Status     | Effort | Priority | Notes                                     |
-| ------------------------- | ---------- | ------ | -------- | ----------------------------------------- |
-| Embedding Models Registry | 🟡 Planned | Medium | High     | Add embedding models to models.py         |
-| Embedding Providers       | 🟡 Planned | Medium | High     | Support OpenAI, Anthropic, Gemini, Cohere |
-| Vector Store Abstraction  | 🟡 Planned | High   | High     | Unified interface for vector databases    |
-| Built-in Vector Stores    | 🟡 Planned | High   | Medium   | In-memory, SQLite, Chroma, Pinecone       |
-| Document Loaders          | 🟡 Planned | Medium | Medium   | PDF, TXT, Markdown, HTML parsers          |
-| Text Chunking Strategies  | 🟡 Planned | Medium | Medium   | Fixed, recursive, semantic splitting      |
-| RAG Tool                  | 🟡 Planned | High   | High     | Pre-built tool for document Q&A           |
-| Semantic Search Tool      | 🟡 Planned | Medium | Medium   | Search documents by meaning               |
-| Hybrid Search             | 🟡 Planned | High   | Low      | Combine vector + keyword search           |
+| Feature                   | Status    | Notes                                            |
+| ------------------------- | --------- | ------------------------------------------------ |
+| Embedding Models Registry | ✅ v0.8.0 | 10 embedding models in models.py                 |
+| Embedding Providers       | ✅ v0.8.0 | OpenAI, Anthropic/Voyage, Gemini, Cohere         |
+| Vector Store Abstraction  | ✅ v0.8.0 | VectorStore interface with Document/SearchResult |
+| Built-in Vector Stores    | ✅ v0.8.0 | InMemory, SQLite, Chroma, Pinecone               |
+| Document Loaders          | ✅ v0.8.0 | Text, file, directory, PDF support               |
+| Text Chunking Strategies  | ✅ v0.8.0 | TextSplitter, RecursiveTextSplitter              |
+| RAG Tool                  | ✅ v0.8.0 | RAGTool for document Q&A                         |
+| Semantic Search Tool      | ✅ v0.8.0 | SemanticSearchTool with scoring                  |
+| Hybrid Search             | ⏸️ v0.9.0 | Deferred (Low priority)                          |
 
 **Key Capabilities:**
 
-- **Embedding Support**: Add embedding models to model registry (OpenAI, Anthropic, Gemini, Cohere)
-- **Vector Databases**: Abstract interface + built-in implementations (in-memory, SQLite, Chroma, Pinecone)
-- **Document Processing**: Load, chunk, and embed documents automatically
-- **RAG Tools**: Pre-built tools for retrieval-augmented generation
-- **Cost Tracking**: Extend to track embedding API costs
+- ✅ **Embedding Support**: 10 embedding models across 4 providers (OpenAI, Anthropic/Voyage, Gemini, Cohere)
+- ✅ **Vector Databases**: Abstract VectorStore interface + 4 implementations (InMemory, SQLite, Chroma, Pinecone)
+- ✅ **Document Processing**: Load from text/files/directories, automatic chunking, PDF support
+- ✅ **RAG Tools**: RAGTool and SemanticSearchTool pre-built
+- ✅ **Cost Tracking**: Full embedding cost tracking integrated with UsageStats
+- ✅ **High-Level API**: RAGAgent.from_documents() and RAGAgent.from_directory()
 
 **Example API:**
 
 ```python
 from selectools import Agent, OpenAIProvider
 from selectools.models import OpenAI
-from selectools.embeddings import EmbeddingProvider
-from selectools.rag import VectorStore, DocumentLoader, RAGTool
+from selectools.embeddings import OpenAIEmbeddingProvider
+from selectools.rag import VectorStore, DocumentLoader, RAGAgent
 
 # Set up embedding provider
-embedder = EmbeddingProvider(model=OpenAI.TEXT_EMBEDDING_3_SMALL)
+embedder = OpenAIEmbeddingProvider(model=OpenAI.TEXT_EMBEDDING_3_SMALL.id)
 
 # Create vector store and load documents
 vector_store = VectorStore.create("chroma", embedder=embedder)
-loader = DocumentLoader.from_directory("./docs")
-vector_store.add_documents(loader.load())
+docs = DocumentLoader.from_directory("./docs")
 
-# Create RAG tool
+# High-level API - creates agent with RAG tool automatically
+agent = RAGAgent.from_documents(
+    documents=docs,
+    provider=OpenAIProvider(),
+    vector_store=vector_store,
+    chunk_size=500
+)
+
+# Or use RAGTool directly
+from selectools.rag import RAGTool
 rag_tool = RAGTool(vector_store=vector_store, top_k=3)
-
-# Use with agent
 agent = Agent(tools=[rag_tool], provider=OpenAIProvider())
+
 response = agent.run("What are the main features of selectools?")
 ```
 
 ---
 
-## v0.8.x: Upcoming (Planned)
+## v0.9.0: Upcoming (Planned)
 
-| Feature              | Status     | Effort | Notes                            |
-| -------------------- | ---------- | ------ | -------------------------------- |
-| Dynamic Tool Loading | 🟡 Planned | Medium | Hot-reload tools without restart |
-| Reranking Models     | 🟡 Planned | Medium | Cohere, Jina rerankers           |
-| Advanced Chunking    | 🟡 Planned | High   | Agentic, contextual chunking     |
+| Feature              | Status     | Effort | Priority | Notes                            |
+| -------------------- | ---------- | ------ | -------- | -------------------------------- |
+| Hybrid Search        | 🟡 Planned | High   | Medium   | Vector + BM25 keyword search     |
+| Reranking Models     | 🟡 Planned | Medium | Medium   | Cohere, Jina rerankers           |
+| Advanced Chunking    | 🟡 Planned | High   | Low      | Agentic, contextual chunking     |
+| Dynamic Tool Loading | 🟡 Planned | Medium | Low      | Hot-reload tools without restart |
 
 ---
 
-## v0.9.0+: Advanced Features (Future)
+## v0.9.0+: Future Enhancements
 
 ### High-Impact Complex Features
 
@@ -290,15 +299,18 @@ response = agent.run("What are the main features of selectools?")
 
 ## Last Updated
 
-**Date:** 2025-12-08
-**By:** John (v0.4.0 progress update)
-**Next Review:** 2025-12-15
+**Date:** 2025-12-10
+**By:** John (v0.8.0 completion)
+**Next Review:** 2025-12-17
 
 **Recent Changes:**
 
-- ✅ Completed Conversation Memory feature
-- ✅ Completed full Async Support (Agent.arun, async tools, async providers)
-- ✅ Implemented real Anthropic and Gemini providers with async support
-- ✅ Removed Pillow dependency, cleaned up codebase
-- ✅ Added comprehensive async tests
-- ✅ Created async usage examples
+- ✅ Completed v0.8.0 - Full Embeddings & RAG support
+- ✅ Implemented 4 embedding providers (OpenAI, Anthropic/Voyage, Gemini, Cohere)
+- ✅ Built 4 vector store implementations (InMemory, SQLite, Chroma, Pinecone)
+- ✅ Added document loaders with PDF support
+- ✅ Created text chunking strategies (TextSplitter, RecursiveTextSplitter)
+- ✅ Implemented RAGTool and SemanticSearchTool
+- ✅ Extended cost tracking for embeddings
+- ✅ Fixed all 65 failing tests - achieved 100% pass rate (463/463)
+- ✅ Created 3 comprehensive RAG examples
