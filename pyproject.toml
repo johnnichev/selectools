@@ -39,6 +39,7 @@ Documentation = "https://github.com/johnnichev/selectools#readme"
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.23.0",
+    "pytest-xdist>=3.5.0",
     "build>=1.2.1",
     "twine>=5.0.0",
     "pre-commit>=3.6.0",
@@ -114,3 +115,16 @@ exclude = [
 exclude_dirs = ["tests", "examples", "scripts"]
 skips = ["B101", "B601", "B602"]  # Skip assert_used, shell, and subprocess checks
 targets = ["src/"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "strict"
+addopts = "-v"
+markers = [
+    "e2e: mark test as end-to-end (requires real API keys, use --run-e2e to run)",
+    "openai: mark test as requiring OpenAI API key",
+    "anthropic: mark test as requiring Anthropic API key",
+    "gemini: mark test as requiring Gemini API key",
+    "ollama: mark test as requiring Ollama running locally",
+]

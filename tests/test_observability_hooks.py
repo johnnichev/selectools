@@ -102,7 +102,7 @@ class TestAgentLifecycleHooks:
         assert recorder.was_called("on_agent_end")
         calls = recorder.get_calls("on_agent_end")
         assert len(calls) == 1
-        assert calls[0]["args"][0] == response
+        assert calls[0]["args"][0] == response.message
         # Usage should be AgentUsage object
         assert hasattr(calls[0]["args"][1], "total_tokens")
 

@@ -22,12 +22,13 @@ from .providers.ollama_provider import OllamaProvider
 from .providers.openai_provider import OpenAIProvider
 from .providers.stubs import LocalProvider
 from .tools import Tool, ToolParameter, ToolRegistry, tool
-from .types import Message, Role, ToolCall
+from .types import AgentResult, Message, Role, ToolCall
 from .usage import AgentUsage, UsageStats
 
 __all__ = [
     "Agent",
     "AgentConfig",
+    "AgentResult",
     "AgentAnalytics",
     "ToolMetrics",
     "ConversationMemory",

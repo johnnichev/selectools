@@ -22,7 +22,7 @@ jobs:
           pip install -e ".[dev]"
       - name: Run tests
         run: |
-          python tests/test_framework.py
+          pytest -n auto
 
   build:
     runs-on: ubuntu-latest

@@ -16,7 +16,7 @@ from .prompt import PromptBuilder
 from .providers.base import Provider, ProviderError
 from .providers.openai_provider import OpenAIProvider
 from .tools import Tool
-from .types import Message, Role
+from .types import AgentResult, Message, Role, ToolCall
 from .usage import AgentUsage
 
 if TYPE_CHECKING:
@@ -48,6 +48,7 @@ class AgentConfig:
         rate_limit_cooldown_seconds: Cooldown period after rate limit errors. Default: 5.0.
         tool_timeout_seconds: Maximum execution time for each tool call. None = no timeout. Default: None.
         cost_warning_threshold: Print warning when total cost exceeds this USD amount. None = no warnings. Default: None.
+        system_prompt: Custom system instructions to replace the default prompt. Default: None (uses built-in instructions).
         hooks: Optional dict of lifecycle hooks for observability. Default: None.
                Available hooks:
                - 'on_agent_start': Called at start of run/arun with (messages,)
@@ -101,6 +102,7 @@ class AgentConfig:
     tool_timeout_seconds: Optional[float] = None
     cost_warning_threshold: Optional[float] = None
     enable_analytics: bool = False
+    system_prompt: Optional[str] = None
     hooks: Optional[Hooks] = None
 
 
@@ -186,7 +188,12 @@ class Agent:
         self.tools = tools
         self._tools_by_name = {tool.name: tool for tool in tools}
         self.provider = provider or OpenAIProvider()
-        self.prompt_builder = prompt_builder or PromptBuilder()
+        if prompt_builder:
+            self.prompt_builder = prompt_builder
+        elif config and config.system_prompt:
+            self.prompt_builder = PromptBuilder(base_instructions=config.system_prompt)
+        else:
+            self.prompt_builder = PromptBuilder()
         self.parser = parser or ToolCallParser()
         self.config = config or AgentConfig()
         self.memory = memory
@@ -208,7 +215,7 @@ class Agent:
 
     def run(
         self, messages: List[Message], stream_handler: Optional[Callable[[str], None]] = None
-    ) -> Message:
+    ) -> AgentResult:
         """
         Execute the agent loop with the provided conversation history.
 
@@ -221,7 +228,7 @@ class Agent:
             stream_handler: Optional callback for streaming responses.
 
         Returns:
-            The final assistant response message.
+            AgentResult with the final response and tool call metadata.
         """
         # Call on_agent_start hook
         self._call_hook("on_agent_start", messages)
@@ -236,6 +243,9 @@ class Agent:
                 self._history = list(messages)
 
             iteration = 0
+            all_tool_calls: List[ToolCall] = []
+            last_tool_name: Optional[str] = None
+            last_tool_args: Dict[str, Any] = {}
 
             while iteration < self.config.max_iterations:
                 iteration += 1
@@ -251,10 +261,19 @@ class Agent:
                     if self.memory:
                         self.memory.add(final_response)
                     self._call_hook("on_agent_end", final_response, self.usage)
-                    return final_response
+                    return AgentResult(
+                        message=final_response,
+                        tool_name=last_tool_name,
+                        tool_args=last_tool_args,
+                        iterations=iteration,
+                        tool_calls=all_tool_calls,
+                    )
 
                 tool_name = parse_result.tool_call.tool_name
                 parameters = parse_result.tool_call.parameters
+                all_tool_calls.append(parse_result.tool_call)
+                last_tool_name = tool_name
+                last_tool_args = parameters
 
                 if self.config.verbose:
                     print(f"[agent] Iteration {iteration}: tool={tool_name} params={parameters}")
@@ -336,7 +355,13 @@ class Agent:
             if self.memory:
                 self.memory.add(final_response)
             self._call_hook("on_agent_end", final_response, self.usage)
-            return final_response
+            return AgentResult(
+                message=final_response,
+                tool_name=last_tool_name,
+                tool_args=last_tool_args,
+                iterations=iteration,
+                tool_calls=all_tool_calls,
+            )
         except Exception as exc:
             self._call_hook("on_error", exc, {"messages": messages, "iteration": iteration})
             raise
@@ -476,7 +501,7 @@ class Agent:
     # Async methods
     async def arun(
         self, messages: List[Message], stream_handler: Optional[Callable[[str], None]] = None
-    ) -> Message:
+    ) -> AgentResult:
         """
         Async version of run().
 
@@ -488,7 +513,7 @@ class Agent:
             stream_handler: Optional callback for streaming responses.
 
         Returns:
-            The final assistant response message.
+            AgentResult with the final response and tool call metadata.
         """
         self._call_hook("on_agent_start", messages)
 
@@ -501,6 +526,9 @@ class Agent:
                 self._history = list(messages)
 
             iteration = 0
+            all_tool_calls: List[ToolCall] = []
+            last_tool_name: Optional[str] = None
+            last_tool_args: Dict[str, Any] = {}
 
             while iteration < self.config.max_iterations:
                 iteration += 1
@@ -515,10 +543,19 @@ class Agent:
                     if self.memory:
                         self.memory.add(final_response)
                     self._call_hook("on_agent_end", final_response, self.usage)
-                    return final_response
+                    return AgentResult(
+                        message=final_response,
+                        tool_name=last_tool_name,
+                        tool_args=last_tool_args,
+                        iterations=iteration,
+                        tool_calls=all_tool_calls,
+                    )
 
                 tool_name = parse_result.tool_call.tool_name
                 parameters = parse_result.tool_call.parameters
+                all_tool_calls.append(parse_result.tool_call)
+                last_tool_name = tool_name
+                last_tool_args = parameters
 
                 if self.config.verbose:
                     print(f"[agent] Iteration {iteration}: tool={tool_name} params={parameters}")
@@ -591,7 +628,13 @@ class Agent:
             if self.memory:
                 self.memory.add(final_response)
             self._call_hook("on_agent_end", final_response, self.usage)
-            return final_response
+            return AgentResult(
+                message=final_response,
+                tool_name=last_tool_name,
+                tool_args=last_tool_args,
+                iterations=iteration,
+                tool_calls=all_tool_calls,
+            )
         except Exception as exc:
             self._call_hook("on_error", exc, {"messages": messages, "iteration": iteration})
             raise
@@ -766,6 +809,29 @@ class Agent:
         the same agent instance.
         """
         self.usage = AgentUsage()
+
+    def reset(self) -> None:
+        """
+        Fully reset agent state for reuse.
+
+        Clears conversation history, usage statistics, analytics, and
+        memory. The agent retains its tools, provider, and configuration.
+
+        Useful when reusing the same agent instance for independent requests
+        (e.g., in a web server where the agent is created once at startup).
+
+        Example:
+            >>> agent = Agent(tools=[search], provider=provider)
+            >>> agent.run([Message(role=Role.USER, content="First request")])
+            >>> agent.reset()  # Clean slate
+            >>> agent.run([Message(role=Role.USER, content="Second request")])
+        """
+        self._history = []
+        self.usage = AgentUsage()
+        if self.analytics:
+            self.analytics = AgentAnalytics()
+        if self.memory:
+            self.memory.clear()
 
     def get_analytics(self) -> AgentAnalytics | None:
         """

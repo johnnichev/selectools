@@ -11,7 +11,7 @@ import base64
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 
 class Role(str, Enum):
@@ -130,4 +130,50 @@ class ToolCall:
     parameters: Dict[str, Any]
 
 
-__all__ = ["Role", "Message", "ToolCall"]
+@dataclass
+class AgentResult:
+    """
+    Structured result from an agent run.
+
+    Wraps the final assistant response with metadata about which tools were
+    called and how many iterations the agent used. Provides backward-compatible
+    `content` and `role` properties so existing code that accesses
+    ``result.content`` continues to work.
+
+    Attributes:
+        message: The final assistant response message.
+        tool_name: Name of the last tool called, or None if no tool was used.
+        tool_args: Parameters passed to the last tool call.
+        iterations: Number of loop iterations used.
+        tool_calls: Ordered list of all tool calls made during the run.
+
+    Example:
+        >>> result = agent.run([Message(role=Role.USER, content="Search for Python")])
+        >>> result.content          # backward-compatible
+        'Here are the results...'
+        >>> result.tool_name        # structured access
+        'search_web'
+        >>> result.tool_args
+        {'query': 'Python'}
+        >>> result.iterations
+        2
+    """
+
+    message: Message
+    tool_name: Optional[str] = None
+    tool_args: Dict[str, Any] = field(default_factory=dict)
+    iterations: int = 0
+    tool_calls: List["ToolCall"] = field(default_factory=list)
+
+    @property
+    def content(self) -> str:
+        """Backward-compatible access to the final response text."""
+        return self.message.content
+
+    @property
+    def role(self) -> "Role":
+        """Backward-compatible access to the message role."""
+        return self.message.role
+
+
+__all__ = ["Role", "Message", "ToolCall", "AgentResult"]

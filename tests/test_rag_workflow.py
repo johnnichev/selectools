@@ -22,6 +22,7 @@ from selectools.rag import (
     TextSplitter,
     VectorStore,
 )
+from selectools.types import AgentResult
 
 # ============================================================================
 # Fixtures
@@ -230,7 +231,7 @@ class TestCompleteRAGWorkflow:
 
         response = agent.run([Message(role=Role.USER, content="Tell me about Python")])
 
-        assert isinstance(response, Message)
+        assert isinstance(response, AgentResult)
         assert len(response.content) > 0
 
 
@@ -511,7 +512,7 @@ class TestEndToEndRAGWorkflow:
         response = agent.run([Message(role=Role.USER, content="What is Python used for?")])
 
         # Verify response
-        assert isinstance(response, Message)
+        assert isinstance(response, AgentResult)
         assert len(response.content) > 0
 
         # Verify usage tracking
@@ -539,8 +540,8 @@ class TestEndToEndRAGWorkflow:
         response1 = agent.run([Message(role=Role.USER, content="Tell me about Python")])
         response2 = agent.run([Message(role=Role.USER, content="Tell me about Docker")])
 
-        assert isinstance(response1, Message)
-        assert isinstance(response2, Message)
+        assert isinstance(response1, AgentResult)
+        assert isinstance(response2, AgentResult)
 
         # Verify usage accumulated
         usage = agent.usage
