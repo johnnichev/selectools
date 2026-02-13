@@ -83,6 +83,8 @@ class Message:
     image_path: Optional[str] = None
     tool_name: Optional[str] = None
     tool_result: Optional[str] = None
+    tool_calls: Optional[List["ToolCall"]] = None
+    tool_call_id: Optional[str] = None
     image_base64: Optional[str] = field(init=False, default=None)
 
     def __post_init__(self) -> None:
@@ -101,8 +103,16 @@ class Message:
             "role": self.role.value,
             "content": self.content,
             "image_base64": self.image_base64,
-            "tool_name": self.tool_name,
             "tool_result": self.tool_result,
+            "tool_calls": (
+                [
+                    {"name": tc.tool_name, "parameters": tc.parameters, "id": tc.id}
+                    for tc in self.tool_calls
+                ]
+                if self.tool_calls
+                else None
+            ),
+            "tool_call_id": self.tool_call_id,
         }
 
 
@@ -128,6 +138,7 @@ class ToolCall:
 
     tool_name: str
     parameters: Dict[str, Any]
+    id: Optional[str] = None
 
 
 @dataclass

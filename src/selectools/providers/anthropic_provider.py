@@ -5,13 +5,16 @@ Anthropic provider adapter for the tool-calling library.
 from __future__ import annotations
 
 import os
-from typing import AsyncIterable, Iterable, List
+from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, Iterable, List, cast
+
+if TYPE_CHECKING:
+    from ..tools.base import Tool
 
 from ..env import load_default_env
 from ..exceptions import ProviderConfigurationError
 from ..models import Anthropic as AnthropicModels
 from ..pricing import calculate_cost
-from ..types import Message, Role
+from ..types import Message, Role, ToolCall
 from ..usage import UsageStats
 from .base import Provider, ProviderError
 
@@ -55,10 +58,11 @@ class AnthropicProvider(Provider):
         model: str,
         system_prompt: str,
         messages: List[Message],
+        tools: List[Tool] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> tuple[str, UsageStats]:
+    ) -> tuple[Message, UsageStats]:
         """
         Call Anthropic's messages API for a non-streaming completion.
 
@@ -85,6 +89,9 @@ class AnthropicProvider(Provider):
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
+        if tools:
+            request_args["tools"] = [self._map_tool_to_anthropic(t) for t in tools]
+
         if timeout is not None:
             request_args["timeout"] = timeout
         try:
@@ -92,8 +99,20 @@ class AnthropicProvider(Provider):
         except Exception as exc:
             raise ProviderError(f"Anthropic completion failed: {exc}") from exc
 
-        text_chunks = [block.text for block in response.content if hasattr(block, "text")]
-        content = "".join(text_chunks)
+        content_text = ""
+        tool_calls: List[ToolCall] = []
+
+        for block in response.content:
+            if block.type == "text":
+                content_text += block.text
+            elif block.type == "tool_use":
+                tool_calls.append(
+                    ToolCall(
+                        tool_name=block.name,
+                        parameters=cast(Dict[str, Any], block.input),
+                        id=block.id,
+                    )
+                )
 
         # Extract usage stats
         usage = response.usage
@@ -110,7 +129,14 @@ class AnthropicProvider(Provider):
             provider="anthropic",
         )
 
-        return content, usage_stats
+        return (
+            Message(
+                role=Role.ASSISTANT,
+                content=content_text,
+                tool_calls=tool_calls or None,
+            ),
+            usage_stats,
+        )
 
     def stream(
         self,
@@ -118,6 +144,7 @@ class AnthropicProvider(Provider):
         model: str,
         system_prompt: str,
         messages: List[Message],
+        tools: List[Tool] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
@@ -164,26 +191,57 @@ class AnthropicProvider(Provider):
         formatted = []
         for message in messages:
             role = message.role.value
-            if role == Role.TOOL.value:
-                role = Role.ASSISTANT.value
+            content: List[Dict[str, Any]] = []
 
-            # Support vision by checking for image_base64
-            content = []
-            if message.image_base64:
+            if role == Role.TOOL.value:
+                # Map logical TOOL role to Anthropic USER role with tool_result block
+                role = "user"
                 content.append(
                     {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "image/png",
-                            "data": message.image_base64,
-                        },
+                        "type": "tool_result",
+                        "tool_use_id": message.tool_call_id or "unknown",
+                        "content": message.content,
                     }
                 )
-            content.append({"type": "text", "text": message.content})
+            else:
+                # User or Assistant
+                if message.image_base64:
+                    content.append(
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "image/png",
+                                "data": message.image_base64,
+                            },
+                        }
+                    )
+                if message.content:
+                    content.append({"type": "text", "text": message.content})
+
+                # Check for outgoing tool calls (from Assistant)
+                if message.tool_calls:
+                    for tc in message.tool_calls:
+                        content.append(
+                            {
+                                "type": "tool_use",
+                                "id": tc.id or "unknown",
+                                "name": tc.tool_name,
+                                "input": tc.parameters,
+                            }
+                        )
 
             formatted.append({"role": role, "content": content})
         return formatted
+
+    def _map_tool_to_anthropic(self, tool: Tool) -> Dict[str, Any]:
+        """Convert a selectools.Tool to Anthropic tool schema."""
+        schema = tool.schema()
+        return {
+            "name": schema["name"],
+            "description": schema["description"],
+            "input_schema": schema["parameters"],
+        }
 
     # Async methods
     async def acomplete(
@@ -192,10 +250,11 @@ class AnthropicProvider(Provider):
         model: str,
         system_prompt: str,
         messages: List[Message],
+        tools: List[Tool] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> tuple[str, UsageStats]:
+    ) -> tuple[Message, UsageStats]:
         """
         Async version of complete() using AsyncAnthropic client.
 
@@ -211,6 +270,9 @@ class AnthropicProvider(Provider):
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
+        if tools:
+            request_args["tools"] = [self._map_tool_to_anthropic(t) for t in tools]
+
         if timeout is not None:
             request_args["timeout"] = timeout
         try:
@@ -218,8 +280,20 @@ class AnthropicProvider(Provider):
         except Exception as exc:
             raise ProviderError(f"Anthropic async completion failed: {exc}") from exc
 
-        text_chunks = [block.text for block in response.content if hasattr(block, "text")]
-        content = "".join(text_chunks)
+        content_text = ""
+        tool_calls: List[ToolCall] = []
+
+        for block in response.content:
+            if block.type == "text":
+                content_text += block.text
+            elif block.type == "tool_use":
+                tool_calls.append(
+                    ToolCall(
+                        tool_name=block.name,
+                        parameters=cast(Dict[str, Any], block.input),
+                        id=block.id,
+                    )
+                )
 
         # Extract usage stats
         usage = response.usage
@@ -236,7 +310,14 @@ class AnthropicProvider(Provider):
             provider="anthropic",
         )
 
-        return content, usage_stats
+        return (
+            Message(
+                role=Role.ASSISTANT,
+                content=content_text,
+                tool_calls=tool_calls or None,
+            ),
+            usage_stats,
+        )
 
     async def astream(
         self,
@@ -244,6 +325,7 @@ class AnthropicProvider(Provider):
         model: str,
         system_prompt: str,
         messages: List[Message],
+        tools: List[Tool] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,

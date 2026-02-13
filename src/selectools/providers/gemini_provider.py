@@ -8,14 +8,19 @@ See: https://ai.google.dev/gemini-api/docs/migrate
 from __future__ import annotations
 
 import base64
+import json
 import os
-from typing import AsyncIterable, Iterable, List
+import uuid
+from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, Iterable, List, cast
+
+if TYPE_CHECKING:
+    from ..tools.base import Tool
 
 from ..env import load_default_env
 from ..exceptions import ProviderConfigurationError
 from ..models import Gemini as GeminiModels
 from ..pricing import calculate_cost
-from ..types import Message, Role
+from ..types import Message, Role, ToolCall
 from ..usage import UsageStats
 from .base import Provider, ProviderError
 
@@ -62,10 +67,11 @@ class GeminiProvider(Provider):
         model: str,
         system_prompt: str,
         messages: List[Message],
+        tools: List[Tool] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> tuple[str, UsageStats]:
+    ) -> tuple[Message, UsageStats]:
         """
         Call Gemini's generate_content API for a non-streaming completion.
 
@@ -94,6 +100,9 @@ class GeminiProvider(Provider):
             system_instruction=system_prompt if system_prompt else None,
         )
 
+        if tools:
+            config.tools = [self._map_tool_to_gemini(t) for t in tools]
+
         try:
             response = self._client.models.generate_content(
                 model=model_name,
@@ -103,7 +112,23 @@ class GeminiProvider(Provider):
         except Exception as exc:
             raise ProviderError(f"Gemini completion failed: {exc}") from exc
 
-        content = response.text or ""
+        content_text = response.text or ""
+        tool_calls: List[ToolCall] = []
+
+        if response.candidates and response.candidates[0].content.parts:
+            for part in response.candidates[0].content.parts:
+                if part.function_call:
+                    # Gemini doesn't always provide stable IDs, so we generate one if missing
+                    # We might need to handle this carefully if we need to map back to response.
+                    # For now, generate a UUID if needed.
+                    tc_id = f"call_{uuid.uuid4().hex}"
+                    tool_calls.append(
+                        ToolCall(
+                            tool_name=part.function_call.name,
+                            parameters=part.function_call.args if part.function_call.args else {},
+                            id=tc_id,
+                        )
+                    )
 
         # Extract usage stats from response
         usage = response.usage_metadata if hasattr(response, "usage_metadata") else None
@@ -118,7 +143,14 @@ class GeminiProvider(Provider):
             provider="gemini",
         )
 
-        return content, usage_stats
+        return (
+            Message(
+                role=Role.ASSISTANT,
+                content=content_text,
+                tool_calls=tool_calls or None,
+            ),
+            usage_stats,
+        )
 
     def stream(
         self,
@@ -126,6 +158,7 @@ class GeminiProvider(Provider):
         model: str,
         system_prompt: str,
         messages: List[Message],
+        tools: List[Tool] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
@@ -171,33 +204,90 @@ class GeminiProvider(Provider):
         contents = []
         for message in messages:
             role = message.role.value
-            # Map our roles to Gemini roles
-            if role == Role.ASSISTANT.value or role == Role.TOOL.value:
-                role = "model"
-            elif role == Role.USER.value:
-                role = "user"
-            else:
-                role = "user"  # Default fallback
-
-            # Build parts
             parts = []
-            if message.content:
-                parts.append(types.Part(text=message.content))
 
-            # Handle images if present
-            if message.image_base64:
-                parts.append(
-                    types.Part(
-                        inline_data=types.Blob(
-                            mime_type="image/png",
-                            data=base64.b64decode(message.image_base64),
+            if role == Role.TOOL.value:
+                role = "user"
+                # For tool results, we need a FunctionResponse part
+                # Note: We need the tool name here. Message has 'tool_name'.
+                if message.tool_name:
+                    parts.append(
+                        types.Part(
+                            function_response=types.FunctionResponse(
+                                name=message.tool_name, response={"result": message.content}
+                            )
                         )
                     )
-                )
+                else:
+                    # Fallback if no tool name (legacy), treat as text
+                    parts.append(types.Part(text=f"Tool output: {message.content}"))
 
-            contents.append(types.Content(role=role, parts=parts))
+            elif role == Role.ASSISTANT.value:
+                role = "model"
+                if message.content:
+                    parts.append(types.Part(text=message.content))
+
+                # Handle outgoing tool calls
+                if message.tool_calls:
+                    for tc in message.tool_calls:
+                        parts.append(
+                            types.Part(
+                                function_call=types.FunctionCall(
+                                    name=tc.tool_name, args=tc.parameters
+                                )
+                            )
+                        )
+
+            elif role == Role.USER.value:
+                role = "user"
+                if message.content:
+                    parts.append(types.Part(text=message.content))
+                if message.image_base64:
+                    parts.append(
+                        types.Part(
+                            inline_data=types.Blob(
+                                mime_type="image/png",
+                                data=base64.b64decode(message.image_base64),
+                            )
+                        )
+                    )
+
+            else:
+                role = "user"  # Fallback
+                if message.content:
+                    parts.append(types.Part(text=message.content))
+
+            if parts:
+                contents.append(types.Content(role=role, parts=parts))
 
         return contents
+
+    def _map_tool_to_gemini(self, tool: Tool) -> Any:
+        """Convert a selectools.Tool to Gemini tool schema."""
+        # Helper to recursively convert JSON schema dict to types.Schema?
+        # Actually, types.Tool accepts function_declarations.
+        # FunctionDeclaration accepts parameters as types.Schema.
+        # The SDK might auto-convert dict to Schema if we are lucky, or we pass dict directly?
+        # Documentation suggests we can pass dicts in some places, but let's be safe.
+        # For now, we'll try constructing the tool with a list of dicts if the SDK supports it,
+        # or just types.FunctionDeclaration with kwargs.
+        # We will iterate and construct FunctionDeclaration objects.
+        # Ideally we'd convert the parameters dict to Schema.
+        # But writing a full converter here is complex.
+        # Let's hope the SDK accepts the dict or we can use a helper.
+        # Check if types.Schema has a from_payload or similar?
+        from google.genai import types
+
+        schema = tool.schema()
+        return types.Tool(
+            function_declarations=[
+                types.FunctionDeclaration(
+                    name=schema["name"],
+                    description=schema["description"],
+                    parameters=schema["parameters"],
+                )
+            ]
+        )
 
     # Async methods using client.aio
     async def acomplete(
@@ -206,10 +296,11 @@ class GeminiProvider(Provider):
         model: str,
         system_prompt: str,
         messages: List[Message],
+        tools: List[Tool] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> tuple[str, UsageStats]:
+    ) -> tuple[Message, UsageStats]:
         """
         Async version of complete() using client.aio.
 
@@ -227,6 +318,9 @@ class GeminiProvider(Provider):
             system_instruction=system_prompt if system_prompt else None,
         )
 
+        if tools:
+            config.tools = [self._map_tool_to_gemini(t) for t in tools]
+
         try:
             response = await self._client.aio.models.generate_content(
                 model=model_name,
@@ -236,7 +330,20 @@ class GeminiProvider(Provider):
         except Exception as exc:
             raise ProviderError(f"Gemini async completion failed: {exc}") from exc
 
-        content = response.text or ""
+        content_text = response.text or ""
+
+        tool_calls: List[ToolCall] = []
+        if response.candidates and response.candidates[0].content.parts:
+            for part in response.candidates[0].content.parts:
+                if part.function_call:
+                    tc_id = f"call_{uuid.uuid4().hex}"
+                    tool_calls.append(
+                        ToolCall(
+                            tool_name=part.function_call.name,
+                            parameters=part.function_call.args if part.function_call.args else {},
+                            id=tc_id,
+                        )
+                    )
 
         # Extract usage stats
         usage = response.usage_metadata if hasattr(response, "usage_metadata") else None
@@ -251,7 +358,14 @@ class GeminiProvider(Provider):
             provider="gemini",
         )
 
-        return content, usage_stats
+        return (
+            Message(
+                role=Role.ASSISTANT,
+                content=content_text,
+                tool_calls=tool_calls or None,
+            ),
+            usage_stats,
+        )
 
     async def astream(
         self,
@@ -259,6 +373,7 @@ class GeminiProvider(Provider):
         model: str,
         system_prompt: str,
         messages: List[Message],
+        tools: List[Tool] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,

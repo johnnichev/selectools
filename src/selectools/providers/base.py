@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, AsyncIterable, Iterable, Protocol, runtime_che
 from ..types import Message
 
 if TYPE_CHECKING:
+    from ..tools.base import Tool
     from ..usage import UsageStats
 
 
@@ -35,15 +36,16 @@ class Provider(Protocol):
         model: str,
         system_prompt: str,
         messages: list[Message],
+        tools: list["Tool"] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> tuple[str, "UsageStats"]:
+    ) -> tuple[Message, "UsageStats"]:
         """
-        Return assistant text and usage stats given conversation state.
+        Return assistant message and usage stats given conversation state.
 
         Returns:
-            Tuple of (response_text, usage_stats)
+            Tuple of (response_message, usage_stats)
         """
         ...
 
@@ -53,6 +55,7 @@ class Provider(Protocol):
         model: str,
         system_prompt: str,
         messages: list[Message],
+        tools: list["Tool"] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
@@ -75,10 +78,11 @@ class Provider(Protocol):
         model: str,
         system_prompt: str,
         messages: list[Message],
+        tools: list["Tool"] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> tuple[str, "UsageStats"]:
+    ) -> tuple[Message, "UsageStats"]:
         """
         Async version of complete().
 
@@ -86,7 +90,7 @@ class Provider(Protocol):
         the agent will fall back to running the sync version in an executor.
 
         Returns:
-            Tuple of (response_text, usage_stats)
+            Tuple of (response_message, usage_stats)
         """
         ...
 
@@ -96,6 +100,7 @@ class Provider(Protocol):
         model: str,
         system_prompt: str,
         messages: list[Message],
+        tools: list["Tool"] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,

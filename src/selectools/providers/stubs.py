@@ -6,7 +6,7 @@ This provider doesn't call any external API and simply echoes user messages.
 
 from __future__ import annotations
 
-from typing import AsyncGenerator, AsyncIterable, Iterable, List
+from typing import Any, AsyncGenerator, AsyncIterable, Iterable, List
 
 from ..types import Message, Role
 from ..usage import UsageStats
@@ -31,13 +31,14 @@ class LocalProvider(Provider):
         model: str,
         system_prompt: str,
         messages: List[Message],
+        tools: List[Any] | None = None,  # Type Any to avoid circular import dynamically
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> tuple[str, UsageStats]:
+    ) -> tuple[Message, UsageStats]:
         last_user = next((m for m in reversed(messages) if m.role == Role.USER), None)
         user_text = last_user.content if last_user else ""
-        response = f"[local provider: {model}] {user_text or 'No user message provided.'}"
+        response_text = f"[local provider: {model}] {user_text or 'No user message provided.'}"
 
         # Create dummy usage stats
         usage_stats = UsageStats(
@@ -48,7 +49,8 @@ class LocalProvider(Provider):
             model=model,
             provider="local",
         )
-        return response, usage_stats
+        response_msg = Message(role=Role.ASSISTANT, content=response_text)
+        return response_msg, usage_stats
 
     def stream(
         self,
@@ -56,18 +58,21 @@ class LocalProvider(Provider):
         model: str,
         system_prompt: str,
         messages: List[Message],
+        tools: List[Any] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
     ) -> Iterable[str]:
-        text, _ = self.complete(
+        response_msg, _ = self.complete(
             model=model,
             system_prompt=system_prompt,
             messages=messages,
+            tools=tools,
             temperature=temperature,
             max_tokens=max_tokens,
             timeout=timeout,
         )
+        text = response_msg.content
         for token in text.split():
             yield token + " "
 
@@ -78,10 +83,11 @@ class LocalProvider(Provider):
         model: str,
         system_prompt: str,
         messages: List[Message],
+        tools: List[Any] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> tuple[str, UsageStats]:
+    ) -> tuple[Message, UsageStats]:
         raise NotImplementedError("LocalProvider does not support async operations")
 
     async def astream(
@@ -90,6 +96,7 @@ class LocalProvider(Provider):
         model: str,
         system_prompt: str,
         messages: List[Message],
+        tools: List[Any] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,

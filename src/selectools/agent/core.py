@@ -177,10 +177,21 @@ class Agent:
                 iteration += 1
                 self._call_hook("on_iteration_start", iteration, self._history)
 
-                response_text = self._call_provider(stream_handler=stream_handler)
-                parse_result = self.parser.parse(response_text)
+                response_msg = self._call_provider(stream_handler=stream_handler)
+                response_text = response_msg.content
 
-                if not parse_result.tool_call:
+                # Determine tools to call
+                tool_calls_to_execute = []
+                if response_msg.tool_calls:
+                    # Native tool calls
+                    tool_calls_to_execute = response_msg.tool_calls
+                else:
+                    # Fallback to regex parsing for text-only responses
+                    parse_result = self.parser.parse(response_text)
+                    if parse_result.tool_call:
+                        tool_calls_to_execute.append(parse_result.tool_call)
+
+                if not tool_calls_to_execute:
                     final_response = Message(role=Role.ASSISTANT, content=response_text)
                     self._call_hook("on_iteration_end", iteration, response_text)
                     # Save final response to memory if available
@@ -195,83 +206,94 @@ class Agent:
                         tool_calls=all_tool_calls,
                     )
 
-                tool_name = parse_result.tool_call.tool_name
-                parameters = parse_result.tool_call.parameters
-                all_tool_calls.append(parse_result.tool_call)
-                last_tool_name = tool_name
-                last_tool_args = parameters
+                # Execute tool calls (support multiple in future, currently loop structure handles parsing single)
+                # But here we might have multiple from native.
+                # If we have multiple, we should execute all.
+                # Assuming standard Agent behavior: execute all, then loop.
+                # However, our loop logic is "one iteration = one LLM call + tool executions".
 
-                if self.config.verbose:
-                    print(f"[agent] Iteration {iteration}: tool={tool_name} params={parameters}")
+                # We need to append the ASSISTANT message (with tool_calls) to history once.
+                # Then append TOOL messages for each result.
 
-                tool = self._tools_by_name.get(tool_name)
-                if not tool:
-                    error_message = f"Unknown tool '{tool_name}'. Available tools: {', '.join(self._tools_by_name.keys())}"
-                    self._append_assistant_and_tool(response_text, error_message, tool_name)
-                    self._call_hook("on_iteration_end", iteration, response_text)
-                    continue
+                self._history.append(response_msg)
+                if self.memory:
+                    self.memory.add(response_msg)
 
-                try:
-                    start_time = time.time()
-                    self._call_hook("on_tool_start", tool_name, parameters)
+                for tool_call in tool_calls_to_execute:
+                    tool_name = tool_call.tool_name
+                    parameters = tool_call.parameters
+                    all_tool_calls.append(tool_call)
+                    last_tool_name = tool_name
+                    last_tool_args = parameters
 
-                    # Create chunk callback for streaming tools
-                    chunk_counter = {"count": 0}
-
-                    def chunk_callback(chunk: str) -> None:
-                        chunk_counter["count"] += 1
-                        self._call_hook("on_tool_chunk", tool_name, chunk)
-
-                    result = self._execute_tool_with_timeout(tool, parameters, chunk_callback)
-                    duration = time.time() - start_time
-                    self._call_hook("on_tool_end", tool_name, result, duration)
-
-                    # Track analytics if enabled
-                    if self.analytics:
-                        self.analytics.record_tool_call(
-                            tool_name=tool.name,
-                            success=True,
-                            duration=duration,
-                            params=parameters,
-                            cost=0.0,  # TODO: attribute cost per tool in future
-                            chunk_count=chunk_counter["count"],
+                    if self.config.verbose:
+                        print(
+                            f"[agent] Iteration {iteration}: tool={tool_name} params={parameters}"
                         )
 
-                    # Track tool usage
-                    if self.usage.iterations:
-                        last_iteration = self.usage.iterations[-1]
-                        # Update the most recent iteration with the tool name
-                        if tool.name not in self.usage.tool_usage:
-                            self.usage.tool_usage[tool.name] = 0
-                            self.usage.tool_tokens[tool.name] = 0
-                        self.usage.tool_usage[tool.name] += 1
-                        self.usage.tool_tokens[tool.name] += last_iteration.total_tokens
-                except Exception as exc:  # noqa: BLE001
-                    duration = time.time() - start_time
-                    self._call_hook("on_tool_error", tool.name, exc, parameters)
+                    tool = self._tools_by_name.get(tool_name)
+                    if not tool:
+                        error_message = f"Unknown tool '{tool_name}'. Available tools: {', '.join(self._tools_by_name.keys())}"
+                        self._append_tool_result(error_message, tool_name, tool_call.id)
+                        self._call_hook("on_iteration_end", iteration, response_text)
+                        continue
 
-                    # Track analytics for failed call if enabled
-                    if self.analytics:
-                        self.analytics.record_tool_call(
-                            tool_name=tool.name,
-                            success=False,
-                            duration=duration,
-                            params=parameters,
-                            cost=0.0,
-                            chunk_count=(
-                                chunk_counter.get("count", 0) if "chunk_counter" in locals() else 0
-                            ),
+                    try:
+                        start_time = time.time()
+                        self._call_hook("on_tool_start", tool_name, parameters)
+
+                        # Create chunk callback for streaming tools
+                        chunk_counter = {"count": 0}
+
+                        def chunk_callback(chunk: str) -> None:
+                            chunk_counter["count"] += 1
+                            self._call_hook("on_tool_chunk", tool_name, chunk)
+
+                        result = self._execute_tool_with_timeout(tool, parameters, chunk_callback)
+                        duration = time.time() - start_time
+                        self._call_hook("on_tool_end", tool_name, result, duration)
+
+                        # Track analytics/usage (simplified for bulk)
+                        if self.analytics:
+                            self.analytics.record_tool_call(
+                                tool_name=tool.name,
+                                success=True,
+                                duration=duration,
+                                params=parameters,
+                                cost=0.0,
+                                chunk_count=chunk_counter["count"],
+                            )
+                        if self.usage.iterations:
+                            self.usage.tool_usage[tool.name] = (
+                                self.usage.tool_usage.get(tool.name, 0) + 1
+                            )
+                            self.usage.tool_tokens[tool.name] = (
+                                self.usage.tool_tokens.get(tool.name, 0)
+                                + self.usage.iterations[-1].total_tokens
+                            )
+
+                        self._append_tool_result(
+                            result, tool_name, tool_call.id, tool_result=result
                         )
 
-                    error_message = f"Error executing tool '{tool.name}': {exc}"
-                    self._append_assistant_and_tool(response_text, error_message, tool.name)
-                    self._call_hook("on_iteration_end", iteration, response_text)
-                    continue
+                    except Exception as exc:
+                        duration = time.time() - start_time
+                        self._call_hook("on_tool_error", tool_name, exc, parameters)
+                        if self.analytics:
+                            self.analytics.record_tool_call(
+                                tool_name=tool.name,
+                                success=False,
+                                duration=duration,
+                                params=parameters,
+                                cost=0.0,
+                                chunk_count=0,
+                            )
 
-                self._append_assistant_and_tool(
-                    response_text, result, tool.name, tool_result=result
-                )
+                        error_message = f"Error executing tool '{tool_name}': {exc}"
+                        self._append_tool_result(error_message, tool_name, tool_call.id)
+
                 self._call_hook("on_iteration_end", iteration, response_text)
+                continue  # Continue to next iteration
 
             final_response = Message(
                 role=Role.ASSISTANT,
@@ -292,7 +314,7 @@ class Agent:
             self._call_hook("on_error", exc, {"messages": messages, "iteration": iteration})
             raise
 
-    def _call_provider(self, stream_handler: Optional[Callable[[str], None]] = None) -> str:
+    def _call_provider(self, stream_handler: Optional[Callable[[str], None]] = None) -> Message:
         attempts = 0
         last_error: Optional[str] = None
 
@@ -306,16 +328,19 @@ class Agent:
                     self._call_hook(
                         "on_llm_end", response_text, None
                     )  # No usage stats for streaming
-                    return response_text
+                    # For streaming, we currently construct a text-only Message
+                    return Message(role=Role.ASSISTANT, content=response_text)
 
-                response_text, usage_stats = self.provider.complete(
+                response_msg, usage_stats = self.provider.complete(
                     model=self.config.model,
                     system_prompt=self._system_prompt,
                     messages=self._history,
+                    tools=self.tools,
                     temperature=self.config.temperature,
                     max_tokens=self.config.max_tokens,
                     timeout=self.config.request_timeout,
                 )
+                response_text = response_msg.content
 
                 # Track usage (tool name will be added later after parsing)
                 self.usage.add_usage(usage_stats, tool_name=None)
@@ -340,7 +365,7 @@ class Agent:
                         f"cost: ${usage_stats.cost_usd:.6f}"
                     )
 
-                return response_text
+                return response_msg
             except ProviderError as exc:
                 last_error = str(exc)
                 if self.config.verbose:
@@ -357,7 +382,9 @@ class Agent:
                 if self.config.retry_backoff_seconds:
                     time.sleep(self.config.retry_backoff_seconds * attempts)
 
-        return f"Provider error: {last_error or 'unknown error'}"
+        return Message(
+            role=Role.ASSISTANT, content=f"Provider error: {last_error or 'unknown error'}"
+        )
 
     def _streaming_call(self, stream_handler: Optional[Callable[[str], None]] = None) -> str:
         if not getattr(self.provider, "supports_streaming", False):
@@ -380,28 +407,24 @@ class Agent:
 
         return "".join(aggregated)
 
-    def _append_assistant_and_tool(
+    def _append_tool_result(
         self,
-        assistant_content: str,
         tool_content: str,
         tool_name: str,
+        tool_call_id: Optional[str] = None,
         tool_result: Optional[str] = None,
     ) -> None:
-        """Update history with assistant response and tool output."""
-        assistant_msg = Message(role=Role.ASSISTANT, content=assistant_content)
+        """Update history with tool output."""
         tool_msg = Message(
             role=Role.TOOL,
             content=tool_content,
             tool_name=tool_name,
             tool_result=tool_result,
+            tool_call_id=tool_call_id,
         )
-
-        self._history.append(assistant_msg)
         self._history.append(tool_msg)
-
-        # Also add to memory if available
         if self.memory:
-            self.memory.add_many([assistant_msg, tool_msg])
+            self.memory.add(tool_msg)
 
     def _execute_tool_with_timeout(
         self, tool: Tool, parameters: dict, chunk_callback: Optional[Callable[[str], None]] = None
@@ -460,10 +483,21 @@ class Agent:
                 iteration += 1
                 self._call_hook("on_iteration_start", iteration, self._history)
 
-                response_text = await self._acall_provider(stream_handler=stream_handler)
-                parse_result = self.parser.parse(response_text)
+                response_msg = await self._acall_provider(stream_handler=stream_handler)
+                response_text = response_msg.content
 
-                if not parse_result.tool_call:
+                # Determine tools to call
+                tool_calls_to_execute = []
+                if response_msg.tool_calls:
+                    # Native tool calls
+                    tool_calls_to_execute = response_msg.tool_calls
+                else:
+                    # Fallback to regex parsing for text-only responses
+                    parse_result = self.parser.parse(response_text)
+                    if parse_result.tool_call:
+                        tool_calls_to_execute.append(parse_result.tool_call)
+
+                if not tool_calls_to_execute:
                     final_response = Message(role=Role.ASSISTANT, content=response_text)
                     self._call_hook("on_iteration_end", iteration, response_text)
                     if self.memory:
@@ -477,75 +511,77 @@ class Agent:
                         tool_calls=all_tool_calls,
                     )
 
-                tool_name = parse_result.tool_call.tool_name
-                parameters = parse_result.tool_call.parameters
-                all_tool_calls.append(parse_result.tool_call)
-                last_tool_name = tool_name
-                last_tool_args = parameters
+                # Execute tool calls
+                self._history.append(response_msg)
+                if self.memory:
+                    self.memory.add(response_msg)
 
-                if self.config.verbose:
-                    print(f"[agent] Iteration {iteration}: tool={tool_name} params={parameters}")
+                for tool_call in tool_calls_to_execute:
+                    tool_name = tool_call.tool_name
+                    parameters = tool_call.parameters
+                    all_tool_calls.append(tool_call)
+                    last_tool_name = tool_name
+                    last_tool_args = parameters
 
-                tool = self._tools_by_name.get(tool_name)
-                if not tool:
-                    error_message = f"Unknown tool '{tool_name}'. Available tools: {', '.join(self._tools_by_name.keys())}"
-                    self._append_assistant_and_tool(response_text, error_message, tool_name)
-                    self._call_hook("on_iteration_end", iteration, response_text)
-                    continue
-
-                try:
-                    start_time = time.time()
-                    self._call_hook("on_tool_start", tool_name, parameters)
-
-                    # Create chunk callback for streaming tools
-                    chunk_counter = {"count": 0}
-
-                    def chunk_callback(chunk: str) -> None:
-                        chunk_counter["count"] += 1
-                        self._call_hook("on_tool_chunk", tool_name, chunk)
-
-                    result = await self._aexecute_tool_with_timeout(
-                        tool, parameters, chunk_callback
-                    )
-                    duration = time.time() - start_time
-                    self._call_hook("on_tool_end", tool_name, result, duration)
-
-                    # Track analytics if enabled
-                    if self.analytics:
-                        self.analytics.record_tool_call(
-                            tool_name=tool.name,
-                            success=True,
-                            duration=duration,
-                            params=parameters,
-                            cost=0.0,  # TODO: attribute cost per tool in future
-                            chunk_count=chunk_counter["count"],
-                        )
-                except Exception as exc:
-                    duration = time.time() - start_time
-                    self._call_hook("on_tool_error", tool.name, exc, parameters)
-
-                    # Track analytics for failed call if enabled
-                    if self.analytics:
-                        self.analytics.record_tool_call(
-                            tool_name=tool.name,
-                            success=False,
-                            duration=duration,
-                            params=parameters,
-                            cost=0.0,
-                            chunk_count=(
-                                chunk_counter.get("count", 0) if "chunk_counter" in locals() else 0
-                            ),
+                    if self.config.verbose:
+                        print(
+                            f"[agent] Iteration {iteration}: tool={tool_name} params={parameters}"
                         )
 
-                    error_message = f"Error executing tool '{tool.name}': {exc}"
-                    self._append_assistant_and_tool(response_text, error_message, tool.name)
-                    self._call_hook("on_iteration_end", iteration, response_text)
-                    continue
+                    tool = self._tools_by_name.get(tool_name)
+                    if not tool:
+                        error_message = f"Unknown tool '{tool_name}'. Available tools: {', '.join(self._tools_by_name.keys())}"
+                        self._append_tool_result(error_message, tool_name, tool_call.id)
+                        self._call_hook("on_iteration_end", iteration, response_text)
+                        continue
 
-                self._append_assistant_and_tool(
-                    response_text, result, tool.name, tool_result=result
-                )
-                self._call_hook("on_iteration_end", iteration, response_text)
+                    try:
+                        start_time = time.time()
+                        self._call_hook("on_tool_start", tool_name, parameters)
+
+                        # Create chunk callback for streaming tools
+                        chunk_counter = {"count": 0}
+
+                        def chunk_callback(chunk: str) -> None:
+                            chunk_counter["count"] += 1
+                            self._call_hook("on_tool_chunk", tool_name, chunk)
+
+                        result = await self._aexecute_tool_with_timeout(
+                            tool, parameters, chunk_callback
+                        )
+                        duration = time.time() - start_time
+                        self._call_hook("on_tool_end", tool_name, result, duration)
+
+                        if self.analytics:
+                            self.analytics.record_tool_call(
+                                tool_name=tool.name,
+                                success=True,
+                                duration=duration,
+                                params=parameters,
+                                cost=0.0,
+                                chunk_count=chunk_counter["count"],
+                            )
+                    except Exception as exc:
+                        duration = time.time() - start_time
+                        self._call_hook("on_tool_error", tool.name, exc, parameters)
+
+                        if self.analytics:
+                            self.analytics.record_tool_call(
+                                tool_name=tool.name,
+                                success=False,
+                                duration=duration,
+                                params=parameters,
+                                cost=0.0,
+                                chunk_count=chunk_counter.get("count", 0),
+                            )
+
+                        error_message = f"Error executing tool '{tool.name}': {exc}"
+                        self._append_tool_result(error_message, tool_name, tool_call.id)
+                        self._call_hook("on_iteration_end", iteration, response_text)
+                        continue
+
+                    self._append_tool_result(result, tool_name, tool_call.id, tool_result=result)
+                    self._call_hook("on_iteration_end", iteration, response_text)
 
             final_response = Message(
                 role=Role.ASSISTANT,
@@ -565,7 +601,9 @@ class Agent:
             self._call_hook("on_error", exc, {"messages": messages, "iteration": iteration})
             raise
 
-    async def _acall_provider(self, stream_handler: Optional[Callable[[str], None]] = None) -> str:
+    async def _acall_provider(
+        self, stream_handler: Optional[Callable[[str], None]] = None
+    ) -> Message:
         """Async version of _call_provider with retry logic."""
         attempts = 0
         last_error: Optional[str] = None
@@ -578,35 +616,41 @@ class Agent:
                 if self.config.stream and getattr(self.provider, "supports_streaming", False):
                     response_text = await self._astreaming_call(stream_handler=stream_handler)
                     self._call_hook("on_llm_end", response_text, None)
-                    return response_text
+                    self._call_hook("on_llm_end", response_text, None)
+                    return Message(role=Role.ASSISTANT, content=response_text)
 
                 # Check if provider has async support
                 if hasattr(self.provider, "acomplete") and getattr(
                     self.provider, "supports_async", False
                 ):
-                    response_text, usage_stats = await self.provider.acomplete(
+                    response_msg, usage_stats = await self.provider.acomplete(
                         model=self.config.model,
                         system_prompt=self._system_prompt,
                         messages=self._history,
+                        tools=self.tools,
                         temperature=self.config.temperature,
                         max_tokens=self.config.max_tokens,
                         timeout=self.config.request_timeout,
                     )
+                    response_text = response_msg.content
                 else:
                     # Fallback to sync in executor
                     loop = asyncio.get_event_loop()
                     with ThreadPoolExecutor() as executor:
-                        response_text, usage_stats = await loop.run_in_executor(
+                        response_msg, usage_stats = await loop.run_in_executor(
                             executor,
                             lambda: self.provider.complete(
                                 model=self.config.model,
                                 system_prompt=self._system_prompt,
                                 messages=self._history,
+                                tools=self.tools,
                                 temperature=self.config.temperature,
                                 max_tokens=self.config.max_tokens,
                                 timeout=self.config.request_timeout,
                             ),
                         )
+                    # Sync calls return tuple[Message, UsageStats]
+                    response_text = response_msg.content
 
                 # Track usage
                 self.usage.add_usage(usage_stats, tool_name=None)
@@ -631,7 +675,7 @@ class Agent:
                         f"cost: ${usage_stats.cost_usd:.6f}"
                     )
 
-                return response_text
+                return response_msg
             except ProviderError as exc:
                 last_error = str(exc)
                 if self.config.verbose:
@@ -648,7 +692,9 @@ class Agent:
                 if self.config.retry_backoff_seconds:
                     await asyncio.sleep(self.config.retry_backoff_seconds * attempts)
 
-        return f"Provider error: {last_error or 'unknown error'}"
+        return Message(
+            role=Role.ASSISTANT, content=f"Provider error: {last_error or 'unknown error'}"
+        )
 
     async def _astreaming_call(self, stream_handler: Optional[Callable[[str], None]] = None) -> str:
         """Async version of _streaming_call."""

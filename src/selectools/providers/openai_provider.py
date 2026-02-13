@@ -4,15 +4,20 @@ OpenAI provider adapter for the tool-calling library.
 
 from __future__ import annotations
 
+import json
 import os
-from typing import Any, AsyncIterable, Dict, Iterable, List, cast
+from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, Iterable, List, cast
 
 from ..env import load_default_env
 from ..exceptions import ProviderConfigurationError
 from ..models import OpenAI as OpenAIModels
 from ..pricing import calculate_cost
-from ..types import Message, Role
+from ..types import Message, Role, ToolCall
 from ..usage import UsageStats
+
+if TYPE_CHECKING:
+    from ..tools.base import Tool
+
 from .base import Provider, ProviderError
 
 
@@ -50,28 +55,47 @@ class OpenAIProvider(Provider):
         model: str,
         system_prompt: str,
         messages: List[Message],
+        tools: List[Tool] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> tuple[str, UsageStats]:
+    ) -> tuple[Message, UsageStats]:
         formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
         model_name = model or self.default_model
 
+        args: Dict[str, Any] = {
+            "model": model_name,
+            "messages": cast(Any, formatted),
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "timeout": timeout,
+        }
+
+        if tools:
+            args["tools"] = [self._map_tool_to_openai(t) for t in tools]
+
         try:
-            response = cast(
-                Any,
-                self._client.chat.completions.create(
-                    model=model_name,
-                    messages=cast(Any, formatted),
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    timeout=timeout,
-                ),
-            )
+            response = cast(Any, self._client.chat.completions.create(**args))
         except Exception as exc:  # noqa: BLE001
             raise ProviderError(f"OpenAI completion failed: {exc}") from exc
 
-        content = response.choices[0].message.content
+        message = response.choices[0].message
+        content = message.content
+        tool_calls: List[ToolCall] = []
+
+        if message.tool_calls:
+            for tc in message.tool_calls:
+                try:
+                    params = json.loads(tc.function.arguments)
+                except json.JSONDecodeError:
+                    params = {}
+                tool_calls.append(
+                    ToolCall(
+                        tool_name=tc.function.name,
+                        parameters=params,
+                        id=tc.id,
+                    )
+                )
 
         # Extract usage stats
         usage = response.usage
@@ -88,7 +112,14 @@ class OpenAIProvider(Provider):
             provider="openai",
         )
 
-        return content or "", usage_stats
+        return (
+            Message(
+                role=Role.ASSISTANT,
+                content=content or "",
+                tool_calls=tool_calls or None,
+            ),
+            usage_stats,
+        )
 
     def stream(
         self,
@@ -96,6 +127,7 @@ class OpenAIProvider(Provider):
         model: str,
         system_prompt: str,
         messages: List[Message],
+        tools: List[Tool] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
@@ -158,6 +190,13 @@ class OpenAIProvider(Provider):
             ]
         return message.content
 
+    def _map_tool_to_openai(self, tool: Tool) -> Dict[str, Any]:
+        """Convert a selectools.Tool to OpenAI tool schema."""
+        return {
+            "type": "function",
+            "function": tool.schema(),
+        }
+
     # Async methods
     async def acomplete(
         self,
@@ -165,29 +204,48 @@ class OpenAIProvider(Provider):
         model: str,
         system_prompt: str,
         messages: List[Message],
+        tools: List[Tool] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> tuple[str, UsageStats]:
+    ) -> tuple[Message, UsageStats]:
         """Async version of complete() using AsyncOpenAI client."""
         formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
         model_name = model or self.default_model
 
+        args: Dict[str, Any] = {
+            "model": model_name,
+            "messages": cast(Any, formatted),
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "timeout": timeout,
+        }
+
+        if tools:
+            args["tools"] = [self._map_tool_to_openai(t) for t in tools]
+
         try:
-            response = cast(
-                Any,
-                await self._async_client.chat.completions.create(
-                    model=model_name,
-                    messages=cast(Any, formatted),
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    timeout=timeout,
-                ),
-            )
+            response = cast(Any, await self._async_client.chat.completions.create(**args))
         except Exception as exc:
             raise ProviderError(f"OpenAI async completion failed: {exc}") from exc
 
-        content = response.choices[0].message.content
+        message = response.choices[0].message
+        content = message.content
+        tool_calls: List[ToolCall] = []
+
+        if message.tool_calls:
+            for tc in message.tool_calls:
+                try:
+                    params = json.loads(tc.function.arguments)
+                except json.JSONDecodeError:
+                    params = {}
+                tool_calls.append(
+                    ToolCall(
+                        tool_name=tc.function.name,
+                        parameters=params,
+                        id=tc.id,
+                    )
+                )
 
         # Extract usage stats
         usage = response.usage
@@ -204,7 +262,14 @@ class OpenAIProvider(Provider):
             provider="openai",
         )
 
-        return content or "", usage_stats
+        return (
+            Message(
+                role=Role.ASSISTANT,
+                content=content or "",
+                tool_calls=tool_calls or None,
+            ),
+            usage_stats,
+        )
 
     async def astream(
         self,
@@ -212,6 +277,7 @@ class OpenAIProvider(Provider):
         model: str,
         system_prompt: str,
         messages: List[Message],
+        tools: List[Tool] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
