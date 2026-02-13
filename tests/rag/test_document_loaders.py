@@ -25,7 +25,7 @@ from selectools.rag.loaders import DocumentLoader
 @pytest.fixture
 def fixtures_dir():
     """Get path to fixtures directory."""
-    return Path(__file__).parent / "fixtures"
+    return Path(__file__).parents[1] / "fixtures"
 
 
 @pytest.fixture

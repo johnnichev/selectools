@@ -5,7 +5,7 @@ OpenAI provider adapter for the tool-calling library.
 from __future__ import annotations
 
 import os
-from typing import List
+from typing import Any, AsyncIterable, Dict, Iterable, List, cast
 
 from ..env import load_default_env
 from ..exceptions import ProviderConfigurationError
@@ -58,12 +58,15 @@ class OpenAIProvider(Provider):
         model_name = model or self.default_model
 
         try:
-            response = self._client.chat.completions.create(
-                model=model_name,
-                messages=formatted,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                timeout=timeout,
+            response = cast(
+                Any,
+                self._client.chat.completions.create(
+                    model=model_name,
+                    messages=cast(Any, formatted),
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    timeout=timeout,
+                ),
             )
         except Exception as exc:  # noqa: BLE001
             raise ProviderError(f"OpenAI completion failed: {exc}") from exc
@@ -96,19 +99,22 @@ class OpenAIProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ):
+    ) -> Iterable[str]:
         """Stream response chunks. Note: Does not return usage stats."""
         formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
         model_name = model or self.default_model
 
         try:
-            response = self._client.chat.completions.create(
-                model=model_name,
-                messages=formatted,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                stream=True,
-                timeout=timeout,
+            response = cast(
+                Any,
+                self._client.chat.completions.create(
+                    model=model_name,
+                    messages=cast(Any, formatted),
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    stream=True,
+                    timeout=timeout,
+                ),
             )
         except Exception as exc:  # noqa: BLE001
             raise ProviderError(f"OpenAI streaming failed: {exc}") from exc
@@ -127,8 +133,8 @@ class OpenAIProvider(Provider):
             except Exception as exc:  # noqa: BLE001
                 raise ProviderError(f"OpenAI stream parsing failed: {exc}") from exc
 
-    def _format_messages(self, system_prompt: str, messages: List[Message]):
-        payload = [{"role": "system", "content": system_prompt}]
+    def _format_messages(self, system_prompt: str, messages: List[Message]) -> List[dict]:
+        payload: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
         for message in messages:
             role = message.role.value
             if role == Role.TOOL.value:
@@ -141,7 +147,7 @@ class OpenAIProvider(Provider):
             )
         return payload
 
-    def _format_content(self, message: Message):
+    def _format_content(self, message: Message) -> str | List[Any]:
         if message.image_base64:
             return [
                 {"type": "text", "text": message.content},
@@ -168,12 +174,15 @@ class OpenAIProvider(Provider):
         model_name = model or self.default_model
 
         try:
-            response = await self._async_client.chat.completions.create(
-                model=model_name,
-                messages=formatted,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                timeout=timeout,
+            response = cast(
+                Any,
+                await self._async_client.chat.completions.create(
+                    model=model_name,
+                    messages=cast(Any, formatted),
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    timeout=timeout,
+                ),
             )
         except Exception as exc:
             raise ProviderError(f"OpenAI async completion failed: {exc}") from exc
@@ -206,7 +215,7 @@ class OpenAIProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ):
+    ) -> AsyncIterable[str]:
         """
         Async version of stream() using AsyncOpenAI client.
 
@@ -218,14 +227,17 @@ class OpenAIProvider(Provider):
         model_name = model or self.default_model
 
         try:
-            response = await self._async_client.chat.completions.create(
-                model=model_name,
-                messages=formatted,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                stream=True,
-                stream_options={"include_usage": True},  # Get usage stats with streaming
-                timeout=timeout,
+            response = cast(
+                Any,
+                await self._async_client.chat.completions.create(
+                    model=model_name,
+                    messages=cast(Any, formatted),
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    stream=True,
+                    stream_options={"include_usage": True},  # Get usage stats with streaming
+                    timeout=timeout,
+                ),
             )
         except Exception as exc:
             raise ProviderError(f"OpenAI async streaming failed: {exc}") from exc

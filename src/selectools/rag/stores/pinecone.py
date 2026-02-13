@@ -50,8 +50,8 @@ class PineconeVectorStore(VectorStore):
         namespace: str = "",
         api_key: Optional[str] = None,
         environment: Optional[str] = None,
-        **pinecone_kwargs,
-    ):
+        **pinecone_kwargs: Any,
+    ) -> None:
         """
         Initialize Pinecone vector store.
 

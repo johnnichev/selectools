@@ -33,7 +33,7 @@ class UsageStats:
     embedding_tokens: int = 0
     embedding_cost_usd: float = 0.0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Ensure total_tokens is consistent."""
         if self.total_tokens == 0 and (self.prompt_tokens or self.completion_tokens):
             self.total_tokens = self.prompt_tokens + self.completion_tokens

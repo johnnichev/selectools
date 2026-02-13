@@ -16,7 +16,7 @@ from selectools.analytics import AgentAnalytics, ToolMetrics
 
 tests_dir = Path(__file__).parent
 sys.path.insert(0, str(tests_dir))
-from test_framework import FakeProvider  # noqa: E402
+from tests.core.test_framework import FakeProvider  # noqa: E402
 
 
 @pytest.fixture

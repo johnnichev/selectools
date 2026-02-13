@@ -4,7 +4,7 @@ Provider abstraction for model-agnostic tool calling.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, AsyncIterable, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, AsyncIterable, Iterable, Protocol, runtime_checkable
 
 from ..types import Message
 
@@ -56,7 +56,7 @@ class Provider(Protocol):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ):
+    ) -> Iterable[str]:
         """
         Yield assistant text chunks for providers that support streaming.
 

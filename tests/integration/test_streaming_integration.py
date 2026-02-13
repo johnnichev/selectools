@@ -18,7 +18,7 @@ import pytest
 
 from selectools import Agent, AgentConfig, ConversationMemory, Message, Role, tool
 from selectools.providers.stubs import LocalProvider
-from tests.test_framework import FakeProvider
+from tests.core.test_framework import FakeProvider
 
 
 @tool(description="Simple streaming tool", streaming=True)

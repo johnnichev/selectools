@@ -6,7 +6,7 @@ This provider doesn't call any external API and simply echoes user messages.
 
 from __future__ import annotations
 
-from typing import Iterable, List
+from typing import AsyncGenerator, AsyncIterable, Iterable, List
 
 from ..types import Message, Role
 from ..usage import UsageStats
@@ -59,7 +59,7 @@ class LocalProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ):
+    ) -> Iterable[str]:
         text, _ = self.complete(
             model=model,
             system_prompt=system_prompt,
@@ -84,7 +84,7 @@ class LocalProvider(Provider):
     ) -> tuple[str, UsageStats]:
         raise NotImplementedError("LocalProvider does not support async operations")
 
-    def astream(
+    async def astream(
         self,
         *,
         model: str,
@@ -93,10 +93,11 @@ class LocalProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ):
+    ) -> AsyncIterable[str]:
         raise NotImplementedError("LocalProvider does not support async operations")
         # Make mypy happy with async generator type
-        yield ""  # pragma: no cover
+        if False:
+            yield ""  # pragma: no cover
 
 
 __all__ = ["LocalProvider"]

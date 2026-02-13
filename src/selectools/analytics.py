@@ -102,7 +102,7 @@ class AgentAnalytics:
         >>> analytics.to_csv("analytics.csv")
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize analytics tracker."""
         self._metrics: Dict[str, ToolMetrics] = {}
 

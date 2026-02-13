@@ -5,7 +5,7 @@ Anthropic provider adapter for the tool-calling library.
 from __future__ import annotations
 
 import os
-from typing import Iterable, List
+from typing import AsyncIterable, Iterable, List
 
 from ..env import load_default_env
 from ..exceptions import ProviderConfigurationError
@@ -88,7 +88,7 @@ class AnthropicProvider(Provider):
         if timeout is not None:
             request_args["timeout"] = timeout
         try:
-            response = self._client.messages.create(**request_args)
+            response = self._client.messages.create(**request_args)  # type: ignore
         except Exception as exc:
             raise ProviderError(f"Anthropic completion failed: {exc}") from exc
 
@@ -121,7 +121,7 @@ class AnthropicProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ):
+    ) -> Iterable[str]:
         """
         Stream responses from Anthropic's messages API.
 
@@ -140,7 +140,7 @@ class AnthropicProvider(Provider):
         if timeout is not None:
             request_args["timeout"] = timeout
         try:
-            stream = self._client.messages.create(**request_args)
+            stream = self._client.messages.create(**request_args)  # type: ignore
         except Exception as exc:
             raise ProviderError(f"Anthropic streaming failed: {exc}") from exc
 
@@ -154,7 +154,7 @@ class AnthropicProvider(Provider):
                 if text:
                     yield text
 
-    def _format_messages(self, messages: List[Message]):
+    def _format_messages(self, messages: List[Message]) -> List[dict]:
         """
         Format messages for Anthropic's API.
 
@@ -214,7 +214,7 @@ class AnthropicProvider(Provider):
         if timeout is not None:
             request_args["timeout"] = timeout
         try:
-            response = await self._async_client.messages.create(**request_args)
+            response = await self._async_client.messages.create(**request_args)  # type: ignore
         except Exception as exc:
             raise ProviderError(f"Anthropic async completion failed: {exc}") from exc
 
@@ -247,7 +247,7 @@ class AnthropicProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ):
+    ) -> AsyncIterable[str]:
         """Async version of stream() using AsyncAnthropic client."""
         payload = self._format_messages(messages)
         model_name = model or self.default_model
@@ -262,7 +262,7 @@ class AnthropicProvider(Provider):
         if timeout is not None:
             request_args["timeout"] = timeout
         try:
-            stream = await self._async_client.messages.create(**request_args)
+            stream = await self._async_client.messages.create(**request_args)  # type: ignore
         except Exception as exc:
             raise ProviderError(f"Anthropic async streaming failed: {exc}") from exc
 

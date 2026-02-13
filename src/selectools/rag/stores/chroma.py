@@ -48,8 +48,8 @@ class ChromaVectorStore(VectorStore):
         embedder: "EmbeddingProvider",  # noqa: F821
         collection_name: str = "selectools_docs",
         persist_directory: Optional[str] = None,
-        **chroma_kwargs,
-    ):
+        **chroma_kwargs: Any,
+    ) -> None:
         """
         Initialize Chroma vector store.
 
@@ -110,7 +110,7 @@ class ChromaVectorStore(VectorStore):
         metadatas = [doc.metadata for doc in documents]
 
         # Add to Chroma collection
-        self.collection.add(ids=ids, embeddings=embeddings, documents=texts, metadatas=metadatas)
+        self.collection.add(ids=ids, embeddings=embeddings, documents=texts, metadatas=metadatas)  # type: ignore
 
         return ids
 
@@ -140,7 +140,7 @@ class ChromaVectorStore(VectorStore):
 
         # Query Chroma
         results = self.collection.query(
-            query_embeddings=[query_embedding],
+            query_embeddings=[query_embedding],  # type: ignore
             n_results=top_k,
             where=where,
             include=["documents", "metadatas", "distances"],
@@ -148,11 +148,17 @@ class ChromaVectorStore(VectorStore):
 
         # Convert to SearchResult objects
         search_results = []
-        if results["ids"] and len(results["ids"][0]) > 0:
+        if (
+            results["ids"]
+            and len(results["ids"][0]) > 0
+            and results["documents"]
+            and results["metadatas"]
+            and results["distances"]
+        ):
             for i in range(len(results["ids"][0])):
                 doc = Document(
                     text=results["documents"][0][i],
-                    metadata=results["metadatas"][0][i] or {},
+                    metadata=results["metadatas"][0][i] or {},  # type: ignore
                 )
 
                 # Chroma returns distances, convert to similarity scores

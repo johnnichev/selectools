@@ -41,3 +41,6 @@ htmlcov/
 *_with_bbox.png
 
 .docs
+
+mypy_cache/
+mypy_output.txt

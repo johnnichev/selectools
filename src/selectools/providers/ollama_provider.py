@@ -4,7 +4,7 @@ Ollama provider adapter for local LLM inference.
 
 from __future__ import annotations
 
-from typing import List
+from typing import Any, AsyncIterable, Dict, Iterable, List, cast
 
 from ..models import Ollama as OllamaModels
 from ..types import Message, Role
@@ -93,12 +93,15 @@ class OllamaProvider(Provider):
         model_name = model or self.default_model
 
         try:
-            response = self._client.chat.completions.create(
-                model=model_name,
-                messages=formatted,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                timeout=timeout,
+            response = cast(
+                Any,
+                self._client.chat.completions.create(
+                    model=model_name,
+                    messages=cast(Any, formatted),
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    timeout=timeout,
+                ),
             )
         except Exception as exc:  # noqa: BLE001
             error_msg = str(exc)
@@ -133,19 +136,22 @@ class OllamaProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ):
+    ) -> Iterable[str]:
         """Stream response chunks. Note: Does not return usage stats."""
         formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
         model_name = model or self.default_model
 
         try:
-            response = self._client.chat.completions.create(
-                model=model_name,
-                messages=formatted,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                stream=True,
-                timeout=timeout,
+            response = cast(
+                Any,
+                self._client.chat.completions.create(
+                    model=model_name,
+                    messages=cast(Any, formatted),
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    stream=True,
+                    timeout=timeout,
+                ),
             )
         except Exception as exc:  # noqa: BLE001
             error_msg = str(exc)
@@ -156,7 +162,7 @@ class OllamaProvider(Provider):
                 ) from exc
             raise ProviderError(f"Ollama streaming failed: {exc}") from exc
 
-        for chunk in response:
+        for chunk in response:  # type: ignore
             try:
                 delta = chunk.choices[0].delta if chunk.choices else None
                 if not delta or not delta.content:
@@ -170,8 +176,8 @@ class OllamaProvider(Provider):
             except Exception as exc:  # noqa: BLE001
                 raise ProviderError(f"Ollama stream parsing failed: {exc}") from exc
 
-    def _format_messages(self, system_prompt: str, messages: List[Message]):
-        payload = [{"role": "system", "content": system_prompt}]
+    def _format_messages(self, system_prompt: str, messages: List[Message]) -> List[dict]:
+        payload: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
         for message in messages:
             role = message.role.value
             if role == Role.TOOL.value:
@@ -184,7 +190,7 @@ class OllamaProvider(Provider):
             )
         return payload
 
-    def _format_content(self, message: Message):
+    def _format_content(self, message: Message) -> str | List[Any]:
         if message.image_base64:
             # Ollama supports vision in some models (e.g., llava)
             return [
@@ -212,12 +218,15 @@ class OllamaProvider(Provider):
         model_name = model or self.default_model
 
         try:
-            response = await self._async_client.chat.completions.create(
-                model=model_name,
-                messages=formatted,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                timeout=timeout,
+            response = cast(
+                Any,
+                await self._async_client.chat.completions.create(
+                    model=model_name,
+                    messages=cast(Any, formatted),
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    timeout=timeout,
+                ),
             )
         except Exception as exc:
             error_msg = str(exc)
@@ -252,19 +261,22 @@ class OllamaProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ):
+    ) -> AsyncIterable[str]:
         """Async version of stream() using AsyncOpenAI client."""
         formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
         model_name = model or self.default_model
 
         try:
-            response = await self._async_client.chat.completions.create(
-                model=model_name,
-                messages=formatted,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                stream=True,
-                timeout=timeout,
+            response = cast(
+                Any,
+                await self._async_client.chat.completions.create(
+                    model=model_name,
+                    messages=cast(Any, formatted),
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    stream=True,
+                    timeout=timeout,
+                ),
             )
         except Exception as exc:
             error_msg = str(exc)
@@ -275,7 +287,7 @@ class OllamaProvider(Provider):
                 ) from exc
             raise ProviderError(f"Ollama async streaming failed: {exc}") from exc
 
-        async for chunk in response:
+        async for chunk in response:  # type: ignore
             try:
                 delta = chunk.choices[0].delta if chunk.choices else None
                 if not delta or not delta.content:

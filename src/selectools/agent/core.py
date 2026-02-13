@@ -7,103 +7,20 @@ from __future__ import annotations
 import asyncio
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
-from .analytics import AgentAnalytics
-from .parser import ToolCallParser
-from .prompt import PromptBuilder
-from .providers.base import Provider, ProviderError
-from .providers.openai_provider import OpenAIProvider
-from .tools import Tool
-from .types import AgentResult, Message, Role, ToolCall
-from .usage import AgentUsage
+from ..analytics import AgentAnalytics
+from ..parser import ToolCallParser
+from ..prompt import PromptBuilder
+from ..providers.base import Provider, ProviderError
+from ..providers.openai_provider import OpenAIProvider
+from ..tools import Tool
+from ..types import AgentResult, Message, Role, ToolCall
+from ..usage import AgentUsage
+from .config import AgentConfig
 
 if TYPE_CHECKING:
-    from .memory import ConversationMemory
-
-# Hook type definitions
-HookCallable = Callable[..., None]
-Hooks = Dict[str, HookCallable]
-
-
-@dataclass
-class AgentConfig:
-    """
-    Configuration options for customizing agent behavior.
-
-    Controls model selection, retry logic, timeouts, and verbosity for debugging.
-    Sensible defaults are provided for all options.
-
-    Attributes:
-        model: Model identifier to use (e.g., "gpt-4o", "claude-3-5-sonnet-20240620").
-        temperature: LLM temperature (0.0 = deterministic, higher = more creative). Default: 0.0.
-        max_tokens: Maximum tokens in LLM response. Default: 1000.
-        max_iterations: Maximum tool-calling iterations before stopping. Default: 6.
-        verbose: Print detailed logs for debugging. Default: False.
-        stream: Enable streaming responses (if provider supports it). Default: False.
-        request_timeout: Timeout for LLM API requests in seconds. Default: 30.0.
-        max_retries: Maximum retry attempts for failed LLM requests. Default: 2.
-        retry_backoff_seconds: Seconds to wait between retries (multiplied by attempt number). Default: 1.0.
-        rate_limit_cooldown_seconds: Cooldown period after rate limit errors. Default: 5.0.
-        tool_timeout_seconds: Maximum execution time for each tool call. None = no timeout. Default: None.
-        cost_warning_threshold: Print warning when total cost exceeds this USD amount. None = no warnings. Default: None.
-        system_prompt: Custom system instructions to replace the default prompt. Default: None (uses built-in instructions).
-        hooks: Optional dict of lifecycle hooks for observability. Default: None.
-               Available hooks:
-               - 'on_agent_start': Called at start of run/arun with (messages,)
-               - 'on_agent_end': Called at end with (response, usage)
-               - 'on_iteration_start': Called at start of each iteration with (iteration_num, messages)
-               - 'on_iteration_end': Called at end of each iteration with (iteration_num, response)
-               - 'on_tool_start': Called before tool execution with (tool_name, tool_args)
-               - 'on_tool_chunk': Called for each chunk from streaming tools with (tool_name, chunk)
-               - 'on_tool_end': Called after tool execution with (tool_name, result, duration)
-               - 'on_tool_error': Called on tool error with (tool_name, error, tool_args)
-               - 'on_llm_start': Called before LLM call with (messages, model)
-               - 'on_llm_end': Called after LLM call with (response, usage)
-               - 'on_error': Called on any error with (error, context)
-
-    Example:
-        >>> # Production config with retries and timeouts
-        >>> config = AgentConfig(
-        ...     model="gpt-4o-mini",
-        ...     temperature=0.3,
-        ...     max_tokens=2000,
-        ...     max_iterations=10,
-        ...     request_timeout=60.0,
-        ...     tool_timeout_seconds=30.0,
-        ... )
-        >>>
-        >>> # Debug config with verbose logging
-        >>> config = AgentConfig(verbose=True, stream=True)
-        >>>
-        >>> # Config with observability hooks
-        >>> def log_tool(name, args):
-        ...     print(f"Calling {name} with {args}")
-        >>>
-        >>> config = AgentConfig(
-        ...     hooks={
-        ...         'on_tool_start': log_tool,
-        ...         'on_tool_end': lambda name, result, dur: print(f"{name} took {dur:.2f}s"),
-        ...     }
-        ... )
-    """
-
-    model: str = "gpt-4o"
-    temperature: float = 0.0
-    max_tokens: int = 1000
-    max_iterations: int = 6
-    verbose: bool = False
-    stream: bool = False
-    request_timeout: Optional[float] = 30.0
-    max_retries: int = 2
-    retry_backoff_seconds: float = 1.0
-    rate_limit_cooldown_seconds: float = 5.0
-    tool_timeout_seconds: Optional[float] = None
-    cost_warning_threshold: Optional[float] = None
-    enable_analytics: bool = False
-    system_prompt: Optional[str] = None
-    hooks: Optional[Hooks] = None
+    from ..memory import ConversationMemory
 
 
 class Agent:
@@ -202,6 +119,15 @@ class Agent:
 
         self._system_prompt = self.prompt_builder.build(self.tools)
         self._history: List[Message] = []
+
+    def reset(self) -> None:
+        """Reset agent state for reuse. Clears history, usage stats, and memory."""
+        self._history = []
+        self.usage = AgentUsage()
+        if self.analytics:
+            self.analytics = AgentAnalytics()
+        if self.memory:
+            self.memory.clear()
 
     def _call_hook(self, hook_name: str, *args: Any, **kwargs: Any) -> None:
         """Safely call a hook if it exists, swallowing any exceptions."""
@@ -801,55 +727,10 @@ class Agent:
         """
         return str(self.usage)
 
-    def reset_usage(self) -> None:
-        """
-        Reset usage tracking statistics.
-
-        Useful when starting a new conversation or session while reusing
-        the same agent instance.
-        """
-        self.usage = AgentUsage()
-
-    def reset(self) -> None:
-        """
-        Fully reset agent state for reuse.
-
-        Clears conversation history, usage statistics, analytics, and
-        memory. The agent retains its tools, provider, and configuration.
-
-        Useful when reusing the same agent instance for independent requests
-        (e.g., in a web server where the agent is created once at startup).
-
-        Example:
-            >>> agent = Agent(tools=[search], provider=provider)
-            >>> agent.run([Message(role=Role.USER, content="First request")])
-            >>> agent.reset()  # Clean slate
-            >>> agent.run([Message(role=Role.USER, content="Second request")])
-        """
-        self._history = []
-        self.usage = AgentUsage()
-        if self.analytics:
-            self.analytics = AgentAnalytics()
-        if self.memory:
-            self.memory.clear()
-
-    def get_analytics(self) -> AgentAnalytics | None:
-        """
-        Get analytics tracker with tool usage metrics.
-
-        Returns:
-            AgentAnalytics instance if analytics are enabled, None otherwise.
-
-        Example:
-            >>> config = AgentConfig(enable_analytics=True)
-            >>> agent = Agent(tools=[...], provider=provider, config=config)
-            >>> agent.run([Message(role=Role.USER, content="Search for Python")])
-            >>>
-            >>> analytics = agent.get_analytics()
-            >>> print(analytics.summary())
-            >>> analytics.to_json("analytics.json")
-        """
+    def get_analytics(self) -> Optional[AgentAnalytics]:
+        """Get the analytics tracker if enabled."""
         return self.analytics
 
-
-__all__ = ["Agent", "AgentConfig"]
+    def reset_usage(self) -> None:
+        """Reset usage statistics."""
+        self.usage = AgentUsage()

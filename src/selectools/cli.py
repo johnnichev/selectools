@@ -17,6 +17,7 @@ from .agent import Agent, AgentConfig
 from .parser import ToolCallParser
 from .prompt import PromptBuilder
 from .providers.anthropic_provider import AnthropicProvider
+from .providers.base import Provider
 from .providers.gemini_provider import GeminiProvider
 from .providers.openai_provider import OpenAIProvider
 from .providers.stubs import LocalProvider
@@ -24,7 +25,7 @@ from .tools import Tool, ToolParameter, ToolRegistry
 from .types import Message, Role
 
 
-def _build_provider(name: str, model: str):
+def _build_provider(name: str, model: str) -> Provider:
     if name == "openai":
         return OpenAIProvider(default_model=model)
     if name == "anthropic":
@@ -52,7 +53,7 @@ def list_tools(tools: Dict[str, Tool]) -> None:
         print(f"- {schema['name']}: {schema['description']}")
 
 
-def run_agent(args, tools: Dict[str, Tool]) -> None:
+def run_agent(args: argparse.Namespace, tools: Dict[str, Tool]) -> None:
     provider = _build_provider(args.provider, args.model)
     selected_tools: List[Tool] = list(tools.values())
     if args.tool and args.tool in tools:
@@ -91,7 +92,7 @@ def run_agent(args, tools: Dict[str, Tool]) -> None:
         print(response.content)
 
 
-def interactive_chat(args, tools: Dict[str, Tool]) -> None:
+def interactive_chat(args: argparse.Namespace, tools: Dict[str, Tool]) -> None:
     provider = _build_provider(args.provider, args.model)
     config = AgentConfig(
         model=args.model,
@@ -126,7 +127,7 @@ def interactive_chat(args, tools: Dict[str, Tool]) -> None:
             messages=history,
             stream_handler=_stream_printer if args.stream else None,
         )
-        history.append(response)
+        history.append(response.message)
         if not args.stream:
             print(f"\nAI: {response.content}\n")
 

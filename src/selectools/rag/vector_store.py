@@ -27,7 +27,7 @@ class Document:
     metadata: Dict[str, Any] = field(default_factory=dict)
     embedding: Optional[List[float]] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize metadata if None."""
         if self.metadata is None:
             self.metadata = {}
@@ -113,7 +113,7 @@ class VectorStore(ABC):
 
     @staticmethod
     def create(
-        backend: str, embedder: "EmbeddingProvider", **kwargs
+        backend: str, embedder: "EmbeddingProvider", **kwargs: Any
     ) -> "VectorStore":  # noqa: F821
         """
         Factory method to create a vector store.

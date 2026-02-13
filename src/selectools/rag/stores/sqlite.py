@@ -48,7 +48,7 @@ class SQLiteVectorStore(VectorStore):
 
     def __init__(
         self, embedder: "EmbeddingProvider", db_path: str = "vector_store.db"
-    ):  # noqa: F821
+    ) -> None:  # noqa: F821
         """
         Initialize SQLite vector store.
 
@@ -60,7 +60,7 @@ class SQLiteVectorStore(VectorStore):
         self.db_path = db_path
         self._init_db()
 
-    def _init_db(self):
+    def _init_db(self) -> None:
         """Initialize the database schema."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()

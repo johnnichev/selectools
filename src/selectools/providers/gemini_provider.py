@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import base64
 import os
-from typing import List
+from typing import AsyncIterable, Iterable, List
 
 from ..env import load_default_env
 from ..exceptions import ProviderConfigurationError
@@ -129,7 +129,7 @@ class GeminiProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ):
+    ) -> Iterable[str]:
         """
         Stream responses from Gemini's generate_content_stream API.
 
@@ -262,7 +262,7 @@ class GeminiProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ):
+    ) -> AsyncIterable[str]:
         """
         Async version of stream() using client.aio.
 
