@@ -47,17 +47,17 @@ Focus: E2E streaming, parallel execution, and type safety.
 
 ---
 
-## v0.12.0: Advanced Data & RAG (Planned)
+## v0.12.0: Caching & Data (In Progress)
 
-Focus: Advanced RAG capabilities and caching.
+Focus: Response caching and advanced RAG capabilities.
 
-| Feature                      | Priority  | Notes                                                                  |
-| ---------------------------- | --------- | ---------------------------------------------------------------------- |
-| **Hybrid Search**            | 🟠 High   | Vector + BM25 keyword search                                           |
-| **Reranking Models**         | 🟡 Medium | Cohere/Jina rerankers for better search relevance                      |
-| **Advanced Chunking**        | 🟡 Medium | Agentic/Contextual document chunking                                   |
-| **Response Caching**         | 🟡 Medium | Built-in TTL/LRU caching for identical queries (Redis + In-Memory)     |
-| **Dynamic Tool Loading**     | 🟡 Medium | Hot-reload tools without restart                                       |
+| Feature                      | Status     | Notes                                                                  |
+| ---------------------------- | ---------- | ---------------------------------------------------------------------- |
+| **Response Caching**         | ✅ v0.12.0 | `InMemoryCache` (LRU+TTL) and `RedisCache`; `AgentConfig(cache=...)` |
+| **Hybrid Search**            | 🟡 Planned | Vector + BM25 keyword search                                           |
+| **Reranking Models**         | 🟡 Planned | Cohere/Jina rerankers for better search relevance                      |
+| **Advanced Chunking**        | 🟡 Planned | Agentic/Contextual document chunking                                   |
+| **Dynamic Tool Loading**     | 🟡 Planned | Hot-reload tools without restart                                       |
 
 ---
 
@@ -141,13 +141,20 @@ Focus: Stability, observability, and advanced orchestration.
 
 | Feature             | Status     | Notes                              |
 | ------------------- | ---------- | ---------------------------------- |
-| Caching Layer       | 🟡 Planned | LRU, semantic, distributed caching |
+| Caching Layer       | ✅ Implemented | `InMemoryCache` (LRU+TTL) + `RedisCache` |
 | Batch Processing    | 🟡 Planned | Efficient multi-request handling   |
 | Prompt Optimization | 🟡 Planned | Automatic prompt compression       |
 
 ---
 
 ## Release History
+
+### v0.12.0 - Response Caching
+
+- ✅ **InMemoryCache**: Thread-safe LRU + TTL cache with `OrderedDict`; zero dependencies
+- ✅ **RedisCache**: Distributed TTL cache for multi-process deployments (optional `redis` dep)
+- ✅ **CacheKeyBuilder**: Deterministic SHA-256 keys from (model, prompt, messages, tools, temperature)
+- ✅ **Agent Integration**: `AgentConfig(cache=...)` checks cache before every provider call
 
 ### v0.11.0 - Streaming & Parallel Execution
 

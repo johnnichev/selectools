@@ -1,6 +1,6 @@
 # Selectools Architecture
 
-**Version:** 0.11.0
+**Version:** 0.12.0
 **Last Updated:** February 2026
 
 ## Table of Contents
@@ -29,6 +29,7 @@ Selectools is a production-ready Python framework for building AI agents with to
 - **Native Tool Calling**: OpenAI, Anthropic, and Gemini native function calling APIs
 - **Streaming**: E2E token-level streaming with native tool call support via `Agent.astream`
 - **Parallel Execution**: Concurrent tool execution via `asyncio.gather` / `ThreadPoolExecutor`
+- **Response Caching**: Built-in LRU+TTL cache (`InMemoryCache`) and distributed `RedisCache`
 
 ---
 
@@ -49,6 +50,7 @@ Selectools is a production-ready Python framework for building AI agents with to
 │  │  • Error handling & retries                                      │  │
 │  │  • Hooks (observability)                                         │  │
 │  │  • Parallel tool execution                                       │  │
+│  │  • Response caching (LRU+TTL)                                    │  │
 │  └─────────┬────────────────────────┬──────────────────┬────────────┘  │
 │            │                        │                  │               │
 │            ▼                        ▼                  ▼               │
@@ -151,6 +153,7 @@ The **Agent** is the orchestrator that manages the iterative loop of:
 - Async/sync execution support
 - Parallel tool execution for concurrent multi-tool calls
 - Streaming responses via `astream()`
+- Response caching to avoid redundant LLM calls
 
 ### 2. Tools (`tools.py`)
 
@@ -260,30 +263,36 @@ Single source of truth for 130+ models:
    ├─→ PromptBuilder.build(tools)
    ├─→ System prompt with tool schemas
    │
-4. LLM Request
+4. Cache Lookup [if cache configured]
+   │
+   ├─→ CacheKeyBuilder.build(model, prompt, messages, tools, temperature)
+   ├─→ Cache.get(key) → hit? Return cached (Message, UsageStats)
+   │
+5. LLM Request [on cache miss]
    │
    ├─→ Provider.complete(model, prompt, messages)
    ├─→ [OpenAI / Anthropic / Gemini / Ollama]
+   ├─→ Cache.set(key, response) [store for future hits]
    │
-5. Response Parsing
+6. Response Parsing
    │
    ├─→ ToolCallParser.parse(response_text)
    ├─→ Extract: tool_name, parameters
    │
-6. Tool Execution [if tool call detected]
+7. Tool Execution [if tool call detected]
    │
    ├─→ Tool.validate(parameters)
    ├─→ Tool.execute(parameters, injected_kwargs)
    ├─→ Parallel execution if multiple tools (asyncio.gather / ThreadPoolExecutor)
    ├─→ Handle timeout, errors, streaming
    │
-7. Feedback Loop [if tool executed]
+8. Feedback Loop [if tool executed]
    │
    ├─→ Append ASSISTANT message (tool call)
    ├─→ Append TOOL message (result)
    ├─→ Return to step 4 (next iteration)
    │
-8. Final Response [no tool call]
+9. Final Response [no tool call]
    │
    ├─→ Memory.add(response) [if enabled]
    ├─→ Return to user
@@ -340,7 +349,14 @@ Single source of truth for 130+ models:
          │    ├─→ providers/base.py (Provider)
          │    ├─→ memory.py (ConversationMemory)
          │    ├─→ usage.py (AgentUsage, UsageStats)
-         │    └─→ analytics.py (AgentAnalytics)
+         │    ├─→ analytics.py (AgentAnalytics)
+         │    └─→ cache.py (Cache, InMemoryCache, CacheKeyBuilder)
+         │
+         ├─→ cache.py (core caching)
+         │    └─→ types.py, tools.py, usage.py
+         │
+         ├─→ cache_redis.py (distributed caching, optional)
+         │    └─→ cache.py (CacheStats)
          │
          ├─→ tools.py
          │    ├─→ types.py
@@ -494,6 +510,20 @@ Single source of truth for 130+ models:
 
 **Benefit:** Faster agent loops when LLM requests multiple independent tools.
 
+### 9. Response Caching
+
+**Problem:** Identical LLM requests are expensive and wasteful.
+
+**Solution:** Pluggable cache layer:
+
+- `Cache` protocol for custom backends
+- `InMemoryCache`: LRU + TTL with `OrderedDict`, thread-safe, zero dependencies
+- `RedisCache`: Distributed TTL cache for multi-process deployments
+- Deterministic key generation via `CacheKeyBuilder` (SHA-256 hash)
+- Opt-in via `AgentConfig(cache=InMemoryCache())`
+
+**Benefit:** Eliminate redundant LLM calls, reduce cost and latency.
+
 ---
 
 ## RAG Integration
@@ -614,7 +644,32 @@ agent = Agent(tools=[...], provider=provider, config=config)
 - **Chroma**: Advanced features, 10k+ documents
 - **Pinecone**: Cloud-hosted, production scale
 
-### Caching
+### Response Caching
+
+Built-in caching avoids redundant LLM calls for identical requests:
+
+- **`InMemoryCache`**: Thread-safe LRU + TTL cache, zero dependencies
+- **`RedisCache`**: Distributed TTL cache for multi-process / multi-server deployments
+- Cache key is a SHA-256 hash of (model, system_prompt, messages, tools, temperature)
+- Streaming (`astream`) bypasses cache (non-replayable)
+- Cache hits still contribute to usage tracking
+
+```python
+from selectools import Agent, AgentConfig, InMemoryCache
+
+cache = InMemoryCache(max_size=500, default_ttl=600)
+config = AgentConfig(cache=cache)
+agent = Agent(tools=[...], provider=provider, config=config)
+
+# Second identical call returns cached response (no LLM call)
+response1 = agent.run([Message(role=Role.USER, content="Hello")])
+agent.reset()
+response2 = agent.run([Message(role=Role.USER, content="Hello")])
+
+print(cache.stats)  # CacheStats(hits=1, misses=1, ...)
+```
+
+### General Caching Tips
 
 - Keep `VectorStore` instance alive between queries
 - Reuse `Agent` instance for same tool set

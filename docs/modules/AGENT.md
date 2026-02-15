@@ -15,7 +15,8 @@
 8. [Memory Integration](#memory-integration)
 9. [Streaming](#streaming)
 10. [Parallel Tool Execution](#parallel-tool-execution)
-11. [Implementation Details](#implementation-details)
+11. [Response Caching](#response-caching)
+12. [Implementation Details](#implementation-details)
 
 ---
 
@@ -34,6 +35,7 @@ The **Agent** class is the central orchestrator of the selectools framework. It 
 7. **Analytics**: Track tool usage patterns (optional)
 8. **Parallel Execution**: Execute independent tool calls concurrently
 9. **Streaming**: Token-level streaming with native tool support
+10. **Response Caching**: Avoid redundant LLM calls via pluggable cache layer
 
 ### Core Dependencies
 
@@ -383,6 +385,9 @@ class AgentConfig:
 
     # Streaming
     stream: bool = False
+
+    # Caching
+    cache: Optional[Cache] = None  # InMemoryCache, RedisCache, or custom
 ```
 
 ### Configuration Patterns
@@ -403,6 +408,21 @@ config = AgentConfig(
     cost_warning_threshold=0.50,  # Alert at $0.50
     verbose=False,
     enable_analytics=True
+)
+```
+
+#### Production Config with Caching
+
+```python
+from selectools import InMemoryCache
+
+cache = InMemoryCache(max_size=2000, default_ttl=600)
+config = AgentConfig(
+    model="gpt-4o-mini",
+    temperature=0.0,
+    cache=cache,               # Enable response caching
+    max_retries=3,
+    cost_warning_threshold=0.50,
 )
 ```
 
@@ -857,6 +877,176 @@ agent = Agent(
 # LLM requests all 3 tools → executed concurrently
 result = await agent.arun([Message(role=Role.USER, content="...")])
 ```
+
+---
+
+## Response Caching
+
+### Overview
+
+The agent supports **pluggable response caching** to avoid redundant LLM calls. When `AgentConfig(cache=...)` is set, the agent checks the cache before every `provider.complete()` / `provider.acomplete()` call. On a cache hit, the stored `(Message, UsageStats)` is returned immediately without calling the LLM.
+
+### Architecture
+
+```
+Agent._call_provider()
+    │
+    ├─→ CacheKeyBuilder.build(model, prompt, messages, tools, temperature)
+    │     → SHA-256 hex digest (deterministic)
+    │
+    ├─→ cache.get(key)
+    │     ├── HIT  → return cached (Message, UsageStats), fire on_llm_end hook
+    │     └── MISS → continue to provider call
+    │
+    ├─→ provider.complete(...)
+    │
+    └─→ cache.set(key, (response_msg, usage_stats))
+```
+
+### Cache Protocol
+
+Any object satisfying the `Cache` protocol can be used:
+
+```python
+@runtime_checkable
+class Cache(Protocol):
+    def get(self, key: str) -> Optional[Tuple[Any, Any]]: ...
+    def set(self, key: str, value: Tuple[Any, Any], ttl: Optional[int] = None) -> None: ...
+    def delete(self, key: str) -> bool: ...
+    def clear(self) -> None: ...
+
+    @property
+    def stats(self) -> CacheStats: ...
+```
+
+### Built-in Backends
+
+#### InMemoryCache
+
+Thread-safe LRU + TTL cache with zero external dependencies:
+
+```python
+from selectools import InMemoryCache
+
+cache = InMemoryCache(
+    max_size=1000,    # Max entries (LRU eviction)
+    default_ttl=300,  # 5 minutes
+)
+```
+
+**Features:**
+- `OrderedDict`-based O(1) LRU operations
+- Per-entry TTL with monotonic timestamp expiry
+- Thread-safe via `threading.Lock`
+- `CacheStats` tracking (hits, misses, evictions, hit_rate)
+
+#### RedisCache
+
+Distributed TTL cache for multi-process deployments:
+
+```python
+from selectools.cache_redis import RedisCache
+
+cache = RedisCache(
+    url="redis://localhost:6379/0",
+    prefix="selectools:",
+    default_ttl=300,
+)
+```
+
+**Features:**
+- Server-side TTL management
+- Pickle-serialized `(Message, UsageStats)` entries
+- Key prefix namespacing
+- Requires optional dependency: `pip install selectools[cache]`
+
+### Cache Key Generation
+
+`CacheKeyBuilder` creates deterministic SHA-256 keys from request parameters:
+
+```python
+from selectools import CacheKeyBuilder
+
+key = CacheKeyBuilder.build(
+    model="gpt-4o",
+    system_prompt="You are a helpful assistant.",
+    messages=[Message(role=Role.USER, content="Hello")],
+    tools=[my_tool],
+    temperature=0.0,
+)
+# → "selectools:a3f2b8c1d4e5..."
+```
+
+**Inputs hashed:** model, system_prompt, messages (role + content + tool_calls), tools (name + description + parameters), temperature.
+
+**Guarantees:**
+- Same inputs always produce the same key
+- Different inputs produce different keys
+- Tool ordering is preserved in the hash
+
+### What Gets Cached
+
+| Call Type | Cached? | Reason |
+| --- | --- | --- |
+| `provider.complete()` | Yes | Deterministic request/response |
+| `provider.acomplete()` | Yes | Deterministic request/response |
+| `provider.astream()` | No | Non-replayable generator |
+| Tool execution results | No | Side effects possible |
+
+### Usage Examples
+
+#### Basic In-Memory Caching
+
+```python
+from selectools import Agent, AgentConfig, InMemoryCache
+
+cache = InMemoryCache(max_size=500, default_ttl=600)
+config = AgentConfig(model="gpt-4o-mini", cache=cache)
+agent = Agent(tools=[my_tool], provider=provider, config=config)
+
+# First call → cache miss → LLM called
+response1 = agent.run([Message(role=Role.USER, content="What is Python?")])
+
+# Reset history, same question → cache hit → instant response
+agent.reset()
+response2 = agent.run([Message(role=Role.USER, content="What is Python?")])
+
+print(cache.stats)
+# CacheStats(hits=1, misses=1, evictions=0, hit_rate=50.00%)
+```
+
+#### Distributed Redis Caching
+
+```python
+from selectools.cache_redis import RedisCache
+
+cache = RedisCache(url="redis://my-redis:6379/0", default_ttl=900)
+config = AgentConfig(cache=cache)
+
+# Cache is shared across processes/servers
+agent = Agent(tools=[...], provider=provider, config=config)
+```
+
+#### Monitoring Cache Performance
+
+```python
+stats = cache.stats
+print(f"Hit rate: {stats.hit_rate:.1%}")
+print(f"Hits: {stats.hits}, Misses: {stats.misses}")
+print(f"Evictions: {stats.evictions}")
+```
+
+### Verbose Mode
+
+When `verbose=True`, cache hits are logged:
+
+```
+[agent] cache hit -- skipping provider call
+```
+
+### Integration with Usage Tracking
+
+Cache hits still contribute to `AgentUsage`. The stored `UsageStats` is replayed via `agent.usage.add_usage()`, so cost tracking remains accurate even when responses come from cache.
 
 ---
 

@@ -5,6 +5,43 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-02-15
+
+### Added - Response Caching
+
+#### Cache Protocol & Backends
+
+- **`Cache` protocol** - Abstract interface any cache backend must satisfy (`get`, `set`, `delete`, `clear`, `stats`)
+- **`InMemoryCache`** - Thread-safe LRU + TTL cache with zero external dependencies
+  - `OrderedDict`-based O(1) LRU operations
+  - Per-entry TTL with monotonic timestamp expiry
+  - Configurable `max_size` (LRU eviction) and `default_ttl`
+  - Thread-safe via `threading.Lock`
+- **`RedisCache`** - Distributed TTL cache for multi-process deployments
+  - Pickle-serialized `(Message, UsageStats)` entries
+  - Server-side TTL management
+  - Key prefix namespacing (`selectools:`)
+  - Requires optional `redis` dependency (`pip install selectools[cache]`)
+- **`CacheStats`** - Hit/miss/eviction counters with `hit_rate` property
+- **`CacheKeyBuilder`** - Deterministic SHA-256 cache keys from (model, system_prompt, messages, tools, temperature)
+
+#### Agent Integration
+
+- **`AgentConfig(cache=...)`** - Enable caching by passing any `Cache` instance
+- Cache checked before every `provider.complete()` / `provider.acomplete()` call
+- Cache populated after successful provider responses
+- Streaming (`astream`) bypasses cache (non-replayable)
+- Cache hits still contribute to usage tracking (`UsageStats` replayed from cache)
+- Verbose mode prints `[agent] cache hit -- skipping provider call`
+
+### Changed
+
+- `AgentConfig` extended with `cache: Optional[Cache] = None` field
+- `Agent._call_provider()` and `Agent._acall_provider()` now check cache before retry loop
+- New exports in `selectools.__init__`: `Cache`, `CacheStats`, `CacheKeyBuilder`, `InMemoryCache`
+
+---
+
 ## [0.11.0] - 2026-02-14
 
 ### Added - E2E Streaming & Parallel Execution

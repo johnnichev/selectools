@@ -1,6 +1,6 @@
 # Selectools Implementation Documentation
 
-**Version:** 0.11.0
+**Version:** 0.12.0
 **Last Updated:** February 2026
 
 Welcome to the comprehensive technical documentation for selectools - a production-ready Python framework for building AI agents with tool-calling capabilities and RAG support.
@@ -17,7 +17,7 @@ Welcome to the comprehensive technical documentation for selectools - a producti
 
 Detailed technical documentation for each module:
 
-1. **[AGENT.md](modules/AGENT.md)** - Agent loop, tool selection, retry logic, streaming, parallel execution, and execution flow
+1. **[AGENT.md](modules/AGENT.md)** - Agent loop, tool selection, retry logic, streaming, parallel execution, caching, and execution flow
 2. **[TOOLS.md](modules/TOOLS.md)** - Tool definition, validation, registry, and streaming
 3. **[PARSER.md](modules/PARSER.md)** - TOOL_CALL contract and JSON extraction strategies
 4. **[PROMPT.md](modules/PROMPT.md)** - System prompt generation and tool schema formatting
@@ -69,10 +69,11 @@ Detailed technical documentation for each module:
 - [EMBEDDINGS.md](modules/EMBEDDINGS.md) - Vector generation
 - [VECTOR_STORES.md](modules/VECTOR_STORES.md) - Storage
 
-**Cost Management:**
+**Cost Management & Caching:**
 
 - [USAGE.md](modules/USAGE.md) - Tracking
 - [MODELS.md](modules/MODELS.md) - Pricing
+- [AGENT.md](modules/AGENT.md#response-caching) - Response caching
 
 ---
 
@@ -95,17 +96,19 @@ Detailed technical documentation for each module:
    ↓
 2. AGENT loads history (MEMORY) and calls PROVIDER
    ↓
-3. PROVIDER formats prompt (PROMPT) and calls LLM
+3. CACHE checked (if configured) → hit? Return cached response
    ↓
-4. PARSER extracts TOOL_CALL from response
+4. PROVIDER formats prompt (PROMPT) and calls LLM → CACHE stores result
    ↓
-5. TOOLS validates and executes
+5. PARSER extracts TOOL_CALL from response
    ↓
-5b. If multiple tools: PARALLEL execution (asyncio.gather)
+6. TOOLS validates and executes
    ↓
-6. USAGE tracks tokens and costs
+6b. If multiple tools: PARALLEL execution (asyncio.gather)
    ↓
-7. Loop continues or returns final response
+7. USAGE tracks tokens and costs
+   ↓
+8. Loop continues or returns final response
 ```
 
 **Read:**
@@ -174,7 +177,7 @@ Detailed technical documentation for each module:
 4. **Developer Friendly** - Type hints, decorators, clear errors
 5. **Observable** - Hooks, analytics, usage tracking
 6. **Cost Aware** - Automatic tracking and warnings
-7. **Performance Optimized** - Parallel tool execution, async-first design
+7. **Performance Optimized** - Parallel tool execution, response caching, async-first design
 
 ### Core Patterns
 
@@ -185,6 +188,7 @@ Detailed technical documentation for each module:
 - **Schema Generation** - Automatic from type hints
 - **Injected Parameters** - Hide secrets from LLM
 - **Streaming** - Progressive results via generators
+- **Response Caching** - LRU+TTL caching for identical LLM requests
 - **RAG Pipeline** - Load → Chunk → Embed → Store → Search
 
 ---

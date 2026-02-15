@@ -8,9 +8,21 @@ import asyncio
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, AsyncGenerator, Callable, Dict, List, Optional, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncGenerator,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    cast,
+)
 
 from ..analytics import AgentAnalytics
+from ..cache import CacheKeyBuilder
 from ..parser import ToolCallParser
 from ..prompt import PromptBuilder
 from ..providers.base import Provider, ProviderError
@@ -331,6 +343,28 @@ class Agent:
             raise
 
     def _call_provider(self, stream_handler: Optional[Callable[[str], None]] = None) -> Message:
+        # --- Cache lookup (before any retries / API calls) ---
+        cache_key: Optional[str] = None
+        if self.config.cache and not (
+            self.config.stream and getattr(self.provider, "supports_streaming", False)
+        ):
+            cache_key = CacheKeyBuilder.build(
+                model=self.config.model,
+                system_prompt=self._system_prompt,
+                messages=self._history,
+                tools=self.tools,
+                temperature=self.config.temperature,
+            )
+            cached = self.config.cache.get(cache_key)
+            if cached is not None:
+                cached_msg = cast(Message, cached[0])
+                cached_usage = cached[1]
+                self.usage.add_usage(cached_usage, tool_name=None)
+                self._call_hook("on_llm_end", cached_msg.content, cached_usage)
+                if self.config.verbose:
+                    print("[agent] cache hit -- skipping provider call")
+                return cached_msg
+
         attempts = 0
         last_error: Optional[str] = None
 
@@ -360,6 +394,10 @@ class Agent:
 
                 # Track usage (tool name will be added later after parsing)
                 self.usage.add_usage(usage_stats, tool_name=None)
+
+                # Store in cache on successful provider call
+                if cache_key is not None and self.config.cache:
+                    self.config.cache.set(cache_key, (response_msg, usage_stats))
 
                 # Call on_llm_end hook
                 self._call_hook("on_llm_end", response_text, usage_stats)
@@ -1026,6 +1064,28 @@ class Agent:
         self, stream_handler: Optional[Callable[[str], None]] = None
     ) -> Message:
         """Async version of _call_provider with retry logic."""
+        # --- Cache lookup (before any retries / API calls) ---
+        cache_key: Optional[str] = None
+        if self.config.cache and not (
+            self.config.stream and getattr(self.provider, "supports_streaming", False)
+        ):
+            cache_key = CacheKeyBuilder.build(
+                model=self.config.model,
+                system_prompt=self._system_prompt,
+                messages=self._history,
+                tools=self.tools,
+                temperature=self.config.temperature,
+            )
+            cached = self.config.cache.get(cache_key)
+            if cached is not None:
+                cached_msg = cast(Message, cached[0])
+                cached_usage = cached[1]
+                self.usage.add_usage(cached_usage, tool_name=None)
+                self._call_hook("on_llm_end", cached_msg.content, cached_usage)
+                if self.config.verbose:
+                    print("[agent] cache hit -- skipping provider call")
+                return cached_msg
+
         attempts = 0
         last_error: Optional[str] = None
 
@@ -1074,6 +1134,10 @@ class Agent:
 
                 # Track usage
                 self.usage.add_usage(usage_stats, tool_name=None)
+
+                # Store in cache on successful provider call
+                if cache_key is not None and self.config.cache:
+                    self.config.cache.set(cache_key, (response_msg, usage_stats))
 
                 # Call on_llm_end hook
                 self._call_hook("on_llm_end", response_text, usage_stats)

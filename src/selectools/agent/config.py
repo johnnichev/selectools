@@ -2,8 +2,13 @@
 Configuration options for the agent.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Callable, Dict, Optional
+from typing import TYPE_CHECKING, Callable, Dict, Optional
+
+if TYPE_CHECKING:
+    from ..cache import Cache
 
 # Hook type definitions
 HookCallable = Callable[..., None]
@@ -51,6 +56,10 @@ class AgentConfig:
         parallel_tool_execution: Execute multiple tool calls concurrently when the LLM
                requests more than one tool in a single response. Uses asyncio.gather for
                async and ThreadPoolExecutor for sync execution. Default: True.
+        cache: Optional response cache.  When set, the agent checks the cache
+               before calling the LLM provider and stores successful responses.
+               Any object satisfying the ``Cache`` protocol can be used (e.g.
+               ``InMemoryCache``, ``RedisCache``).  Default: None (caching disabled).
     """
 
     model: str = "gpt-4o"
@@ -70,3 +79,4 @@ class AgentConfig:
     hooks: Optional[Hooks] = None
     routing_only: bool = False
     parallel_tool_execution: bool = True
+    cache: Optional[Cache] = None

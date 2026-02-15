@@ -485,6 +485,79 @@ def test_analytics():
 
 ---
 
+## Cache-Aware Usage Tracking
+
+When response caching is enabled via `AgentConfig(cache=...)`, usage tracking remains accurate even for cached responses.
+
+### How It Works
+
+- **Cache miss**: Provider is called normally; `UsageStats` tracked as usual
+- **Cache hit**: The stored `UsageStats` from the original call is replayed via `agent.usage.add_usage()`
+
+This means `agent.total_cost` and `agent.total_tokens` reflect the _logical_ usage (what it would have cost), not just the actual API calls.
+
+### Cache Stats
+
+The cache itself tracks hit/miss/eviction metrics:
+
+```python
+from selectools import InMemoryCache
+
+cache = InMemoryCache(max_size=500, default_ttl=600)
+config = AgentConfig(cache=cache)
+agent = Agent(tools=[...], provider=provider, config=config)
+
+# Run some queries...
+agent.run([Message(role=Role.USER, content="Hello")])
+agent.reset()
+agent.run([Message(role=Role.USER, content="Hello")])  # cache hit
+
+# Cache performance
+stats = cache.stats
+print(f"Hit rate: {stats.hit_rate:.1%}")    # 50.0%
+print(f"Hits: {stats.hits}")                # 1
+print(f"Misses: {stats.misses}")            # 1
+print(f"Evictions: {stats.evictions}")       # 0
+```
+
+### CacheStats Dataclass
+
+```python
+@dataclass
+class CacheStats:
+    hits: int = 0
+    misses: int = 0
+    evictions: int = 0
+
+    @property
+    def total_requests(self) -> int:
+        return self.hits + self.misses
+
+    @property
+    def hit_rate(self) -> float:
+        total = self.total_requests
+        return self.hits / total if total > 0 else 0.0
+```
+
+### Monitoring Cache + Usage Together
+
+```python
+# Agent usage (logical)
+print(f"Tokens used: {agent.total_tokens:,}")
+print(f"Cost: ${agent.total_cost:.6f}")
+
+# Cache efficiency
+print(f"Cache hit rate: {cache.stats.hit_rate:.1%}")
+print(f"API calls saved: {cache.stats.hits}")
+
+# Cost savings estimate
+avg_cost_per_call = agent.total_cost / cache.stats.total_requests
+savings = cache.stats.hits * avg_cost_per_call
+print(f"Estimated savings: ${savings:.6f}")
+```
+
+---
+
 ## RAG Usage Tracking
 
 When using RAG, both LLM and embedding costs are tracked:
@@ -522,6 +595,7 @@ print(agent.usage)
 ## Further Reading
 
 - [Agent Module](AGENT.md) - How usage is tracked
+- [Agent Module - Caching](AGENT.md#response-caching) - Response caching details
 - [Providers Module](PROVIDERS.md) - Usage stat extraction
 - [Models Module](MODELS.md) - Pricing information
 - [RAG Module](RAG.md) - RAG usage tracking

@@ -4,6 +4,7 @@
 from . import embeddings, models, rag, toolbox
 from .agent import Agent, AgentConfig
 from .analytics import AgentAnalytics, ToolMetrics
+from .cache import Cache, CacheKeyBuilder, CacheStats, InMemoryCache
 from .exceptions import (
     MemoryLimitExceededError,
     ProviderConfigurationError,
@@ -70,6 +71,11 @@ __all__ = [
     "Gemini",
     "Ollama",
     "Cohere",
+    # Caching
+    "Cache",
+    "CacheStats",
+    "CacheKeyBuilder",
+    "InMemoryCache",
     # Submodules (for lazy loading)
     "embeddings",
     "rag",
