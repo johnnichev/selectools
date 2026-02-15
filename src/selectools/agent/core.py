@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, AsyncGenerator, Callable, Dict, List, Optional, Union
 
 from ..analytics import AgentAnalytics
@@ -217,91 +218,95 @@ class Agent:
                         tool_calls=tool_calls_to_execute,
                     )
 
-                # Execute tool calls (support multiple in future, currently loop structure handles parsing single)
-                # But here we might have multiple from native.
-                # If we have multiple, we should execute all.
-                # Assuming standard Agent behavior: execute all, then loop.
-                # However, our loop logic is "one iteration = one LLM call + tool executions".
-
-                # We need to append the ASSISTANT message (with tool_calls) to history once.
-                # Then append TOOL messages for each result.
-
+                # Append the ASSISTANT message (with tool_calls) to history once,
+                # then execute all requested tools and append TOOL results.
                 self._history.append(response_msg)
                 if self.memory:
                     self.memory.add(response_msg)
 
-                for tool_call in tool_calls_to_execute:
-                    tool_name = tool_call.tool_name
-                    parameters = tool_call.parameters
-                    all_tool_calls.append(tool_call)
-                    last_tool_name = tool_name
-                    last_tool_args = parameters
+                use_parallel = (
+                    self.config.parallel_tool_execution and len(tool_calls_to_execute) > 1
+                )
 
-                    if self.config.verbose:
-                        print(
-                            f"[agent] Iteration {iteration}: tool={tool_name} params={parameters}"
-                        )
+                if use_parallel:
+                    _last_name, _last_args = self._execute_tools_parallel(
+                        tool_calls_to_execute, all_tool_calls, iteration, response_text
+                    )
+                    last_tool_name = _last_name
+                    last_tool_args = _last_args
+                else:
+                    # Sequential execution (single tool call or parallel disabled)
+                    for tool_call in tool_calls_to_execute:
+                        tool_name = tool_call.tool_name
+                        parameters = tool_call.parameters
+                        all_tool_calls.append(tool_call)
+                        last_tool_name = tool_name
+                        last_tool_args = parameters
 
-                    tool = self._tools_by_name.get(tool_name)
-                    if not tool:
-                        error_message = f"Unknown tool '{tool_name}'. Available tools: {', '.join(self._tools_by_name.keys())}"
-                        self._append_tool_result(error_message, tool_name, tool_call.id)
-                        self._call_hook("on_iteration_end", iteration, response_text)
-                        continue
-
-                    try:
-                        start_time = time.time()
-                        self._call_hook("on_tool_start", tool_name, parameters)
-
-                        # Create chunk callback for streaming tools
-                        chunk_counter = {"count": 0}
-
-                        def chunk_callback(chunk: str) -> None:
-                            chunk_counter["count"] += 1
-                            self._call_hook("on_tool_chunk", tool_name, chunk)
-
-                        result = self._execute_tool_with_timeout(tool, parameters, chunk_callback)
-                        duration = time.time() - start_time
-                        self._call_hook("on_tool_end", tool_name, result, duration)
-
-                        # Track analytics/usage (simplified for bulk)
-                        if self.analytics:
-                            self.analytics.record_tool_call(
-                                tool_name=tool.name,
-                                success=True,
-                                duration=duration,
-                                params=parameters,
-                                cost=0.0,
-                                chunk_count=chunk_counter["count"],
-                            )
-                        if self.usage.iterations:
-                            self.usage.tool_usage[tool.name] = (
-                                self.usage.tool_usage.get(tool.name, 0) + 1
-                            )
-                            self.usage.tool_tokens[tool.name] = (
-                                self.usage.tool_tokens.get(tool.name, 0)
-                                + self.usage.iterations[-1].total_tokens
+                        if self.config.verbose:
+                            print(
+                                f"[agent] Iteration {iteration}: tool={tool_name} params={parameters}"
                             )
 
-                        self._append_tool_result(
-                            result, tool_name, tool_call.id, tool_result=result
-                        )
+                        tool = self._tools_by_name.get(tool_name)
+                        if not tool:
+                            error_message = f"Unknown tool '{tool_name}'. Available tools: {', '.join(self._tools_by_name.keys())}"
+                            self._append_tool_result(error_message, tool_name, tool_call.id)
+                            continue
 
-                    except Exception as exc:
-                        duration = time.time() - start_time
-                        self._call_hook("on_tool_error", tool_name, exc, parameters)
-                        if self.analytics:
-                            self.analytics.record_tool_call(
-                                tool_name=tool.name,
-                                success=False,
-                                duration=duration,
-                                params=parameters,
-                                cost=0.0,
-                                chunk_count=0,
+                        try:
+                            start_time = time.time()
+                            self._call_hook("on_tool_start", tool_name, parameters)
+
+                            chunk_counter = {"count": 0}
+
+                            def chunk_callback(chunk: str) -> None:
+                                chunk_counter["count"] += 1
+                                self._call_hook("on_tool_chunk", tool_name, chunk)
+
+                            result = self._execute_tool_with_timeout(
+                                tool, parameters, chunk_callback
+                            )
+                            duration = time.time() - start_time
+                            self._call_hook("on_tool_end", tool_name, result, duration)
+
+                            if self.analytics:
+                                self.analytics.record_tool_call(
+                                    tool_name=tool.name,
+                                    success=True,
+                                    duration=duration,
+                                    params=parameters,
+                                    cost=0.0,
+                                    chunk_count=chunk_counter["count"],
+                                )
+                            if self.usage.iterations:
+                                self.usage.tool_usage[tool.name] = (
+                                    self.usage.tool_usage.get(tool.name, 0) + 1
+                                )
+                                self.usage.tool_tokens[tool.name] = (
+                                    self.usage.tool_tokens.get(tool.name, 0)
+                                    + self.usage.iterations[-1].total_tokens
+                                )
+
+                            self._append_tool_result(
+                                result, tool_name, tool_call.id, tool_result=result
                             )
 
-                        error_message = f"Error executing tool '{tool_name}': {exc}"
-                        self._append_tool_result(error_message, tool_name, tool_call.id)
+                        except Exception as exc:
+                            duration = time.time() - start_time
+                            self._call_hook("on_tool_error", tool_name, exc, parameters)
+                            if self.analytics:
+                                self.analytics.record_tool_call(
+                                    tool_name=tool.name,
+                                    success=False,
+                                    duration=duration,
+                                    params=parameters,
+                                    cost=0.0,
+                                    chunk_count=0,
+                                )
+
+                            error_message = f"Error executing tool '{tool_name}': {exc}"
+                            self._append_tool_result(error_message, tool_name, tool_call.id)
 
                 self._call_hook("on_iteration_end", iteration, response_text)
                 continue  # Continue to next iteration
@@ -437,6 +442,206 @@ class Agent:
         if self.memory:
             self.memory.add(tool_msg)
 
+    # ------------------------------------------------------------------
+    # Parallel tool execution helpers
+    # ------------------------------------------------------------------
+
+    def _execute_tools_parallel(
+        self,
+        tool_calls_to_execute: List[ToolCall],
+        all_tool_calls: List[ToolCall],
+        iteration: int,
+        response_text: str,
+    ) -> tuple:
+        """Execute multiple tool calls concurrently using ThreadPoolExecutor.
+
+        Returns (last_tool_name, last_tool_args) from the batch.
+        Results are appended to history in the original request order.
+        """
+
+        @dataclass
+        class _Result:
+            tool_call: ToolCall
+            result: str
+            is_error: bool
+            duration: float
+            tool: Optional[Tool]
+            chunk_count: int
+
+        def _run_one(tc: ToolCall) -> _Result:
+            tool_name = tc.tool_name
+            parameters = tc.parameters
+            tool = self._tools_by_name.get(tool_name)
+
+            if not tool:
+                error_msg = (
+                    f"Unknown tool '{tool_name}'. "
+                    f"Available tools: {', '.join(self._tools_by_name.keys())}"
+                )
+                return _Result(tc, error_msg, True, 0.0, None, 0)
+
+            start = time.time()
+            self._call_hook("on_tool_start", tool_name, parameters)
+
+            chunk_counter = {"count": 0}
+
+            def chunk_cb(chunk: str) -> None:
+                chunk_counter["count"] += 1
+                self._call_hook("on_tool_chunk", tool_name, chunk)
+
+            try:
+                result = self._execute_tool_with_timeout(tool, parameters, chunk_cb)
+                dur = time.time() - start
+                self._call_hook("on_tool_end", tool_name, result, dur)
+                return _Result(tc, result, False, dur, tool, chunk_counter["count"])
+            except Exception as exc:
+                dur = time.time() - start
+                self._call_hook("on_tool_error", tool_name, exc, parameters)
+                error_msg = f"Error executing tool '{tool_name}': {exc}"
+                return _Result(tc, error_msg, True, dur, tool, 0)
+
+        # Submit all tool calls to the thread pool
+        with ThreadPoolExecutor(max_workers=len(tool_calls_to_execute)) as pool:
+            futures = [pool.submit(_run_one, tc) for tc in tool_calls_to_execute]
+            results = [f.result() for f in futures]  # preserves order
+
+        last_tool_name: Optional[str] = None
+        last_tool_args: Dict[str, Any] = {}
+
+        for r in results:
+            all_tool_calls.append(r.tool_call)
+            last_tool_name = r.tool_call.tool_name
+            last_tool_args = r.tool_call.parameters
+
+            if self.config.verbose:
+                status = "OK" if not r.is_error else "ERR"
+                print(
+                    f"[agent] Iteration {iteration}: tool={r.tool_call.tool_name} "
+                    f"[{status}] {r.duration:.3f}s"
+                )
+
+            # Record analytics
+            if self.analytics and r.tool:
+                self.analytics.record_tool_call(
+                    tool_name=r.tool.name,
+                    success=not r.is_error,
+                    duration=r.duration,
+                    params=r.tool_call.parameters,
+                    cost=0.0,
+                    chunk_count=r.chunk_count,
+                )
+            if not r.is_error and self.usage.iterations:
+                self.usage.tool_usage[r.tool_call.tool_name] = (
+                    self.usage.tool_usage.get(r.tool_call.tool_name, 0) + 1
+                )
+                self.usage.tool_tokens[r.tool_call.tool_name] = (
+                    self.usage.tool_tokens.get(r.tool_call.tool_name, 0)
+                    + self.usage.iterations[-1].total_tokens
+                )
+
+            # Append result to history (in order)
+            if r.is_error:
+                self._append_tool_result(r.result, r.tool_call.tool_name, r.tool_call.id)
+            else:
+                self._append_tool_result(
+                    r.result, r.tool_call.tool_name, r.tool_call.id, tool_result=r.result
+                )
+
+        return last_tool_name, last_tool_args
+
+    async def _aexecute_tools_parallel(
+        self,
+        tool_calls_to_execute: List[ToolCall],
+        all_tool_calls: List[ToolCall],
+        iteration: int,
+        response_text: str,
+    ) -> tuple:
+        """Execute multiple tool calls concurrently using asyncio.gather.
+
+        Returns (last_tool_name, last_tool_args) from the batch.
+        Results are appended to history in the original request order.
+        """
+
+        @dataclass
+        class _Result:
+            tool_call: ToolCall
+            result: str
+            is_error: bool
+            duration: float
+            tool: Optional[Tool]
+            chunk_count: int
+
+        async def _run_one(tc: ToolCall) -> _Result:
+            tool_name = tc.tool_name
+            parameters = tc.parameters
+            tool = self._tools_by_name.get(tool_name)
+
+            if not tool:
+                error_msg = (
+                    f"Unknown tool '{tool_name}'. "
+                    f"Available tools: {', '.join(self._tools_by_name.keys())}"
+                )
+                return _Result(tc, error_msg, True, 0.0, None, 0)
+
+            start = time.time()
+            self._call_hook("on_tool_start", tool_name, parameters)
+
+            chunk_counter = {"count": 0}
+
+            def chunk_cb(chunk: str) -> None:
+                chunk_counter["count"] += 1
+                self._call_hook("on_tool_chunk", tool_name, chunk)
+
+            try:
+                result = await self._aexecute_tool_with_timeout(tool, parameters, chunk_cb)
+                dur = time.time() - start
+                self._call_hook("on_tool_end", tool_name, result, dur)
+                return _Result(tc, result, False, dur, tool, chunk_counter["count"])
+            except Exception as exc:
+                dur = time.time() - start
+                self._call_hook("on_tool_error", tool_name, exc, parameters)
+                error_msg = f"Error executing tool '{tool_name}': {exc}"
+                return _Result(tc, error_msg, True, dur, tool, 0)
+
+        # Run all tool calls concurrently
+        results = await asyncio.gather(*[_run_one(tc) for tc in tool_calls_to_execute])
+
+        last_tool_name: Optional[str] = None
+        last_tool_args: Dict[str, Any] = {}
+
+        for r in results:
+            all_tool_calls.append(r.tool_call)
+            last_tool_name = r.tool_call.tool_name
+            last_tool_args = r.tool_call.parameters
+
+            if self.config.verbose:
+                status = "OK" if not r.is_error else "ERR"
+                print(
+                    f"[agent] Iteration {iteration}: tool={r.tool_call.tool_name} "
+                    f"[{status}] {r.duration:.3f}s"
+                )
+
+            # Record analytics
+            if self.analytics and r.tool:
+                self.analytics.record_tool_call(
+                    tool_name=r.tool.name,
+                    success=not r.is_error,
+                    duration=r.duration,
+                    params=r.tool_call.parameters,
+                    cost=0.0,
+                    chunk_count=r.chunk_count,
+                )
+
+            # Append result to history (in order)
+            if r.is_error:
+                self._append_tool_result(r.result, r.tool_call.tool_name, r.tool_call.id)
+            else:
+                self._append_tool_result(
+                    r.result, r.tool_call.tool_name, r.tool_call.id, tool_result=r.result
+                )
+
+        return last_tool_name, last_tool_args
+
     def _execute_tool_with_timeout(
         self, tool: Tool, parameters: dict, chunk_callback: Optional[Callable[[str], None]] = None
     ) -> str:
@@ -570,27 +775,38 @@ class Agent:
                     return
 
                 # Execute tools
-                for tool_call in tool_calls_to_execute:
-                    tool_name = tool_call.tool_name
-                    parameters = tool_call.parameters
-                    all_tool_calls.append(tool_call)
-                    last_tool_name = tool_name
-                    last_tool_args = parameters
+                use_parallel = (
+                    self.config.parallel_tool_execution and len(tool_calls_to_execute) > 1
+                )
 
-                    tool = self._tools_by_name.get(tool_name)
-                    if not tool:
-                        result = f"Error: Tool {tool_name} not found"
-                        self._append_tool_result(result, tool_name, tool_call.id)
-                        continue
+                if use_parallel:
+                    _last_name, _last_args = await self._aexecute_tools_parallel(
+                        tool_calls_to_execute, all_tool_calls, iteration, full_content
+                    )
+                    last_tool_name = _last_name
+                    last_tool_args = _last_args
+                else:
+                    for tool_call in tool_calls_to_execute:
+                        tool_name = tool_call.tool_name
+                        parameters = tool_call.parameters
+                        all_tool_calls.append(tool_call)
+                        last_tool_name = tool_name
+                        last_tool_args = parameters
 
-                    try:
-                        result = await self._aexecute_tool_with_timeout(tool, parameters, None)
-                        self._append_tool_result(
-                            result, tool_name, tool_call.id, tool_result=result
-                        )
-                    except Exception as exc:
-                        error_message = f"Error executing tool '{tool.name}': {exc}"
-                        self._append_tool_result(error_message, tool_name, tool_call.id)
+                        tool = self._tools_by_name.get(tool_name)
+                        if not tool:
+                            result = f"Error: Tool {tool_name} not found"
+                            self._append_tool_result(result, tool_name, tool_call.id)
+                            continue
+
+                        try:
+                            result = await self._aexecute_tool_with_timeout(tool, parameters, None)
+                            self._append_tool_result(
+                                result, tool_name, tool_call.id, tool_result=result
+                            )
+                        except Exception as exc:
+                            error_message = f"Error executing tool '{tool.name}': {exc}"
+                            self._append_tool_result(error_message, tool_name, tool_call.id)
 
                 self._call_hook("on_iteration_end", iteration, full_content)
 
@@ -691,72 +907,84 @@ class Agent:
                 if self.memory:
                     self.memory.add(response_msg)
 
-                for tool_call in tool_calls_to_execute:
-                    tool_name = tool_call.tool_name
-                    parameters = tool_call.parameters
-                    all_tool_calls.append(tool_call)
-                    last_tool_name = tool_name
-                    last_tool_args = parameters
+                use_parallel = (
+                    self.config.parallel_tool_execution and len(tool_calls_to_execute) > 1
+                )
 
-                    if self.config.verbose:
-                        print(
-                            f"[agent] Iteration {iteration}: tool={tool_name} params={parameters}"
-                        )
+                if use_parallel:
+                    _last_name, _last_args = await self._aexecute_tools_parallel(
+                        tool_calls_to_execute, all_tool_calls, iteration, response_text
+                    )
+                    last_tool_name = _last_name
+                    last_tool_args = _last_args
+                else:
+                    # Sequential execution (single tool call or parallel disabled)
+                    for tool_call in tool_calls_to_execute:
+                        tool_name = tool_call.tool_name
+                        parameters = tool_call.parameters
+                        all_tool_calls.append(tool_call)
+                        last_tool_name = tool_name
+                        last_tool_args = parameters
 
-                    tool = self._tools_by_name.get(tool_name)
-                    if not tool:
-                        error_message = f"Unknown tool '{tool_name}'. Available tools: {', '.join(self._tools_by_name.keys())}"
-                        self._append_tool_result(error_message, tool_name, tool_call.id)
-                        self._call_hook("on_iteration_end", iteration, response_text)
-                        continue
-
-                    try:
-                        start_time = time.time()
-                        self._call_hook("on_tool_start", tool_name, parameters)
-
-                        # Create chunk callback for streaming tools
-                        chunk_counter = {"count": 0}
-
-                        def chunk_callback(chunk: str) -> None:
-                            chunk_counter["count"] += 1
-                            self._call_hook("on_tool_chunk", tool_name, chunk)
-
-                        result = await self._aexecute_tool_with_timeout(
-                            tool, parameters, chunk_callback
-                        )
-                        duration = time.time() - start_time
-                        self._call_hook("on_tool_end", tool_name, result, duration)
-
-                        if self.analytics:
-                            self.analytics.record_tool_call(
-                                tool_name=tool.name,
-                                success=True,
-                                duration=duration,
-                                params=parameters,
-                                cost=0.0,
-                                chunk_count=chunk_counter["count"],
-                            )
-                    except Exception as exc:
-                        duration = time.time() - start_time
-                        self._call_hook("on_tool_error", tool.name, exc, parameters)
-
-                        if self.analytics:
-                            self.analytics.record_tool_call(
-                                tool_name=tool.name,
-                                success=False,
-                                duration=duration,
-                                params=parameters,
-                                cost=0.0,
-                                chunk_count=chunk_counter.get("count", 0),
+                        if self.config.verbose:
+                            print(
+                                f"[agent] Iteration {iteration}: tool={tool_name} params={parameters}"
                             )
 
-                        error_message = f"Error executing tool '{tool.name}': {exc}"
-                        self._append_tool_result(error_message, tool_name, tool_call.id)
-                        self._call_hook("on_iteration_end", iteration, response_text)
-                        continue
+                        tool = self._tools_by_name.get(tool_name)
+                        if not tool:
+                            error_message = f"Unknown tool '{tool_name}'. Available tools: {', '.join(self._tools_by_name.keys())}"
+                            self._append_tool_result(error_message, tool_name, tool_call.id)
+                            continue
 
-                    self._append_tool_result(result, tool_name, tool_call.id, tool_result=result)
-                    self._call_hook("on_iteration_end", iteration, response_text)
+                        try:
+                            start_time = time.time()
+                            self._call_hook("on_tool_start", tool_name, parameters)
+
+                            chunk_counter = {"count": 0}
+
+                            def chunk_callback(chunk: str) -> None:
+                                chunk_counter["count"] += 1
+                                self._call_hook("on_tool_chunk", tool_name, chunk)
+
+                            result = await self._aexecute_tool_with_timeout(
+                                tool, parameters, chunk_callback
+                            )
+                            duration = time.time() - start_time
+                            self._call_hook("on_tool_end", tool_name, result, duration)
+
+                            if self.analytics:
+                                self.analytics.record_tool_call(
+                                    tool_name=tool.name,
+                                    success=True,
+                                    duration=duration,
+                                    params=parameters,
+                                    cost=0.0,
+                                    chunk_count=chunk_counter["count"],
+                                )
+                        except Exception as exc:
+                            duration = time.time() - start_time
+                            self._call_hook("on_tool_error", tool.name, exc, parameters)
+
+                            if self.analytics:
+                                self.analytics.record_tool_call(
+                                    tool_name=tool.name,
+                                    success=False,
+                                    duration=duration,
+                                    params=parameters,
+                                    cost=0.0,
+                                    chunk_count=chunk_counter.get("count", 0),
+                                )
+
+                            error_message = f"Error executing tool '{tool.name}': {exc}"
+                            self._append_tool_result(error_message, tool_name, tool_call.id)
+                            continue
+
+                        self._append_tool_result(
+                            result, tool_name, tool_call.id, tool_result=result
+                        )
+
+                self._call_hook("on_iteration_end", iteration, response_text)
 
             final_response = Message(
                 role=Role.ASSISTANT,

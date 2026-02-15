@@ -48,6 +48,9 @@ class AgentConfig:
                - 'on_llm_end': Called after LLM call with (response, usage)
                - 'on_error': Called on any error with (error, context)
         routing_only: If True, returns tool selection without executing it. Default: False.
+        parallel_tool_execution: Execute multiple tool calls concurrently when the LLM
+               requests more than one tool in a single response. Uses asyncio.gather for
+               async and ThreadPoolExecutor for sync execution. Default: True.
     """
 
     model: str = "gpt-4o"
@@ -66,3 +69,4 @@ class AgentConfig:
     system_prompt: Optional[str] = None
     hooks: Optional[Hooks] = None
     routing_only: bool = False
+    parallel_tool_execution: bool = True
