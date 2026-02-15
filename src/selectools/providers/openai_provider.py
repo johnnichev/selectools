@@ -169,14 +169,41 @@ class OpenAIProvider(Provider):
         payload: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
         for message in messages:
             role = message.role.value
+
             if role == Role.TOOL.value:
-                role = Role.ASSISTANT.value
-            payload.append(
-                {
-                    "role": role,
+                payload.append(
+                    {
+                        "role": "tool",
+                        "content": message.content,
+                        "tool_call_id": message.tool_call_id,
+                    }
+                )
+            elif role == Role.ASSISTANT.value:
+                msg_dict: Dict[str, Any] = {
+                    "role": "assistant",
                     "content": self._format_content(message),
                 }
-            )
+                if message.tool_calls:
+                    msg_dict["tool_calls"] = [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.tool_name,
+                                "arguments": json.dumps(tc.parameters),
+                            },
+                        }
+                        for tc in message.tool_calls
+                    ]
+                payload.append(msg_dict)
+            else:
+                # User role
+                payload.append(
+                    {
+                        "role": role,
+                        "content": self._format_content(message),
+                    }
+                )
         return payload
 
     def _format_content(self, message: Message) -> str | List[Any]:

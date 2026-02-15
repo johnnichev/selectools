@@ -29,12 +29,12 @@ Recent major improvements focusing on agent control and reliability (Agent v0.9)
 
 Focus: Fixing architectural limitations and enabling production scaling.
 
-| Feature                         | Priority    | Impact | Description                                                              |
-| ------------------------------- | ----------- | ------ | ------------------------------------------------------------------------ |
-| **Native Function Calling**     | 🔴 Critical | High   | Use OpenAI/Anthropic native tool APIs instead of regex parsing           |
-| **Context Propagation (Async)** | 🔴 Critical | High   | `contextvars.copy_context()` for tracing/auth in async tools             |
-| **AWS Bedrock Provider**        | 🟠 High     | High   | Secure VPC-native model access (Claude, Llama, Mistral) via boto3        |
-| **Select-Only / Routing Mode**  | 🟠 High     | High   | Run agent for classification/routing without executing the selected tool |
+| Feature                         | Priority    | Impact | Description                                                    |
+| ------------------------------- | ----------- | ------ | -------------------------------------------------------------- |
+| **Native Function Calling**     | 🔴 Critical | High   | Use OpenAI/Anthropic native tool APIs instead of regex parsing |
+| **Context Propagation (Async)** | 🔴 Critical | High   | `contextvars.copy_context()` for tracing/auth in async tools   |
+
+| **Select-Only / Routing Mode** | 🟠 High | High | Run agent for classification/routing without executing the selected tool |
 
 ---
 
@@ -94,12 +94,13 @@ Focus: Stability, observability, and advanced orchestration.
 
 ### Provider Enhancements
 
-| Feature                  | Status     | Notes                         |
-| ------------------------ | ---------- | ----------------------------- |
-| Universal Vision Support | 🟡 Planned | Unified vision API            |
-| Provider Auto-Selection  | 🟡 Planned | Automatic fallback chains     |
-| Streaming Improvements   | 🟡 Planned | SSE, WebSocket support        |
-| Local Model Support      | 🟡 Planned | Ollama, LM Studio integration |
+| Feature                  | Status     | Notes                                                   |
+| ------------------------ | ---------- | ------------------------------------------------------- |
+| Universal Vision Support | 🟡 Planned | Unified vision API                                      |
+| Provider Auto-Selection  | 🟡 Planned | Automatic fallback chains                               |
+| Streaming Improvements   | 🟡 Planned | SSE, WebSocket support                                  |
+| Local Model Support      | 🟡 Planned | Ollama, LM Studio integration                           |
+| AWS Bedrock Provider     | 🟡 Planned | Secure VPC-native model access (Claude, Llama, Mistral) |
 
 ### Production Reliability
 

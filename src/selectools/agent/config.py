@@ -45,7 +45,9 @@ class AgentConfig:
                - 'on_tool_error': Called on tool error with (tool_name, error, tool_args)
                - 'on_llm_start': Called before LLM call with (messages, model)
                - 'on_llm_end': Called after LLM call with (response, usage)
+               - 'on_llm_end': Called after LLM call with (response, usage)
                - 'on_error': Called on any error with (error, context)
+        routing_only: If True, returns tool selection without executing it. Default: False.
     """
 
     model: str = "gpt-4o"
@@ -63,3 +65,4 @@ class AgentConfig:
     enable_analytics: bool = False
     system_prompt: Optional[str] = None
     hooks: Optional[Hooks] = None
+    routing_only: bool = False

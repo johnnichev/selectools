@@ -198,7 +198,10 @@ class TestToolExecutionHooks:
                 from selectools.usage import UsageStats
 
                 return (
-                    'TOOL_CALL: {"tool_name": "test_tool", "parameters": {"x": 42}}',
+                    Message(
+                        role=Role.ASSISTANT,
+                        content='TOOL_CALL: {"tool_name": "test_tool", "parameters": {"x": 42}}',
+                    ),
                     UsageStats(),
                 )
 
@@ -237,7 +240,10 @@ class TestToolExecutionHooks:
                 from selectools.usage import UsageStats
 
                 return (
-                    'TOOL_CALL: {"tool_name": "test_tool", "parameters": {"x": 5}}',
+                    Message(
+                        role=Role.ASSISTANT,
+                        content='TOOL_CALL: {"tool_name": "test_tool", "parameters": {"x": 5}}',
+                    ),
                     UsageStats(),
                 )
 

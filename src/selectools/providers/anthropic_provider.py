@@ -29,7 +29,7 @@ class AnthropicProvider(Provider):
     def __init__(
         self,
         api_key: str | None = None,
-        default_model: str = AnthropicModels.SONNET_3_5_20241022.id,
+        default_model: str = AnthropicModels.SONNET_4_5.id,
         base_url: str | None = None,
     ):
         load_default_env()
@@ -67,7 +67,7 @@ class AnthropicProvider(Provider):
         Call Anthropic's messages API for a non-streaming completion.
 
         Args:
-            model: Model name (e.g., "claude-3-5-sonnet-20241022")
+            model: Model name (e.g., "claude-sonnet-4-5")
             system_prompt: System-level instructions
             messages: Conversation history
             temperature: Sampling temperature (0.0-1.0)

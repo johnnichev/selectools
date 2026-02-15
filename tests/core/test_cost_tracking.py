@@ -366,7 +366,7 @@ class TestAgentCostWarning:
             supports_async = False
 
             def complete(self, **kwargs) -> tuple:
-                return "Response", UsageStats(
+                return Message(role=Role.ASSISTANT, content="Response"), UsageStats(
                     prompt_tokens=1000,
                     completion_tokens=500,
                     total_tokens=1500,

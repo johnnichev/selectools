@@ -48,7 +48,15 @@ class FakeProvider:
         self.calls = 0
 
     def complete(
-        self, *, model, system_prompt, messages, temperature=0.0, max_tokens=1000, timeout=None
+        self,
+        *,
+        model,
+        system_prompt,
+        messages,
+        tools=None,
+        temperature=0.0,
+        max_tokens=1000,
+        timeout=None,
     ):  # noqa: D401
         from selectools import UsageStats
 
@@ -62,7 +70,31 @@ class FakeProvider:
             model=model or "fake",
             provider="fake",
         )
+        # Wrap raw strings in a Message for the agent's response_msg.content access
+        if isinstance(response, str):
+            response = Message(role=Role.ASSISTANT, content=response)
         return response, usage
+
+    async def acomplete(
+        self,
+        *,
+        model,
+        system_prompt,
+        messages,
+        tools=None,
+        temperature=0.0,
+        max_tokens=1000,
+        timeout=None,
+    ):  # noqa: D401
+        return self.complete(
+            model=model,
+            system_prompt=system_prompt,
+            messages=messages,
+            tools=tools,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            timeout=timeout,
+        )
 
 
 class FakeStreamingProvider(FakeProvider):
@@ -370,7 +402,15 @@ def test_agent_streaming_handler_and_fallback():
 def test_agent_retries_on_provider_error():
     class FlakyProvider(FakeProvider):
         def complete(
-            self, *, model, system_prompt, messages, temperature=0.0, max_tokens=1000, timeout=None
+            self,
+            *,
+            model,
+            system_prompt,
+            messages,
+            tools=None,
+            temperature=0.0,
+            max_tokens=1000,
+            timeout=None,
         ):  # noqa: D401
             if self.calls == 0:
                 self.calls += 1
@@ -379,6 +419,7 @@ def test_agent_retries_on_provider_error():
                 model=model,
                 system_prompt=system_prompt,
                 messages=messages,
+                tools=tools,
                 temperature=temperature,
                 max_tokens=max_tokens,
                 timeout=timeout,
@@ -413,29 +454,34 @@ def test_local_provider_streams_tokens():
     assert any("hi" in chunk for chunk in chunks)
 
 
-def test_anthropic_and_gemini_require_api_keys():
+def test_anthropic_and_gemini_require_api_keys(monkeypatch):
+    from unittest.mock import patch
+
     from selectools.exceptions import ProviderConfigurationError
 
-    os.environ.pop("ANTHROPIC_API_KEY", None)
-    os.environ.pop("GEMINI_API_KEY", None)
-    os.environ.pop("GOOGLE_API_KEY", None)
-    try:
-        AnthropicProvider()
-        assert False, "AnthropicProvider should require an API key"
-    except (ProviderError, ProviderConfigurationError):
-        pass
+    # Remove all relevant keys and prevent load_default_env from restoring them
+    for key in ("ANTHROPIC_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        monkeypatch.delenv(key, raising=False)
 
-    try:
-        GeminiProvider()
-        assert False, "GeminiProvider should require an API key"
-    except (ProviderError, ProviderConfigurationError):
-        pass
+    with patch("selectools.providers.anthropic_provider.load_default_env"):
+        try:
+            AnthropicProvider()
+            assert False, "AnthropicProvider should require an API key"
+        except (ProviderError, ProviderConfigurationError):
+            pass
+
+    with patch("selectools.providers.gemini_provider.load_default_env"):
+        try:
+            GeminiProvider()
+            assert False, "GeminiProvider should require an API key"
+        except (ProviderError, ProviderConfigurationError):
+            pass
 
 
 def test_anthropic_provider_with_mocked_client():
     """Test Anthropic provider using a mocked anthropic package."""
     os.environ["ANTHROPIC_API_KEY"] = "test-key"
-    fake_resp_block = types.SimpleNamespace(text="hello anthropic")
+    fake_resp_block = types.SimpleNamespace(type="text", text="hello anthropic")
 
     class FakeUsage:
         def __init__(self):
@@ -471,7 +517,7 @@ def test_anthropic_provider_with_mocked_client():
             system_prompt="sys",
             messages=[Message(role=Role.USER, content="hi")],
         )
-        assert "hello anthropic" in result
+        assert "hello anthropic" in result.content
 
         streamed = "".join(
             provider.stream(
@@ -502,6 +548,7 @@ def test_gemini_provider_with_mocked_client():
     class FakeResponse:
         def __init__(self, text):
             self.text = text
+            self.candidates = []  # No tool calls
             self.usage_metadata = FakeUsageMetadata()
 
     class FakeModels:
@@ -559,7 +606,7 @@ def test_gemini_provider_with_mocked_client():
             system_prompt="sys",
             messages=[Message(role=Role.USER, content="hi")],
         )
-        assert "gemini-response" in result
+        assert "gemini-response" in result.content
 
         stream_result = "".join(
             provider.stream(

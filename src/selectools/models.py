@@ -52,7 +52,45 @@ class ModelInfo:
 class OpenAI:
     """OpenAI GPT models with pricing and capabilities."""
 
-    # ===== GPT-5 Series (Latest Generation) =====
+    # ===== GPT-5.2 Series (Latest) =====
+    GPT_5_2 = ModelInfo(
+        id="gpt-5.2",
+        provider="openai",
+        type="chat",
+        prompt_cost=1.25,
+        completion_cost=10.00,
+        max_tokens=16384,
+        context_window=128000,
+    )
+    GPT_5_2_CHAT_LATEST = ModelInfo(
+        id="gpt-5.2-chat-latest",
+        provider="openai",
+        type="chat",
+        prompt_cost=1.25,
+        completion_cost=10.00,
+        max_tokens=16384,
+        context_window=128000,
+    )
+    GPT_5_2_CODEX = ModelInfo(
+        id="gpt-5.2-codex",
+        provider="openai",
+        type="chat",
+        prompt_cost=1.25,
+        completion_cost=10.00,
+        max_tokens=16384,
+        context_window=128000,
+    )
+    GPT_5_2_PRO = ModelInfo(
+        id="gpt-5.2-pro",
+        provider="openai",
+        type="chat",
+        prompt_cost=15.00,
+        completion_cost=120.00,
+        max_tokens=16384,
+        context_window=128000,
+    )
+
+    # ===== GPT-5.1 Series =====
     GPT_5_1 = ModelInfo(
         id="gpt-5.1",
         provider="openai",
@@ -689,7 +727,18 @@ class OpenAI:
 class Anthropic:
     """Anthropic Claude models with pricing and capabilities."""
 
-    # ===== Claude 4.5 Series (Latest) =====
+    # ===== Claude 4.6 Series (Latest) =====
+    OPUS_4_6 = ModelInfo(
+        id="claude-opus-4-6",
+        provider="anthropic",
+        type="chat",
+        prompt_cost=5.00,
+        completion_cost=25.00,
+        max_tokens=8192,
+        context_window=200000,
+    )
+
+    # ===== Claude 4.5 Series =====
     OPUS_4_5 = ModelInfo(
         id="claude-opus-4-5",
         provider="anthropic",

@@ -7,7 +7,7 @@ from __future__ import annotations
 import asyncio
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, AsyncGenerator, Callable, Dict, List, Optional, Union
 
 from ..analytics import AgentAnalytics
 from ..parser import ToolCallParser
@@ -15,7 +15,7 @@ from ..prompt import PromptBuilder
 from ..providers.base import Provider, ProviderError
 from ..providers.openai_provider import OpenAIProvider
 from ..tools import Tool
-from ..types import AgentResult, Message, Role, ToolCall
+from ..types import AgentResult, Message, Role, StreamChunk, ToolCall
 from ..usage import AgentUsage
 from .config import AgentConfig
 
@@ -166,7 +166,7 @@ class Agent:
                 # Add new user messages to memory
                 self.memory.add_many(messages)
             else:
-                self._history = list(messages)
+                self._history.extend(messages)
 
             iteration = 0
             all_tool_calls: List[ToolCall] = []
@@ -204,6 +204,17 @@ class Agent:
                         tool_args=last_tool_args,
                         iterations=iteration,
                         tool_calls=all_tool_calls,
+                    )
+
+                if self.config.routing_only and tool_calls_to_execute:
+                    # In routing mode, we return the selection without executing.
+                    # We do NOT append to history because the action wasn't completed.
+                    return AgentResult(
+                        message=response_msg,
+                        tool_name=tool_calls_to_execute[-1].tool_name,
+                        tool_args=tool_calls_to_execute[-1].parameters,
+                        iterations=iteration,
+                        tool_calls=tool_calls_to_execute,
                     )
 
                 # Execute tool calls (support multiple in future, currently loop structure handles parsing single)
@@ -448,6 +459,161 @@ class Agent:
         return "rate limit" in lowered or "429" in lowered
 
     # Async methods
+    async def astream(
+        self, messages: List[Message]
+    ) -> AsyncGenerator[Union[StreamChunk, AgentResult], None]:
+        """
+        Stream the agent's response token-by-token.
+
+        Yields:
+            StreamChunk: Intermediate content chunks.
+            AgentResult: The final result object (yielded at the very end).
+        """
+        self._call_hook("on_agent_start", messages)
+
+        try:
+            if self.memory:
+                self._history = self.memory.get_history() + list(messages)
+                self.memory.add_many(messages)
+            else:
+                self._history.extend(messages)
+
+            iteration = 0
+            all_tool_calls: List[ToolCall] = []
+            last_tool_name: Optional[str] = None
+            last_tool_args: Dict[str, Any] = {}
+
+            while iteration < self.config.max_iterations:
+                iteration += 1
+                self._call_hook("on_iteration_start", iteration, self._history)
+
+                full_content = ""
+
+                if not hasattr(self.provider, "astream"):
+                    # Fallback: provider doesn't support astream, use acomplete
+                    if hasattr(self.provider, "acomplete") and getattr(
+                        self.provider, "supports_async", False
+                    ):
+                        response_msg, _usage = await self.provider.acomplete(
+                            model=self.config.model,
+                            system_prompt=self._system_prompt,
+                            messages=self._history,
+                            tools=self.tools,
+                            temperature=self.config.temperature,
+                            max_tokens=self.config.max_tokens,
+                            timeout=self.config.request_timeout,
+                        )
+                    else:
+                        # Last resort: sync complete in executor
+                        loop = asyncio.get_event_loop()
+                        response_msg, _usage = await loop.run_in_executor(
+                            None,
+                            lambda: self.provider.complete(
+                                model=self.config.model,
+                                system_prompt=self._system_prompt,
+                                messages=self._history,
+                                tools=self.tools,
+                                temperature=self.config.temperature,
+                                max_tokens=self.config.max_tokens,
+                                timeout=self.config.request_timeout,
+                            ),
+                        )
+                    yield StreamChunk(content=response_msg.content)
+                    full_content = response_msg.content
+                else:
+                    # Real async streaming
+                    async for chunk in self.provider.astream(
+                        model=self.config.model,
+                        system_prompt=self._system_prompt,
+                        messages=self._history,
+                        tools=self.tools,
+                        temperature=self.config.temperature,
+                        max_tokens=self.config.max_tokens,
+                        timeout=self.config.request_timeout,
+                    ):
+                        yield StreamChunk(content=chunk)
+                        full_content += chunk
+
+                # Reconstruct the response message
+                response_msg = Message(role=Role.ASSISTANT, content=full_content)
+                self._history.append(response_msg)
+                if self.memory:
+                    self.memory.add(response_msg)
+
+                # Tool parsing logic (same as run/arun)
+                tool_calls_to_execute = []
+                parse_result = self.parser.parse(full_content)
+                if parse_result.tool_call:
+                    tool_calls_to_execute.append(parse_result.tool_call)
+
+                if not tool_calls_to_execute:
+                    final_response = response_msg
+                    self._call_hook("on_iteration_end", iteration, full_content)
+                    yield AgentResult(
+                        message=final_response,
+                        tool_name=last_tool_name,
+                        tool_args=last_tool_args,
+                        iterations=iteration,
+                        tool_calls=all_tool_calls,
+                    )
+                    self._call_hook("on_agent_end", final_response, self.usage)
+                    return
+
+                if self.config.routing_only:
+                    yield AgentResult(
+                        message=response_msg,
+                        tool_name=tool_calls_to_execute[-1].tool_name,
+                        tool_args=tool_calls_to_execute[-1].parameters,
+                        iterations=iteration,
+                        tool_calls=tool_calls_to_execute,
+                    )
+                    return
+
+                # Execute tools
+                for tool_call in tool_calls_to_execute:
+                    tool_name = tool_call.tool_name
+                    parameters = tool_call.parameters
+                    all_tool_calls.append(tool_call)
+                    last_tool_name = tool_name
+                    last_tool_args = parameters
+
+                    tool = self._tools_by_name.get(tool_name)
+                    if not tool:
+                        result = f"Error: Tool {tool_name} not found"
+                        self._append_tool_result(result, tool_name, tool_call.id)
+                        continue
+
+                    try:
+                        result = await self._aexecute_tool_with_timeout(tool, parameters, None)
+                        self._append_tool_result(
+                            result, tool_name, tool_call.id, tool_result=result
+                        )
+                    except Exception as exc:
+                        error_message = f"Error executing tool '{tool.name}': {exc}"
+                        self._append_tool_result(error_message, tool_name, tool_call.id)
+
+                self._call_hook("on_iteration_end", iteration, full_content)
+
+            # Max iterations reached
+            final_msg = Message(
+                role=Role.ASSISTANT,
+                content=f"Maximum iterations ({self.config.max_iterations}) reached without resolution.",
+            )
+            yield AgentResult(
+                message=final_msg,
+                tool_name=last_tool_name,
+                tool_args=last_tool_args,
+                iterations=iteration,
+                tool_calls=all_tool_calls,
+            )
+            if self.memory:
+                self.memory.add(final_msg)
+            self._call_hook("on_agent_end", final_msg, self.usage)
+            return
+        except Exception as exc:
+            self._call_hook("on_error", exc, {"messages": messages, "iteration": 0})
+            raise
+
     async def arun(
         self, messages: List[Message], stream_handler: Optional[Callable[[str], None]] = None
     ) -> AgentResult:
@@ -509,6 +675,15 @@ class Agent:
                         tool_args=last_tool_args,
                         iterations=iteration,
                         tool_calls=all_tool_calls,
+                    )
+
+                if self.config.routing_only and tool_calls_to_execute:
+                    return AgentResult(
+                        message=response_msg,
+                        tool_name=tool_calls_to_execute[-1].tool_name,
+                        tool_args=tool_calls_to_execute[-1].parameters,
+                        iterations=iteration,
+                        tool_calls=tool_calls_to_execute,
                     )
 
                 # Execute tool calls
@@ -615,7 +790,6 @@ class Agent:
 
                 if self.config.stream and getattr(self.provider, "supports_streaming", False):
                     response_text = await self._astreaming_call(stream_handler=stream_handler)
-                    self._call_hook("on_llm_end", response_text, None)
                     self._call_hook("on_llm_end", response_text, None)
                     return Message(role=Role.ASSISTANT, content=response_text)
 

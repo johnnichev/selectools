@@ -28,7 +28,7 @@ def e2e_provider():
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         pytest.skip("OPENAI_API_KEY not set")
-    return OpenAIProvider(api_key=api_key, model="gpt-4o-mini")
+    return OpenAIProvider(api_key=api_key, default_model="gpt-4o-mini")
 
 
 @tool()
@@ -45,7 +45,7 @@ class TestAgentE2E:
     def test_custom_system_prompt_e2e(self, e2e_provider):
         """Verify custom system prompt changes agent behavior."""
         agent = Agent(
-            tools=[],
+            tools=[get_weather],
             provider=e2e_provider,
             config=AgentConfig(
                 system_prompt="You are a pirate. Always speak like a pirate. Start response with 'Ahoy'."
@@ -83,24 +83,24 @@ class TestAgentE2E:
     def test_agent_reset_e2e(self, e2e_provider):
         """Verify agent reset clears history and allows reuse."""
         agent = Agent(
-            tools=[],
+            tools=[get_weather],
             provider=e2e_provider,
             config=AgentConfig(max_iterations=3),
         )
 
         # First conversation
-        agent.run([Message(role=Role.USER, content="My name is John.")])
+        agent.run([Message(role=Role.USER, content="The magic number is 42.")])
 
         # Verify memory without reset
-        r2 = agent.run([Message(role=Role.USER, content="What is my name?")])
-        assert "John" in r2.content
+        r2 = agent.run([Message(role=Role.USER, content="What is the magic number?")])
+        assert "42" in r2.content
 
         # Reset
         agent.reset()
 
         # Verify clean slate
-        r3 = agent.run([Message(role=Role.USER, content="What is my name?")])
-        assert "John" not in r3.content  # Should not know the name anymore
+        r3 = agent.run([Message(role=Role.USER, content="What is the magic number?")])
+        assert "42" not in r3.content  # Should not know the number anymore
         assert agent.total_tokens > 0  # Usage from r3 only (previous cleared) but still > 0
 
     def test_reusable_agent_multiple_turns(self, e2e_provider):

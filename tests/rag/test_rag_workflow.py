@@ -22,7 +22,7 @@ from selectools.rag import (
     TextSplitter,
     VectorStore,
 )
-from selectools.types import AgentResult
+from selectools.types import AgentResult, Message, Role
 
 # ============================================================================
 # Fixtures
@@ -74,7 +74,10 @@ def mock_provider():
         if last_message and "search_knowledge_base" in content:
             # Return tool call response
             return (
-                'TOOL_CALL: {"tool_name": "search_knowledge_base", "parameters": {"query": "test"}}',
+                Message(
+                    role=Role.ASSISTANT,
+                    content='TOOL_CALL: {"tool_name": "search_knowledge_base", "parameters": {"query": "test"}}',
+                ),
                 Mock(
                     prompt_tokens=10,
                     completion_tokens=20,
@@ -90,7 +93,10 @@ def mock_provider():
         else:
             # Return final answer
             return (
-                "Based on the knowledge base, here is the answer.",
+                Message(
+                    role=Role.ASSISTANT,
+                    content="Based on the knowledge base, here is the answer.",
+                ),
                 Mock(
                     prompt_tokens=5,
                     completion_tokens=15,

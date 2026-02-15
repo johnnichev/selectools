@@ -5,7 +5,9 @@ Tool metadata, schemas, and runtime validation.
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import difflib
+import functools
 import inspect
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -441,10 +443,11 @@ class Tool:
             else:
                 # Run sync function in executor to avoid blocking
                 loop = asyncio.get_event_loop()
+                context = contextvars.copy_context()
+                func_with_args = functools.partial(self.function, **call_args)
+
                 with ThreadPoolExecutor() as executor:
-                    result = await loop.run_in_executor(
-                        executor, lambda: self.function(**call_args)
-                    )
+                    result = await loop.run_in_executor(executor, context.run, func_with_args)
 
                 # Handle sync streaming in async context
                 if inspect.isgenerator(result):

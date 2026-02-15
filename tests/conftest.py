@@ -19,7 +19,13 @@ def pytest_addoption(parser):
 
 
 def pytest_configure(config):
-    """Register custom markers."""
+    """Register custom markers and load environment."""
+    # Load .env file for E2E tests
+    from selectools.env import load_default_env
+
+    load_default_env()
+
+    # Register markers
     config.addinivalue_line(
         "markers", "e2e: mark test as end-to-end (requires real API keys, use --run-e2e to run)"
     )

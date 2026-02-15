@@ -135,8 +135,8 @@ class TestOpenAIProvider:
         )
 
         assert response is not None
-        assert len(response) > 0
-        assert "hello" in response.lower()
+        assert len(response.content) > 0
+        assert "hello" in response.content.lower()
         assert usage.prompt_tokens > 0
         assert usage.completion_tokens > 0
         assert usage.cost_usd > 0
@@ -259,7 +259,7 @@ class TestAnthropicProvider:
         )
 
         assert response is not None
-        assert len(response) > 0
+        assert len(response.content) > 0
         assert usage.prompt_tokens > 0
         assert usage.completion_tokens > 0
         assert usage.cost_usd > 0
@@ -366,16 +366,16 @@ class TestGeminiProvider:
         """Test basic completion with Gemini."""
         from selectools.providers.gemini_provider import GeminiProvider
 
-        provider = GeminiProvider(default_model="gemini-1.5-flash")
+        provider = GeminiProvider(default_model="gemini-2.0-flash")
         response, usage = provider.complete(
-            model="gemini-1.5-flash",
+            model="gemini-2.0-flash",
             system_prompt="You are a helpful assistant. Be very brief.",
             messages=[Message(role=Role.USER, content="Say 'hello' and nothing else.")],
             max_tokens=50,
         )
 
         assert response is not None
-        assert len(response) > 0
+        assert len(response.content) > 0
         assert usage.prompt_tokens > 0
         assert usage.completion_tokens > 0
         assert usage.cost_usd >= 0  # Gemini can be free tier
@@ -388,8 +388,8 @@ class TestGeminiProvider:
 
         agent = Agent(
             tools=[calculator_tool],
-            provider=GeminiProvider(default_model="gemini-1.5-flash"),
-            config=AgentConfig(model="gemini-1.5-flash", max_iterations=3, verbose=True),
+            provider=GeminiProvider(default_model="gemini-2.0-flash"),
+            config=AgentConfig(model="gemini-2.0-flash", max_iterations=3, verbose=True),
         )
 
         response = agent.run(
@@ -406,11 +406,11 @@ class TestGeminiProvider:
         """Test streaming with Gemini."""
         from selectools.providers.gemini_provider import GeminiProvider
 
-        provider = GeminiProvider(default_model="gemini-1.5-flash")
+        provider = GeminiProvider(default_model="gemini-2.0-flash")
         chunks = []
 
         for chunk in provider.stream(
-            model="gemini-1.5-flash",
+            model="gemini-2.0-flash",
             system_prompt="You are a helpful assistant. Be brief.",
             messages=[Message(role=Role.USER, content="Name 3 fruits.")],
             max_tokens=50,
@@ -429,8 +429,8 @@ class TestGeminiProvider:
 
         agent = Agent(
             tools=[calculator_tool],
-            provider=GeminiProvider(default_model="gemini-1.5-flash"),
-            config=AgentConfig(model="gemini-1.5-flash", max_iterations=3),
+            provider=GeminiProvider(default_model="gemini-2.0-flash"),
+            config=AgentConfig(model="gemini-2.0-flash", max_iterations=3),
         )
 
         response = await agent.arun(
@@ -448,8 +448,8 @@ class TestGeminiProvider:
         memory = ConversationMemory(max_messages=10)
         agent = Agent(
             tools=[weather_tool],
-            provider=GeminiProvider(default_model="gemini-1.5-flash"),
-            config=AgentConfig(model="gemini-1.5-flash", max_iterations=3),
+            provider=GeminiProvider(default_model="gemini-2.0-flash"),
+            config=AgentConfig(model="gemini-2.0-flash", max_iterations=3),
             memory=memory,
         )
 
@@ -511,8 +511,8 @@ class TestCrossProvider:
 
             agent = Agent(
                 tools=[calculator_tool],
-                provider=GeminiProvider(default_model="gemini-1.5-flash"),
-                config=AgentConfig(model="gemini-1.5-flash", max_iterations=2),
+                provider=GeminiProvider(default_model="gemini-2.0-flash"),
+                config=AgentConfig(model="gemini-2.0-flash", max_iterations=2),
             )
             agent.run([Message(role=Role.USER, content="What is 2+2? Use calculator.")])
             results["gemini"] = {

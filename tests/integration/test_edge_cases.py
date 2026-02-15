@@ -222,11 +222,11 @@ async def test_provider_error_recovery():
 
                 raise ProviderError("Temporary failure")
             usage = UsageStats(prompt_tokens=10, completion_tokens=5)
-            return "Success after retries", usage
+            return Message(role=Role.ASSISTANT, content="Success after retries"), usage
 
         def complete(self, **kwargs):
             usage = UsageStats(prompt_tokens=10, completion_tokens=5)
-            return "Sync fallback", usage
+            return Message(role=Role.ASSISTANT, content="Sync fallback"), usage
 
     tool = Tool(name="test", description="Test", parameters=[], function=lambda: "ok")
 

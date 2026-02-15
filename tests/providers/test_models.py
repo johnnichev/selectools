@@ -39,8 +39,8 @@ class TestModelRegistry:
     """Tests for the complete model registry."""
 
     def test_all_models_count(self):
-        """Test that we have all 130 models (120 chat + 10 embedding)."""
-        assert len(ALL_MODELS) == 130
+        """Test that we have all registered models."""
+        assert len(ALL_MODELS) == 135
 
     def test_models_by_id_count(self):
         """Test that MODELS_BY_ID has same count as ALL_MODELS."""
@@ -70,9 +70,9 @@ class TestOpenAIModels:
     """Tests for OpenAI model definitions."""
 
     def test_openai_model_count(self):
-        """Test OpenAI has 67 models (64 chat + 3 embedding)."""
+        """Test OpenAI model count."""
         openai_models = [m for m in ALL_MODELS if m.provider == "openai"]
-        assert len(openai_models) == 67
+        assert len(openai_models) == 71
 
     def test_openai_gpt4o(self):
         """Test GPT-4o model definition."""
@@ -104,9 +104,9 @@ class TestAnthropicModels:
     """Tests for Anthropic Claude model definitions."""
 
     def test_anthropic_model_count(self):
-        """Test Anthropic has 20 models (18 chat + 2 embedding)."""
+        """Test Anthropic model count."""
         anthropic_models = [m for m in ALL_MODELS if m.provider == "anthropic"]
-        assert len(anthropic_models) == 20
+        assert len(anthropic_models) == 21
 
     def test_anthropic_sonnet_4_5(self):
         """Test Claude Sonnet 4.5 model definition."""

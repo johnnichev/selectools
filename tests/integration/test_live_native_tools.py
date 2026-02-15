@@ -55,7 +55,11 @@ def test_anthropic_native_tool_call():
     except Exception as e:
         pytest.skip(f"Anthropic init failed: {e}")
 
-    agent = Agent(config=AgentConfig(), provider=provider, tools=[get_random_number])
+    agent = Agent(
+        config=AgentConfig(model=provider.default_model),
+        provider=provider,
+        tools=[get_random_number],
+    )
     response = agent.run(
         [Message(role=Role.USER, content="Generate a random number between 1 and 100.")]
     )
@@ -73,7 +77,11 @@ def test_gemini_native_tool_call():
     except Exception as e:
         pytest.skip(f"Gemini init failed: {e}")
 
-    agent = Agent(config=AgentConfig(), provider=provider, tools=[get_random_number])
+    agent = Agent(
+        config=AgentConfig(model=provider.default_model),
+        provider=provider,
+        tools=[get_random_number],
+    )
     response = agent.run(
         [Message(role=Role.USER, content="Generate a random number between 1 and 100.")]
     )

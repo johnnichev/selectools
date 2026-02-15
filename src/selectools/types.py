@@ -11,7 +11,7 @@ import base64
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Protocol, Union
 
 
 class Role(str, Enum):
@@ -187,4 +187,26 @@ class AgentResult:
         return self.message.role
 
 
-__all__ = ["Role", "Message", "ToolCall", "AgentResult"]
+@dataclass
+class StreamChunk:
+    """
+    A chunk of streaming content from the agent.
+
+    Attributes:
+        content: The text content of this chunk (delta).
+        role: The role emitting this chunk (usually ASSISTANT).
+    """
+
+    content: str
+    role: Role = Role.ASSISTANT
+
+
+class StreamHandler(Protocol):
+    """Protocol for handling streaming response chunks."""
+
+    async def on_chunk(self, chunk: StreamChunk) -> None:
+        """Called when a new chunk of content is available."""
+        ...
+
+
+__all__ = ["Role", "Message", "ToolCall", "AgentResult", "StreamChunk", "StreamHandler"]

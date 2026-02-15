@@ -42,7 +42,15 @@ class FakeProvider:
         self.last_system_prompt = None
 
     def complete(
-        self, *, model, system_prompt, messages, temperature=0.0, max_tokens=1000, timeout=None
+        self,
+        *,
+        model,
+        system_prompt,
+        messages,
+        tools=None,
+        temperature=0.0,
+        max_tokens=1000,
+        timeout=None,
     ):
         self.last_system_prompt = system_prompt
         response = self.responses[min(self.calls, len(self.responses) - 1)]
@@ -55,6 +63,8 @@ class FakeProvider:
             model=model or "fake",
             provider="fake",
         )
+        if isinstance(response, str):
+            response = Message(role=Role.ASSISTANT, content=response)
         return response, usage
 
 
@@ -344,7 +354,15 @@ class FakeAsyncProvider:
         self.calls = 0
 
     async def acomplete(
-        self, *, model, system_prompt, messages, temperature=0.0, max_tokens=1000, timeout=None
+        self,
+        *,
+        model,
+        system_prompt,
+        messages,
+        tools=None,
+        temperature=0.0,
+        max_tokens=1000,
+        timeout=None,
     ):
         response = self.responses[min(self.calls, len(self.responses) - 1)]
         self.calls += 1
@@ -356,6 +374,8 @@ class FakeAsyncProvider:
             model=model or "fake",
             provider="fake",
         )
+        if isinstance(response, str):
+            response = Message(role=Role.ASSISTANT, content=response)
         return response, usage
 
     def complete(self, **kwargs):
