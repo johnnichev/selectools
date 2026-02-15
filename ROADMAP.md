@@ -1,7 +1,5 @@
 # Selectools Development Roadmap
 
-This document tracks all planned features and improvements. It consolidates requests from the Traffic Cop and Smart Router projects into a unified release plan.
-
 > **Status Legend**
 >
 > - ✅ **Implemented** - Merged and available in latest release
