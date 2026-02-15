@@ -42,7 +42,7 @@ def get_weather(city: str) -> str:
     return weather_data.get(city.lower(), f"Weather data not available for {city}")
 
 
-def test_basic_memory():
+def test_basic_memory() -> bool:
     """Test that memory persists across turns."""
     print("\n" + "=" * 60)
     print("TEST 1: Basic Memory Persistence")
@@ -80,7 +80,7 @@ def test_basic_memory():
         return False
 
 
-def test_multi_turn_context():
+def test_multi_turn_context() -> bool:
     """Test that agent maintains context across multiple turns."""
     print("\n" + "=" * 60)
     print("TEST 2: Multi-Turn Context")
@@ -126,7 +126,7 @@ def test_multi_turn_context():
         return False
 
 
-def test_memory_without_memory():
+def test_memory_without_memory() -> bool:
     """Test that agent still works without memory (backward compatibility)."""
     print("\n" + "=" * 60)
     print("TEST 3: Backward Compatibility (No Memory)")
@@ -152,7 +152,7 @@ def test_memory_without_memory():
         return False
 
 
-def test_memory_limits():
+def test_memory_limits() -> bool:
     """Test that memory respects max_messages limit."""
     print("\n" + "=" * 60)
     print("TEST 4: Memory Limits")
@@ -184,7 +184,7 @@ def test_memory_limits():
         return False
 
 
-def main():
+def main() -> None:
     """Run all tests."""
     # Check for API key
     if not os.getenv("OPENAI_API_KEY"):

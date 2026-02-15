@@ -1,14 +1,19 @@
-import json
-import os
+"""Fetch available models from OpenAI, Anthropic, and Gemini APIs."""
 
-import requests
+from __future__ import annotations
+
+import os
+from typing import Any
+
+import requests  # type: ignore[import-untyped]
 
 from selectools.env import load_default_env
 
 load_default_env()
 
 
-def fetch_openai_models():
+def fetch_openai_models() -> None:
+    """Print available OpenAI chat/GPT models."""
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         print("Skipping OpenAI (no key)")
@@ -18,9 +23,8 @@ def fetch_openai_models():
     try:
         response = requests.get("https://api.openai.com/v1/models", headers=headers)
         response.raise_for_status()
-        models = response.json()["data"]
+        models: list[dict[str, Any]] = response.json()["data"]
         print("\n=== OpenAI Models ===")
-        # Filter for chat/gpt models
         for m in sorted(models, key=lambda x: x["id"]):
             if "gpt" in m["id"] or "o1" in m["id"] or "o3" in m["id"]:
                 print(f"{m['id']}")
@@ -28,23 +32,17 @@ def fetch_openai_models():
         print(f"Error fetching OpenAI models: {e}")
 
 
-def fetch_anthropic_models():
+def fetch_anthropic_models() -> None:
+    """Print available Anthropic models."""
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         print("Skipping Anthropic (no key)")
         return
 
-    # Anthropic models endpoint?
-    # Official API doesn't have a public list models endpoint documented in the same way,
-    # but the client might have one?
-    # python client: client.models.list()
     try:
-        import anthropic
+        import anthropic  # type: ignore[import-untyped]
 
         client = anthropic.Anthropic(api_key=api_key)
-        # As of early 2025/2026, list models might be available
-        # If not, we rely on known docs.
-        # But let's check.
         if hasattr(client, "models") and hasattr(client.models, "list"):
             models = client.models.list()
             print("\n=== Anthropic Models ===")
@@ -59,14 +57,15 @@ def fetch_anthropic_models():
         print(f"Error fetching Anthropic models: {e}")
 
 
-def fetch_gemini_models():
+def fetch_gemini_models() -> None:
+    """Print available Gemini models."""
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     if not api_key:
         print("Skipping Gemini (no key)")
         return
 
     try:
-        from google import genai
+        from google import genai  # type: ignore[import-untyped]
 
         client = genai.Client(api_key=api_key)
         print("\n=== Gemini Models ===")

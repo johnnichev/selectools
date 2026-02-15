@@ -116,10 +116,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ideal for classification, intent routing, and tool selection pipelines
 - Returns `AgentResult` with `tool_name` and `tool_args` immediately
 
+### Breaking Changes
+
+- **`Provider.complete()` return type**: Returns `tuple[Message, UsageStats]` instead of `tuple[str, UsageStats]`
+  - **Migration**: If you call `provider.complete()` directly, the first element is now a `Message` object; use `message.content` to get the text
+  - **Migration**: If you have a custom `Provider` implementation, update `complete()` and `acomplete()` to return `(Message, UsageStats)` instead of `(str, UsageStats)`
+  - **No impact** if you only use `Agent.run()` / `Agent.arun()` (the agent handles this internally)
+- **`Provider.complete()` signature**: New `tools: Optional[List[Tool]] = None` parameter added
+  - **No impact** for existing code (parameter has a default value)
+
 ### Changed
 
-- Provider `complete()` signature extended with `tools: Optional[List[Tool]] = None`
-- Agent loop checks `response_msg.tool_calls` before falling back to parser
+- Agent loop checks `response_msg.tool_calls` before falling back to text-based parser
 - Default Anthropic model updated from retired `claude-3-5-sonnet-20241022` to `claude-sonnet-4-5-20250514`
 
 ### Fixed
@@ -128,6 +136,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed API key isolation tests using `monkeypatch.delenv` + `unittest.mock.patch`
 - Fixed E2E test failures from retired Anthropic model
 - Updated model registry assertion counts to match current 135+ model entries
+
+---
+
+## [0.9.0] - 2026-02-12
+
+### Added - Core Capabilities & Reliability
+
+#### Custom System Prompt
+
+- **`AgentConfig(system_prompt=...)`** - Inject domain-specific instructions directly
+  - Replaces the default built-in system prompt when provided
+  - No more workarounds prepending instructions to user messages
+
+#### Structured AgentResult
+
+- **`Agent.run()` now returns `AgentResult`** instead of `Message`
+  - `result.message` - The final `Message` object
+  - `result.tool_name` - Name of the last tool called (or `None`)
+  - `result.tool_args` - Parameters passed to the last tool call
+  - `result.iterations` - Number of loop iterations used
+  - `result.tool_calls` - Ordered list of all `ToolCall` objects made during the run
+  - **Backward-compatible**: `result.content` and `result.role` properties still work
+
+#### Reusable Agent Instances
+
+- **`Agent.reset()`** - Clears history, usage stats, analytics, and memory for clean reuse
+  - No more creating fresh Agent/Provider/Config per request
+
+### Breaking Changes
+
+- **`run()` / `arun()` return type**: Returns `AgentResult` instead of `Message`
+  - **Migration**: Code using `result.content` continues to work unchanged (backward-compat property)
+  - **Migration**: Code doing `isinstance(result, Message)` or type-checking the return must update to `AgentResult`
+  - **Migration**: Code passing the result directly as a `Message` should use `result.message` instead
 
 ---
 
@@ -539,10 +581,99 @@ agent = RAGAgent.from_directory(
 
 ---
 
+## Migration Guide: v0.8.0 → v0.12.0
+
+This section covers all breaking changes for consumers upgrading from v0.8.0.
+
+### Summary of Breaking Changes
+
+| Version | Change | Impact |
+|---------|--------|--------|
+| v0.9.0  | `run()` / `arun()` return `AgentResult` instead of `Message` | Low (backward-compat properties) |
+| v0.10.0 | `Provider.complete()` returns `(Message, UsageStats)` instead of `(str, UsageStats)` | Low (only if calling provider directly) |
+| v0.10.0 | `Provider.complete()` signature adds `tools` parameter | None (has default) |
+
+### Step-by-Step Migration
+
+#### 1. `Agent.run()` return type (v0.9.0)
+
+```python
+# v0.8.0 — run() returned a Message
+result = agent.run([Message(role=Role.USER, content="Hello")])
+print(result.content)  # str — the response text
+
+# v0.9.0+ — run() returns AgentResult
+result = agent.run([Message(role=Role.USER, content="Hello")])
+print(result.content)      # STILL WORKS — backward-compat property
+print(result.message)      # NEW — the underlying Message object
+print(result.tool_name)    # NEW — last tool called (or None)
+print(result.tool_args)    # NEW — last tool parameters
+print(result.iterations)   # NEW — loop iteration count
+print(result.tool_calls)   # NEW — all ToolCall objects
+```
+
+**Most code needs zero changes** because `result.content` and `result.role` are preserved as properties on `AgentResult`.
+
+**Code that breaks:**
+
+```python
+# ❌ Type checks against Message
+if isinstance(result, Message):  # False now — it's AgentResult
+
+# ❌ Passing result where Message is expected
+some_function_expecting_message(result)  # Pass result.message instead
+```
+
+#### 2. `Provider.complete()` return type (v0.10.0)
+
+Only relevant if you call `provider.complete()` directly or have a custom `Provider`:
+
+```python
+# v0.8.0 — complete() returned (str, UsageStats)
+text, usage = provider.complete(model="gpt-4o", ...)
+print(text)  # str
+
+# v0.10.0+ — complete() returns (Message, UsageStats)
+message, usage = provider.complete(model="gpt-4o", ...)
+print(message.content)      # str — the response text
+print(message.tool_calls)   # List[ToolCall] — native tool calls
+```
+
+**No impact** if you only use `Agent.run()` / `Agent.arun()`.
+
+#### 3. New features (all backward-compatible, opt-in)
+
+```python
+from selectools import Agent, AgentConfig, InMemoryCache
+
+config = AgentConfig(
+    # NEW in v0.9.0 — custom system prompt (replaces message-prepending hacks)
+    system_prompt="You are a routing assistant.",
+
+    # NEW in v0.10.0 — return tool selection without executing
+    routing_only=True,
+
+    # NEW in v0.11.0 — parallel tool execution (on by default)
+    parallel_tool_execution=True,
+
+    # NEW in v0.12.0 — response caching
+    cache=InMemoryCache(max_size=1000, default_ttl=300),
+)
+
+agent = Agent(tools=[...], provider=provider, config=config)
+
+# NEW in v0.9.0 — reuse agent between requests
+agent.reset()
+```
+
+---
+
 ## Release Links
 
+- [0.12.0 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.12.0)
 - [0.11.0 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.11.0)
 - [0.10.0 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.10.0)
+- [0.9.0 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.9.0)
 - [0.8.0 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.8.0)
 - [0.7.0 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.7.0)
 - [0.6.1 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.6.1)

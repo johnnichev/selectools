@@ -24,7 +24,8 @@ import json
 from openai import OpenAI
 
 
-def main():
+def main() -> None:
+    """Fetch and display all available OpenAI models with pricing info."""
     client = OpenAI()
 
     print("=" * 80)

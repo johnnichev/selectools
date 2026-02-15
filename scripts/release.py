@@ -8,12 +8,15 @@ Usage:
     python scripts/release.py --version 1.0.0 --dry-run
 """
 
+from __future__ import annotations
+
 import argparse
 import re
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 
 class ReleaseManager:
@@ -37,7 +40,7 @@ class ReleaseManager:
         self.pyproject_path.write_text(updated)
         print(f"✓ Updated version in pyproject.toml to {new_version}")
 
-    def update_changelog(self, version: str, message: str = None) -> None:
+    def update_changelog(self, version: str, message: Optional[str] = None) -> None:
         """Add new version entry to CHANGELOG.md"""
         if not self.changelog_path.exists():
             print("⚠ CHANGELOG.md not found, skipping changelog update")
@@ -103,7 +106,7 @@ class ReleaseManager:
                 f"Invalid version format: {version}. Use semantic versioning (e.g., 0.3.1)"
             )
 
-    def git_commit(self, version: str, message: str = None) -> None:
+    def git_commit(self, version: str, message: Optional[str] = None) -> None:
         """Commit version changes"""
         files = ["pyproject.toml"]
         if self.changelog_path.exists():
@@ -136,7 +139,7 @@ class ReleaseManager:
     def release(
         self,
         new_version: str,
-        message: str = None,
+        message: Optional[str] = None,
         dry_run: bool = False,
         skip_confirm: bool = False,
     ) -> None:
@@ -223,7 +226,8 @@ class ReleaseManager:
             sys.exit(1)
 
 
-def main():
+def main() -> None:
+    """Parse arguments and execute the release."""
     parser = argparse.ArgumentParser(
         description="Release selectools to PyPI via GitHub Actions",
         formatter_class=argparse.RawDescriptionHelpFormatter,
