@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 
 import pytest
@@ -18,7 +20,7 @@ def get_random_number(min_val: int, max_val: int) -> int:
 
 
 @pytest.fixture
-def weather_agent(request):
+def weather_agent(request: pytest.FixtureRequest) -> Agent:
     provider_cls = request.param
     try:
         provider = provider_cls()
@@ -29,7 +31,7 @@ def weather_agent(request):
 
 
 @pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"), reason="OPENAI_API_KEY not set")
-def test_openai_native_tool_call():
+def test_openai_native_tool_call() -> None:
     print("\nTesting OpenAI native tool call...")
     try:
         provider = OpenAIProvider()
@@ -48,7 +50,7 @@ def test_openai_native_tool_call():
 
 
 @pytest.mark.skipif(not os.getenv("ANTHROPIC_API_KEY"), reason="ANTHROPIC_API_KEY not set")
-def test_anthropic_native_tool_call():
+def test_anthropic_native_tool_call() -> None:
     print("\nTesting Anthropic native tool call...")
     try:
         provider = AnthropicProvider()
@@ -70,7 +72,7 @@ def test_anthropic_native_tool_call():
 
 
 @pytest.mark.skipif(not os.getenv("GEMINI_API_KEY"), reason="GEMINI_API_KEY not set")
-def test_gemini_native_tool_call():
+def test_gemini_native_tool_call() -> None:
     print("\nTesting Gemini native tool call...")
     try:
         provider = GeminiProvider()
@@ -91,7 +93,7 @@ def test_gemini_native_tool_call():
     assert response.tool_calls[0].tool_name == "get_random_number"
 
 
-def test_ollama_native_tool_call():
+def test_ollama_native_tool_call() -> None:
     print("\nTesting Ollama native tool call...")
     try:
         # Short timeout to fail fast if not running

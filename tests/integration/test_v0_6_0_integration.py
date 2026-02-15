@@ -10,9 +10,12 @@ Tests that Ollama provider and Analytics work well with:
 - Observability Hooks (v0.5.2)
 """
 
+from __future__ import annotations
+
 # Import FakeProvider from test_framework
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -27,7 +30,7 @@ from tests.core.test_framework import FakeProvider  # noqa: E402
 
 
 @pytest.fixture
-def simple_tool():
+def simple_tool() -> Tool:
     """Simple tool for testing."""
 
     def greet(name: str) -> str:
@@ -42,7 +45,7 @@ def simple_tool():
 
 
 @pytest.fixture
-def counter_tool():
+def counter_tool() -> Tool:
     """Tool that maintains state for testing memory."""
     call_count = {"count": 0}
 
@@ -61,7 +64,7 @@ def counter_tool():
 class TestOllamaIntegration:
     """Test Ollama provider integration with existing features."""
 
-    def test_ollama_with_cost_tracking(self, simple_tool):
+    def test_ollama_with_cost_tracking(self, simple_tool: Tool) -> None:
         """Test that Ollama correctly reports zero cost."""
         # Use LocalProvider as a proxy since we can't assume Ollama is running
         provider = LocalProvider()
@@ -76,7 +79,7 @@ class TestOllamaIntegration:
         assert agent.total_cost == 0.0
         assert agent.usage.total_cost_usd == 0.0
 
-    def test_ollama_with_memory(self, simple_tool):
+    def test_ollama_with_memory(self, simple_tool: Tool) -> None:
         """Test Ollama with conversation memory."""
         provider = FakeProvider(
             responses=[
@@ -107,7 +110,7 @@ class TestOllamaIntegration:
         assert len(history) >= 2  # At least 2 user messages
 
     @pytest.mark.asyncio
-    async def test_ollama_async_execution(self, simple_tool):
+    async def test_ollama_async_execution(self, simple_tool: Tool) -> None:
         """Test async execution with Ollama-like provider."""
         provider = FakeProvider(
             responses=[
@@ -124,17 +127,17 @@ class TestOllamaIntegration:
 class TestAnalyticsIntegration:
     """Test Analytics integration with existing features."""
 
-    def test_analytics_with_observability_hooks(self, simple_tool):
+    def test_analytics_with_observability_hooks(self, simple_tool: Tool) -> None:
         """Test that analytics and hooks work together."""
         hook_calls = {"tool_start": 0, "tool_end": 0, "llm_end": 0}
 
-        def on_tool_start(name, args):
+        def on_tool_start(name: str, args: Any) -> None:
             hook_calls["tool_start"] += 1
 
-        def on_tool_end(name, result, duration):
+        def on_tool_end(name: str, result: Any, duration: Any) -> None:
             hook_calls["tool_end"] += 1
 
-        def on_llm_end(response, usage):
+        def on_llm_end(response: Any, usage: Any) -> None:
             hook_calls["llm_end"] += 1
 
         provider = FakeProvider(
@@ -165,7 +168,7 @@ class TestAnalyticsIntegration:
         assert metrics is not None
         assert metrics.total_calls >= 1
 
-    def test_analytics_with_toolbox(self):
+    def test_analytics_with_toolbox(self) -> None:
         """Test analytics with pre-built toolbox tools."""
         # Get some toolbox tools
         text_tools = get_tools_by_category("text")[:2]  # Get 2 text tools
@@ -186,7 +189,7 @@ class TestAnalyticsIntegration:
         assert metrics is not None
         assert metrics.total_calls >= 1
 
-    def test_analytics_with_memory(self, simple_tool, counter_tool):
+    def test_analytics_with_memory(self, simple_tool: Tool, counter_tool: Tool) -> None:
         """Test analytics across multiple conversation turns with memory."""
         provider = FakeProvider(
             responses=[
@@ -226,7 +229,7 @@ class TestAnalyticsIntegration:
         assert greet_metrics is not None
         assert greet_metrics.total_calls >= 1  # Called in turn 3
 
-    def test_analytics_with_cost_tracking(self, simple_tool):
+    def test_analytics_with_cost_tracking(self, simple_tool: Tool) -> None:
         """Test that analytics and cost tracking coexist properly."""
         provider = FakeProvider(
             responses=[
@@ -247,7 +250,7 @@ class TestAnalyticsIntegration:
         assert metrics is not None
         assert metrics.total_calls >= 1
 
-    def test_analytics_with_tool_validation(self):
+    def test_analytics_with_tool_validation(self) -> None:
         """Test analytics with tool validation errors."""
 
         # Create a tool with strict validation
@@ -287,7 +290,7 @@ class TestAnalyticsIntegration:
             assert metrics.total_calls >= 0
 
     @pytest.mark.asyncio
-    async def test_analytics_async_integration(self, simple_tool):
+    async def test_analytics_async_integration(self, simple_tool: Tool) -> None:
         """Test analytics with async agent execution."""
         provider = FakeProvider(
             responses=[
@@ -310,11 +313,11 @@ class TestAnalyticsIntegration:
 class TestCombinedFeatures:
     """Test combinations of multiple v0.6.0 and previous features."""
 
-    def test_all_features_together(self, simple_tool):
+    def test_all_features_together(self, simple_tool: Tool) -> None:
         """Test Ollama-like provider with analytics, hooks, memory, and cost tracking."""
         hook_calls = []
 
-        def log_hook(event, *args):
+        def log_hook(event: str, *args: Any) -> None:
             hook_calls.append(event)
 
         provider = FakeProvider(
@@ -365,7 +368,7 @@ class TestCombinedFeatures:
         # 4. Cost tracking worked (should be minimal with FakeProvider)
         assert agent.total_cost >= 0.0
 
-    def test_analytics_reset_preserves_other_features(self, simple_tool):
+    def test_analytics_reset_preserves_other_features(self, simple_tool: Tool) -> None:
         """Test that resetting analytics doesn't affect other features."""
         provider = FakeProvider(
             responses=[
@@ -392,11 +395,11 @@ class TestCombinedFeatures:
         assert agent.total_cost >= 0.0  # Cost tracking still works
         assert len(memory.get_history()) >= 1  # Memory still has history
 
-    def test_toolbox_with_analytics_and_hooks(self):
+    def test_toolbox_with_analytics_and_hooks(self) -> None:
         """Test pre-built toolbox tools with analytics and observability."""
         hook_events = []
 
-        def track_event(event):
+        def track_event(event: str) -> None:
             hook_events.append(event)
 
         # Get file tools from toolbox

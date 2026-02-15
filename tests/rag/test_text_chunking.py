@@ -6,6 +6,10 @@ Tests:
 - RecursiveTextSplitter (hierarchical chunking)
 """
 
+from __future__ import annotations
+
+from typing import List
+
 import pytest
 
 from selectools.rag import Document, RecursiveTextSplitter, TextSplitter
@@ -16,7 +20,7 @@ from selectools.rag import Document, RecursiveTextSplitter, TextSplitter
 
 
 @pytest.fixture
-def sample_text():
+def sample_text() -> str:
     """Sample text for testing."""
     return """This is the first paragraph. It contains multiple sentences.
 
@@ -26,13 +30,13 @@ This is the third paragraph with more content."""
 
 
 @pytest.fixture
-def long_text():
+def long_text() -> str:
     """Longer text for testing chunk creation."""
     return " ".join([f"Sentence {i}." for i in range(100)])
 
 
 @pytest.fixture
-def sample_documents():
+def sample_documents() -> List[Document]:
     """Sample documents for testing."""
     return [
         Document(
@@ -54,14 +58,14 @@ def sample_documents():
 class TestTextSplitter:
     """Test basic text splitter with fixed chunk size."""
 
-    def test_initialization(self):
+    def test_initialization(self) -> None:
         """Test splitter initialization."""
         splitter = TextSplitter(chunk_size=100, chunk_overlap=20)
         assert splitter.chunk_size == 100
         assert splitter.chunk_overlap == 20
         assert callable(splitter.length_function)
 
-    def test_invalid_overlap(self):
+    def test_invalid_overlap(self) -> None:
         """Test error when overlap >= chunk_size."""
         with pytest.raises(ValueError, match="chunk_overlap must be less than chunk_size"):
             TextSplitter(chunk_size=100, chunk_overlap=100)
@@ -69,7 +73,7 @@ class TestTextSplitter:
         with pytest.raises(ValueError):
             TextSplitter(chunk_size=100, chunk_overlap=150)
 
-    def test_split_short_text(self):
+    def test_split_short_text(self) -> None:
         """Test splitting text shorter than chunk size."""
         splitter = TextSplitter(chunk_size=100, chunk_overlap=20)
         text = "Short text."
@@ -79,7 +83,7 @@ class TestTextSplitter:
         assert len(chunks) == 1
         assert chunks[0] == text
 
-    def test_split_long_text(self, long_text):
+    def test_split_long_text(self, long_text: str) -> None:
         """Test splitting long text into multiple chunks."""
         splitter = TextSplitter(chunk_size=100, chunk_overlap=20)
 
@@ -88,7 +92,7 @@ class TestTextSplitter:
         assert len(chunks) > 1
         assert all(len(chunk) <= 100 for chunk in chunks)
 
-    def test_chunk_overlap(self):
+    def test_chunk_overlap(self) -> None:
         """Test that overlap is correctly applied."""
         splitter = TextSplitter(chunk_size=50, chunk_overlap=10)
         text = "a" * 100  # 100 character string
@@ -102,7 +106,7 @@ class TestTextSplitter:
             overlap = chunks[0][-10:]
             assert chunks[1].startswith(overlap)
 
-    def test_empty_text(self):
+    def test_empty_text(self) -> None:
         """Test splitting empty text."""
         splitter = TextSplitter(chunk_size=100, chunk_overlap=20)
 
@@ -111,7 +115,7 @@ class TestTextSplitter:
         assert len(chunks) == 0
         assert chunks == []
 
-    def test_exact_chunk_size(self):
+    def test_exact_chunk_size(self) -> None:
         """Test text that is exactly chunk_size."""
         splitter = TextSplitter(chunk_size=50, chunk_overlap=10)
         text = "a" * 50
@@ -121,7 +125,7 @@ class TestTextSplitter:
         assert len(chunks) == 1
         assert chunks[0] == text
 
-    def test_custom_length_function(self):
+    def test_custom_length_function(self) -> None:
         """Test using custom length function."""
 
         def word_count_length(text: str) -> int:
@@ -140,7 +144,7 @@ class TestTextSplitter:
         # Each chunk should have at most 5 words
         # Note: This is approximate due to character-based slicing
 
-    def test_split_documents(self, sample_documents):
+    def test_split_documents(self, sample_documents: List[Document]) -> None:
         """Test splitting multiple documents."""
         splitter = TextSplitter(chunk_size=20, chunk_overlap=5)
 
@@ -153,7 +157,7 @@ class TestTextSplitter:
         assert all("chunk" in d.metadata for d in chunked_docs)
         assert all("total_chunks" in d.metadata for d in chunked_docs)
 
-    def test_metadata_preservation(self, sample_documents):
+    def test_metadata_preservation(self, sample_documents: List[Document]) -> None:
         """Test that original metadata is preserved in chunks."""
         splitter = TextSplitter(chunk_size=20, chunk_overlap=5)
 
@@ -166,7 +170,7 @@ class TestTextSplitter:
         doc2_chunks = [d for d in chunked_docs if d.metadata.get("source") == "doc2.txt"]
         assert all(d.metadata["category"] == "test" for d in doc2_chunks)
 
-    def test_chunk_index_metadata(self):
+    def test_chunk_index_metadata(self) -> None:
         """Test that chunk indices are correctly assigned."""
         splitter = TextSplitter(chunk_size=30, chunk_overlap=5)
         doc = Document(text="a" * 100, metadata={})
@@ -186,20 +190,20 @@ class TestTextSplitter:
 class TestRecursiveTextSplitter:
     """Test recursive text splitter with natural boundaries."""
 
-    def test_initialization(self):
+    def test_initialization(self) -> None:
         """Test splitter initialization."""
         splitter = RecursiveTextSplitter(chunk_size=100, chunk_overlap=20)
         assert splitter.chunk_size == 100
         assert splitter.chunk_overlap == 20
         assert splitter.separators == ["\n\n", "\n", ". ", " ", ""]
 
-    def test_custom_separators(self):
+    def test_custom_separators(self) -> None:
         """Test initialization with custom separators."""
         separators = ["\n", ". ", " "]
         splitter = RecursiveTextSplitter(chunk_size=100, chunk_overlap=20, separators=separators)
         assert splitter.separators == separators
 
-    def test_split_by_paragraphs(self, sample_text):
+    def test_split_by_paragraphs(self, sample_text: str) -> None:
         """Test splitting on paragraph boundaries."""
         splitter = RecursiveTextSplitter(
             chunk_size=100, chunk_overlap=10, separators=["\n\n", "\n", " ", ""]
@@ -210,7 +214,7 @@ class TestRecursiveTextSplitter:
         assert len(chunks) > 0
         # Should respect paragraph boundaries when possible
 
-    def test_split_by_lines(self):
+    def test_split_by_lines(self) -> None:
         """Test splitting on line boundaries."""
         text = "\n".join([f"Line {i}" for i in range(20)])
 
@@ -222,7 +226,7 @@ class TestRecursiveTextSplitter:
 
         assert len(chunks) > 1
 
-    def test_split_by_sentences(self):
+    def test_split_by_sentences(self) -> None:
         """Test splitting on sentence boundaries."""
         text = ". ".join([f"Sentence {i}" for i in range(20)])
 
@@ -234,7 +238,7 @@ class TestRecursiveTextSplitter:
 
         assert len(chunks) > 1
 
-    def test_fallback_to_character_split(self):
+    def test_fallback_to_character_split(self) -> None:
         """Test fallback to character-level splitting."""
         # Very long word that can't be split on natural boundaries
         text = "a" * 200
@@ -246,7 +250,7 @@ class TestRecursiveTextSplitter:
         assert len(chunks) > 1
         assert all(len(chunk) <= 50 for chunk in chunks)
 
-    def test_empty_text(self):
+    def test_empty_text(self) -> None:
         """Test splitting empty text."""
         splitter = RecursiveTextSplitter(chunk_size=100, chunk_overlap=20)
 
@@ -255,7 +259,7 @@ class TestRecursiveTextSplitter:
         assert len(chunks) == 0
         assert chunks == []
 
-    def test_short_text(self):
+    def test_short_text(self) -> None:
         """Test splitting short text."""
         text = "Short."
         splitter = RecursiveTextSplitter(chunk_size=100, chunk_overlap=20)
@@ -265,7 +269,7 @@ class TestRecursiveTextSplitter:
         assert len(chunks) == 1
         assert chunks[0] == text
 
-    def test_split_documents(self, sample_documents):
+    def test_split_documents(self, sample_documents: List[Document]) -> None:
         """Test splitting documents with recursive strategy."""
         splitter = RecursiveTextSplitter(chunk_size=25, chunk_overlap=5)
 
@@ -277,7 +281,7 @@ class TestRecursiveTextSplitter:
         assert all("chunk" in d.metadata for d in chunked_docs)
         assert all("total_chunks" in d.metadata for d in chunked_docs)
 
-    def test_preserves_meaningful_chunks(self):
+    def test_preserves_meaningful_chunks(self) -> None:
         """Test that natural boundaries are preserved when possible."""
         text = """First paragraph.
 
@@ -294,7 +298,7 @@ Third paragraph."""
         # Should create chunks respecting paragraph structure
         assert len(chunks) > 0
 
-    def test_overlap_correctness(self):
+    def test_overlap_correctness(self) -> None:
         """Test that overlap is maintained in recursive splitting."""
         text = "Paragraph one.\n\nParagraph two.\n\nParagraph three."
 
@@ -313,7 +317,7 @@ Third paragraph."""
 class TestSplitterComparison:
     """Compare behavior of different splitters."""
 
-    def test_both_handle_same_text(self, long_text):
+    def test_both_handle_same_text(self, long_text: str) -> None:
         """Test that both splitters can handle the same input."""
         text_splitter = TextSplitter(chunk_size=100, chunk_overlap=20)
         recursive_splitter = RecursiveTextSplitter(chunk_size=100, chunk_overlap=20)
@@ -329,7 +333,7 @@ class TestSplitterComparison:
         assert all(len(c) <= 100 for c in text_chunks)
         assert all(len(c) <= 100 for c in recursive_chunks)
 
-    def test_recursive_respects_boundaries_better(self):
+    def test_recursive_respects_boundaries_better(self) -> None:
         """Test that recursive splitter preserves natural boundaries."""
         text = "First sentence. Second sentence. Third sentence. " * 10
 
@@ -354,7 +358,7 @@ class TestSplitterComparison:
 class TestEdgeCases:
     """Test edge cases and error conditions."""
 
-    def test_very_long_text(self):
+    def test_very_long_text(self) -> None:
         """Test with very long text."""
         text = "a" * 10000
         splitter = TextSplitter(chunk_size=100, chunk_overlap=20)
@@ -364,7 +368,7 @@ class TestEdgeCases:
         assert len(chunks) > 10
         assert all(len(c) <= 100 for c in chunks)
 
-    def test_unicode_characters(self):
+    def test_unicode_characters(self) -> None:
         """Test with Unicode characters."""
         text = "Hello 世界! " * 50
         splitter = TextSplitter(chunk_size=50, chunk_overlap=10)
@@ -375,7 +379,7 @@ class TestEdgeCases:
         # Verify Unicode is preserved
         assert any("世界" in chunk for chunk in chunks)
 
-    def test_special_characters(self):
+    def test_special_characters(self) -> None:
         """Test with special characters."""
         text = "Test\n\n\t\r special chars! @#$%^&*()" * 10
         splitter = TextSplitter(chunk_size=50, chunk_overlap=10)
@@ -384,7 +388,7 @@ class TestEdgeCases:
 
         assert len(chunks) > 0
 
-    def test_zero_overlap(self):
+    def test_zero_overlap(self) -> None:
         """Test with zero overlap."""
         text = "a" * 100
         splitter = TextSplitter(chunk_size=50, chunk_overlap=0)
@@ -395,7 +399,7 @@ class TestEdgeCases:
         assert chunks[0] == "a" * 50
         assert chunks[1] == "a" * 50
 
-    def test_single_character_chunks(self):
+    def test_single_character_chunks(self) -> None:
         """Test with very small chunk size."""
         text = "hello"
         splitter = TextSplitter(chunk_size=1, chunk_overlap=0)

@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import uuid
-from typing import List, Optional
+from typing import Any, List, Optional, Tuple
 
 from selectools import Agent, AgentConfig
 from selectools.providers.stubs import LocalProvider
@@ -15,9 +17,9 @@ class MockNativeToolProvider(LocalProvider):
         model: str,
         system_prompt: str,
         messages: List[Message],
-        tools: Optional[List] = None,
-        **kwargs,
-    ):
+        tools: Optional[List[Any]] = None,
+        **kwargs: Any,
+    ) -> Tuple[Message, UsageStats]:
         print(f"DEBUG: complete called with {len(messages)} messages")
         print(f"DEBUG: messages type: {type(messages)}")
         if len(messages) > 0:
@@ -81,11 +83,11 @@ class MockNativeToolProvider(LocalProvider):
 
 
 @tool_decorator(description="Get weather for location")
-def get_weather(location: str):
+def get_weather(location: str) -> str:
     return "Sunny"
 
 
-def test_native_tool_calling():
+def test_native_tool_calling() -> None:
     print("Starting native tool calling test...")
     provider = MockNativeToolProvider()
 

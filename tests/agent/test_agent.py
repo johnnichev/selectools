@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from typing import Any, List, NoReturn, Tuple
 
 import pytest
 
@@ -36,22 +37,22 @@ class FakeProvider:
     supports_streaming = False
     supports_async = False
 
-    def __init__(self, responses):
+    def __init__(self, responses: List[str]) -> None:
         self.responses = responses
         self.calls = 0
-        self.last_system_prompt = None
+        self.last_system_prompt: str = ""
 
     def complete(
         self,
         *,
-        model,
-        system_prompt,
-        messages,
-        tools=None,
-        temperature=0.0,
-        max_tokens=1000,
-        timeout=None,
-    ):
+        model: str,
+        system_prompt: str,
+        messages: List[Message],
+        tools: List[Tool] | None = None,
+        temperature: float = 0.0,
+        max_tokens: int = 1000,
+        timeout: float | None = None,
+    ) -> Tuple[Message, UsageStats]:
         self.last_system_prompt = system_prompt
         response = self.responses[min(self.calls, len(self.responses) - 1)]
         self.calls += 1
@@ -68,11 +69,11 @@ class FakeProvider:
         return response, usage
 
 
-def _noop_tool():
+def _noop_tool() -> Tool:
     return Tool(name="noop", description="no-op", parameters=[], function=lambda: "ok")
 
 
-def _add_tool():
+def _add_tool() -> Tool:
     def add(a: int, b: int) -> str:
         return json.dumps({"sum": a + b})
 
@@ -93,7 +94,7 @@ def _add_tool():
 
 
 class TestCustomSystemPrompt:
-    def test_default_system_prompt_used_when_not_set(self):
+    def test_default_system_prompt_used_when_not_set(self) -> None:
         """Default PromptBuilder instructions should be used when system_prompt is None."""
         provider = FakeProvider(responses=["Hello"])
         agent = Agent(tools=[_noop_tool()], provider=provider)
@@ -102,7 +103,7 @@ class TestCustomSystemPrompt:
         assert "TOOL_CALL" in provider.last_system_prompt
         assert "tool call contract" in provider.last_system_prompt.lower()
 
-    def test_custom_system_prompt_replaces_default(self):
+    def test_custom_system_prompt_replaces_default(self) -> None:
         """When system_prompt is set in AgentConfig, it should replace the default instructions."""
         custom = "You are a helpful routing agent. Always route to the correct service."
         provider = FakeProvider(responses=["Routed!"])
@@ -113,7 +114,7 @@ class TestCustomSystemPrompt:
         assert "routing agent" in provider.last_system_prompt
         assert "Always route to the correct service" in provider.last_system_prompt
 
-    def test_custom_system_prompt_includes_tool_schemas(self):
+    def test_custom_system_prompt_includes_tool_schemas(self) -> None:
         """Custom system prompt should still include tool schemas in the final prompt."""
         custom = "Custom instructions here."
         provider = FakeProvider(responses=["Done"])
@@ -127,7 +128,7 @@ class TestCustomSystemPrompt:
         assert "add" in provider.last_system_prompt
         assert "parameters" in provider.last_system_prompt
 
-    def test_explicit_prompt_builder_takes_precedence(self):
+    def test_explicit_prompt_builder_takes_precedence(self) -> None:
         """If a PromptBuilder is passed directly, it should take precedence over system_prompt."""
         from selectools.prompt import PromptBuilder
 
@@ -152,7 +153,7 @@ class TestCustomSystemPrompt:
 
 
 class TestAgentResult:
-    def test_run_returns_agent_result(self):
+    def test_run_returns_agent_result(self) -> None:
         """run() should return an AgentResult, not a raw Message."""
         provider = FakeProvider(responses=["Hello there"])
         agent = Agent(tools=[_noop_tool()], provider=provider, config=AgentConfig(model="fake"))
@@ -160,7 +161,7 @@ class TestAgentResult:
 
         assert isinstance(result, AgentResult)
 
-    def test_backward_compatible_content_property(self):
+    def test_backward_compatible_content_property(self) -> None:
         """result.content should work the same as the old result.content (Message.content)."""
         provider = FakeProvider(responses=["The answer is 42"])
         agent = Agent(tools=[_noop_tool()], provider=provider, config=AgentConfig(model="fake"))
@@ -168,7 +169,7 @@ class TestAgentResult:
 
         assert result.content == "The answer is 42"
 
-    def test_backward_compatible_role_property(self):
+    def test_backward_compatible_role_property(self) -> None:
         """result.role should return Role.ASSISTANT."""
         provider = FakeProvider(responses=["Done"])
         agent = Agent(tools=[_noop_tool()], provider=provider, config=AgentConfig(model="fake"))
@@ -176,7 +177,7 @@ class TestAgentResult:
 
         assert result.role == Role.ASSISTANT
 
-    def test_no_tool_call_metadata(self):
+    def test_no_tool_call_metadata(self) -> None:
         """When no tool is called, tool_name and tool_args should be None/empty."""
         provider = FakeProvider(responses=["Direct response"])
         agent = Agent(tools=[_noop_tool()], provider=provider, config=AgentConfig(model="fake"))
@@ -187,7 +188,7 @@ class TestAgentResult:
         assert result.tool_calls == []
         assert result.iterations == 1
 
-    def test_tool_call_metadata_populated(self):
+    def test_tool_call_metadata_populated(self) -> None:
         """When a tool is called, AgentResult should contain full tool call metadata."""
         provider = FakeProvider(
             responses=[
@@ -210,7 +211,7 @@ class TestAgentResult:
         assert result.tool_calls[0].tool_name == "add"
         assert result.tool_calls[0].parameters == {"a": 2, "b": 3}
 
-    def test_multiple_tool_calls_tracked(self):
+    def test_multiple_tool_calls_tracked(self) -> None:
         """When multiple tools are called, all should be tracked in tool_calls."""
         provider = FakeProvider(
             responses=[
@@ -234,7 +235,7 @@ class TestAgentResult:
         assert result.tool_args == {"a": 3, "b": 4}
         assert result.iterations == 3
 
-    def test_message_attribute_is_accessible(self):
+    def test_message_attribute_is_accessible(self) -> None:
         """The underlying Message object should be accessible via .message."""
         provider = FakeProvider(responses=["Hello"])
         agent = Agent(tools=[_noop_tool()], provider=provider, config=AgentConfig(model="fake"))
@@ -251,7 +252,7 @@ class TestAgentResult:
 
 
 class TestReusableAgent:
-    def test_agent_reusable_without_reset(self):
+    def test_agent_reusable_without_reset(self) -> None:
         """Agent should work correctly across multiple run() calls even without reset()."""
         provider = FakeProvider(responses=["Response 1", "Response 2", "Response 3"])
         agent = Agent(tools=[_noop_tool()], provider=provider, config=AgentConfig(model="fake"))
@@ -264,7 +265,7 @@ class TestReusableAgent:
         assert r2.content == "Response 2"
         assert r3.content == "Response 3"
 
-    def test_reset_clears_usage(self):
+    def test_reset_clears_usage(self) -> None:
         """reset() should clear usage tracking."""
         provider = FakeProvider(responses=["Done", "Done again"])
         agent = Agent(tools=[_noop_tool()], provider=provider, config=AgentConfig(model="fake"))
@@ -276,7 +277,7 @@ class TestReusableAgent:
         assert agent.total_tokens == 0
         assert agent.total_cost == 0.0
 
-    def test_reset_clears_history(self):
+    def test_reset_clears_history(self) -> None:
         """reset() should clear internal conversation history."""
         provider = FakeProvider(responses=["Done", "Done again"])
         agent = Agent(tools=[_noop_tool()], provider=provider, config=AgentConfig(model="fake"))
@@ -287,7 +288,7 @@ class TestReusableAgent:
         agent.reset()
         assert len(agent._history) == 0
 
-    def test_reset_clears_memory(self):
+    def test_reset_clears_memory(self) -> None:
         """reset() should clear conversation memory if set."""
         memory = ConversationMemory(max_messages=10)
         provider = FakeProvider(responses=["Done"])
@@ -301,7 +302,7 @@ class TestReusableAgent:
         agent.reset()
         assert len(memory) == 0
 
-    def test_reset_clears_analytics(self):
+    def test_reset_clears_analytics(self) -> None:
         """reset() should reset analytics when enabled."""
         provider = FakeProvider(
             responses=[
@@ -322,7 +323,7 @@ class TestReusableAgent:
         # The analytics object should be a fresh instance
         assert new_analytics is not analytics
 
-    def test_agent_works_after_reset(self):
+    def test_agent_works_after_reset(self) -> None:
         """Agent should produce correct results after a reset()."""
         provider = FakeProvider(responses=["First", "Second"])
         agent = Agent(tools=[_noop_tool()], provider=provider, config=AgentConfig(model="fake"))
@@ -349,21 +350,21 @@ class FakeAsyncProvider:
     supports_streaming = False
     supports_async = True
 
-    def __init__(self, responses):
+    def __init__(self, responses: List[str]) -> None:
         self.responses = responses
         self.calls = 0
 
     async def acomplete(
         self,
         *,
-        model,
-        system_prompt,
-        messages,
-        tools=None,
-        temperature=0.0,
-        max_tokens=1000,
-        timeout=None,
-    ):
+        model: str,
+        system_prompt: str,
+        messages: List[Message],
+        tools: List[Tool] | None = None,
+        temperature: float = 0.0,
+        max_tokens: int = 1000,
+        timeout: float | None = None,
+    ) -> Tuple[Message, UsageStats]:
         response = self.responses[min(self.calls, len(self.responses) - 1)]
         self.calls += 1
         usage = UsageStats(
@@ -378,12 +379,12 @@ class FakeAsyncProvider:
             response = Message(role=Role.ASSISTANT, content=response)
         return response, usage
 
-    def complete(self, **kwargs):
+    def complete(self, **kwargs: Any) -> NoReturn:
         raise RuntimeError("Should use acomplete")
 
 
 @pytest.mark.asyncio
-async def test_arun_returns_agent_result():
+async def test_arun_returns_agent_result() -> None:
     """arun() should return AgentResult with the same structure as run()."""
     provider = FakeAsyncProvider(
         responses=[

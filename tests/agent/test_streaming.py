@@ -1,4 +1,6 @@
-from typing import Any, AsyncGenerator, List, Tuple
+from __future__ import annotations
+
+from typing import Any, AsyncGenerator, Generator, List, Tuple
 
 import pytest
 
@@ -43,14 +45,14 @@ class MockStreamingProvider(Provider):
     supports_streaming = True
     supports_async = True
 
-    def __init__(self, chunks: List[str]):
+    def __init__(self, chunks: List[str]) -> None:
         self.chunks = chunks
         self.default_model = "mock-stream"
 
     def complete(self, **kwargs: Any) -> Tuple[Message, UsageStats]:
         return Message(role=Role.ASSISTANT, content="".join(self.chunks)), _DUMMY_USAGE
 
-    def stream(self, **kwargs: Any):  # type: ignore[override]
+    def stream(self, **kwargs: Any) -> Generator[str, None, None]:  # type: ignore[override]
         yield from self.chunks
 
     async def acomplete(self, **kwargs: Any) -> Tuple[Message, UsageStats]:
@@ -67,7 +69,7 @@ class MockStreamingProvider(Provider):
 
 
 @pytest.mark.asyncio
-async def test_agent_astream_yields_chunks():
+async def test_agent_astream_yields_chunks() -> None:
     chunks = ["Hello", " ", "world", "!"]
     provider = MockStreamingProvider(chunks)
     agent = Agent(
@@ -91,7 +93,7 @@ async def test_agent_astream_yields_chunks():
 
 
 @pytest.mark.asyncio
-async def test_agent_astream_fallback_without_astream_method():
+async def test_agent_astream_fallback_without_astream_method() -> None:
     """Verify fallback if provider doesn't implement astream."""
 
     class MockNoStreamProvider:
@@ -107,7 +109,7 @@ async def test_agent_astream_fallback_without_astream_method():
         def complete(self, **kwargs: Any) -> Tuple[Message, UsageStats]:
             return Message(role=Role.ASSISTANT, content="Fallback response"), _DUMMY_USAGE
 
-        def stream(self, **kwargs: Any):  # type: ignore[override]
+        def stream(self, **kwargs: Any) -> Generator[str, None, None]:  # type: ignore[override]
             yield "Fallback response"
 
         async def acomplete(self, **kwargs: Any) -> Tuple[Message, UsageStats]:

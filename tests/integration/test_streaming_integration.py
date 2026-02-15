@@ -10,8 +10,11 @@ Tests streaming integration with:
 - Multiple features combined
 """
 
+from __future__ import annotations
+
 import asyncio
-from typing import AsyncGenerator, Generator
+from pathlib import Path
+from typing import Any, AsyncGenerator, Generator
 from unittest.mock import MagicMock
 
 import pytest
@@ -37,11 +40,11 @@ def get_info(name: str) -> str:
 class TestStreamingWithHooks:
     """Test streaming integration with observability hooks."""
 
-    def test_streaming_with_all_hooks(self):
+    def test_streaming_with_all_hooks(self) -> None:
         """Test streaming with complete set of hooks."""
         hook_events = []
 
-        def track(event_name, *args, **kwargs):
+        def track(event_name: str, *args: Any, **kwargs: Any) -> None:
             hook_events.append(event_name)
 
         provider = FakeProvider(
@@ -71,11 +74,11 @@ class TestStreamingWithHooks:
         assert "agent_end" in hook_events
 
     @pytest.mark.asyncio
-    async def test_streaming_with_async_hooks(self):
+    async def test_streaming_with_async_hooks(self) -> None:
         """Test streaming works with async agent and hooks."""
         hook_events = []
 
-        def track(event_name, *args, **kwargs):
+        def track(event_name: str, *args: Any, **kwargs: Any) -> None:
             hook_events.append(event_name)
 
         provider = FakeProvider(
@@ -100,11 +103,11 @@ class TestStreamingWithHooks:
 class TestStreamingWithAnalytics:
     """Test streaming integration with analytics."""
 
-    def test_streaming_analytics_with_observability(self):
+    def test_streaming_analytics_with_observability(self) -> None:
         """Test analytics and hooks work together for streaming."""
         chunks_received = []
 
-        def on_chunk(tool_name, chunk):
+        def on_chunk(tool_name: str, chunk: str) -> None:
             chunks_received.append(chunk)
 
         provider = FakeProvider(
@@ -131,7 +134,7 @@ class TestStreamingWithAnalytics:
         # Check hooks
         assert len(chunks_received) == 4
 
-    def test_streaming_analytics_summary_shows_chunks(self):
+    def test_streaming_analytics_summary_shows_chunks(self) -> None:
         """Test that analytics summary includes streaming info."""
         provider = FakeProvider(
             responses=[
@@ -155,7 +158,7 @@ class TestStreamingWithAnalytics:
 class TestStreamingWithMemory:
     """Test streaming integration with conversation memory."""
 
-    def test_streaming_with_memory_context(self):
+    def test_streaming_with_memory_context(self) -> None:
         """Test streaming tools work with conversation memory."""
         memory = ConversationMemory(max_messages=10)
         provider = FakeProvider(
@@ -176,7 +179,7 @@ class TestStreamingWithMemory:
         assert any(msg.role == Role.ASSISTANT for msg in history)
 
     @pytest.mark.asyncio
-    async def test_streaming_memory_multi_turn(self):
+    async def test_streaming_memory_multi_turn(self) -> None:
         """Test streaming with memory across multiple turns."""
         memory = ConversationMemory(max_messages=10)
         provider = FakeProvider(
@@ -204,7 +207,7 @@ class TestStreamingWithMemory:
 class TestStreamingWithCostTracking:
     """Test streaming integration with cost tracking."""
 
-    def test_streaming_cost_attribution(self):
+    def test_streaming_cost_attribution(self) -> None:
         """Test that streaming tools work with cost tracking."""
         provider = FakeProvider(
             responses=[
@@ -225,11 +228,11 @@ class TestStreamingWithCostTracking:
 class TestStreamingCombinedFeatures:
     """Test streaming with multiple features enabled simultaneously."""
 
-    def test_all_features_with_streaming(self):
+    def test_all_features_with_streaming(self) -> None:
         """Test streaming with analytics, hooks, memory, and cost tracking."""
         hook_events = []
 
-        def track_event(event_name, *args, **kwargs):
+        def track_event(event_name: str, *args: Any, **kwargs: Any) -> None:
             hook_events.append(event_name)
 
         memory = ConversationMemory(max_messages=10)
@@ -282,7 +285,7 @@ class TestStreamingCombinedFeatures:
         assert agent.total_cost > 0
 
     @pytest.mark.asyncio
-    async def test_all_features_async_streaming(self):
+    async def test_all_features_async_streaming(self) -> None:
         """Test all features with async streaming."""
 
         @tool(description="Async streaming tool", streaming=True)
@@ -293,7 +296,7 @@ class TestStreamingCombinedFeatures:
 
         chunks = []
 
-        def on_chunk(tool_name, chunk):
+        def on_chunk(tool_name: str, chunk: str) -> None:
             chunks.append(chunk)
 
         memory = ConversationMemory(max_messages=10)
@@ -318,11 +321,11 @@ class TestStreamingCombinedFeatures:
         assert len(memory.get_history()) > 0
         assert agent.total_cost > 0
 
-    def test_streaming_reset_analytics_preserves_other_features(self):
+    def test_streaming_reset_analytics_preserves_other_features(self) -> None:
         """Test resetting analytics doesn't affect streaming or other features."""
         chunks = []
 
-        def on_chunk(tool_name, chunk):
+        def on_chunk(tool_name: str, chunk: str) -> None:
             chunks.append(chunk)
 
         memory = ConversationMemory(max_messages=10)
@@ -357,7 +360,7 @@ class TestStreamingCombinedFeatures:
 class TestStreamingToolboxIntegration:
     """Test streaming toolbox tools with full feature set."""
 
-    def test_toolbox_streaming_with_analytics(self, tmp_path):
+    def test_toolbox_streaming_with_analytics(self, tmp_path: Path) -> None:
         """Test toolbox streaming tools work with analytics."""
         from selectools.toolbox.file_tools import read_file_stream
 
@@ -383,7 +386,7 @@ class TestStreamingToolboxIntegration:
         assert metrics.streaming_calls == 1
         assert metrics.total_chunks > 0  # Should have multiple chunks
 
-    def test_toolbox_csv_streaming_with_hooks(self, tmp_path):
+    def test_toolbox_csv_streaming_with_hooks(self, tmp_path: Path) -> None:
         """Test CSV streaming with hooks."""
         from selectools.toolbox.data_tools import process_csv_stream
 
@@ -393,7 +396,7 @@ class TestStreamingToolboxIntegration:
 
         chunks = []
 
-        def on_chunk(tool_name, chunk):
+        def on_chunk(tool_name: str, chunk: str) -> None:
             chunks.append(chunk)
 
         provider = FakeProvider(

@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import asyncio
 import contextvars
-from typing import Any
+from typing import Any, Tuple
 
 import pytest
 
@@ -26,7 +28,7 @@ async def get_context_async() -> str:
 
 
 @pytest.mark.asyncio
-async def test_context_propagation_to_tools():
+async def test_context_propagation_to_tools() -> None:
     """
     Verify that context variables set in the parent task are propagated
     to both synchronous (threaded) and asynchronous tools.
@@ -86,12 +88,12 @@ async def test_context_propagation_to_tools():
         # or `unittest.mock`. Let's use a simple mock class.
 
         class MockToolProvider(LocalProvider):
-            def __init__(self):
+            def __init__(self) -> None:
                 super().__init__()
                 self.call_count = 0
                 self.supports_async = True
 
-            async def acomplete(self, **kwargs):
+            async def acomplete(self, **kwargs: Any) -> Tuple[Message, UsageStats]:
                 self.call_count += 1
                 dummy_usage = UsageStats(0, 0, 0, 0.0, "mock", "mock")
                 if self.call_count == 1:

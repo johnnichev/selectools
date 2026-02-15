@@ -8,6 +8,7 @@ import asyncio
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -26,7 +27,7 @@ from selectools.providers.stubs import LocalProvider
 
 @pytest.mark.asyncio
 @pytest.mark.asyncio
-async def test_realistic_customer_support_scenario():
+async def test_realistic_customer_support_scenario() -> None:
     """Simulate a realistic customer support conversation."""
     memory = ConversationMemory(max_messages=30)
     conversation_log = []
@@ -84,7 +85,7 @@ async def test_realistic_customer_support_scenario():
 
 
 @pytest.mark.asyncio
-async def test_concurrent_users_scenario():
+async def test_concurrent_users_scenario() -> None:
     """Simulate multiple users hitting the system concurrently."""
 
     @selectools.tool(description="Process request")
@@ -93,7 +94,7 @@ async def test_concurrent_users_scenario():
         return json.dumps({"user": user_id, "action": action, "status": "completed"})
 
     # Create separate agents for each user (with their own memory)
-    async def handle_user(user_id: int):
+    async def handle_user(user_id: int) -> tuple[int, int]:
         memory = ConversationMemory(max_messages=10)
         agent = Agent(
             tools=[process_request],
@@ -119,7 +120,7 @@ async def test_concurrent_users_scenario():
 
 
 @pytest.mark.asyncio
-async def test_error_recovery_and_retry():
+async def test_error_recovery_and_retry() -> None:
     """Test the system can recover from various error conditions."""
     failures = []
 
@@ -146,7 +147,7 @@ async def test_error_recovery_and_retry():
 
 
 @pytest.mark.asyncio
-async def test_memory_persistence_across_sessions():
+async def test_memory_persistence_across_sessions() -> None:
     """Test that memory properly persists state across multiple interactions."""
     memory = ConversationMemory(max_messages=20)
 
@@ -184,12 +185,12 @@ async def test_memory_persistence_across_sessions():
 
 
 @pytest.mark.asyncio
-async def test_streaming_with_async_and_memory():
+async def test_streaming_with_async_and_memory() -> None:
     """Test streaming works correctly with async execution and memory."""
     memory = ConversationMemory(max_messages=15)
     chunks_collected = []
 
-    def stream_handler(chunk: str):
+    def stream_handler(chunk: str) -> None:
         chunks_collected.append(chunk)
 
     @selectools.tool(description="Generate report")
@@ -215,7 +216,7 @@ async def test_streaming_with_async_and_memory():
 
 
 @pytest.mark.asyncio
-async def test_mixed_tool_types_realistic():
+async def test_mixed_tool_types_realistic() -> None:
     """Test realistic mix of sync I/O, async I/O, and compute-heavy tools."""
 
     @selectools.tool(description="Async database query")
@@ -260,7 +261,7 @@ async def test_mixed_tool_types_realistic():
 
 
 @pytest.mark.asyncio
-async def test_tool_timeout_with_graceful_degradation():
+async def test_tool_timeout_with_graceful_degradation() -> None:
     """Test that tool timeouts don't crash the system."""
 
     @selectools.tool(description="Fast tool")
@@ -290,7 +291,7 @@ async def test_tool_timeout_with_graceful_degradation():
 
 
 @pytest.mark.asyncio
-async def test_large_scale_conversation():
+async def test_large_scale_conversation() -> None:
     """Test system handles large-scale conversations."""
     memory = ConversationMemory(max_messages=50, max_tokens=10000)
 
@@ -314,7 +315,7 @@ async def test_large_scale_conversation():
     print(f"  ✓ Handled 20-turn conversation, memory capped at {len(memory)} messages")
 
 
-def run_async_test(test_func):
+def run_async_test(test_func: Any) -> None:
     """Helper to run async tests."""
     asyncio.run(test_func())
 

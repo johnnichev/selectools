@@ -8,6 +8,10 @@ Tests cover:
 - Async hooks
 """
 
+from __future__ import annotations
+
+from typing import Any, Dict, List, Tuple
+
 import pytest
 
 from selectools import Agent, AgentConfig, Message, Role, tool
@@ -21,10 +25,10 @@ from selectools.providers.stubs import LocalProvider
 class HookRecorder:
     """Records all hook calls for testing."""
 
-    def __init__(self):
-        self.calls = []
+    def __init__(self) -> None:
+        self.calls: List[Dict[str, Any]] = []
 
-    def record(self, hook_name, *args, **kwargs):
+    def record(self, hook_name: str, *args: Any, **kwargs: Any) -> None:
         """Record a hook call."""
         self.calls.append(
             {
@@ -34,11 +38,11 @@ class HookRecorder:
             }
         )
 
-    def get_calls(self, hook_name):
+    def get_calls(self, hook_name: str) -> List[Dict[str, Any]]:
         """Get all calls for a specific hook."""
         return [c for c in self.calls if c["hook"] == hook_name]
 
-    def was_called(self, hook_name):
+    def was_called(self, hook_name: str) -> bool:
         """Check if a hook was called."""
         return len(self.get_calls(hook_name)) > 0
 
@@ -51,7 +55,7 @@ class HookRecorder:
 class TestAgentLifecycleHooks:
     """Test on_agent_start and on_agent_end hooks."""
 
-    def test_on_agent_start_called_with_messages(self):
+    def test_on_agent_start_called_with_messages(self) -> None:
         """Test that on_agent_start is called with input messages."""
         recorder = HookRecorder()
 
@@ -76,7 +80,7 @@ class TestAgentLifecycleHooks:
         assert len(calls) == 1
         assert calls[0]["args"][0] == messages
 
-    def test_on_agent_end_called_with_response_and_usage(self):
+    def test_on_agent_end_called_with_response_and_usage(self) -> None:
         """Test that on_agent_end is called with final response and usage."""
         recorder = HookRecorder()
 
@@ -115,7 +119,7 @@ class TestAgentLifecycleHooks:
 class TestIterationHooks:
     """Test on_iteration_start and on_iteration_end hooks."""
 
-    def test_on_iteration_start_called_each_iteration(self):
+    def test_on_iteration_start_called_each_iteration(self) -> None:
         """Test that on_iteration_start is called for each iteration."""
         recorder = HookRecorder()
 
@@ -144,7 +148,7 @@ class TestIterationHooks:
         # First iteration should be 1
         assert calls[0]["args"][0] == 1
 
-    def test_on_iteration_end_called_each_iteration(self):
+    def test_on_iteration_end_called_each_iteration(self) -> None:
         """Test that on_iteration_end is called for each iteration."""
         recorder = HookRecorder()
 
@@ -179,10 +183,10 @@ class TestIterationHooks:
 class TestToolExecutionHooks:
     """Test tool-related hooks."""
 
-    def test_on_tool_start_called_before_execution(self):
+    def test_on_tool_start_called_before_execution(self) -> None:
         """Test that on_tool_start is called before tool execution."""
         recorder = HookRecorder()
-        tool_executed = []
+        tool_executed: List[bool] = []
 
         @tool(description="Test tool")
         def test_tool(x: int) -> str:
@@ -194,7 +198,7 @@ class TestToolExecutionHooks:
             name = "fake"
             supports_streaming = False
 
-            def complete(self, **kwargs):
+            def complete(self, **kwargs: Any) -> Tuple[Message, Any]:
                 from selectools.usage import UsageStats
 
                 return (
@@ -224,7 +228,7 @@ class TestToolExecutionHooks:
             assert calls[0]["args"][0] == "test_tool"
             assert calls[0]["args"][1] == {"x": 42}
 
-    def test_on_tool_end_called_after_execution(self):
+    def test_on_tool_end_called_after_execution(self) -> None:
         """Test that on_tool_end is called after tool execution with duration."""
         recorder = HookRecorder()
 
@@ -236,7 +240,7 @@ class TestToolExecutionHooks:
             name = "fake"
             supports_streaming = False
 
-            def complete(self, **kwargs):
+            def complete(self, **kwargs: Any) -> Tuple[Message, Any]:
                 from selectools.usage import UsageStats
 
                 return (
@@ -277,7 +281,7 @@ class TestToolExecutionHooks:
 class TestLLMHooks:
     """Test on_llm_start and on_llm_end hooks."""
 
-    def test_on_llm_start_called_before_llm_call(self):
+    def test_on_llm_start_called_before_llm_call(self) -> None:
         """Test that on_llm_start is called before LLM requests."""
         recorder = HookRecorder()
 
@@ -304,7 +308,7 @@ class TestLLMHooks:
         calls = recorder.get_calls("on_llm_start")
         assert len(calls) >= 1
 
-    def test_on_llm_end_called_after_llm_call(self):
+    def test_on_llm_end_called_after_llm_call(self) -> None:
         """Test that on_llm_end is called after LLM responses."""
         recorder = HookRecorder()
 
@@ -338,10 +342,10 @@ class TestLLMHooks:
 class TestHookErrorHandling:
     """Test that hook errors don't break agent execution."""
 
-    def test_hook_exceptions_are_silently_ignored(self):
+    def test_hook_exceptions_are_silently_ignored(self) -> None:
         """Test that exceptions in hooks don't break the agent."""
 
-        def failing_hook(*args, **kwargs):
+        def failing_hook(*args: Any, **kwargs: Any) -> None:
             raise ValueError("Hook error!")
 
         @tool(description="Echo tool")
@@ -370,7 +374,7 @@ class TestHookErrorHandling:
 class TestMultipleHooks:
     """Test using multiple hooks together."""
 
-    def test_multiple_hooks_all_called(self):
+    def test_multiple_hooks_all_called(self) -> None:
         """Test that multiple hooks can be used simultaneously."""
         recorder = HookRecorder()
 
@@ -418,7 +422,7 @@ class TestAsyncHooks:
     """Test that hooks work with async agent execution."""
 
     @pytest.mark.asyncio
-    async def test_hooks_work_with_async_agent(self):
+    async def test_hooks_work_with_async_agent(self) -> None:
         """Test that hooks are called during async execution."""
         recorder = HookRecorder()
 

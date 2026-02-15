@@ -8,6 +8,8 @@ Tests all 4 vector store implementations:
 - PineconeVectorStore
 """
 
+from __future__ import annotations
+
 import os
 import tempfile
 from typing import List
@@ -26,21 +28,21 @@ from selectools.rag.stores.sqlite import SQLiteVectorStore
 
 
 @pytest.fixture
-def mock_embedder():
+def mock_embedder() -> Mock:
     """Create a mock embedding provider."""
     embedder = Mock()
     embedder.model = "mock-embedding-model"
     embedder.dimension = 128
 
-    def mock_embed_text(text: str):
+    def mock_embed_text(text: str) -> list[float]:
         # Generate consistent embeddings based on text hash
         hash_val = hash(text) % 1000
         return [float(hash_val + i) / 1000.0 for i in range(128)]
 
-    def mock_embed_texts(texts: List[str]):
+    def mock_embed_texts(texts: List[str]) -> list[list[float]]:
         return [mock_embed_text(text) for text in texts]
 
-    def mock_embed_query(query: str):
+    def mock_embed_query(query: str) -> list[float]:
         return mock_embed_text(query)
 
     embedder.embed_text.side_effect = mock_embed_text
@@ -51,7 +53,7 @@ def mock_embedder():
 
 
 @pytest.fixture
-def sample_documents():
+def sample_documents() -> list[Document]:
     """Create sample documents for testing."""
     return [
         Document(
@@ -77,7 +79,7 @@ def sample_documents():
 class TestInMemoryVectorStore:
     """Test in-memory vector store implementation."""
 
-    def test_initialization(self, mock_embedder):
+    def test_initialization(self, mock_embedder: Mock) -> None:
         """Test store initialization."""
         store = InMemoryVectorStore(embedder=mock_embedder)
         assert store.embedder == mock_embedder
@@ -87,7 +89,7 @@ class TestInMemoryVectorStore:
         results = store.search(query_embedding, top_k=5)
         assert len(results) == 0
 
-    def test_add_documents(self, mock_embedder, sample_documents):
+    def test_add_documents(self, mock_embedder: Mock, sample_documents: list[Document]) -> None:
         """Test adding documents to the store."""
         store = InMemoryVectorStore(embedder=mock_embedder)
         doc_ids = store.add_documents(sample_documents)
@@ -100,7 +102,9 @@ class TestInMemoryVectorStore:
         results = store.search(query_embedding, top_k=5)
         assert len(results) == 3
 
-    def test_add_documents_with_embeddings(self, mock_embedder, sample_documents):
+    def test_add_documents_with_embeddings(
+        self, mock_embedder: Mock, sample_documents: list[Document]
+    ) -> None:
         """Test adding documents with pre-computed embeddings."""
         store = InMemoryVectorStore(embedder=mock_embedder)
 
@@ -116,7 +120,7 @@ class TestInMemoryVectorStore:
         assert len(results) == 1
         assert results[0].score > 0.99  # Should be very similar to itself
 
-    def test_search_basic(self, mock_embedder, sample_documents):
+    def test_search_basic(self, mock_embedder: Mock, sample_documents: list[Document]) -> None:
         """Test basic search functionality."""
         store = InMemoryVectorStore(embedder=mock_embedder)
         store.add_documents(sample_documents)
@@ -132,7 +136,9 @@ class TestInMemoryVectorStore:
         if len(results) > 1:
             assert results[0].score >= results[1].score
 
-    def test_search_with_filter(self, mock_embedder, sample_documents):
+    def test_search_with_filter(
+        self, mock_embedder: Mock, sample_documents: list[Document]
+    ) -> None:
         """Test search with metadata filtering."""
         store = InMemoryVectorStore(embedder=mock_embedder)
         store.add_documents(sample_documents)
@@ -146,7 +152,7 @@ class TestInMemoryVectorStore:
         if results:
             assert results[0].document.metadata["category"] == "programming"
 
-    def test_search_empty_store(self, mock_embedder):
+    def test_search_empty_store(self, mock_embedder: Mock) -> None:
         """Test searching in empty store."""
         store = InMemoryVectorStore(embedder=mock_embedder)
 
@@ -155,7 +161,7 @@ class TestInMemoryVectorStore:
 
         assert len(results) == 0
 
-    def test_delete_documents(self, mock_embedder, sample_documents):
+    def test_delete_documents(self, mock_embedder: Mock, sample_documents: list[Document]) -> None:
         """Test deleting documents from store."""
         store = InMemoryVectorStore(embedder=mock_embedder)
         doc_ids = store.add_documents(sample_documents)
@@ -170,7 +176,9 @@ class TestInMemoryVectorStore:
         results = store.search(query_embedding, top_k=10)
         assert len(results) == 2
 
-    def test_delete_multiple_documents(self, mock_embedder, sample_documents):
+    def test_delete_multiple_documents(
+        self, mock_embedder: Mock, sample_documents: list[Document]
+    ) -> None:
         """Test deleting multiple documents."""
         store = InMemoryVectorStore(embedder=mock_embedder)
         doc_ids = store.add_documents(sample_documents)
@@ -186,7 +194,9 @@ class TestInMemoryVectorStore:
         results = store.search(query_embedding, top_k=10)
         assert len(results) == 1
 
-    def test_delete_nonexistent_document(self, mock_embedder, sample_documents):
+    def test_delete_nonexistent_document(
+        self, mock_embedder: Mock, sample_documents: list[Document]
+    ) -> None:
         """Test deleting non-existent document (should not error)."""
         store = InMemoryVectorStore(embedder=mock_embedder)
         store.add_documents(sample_documents)
@@ -196,7 +206,7 @@ class TestInMemoryVectorStore:
 
         assert len(store.documents) == 3
 
-    def test_clear_store(self, mock_embedder, sample_documents):
+    def test_clear_store(self, mock_embedder: Mock, sample_documents: list[Document]) -> None:
         """Test clearing all documents."""
         store = InMemoryVectorStore(embedder=mock_embedder)
         store.add_documents(sample_documents)
@@ -209,7 +219,7 @@ class TestInMemoryVectorStore:
         results = store.search(query_embedding, top_k=10)
         assert len(results) == 0
 
-    def test_cosine_similarity_accuracy(self, mock_embedder):
+    def test_cosine_similarity_accuracy(self, mock_embedder: Mock) -> None:
         """Test cosine similarity calculation accuracy."""
         store = InMemoryVectorStore(embedder=mock_embedder)
 
@@ -235,7 +245,7 @@ class TestInMemoryVectorStore:
         assert results[0].score > 0.99
         assert results[1].score > 0.99
 
-    def test_top_k_limiting(self, mock_embedder):
+    def test_top_k_limiting(self, mock_embedder: Mock) -> None:
         """Test that top_k properly limits results."""
         store = InMemoryVectorStore(embedder=mock_embedder)
 
@@ -258,7 +268,7 @@ class TestInMemoryVectorStore:
 class TestSQLiteVectorStore:
     """Test SQLite vector store implementation."""
 
-    def test_initialization(self, mock_embedder):
+    def test_initialization(self, mock_embedder: Mock) -> None:
         """Test store initialization."""
         with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as f:
             db_path = f.name
@@ -272,7 +282,7 @@ class TestSQLiteVectorStore:
             if os.path.exists(db_path):
                 os.remove(db_path)
 
-    def test_add_documents(self, mock_embedder, sample_documents):
+    def test_add_documents(self, mock_embedder: Mock, sample_documents: list[Document]) -> None:
         """Test adding documents to SQLite store."""
         with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as f:
             db_path = f.name
@@ -287,7 +297,7 @@ class TestSQLiteVectorStore:
             if os.path.exists(db_path):
                 os.remove(db_path)
 
-    def test_persistence(self, mock_embedder, sample_documents):
+    def test_persistence(self, mock_embedder: Mock, sample_documents: list[Document]) -> None:
         """Test that documents persist after reconnection."""
         with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as f:
             db_path = f.name
@@ -308,7 +318,7 @@ class TestSQLiteVectorStore:
             if os.path.exists(db_path):
                 os.remove(db_path)
 
-    def test_search_basic(self, mock_embedder, sample_documents):
+    def test_search_basic(self, mock_embedder: Mock, sample_documents: list[Document]) -> None:
         """Test basic search functionality."""
         with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as f:
             db_path = f.name
@@ -326,7 +336,9 @@ class TestSQLiteVectorStore:
             if os.path.exists(db_path):
                 os.remove(db_path)
 
-    def test_search_with_filter(self, mock_embedder, sample_documents):
+    def test_search_with_filter(
+        self, mock_embedder: Mock, sample_documents: list[Document]
+    ) -> None:
         """Test search with metadata filtering."""
         with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as f:
             db_path = f.name
@@ -345,7 +357,7 @@ class TestSQLiteVectorStore:
             if os.path.exists(db_path):
                 os.remove(db_path)
 
-    def test_delete_documents(self, mock_embedder, sample_documents):
+    def test_delete_documents(self, mock_embedder: Mock, sample_documents: list[Document]) -> None:
         """Test deleting documents."""
         with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as f:
             db_path = f.name
@@ -364,7 +376,7 @@ class TestSQLiteVectorStore:
             if os.path.exists(db_path):
                 os.remove(db_path)
 
-    def test_clear_store(self, mock_embedder, sample_documents):
+    def test_clear_store(self, mock_embedder: Mock, sample_documents: list[Document]) -> None:
         """Test clearing all documents."""
         with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as f:
             db_path = f.name
@@ -392,7 +404,7 @@ class TestSQLiteVectorStore:
 class TestChromaVectorStore:
     """Test Chroma vector store wrapper."""
 
-    def test_initialization(self, mock_embedder):
+    def test_initialization(self, mock_embedder: Mock) -> None:
         """Test store initialization."""
         mock_chroma = MagicMock()
         mock_client = Mock()
@@ -406,7 +418,7 @@ class TestChromaVectorStore:
             store = ChromaVectorStore(embedder=mock_embedder, collection_name="test_collection")
             assert store.embedder == mock_embedder
 
-    def test_add_documents(self, mock_embedder, sample_documents):
+    def test_add_documents(self, mock_embedder: Mock, sample_documents: list[Document]) -> None:
         """Test adding documents."""
         mock_chroma = MagicMock()
         mock_client = Mock()
@@ -424,7 +436,7 @@ class TestChromaVectorStore:
             assert len(doc_ids) == 3
             mock_collection.add.assert_called_once()
 
-    def test_search_basic(self, mock_embedder):
+    def test_search_basic(self, mock_embedder: Mock) -> None:
         """Test basic search."""
         mock_chroma = MagicMock()
         mock_client = Mock()
@@ -452,7 +464,7 @@ class TestChromaVectorStore:
             assert len(results) == 2
             mock_collection.query.assert_called_once()
 
-    def test_delete_documents(self, mock_embedder):
+    def test_delete_documents(self, mock_embedder: Mock) -> None:
         """Test deleting documents."""
         mock_chroma = MagicMock()
         mock_client = Mock()
@@ -478,7 +490,7 @@ class TestChromaVectorStore:
 class TestPineconeVectorStore:
     """Test Pinecone vector store wrapper."""
 
-    def test_initialization(self, mock_embedder):
+    def test_initialization(self, mock_embedder: Mock) -> None:
         """Test store initialization."""
         mock_pinecone_module = MagicMock()
         mock_pinecone = Mock()
@@ -495,7 +507,7 @@ class TestPineconeVectorStore:
             )
             assert store.embedder == mock_embedder
 
-    def test_add_documents(self, mock_embedder, sample_documents):
+    def test_add_documents(self, mock_embedder: Mock, sample_documents: list[Document]) -> None:
         """Test adding documents."""
         mock_pinecone_module = MagicMock()
         mock_pinecone = Mock()
@@ -516,7 +528,7 @@ class TestPineconeVectorStore:
             assert len(doc_ids) == 3
             mock_index.upsert.assert_called_once()
 
-    def test_search_basic(self, mock_embedder):
+    def test_search_basic(self, mock_embedder: Mock) -> None:
         """Test basic search."""
         mock_pinecone_module = MagicMock()
         mock_pinecone = Mock()
@@ -563,7 +575,7 @@ class TestPineconeVectorStore:
 class TestVectorStoreCompatibility:
     """Test that all vector stores behave consistently."""
 
-    def test_factory_method(self, mock_embedder):
+    def test_factory_method(self, mock_embedder: Mock) -> None:
         """Test VectorStore.create factory method."""
         # Memory store
         memory_store = VectorStore.create("memory", embedder=mock_embedder)
@@ -580,7 +592,7 @@ class TestVectorStoreCompatibility:
             if os.path.exists(db_path):
                 os.remove(db_path)
 
-    def test_invalid_backend(self, mock_embedder):
+    def test_invalid_backend(self, mock_embedder: Mock) -> None:
         """Test error on invalid backend name."""
         with pytest.raises(ValueError, match="Unknown vector store backend"):
             VectorStore.create("invalid_backend", embedder=mock_embedder)

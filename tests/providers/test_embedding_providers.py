@@ -8,7 +8,9 @@ Tests all 4 embedding providers:
 - CohereEmbeddingProvider
 """
 
-from typing import List
+from __future__ import annotations
+
+from typing import Any, List, Optional, Type
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -27,7 +29,7 @@ from selectools.models import Anthropic, Cohere, Gemini, OpenAI
 
 
 @pytest.fixture
-def mock_openai_response():
+def mock_openai_response() -> Mock:
     """Mock OpenAI embedding API response."""
     mock_response = Mock()
     mock_data_0 = Mock()
@@ -42,7 +44,7 @@ def mock_openai_response():
 
 
 @pytest.fixture
-def mock_voyage_response():
+def mock_voyage_response() -> Mock:
     """Mock Voyage AI embedding API response."""
     mock_response = Mock()
     mock_response.embeddings = [[0.1] * 1024, [0.2] * 1024]
@@ -51,7 +53,7 @@ def mock_voyage_response():
 
 
 @pytest.fixture
-def mock_gemini_response():
+def mock_gemini_response() -> Mock:
     """Mock Gemini embedding API response."""
     mock_response = Mock()
     mock_embedding1 = Mock()
@@ -63,7 +65,7 @@ def mock_gemini_response():
 
 
 @pytest.fixture
-def mock_cohere_response():
+def mock_cohere_response() -> Mock:
     """Mock Cohere embedding API response."""
     mock_response = Mock()
     mock_response.embeddings = [[0.1] * 1024, [0.2] * 1024]
@@ -79,14 +81,14 @@ def mock_cohere_response():
 class TestOpenAIEmbeddingProvider:
     """Test OpenAI embedding provider."""
 
-    def test_initialization(self):
+    def test_initialization(self) -> None:
         """Test provider initialization."""
         with patch("openai.OpenAI"):
             provider = OpenAIEmbeddingProvider(model=OpenAI.Embeddings.TEXT_EMBEDDING_3_SMALL.id)
             assert provider.model == OpenAI.Embeddings.TEXT_EMBEDDING_3_SMALL.id
             assert provider.dimension == 1536
 
-    def test_embed_text(self, mock_openai_response):
+    def test_embed_text(self, mock_openai_response: Mock) -> None:
         """Test embedding a single text."""
         with patch("openai.OpenAI") as MockClient:
             mock_client = MockClient.return_value
@@ -100,7 +102,7 @@ class TestOpenAIEmbeddingProvider:
             assert all(isinstance(x, float) for x in embedding)
             mock_client.embeddings.create.assert_called_once()
 
-    def test_embed_texts_batch(self, mock_openai_response):
+    def test_embed_texts_batch(self, mock_openai_response: Mock) -> None:
         """Test embedding multiple texts in batch."""
         with patch("openai.OpenAI") as MockClient:
             mock_client = MockClient.return_value
@@ -114,7 +116,7 @@ class TestOpenAIEmbeddingProvider:
             assert all(len(e) == 1536 for e in embeddings)
             mock_client.embeddings.create.assert_called_once()
 
-    def test_embed_query(self, mock_openai_response):
+    def test_embed_query(self, mock_openai_response: Mock) -> None:
         """Test embedding a query (same as text for OpenAI)."""
         with patch("openai.OpenAI") as MockClient:
             mock_client = MockClient.return_value
@@ -126,7 +128,7 @@ class TestOpenAIEmbeddingProvider:
             assert isinstance(embedding, list)
             assert len(embedding) == 1536
 
-    def test_dimension_property(self):
+    def test_dimension_property(self) -> None:
         """Test dimension property for different models."""
         with patch("openai.OpenAI"):
             # Small model
@@ -141,7 +143,7 @@ class TestOpenAIEmbeddingProvider:
             )
             assert provider_large.dimension == 3072
 
-    def test_error_handling_invalid_key(self):
+    def test_error_handling_invalid_key(self) -> None:
         """Test error handling with invalid API key."""
         with patch("openai.OpenAI") as MockClient:
             mock_client = MockClient.return_value
@@ -153,7 +155,7 @@ class TestOpenAIEmbeddingProvider:
                 provider.embed_text("Test")
 
     @pytest.mark.skip(reason="Retry logic not yet implemented in OpenAI provider")
-    def test_retry_on_rate_limit(self):
+    def test_retry_on_rate_limit(self) -> None:
         """Test retry logic on rate limit errors."""
         with patch("openai.OpenAI") as MockClient:
             mock_client = MockClient.return_value
@@ -179,7 +181,7 @@ class TestOpenAIEmbeddingProvider:
 class TestAnthropicEmbeddingProvider:
     """Test Anthropic/Voyage AI embedding provider."""
 
-    def test_initialization(self):
+    def test_initialization(self) -> None:
         """Test provider initialization."""
         mock_voyage = Mock()
         mock_client = Mock()
@@ -190,7 +192,7 @@ class TestAnthropicEmbeddingProvider:
             assert provider.model == Anthropic.Embeddings.VOYAGE_3_LITE.id
             assert provider.dimension == 1024
 
-    def test_embed_text_document_type(self, mock_voyage_response):
+    def test_embed_text_document_type(self, mock_voyage_response: Mock) -> None:
         """Test embedding text with document input type."""
         mock_voyage = Mock()
         mock_client = Mock()
@@ -207,7 +209,7 @@ class TestAnthropicEmbeddingProvider:
             call_args = mock_client.embed.call_args
             assert call_args[1]["input_type"] == "document"
 
-    def test_embed_query_query_type(self, mock_voyage_response):
+    def test_embed_query_query_type(self, mock_voyage_response: Mock) -> None:
         """Test embedding query with query input type."""
         mock_voyage = Mock()
         mock_client = Mock()
@@ -223,7 +225,7 @@ class TestAnthropicEmbeddingProvider:
             call_args = mock_client.embed.call_args
             assert call_args[1]["input_type"] == "query"
 
-    def test_embed_texts_batch(self, mock_voyage_response):
+    def test_embed_texts_batch(self, mock_voyage_response: Mock) -> None:
         """Test embedding multiple texts."""
         mock_voyage = Mock()
         mock_client = Mock()
@@ -237,7 +239,7 @@ class TestAnthropicEmbeddingProvider:
             assert isinstance(embeddings, list)
             assert len(embeddings) == 2
 
-    def test_missing_voyageai_import(self):
+    def test_missing_voyageai_import(self) -> None:
         """Test error when voyageai is not installed."""
         with patch.dict("sys.modules", {"voyageai": None}):
             with pytest.raises(ImportError, match="voyageai package required"):
@@ -252,7 +254,7 @@ class TestAnthropicEmbeddingProvider:
 class TestGeminiEmbeddingProvider:
     """Test Google Gemini embedding provider."""
 
-    def test_initialization(self):
+    def test_initialization(self) -> None:
         """Test provider initialization."""
         mock_google = Mock()
         mock_genai = Mock()
@@ -267,7 +269,7 @@ class TestGeminiEmbeddingProvider:
             assert provider.model == Gemini.Embeddings.EMBEDDING_001.id
             assert provider.dimension == 768
 
-    def test_embed_text_document_task(self, mock_gemini_response):
+    def test_embed_text_document_task(self, mock_gemini_response: Mock) -> None:
         """Test embedding text with RETRIEVAL_DOCUMENT task."""
         mock_google = Mock()
         mock_genai = Mock()
@@ -291,7 +293,7 @@ class TestGeminiEmbeddingProvider:
             assert len(embedding) == 768
             mock_models.embed_content.assert_called_once()
 
-    def test_embed_query_query_task(self, mock_gemini_response):
+    def test_embed_query_query_task(self, mock_gemini_response: Mock) -> None:
         """Test embedding query with RETRIEVAL_QUERY task."""
         mock_google = Mock()
         mock_genai = Mock()
@@ -315,7 +317,7 @@ class TestGeminiEmbeddingProvider:
             assert len(embedding) == 768
             mock_models.embed_content.assert_called()
 
-    def test_embed_texts_batch(self, mock_gemini_response):
+    def test_embed_texts_batch(self, mock_gemini_response: Mock) -> None:
         """Test embedding multiple texts."""
         mock_google = Mock()
         mock_genai = Mock()
@@ -338,7 +340,7 @@ class TestGeminiEmbeddingProvider:
             assert isinstance(embeddings, list)
             assert len(embeddings) == 2
 
-    def test_missing_api_key(self):
+    def test_missing_api_key(self) -> None:
         """Test error when API key is not provided."""
         mock_google = Mock()
         mock_genai = Mock()
@@ -353,7 +355,7 @@ class TestGeminiEmbeddingProvider:
                 with pytest.raises(ValueError, match="API_KEY"):
                     GeminiEmbeddingProvider()
 
-    def test_free_tier(self, mock_gemini_response):
+    def test_free_tier(self, mock_gemini_response: Mock) -> None:
         """Test that Gemini embeddings are free."""
         mock_google = Mock()
         mock_genai = Mock()
@@ -388,7 +390,7 @@ class TestGeminiEmbeddingProvider:
 class TestCohereEmbeddingProvider:
     """Test Cohere embedding provider."""
 
-    def test_initialization(self):
+    def test_initialization(self) -> None:
         """Test provider initialization."""
         mock_cohere_lib = Mock()
         mock_client = Mock()
@@ -401,7 +403,7 @@ class TestCohereEmbeddingProvider:
             assert provider.model == Cohere.Embeddings.EMBED_V3.id
             assert provider.dimension == 1024
 
-    def test_embed_text_document_type(self, mock_cohere_response):
+    def test_embed_text_document_type(self, mock_cohere_response: Mock) -> None:
         """Test embedding text with search_document input type."""
         mock_cohere_lib = Mock()
         mock_client = Mock()
@@ -418,7 +420,7 @@ class TestCohereEmbeddingProvider:
             call_args = mock_client.embed.call_args
             assert call_args[1]["input_type"] == "search_document"
 
-    def test_embed_query_query_type(self, mock_cohere_response):
+    def test_embed_query_query_type(self, mock_cohere_response: Mock) -> None:
         """Test embedding query with search_query input type."""
         mock_cohere_lib = Mock()
         mock_client = Mock()
@@ -434,7 +436,7 @@ class TestCohereEmbeddingProvider:
             call_args = mock_client.embed.call_args
             assert call_args[1]["input_type"] == "search_query"
 
-    def test_embed_texts_batch(self, mock_cohere_response):
+    def test_embed_texts_batch(self, mock_cohere_response: Mock) -> None:
         """Test embedding multiple texts."""
         mock_cohere_lib = Mock()
         mock_client = Mock()
@@ -448,13 +450,13 @@ class TestCohereEmbeddingProvider:
             assert isinstance(embeddings, list)
             assert len(embeddings) == 2
 
-    def test_missing_cohere_import(self):
+    def test_missing_cohere_import(self) -> None:
         """Test error when cohere is not installed."""
         with patch.dict("sys.modules", {"cohere": None}):
             with pytest.raises(ImportError, match="cohere package required"):
                 CohereEmbeddingProvider()
 
-    def test_multilingual_model(self):
+    def test_multilingual_model(self) -> None:
         """Test multilingual model support."""
         mock_cohere_lib = Mock()
         mock_client = Mock()
@@ -475,7 +477,7 @@ class TestCohereEmbeddingProvider:
 class TestEmbeddingProviderInterface:
     """Test that all providers implement the same interface."""
 
-    def _create_provider(self, provider_class):
+    def _create_provider(self, provider_class: Any) -> Any:
         """Helper to create provider with proper mocking."""
         mock_client = Mock()
 
@@ -503,7 +505,7 @@ class TestEmbeddingProviderInterface:
                 return provider_class()
         return None
 
-    def test_all_providers_have_embed_text(self):
+    def test_all_providers_have_embed_text(self) -> None:
         """Test all providers have embed_text method."""
         providers = [
             OpenAIEmbeddingProvider,
@@ -517,7 +519,7 @@ class TestEmbeddingProviderInterface:
             assert hasattr(provider, "embed_text")
             assert callable(provider.embed_text)
 
-    def test_all_providers_have_embed_texts(self):
+    def test_all_providers_have_embed_texts(self) -> None:
         """Test all providers have embed_texts method."""
         providers = [
             OpenAIEmbeddingProvider,
@@ -531,7 +533,7 @@ class TestEmbeddingProviderInterface:
             assert hasattr(provider, "embed_texts")
             assert callable(provider.embed_texts)
 
-    def test_all_providers_have_dimension(self):
+    def test_all_providers_have_dimension(self) -> None:
         """Test all providers have dimension property."""
         providers = [
             OpenAIEmbeddingProvider,

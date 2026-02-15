@@ -4,8 +4,11 @@ Vector store compatibility tests.
 Ensures all vector store implementations behave consistently with the same data.
 """
 
+from __future__ import annotations
+
 import os
 import tempfile
+from typing import Any, Dict, Generator, List
 from unittest.mock import Mock
 
 import numpy as np
@@ -21,21 +24,21 @@ from selectools.rag.stores.sqlite import SQLiteVectorStore
 
 
 @pytest.fixture
-def mock_embedder():
+def mock_embedder() -> Mock:
     """Create a consistent mock embedding provider."""
     embedder = Mock()
     embedder.model = "mock-embedding-model"
     embedder.dimension = 128
 
-    def mock_embed_text(text: str):
+    def mock_embed_text(text: str) -> list[float]:
         # Consistent embeddings based on text
         hash_val = abs(hash(text)) % 1000
         return [float(hash_val + i) / 1000.0 for i in range(128)]
 
-    def mock_embed_texts(texts: list):
+    def mock_embed_texts(texts: list[str]) -> list[list[float]]:
         return [mock_embed_text(text) for text in texts]
 
-    def mock_embed_query(query: str):
+    def mock_embed_query(query: str) -> list[float]:
         return mock_embed_text(query)
 
     embedder.embed_text.side_effect = mock_embed_text
@@ -46,7 +49,7 @@ def mock_embedder():
 
 
 @pytest.fixture
-def sample_documents():
+def sample_documents() -> list[Document]:
     """Sample documents for testing."""
     return [
         Document(
@@ -73,7 +76,7 @@ def sample_documents():
 
 
 @pytest.fixture
-def all_vector_stores(mock_embedder):
+def all_vector_stores(mock_embedder: Mock) -> Generator[Dict[str, Any], None, None]:
     """Create instances of all vector store types."""
     stores = {}
 
@@ -104,7 +107,9 @@ def all_vector_stores(mock_embedder):
 class TestVectorStoreConsistency:
     """Test that all vector stores behave consistently."""
 
-    def test_add_documents_returns_same_count(self, all_vector_stores, sample_documents):
+    def test_add_documents_returns_same_count(
+        self, all_vector_stores: Dict[str, Any], sample_documents: list[Document]
+    ) -> None:
         """Test that all stores return same number of IDs when adding documents."""
         for store_name, store in all_vector_stores.items():
             if store_name.endswith("_db_path"):
@@ -116,8 +121,11 @@ class TestVectorStoreConsistency:
             assert all(isinstance(id, str) for id in doc_ids), f"{store_name} failed"
 
     def test_search_returns_similar_results(
-        self, all_vector_stores, mock_embedder, sample_documents
-    ):
+        self,
+        all_vector_stores: Dict[str, Any],
+        mock_embedder: Mock,
+        sample_documents: list[Document],
+    ) -> None:
         """Test that all stores return similar search results for same query."""
         # Add documents to all stores
         for store_name, store in all_vector_stores.items():
@@ -139,7 +147,12 @@ class TestVectorStoreConsistency:
         result_counts = {name: len(results) for name, results in results_by_store.items()}
         assert len(set(result_counts.values())) == 1, f"Inconsistent result counts: {result_counts}"
 
-    def test_top_k_consistency(self, all_vector_stores, mock_embedder, sample_documents):
+    def test_top_k_consistency(
+        self,
+        all_vector_stores: Dict[str, Any],
+        mock_embedder: Mock,
+        sample_documents: list[Document],
+    ) -> None:
         """Test that top_k parameter works consistently."""
         # Add documents
         for store_name, store in all_vector_stores.items():
@@ -157,7 +170,12 @@ class TestVectorStoreConsistency:
                 results = store.search(query_embedding, top_k=k)
                 assert len(results) == k, f"{store_name} returned {len(results)} instead of {k}"
 
-    def test_score_ordering_consistency(self, all_vector_stores, mock_embedder, sample_documents):
+    def test_score_ordering_consistency(
+        self,
+        all_vector_stores: Dict[str, Any],
+        mock_embedder: Mock,
+        sample_documents: list[Document],
+    ) -> None:
         """Test that all stores return results in descending score order."""
         # Add documents
         for store_name, store in all_vector_stores.items():
@@ -186,7 +204,12 @@ class TestVectorStoreConsistency:
 class TestMetadataFilteringConsistency:
     """Test that metadata filtering works consistently across stores."""
 
-    def test_single_filter_consistency(self, all_vector_stores, mock_embedder, sample_documents):
+    def test_single_filter_consistency(
+        self,
+        all_vector_stores: Dict[str, Any],
+        mock_embedder: Mock,
+        sample_documents: list[Document],
+    ) -> None:
         """Test single metadata filter across all stores."""
         # Add documents
         for store_name, store in all_vector_stores.items():
@@ -219,7 +242,12 @@ class TestMetadataFilteringConsistency:
                     result.document.metadata["category"] == "programming"
                 ), f"{store_name} failed filter"
 
-    def test_multiple_filters_consistency(self, all_vector_stores, mock_embedder, sample_documents):
+    def test_multiple_filters_consistency(
+        self,
+        all_vector_stores: Dict[str, Any],
+        mock_embedder: Mock,
+        sample_documents: list[Document],
+    ) -> None:
         """Test multiple metadata filters."""
         # Add documents
         for store_name, store in all_vector_stores.items():
@@ -252,7 +280,12 @@ class TestMetadataFilteringConsistency:
 class TestCRUDConsistency:
     """Test CRUD operations consistency."""
 
-    def test_delete_consistency(self, all_vector_stores, mock_embedder, sample_documents):
+    def test_delete_consistency(
+        self,
+        all_vector_stores: Dict[str, Any],
+        mock_embedder: Mock,
+        sample_documents: list[Document],
+    ) -> None:
         """Test that delete works consistently."""
         # Add documents and get IDs
         doc_ids_by_store = {}
@@ -277,7 +310,12 @@ class TestCRUDConsistency:
             results = store.search(query_embedding, top_k=10)
             assert len(results) == 4, f"{store_name} has {len(results)} documents after delete"
 
-    def test_clear_consistency(self, all_vector_stores, mock_embedder, sample_documents):
+    def test_clear_consistency(
+        self,
+        all_vector_stores: Dict[str, Any],
+        mock_embedder: Mock,
+        sample_documents: list[Document],
+    ) -> None:
         """Test that clear works consistently."""
         # Add documents
         for store_name, store in all_vector_stores.items():
@@ -308,7 +346,9 @@ class TestCRUDConsistency:
 class TestEdgeCasesConsistency:
     """Test edge cases across all stores."""
 
-    def test_empty_store_search(self, all_vector_stores, mock_embedder):
+    def test_empty_store_search(
+        self, all_vector_stores: Dict[str, Any], mock_embedder: Mock
+    ) -> None:
         """Test searching in empty stores."""
         query_embedding = mock_embedder.embed_query("test")
 
@@ -318,7 +358,7 @@ class TestEdgeCasesConsistency:
             results = store.search(query_embedding, top_k=5)
             assert len(results) == 0, f"{store_name} returned results from empty store"
 
-    def test_single_document(self, all_vector_stores, mock_embedder):
+    def test_single_document(self, all_vector_stores: Dict[str, Any], mock_embedder: Mock) -> None:
         """Test with single document."""
         doc = Document(text="Single document test", metadata={"test": True})
 
@@ -336,7 +376,9 @@ class TestEdgeCasesConsistency:
             results = store.search(query_embedding, top_k=5)
             assert len(results) == 1, f"{store_name} failed single document search"
 
-    def test_duplicate_documents(self, all_vector_stores, mock_embedder):
+    def test_duplicate_documents(
+        self, all_vector_stores: Dict[str, Any], mock_embedder: Mock
+    ) -> None:
         """Test adding duplicate documents."""
         doc = Document(text="Duplicate test", metadata={"dup": True})
         docs = [doc, doc, doc]  # Same document 3 times
@@ -364,7 +406,12 @@ class TestEdgeCasesConsistency:
 class TestPerformanceCharacteristics:
     """Compare performance characteristics (not strict equality)."""
 
-    def test_search_time_reasonable(self, all_vector_stores, mock_embedder, sample_documents):
+    def test_search_time_reasonable(
+        self,
+        all_vector_stores: Dict[str, Any],
+        mock_embedder: Mock,
+        sample_documents: list[Document],
+    ) -> None:
         """Test that search completes in reasonable time for all stores."""
         import time
 
@@ -389,7 +436,9 @@ class TestPerformanceCharacteristics:
             assert elapsed < 1.0, f"{store_name} search took {elapsed:.3f}s"
             assert len(results) == 3
 
-    def test_batch_insert_performance(self, all_vector_stores, mock_embedder):
+    def test_batch_insert_performance(
+        self, all_vector_stores: Dict[str, Any], mock_embedder: Mock
+    ) -> None:
         """Test batch insert performance."""
         import time
 
@@ -420,7 +469,7 @@ class TestPerformanceCharacteristics:
 class TestAPICompatibility:
     """Test that all stores have compatible APIs."""
 
-    def test_all_have_add_documents(self, all_vector_stores):
+    def test_all_have_add_documents(self, all_vector_stores: Dict[str, Any]) -> None:
         """Test that all stores have add_documents method."""
         for store_name, store in all_vector_stores.items():
             if store_name.endswith("_db_path"):
@@ -428,7 +477,7 @@ class TestAPICompatibility:
             assert hasattr(store, "add_documents")
             assert callable(store.add_documents)
 
-    def test_all_have_search(self, all_vector_stores):
+    def test_all_have_search(self, all_vector_stores: Dict[str, Any]) -> None:
         """Test that all stores have search method."""
         for store_name, store in all_vector_stores.items():
             if store_name.endswith("_db_path"):
@@ -436,7 +485,7 @@ class TestAPICompatibility:
             assert hasattr(store, "search")
             assert callable(store.search)
 
-    def test_all_have_delete(self, all_vector_stores):
+    def test_all_have_delete(self, all_vector_stores: Dict[str, Any]) -> None:
         """Test that all stores have delete method."""
         for store_name, store in all_vector_stores.items():
             if store_name.endswith("_db_path"):
@@ -444,7 +493,7 @@ class TestAPICompatibility:
             assert hasattr(store, "delete")
             assert callable(store.delete)
 
-    def test_all_have_clear(self, all_vector_stores):
+    def test_all_have_clear(self, all_vector_stores: Dict[str, Any]) -> None:
         """Test that all stores have clear method."""
         for store_name, store in all_vector_stores.items():
             if store_name.endswith("_db_path"):
@@ -452,7 +501,7 @@ class TestAPICompatibility:
             assert hasattr(store, "clear")
             assert callable(store.clear)
 
-    def test_all_have_embedder(self, all_vector_stores):
+    def test_all_have_embedder(self, all_vector_stores: Dict[str, Any]) -> None:
         """Test that all stores have embedder attribute."""
         for store_name, store in all_vector_stores.items():
             if store_name.endswith("_db_path"):

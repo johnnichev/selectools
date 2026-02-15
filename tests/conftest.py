@@ -5,10 +5,14 @@ This file configures pytest with custom markers and command-line options
 for running different types of tests.
 """
 
+from __future__ import annotations
+
+from typing import Any, List
+
 import pytest
 
 
-def pytest_addoption(parser):
+def pytest_addoption(parser: Any) -> None:
     """Add custom command line options."""
     parser.addoption(
         "--run-e2e",
@@ -18,7 +22,7 @@ def pytest_addoption(parser):
     )
 
 
-def pytest_configure(config):
+def pytest_configure(config: Any) -> None:
     """Register custom markers and load environment."""
     # Load .env file for E2E tests
     from selectools.env import load_default_env
@@ -35,7 +39,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "ollama: mark test as requiring Ollama running locally")
 
 
-def pytest_collection_modifyitems(config, items):
+def pytest_collection_modifyitems(config: Any, items: List[Any]) -> None:
     """Skip e2e tests unless --run-e2e is passed."""
     if config.getoption("--run-e2e"):
         # --run-e2e given: do not skip e2e tests

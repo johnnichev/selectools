@@ -4,9 +4,12 @@ SQLite vector store integration tests.
 Tests persistence, reconnection, and real-world usage patterns.
 """
 
+from __future__ import annotations
+
 import os
 import tempfile
 from pathlib import Path
+from typing import Generator
 from unittest.mock import Mock
 
 import pytest
@@ -20,21 +23,21 @@ from selectools.rag.stores.sqlite import SQLiteVectorStore
 
 
 @pytest.fixture
-def mock_embedder():
+def mock_embedder() -> Mock:
     """Create a mock embedding provider."""
     embedder = Mock()
     embedder.model = "mock-embedding-model"
     embedder.dimension = 128
 
-    def mock_embed_text(text: str):
+    def mock_embed_text(text: str) -> list[float]:
         # Generate consistent embeddings based on text hash
         hash_val = hash(text) % 1000
         return [float(hash_val + i) / 1000.0 for i in range(128)]
 
-    def mock_embed_texts(texts: list):
+    def mock_embed_texts(texts: list[str]) -> list[list[float]]:
         return [mock_embed_text(text) for text in texts]
 
-    def mock_embed_query(query: str):
+    def mock_embed_query(query: str) -> list[float]:
         return mock_embed_text(query)
 
     embedder.embed_text.side_effect = mock_embed_text
@@ -45,7 +48,7 @@ def mock_embedder():
 
 
 @pytest.fixture
-def temp_db_path():
+def temp_db_path() -> Generator[str, None, None]:
     """Create a temporary database path (file not created yet)."""
     temp_dir = tempfile.mkdtemp()
     db_path = os.path.join(temp_dir, "test.db")
@@ -65,7 +68,7 @@ def temp_db_path():
 
 
 @pytest.fixture
-def sample_documents():
+def sample_documents() -> list[Document]:
     """Create sample documents."""
     return [
         Document(
@@ -99,7 +102,9 @@ def sample_documents():
 class TestSQLitePersistence:
     """Test that data persists across connections."""
 
-    def test_basic_persistence(self, mock_embedder, temp_db_path, sample_documents):
+    def test_basic_persistence(
+        self, mock_embedder: Mock, temp_db_path: str, sample_documents: list[Document]
+    ) -> None:
         """Test basic persistence after reconnection."""
         # Add documents and close
         store1 = SQLiteVectorStore(embedder=mock_embedder, db_path=temp_db_path)
@@ -115,7 +120,9 @@ class TestSQLitePersistence:
         assert all(isinstance(result.document.text, str) for result in results)
         assert all(len(result.document.text) > 0 for result in results)
 
-    def test_metadata_persistence(self, mock_embedder, temp_db_path, sample_documents):
+    def test_metadata_persistence(
+        self, mock_embedder: Mock, temp_db_path: str, sample_documents: list[Document]
+    ) -> None:
         """Test that metadata persists correctly."""
         # Add documents
         store1 = SQLiteVectorStore(embedder=mock_embedder, db_path=temp_db_path)
@@ -132,7 +139,7 @@ class TestSQLitePersistence:
             assert "category" in result.document.metadata
             assert "difficulty" in result.document.metadata
 
-    def test_embeddings_persistence(self, mock_embedder, temp_db_path):
+    def test_embeddings_persistence(self, mock_embedder: Mock, temp_db_path: str) -> None:
         """Test that embeddings are stored and retrieved correctly."""
         # Add document with known embedding
         store1 = SQLiteVectorStore(embedder=mock_embedder, db_path=temp_db_path)
@@ -149,7 +156,9 @@ class TestSQLitePersistence:
         # Cosine similarity should be ~1.0 for identical vectors
         assert results[0].score > 0.99
 
-    def test_multiple_sessions(self, mock_embedder, temp_db_path, sample_documents):
+    def test_multiple_sessions(
+        self, mock_embedder: Mock, temp_db_path: str, sample_documents: list[Document]
+    ) -> None:
         """Test multiple open/close cycles."""
         # Session 1: Add 2 documents
         store1 = SQLiteVectorStore(embedder=mock_embedder, db_path=temp_db_path)
@@ -168,7 +177,9 @@ class TestSQLitePersistence:
 
         assert len(results) == 4
 
-    def test_delete_and_reconnect(self, mock_embedder, temp_db_path, sample_documents):
+    def test_delete_and_reconnect(
+        self, mock_embedder: Mock, temp_db_path: str, sample_documents: list[Document]
+    ) -> None:
         """Test that deletions persist."""
         # Add documents
         store1 = SQLiteVectorStore(embedder=mock_embedder, db_path=temp_db_path)
@@ -195,7 +206,7 @@ class TestSQLitePersistence:
 class TestSQLiteDatabaseOperations:
     """Test database-specific operations."""
 
-    def test_database_file_creation(self, mock_embedder, temp_db_path):
+    def test_database_file_creation(self, mock_embedder: Mock, temp_db_path: str) -> None:
         """Test that database file is created."""
         assert not os.path.exists(temp_db_path)
 
@@ -204,7 +215,7 @@ class TestSQLiteDatabaseOperations:
         assert os.path.exists(temp_db_path)
         assert os.path.isfile(temp_db_path)
 
-    def test_custom_db_path(self, mock_embedder):
+    def test_custom_db_path(self, mock_embedder: Mock) -> None:
         """Test using custom database path."""
         custom_dir = tempfile.mkdtemp()
         custom_path = os.path.join(custom_dir, "my_custom.db")
@@ -219,7 +230,9 @@ class TestSQLiteDatabaseOperations:
                 os.remove(custom_path)
             os.rmdir(custom_dir)
 
-    def test_clear_database(self, mock_embedder, temp_db_path, sample_documents):
+    def test_clear_database(
+        self, mock_embedder: Mock, temp_db_path: str, sample_documents: list[Document]
+    ) -> None:
         """Test clearing the database."""
         store = SQLiteVectorStore(embedder=mock_embedder, db_path=temp_db_path)
         store.add_documents(sample_documents)
@@ -236,7 +249,7 @@ class TestSQLiteDatabaseOperations:
         results_after = store.search(query_embedding, top_k=10)
         assert len(results_after) == 0
 
-    def test_upsert_behavior(self, mock_embedder, temp_db_path):
+    def test_upsert_behavior(self, mock_embedder: Mock, temp_db_path: str) -> None:
         """Test multiple additions and deletions."""
         store = SQLiteVectorStore(embedder=mock_embedder, db_path=temp_db_path)
 
@@ -266,7 +279,9 @@ class TestSQLiteDatabaseOperations:
 class TestSQLiteSearchQuality:
     """Test search accuracy and quality."""
 
-    def test_search_relevance_ordering(self, mock_embedder, temp_db_path, sample_documents):
+    def test_search_relevance_ordering(
+        self, mock_embedder: Mock, temp_db_path: str, sample_documents: list[Document]
+    ) -> None:
         """Test that search results are ordered by relevance."""
         store = SQLiteVectorStore(embedder=mock_embedder, db_path=temp_db_path)
         store.add_documents(sample_documents)
@@ -280,7 +295,9 @@ class TestSQLiteSearchQuality:
         scores = [r.score for r in results]
         assert scores == sorted(scores, reverse=True)
 
-    def test_search_with_filter_accuracy(self, mock_embedder, temp_db_path, sample_documents):
+    def test_search_with_filter_accuracy(
+        self, mock_embedder: Mock, temp_db_path: str, sample_documents: list[Document]
+    ) -> None:
         """Test that metadata filtering works correctly."""
         store = SQLiteVectorStore(embedder=mock_embedder, db_path=temp_db_path)
         store.add_documents(sample_documents)
@@ -293,7 +310,9 @@ class TestSQLiteSearchQuality:
         assert len(devops_results) == 2  # Docker and Kubernetes
         assert all(r.document.metadata["category"] == "devops" for r in devops_results)
 
-    def test_top_k_limiting(self, mock_embedder, temp_db_path, sample_documents):
+    def test_top_k_limiting(
+        self, mock_embedder: Mock, temp_db_path: str, sample_documents: list[Document]
+    ) -> None:
         """Test that top_k parameter works correctly."""
         store = SQLiteVectorStore(embedder=mock_embedder, db_path=temp_db_path)
         store.add_documents(sample_documents)
@@ -305,7 +324,7 @@ class TestSQLiteSearchQuality:
             results = store.search(query_embedding, top_k=k)
             assert len(results) == k
 
-    def test_empty_search(self, mock_embedder, temp_db_path):
+    def test_empty_search(self, mock_embedder: Mock, temp_db_path: str) -> None:
         """Test searching in empty database."""
         store = SQLiteVectorStore(embedder=mock_embedder, db_path=temp_db_path)
 
@@ -323,7 +342,7 @@ class TestSQLiteSearchQuality:
 class TestSQLiteConcurrency:
     """Test concurrent access patterns."""
 
-    def test_sequential_writes(self, mock_embedder, temp_db_path):
+    def test_sequential_writes(self, mock_embedder: Mock, temp_db_path: str) -> None:
         """Test sequential writes from different store instances."""
         # First instance writes
         store1 = SQLiteVectorStore(embedder=mock_embedder, db_path=temp_db_path)
@@ -342,7 +361,9 @@ class TestSQLiteConcurrency:
 
         assert len(results) == 2
 
-    def test_read_after_write(self, mock_embedder, temp_db_path, sample_documents):
+    def test_read_after_write(
+        self, mock_embedder: Mock, temp_db_path: str, sample_documents: list[Document]
+    ) -> None:
         """Test reading immediately after writing."""
         store = SQLiteVectorStore(embedder=mock_embedder, db_path=temp_db_path)
 
@@ -364,7 +385,7 @@ class TestSQLiteConcurrency:
 class TestSQLitePerformance:
     """Test performance characteristics."""
 
-    def test_large_batch_insert(self, mock_embedder, temp_db_path):
+    def test_large_batch_insert(self, mock_embedder: Mock, temp_db_path: str) -> None:
         """Test inserting a large batch of documents."""
         store = SQLiteVectorStore(embedder=mock_embedder, db_path=temp_db_path)
 
@@ -382,7 +403,7 @@ class TestSQLitePerformance:
 
         assert len(results) == 100
 
-    def test_search_performance(self, mock_embedder, temp_db_path):
+    def test_search_performance(self, mock_embedder: Mock, temp_db_path: str) -> None:
         """Test search on moderately sized database."""
         store = SQLiteVectorStore(embedder=mock_embedder, db_path=temp_db_path)
 
@@ -406,7 +427,7 @@ class TestSQLitePerformance:
 class TestSQLiteErrorHandling:
     """Test error handling and edge cases."""
 
-    def test_invalid_db_path(self, mock_embedder):
+    def test_invalid_db_path(self, mock_embedder: Mock) -> None:
         """Test handling of invalid database path."""
         # Path to a directory (not a file)
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -416,7 +437,7 @@ class TestSQLiteErrorHandling:
             )
             store.add_documents([Document(text="test", metadata={})])
 
-    def test_delete_nonexistent_documents(self, mock_embedder, temp_db_path):
+    def test_delete_nonexistent_documents(self, mock_embedder: Mock, temp_db_path: str) -> None:
         """Test deleting non-existent documents (should not error)."""
         store = SQLiteVectorStore(embedder=mock_embedder, db_path=temp_db_path)
 

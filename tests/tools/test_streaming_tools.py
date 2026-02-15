@@ -10,8 +10,11 @@ Tests cover:
 - Integration with hooks
 """
 
+from __future__ import annotations
+
 import asyncio
 import inspect
+from pathlib import Path
 from typing import AsyncGenerator, Generator
 from unittest.mock import MagicMock
 
@@ -56,23 +59,23 @@ def non_streaming(text: str) -> str:
 class TestBasicStreamingExecution:
     """Test basic streaming tool execution."""
 
-    def test_sync_streaming_tool_execute(self):
+    def test_sync_streaming_tool_execute(self) -> None:
         """Test synchronous streaming tool execution."""
         result = simple_stream.execute({"count": 3})
         assert result == "Chunk 0\nChunk 1\nChunk 2\n"
 
-    def test_streaming_tool_is_streaming_property(self):
+    def test_streaming_tool_is_streaming_property(self) -> None:
         """Test is_streaming property."""
         assert simple_stream.is_streaming is True
         assert simple_stream.streaming is True
         assert non_streaming.is_streaming is False
         assert non_streaming.streaming is False
 
-    def test_streaming_tool_chunk_accumulation(self):
+    def test_streaming_tool_chunk_accumulation(self) -> None:
         """Test that chunks are accumulated correctly."""
         chunks_received = []
 
-        def callback(chunk: str):
+        def callback(chunk: str) -> None:
             chunks_received.append(chunk)
 
         result = simple_stream.execute({"count": 5}, chunk_callback=callback)
@@ -81,11 +84,11 @@ class TestBasicStreamingExecution:
         assert chunks_received == [f"Chunk {i}\n" for i in range(5)]
         assert result == "".join(chunks_received)
 
-    def test_non_streaming_tool_no_chunks(self):
+    def test_non_streaming_tool_no_chunks(self) -> None:
         """Test that non-streaming tools don't trigger chunk callback."""
         chunks_received = []
 
-        def callback(chunk: str):
+        def callback(chunk: str) -> None:
             chunks_received.append(chunk)
 
         result = non_streaming.execute({"text": "hello"}, chunk_callback=callback)
@@ -93,12 +96,12 @@ class TestBasicStreamingExecution:
         assert len(chunks_received) == 0
         assert result == "Result: hello"
 
-    def test_streaming_tool_empty_stream(self):
+    def test_streaming_tool_empty_stream(self) -> None:
         """Test streaming tool with zero chunks."""
         result = simple_stream.execute({"count": 0})
         assert result == ""
 
-    def test_streaming_tool_single_chunk(self):
+    def test_streaming_tool_single_chunk(self) -> None:
         """Test streaming tool with single chunk."""
         result = simple_stream.execute({"count": 1})
         assert result == "Chunk 0\n"
@@ -108,17 +111,17 @@ class TestAsyncStreamingExecution:
     """Test async streaming tool execution."""
 
     @pytest.mark.asyncio
-    async def test_async_streaming_tool_aexecute(self):
+    async def test_async_streaming_tool_aexecute(self) -> None:
         """Test async streaming tool execution."""
         result = await async_stream.aexecute({"count": 3})
         assert result == "AsyncChunk 0\nAsyncChunk 1\nAsyncChunk 2\n"
 
     @pytest.mark.asyncio
-    async def test_async_streaming_chunk_accumulation(self):
+    async def test_async_streaming_chunk_accumulation(self) -> None:
         """Test that async chunks are accumulated correctly."""
         chunks_received = []
 
-        def callback(chunk: str):
+        def callback(chunk: str) -> None:
             chunks_received.append(chunk)
 
         result = await async_stream.aexecute({"count": 5}, chunk_callback=callback)
@@ -128,17 +131,17 @@ class TestAsyncStreamingExecution:
         assert result == "".join(chunks_received)
 
     @pytest.mark.asyncio
-    async def test_sync_streaming_in_async_context(self):
+    async def test_sync_streaming_in_async_context(self) -> None:
         """Test sync streaming tool in async context."""
         result = await simple_stream.aexecute({"count": 3})
         assert result == "Chunk 0\nChunk 1\nChunk 2\n"
 
     @pytest.mark.asyncio
-    async def test_sync_streaming_with_callback_in_async(self):
+    async def test_sync_streaming_with_callback_in_async(self) -> None:
         """Test sync streaming with callback in async context."""
         chunks_received = []
 
-        def callback(chunk: str):
+        def callback(chunk: str) -> None:
             chunks_received.append(chunk)
 
         result = await simple_stream.aexecute({"count": 3}, chunk_callback=callback)
@@ -150,11 +153,11 @@ class TestAsyncStreamingExecution:
 class TestStreamingErrorHandling:
     """Test error handling for streaming tools."""
 
-    def test_streaming_error_mid_stream(self):
+    def test_streaming_error_mid_stream(self) -> None:
         """Test that error mid-stream is caught properly."""
         chunks_received = []
 
-        def callback(chunk: str):
+        def callback(chunk: str) -> None:
             chunks_received.append(chunk)
 
         with pytest.raises(Exception) as exc_info:
@@ -165,7 +168,7 @@ class TestStreamingErrorHandling:
         assert "Error at chunk 3" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_async_streaming_error_handling(self):
+    async def test_async_streaming_error_handling(self) -> None:
         """Test async streaming error handling."""
 
         @tool(description="Async error streaming", streaming=True)
@@ -178,7 +181,7 @@ class TestStreamingErrorHandling:
 
         chunks_received = []
 
-        def callback(chunk: str):
+        def callback(chunk: str) -> None:
             chunks_received.append(chunk)
 
         with pytest.raises(Exception) as exc_info:
@@ -191,7 +194,7 @@ class TestStreamingErrorHandling:
 class TestStreamingWithAnalytics:
     """Test streaming integration with analytics."""
 
-    def test_analytics_tracks_streaming_chunks(self):
+    def test_analytics_tracks_streaming_chunks(self) -> None:
         """Test that analytics tracks chunk count for streaming tools."""
         provider = FakeProvider(
             responses=[
@@ -212,7 +215,7 @@ class TestStreamingWithAnalytics:
         assert metrics.streaming_calls == 1
         assert metrics.total_chunks == 5
 
-    def test_analytics_non_streaming_zero_chunks(self):
+    def test_analytics_non_streaming_zero_chunks(self) -> None:
         """Test that non-streaming tools show zero chunks."""
         provider = FakeProvider(
             responses=[
@@ -233,7 +236,7 @@ class TestStreamingWithAnalytics:
         assert metrics.streaming_calls == 0
         assert metrics.total_chunks == 0
 
-    def test_analytics_mixed_streaming_non_streaming(self):
+    def test_analytics_mixed_streaming_non_streaming(self) -> None:
         """Test analytics with both streaming and non-streaming calls."""
         provider = FakeProvider(
             responses=[
@@ -264,11 +267,11 @@ class TestStreamingWithAnalytics:
 class TestStreamingWithHooks:
     """Test streaming integration with observability hooks."""
 
-    def test_on_tool_chunk_hook_invoked(self):
+    def test_on_tool_chunk_hook_invoked(self) -> None:
         """Test that on_tool_chunk hook is called for each chunk."""
         chunks_received = []
 
-        def on_tool_chunk(tool_name: str, chunk: str):
+        def on_tool_chunk(tool_name: str, chunk: str) -> None:
             chunks_received.append((tool_name, chunk))
 
         provider = FakeProvider(
@@ -292,11 +295,11 @@ class TestStreamingWithHooks:
             ("simple_stream", "Chunk 2\n"),
         ]
 
-    def test_on_tool_chunk_not_called_for_non_streaming(self):
+    def test_on_tool_chunk_not_called_for_non_streaming(self) -> None:
         """Test that on_tool_chunk is not called for non-streaming tools."""
         chunks_received = []
 
-        def on_tool_chunk(tool_name: str, chunk: str):
+        def on_tool_chunk(tool_name: str, chunk: str) -> None:
             chunks_received.append((tool_name, chunk))
 
         provider = FakeProvider(
@@ -316,11 +319,11 @@ class TestStreamingWithHooks:
         assert len(chunks_received) == 0
 
     @pytest.mark.asyncio
-    async def test_on_tool_chunk_hook_async(self):
+    async def test_on_tool_chunk_hook_async(self) -> None:
         """Test on_tool_chunk hook with async agent."""
         chunks_received = []
 
-        def on_tool_chunk(tool_name: str, chunk: str):
+        def on_tool_chunk(tool_name: str, chunk: str) -> None:
             chunks_received.append((tool_name, chunk))
 
         provider = FakeProvider(
@@ -344,7 +347,7 @@ class TestStreamingWithHooks:
 class TestStreamingToolValidation:
     """Test validation for streaming tools."""
 
-    def test_streaming_tool_with_generator_function(self):
+    def test_streaming_tool_with_generator_function(self) -> None:
         """Test that generator functions are detected."""
 
         def gen_func() -> Generator[str, None, None]:
@@ -352,7 +355,7 @@ class TestStreamingToolValidation:
 
         assert inspect.isgeneratorfunction(gen_func)
 
-    def test_streaming_tool_creation(self):
+    def test_streaming_tool_creation(self) -> None:
         """Test creating a streaming tool."""
         tool_obj = Tool(
             name="test_stream",
@@ -365,7 +368,7 @@ class TestStreamingToolValidation:
         assert tool_obj.streaming is True
         assert tool_obj.is_streaming is True
 
-    def test_non_streaming_tool_default(self):
+    def test_non_streaming_tool_default(self) -> None:
         """Test that streaming defaults to False."""
         tool_obj = Tool(
             name="test_regular",
@@ -381,19 +384,19 @@ class TestStreamingToolValidation:
 class TestStreamingToolboxTools:
     """Test streaming tools from toolbox."""
 
-    def test_read_file_stream_tool_exists(self):
+    def test_read_file_stream_tool_exists(self) -> None:
         """Test that read_file_stream tool exists in toolbox."""
         from selectools.toolbox.file_tools import read_file_stream
 
         assert read_file_stream.is_streaming is True
 
-    def test_process_csv_stream_tool_exists(self):
+    def test_process_csv_stream_tool_exists(self) -> None:
         """Test that process_csv_stream tool exists in toolbox."""
         from selectools.toolbox.data_tools import process_csv_stream
 
         assert process_csv_stream.is_streaming is True
 
-    def test_read_file_stream_basic_execution(self, tmp_path):
+    def test_read_file_stream_basic_execution(self, tmp_path: Path) -> None:
         """Test basic execution of read_file_stream."""
         from selectools.toolbox.file_tools import read_file_stream
 
@@ -408,7 +411,7 @@ class TestStreamingToolboxTools:
         assert "Line 3" in result
         assert "[Line" in result  # Should have line numbers
 
-    def test_process_csv_stream_basic_execution(self, tmp_path):
+    def test_process_csv_stream_basic_execution(self, tmp_path: Path) -> None:
         """Test basic execution of process_csv_stream."""
         from selectools.toolbox.data_tools import process_csv_stream
 

@@ -47,7 +47,7 @@ from selectools.memory import ConversationMemory
 
 
 @pytest.fixture
-def calculator_tool():
+def calculator_tool() -> Tool:
     """Simple calculator tool for testing."""
 
     @tool(
@@ -80,7 +80,7 @@ def calculator_tool():
 
 
 @pytest.fixture
-def weather_tool():
+def weather_tool() -> Tool:
     """Mock weather tool for testing."""
 
     @tool(description="Get current weather for a city. Returns temperature and conditions.")
@@ -117,12 +117,12 @@ class TestOpenAIProvider:
     """End-to-end tests for OpenAI provider."""
 
     @pytest.fixture(autouse=True)
-    def check_api_key(self):
+    def check_api_key(self) -> None:
         """Skip if OpenAI API key is not available."""
         if not os.getenv("OPENAI_API_KEY"):
             pytest.skip("OPENAI_API_KEY not set")
 
-    def test_openai_basic_completion(self):
+    def test_openai_basic_completion(self) -> None:
         """Test basic completion with OpenAI."""
         from selectools.providers.openai_provider import OpenAIProvider
 
@@ -143,7 +143,7 @@ class TestOpenAIProvider:
         print(f"\n  Response: {response}")
         print(f"  Usage: {usage.total_tokens} tokens, ${usage.cost_usd:.6f}")
 
-    def test_openai_tool_calling(self, calculator_tool):
+    def test_openai_tool_calling(self, calculator_tool: Tool) -> None:
         """Test tool calling with OpenAI."""
         from selectools.providers.openai_provider import OpenAIProvider
 
@@ -167,7 +167,7 @@ class TestOpenAIProvider:
         print(f"\n  Response: {response.content}")
         print(f"  Total cost: ${agent.total_cost:.6f}")
 
-    def test_openai_streaming(self, weather_tool):
+    def test_openai_streaming(self, weather_tool: Tool) -> None:
         """Test streaming with OpenAI."""
         from selectools.providers.openai_provider import OpenAIProvider
 
@@ -188,7 +188,7 @@ class TestOpenAIProvider:
         print(f"\n  Streamed response ({len(chunks)} chunks): {full_response}")
 
     @pytest.mark.asyncio
-    async def test_openai_async(self, calculator_tool):
+    async def test_openai_async(self, calculator_tool: Tool) -> None:
         """Test async execution with OpenAI."""
         from selectools.providers.openai_provider import OpenAIProvider
 
@@ -206,7 +206,7 @@ class TestOpenAIProvider:
         assert "25" in response.content
         print(f"\n  Async response: {response.content}")
 
-    def test_openai_with_memory(self, weather_tool):
+    def test_openai_with_memory(self, weather_tool: Tool) -> None:
         """Test conversation memory with OpenAI."""
         from selectools.providers.openai_provider import OpenAIProvider
 
@@ -241,12 +241,12 @@ class TestAnthropicProvider:
     """End-to-end tests for Anthropic provider."""
 
     @pytest.fixture(autouse=True)
-    def check_api_key(self):
+    def check_api_key(self) -> None:
         """Skip if Anthropic API key is not available."""
         if not os.getenv("ANTHROPIC_API_KEY"):
             pytest.skip("ANTHROPIC_API_KEY not set")
 
-    def test_anthropic_basic_completion(self):
+    def test_anthropic_basic_completion(self) -> None:
         """Test basic completion with Anthropic."""
         from selectools.providers.anthropic_provider import AnthropicProvider
 
@@ -266,7 +266,7 @@ class TestAnthropicProvider:
         print(f"\n  Response: {response}")
         print(f"  Usage: {usage.total_tokens} tokens, ${usage.cost_usd:.6f}")
 
-    def test_anthropic_tool_calling(self, calculator_tool):
+    def test_anthropic_tool_calling(self, calculator_tool: Tool) -> None:
         """Test tool calling with Anthropic."""
         from selectools.providers.anthropic_provider import AnthropicProvider
 
@@ -286,7 +286,7 @@ class TestAnthropicProvider:
         print(f"\n  Response: {response.content}")
         print(f"  Total cost: ${agent.total_cost:.6f}")
 
-    def test_anthropic_streaming(self):
+    def test_anthropic_streaming(self) -> None:
         """Test streaming with Anthropic."""
         from selectools.providers.anthropic_provider import AnthropicProvider
 
@@ -307,7 +307,7 @@ class TestAnthropicProvider:
         print(f"\n  Streamed response ({len(chunks)} chunks): {full_response}")
 
     @pytest.mark.asyncio
-    async def test_anthropic_async(self, calculator_tool):
+    async def test_anthropic_async(self, calculator_tool: Tool) -> None:
         """Test async execution with Anthropic."""
         from selectools.providers.anthropic_provider import AnthropicProvider
 
@@ -325,7 +325,7 @@ class TestAnthropicProvider:
         assert "150" in response.content
         print(f"\n  Async response: {response.content}")
 
-    def test_anthropic_with_memory(self, weather_tool):
+    def test_anthropic_with_memory(self, weather_tool: Tool) -> None:
         """Test conversation memory with Anthropic."""
         from selectools.providers.anthropic_provider import AnthropicProvider
 
@@ -357,12 +357,12 @@ class TestGeminiProvider:
     """End-to-end tests for Gemini provider."""
 
     @pytest.fixture(autouse=True)
-    def check_api_key(self):
+    def check_api_key(self) -> None:
         """Skip if Gemini API key is not available."""
         if not os.getenv("GEMINI_API_KEY") and not os.getenv("GOOGLE_API_KEY"):
             pytest.skip("GEMINI_API_KEY or GOOGLE_API_KEY not set")
 
-    def test_gemini_basic_completion(self):
+    def test_gemini_basic_completion(self) -> None:
         """Test basic completion with Gemini."""
         from selectools.providers.gemini_provider import GeminiProvider
 
@@ -382,7 +382,7 @@ class TestGeminiProvider:
         print(f"\n  Response: {response}")
         print(f"  Usage: {usage.total_tokens} tokens, ${usage.cost_usd:.6f}")
 
-    def test_gemini_tool_calling(self, calculator_tool):
+    def test_gemini_tool_calling(self, calculator_tool: Tool) -> None:
         """Test tool calling with Gemini."""
         from selectools.providers.gemini_provider import GeminiProvider
 
@@ -402,7 +402,7 @@ class TestGeminiProvider:
         print(f"\n  Response: {response.content}")
         print(f"  Total cost: ${agent.total_cost:.6f}")
 
-    def test_gemini_streaming(self):
+    def test_gemini_streaming(self) -> None:
         """Test streaming with Gemini."""
         from selectools.providers.gemini_provider import GeminiProvider
 
@@ -423,7 +423,7 @@ class TestGeminiProvider:
         print(f"\n  Streamed response ({len(chunks)} chunks): {full_response}")
 
     @pytest.mark.asyncio
-    async def test_gemini_async(self, calculator_tool):
+    async def test_gemini_async(self, calculator_tool: Tool) -> None:
         """Test async execution with Gemini."""
         from selectools.providers.gemini_provider import GeminiProvider
 
@@ -441,7 +441,7 @@ class TestGeminiProvider:
         assert "12" in response.content
         print(f"\n  Async response: {response.content}")
 
-    def test_gemini_with_memory(self, weather_tool):
+    def test_gemini_with_memory(self, weather_tool: Tool) -> None:
         """Test conversation memory with Gemini."""
         from selectools.providers.gemini_provider import GeminiProvider
 
@@ -471,7 +471,7 @@ class TestGeminiProvider:
 class TestCrossProvider:
     """Tests that run across multiple providers."""
 
-    def test_cost_tracking_comparison(self, calculator_tool):
+    def test_cost_tracking_comparison(self, calculator_tool: Tool) -> None:
         """Compare cost tracking across providers."""
         results = {}
 

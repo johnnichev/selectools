@@ -8,7 +8,7 @@ import asyncio
 import sys
 import time
 from pathlib import Path
-from typing import List
+from typing import Any, List, Tuple
 
 import pytest
 
@@ -26,7 +26,7 @@ from selectools.providers.stubs import LocalProvider
 
 
 @pytest.mark.asyncio
-async def test_100_concurrent_users():
+async def test_100_concurrent_users() -> None:
     """Test 100 concurrent users making requests simultaneously."""
     print("  Testing 100 concurrent users...")
 
@@ -35,14 +35,14 @@ async def test_100_concurrent_users():
         await asyncio.sleep(0.01)  # Simulate work
         return f"Processed for user {user_id}"
 
-    async def simulate_user(user_id: int):
+    async def simulate_user(user_id: int) -> bool:
         agent = Agent(
             tools=[process_request], provider=LocalProvider(), config=AgentConfig(max_iterations=2)
         )
         response = await agent.arun(
             [Message(role=Role.USER, content=f"Request from user {user_id}")]
         )
-        return response.role == Role.ASSISTANT
+        return bool(response.role == Role.ASSISTANT)
 
     start_time = time.time()
     results = await asyncio.gather(*[simulate_user(i) for i in range(100)])
@@ -53,11 +53,10 @@ async def test_100_concurrent_users():
 
     throughput = 100 / elapsed
     print(f"  ✓ 100 concurrent users completed in {elapsed:.2f}s ({throughput:.1f} req/s)")
-    return elapsed, throughput
 
 
 @pytest.mark.asyncio
-async def test_500_rapid_fire_requests():
+async def test_500_rapid_fire_requests() -> None:
     """Test 500 rapid-fire requests to a single agent pool."""
     print("  Testing 500 rapid-fire requests...")
 
@@ -68,9 +67,9 @@ async def test_500_rapid_fire_requests():
     # Shared agent (more realistic for web apps)
     agent = Agent(tools=[fast_tool], provider=LocalProvider(), config=AgentConfig(max_iterations=2))
 
-    async def make_request(request_id: int):
+    async def make_request(request_id: int) -> bool:
         response = await agent.arun([Message(role=Role.USER, content=f"Request {request_id}")])
-        return response.role == Role.ASSISTANT
+        return bool(response.role == Role.ASSISTANT)
 
     start_time = time.time()
     results = await asyncio.gather(*[make_request(i) for i in range(500)])
@@ -81,11 +80,10 @@ async def test_500_rapid_fire_requests():
 
     throughput = 500 / elapsed
     print(f"  ✓ 500 requests completed in {elapsed:.2f}s ({throughput:.1f} req/s)")
-    return elapsed, throughput
 
 
 @pytest.mark.asyncio
-async def test_sustained_load_1000_requests():
+async def test_sustained_load_1000_requests() -> None:
     """Test sustained load with 1000 requests over time."""
     print("  Testing sustained load (1000 requests)...")
 
@@ -96,7 +94,7 @@ async def test_sustained_load_1000_requests():
 
     agent = Agent(tools=[do_work], provider=LocalProvider(), config=AgentConfig(max_iterations=2))
 
-    async def batch_request(batch_id: int, batch_size: int):
+    async def batch_request(batch_id: int, batch_size: int) -> bool:
         tasks = [
             agent.arun([Message(role=Role.USER, content=f"Batch {batch_id} item {i}")])
             for i in range(batch_size)
@@ -113,11 +111,10 @@ async def test_sustained_load_1000_requests():
 
     throughput = 1000 / elapsed
     print(f"  ✓ 1000 requests in 20 batches completed in {elapsed:.2f}s ({throughput:.1f} req/s)")
-    return elapsed, throughput
 
 
 @pytest.mark.asyncio
-async def test_concurrent_agents_with_memory():
+async def test_concurrent_agents_with_memory() -> None:
     """Test 50 concurrent agents, each with their own memory."""
     print("  Testing 50 agents with independent memory...")
 
@@ -125,7 +122,7 @@ async def test_concurrent_agents_with_memory():
     async def store_data(data: str) -> str:
         return f"Stored: {data}"
 
-    async def agent_with_memory(agent_id: int, num_turns: int):
+    async def agent_with_memory(agent_id: int, num_turns: int) -> int:
         memory = ConversationMemory(max_messages=20)
         agent = Agent(
             tools=[store_data],
@@ -145,18 +142,17 @@ async def test_concurrent_agents_with_memory():
     elapsed = time.time() - start_time
 
     assert len(memory_sizes) == 50
-    assert all(size > 0 for size in memory_sizes)
+    assert all(size is not None and size > 0 for size in memory_sizes)
 
     total_requests = 50 * 5
     throughput = total_requests / elapsed
     print(
         f"  ✓ 50 agents × 5 turns = {total_requests} requests in {elapsed:.2f}s ({throughput:.1f} req/s)"
     )
-    return elapsed, throughput
 
 
 @pytest.mark.asyncio
-async def test_memory_under_load():
+async def test_memory_under_load() -> None:
     """Test memory behavior under high load."""
     print("  Testing memory stability under load...")
 
@@ -166,7 +162,7 @@ async def test_memory_under_load():
 
     memories = [ConversationMemory(max_messages=30, max_tokens=5000) for _ in range(20)]
 
-    async def stress_memory(memory: ConversationMemory, agent_id: int):
+    async def stress_memory(memory: ConversationMemory, agent_id: int) -> int:
         agent = Agent(
             tools=[generate_data],
             provider=LocalProvider(),
@@ -189,14 +185,15 @@ async def test_memory_under_load():
 
     assert len(final_sizes) == 20
     # All memories should have enforced limits
-    assert all(size <= 30 for size in final_sizes), f"Memory limits not enforced: {final_sizes}"
+    assert all(
+        size is not None and size <= 30 for size in final_sizes
+    ), f"Memory limits not enforced: {final_sizes}"
 
     print(f"  ✓ 20 agents × 20 messages with memory limits enforced in {elapsed:.2f}s")
-    return elapsed
 
 
 @pytest.mark.asyncio
-async def test_mixed_workload_realistic():
+async def test_mixed_workload_realistic() -> None:
     """Test mixed workload simulating real production traffic."""
     print("  Testing realistic mixed workload...")
 
@@ -216,13 +213,13 @@ async def test_mixed_workload_realistic():
         total = sum(i for i in range(1000))
         return f"heavy:{total}"
 
-    async def mixed_request(request_type: str, request_id: int):
+    async def mixed_request(request_type: str, request_id: int) -> bool:
         tools = [light_work] if request_type == "light" else [light_work, medium_work, heavy_work]
         agent = Agent(tools=tools, provider=LocalProvider(), config=AgentConfig(max_iterations=2))
         response = await agent.arun(
             [Message(role=Role.USER, content=f"{request_type} request {request_id}")]
         )
-        return response.role == Role.ASSISTANT
+        return bool(response.role == Role.ASSISTANT)
 
     # Simulate realistic traffic: 70% light, 20% medium, 10% heavy
     requests = (
@@ -243,11 +240,10 @@ async def test_mixed_workload_realistic():
     print(
         f"  ✓ 100 mixed requests (70% light, 20% medium, 10% heavy) in {elapsed:.2f}s ({throughput:.1f} req/s)"
     )
-    return elapsed, throughput
 
 
 @pytest.mark.asyncio
-async def test_error_handling_under_load():
+async def test_error_handling_under_load() -> None:
     """Test error handling with high concurrency and failures."""
     print("  Testing error handling under concurrent load...")
 
@@ -262,7 +258,7 @@ async def test_error_handling_under_load():
             raise Exception(f"Simulated failure {request_id}")
         return f"Success {request_id}"
 
-    async def request_with_errors(request_id: int):
+    async def request_with_errors(request_id: int) -> Tuple[str, bool]:
         agent = Agent(
             tools=[flaky_tool], provider=LocalProvider(), config=AgentConfig(max_iterations=3)
         )
@@ -282,12 +278,11 @@ async def test_error_handling_under_load():
         f"  ✓ 100 requests with 20% failure rate: {success_count} succeeded, {100-success_count} handled gracefully"
     )
     print(f"    Completed in {elapsed:.2f}s")
-    return elapsed, success_count
 
 
-def run_async_test(test_func):
+def run_async_test(test_func: Any) -> None:
     """Helper to run async tests."""
-    return asyncio.run(test_func())
+    asyncio.run(test_func())
 
 
 if __name__ == "__main__":
@@ -305,14 +300,14 @@ if __name__ == "__main__":
         ("Error Handling Under Load", test_error_handling_under_load),
     ]
 
-    results = []
+    results: List[Tuple[str, str, Any]] = []
     failures = 0
 
     for test_name, test_func in stress_tests:
         print(f"\n[{test_name}]")
         try:
-            result = run_async_test(test_func)
-            results.append((test_name, "PASS", result))
+            run_async_test(test_func)
+            results.append((test_name, "PASS", None))
         except AssertionError as exc:
             failures += 1
             print(f"  ✗ FAILED: {exc}")

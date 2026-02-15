@@ -13,7 +13,7 @@ import types
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
-from typing import Dict
+from typing import Any, Callable, Coroutine, Dict, Generator, List, Optional
 
 import pytest
 
@@ -34,6 +34,7 @@ from selectools.providers.base import ProviderError
 from selectools.providers.gemini_provider import GeminiProvider
 from selectools.providers.stubs import LocalProvider
 from selectools.tools import ToolRegistry
+from selectools.usage import UsageStats
 
 
 class FakeProvider:
@@ -43,23 +44,21 @@ class FakeProvider:
     supports_streaming = False
     supports_async = False
 
-    def __init__(self, responses):
+    def __init__(self, responses: List[str]) -> None:
         self.responses = responses
         self.calls = 0
 
     def complete(
         self,
         *,
-        model,
-        system_prompt,
-        messages,
-        tools=None,
-        temperature=0.0,
-        max_tokens=1000,
-        timeout=None,
-    ):  # noqa: D401
-        from selectools import UsageStats
-
+        model: Optional[str] = None,
+        system_prompt: Optional[str] = None,
+        messages: List[Message],
+        tools: Optional[List[Any]] = None,
+        temperature: float = 0.0,
+        max_tokens: int = 1000,
+        timeout: Optional[float] = None,
+    ) -> tuple[Message, UsageStats]:  # noqa: D401
         response = self.responses[min(self.calls, len(self.responses) - 1)]
         self.calls += 1
         usage = UsageStats(
@@ -78,14 +77,14 @@ class FakeProvider:
     async def acomplete(
         self,
         *,
-        model,
-        system_prompt,
-        messages,
-        tools=None,
-        temperature=0.0,
-        max_tokens=1000,
-        timeout=None,
-    ):  # noqa: D401
+        model: Optional[str] = None,
+        system_prompt: Optional[str] = None,
+        messages: List[Message],
+        tools: Optional[List[Any]] = None,
+        temperature: float = 0.0,
+        max_tokens: int = 1000,
+        timeout: Optional[float] = None,
+    ) -> tuple[Message, UsageStats]:  # noqa: D401
         return self.complete(
             model=model,
             system_prompt=system_prompt,
@@ -102,25 +101,32 @@ class FakeStreamingProvider(FakeProvider):
 
     supports_streaming = True
 
-    def __init__(self, stream_chunks, final_response):
+    def __init__(self, stream_chunks: List[str], final_response: str) -> None:
         super().__init__(responses=[final_response])
         self.stream_chunks = stream_chunks
 
     def stream(
-        self, *, model, system_prompt, messages, temperature=0.0, max_tokens=1000, timeout=None
-    ):
+        self,
+        *,
+        model: Optional[str] = None,
+        system_prompt: Optional[str] = None,
+        messages: List[Message],
+        temperature: float = 0.0,
+        max_tokens: int = 1000,
+        timeout: Optional[float] = None,
+    ) -> Generator[str, None, None]:
         for chunk in self.stream_chunks:
             yield chunk
 
 
-def test_role_enum():
+def test_role_enum() -> None:
     assert Role.USER.value == "user"
     assert Role.ASSISTANT.value == "assistant"
     assert Role.SYSTEM.value == "system"
     assert Role.TOOL.value == "tool"
 
 
-def test_message_creation_and_image_encoding():
+def test_message_creation_and_image_encoding() -> None:
     image_path = Path(__file__).resolve().parents[1] / "assets" / "environment.png"
     try:
         msg = Message(role=Role.USER, content="What's in this image?", image_path=str(image_path))
@@ -135,7 +141,7 @@ def test_message_creation_and_image_encoding():
     assert formatted["content"] == "Hello"
 
 
-def test_tool_schema_and_validation():
+def test_tool_schema_and_validation() -> None:
     param = ToolParameter(name="query", param_type=str, description="Search query", required=True)
     tool = Tool(
         name="search",
@@ -162,7 +168,7 @@ def test_tool_schema_and_validation():
         assert "Missing required parameter" in str(e)
 
 
-def test_conversation_memory_basic():
+def test_conversation_memory_basic() -> None:
     """Test basic ConversationMemory operations."""
     memory = ConversationMemory(max_messages=5)
 
@@ -193,7 +199,7 @@ def test_conversation_memory_basic():
     assert len(memory) == 0
 
 
-def test_conversation_memory_max_messages():
+def test_conversation_memory_max_messages() -> None:
     """Test that ConversationMemory enforces max_messages limit."""
     memory = ConversationMemory(max_messages=3)
 
@@ -215,7 +221,7 @@ def test_conversation_memory_max_messages():
     assert history[2].content == "Message 5"
 
 
-def test_conversation_memory_with_agent():
+def test_conversation_memory_with_agent() -> None:
     """Test Agent integration with ConversationMemory."""
     memory = ConversationMemory(max_messages=10)
     tool = Tool(name="echo", description="Echo the input", parameters=[], function=lambda: "echoed")
@@ -239,7 +245,7 @@ def test_conversation_memory_with_agent():
     assert history[2].content == "Hi again"
 
 
-def test_conversation_memory_persistence_across_turns():
+def test_conversation_memory_persistence_across_turns() -> None:
     """Test that memory persists across multiple agent turns."""
     memory = ConversationMemory(max_messages=20)
     tool = Tool(name="counter", description="Count", parameters=[], function=lambda: "counted")
@@ -259,7 +265,7 @@ def test_conversation_memory_persistence_across_turns():
     assert history[4].content == "Turn 3"
 
 
-def test_conversation_memory_to_dict():
+def test_conversation_memory_to_dict() -> None:
     """Test ConversationMemory serialization."""
     memory = ConversationMemory(max_messages=5)
     memory.add(Message(role=Role.USER, content="Test"))
@@ -271,7 +277,7 @@ def test_conversation_memory_to_dict():
     assert data["messages"][0]["content"] == "Test"
 
 
-def test_conversation_memory_without_memory():
+def test_conversation_memory_without_memory() -> None:
     """Test that Agent works without memory (backward compatibility)."""
     tool = Tool(name="test", description="Test", parameters=[], function=lambda: "ok")
     provider = FakeProvider(responses=["Done"])
@@ -283,7 +289,7 @@ def test_conversation_memory_without_memory():
     assert agent.memory is None
 
 
-def test_tool_decorator_and_registry_infer_schema():
+def test_tool_decorator_and_registry_infer_schema() -> None:
     registry = ToolRegistry()
 
     @registry.tool(description="Greets a user")
@@ -297,7 +303,7 @@ def test_tool_decorator_and_registry_infer_schema():
     assert names["excited"].required is False
 
 
-def test_parser_handles_fenced_blocks():
+def test_parser_handles_fenced_blocks() -> None:
     parser = ToolCallParser()
     response = """
     Here you go:
@@ -311,7 +317,7 @@ def test_parser_handles_fenced_blocks():
     assert result.tool_call.parameters["query"] == "docs"
 
 
-def test_parser_handles_multiple_candidates_and_mixed_text():
+def test_parser_handles_multiple_candidates_and_mixed_text() -> None:
     parser = ToolCallParser()
     response = """
     Some explanation text.
@@ -327,14 +333,14 @@ def test_parser_handles_multiple_candidates_and_mixed_text():
     assert result.tool_call.tool_name == "first"
 
 
-def test_parser_respects_size_limit():
+def test_parser_respects_size_limit() -> None:
     oversized_json = "{" + '"tool_name":"big","parameters":' + '"' + ("x" * 200) + '"' + "}"
     parser = ToolCallParser(max_payload_chars=10)
     result = parser.parse(f"TOOL_CALL: {oversized_json}")
     assert result.tool_call is None
 
 
-def test_parser_handles_mixed_text_json():
+def test_parser_handles_mixed_text_json() -> None:
     parser = ToolCallParser()
     response = "Random text TOOL_CALL: {'tool':'echo','params':{'text':'hi'}} trailing text"
     result = parser.parse(response)
@@ -342,7 +348,7 @@ def test_parser_handles_mixed_text_json():
     assert result.tool_call.parameters["text"] == "hi"
 
 
-def test_agent_executes_tool_and_returns_final_message():
+def test_agent_executes_tool_and_returns_final_message() -> None:
     def add(a: int, b: int) -> str:
         return json.dumps({"sum": a + b})
 
@@ -374,10 +380,10 @@ def test_agent_executes_tool_and_returns_final_message():
     assert "5" in result.content
 
 
-def test_agent_streaming_handler_and_fallback():
+def test_agent_streaming_handler_and_fallback() -> None:
     captured = []
 
-    def handler(chunk: str):
+    def handler(chunk: str) -> None:
         captured.append(chunk)
 
     provider = FakeStreamingProvider(
@@ -399,19 +405,19 @@ def test_agent_streaming_handler_and_fallback():
     assert "".join(captured) == "Hello world"
 
 
-def test_agent_retries_on_provider_error():
+def test_agent_retries_on_provider_error() -> None:
     class FlakyProvider(FakeProvider):
         def complete(
             self,
             *,
-            model,
-            system_prompt,
-            messages,
-            tools=None,
-            temperature=0.0,
-            max_tokens=1000,
-            timeout=None,
-        ):  # noqa: D401
+            model: Optional[str] = None,
+            system_prompt: Optional[str] = None,
+            messages: List[Message],
+            tools: Optional[List[Any]] = None,
+            temperature: float = 0.0,
+            max_tokens: int = 1000,
+            timeout: Optional[float] = None,
+        ) -> tuple[Message, UsageStats]:  # noqa: D401
             if self.calls == 0:
                 self.calls += 1
                 raise ProviderError("temporary failure")
@@ -442,7 +448,7 @@ def test_agent_retries_on_provider_error():
     assert provider.calls == 2
 
 
-def test_local_provider_streams_tokens():
+def test_local_provider_streams_tokens() -> None:
     provider = LocalProvider()
     chunks = list(
         provider.stream(
@@ -454,7 +460,7 @@ def test_local_provider_streams_tokens():
     assert any("hi" in chunk for chunk in chunks)
 
 
-def test_anthropic_and_gemini_require_api_keys(monkeypatch):
+def test_anthropic_and_gemini_require_api_keys(monkeypatch: pytest.MonkeyPatch) -> None:
     from unittest.mock import patch
 
     from selectools.exceptions import ProviderConfigurationError
@@ -478,19 +484,19 @@ def test_anthropic_and_gemini_require_api_keys(monkeypatch):
             pass
 
 
-def test_anthropic_provider_with_mocked_client():
+def test_anthropic_provider_with_mocked_client() -> None:
     """Test Anthropic provider using a mocked anthropic package."""
     os.environ["ANTHROPIC_API_KEY"] = "test-key"
     fake_resp_block = types.SimpleNamespace(type="text", text="hello anthropic")
 
     class FakeUsage:
-        def __init__(self):
+        def __init__(self) -> None:
             self.input_tokens = 10
             self.output_tokens = 5
 
     class FakeMessages:
         @staticmethod
-        def create(**kwargs):
+        def create(**kwargs: Any) -> Any:
             if kwargs.get("stream"):
                 event = types.SimpleNamespace(
                     type="content_block_delta", delta=types.SimpleNamespace(text="hello anthropic")
@@ -499,17 +505,17 @@ def test_anthropic_provider_with_mocked_client():
             return types.SimpleNamespace(content=[fake_resp_block], usage=FakeUsage())
 
     class FakeAnthropicClient:
-        def __init__(self, api_key=None, base_url=None):
+        def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None) -> None:
             self.messages = FakeMessages()
 
     class FakeAsyncAnthropicClient:
-        def __init__(self, api_key=None, base_url=None):
+        def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None) -> None:
             self.messages = FakeMessages()
 
     fake_module = types.SimpleNamespace(
         Anthropic=FakeAnthropicClient, AsyncAnthropic=FakeAsyncAnthropicClient
     )
-    sys.modules["anthropic"] = fake_module
+    sys.modules["anthropic"] = fake_module  # type: ignore[assignment]
     try:
         provider = AnthropicProvider()
         result, usage = provider.complete(
@@ -532,54 +538,56 @@ def test_anthropic_provider_with_mocked_client():
         os.environ.pop("ANTHROPIC_API_KEY", None)
 
 
-def test_gemini_provider_with_mocked_client():
+def test_gemini_provider_with_mocked_client() -> None:
     """Test Gemini provider using a mocked google-genai package."""
     os.environ["GEMINI_API_KEY"] = "test-key"
 
     class FakeStreamChunk:
-        def __init__(self, text):
+        def __init__(self, text: str) -> None:
             self.text = text
 
     class FakeUsageMetadata:
-        def __init__(self):
+        def __init__(self) -> None:
             self.prompt_token_count = 10
             self.candidates_token_count = 5
 
     class FakeResponse:
-        def __init__(self, text):
+        def __init__(self, text: str) -> None:
             self.text = text
-            self.candidates = []  # No tool calls
+            self.candidates: list[Any] = []  # No tool calls
             self.usage_metadata = FakeUsageMetadata()
 
     class FakeModels:
-        def generate_content(self, model, contents, config=None):
+        def generate_content(self, model: Any, contents: Any, config: Any = None) -> FakeResponse:
             return FakeResponse("gemini-response")
 
-        def generate_content_stream(self, model, contents, config=None):
+        def generate_content_stream(
+            self, model: Any, contents: Any, config: Any = None
+        ) -> Generator[FakeStreamChunk, None, None]:
             yield FakeStreamChunk("stream-1")
             yield FakeStreamChunk("stream-2")
 
     class FakeClient:
-        def __init__(self, api_key=None):
+        def __init__(self, api_key: Optional[str] = None) -> None:
             self.models = FakeModels()
 
     # Mock types module
     class FakeTypes:
         class GenerateContentConfig:
-            def __init__(self, **kwargs):
+            def __init__(self, **kwargs: Any) -> None:
                 pass
 
         class Part:
-            def __init__(self, text=None, inline_data=None):
+            def __init__(self, text: Optional[str] = None, inline_data: Any = None) -> None:
                 self.text = text
 
         class Content:
-            def __init__(self, role=None, parts=None):
+            def __init__(self, role: Any = None, parts: Any = None) -> None:
                 self.role = role
                 self.parts = parts
 
         class Blob:
-            def __init__(self, mime_type=None, data=None):
+            def __init__(self, mime_type: Any = None, data: Any = None) -> None:
                 pass
 
     # Create mock module structure
@@ -587,17 +595,17 @@ def test_gemini_provider_with_mocked_client():
     genai_pkg = types.ModuleType("google.genai")
     genai_types_pkg = types.ModuleType("google.genai.types")
 
-    genai_pkg.Client = FakeClient
-    genai_types_pkg.GenerateContentConfig = FakeTypes.GenerateContentConfig
-    genai_types_pkg.Part = FakeTypes.Part
-    genai_types_pkg.Content = FakeTypes.Content
-    genai_types_pkg.Blob = FakeTypes.Blob
-    genai_pkg.types = genai_types_pkg
+    genai_pkg.Client = FakeClient  # type: ignore[attr-defined]
+    genai_types_pkg.GenerateContentConfig = FakeTypes.GenerateContentConfig  # type: ignore[attr-defined]
+    genai_types_pkg.Part = FakeTypes.Part  # type: ignore[attr-defined]
+    genai_types_pkg.Content = FakeTypes.Content  # type: ignore[attr-defined]
+    genai_types_pkg.Blob = FakeTypes.Blob  # type: ignore[attr-defined]
+    genai_pkg.types = genai_types_pkg  # type: ignore[attr-defined]
 
-    google_pkg.genai = genai_pkg
-    sys.modules["google"] = google_pkg
-    sys.modules["google.genai"] = genai_pkg
-    sys.modules["google.genai.types"] = genai_types_pkg
+    google_pkg.genai = genai_pkg  # type: ignore[attr-defined]
+    sys.modules["google"] = google_pkg  # type: ignore[assignment]
+    sys.modules["google.genai"] = genai_pkg  # type: ignore[assignment]
+    sys.modules["google.genai.types"] = genai_types_pkg  # type: ignore[assignment]
 
     try:
         provider = GeminiProvider()
@@ -623,7 +631,7 @@ def test_gemini_provider_with_mocked_client():
         os.environ.pop("GEMINI_API_KEY", None)
 
 
-def test_cli_streaming_with_local_provider():
+def test_cli_streaming_with_local_provider() -> None:
     parser = build_parser()
     args = parser.parse_args(
         [
@@ -650,7 +658,7 @@ def test_cli_streaming_with_local_provider():
 
 
 @pytest.mark.asyncio
-async def test_async_agent_basic():
+async def test_async_agent_basic() -> None:
     """Test basic async agent execution."""
     import asyncio
 
@@ -667,7 +675,7 @@ async def test_async_agent_basic():
 
 
 @pytest.mark.asyncio
-async def test_async_tool_execution():
+async def test_async_tool_execution() -> None:
     """Test that both sync and async tools work with async agent."""
     import asyncio
 
@@ -705,7 +713,7 @@ async def test_async_tool_execution():
 
 
 @pytest.mark.asyncio
-async def test_async_with_memory():
+async def test_async_with_memory() -> None:
     """Test async agent with conversation memory."""
     from selectools.memory import ConversationMemory
 
@@ -733,7 +741,7 @@ async def test_async_with_memory():
 
 
 @pytest.mark.asyncio
-async def test_async_provider_fallback():
+async def test_async_provider_fallback() -> None:
     """Test that agent falls back to sync when provider doesn't support async."""
     # LocalProvider doesn't have async support
     provider = LocalProvider()
@@ -755,7 +763,7 @@ async def test_async_provider_fallback():
 
 
 @pytest.mark.asyncio
-async def test_async_multiple_iterations():
+async def test_async_multiple_iterations() -> None:
     """Test async agent with multiple tool call iterations."""
     call_count = 0
 
@@ -771,7 +779,9 @@ async def test_async_multiple_iterations():
     assert response.role == Role.ASSISTANT
 
 
-def run_async_test(test_func):
+def run_async_test(
+    test_func: Callable[[], Coroutine[Any, Any, None]],
+) -> None:
     """Helper to run async tests."""
     import asyncio
 
@@ -817,7 +827,7 @@ if __name__ == "__main__":
     failures = 0
     for test in all_tests:
         try:
-            test()
+            test()  # type: ignore[operator]
             print(f"✓ {test.__name__}")
         except AssertionError as exc:  # noqa: BLE001
             failures += 1

@@ -10,6 +10,8 @@ Tests cover:
 - Required parameters with defaults
 """
 
+from __future__ import annotations
+
 import pytest
 
 from selectools import Tool, ToolParameter, ToolValidationError, tool
@@ -22,7 +24,7 @@ from selectools import Tool, ToolParameter, ToolValidationError, tool
 class TestToolNameValidation:
     """Test tool name validation."""
 
-    def test_empty_tool_name(self):
+    def test_empty_tool_name(self) -> None:
         """Test that empty tool names are rejected."""
         with pytest.raises(ToolValidationError, match="Tool name cannot be empty"):
             Tool(
@@ -32,7 +34,7 @@ class TestToolNameValidation:
                 function=lambda: "result",
             )
 
-    def test_whitespace_only_tool_name(self):
+    def test_whitespace_only_tool_name(self) -> None:
         """Test that whitespace-only tool names are rejected."""
         with pytest.raises(ToolValidationError, match="Tool name cannot be empty"):
             Tool(
@@ -51,7 +53,7 @@ class TestToolNameValidation:
 class TestToolDescriptionValidation:
     """Test tool description validation."""
 
-    def test_empty_description(self):
+    def test_empty_description(self) -> None:
         """Test that empty descriptions are rejected."""
         with pytest.raises(ToolValidationError, match="description cannot be empty"):
             Tool(
@@ -61,7 +63,7 @@ class TestToolDescriptionValidation:
                 function=lambda: "result",
             )
 
-    def test_whitespace_only_description(self):
+    def test_whitespace_only_description(self) -> None:
         """Test that whitespace-only descriptions are rejected."""
         with pytest.raises(ToolValidationError, match="description cannot be empty"):
             Tool(
@@ -80,7 +82,7 @@ class TestToolDescriptionValidation:
 class TestParameterNameValidation:
     """Test parameter name validation."""
 
-    def test_duplicate_parameter_names(self):
+    def test_duplicate_parameter_names(self) -> None:
         """Test that duplicate parameter names are rejected."""
         with pytest.raises(ToolValidationError, match="Duplicate parameter name"):
             Tool(
@@ -93,7 +95,7 @@ class TestParameterNameValidation:
                 function=lambda query: query,
             )
 
-    def test_multiple_duplicates(self):
+    def test_multiple_duplicates(self) -> None:
         """Test that multiple duplicate names are all reported."""
         with pytest.raises(ToolValidationError, match="Duplicate parameter name"):
             Tool(
@@ -117,7 +119,7 @@ class TestParameterNameValidation:
 class TestParameterTypeValidation:
     """Test parameter type validation."""
 
-    def test_unsupported_parameter_type(self):
+    def test_unsupported_parameter_type(self) -> None:
         """Test that unsupported types are rejected."""
         with pytest.raises(ToolValidationError, match="Unsupported parameter type"):
 
@@ -133,7 +135,7 @@ class TestParameterTypeValidation:
                 function=lambda param: str(param),
             )
 
-    def test_supported_types_are_allowed(self):
+    def test_supported_types_are_allowed(self) -> None:
         """Test that all supported types are accepted."""
         # Should not raise
         Tool(
@@ -159,7 +161,7 @@ class TestParameterTypeValidation:
 class TestFunctionSignatureValidation:
     """Test function signature validation."""
 
-    def test_parameter_not_in_function_signature(self):
+    def test_parameter_not_in_function_signature(self) -> None:
         """Test that parameters must exist in function signature."""
         with pytest.raises(ToolValidationError, match="not found in function signature"):
             Tool(
@@ -171,7 +173,7 @@ class TestFunctionSignatureValidation:
                 function=lambda: "result",  # No parameters
             )
 
-    def test_required_parameter_with_default_value(self):
+    def test_required_parameter_with_default_value(self) -> None:
         """Test that required parameters can't have defaults in function."""
         with pytest.raises(ToolValidationError, match="marked as required but has default value"):
             Tool(
@@ -183,7 +185,7 @@ class TestFunctionSignatureValidation:
                 function=lambda param="default": param,  # Has default
             )
 
-    def test_optional_parameter_with_default_is_ok(self):
+    def test_optional_parameter_with_default_is_ok(self) -> None:
         """Test that optional parameters can have defaults."""
         # Should not raise
         Tool(
@@ -195,7 +197,7 @@ class TestFunctionSignatureValidation:
             function=lambda param="default": param,
         )
 
-    def test_injected_kwargs_not_required_in_signature(self):
+    def test_injected_kwargs_not_required_in_signature(self) -> None:
         """Test that injected kwargs don't need to be in parameters list."""
         # Should not raise
         Tool(
@@ -217,7 +219,7 @@ class TestFunctionSignatureValidation:
 class TestDecoratorValidation:
     """Test that @tool decorator also validates."""
 
-    def test_decorator_with_empty_description_uses_docstring(self):
+    def test_decorator_with_empty_description_uses_docstring(self) -> None:
         """Test that decorator uses docstring if no description provided."""
 
         @tool()
@@ -227,7 +229,7 @@ class TestDecoratorValidation:
 
         assert "docstring description" in my_tool.description
 
-    def test_decorator_validates_inferred_parameters(self):
+    def test_decorator_validates_inferred_parameters(self) -> None:
         """Test that decorator validates auto-inferred parameters."""
 
         # This should work fine
@@ -247,7 +249,7 @@ class TestDecoratorValidation:
 class TestEdgeCases:
     """Test edge cases and special scenarios."""
 
-    def test_builtin_functions_skip_signature_validation(self):
+    def test_builtin_functions_skip_signature_validation(self) -> None:
         """Test that built-in functions skip signature validation gracefully."""
         # Built-in functions can't be inspected, so validation should be skipped
         # This test just ensures no crash occurs
@@ -264,7 +266,7 @@ class TestEdgeCases:
             # If validation fails for other reasons, that's ok
             pass
 
-    def test_lambda_functions_can_be_validated(self):
+    def test_lambda_functions_can_be_validated(self) -> None:
         """Test that lambda functions work with validation."""
         # Should not raise
         Tool(
@@ -276,7 +278,7 @@ class TestEdgeCases:
             function=lambda x: str(x * 2),
         )
 
-    def test_async_functions_can_be_validated(self):
+    def test_async_functions_can_be_validated(self) -> None:
         """Test that async functions work with validation."""
 
         async def async_func(param: str) -> str:

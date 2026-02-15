@@ -10,7 +10,10 @@ These tests are marked with @pytest.mark.e2e and require an OPENAI_API_KEY envir
 To run them: pytest --run-e2e tests/test_agent_e2e.py
 """
 
+from __future__ import annotations
+
 import os
+from typing import Any
 
 import pytest
 
@@ -23,7 +26,7 @@ pytestmark = pytest.mark.e2e
 
 
 @pytest.fixture
-def e2e_provider():
+def e2e_provider() -> OpenAIProvider:
     """Returns a real OpenAIProvider if key exists, else skips."""
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -42,7 +45,7 @@ def get_weather(city: str) -> str:
 
 
 class TestAgentE2E:
-    def test_custom_system_prompt_e2e(self, e2e_provider):
+    def test_custom_system_prompt_e2e(self, e2e_provider: OpenAIProvider) -> None:
         """Verify custom system prompt changes agent behavior."""
         agent = Agent(
             tools=[get_weather],
@@ -58,7 +61,7 @@ class TestAgentE2E:
         assert "Ahoy" in result.content
         assert len(result.content) > 10
 
-    def test_structured_agent_result_e2e(self, e2e_provider):
+    def test_structured_agent_result_e2e(self, e2e_provider: OpenAIProvider) -> None:
         """Verify tool calls are correctly captured in AgentResult."""
         agent = Agent(
             tools=[get_weather],
@@ -80,7 +83,7 @@ class TestAgentE2E:
         assert weather_call is not None
         assert "london" in weather_call.parameters["city"].lower()
 
-    def test_agent_reset_e2e(self, e2e_provider):
+    def test_agent_reset_e2e(self, e2e_provider: OpenAIProvider) -> None:
         """Verify agent reset clears history and allows reuse."""
         agent = Agent(
             tools=[get_weather],
@@ -103,7 +106,7 @@ class TestAgentE2E:
         assert "42" not in r3.content  # Should not know the number anymore
         assert agent.total_tokens > 0  # Usage from r3 only (previous cleared) but still > 0
 
-    def test_reusable_agent_multiple_turns(self, e2e_provider):
+    def test_reusable_agent_multiple_turns(self, e2e_provider: OpenAIProvider) -> None:
         """Verify reusable agent handles multiple independent tasks sequentially."""
         agent = Agent(tools=[get_weather], provider=e2e_provider)
 

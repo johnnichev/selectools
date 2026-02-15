@@ -115,16 +115,18 @@ class GeminiProvider(Provider):
         content_text = response.text or ""
         tool_calls: List[ToolCall] = []
 
-        if response.candidates and response.candidates[0].content.parts:
-            for part in response.candidates[0].content.parts:
+        candidate_content = (
+            response.candidates[0].content
+            if response.candidates and response.candidates[0].content
+            else None
+        )
+        if candidate_content and candidate_content.parts:
+            for part in candidate_content.parts:
                 if part.function_call:
-                    # Gemini doesn't always provide stable IDs, so we generate one if missing
-                    # We might need to handle this carefully if we need to map back to response.
-                    # For now, generate a UUID if needed.
                     tc_id = f"call_{uuid.uuid4().hex}"
                     tool_calls.append(
                         ToolCall(
-                            tool_name=part.function_call.name,
+                            tool_name=str(part.function_call.name or ""),
                             parameters=part.function_call.args if part.function_call.args else {},
                             id=tc_id,
                         )
@@ -333,13 +335,18 @@ class GeminiProvider(Provider):
         content_text = response.text or ""
 
         tool_calls: List[ToolCall] = []
-        if response.candidates and response.candidates[0].content.parts:
-            for part in response.candidates[0].content.parts:
+        candidate_content = (
+            response.candidates[0].content
+            if response.candidates and response.candidates[0].content
+            else None
+        )
+        if candidate_content and candidate_content.parts:
+            for part in candidate_content.parts:
                 if part.function_call:
                     tc_id = f"call_{uuid.uuid4().hex}"
                     tool_calls.append(
                         ToolCall(
-                            tool_name=part.function_call.name,
+                            tool_name=str(part.function_call.name or ""),
                             parameters=part.function_call.args if part.function_call.args else {},
                             id=tc_id,
                         )

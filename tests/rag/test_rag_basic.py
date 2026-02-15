@@ -4,6 +4,10 @@ Basic integration tests for RAG functionality.
 Tests the core RAG workflow without requiring external API calls.
 """
 
+from __future__ import annotations
+
+from typing import Any, List
+
 import pytest
 
 try:
@@ -18,7 +22,7 @@ except ImportError:
 class TestRAGBasics:
     """Test basic RAG functionality with mocked embeddings."""
 
-    def test_document_creation(self):
+    def test_document_creation(self) -> None:
         """Test creating documents with metadata."""
         from selectools.rag import Document
 
@@ -32,7 +36,7 @@ class TestRAGBasics:
         assert doc.metadata["page"] == 1
         assert doc.embedding is None
 
-    def test_document_loader_from_text(self):
+    def test_document_loader_from_text(self) -> None:
         """Test loading documents from text."""
         from selectools.rag import DocumentLoader
 
@@ -42,7 +46,7 @@ class TestRAGBasics:
         assert docs[0].text == "Test document"
         assert docs[0].metadata["source"] == "memory"
 
-    def test_text_splitter(self):
+    def test_text_splitter(self) -> None:
         """Test text splitting into chunks."""
         from selectools.rag import TextSplitter
 
@@ -55,7 +59,7 @@ class TestRAGBasics:
         # First chunk should be ~10 chars
         assert len(chunks[0]) <= 12  # Allow some flexibility for separators
 
-    def test_recursive_text_splitter(self):
+    def test_recursive_text_splitter(self) -> None:
         """Test recursive text splitting."""
         from selectools.rag import RecursiveTextSplitter
 
@@ -67,25 +71,25 @@ class TestRAGBasics:
         assert len(chunks) >= 1
         assert all(isinstance(chunk, str) for chunk in chunks)
 
-    def test_in_memory_vector_store_mock(self):
+    def test_in_memory_vector_store_mock(self) -> None:
         """Test in-memory vector store with mock embedder."""
         from selectools.rag import Document
         from selectools.rag.stores import InMemoryVectorStore
 
         # Create a simple mock embedder
         class MockEmbedder:
-            def embed_text(self, text):
+            def embed_text(self, text: str) -> List[float]:
                 # Simple hash-based embedding
                 return [float(hash(text) % 100) for _ in range(10)]
 
-            def embed_texts(self, texts):
+            def embed_texts(self, texts: List[str]) -> List[List[float]]:
                 return [self.embed_text(t) for t in texts]
 
-            def embed_query(self, query):
+            def embed_query(self, query: str) -> List[float]:
                 return self.embed_text(query)
 
             @property
-            def dimension(self):
+            def dimension(self) -> int:
                 return 10
 
         embedder = MockEmbedder()
@@ -111,24 +115,24 @@ class TestRAGBasics:
             assert hasattr(results[0], "document")
             assert hasattr(results[0], "score")
 
-    def test_rag_tool_creation(self):
+    def test_rag_tool_creation(self) -> None:
         """Test creating a RAG tool."""
         from selectools.rag import RAGTool
         from selectools.rag.stores import InMemoryVectorStore
 
         # Create mock embedder
         class MockEmbedder:
-            def embed_text(self, text):
+            def embed_text(self, text: str) -> List[float]:
                 return [1.0] * 10
 
-            def embed_texts(self, texts):
+            def embed_texts(self, texts: List[str]) -> List[List[float]]:
                 return [[1.0] * 10 for _ in texts]
 
-            def embed_query(self, query):
+            def embed_query(self, query: str) -> List[float]:
                 return [1.0] * 10
 
             @property
-            def dimension(self):
+            def dimension(self) -> int:
                 return 10
 
         embedder = MockEmbedder()
@@ -142,14 +146,14 @@ class TestRAGBasics:
         assert hasattr(rag_tool, "search_knowledge_base")
         assert rag_tool.search_knowledge_base.name == "search_knowledge_base"
 
-    def test_vector_store_factory(self):
+    def test_vector_store_factory(self) -> None:
         """Test vector store factory method."""
         from selectools.rag import VectorStore
 
         # Create mock embedder
         class MockEmbedder:
             @property
-            def dimension(self):
+            def dimension(self) -> int:
                 return 10
 
         embedder = MockEmbedder()

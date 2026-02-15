@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from pathlib import Path
+from typing import Any, Tuple
 
 import pytest
 
@@ -26,7 +27,7 @@ from selectools.tools import ToolRegistry
 
 @pytest.mark.asyncio
 @pytest.mark.asyncio
-async def test_mixed_sync_async_tools_comprehensive():
+async def test_mixed_sync_async_tools_comprehensive() -> None:
     """Test complex scenarios with mixed sync/async tools."""
     call_log = []
 
@@ -62,7 +63,7 @@ async def test_mixed_sync_async_tools_comprehensive():
 
 
 @pytest.mark.asyncio
-async def test_tool_timeout_edge_cases():
+async def test_tool_timeout_edge_cases() -> None:
     """Test tool timeout behavior in edge cases."""
 
     @selectools.tool(description="Slow async tool")
@@ -89,7 +90,7 @@ async def test_tool_timeout_edge_cases():
 
 
 @pytest.mark.asyncio
-async def test_concurrent_agent_execution():
+async def test_concurrent_agent_execution() -> None:
     """Test multiple agents running concurrently."""
 
     @selectools.tool(description="Counter")
@@ -115,7 +116,7 @@ async def test_concurrent_agent_execution():
 
 
 @pytest.mark.asyncio
-async def test_memory_overflow_handling():
+async def test_memory_overflow_handling() -> None:
     """Test memory behavior when limits are exceeded."""
     memory = ConversationMemory(max_messages=5)
 
@@ -132,7 +133,7 @@ async def test_memory_overflow_handling():
 
 
 @pytest.mark.asyncio
-async def test_error_propagation_in_async():
+async def test_error_propagation_in_async() -> None:
     """Test that errors are properly propagated in async context."""
 
     @selectools.tool(description="Failing tool")
@@ -149,11 +150,11 @@ async def test_error_propagation_in_async():
 
 
 @pytest.mark.asyncio
-async def test_async_with_streaming():
+async def test_async_with_streaming() -> None:
     """Test async agent with streaming enabled."""
     chunks = []
 
-    def stream_handler(chunk: str):
+    def stream_handler(chunk: str) -> None:
         chunks.append(chunk)
 
     tool = Tool(name="test", description="Test", parameters=[], function=lambda: "result")
@@ -172,7 +173,7 @@ async def test_async_with_streaming():
 
 
 @pytest.mark.asyncio
-async def test_complex_multi_turn_async_conversation():
+async def test_complex_multi_turn_async_conversation() -> None:
     """Test complex multi-turn conversation with memory and mixed tools."""
     memory = ConversationMemory(max_messages=20)
     turn_count = 0
@@ -205,7 +206,7 @@ async def test_complex_multi_turn_async_conversation():
 
 
 @pytest.mark.asyncio
-async def test_provider_error_recovery():
+async def test_provider_error_recovery() -> None:
     """Test recovery from provider errors in async mode."""
     from selectools import UsageStats
 
@@ -215,7 +216,7 @@ async def test_provider_error_recovery():
         supports_async = True
         call_count = 0
 
-        async def acomplete(self, **kwargs):
+        async def acomplete(self, **kwargs: Any) -> Tuple[Message, UsageStats]:
             self.call_count += 1
             if self.call_count <= 2:
                 from selectools.providers.base import ProviderError
@@ -224,7 +225,7 @@ async def test_provider_error_recovery():
             usage = UsageStats(prompt_tokens=10, completion_tokens=5)
             return Message(role=Role.ASSISTANT, content="Success after retries"), usage
 
-        def complete(self, **kwargs):
+        def complete(self, **kwargs: Any) -> Tuple[Message, UsageStats]:
             usage = UsageStats(prompt_tokens=10, completion_tokens=5)
             return Message(role=Role.ASSISTANT, content="Sync fallback"), usage
 
@@ -243,7 +244,7 @@ async def test_provider_error_recovery():
 
 
 @pytest.mark.asyncio
-async def test_async_tool_with_sync_provider():
+async def test_async_tool_with_sync_provider() -> None:
     """Test async tools work with providers that don't support async."""
 
     @selectools.tool(description="Async tool")
@@ -263,7 +264,7 @@ async def test_async_tool_with_sync_provider():
 
 
 @pytest.mark.asyncio
-async def test_empty_tool_result_handling():
+async def test_empty_tool_result_handling() -> None:
     """Test handling of empty or None tool results."""
 
     @selectools.tool(description="Empty tool")
@@ -285,7 +286,7 @@ async def test_empty_tool_result_handling():
 
 
 @pytest.mark.asyncio
-async def test_large_tool_results():
+async def test_large_tool_results() -> None:
     """Test handling of large tool results."""
 
     @selectools.tool(description="Large result tool")
@@ -302,7 +303,7 @@ async def test_large_tool_results():
 
 
 @pytest.mark.asyncio
-async def test_memory_with_large_messages():
+async def test_memory_with_large_messages() -> None:
     """Test memory handling with large messages."""
     memory = ConversationMemory(max_messages=10, max_tokens=1000)
 
@@ -319,7 +320,7 @@ async def test_memory_with_large_messages():
 
 
 @pytest.mark.asyncio
-async def test_rapid_consecutive_calls():
+async def test_rapid_consecutive_calls() -> None:
     """Test rapid consecutive agent calls."""
     tool = Tool(name="fast", description="Fast tool", parameters=[], function=lambda: "fast")
 
@@ -333,7 +334,7 @@ async def test_rapid_consecutive_calls():
     assert all(r.role == Role.ASSISTANT for r in results)
 
 
-def run_async_test(test_func):
+def run_async_test(test_func: Any) -> None:
     """Helper to run async tests."""
     asyncio.run(test_func())
 

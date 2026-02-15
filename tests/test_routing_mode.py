@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from typing import Any, List, Tuple
 from unittest.mock import Mock
 
 import pytest
@@ -15,12 +18,12 @@ def dummy_tool(arg: str) -> str:
 class RoutingMockProvider(LocalProvider):
     supports_async = True
 
-    def __init__(self, tool_to_call: str, args: dict):
+    def __init__(self, tool_to_call: str, args: dict) -> None:
         super().__init__()
         self.tool_to_call = tool_to_call
         self.args = args
 
-    def complete(self, **kwargs):
+    def complete(self, **kwargs: Any) -> Tuple[Message, UsageStats]:
         msg = Message(
             role=Role.ASSISTANT,
             tool_calls=[ToolCall(tool_name=self.tool_to_call, parameters=self.args, id="call_1")],
@@ -28,11 +31,11 @@ class RoutingMockProvider(LocalProvider):
         )
         return msg, UsageStats(0, 0, 0, 0.0, "mock", "mock")
 
-    async def acomplete(self, **kwargs):
+    async def acomplete(self, **kwargs: Any) -> Tuple[Message, UsageStats]:
         return self.complete(**kwargs)
 
 
-def test_routing_mode_sync():
+def test_routing_mode_sync() -> None:
     """Verify sync run returns tool call without execution."""
     tool = Tool(
         name="test_tool", description="Test tool", function=Mock(wraps=dummy_tool), parameters={}
@@ -66,7 +69,7 @@ def test_routing_mode_sync():
 
 
 @pytest.mark.asyncio
-async def test_routing_mode_async():
+async def test_routing_mode_async() -> None:
     """Verify async run returns tool call without execution."""
     tool = Tool(
         name="test_tool", description="Test tool", function=Mock(wraps=dummy_tool), parameters={}
@@ -93,11 +96,11 @@ async def test_routing_mode_async():
 class MockProviderMultiple(LocalProvider):
     supports_async = True
 
-    def __init__(self, tool_calls: list):
+    def __init__(self, tool_calls: List[ToolCall]) -> None:
         super().__init__()
         self.tool_calls = tool_calls
 
-    def complete(self, **kwargs):
+    def complete(self, **kwargs: Any) -> Tuple[Message, UsageStats]:
         msg = Message(
             role=Role.ASSISTANT,
             tool_calls=self.tool_calls,
@@ -105,26 +108,26 @@ class MockProviderMultiple(LocalProvider):
         )
         return msg, UsageStats(0, 0, 0, 0.0, "mock", "mock")
 
-    async def acomplete(self, **kwargs):
+    async def acomplete(self, **kwargs: Any) -> Tuple[Message, UsageStats]:
         return self.complete(**kwargs)
 
 
 class MockProviderText(LocalProvider):
     supports_async = True
 
-    def __init__(self, text: str):
+    def __init__(self, text: str) -> None:
         super().__init__()
         self.text = text
 
-    def complete(self, **kwargs):
+    def complete(self, **kwargs: Any) -> Tuple[Message, UsageStats]:
         msg = Message(role=Role.ASSISTANT, content=self.text)
         return msg, UsageStats(0, 0, 0, 0.0, "mock", "mock")
 
-    async def acomplete(self, **kwargs):
+    async def acomplete(self, **kwargs: Any) -> Tuple[Message, UsageStats]:
         return self.complete(**kwargs)
 
 
-def test_routing_mode_text_only():
+def test_routing_mode_text_only() -> None:
     """Verify routing mode behaves normally for text-only responses."""
     tool = Tool(
         name="test_tool", description="Test tool", function=Mock(wraps=dummy_tool), parameters={}
@@ -151,7 +154,7 @@ def test_routing_mode_text_only():
     assert result.message.content == "Just chatting"
 
 
-def test_routing_mode_multiple_tools():
+def test_routing_mode_multiple_tools() -> None:
     """Verify routing mode returns all selected tools."""
     tool1 = Tool(name="tool1", description="T1", function=Mock(), parameters={})
     tool2 = Tool(name="tool2", description="T2", function=Mock(), parameters={})

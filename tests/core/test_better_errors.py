@@ -9,6 +9,8 @@ Tests cover:
 - Parameter validation edge cases
 """
 
+from __future__ import annotations
+
 import pytest
 
 from selectools import (
@@ -34,11 +36,11 @@ from selectools.providers.stubs import LocalProvider
 class TestSelectoolsError:
     """Test base SelectoolsError exception."""
 
-    def test_base_exception_inheritance(self):
+    def test_base_exception_inheritance(self) -> None:
         """SelectoolsError should inherit from Exception."""
         assert issubclass(SelectoolsError, Exception)
 
-    def test_can_raise_base_exception(self):
+    def test_can_raise_base_exception(self) -> None:
         """Should be able to raise SelectoolsError directly."""
         with pytest.raises(SelectoolsError):
             raise SelectoolsError("Test error")
@@ -47,7 +49,7 @@ class TestSelectoolsError:
 class TestToolValidationError:
     """Test ToolValidationError exception."""
 
-    def test_basic_creation(self):
+    def test_basic_creation(self) -> None:
         """Test basic error creation with required fields."""
         error = ToolValidationError(
             tool_name="test_tool",
@@ -59,7 +61,7 @@ class TestToolValidationError:
         assert error.issue == "Test issue"
         assert error.suggestion == ""
 
-    def test_with_suggestion(self):
+    def test_with_suggestion(self) -> None:
         """Test error creation with suggestion."""
         error = ToolValidationError(
             tool_name="test_tool",
@@ -70,7 +72,7 @@ class TestToolValidationError:
         assert "Did you mean 'location'?" in error.suggestion
         assert "Did you mean 'location'?" in str(error)
 
-    def test_error_message_formatting(self):
+    def test_error_message_formatting(self) -> None:
         """Test that error message is properly formatted with emojis."""
         error = ToolValidationError(
             tool_name="get_weather",
@@ -86,7 +88,7 @@ class TestToolValidationError:
         assert "💡" in msg
         assert "Did you mean 'location'?" in msg
 
-    def test_inherits_from_selectools_error(self):
+    def test_inherits_from_selectools_error(self) -> None:
         """ToolValidationError should inherit from SelectoolsError."""
         assert issubclass(ToolValidationError, SelectoolsError)
 
@@ -94,7 +96,7 @@ class TestToolValidationError:
 class TestToolExecutionError:
     """Test ToolExecutionError exception."""
 
-    def test_basic_creation(self):
+    def test_basic_creation(self) -> None:
         """Test basic error creation."""
         original_error = ValueError("Division by zero")
         error = ToolExecutionError(
@@ -106,7 +108,7 @@ class TestToolExecutionError:
         assert error.error == original_error
         assert error.params == {"expression": "1/0"}
 
-    def test_error_message_formatting(self):
+    def test_error_message_formatting(self) -> None:
         """Test that error message includes helpful context."""
         original_error = KeyError("missing_key")
         error = ToolExecutionError(
@@ -127,7 +129,7 @@ class TestToolExecutionError:
 class TestProviderConfigurationError:
     """Test ProviderConfigurationError exception."""
 
-    def test_basic_creation(self):
+    def test_basic_creation(self) -> None:
         """Test basic error creation."""
         error = ProviderConfigurationError(
             provider_name="OpenAI",
@@ -136,7 +138,7 @@ class TestProviderConfigurationError:
         assert error.provider_name == "OpenAI"
         assert error.missing_config == "API key"
 
-    def test_with_env_var_suggestion(self):
+    def test_with_env_var_suggestion(self) -> None:
         """Test error with environment variable suggestion."""
         error = ProviderConfigurationError(
             provider_name="OpenAI",
@@ -151,7 +153,7 @@ class TestProviderConfigurationError:
         assert "export OPENAI_API_KEY=" in msg
         assert "OpenAIProvider(api_key=" in msg
 
-    def test_anthropic_provider_error(self):
+    def test_anthropic_provider_error(self) -> None:
         """Test error message for Anthropic provider."""
         error = ProviderConfigurationError(
             provider_name="Anthropic",
@@ -162,7 +164,7 @@ class TestProviderConfigurationError:
         assert "AnthropicProvider(api_key=" in msg
         assert "ANTHROPIC_API_KEY" in msg
 
-    def test_gemini_provider_error(self):
+    def test_gemini_provider_error(self) -> None:
         """Test error message for Gemini provider."""
         error = ProviderConfigurationError(
             provider_name="Gemini",
@@ -182,7 +184,7 @@ class TestProviderConfigurationError:
 class TestToolValidationFuzzyMatching:
     """Test fuzzy matching for parameter typos."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         self.tool = Tool(
             name="get_weather",
@@ -201,7 +203,7 @@ class TestToolValidationFuzzyMatching:
             function=lambda location, units="celsius": f"Weather in {location}: 72°",
         )
 
-    def test_typo_detection_location(self):
+    def test_typo_detection_location(self) -> None:
         """Test detection of 'loction' typo."""
         with pytest.raises(ToolValidationError) as exc_info:
             self.tool.validate({"loction": "Paris"})
@@ -210,7 +212,7 @@ class TestToolValidationFuzzyMatching:
         assert "loction" in error.param_name
         assert "Did you mean 'location'?" in error.suggestion
 
-    def test_typo_detection_locaton(self):
+    def test_typo_detection_locaton(self) -> None:
         """Test detection of 'locaton' typo."""
         with pytest.raises(ToolValidationError) as exc_info:
             self.tool.validate({"locaton": "Paris"})
@@ -219,7 +221,7 @@ class TestToolValidationFuzzyMatching:
         assert "locaton" in error.param_name
         assert "Did you mean 'location'?" in error.suggestion
 
-    def test_typo_detection_units(self):
+    def test_typo_detection_units(self) -> None:
         """Test detection of 'unit' typo (missing 's')."""
         with pytest.raises(ToolValidationError) as exc_info:
             self.tool.validate({"location": "Paris", "unit": "celsius"})
@@ -228,7 +230,7 @@ class TestToolValidationFuzzyMatching:
         assert "unit" in error.param_name
         assert "Did you mean 'units'?" in error.suggestion
 
-    def test_completely_wrong_parameter(self):
+    def test_completely_wrong_parameter(self) -> None:
         """Test error for completely unrelated parameter name."""
         with pytest.raises(ToolValidationError) as exc_info:
             self.tool.validate({"xyz_unknown_param": "value"})
@@ -238,7 +240,7 @@ class TestToolValidationFuzzyMatching:
         assert "is not a valid parameter" in error.suggestion
         assert "Expected parameters:" in error.suggestion
 
-    def test_multiple_typos(self):
+    def test_multiple_typos(self) -> None:
         """Test multiple parameter typos."""
         with pytest.raises(ToolValidationError) as exc_info:
             self.tool.validate({"loction": "Paris", "unts": "celsius"})
@@ -247,7 +249,7 @@ class TestToolValidationFuzzyMatching:
         error = exc_info.value
         assert "loction" in error.param_name or "unts" in error.param_name
 
-    def test_valid_parameters_no_error(self):
+    def test_valid_parameters_no_error(self) -> None:
         """Test that valid parameters don't raise errors."""
         # Should not raise
         self.tool.validate({"location": "Paris"})
@@ -257,7 +259,7 @@ class TestToolValidationFuzzyMatching:
 class TestToolValidationMissingParameters:
     """Test validation of missing required parameters."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         self.tool = Tool(
             name="send_email",
@@ -275,7 +277,7 @@ class TestToolValidationMissingParameters:
             function=lambda to, subject, body, cc=None: f"Email sent to {to}",
         )
 
-    def test_missing_single_required_parameter(self):
+    def test_missing_single_required_parameter(self) -> None:
         """Test error when single required parameter is missing."""
         with pytest.raises(ToolValidationError) as exc_info:
             self.tool.validate({"to": "user@example.com", "body": "Hello"})
@@ -285,7 +287,7 @@ class TestToolValidationMissingParameters:
         assert "Missing required parameter" in error.issue
         assert "Required parameters:" in error.suggestion
 
-    def test_missing_all_required_parameters(self):
+    def test_missing_all_required_parameters(self) -> None:
         """Test error when all required parameters are missing."""
         with pytest.raises(ToolValidationError) as exc_info:
             self.tool.validate({})
@@ -293,7 +295,7 @@ class TestToolValidationMissingParameters:
         error = exc_info.value
         assert "Missing required parameter" in error.issue
 
-    def test_optional_parameter_can_be_omitted(self):
+    def test_optional_parameter_can_be_omitted(self) -> None:
         """Test that optional parameters don't cause errors when omitted."""
         # Should not raise
         self.tool.validate({"to": "user@example.com", "subject": "Hello", "body": "Hi there"})
@@ -302,7 +304,7 @@ class TestToolValidationMissingParameters:
 class TestToolValidationTypeMismatch:
     """Test validation of parameter type mismatches."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         self.tool = Tool(
             name="calculate",
@@ -319,7 +321,7 @@ class TestToolValidationTypeMismatch:
             function=lambda x, y, operation: f"{x} {operation} {y}",
         )
 
-    def test_string_instead_of_int(self):
+    def test_string_instead_of_int(self) -> None:
         """Test error when string is provided instead of int."""
         with pytest.raises(ToolValidationError) as exc_info:
             self.tool.validate({"x": "five", "y": 2.0, "operation": "+"})
@@ -329,7 +331,7 @@ class TestToolValidationTypeMismatch:
         assert "must be of type int" in error.issue
         assert "got str" in error.issue
 
-    def test_int_instead_of_string(self):
+    def test_int_instead_of_string(self) -> None:
         """Test error when int is provided instead of string."""
         with pytest.raises(ToolValidationError) as exc_info:
             self.tool.validate({"x": 5, "y": 2.0, "operation": 123})
@@ -338,12 +340,12 @@ class TestToolValidationTypeMismatch:
         assert "operation" in error.param_name
         assert "must be of type str" in error.issue
 
-    def test_float_accepts_int(self):
+    def test_float_accepts_int(self) -> None:
         """Test that float parameters accept integers."""
         # Should not raise - int is acceptable for float
         self.tool.validate({"x": 5, "y": 2, "operation": "+"})
 
-    def test_type_hint_in_suggestion(self):
+    def test_type_hint_in_suggestion(self) -> None:
         """Test that type conversion hints are provided."""
         with pytest.raises(ToolValidationError) as exc_info:
             self.tool.validate({"x": "5", "y": 2.0, "operation": "+"})
@@ -361,7 +363,7 @@ class TestToolValidationTypeMismatch:
 class TestToolExecutionErrors:
     """Test tool execution error handling."""
 
-    def test_exception_wrapped_in_tool_execution_error(self):
+    def test_exception_wrapped_in_tool_execution_error(self) -> None:
         """Test that tool exceptions are wrapped in ToolExecutionError."""
 
         def failing_tool(x: str) -> str:
@@ -384,7 +386,7 @@ class TestToolExecutionErrors:
         assert isinstance(error.error, ValueError)
         assert error.params == {"x": "test"}
 
-    def test_key_error_wrapped(self):
+    def test_key_error_wrapped(self) -> None:
         """Test that KeyError is wrapped with context."""
 
         def dict_tool(key: str) -> str:
@@ -407,7 +409,7 @@ class TestToolExecutionErrors:
         assert isinstance(error.error, KeyError)
         assert "dict_tool" in str(error)
 
-    def test_async_tool_execution_error(self):
+    def test_async_tool_execution_error(self) -> None:
         """Test that async tool exceptions are also wrapped."""
         import asyncio
 
@@ -439,7 +441,7 @@ class TestToolExecutionErrors:
 class TestAgentErrorHandling:
     """Test error handling in Agent context."""
 
-    def test_agent_handles_tool_validation_error_gracefully(self):
+    def test_agent_handles_tool_validation_error_gracefully(self) -> None:
         """Test that agent handles tool validation errors gracefully."""
 
         @tool(description="Test tool")

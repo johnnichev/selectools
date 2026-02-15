@@ -1,5 +1,7 @@
 """Tests for the canonical model registry."""
 
+from __future__ import annotations
+
 import pytest
 
 from selectools.models import ALL_MODELS, MODELS_BY_ID, Anthropic, Gemini, ModelInfo, Ollama, OpenAI
@@ -9,7 +11,7 @@ from selectools.pricing import PRICING
 class TestModelInfo:
     """Tests for the ModelInfo dataclass."""
 
-    def test_model_info_creation(self):
+    def test_model_info_creation(self) -> None:
         """Test creating a ModelInfo instance."""
         model = ModelInfo(
             id="test-model",
@@ -28,7 +30,7 @@ class TestModelInfo:
         assert model.max_tokens == 4096
         assert model.context_window == 8192
 
-    def test_model_info_immutable(self):
+    def test_model_info_immutable(self) -> None:
         """Test that ModelInfo is frozen/immutable."""
         model = OpenAI.GPT_4O
         with pytest.raises((AttributeError, TypeError)):  # Frozen dataclass raises these
@@ -38,27 +40,27 @@ class TestModelInfo:
 class TestModelRegistry:
     """Tests for the complete model registry."""
 
-    def test_all_models_count(self):
+    def test_all_models_count(self) -> None:
         """Test that we have all registered models."""
         assert len(ALL_MODELS) == 135
 
-    def test_models_by_id_count(self):
+    def test_models_by_id_count(self) -> None:
         """Test that MODELS_BY_ID has same count as ALL_MODELS."""
         assert len(MODELS_BY_ID) == len(ALL_MODELS)
 
-    def test_models_by_id_lookup(self):
+    def test_models_by_id_lookup(self) -> None:
         """Test looking up models by ID."""
         assert MODELS_BY_ID["gpt-4o"].provider == "openai"
         assert MODELS_BY_ID["claude-3-5-sonnet-20241022"].provider == "anthropic"
         assert MODELS_BY_ID["gemini-2.0-flash"].provider == "gemini"
         assert MODELS_BY_ID["llama3.2"].provider == "ollama"
 
-    def test_all_models_unique_ids(self):
+    def test_all_models_unique_ids(self) -> None:
         """Test that all model IDs are unique."""
         model_ids = [m.id for m in ALL_MODELS]
         assert len(model_ids) == len(set(model_ids))
 
-    def test_pricing_dict_matches(self):
+    def test_pricing_dict_matches(self) -> None:
         """Test that PRICING dict is derived from models."""
         for model in ALL_MODELS:
             assert model.id in PRICING
@@ -69,12 +71,12 @@ class TestModelRegistry:
 class TestOpenAIModels:
     """Tests for OpenAI model definitions."""
 
-    def test_openai_model_count(self):
+    def test_openai_model_count(self) -> None:
         """Test OpenAI model count."""
         openai_models = [m for m in ALL_MODELS if m.provider == "openai"]
         assert len(openai_models) == 71
 
-    def test_openai_gpt4o(self):
+    def test_openai_gpt4o(self) -> None:
         """Test GPT-4o model definition."""
         model = OpenAI.GPT_4O
         assert model.id == "gpt-4o"
@@ -85,14 +87,14 @@ class TestOpenAIModels:
         assert model.max_tokens == 16384
         assert model.context_window == 128000
 
-    def test_openai_gpt4o_mini(self):
+    def test_openai_gpt4o_mini(self) -> None:
         """Test GPT-4o-mini model definition."""
         model = OpenAI.GPT_4O_MINI
         assert model.id == "gpt-4o-mini"
         assert model.prompt_cost == 0.15
         assert model.completion_cost == 0.60
 
-    def test_openai_o1_pro(self):
+    def test_openai_o1_pro(self) -> None:
         """Test o1-pro (most expensive OpenAI model)."""
         model = OpenAI.O1_PRO
         assert model.id == "o1-pro"
@@ -103,12 +105,12 @@ class TestOpenAIModels:
 class TestAnthropicModels:
     """Tests for Anthropic Claude model definitions."""
 
-    def test_anthropic_model_count(self):
+    def test_anthropic_model_count(self) -> None:
         """Test Anthropic model count."""
         anthropic_models = [m for m in ALL_MODELS if m.provider == "anthropic"]
         assert len(anthropic_models) == 21
 
-    def test_anthropic_sonnet_4_5(self):
+    def test_anthropic_sonnet_4_5(self) -> None:
         """Test Claude Sonnet 4.5 model definition."""
         model = Anthropic.SONNET_4_5
         assert model.id == "claude-sonnet-4-5"
@@ -119,14 +121,14 @@ class TestAnthropicModels:
         assert model.max_tokens == 8192
         assert model.context_window == 200000
 
-    def test_anthropic_opus_4_5(self):
+    def test_anthropic_opus_4_5(self) -> None:
         """Test Claude Opus 4.5 model definition."""
         model = Anthropic.OPUS_4_5
         assert model.id == "claude-opus-4-5"
         assert model.prompt_cost == 5.00
         assert model.completion_cost == 25.00
 
-    def test_anthropic_haiku_3(self):
+    def test_anthropic_haiku_3(self) -> None:
         """Test Claude Haiku 3 (cheapest Claude model)."""
         model = Anthropic.HAIKU_3
         assert model.id == "claude-3-haiku"
@@ -137,12 +139,12 @@ class TestAnthropicModels:
 class TestGeminiModels:
     """Tests for Google Gemini model definitions."""
 
-    def test_gemini_model_count(self):
+    def test_gemini_model_count(self) -> None:
         """Test Gemini has 27 models (25 chat + 2 embedding)."""
         gemini_models = [m for m in ALL_MODELS if m.provider == "gemini"]
         assert len(gemini_models) == 27
 
-    def test_gemini_flash_2_0(self):
+    def test_gemini_flash_2_0(self) -> None:
         """Test Gemini 2.0 Flash model definition."""
         model = Gemini.FLASH_2_0
         assert model.id == "gemini-2.0-flash"
@@ -153,7 +155,7 @@ class TestGeminiModels:
         assert model.max_tokens == 8192
         assert model.context_window == 1000000
 
-    def test_gemini_pro_3(self):
+    def test_gemini_pro_3(self) -> None:
         """Test Gemini 3 Pro Preview model definition."""
         model = Gemini.PRO_3
         assert model.id == "gemini-3-pro-preview"
@@ -161,7 +163,7 @@ class TestGeminiModels:
         assert model.completion_cost == 12.00
         assert model.context_window == 2000000  # 2M tokens
 
-    def test_gemini_gemma_free(self):
+    def test_gemini_gemma_free(self) -> None:
         """Test Gemma (free open model)."""
         model = Gemini.GEMMA_3
         assert model.id == "gemma-3"
@@ -172,12 +174,12 @@ class TestGeminiModels:
 class TestOllamaModels:
     """Tests for Ollama local model definitions."""
 
-    def test_ollama_model_count(self):
+    def test_ollama_model_count(self) -> None:
         """Test Ollama has 13 models."""
         ollama_models = [m for m in ALL_MODELS if m.provider == "ollama"]
         assert len(ollama_models) == 13
 
-    def test_ollama_llama_3_2(self):
+    def test_ollama_llama_3_2(self) -> None:
         """Test Llama 3.2 model definition."""
         model = Ollama.LLAMA_3_2
         assert model.id == "llama3.2"
@@ -188,7 +190,7 @@ class TestOllamaModels:
         assert model.max_tokens == 4096
         assert model.context_window == 8192
 
-    def test_ollama_all_free(self):
+    def test_ollama_all_free(self) -> None:
         """Test that all Ollama models are free."""
         ollama_models = [m for m in ALL_MODELS if m.provider == "ollama"]
         for model in ollama_models:
@@ -199,37 +201,37 @@ class TestOllamaModels:
 class TestModelMetadataCompleteness:
     """Tests to ensure all models have complete metadata."""
 
-    def test_all_models_have_id(self):
+    def test_all_models_have_id(self) -> None:
         """Test that all models have an ID."""
         for model in ALL_MODELS:
             assert model.id
             assert isinstance(model.id, str)
             assert len(model.id) > 0
 
-    def test_all_models_have_valid_provider(self):
+    def test_all_models_have_valid_provider(self) -> None:
         """Test that all models have a valid provider."""
         valid_providers = {"openai", "anthropic", "gemini", "ollama", "cohere"}
         for model in ALL_MODELS:
             assert model.provider in valid_providers
 
-    def test_all_models_have_type(self):
+    def test_all_models_have_type(self) -> None:
         """Test that all models have a type (currently all chat)."""
         for model in ALL_MODELS:
             assert model.type in {"chat", "embedding", "image", "audio", "multimodal"}
 
-    def test_all_models_have_pricing(self):
+    def test_all_models_have_pricing(self) -> None:
         """Test that all models have valid pricing."""
         for model in ALL_MODELS:
             assert model.prompt_cost >= 0.0
             assert model.completion_cost >= 0.0
 
-    def test_all_models_have_max_tokens(self):
+    def test_all_models_have_max_tokens(self) -> None:
         """Test that all models have max_tokens > 0."""
         for model in ALL_MODELS:
             assert model.max_tokens > 0
             assert model.max_tokens <= 65536  # Reasonable upper bound
 
-    def test_all_models_have_context_window(self):
+    def test_all_models_have_context_window(self) -> None:
         """Test that all models have context_window > 0."""
         for model in ALL_MODELS:
             assert model.context_window > 0
@@ -239,17 +241,17 @@ class TestModelMetadataCompleteness:
 class TestModelTypes:
     """Tests for different model types."""
 
-    def test_chat_models_majority(self):
+    def test_chat_models_majority(self) -> None:
         """Test that most models are chat type."""
         chat_models = [m for m in ALL_MODELS if m.type == "chat"]
         assert len(chat_models) >= 100  # Most should be chat
 
-    def test_audio_models_exist(self):
+    def test_audio_models_exist(self) -> None:
         """Test that audio models exist."""
         audio_models = [m for m in ALL_MODELS if m.type == "audio"]
         assert len(audio_models) > 0
 
-    def test_multimodal_models_exist(self):
+    def test_multimodal_models_exist(self) -> None:
         """Test that multimodal models exist."""
         multimodal_models = [m for m in ALL_MODELS if m.type == "multimodal"]
         assert len(multimodal_models) > 0
@@ -258,18 +260,18 @@ class TestModelTypes:
 class TestModelPricing:
     """Tests for model pricing values."""
 
-    def test_most_expensive_model(self):
+    def test_most_expensive_model(self) -> None:
         """Test identifying the most expensive model."""
         most_expensive = max(ALL_MODELS, key=lambda m: m.prompt_cost + m.completion_cost)
         assert most_expensive.id == "o1-pro"  # OpenAI o1-pro is most expensive
 
-    def test_cheapest_paid_model(self):
+    def test_cheapest_paid_model(self) -> None:
         """Test finding cheapest non-free model."""
         paid_models = [m for m in ALL_MODELS if m.prompt_cost > 0]
         cheapest = min(paid_models, key=lambda m: m.prompt_cost + m.completion_cost)
         assert cheapest.prompt_cost + cheapest.completion_cost < 1.0  # Under $1 per 1M tokens
 
-    def test_free_models_exist(self):
+    def test_free_models_exist(self) -> None:
         """Test that free models exist (Ollama + Gemma)."""
         free_models = [m for m in ALL_MODELS if m.prompt_cost == 0 and m.completion_cost == 0]
         assert len(free_models) >= 13  # At least Ollama models
@@ -278,18 +280,18 @@ class TestModelPricing:
 class TestProviderDefaults:
     """Tests for provider default models."""
 
-    def test_openai_default_exists(self):
+    def test_openai_default_exists(self) -> None:
         """Test that OpenAI default model (GPT-4O) exists."""
         assert OpenAI.GPT_4O.id in MODELS_BY_ID
 
-    def test_anthropic_default_exists(self):
+    def test_anthropic_default_exists(self) -> None:
         """Test that Anthropic default model exists."""
         assert Anthropic.SONNET_3_5_20241022.id in MODELS_BY_ID
 
-    def test_gemini_default_exists(self):
+    def test_gemini_default_exists(self) -> None:
         """Test that Gemini default model (2.0 Flash) exists."""
         assert Gemini.FLASH_2_0.id in MODELS_BY_ID
 
-    def test_ollama_default_exists(self):
+    def test_ollama_default_exists(self) -> None:
         """Test that Ollama default model (Llama 3.2) exists."""
         assert Ollama.LLAMA_3_2.id in MODELS_BY_ID

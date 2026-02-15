@@ -11,7 +11,10 @@ Tests cover:
 - Per-tool breakdown
 """
 
+from __future__ import annotations
+
 import asyncio
+from typing import Any, Tuple
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -29,7 +32,7 @@ from selectools.providers.stubs import LocalProvider
 class TestUsageStats:
     """Test UsageStats dataclass."""
 
-    def test_basic_creation(self):
+    def test_basic_creation(self) -> None:
         """Test basic UsageStats creation."""
         stats = UsageStats(
             prompt_tokens=100,
@@ -46,7 +49,7 @@ class TestUsageStats:
         assert stats.model == "gpt-4o"
         assert stats.provider == "openai"
 
-    def test_default_values(self):
+    def test_default_values(self) -> None:
         """Test default values."""
         stats = UsageStats()
         assert stats.prompt_tokens == 0
@@ -56,13 +59,13 @@ class TestUsageStats:
         assert stats.model == ""
         assert stats.provider == ""
 
-    def test_total_tokens_auto_calculation(self):
+    def test_total_tokens_auto_calculation(self) -> None:
         """Test that total_tokens is auto-calculated in post_init."""
         stats = UsageStats(prompt_tokens=100, completion_tokens=50)
         # post_init should calculate total if not provided
         assert stats.total_tokens == 150
 
-    def test_explicit_total_tokens_preserved(self):
+    def test_explicit_total_tokens_preserved(self) -> None:
         """Test that explicitly provided total_tokens is preserved."""
         stats = UsageStats(prompt_tokens=100, completion_tokens=50, total_tokens=200)
         # Should keep explicit value
@@ -77,7 +80,7 @@ class TestUsageStats:
 class TestAgentUsage:
     """Test AgentUsage aggregation class."""
 
-    def test_basic_creation(self):
+    def test_basic_creation(self) -> None:
         """Test basic AgentUsage creation."""
         usage = AgentUsage()
         assert usage.total_prompt_tokens == 0
@@ -88,7 +91,7 @@ class TestAgentUsage:
         assert usage.tool_tokens == {}
         assert usage.iterations == []
 
-    def test_add_single_usage(self):
+    def test_add_single_usage(self) -> None:
         """Test adding a single UsageStats."""
         usage = AgentUsage()
         stats = UsageStats(
@@ -107,7 +110,7 @@ class TestAgentUsage:
         assert usage.total_cost_usd == 0.001
         assert len(usage.iterations) == 1
 
-    def test_add_multiple_usages(self):
+    def test_add_multiple_usages(self) -> None:
         """Test adding multiple UsageStats."""
         usage = AgentUsage()
 
@@ -126,7 +129,7 @@ class TestAgentUsage:
         assert usage.total_cost_usd == pytest.approx(0.003)
         assert len(usage.iterations) == 3
 
-    def test_add_usage_with_tool_name(self):
+    def test_add_usage_with_tool_name(self) -> None:
         """Test adding usage with tool name tracking."""
         usage = AgentUsage()
 
@@ -142,7 +145,7 @@ class TestAgentUsage:
         assert usage.tool_usage == {"search": 2, "calculator": 1}
         assert usage.tool_tokens == {"search": 300, "calculator": 150}
 
-    def test_to_dict(self):
+    def test_to_dict(self) -> None:
         """Test serialization to dictionary."""
         usage = AgentUsage()
         stats = UsageStats(
@@ -162,7 +165,7 @@ class TestAgentUsage:
         assert result["tool_tokens"] == {"test_tool": 150}
         assert result["iterations"] == 1
 
-    def test_str_representation(self):
+    def test_str_representation(self) -> None:
         """Test string representation."""
         usage = AgentUsage()
         stats = UsageStats(
@@ -193,7 +196,7 @@ class TestAgentUsage:
 class TestPricing:
     """Test pricing calculations."""
 
-    def test_pricing_table_has_major_models(self):
+    def test_pricing_table_has_major_models(self) -> None:
         """Test that pricing table includes major models."""
         assert "gpt-4o" in PRICING
         assert "gpt-4o-mini" in PRICING
@@ -203,7 +206,7 @@ class TestPricing:
         assert "gemini-1.5-pro" in PRICING
         assert "gemini-1.5-flash" in PRICING
 
-    def test_pricing_structure(self):
+    def test_pricing_structure(self) -> None:
         """Test pricing data structure."""
         for model, pricing in PRICING.items():
             assert "prompt" in pricing, f"Model {model} missing 'prompt' price"
@@ -211,21 +214,21 @@ class TestPricing:
             assert pricing["prompt"] >= 0
             assert pricing["completion"] >= 0
 
-    def test_calculate_cost_gpt4o(self):
+    def test_calculate_cost_gpt4o(self) -> None:
         """Test cost calculation for GPT-4o."""
         # GPT-4o: $2.50/1M prompt, $10/1M completion
         cost = calculate_cost(OpenAI.GPT_4O.id, prompt_tokens=1000, completion_tokens=500)
         expected = (1000 / 1_000_000) * 2.50 + (500 / 1_000_000) * 10.00
         assert cost == pytest.approx(expected)
 
-    def test_calculate_cost_gpt4o_mini(self):
+    def test_calculate_cost_gpt4o_mini(self) -> None:
         """Test cost calculation for GPT-4o-mini."""
         # GPT-4o-mini: $0.15/1M prompt, $0.60/1M completion
         cost = calculate_cost(OpenAI.GPT_4O_MINI.id, prompt_tokens=10000, completion_tokens=5000)
         expected = (10000 / 1_000_000) * 0.15 + (5000 / 1_000_000) * 0.60
         assert cost == pytest.approx(expected)
 
-    def test_calculate_cost_claude(self):
+    def test_calculate_cost_claude(self) -> None:
         """Test cost calculation for Claude 3.5 Sonnet."""
         # Claude 3.5 Sonnet: $3/1M prompt, $15/1M completion
         cost = calculate_cost(
@@ -234,19 +237,21 @@ class TestPricing:
         expected = (2000 / 1_000_000) * 3.00 + (1000 / 1_000_000) * 15.00
         assert cost == pytest.approx(expected)
 
-    def test_calculate_cost_gemini(self):
+    def test_calculate_cost_gemini(self) -> None:
         """Test cost calculation for Gemini 1.5 Flash."""
         # Gemini 1.5 Flash: $0.075/1M prompt, $0.30/1M completion
         cost = calculate_cost(Gemini.FLASH_1_5.id, prompt_tokens=5000, completion_tokens=2500)
         expected = (5000 / 1_000_000) * 0.075 + (2500 / 1_000_000) * 0.30
         assert cost == pytest.approx(expected)
 
-    def test_calculate_cost_unknown_model(self):
+    def test_calculate_cost_unknown_model(self) -> None:
         """Test cost calculation for unknown model returns 0."""
         cost = calculate_cost("unknown-model-xyz", prompt_tokens=1000, completion_tokens=500)
         assert cost == 0.0
 
-    def test_calculate_cost_unknown_model_logs_warning(self, caplog):
+    def test_calculate_cost_unknown_model_logs_warning(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Test that unknown model logs a warning."""
         import logging
 
@@ -255,19 +260,19 @@ class TestPricing:
 
         assert "Unknown model" in caplog.text or len(caplog.records) >= 0
 
-    def test_get_model_pricing_exists(self):
+    def test_get_model_pricing_exists(self) -> None:
         """Test getting pricing for known model."""
         pricing = get_model_pricing("gpt-4o")
         assert pricing is not None
         assert pricing["prompt"] == 2.50
         assert pricing["completion"] == 10.00
 
-    def test_get_model_pricing_not_exists(self):
+    def test_get_model_pricing_not_exists(self) -> None:
         """Test getting pricing for unknown model returns None."""
         pricing = get_model_pricing("unknown-model-xyz")
         assert pricing is None
 
-    def test_zero_tokens(self):
+    def test_zero_tokens(self) -> None:
         """Test cost calculation with zero tokens."""
         cost = calculate_cost(OpenAI.GPT_4O.id, prompt_tokens=0, completion_tokens=0)
         assert cost == 0.0
@@ -281,7 +286,7 @@ class TestPricing:
 class TestAgentCostTracking:
     """Test cost tracking integration with Agent."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
 
         @tool(description="A simple test tool")
@@ -290,30 +295,30 @@ class TestAgentCostTracking:
 
         self.test_tool = test_tool
 
-    def test_agent_has_usage_attribute(self):
+    def test_agent_has_usage_attribute(self) -> None:
         """Test that Agent has usage tracking attribute."""
         agent = Agent(tools=[self.test_tool], provider=LocalProvider())
         assert hasattr(agent, "usage")
         assert isinstance(agent.usage, AgentUsage)
 
-    def test_agent_total_cost_property(self):
+    def test_agent_total_cost_property(self) -> None:
         """Test agent.total_cost property."""
         agent = Agent(tools=[self.test_tool], provider=LocalProvider())
         assert agent.total_cost == 0.0
 
-    def test_agent_total_tokens_property(self):
+    def test_agent_total_tokens_property(self) -> None:
         """Test agent.total_tokens property."""
         agent = Agent(tools=[self.test_tool], provider=LocalProvider())
         assert agent.total_tokens == 0
 
-    def test_agent_get_usage_summary(self):
+    def test_agent_get_usage_summary(self) -> None:
         """Test agent.get_usage_summary() method."""
         agent = Agent(tools=[self.test_tool], provider=LocalProvider())
         summary = agent.get_usage_summary()
         assert "Usage Summary" in summary
         assert "📊" in summary
 
-    def test_agent_reset_usage(self):
+    def test_agent_reset_usage(self) -> None:
         """Test agent.reset_usage() method."""
         agent = Agent(tools=[self.test_tool], provider=LocalProvider())
 
@@ -327,7 +332,7 @@ class TestAgentCostTracking:
         assert agent.total_cost == 0.0
         assert len(agent.usage.iterations) == 0
 
-    def test_usage_tracked_after_run(self):
+    def test_usage_tracked_after_run(self) -> None:
         """Test that usage is tracked after agent.run()."""
         agent = Agent(
             tools=[self.test_tool],
@@ -340,7 +345,7 @@ class TestAgentCostTracking:
         # LocalProvider returns 0 tokens, but iterations should be tracked
         assert len(agent.usage.iterations) >= 0
 
-    def test_cost_warning_threshold_config(self):
+    def test_cost_warning_threshold_config(self) -> None:
         """Test that cost_warning_threshold is configurable."""
         config = AgentConfig(cost_warning_threshold=0.01)
         assert config.cost_warning_threshold == 0.01
@@ -352,7 +357,7 @@ class TestAgentCostTracking:
 class TestAgentCostWarning:
     """Test cost warning functionality."""
 
-    def test_cost_warning_printed_when_exceeded(self, capsys):
+    def test_cost_warning_printed_when_exceeded(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test that warning is printed when cost exceeds threshold."""
 
         @tool(description="Test tool")
@@ -365,7 +370,7 @@ class TestAgentCostWarning:
             supports_streaming = False
             supports_async = False
 
-            def complete(self, **kwargs) -> tuple:
+            def complete(self, **kwargs: Any) -> Tuple[Message, UsageStats]:
                 return Message(role=Role.ASSISTANT, content="Response"), UsageStats(
                     prompt_tokens=1000,
                     completion_tokens=500,
@@ -398,7 +403,7 @@ class TestAgentCostWarning:
 class TestCostTrackingEdgeCases:
     """Test edge cases in cost tracking."""
 
-    def test_very_large_token_counts(self):
+    def test_very_large_token_counts(self) -> None:
         """Test handling of very large token counts."""
         stats = UsageStats(
             prompt_tokens=1_000_000,
@@ -410,7 +415,7 @@ class TestCostTrackingEdgeCases:
         usage.add_usage(stats)
         assert usage.total_tokens == 1_500_000
 
-    def test_floating_point_precision(self):
+    def test_floating_point_precision(self) -> None:
         """Test floating point precision in cost calculations."""
         usage = AgentUsage()
         for _ in range(100):
@@ -420,7 +425,7 @@ class TestCostTrackingEdgeCases:
         # Should be approximately 0.1
         assert abs(usage.total_cost_usd - 0.1) < 0.0001
 
-    def test_many_different_tools(self):
+    def test_many_different_tools(self) -> None:
         """Test tracking many different tools."""
         usage = AgentUsage()
         for i in range(50):
@@ -430,7 +435,7 @@ class TestCostTrackingEdgeCases:
         assert len(usage.tool_usage) == 50
         assert len(usage.tool_tokens) == 50
 
-    def test_same_tool_many_times(self):
+    def test_same_tool_many_times(self) -> None:
         """Test tracking same tool called many times."""
         usage = AgentUsage()
         for _ in range(1000):
@@ -450,7 +455,7 @@ class TestAsyncCostTracking:
     """Test cost tracking with async operations."""
 
     @pytest.mark.asyncio
-    async def test_async_usage_tracking(self):
+    async def test_async_usage_tracking(self) -> None:
         """Test that async agent tracks usage."""
 
         @tool(description="Async test tool")

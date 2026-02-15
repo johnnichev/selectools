@@ -8,9 +8,13 @@ Tests the DocumentLoader class with various sources:
 - from_pdf()
 """
 
+from __future__ import annotations
+
 import os
 import tempfile
+import types
 from pathlib import Path
+from typing import Generator
 
 import pytest
 
@@ -23,13 +27,13 @@ from selectools.rag.loaders import DocumentLoader
 
 
 @pytest.fixture
-def fixtures_dir():
+def fixtures_dir() -> Path:
     """Get path to fixtures directory."""
     return Path(__file__).parents[1] / "fixtures"
 
 
 @pytest.fixture
-def temp_docs_dir():
+def temp_docs_dir() -> Generator[Path, None, None]:
     """Create a temporary directory with test documents."""
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
@@ -55,7 +59,7 @@ def temp_docs_dir():
 class TestDocumentLoaderFromText:
     """Test loading documents from raw text."""
 
-    def test_simple_text(self):
+    def test_simple_text(self) -> None:
         """Test loading simple text."""
         text = "Hello, world!"
         docs = DocumentLoader.from_text(text)
@@ -65,7 +69,7 @@ class TestDocumentLoaderFromText:
         assert docs[0].text == text
         assert docs[0].metadata == {}
 
-    def test_text_with_metadata(self):
+    def test_text_with_metadata(self) -> None:
         """Test loading text with metadata."""
         text = "Test content"
         metadata = {"source": "test", "author": "tester"}
@@ -76,14 +80,14 @@ class TestDocumentLoaderFromText:
         assert docs[0].text == text
         assert docs[0].metadata == metadata
 
-    def test_empty_text(self):
+    def test_empty_text(self) -> None:
         """Test loading empty text."""
         docs = DocumentLoader.from_text("")
 
         assert len(docs) == 1
         assert docs[0].text == ""
 
-    def test_multiline_text(self):
+    def test_multiline_text(self) -> None:
         """Test loading multiline text."""
         text = "Line 1\nLine 2\nLine 3"
         docs = DocumentLoader.from_text(text)
@@ -101,7 +105,7 @@ class TestDocumentLoaderFromText:
 class TestDocumentLoaderFromFile:
     """Test loading documents from files."""
 
-    def test_load_txt_file(self, fixtures_dir):
+    def test_load_txt_file(self, fixtures_dir: Path) -> None:
         """Test loading a .txt file."""
         file_path = fixtures_dir / "sample.txt"
         docs = DocumentLoader.from_file(str(file_path))
@@ -111,7 +115,7 @@ class TestDocumentLoaderFromFile:
         assert len(docs[0].text) > 0
         assert docs[0].metadata["source"] == str(file_path)
 
-    def test_load_md_file(self, fixtures_dir):
+    def test_load_md_file(self, fixtures_dir: Path) -> None:
         """Test loading a .md file."""
         file_path = fixtures_dir / "sample.md"
         docs = DocumentLoader.from_file(str(file_path))
@@ -120,7 +124,7 @@ class TestDocumentLoaderFromFile:
         assert len(docs[0].text) > 0
         assert docs[0].metadata["source"] == str(file_path)
 
-    def test_load_with_custom_metadata(self, fixtures_dir):
+    def test_load_with_custom_metadata(self, fixtures_dir: Path) -> None:
         """Test loading file with additional metadata."""
         file_path = fixtures_dir / "sample.txt"
         metadata = {"category": "test", "version": "1.0"}
@@ -132,12 +136,12 @@ class TestDocumentLoaderFromFile:
         assert docs[0].metadata["version"] == "1.0"
         assert docs[0].metadata["source"] == str(file_path)
 
-    def test_load_nonexistent_file(self):
+    def test_load_nonexistent_file(self) -> None:
         """Test error handling for missing file."""
         with pytest.raises(FileNotFoundError):
             DocumentLoader.from_file("nonexistent.txt")
 
-    def test_unicode_content(self):
+    def test_unicode_content(self) -> None:
         """Test loading file with Unicode content."""
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".txt", delete=False, encoding="utf-8"
@@ -161,7 +165,7 @@ class TestDocumentLoaderFromFile:
 class TestDocumentLoaderFromDirectory:
     """Test loading documents from directories."""
 
-    def test_load_all_txt_files(self, temp_docs_dir):
+    def test_load_all_txt_files(self, temp_docs_dir: Path) -> None:
         """Test loading all .txt files from directory."""
         docs = DocumentLoader.from_directory(
             str(temp_docs_dir), glob_pattern="*.txt", recursive=False
@@ -172,21 +176,21 @@ class TestDocumentLoaderFromDirectory:
         assert all(isinstance(d, Document) for d in docs)
         assert all("test file" in d.text for d in docs)
 
-    def test_load_recursive(self, temp_docs_dir):
+    def test_load_recursive(self, temp_docs_dir: Path) -> None:
         """Test loading files recursively."""
         docs = DocumentLoader.from_directory(str(temp_docs_dir), glob_pattern="**/*.txt")
 
         # Should find test1.txt, test2.txt, and subdir/test3.txt
         assert len(docs) == 3
 
-    def test_load_specific_pattern(self, temp_docs_dir):
+    def test_load_specific_pattern(self, temp_docs_dir: Path) -> None:
         """Test loading with specific glob pattern."""
         docs = DocumentLoader.from_directory(str(temp_docs_dir), glob_pattern="test1.txt")
 
         assert len(docs) == 1
         assert "test file 1" in docs[0].text
 
-    def test_load_multiple_extensions(self, temp_docs_dir):
+    def test_load_multiple_extensions(self, temp_docs_dir: Path) -> None:
         """Test loading files with multiple extensions."""
         # Load both .txt and .md files
         txt_docs = DocumentLoader.from_directory(
@@ -199,13 +203,13 @@ class TestDocumentLoaderFromDirectory:
         assert len(txt_docs) == 2
         assert len(md_docs) == 1
 
-    def test_load_empty_directory(self):
+    def test_load_empty_directory(self) -> None:
         """Test loading from empty directory."""
         with tempfile.TemporaryDirectory() as temp_dir:
             docs = DocumentLoader.from_directory(temp_dir, glob_pattern="*.txt")
             assert len(docs) == 0
 
-    def test_load_with_metadata(self, temp_docs_dir):
+    def test_load_with_metadata(self, temp_docs_dir: Path) -> None:
         """Test loading directory with custom metadata."""
         metadata = {"project": "test", "version": "1.0"}
         docs = DocumentLoader.from_directory(
@@ -217,7 +221,7 @@ class TestDocumentLoaderFromDirectory:
         assert all(d.metadata["version"] == "1.0" for d in docs)
         assert all("source" in d.metadata for d in docs)
 
-    def test_metadata_source_preserved(self, temp_docs_dir):
+    def test_metadata_source_preserved(self, temp_docs_dir: Path) -> None:
         """Test that source paths are correctly preserved in metadata."""
         docs = DocumentLoader.from_directory(str(temp_docs_dir), glob_pattern="**/*.txt")
 
@@ -235,7 +239,7 @@ class TestDocumentLoaderFromDirectory:
 class TestDocumentLoaderFromPDF:
     """Test loading documents from PDF files."""
 
-    def test_load_pdf_file(self, fixtures_dir):
+    def test_load_pdf_file(self, fixtures_dir: Path) -> None:
         """Test loading a PDF file."""
         pdf_path = fixtures_dir / "sample.pdf"
 
@@ -250,7 +254,7 @@ class TestDocumentLoaderFromPDF:
         assert all(len(d.text) > 0 for d in docs)
         assert all(d.metadata["source"] == str(pdf_path) for d in docs)
 
-    def test_pdf_page_metadata(self, fixtures_dir):
+    def test_pdf_page_metadata(self, fixtures_dir: Path) -> None:
         """Test that page numbers are included in metadata."""
         pdf_path = fixtures_dir / "sample.pdf"
 
@@ -264,7 +268,7 @@ class TestDocumentLoaderFromPDF:
         assert all(isinstance(p, int) for p in page_numbers)
         assert page_numbers == list(range(1, len(docs) + 1))
 
-    def test_pdf_with_custom_metadata(self, fixtures_dir):
+    def test_pdf_with_custom_metadata(self, fixtures_dir: Path) -> None:
         """Test loading PDF with additional metadata."""
         pdf_path = fixtures_dir / "sample.pdf"
         metadata = {"category": "documentation", "author": "test"}
@@ -278,7 +282,7 @@ class TestDocumentLoaderFromPDF:
         assert all(d.metadata["author"] == "test" for d in docs)
         assert all("page" in d.metadata for d in docs)
 
-    def test_pdf_nonexistent_file(self):
+    def test_pdf_nonexistent_file(self) -> None:
         """Test error handling for missing PDF."""
         try:
             from pypdf import PdfReader  # Check if pypdf is available
@@ -288,7 +292,7 @@ class TestDocumentLoaderFromPDF:
         with pytest.raises(FileNotFoundError):
             DocumentLoader.from_pdf("nonexistent.pdf")
 
-    def test_missing_pypdf_library(self):
+    def test_missing_pypdf_library(self) -> None:
         """Test error when pypdf is not installed."""
         # Temporarily hide pypdf
         import sys
@@ -297,7 +301,7 @@ class TestDocumentLoaderFromPDF:
 
         if pypdf_module:
             # Only test if we can temporarily remove it
-            sys.modules["pypdf"] = None
+            sys.modules["pypdf"] = None  # type: ignore[assignment]
 
             try:
                 with pytest.raises(ImportError, match="pypdf required"):
@@ -315,7 +319,7 @@ class TestDocumentLoaderFromPDF:
 class TestDocumentLoaderIntegration:
     """Integration tests for document loader."""
 
-    def test_load_mixed_content(self, temp_docs_dir):
+    def test_load_mixed_content(self, temp_docs_dir: Path) -> None:
         """Test loading different file types from same directory."""
         # Load all files
         txt_docs = DocumentLoader.from_directory(
@@ -330,7 +334,7 @@ class TestDocumentLoaderIntegration:
         assert len(all_docs) == 3  # 2 txt + 1 md
         assert all(isinstance(d, Document) for d in all_docs)
 
-    def test_document_metadata_integrity(self):
+    def test_document_metadata_integrity(self) -> None:
         """Test that metadata is preserved correctly."""
         text = "Test content"
         metadata = {
@@ -348,7 +352,7 @@ class TestDocumentLoaderIntegration:
         assert docs[0].metadata["key3"] == ["list", "items"]
         assert docs[0].metadata["key4"] == {"nested": "dict"}
 
-    def test_static_methods_callable(self):
+    def test_static_methods_callable(self) -> None:
         """Test that all methods are static and callable."""
         assert callable(DocumentLoader.from_text)
         assert callable(DocumentLoader.from_file)

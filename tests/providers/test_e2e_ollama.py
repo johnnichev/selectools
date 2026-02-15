@@ -10,6 +10,8 @@ Run with: pytest tests/test_e2e_ollama.py --run-e2e -v
 Note: Tests will be skipped if Ollama is not running.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from selectools import Agent, AgentConfig, Message, Role, Tool, ToolParameter
@@ -18,7 +20,7 @@ from selectools.providers.base import ProviderError
 
 
 @pytest.fixture
-def calculator_tool():
+def calculator_tool() -> Tool:
     """Simple calculator tool for testing."""
 
     def calculate(expression: str) -> str:
@@ -44,7 +46,7 @@ def calculator_tool():
 
 
 @pytest.fixture
-def search_tool():
+def search_tool() -> Tool:
     """Mock search tool for testing."""
 
     def search(query: str) -> str:
@@ -59,7 +61,7 @@ def search_tool():
     )
 
 
-def check_ollama_available():
+def check_ollama_available() -> bool:
     """Check if Ollama is running and accessible."""
     try:
         provider = OllamaProvider(model="llama3.2")
@@ -82,7 +84,7 @@ def check_ollama_available():
 class TestOllamaProvider:
     """End-to-end tests for Ollama provider."""
 
-    def test_ollama_basic_completion(self):
+    def test_ollama_basic_completion(self) -> None:
         """Test basic completion without tools."""
         if not check_ollama_available():
             pytest.skip("Ollama is not running or not accessible")
@@ -103,7 +105,7 @@ class TestOllamaProvider:
         assert usage.provider == "ollama"
         assert usage.model == "llama3.2"
 
-    def test_ollama_tool_calling(self, calculator_tool):
+    def test_ollama_tool_calling(self, calculator_tool: Tool) -> None:
         """Test tool calling with Ollama."""
         if not check_ollama_available():
             pytest.skip("Ollama is not running or not accessible")
@@ -123,7 +125,7 @@ class TestOllamaProvider:
         # Note: Ollama models may not always follow tool calling format perfectly
         assert len(response.content) > 0
 
-    def test_ollama_cost_tracking(self, calculator_tool):
+    def test_ollama_cost_tracking(self, calculator_tool: Tool) -> None:
         """Test that Ollama usage has zero cost."""
         if not check_ollama_available():
             pytest.skip("Ollama is not running or not accessible")
@@ -141,7 +143,7 @@ class TestOllamaProvider:
         assert agent.total_cost == 0.0
         assert agent.usage.total_cost_usd == 0.0
 
-    def test_ollama_streaming(self):
+    def test_ollama_streaming(self) -> None:
         """Test streaming responses from Ollama."""
         if not check_ollama_available():
             pytest.skip("Ollama is not running or not accessible")
@@ -163,7 +165,7 @@ class TestOllamaProvider:
         assert len(full_response) > 0
 
     @pytest.mark.asyncio
-    async def test_ollama_async_completion(self):
+    async def test_ollama_async_completion(self) -> None:
         """Test async completion with Ollama."""
         if not check_ollama_available():
             pytest.skip("Ollama is not running or not accessible")
@@ -184,7 +186,7 @@ class TestOllamaProvider:
         assert usage.provider == "ollama"
 
     @pytest.mark.asyncio
-    async def test_ollama_async_agent(self, calculator_tool):
+    async def test_ollama_async_agent(self, calculator_tool: Tool) -> None:
         """Test async agent execution with Ollama."""
         if not check_ollama_available():
             pytest.skip("Ollama is not running or not accessible")
@@ -203,7 +205,7 @@ class TestOllamaProvider:
         assert len(response.content) > 0
 
     @pytest.mark.asyncio
-    async def test_ollama_async_streaming(self):
+    async def test_ollama_async_streaming(self) -> None:
         """Test async streaming with Ollama."""
         if not check_ollama_available():
             pytest.skip("Ollama is not running or not accessible")
@@ -224,7 +226,7 @@ class TestOllamaProvider:
         full_response = "".join(chunks)
         assert len(full_response) > 0
 
-    def test_ollama_connection_error(self):
+    def test_ollama_connection_error(self) -> None:
         """Test graceful handling of connection errors."""
         # Use invalid port to force connection error
         provider = OllamaProvider(model="llama3.2", base_url="http://localhost:99999")
@@ -240,7 +242,7 @@ class TestOllamaProvider:
         # Should mention connection issue
         assert "connect" in str(exc_info.value).lower() or "ollama" in str(exc_info.value).lower()
 
-    def test_ollama_custom_model(self):
+    def test_ollama_custom_model(self) -> None:
         """Test using a custom Ollama model."""
         if not check_ollama_available():
             pytest.skip("Ollama is not running or not accessible")

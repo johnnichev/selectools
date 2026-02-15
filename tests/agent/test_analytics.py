@@ -2,6 +2,8 @@
 Tests for the analytics module and agent integration.
 """
 
+from __future__ import annotations
+
 import json
 
 # Import FakeProvider from test_framework
@@ -20,7 +22,7 @@ from tests.core.test_framework import FakeProvider  # noqa: E402
 
 
 @pytest.fixture
-def simple_tool():
+def simple_tool() -> Tool:
     """Simple tool for testing analytics."""
 
     def greet(name: str) -> str:
@@ -36,7 +38,7 @@ def simple_tool():
 
 
 @pytest.fixture
-def calculator_tool():
+def calculator_tool() -> Tool:
     """Calculator tool for testing analytics."""
 
     def calculate(expression: str) -> str:
@@ -55,7 +57,7 @@ def calculator_tool():
 
 
 @pytest.fixture
-def failing_tool():
+def failing_tool() -> Tool:
     """Tool that always fails for testing error tracking."""
 
     def fail(message: str) -> str:
@@ -73,7 +75,7 @@ def failing_tool():
 class TestToolMetrics:
     """Tests for ToolMetrics class."""
 
-    def test_initial_metrics(self):
+    def test_initial_metrics(self) -> None:
         """Test initial metrics values."""
         metrics = ToolMetrics(name="test_tool")
 
@@ -85,37 +87,37 @@ class TestToolMetrics:
         assert metrics.total_cost == 0.0
         assert metrics.parameter_usage == {}
 
-    def test_success_rate_zero_calls(self):
+    def test_success_rate_zero_calls(self) -> None:
         """Test success rate with zero calls."""
         metrics = ToolMetrics(name="test_tool")
         assert metrics.success_rate == 0.0
 
-    def test_success_rate_all_successful(self):
+    def test_success_rate_all_successful(self) -> None:
         """Test success rate with all successful calls."""
         metrics = ToolMetrics(name="test_tool", total_calls=10, successful_calls=10, failed_calls=0)
         assert metrics.success_rate == 100.0
 
-    def test_success_rate_mixed(self):
+    def test_success_rate_mixed(self) -> None:
         """Test success rate with mixed results."""
         metrics = ToolMetrics(name="test_tool", total_calls=10, successful_calls=7, failed_calls=3)
         assert metrics.success_rate == 70.0
 
-    def test_failure_rate(self):
+    def test_failure_rate(self) -> None:
         """Test failure rate calculation."""
         metrics = ToolMetrics(name="test_tool", total_calls=10, successful_calls=7, failed_calls=3)
         assert metrics.failure_rate == 30.0
 
-    def test_avg_duration_zero_calls(self):
+    def test_avg_duration_zero_calls(self) -> None:
         """Test average duration with zero calls."""
         metrics = ToolMetrics(name="test_tool")
         assert metrics.avg_duration == 0.0
 
-    def test_avg_duration(self):
+    def test_avg_duration(self) -> None:
         """Test average duration calculation."""
         metrics = ToolMetrics(name="test_tool", total_calls=5, total_duration=10.0)
         assert metrics.avg_duration == 2.0
 
-    def test_to_dict(self):
+    def test_to_dict(self) -> None:
         """Test conversion to dictionary."""
         metrics = ToolMetrics(
             name="test_tool",
@@ -144,13 +146,13 @@ class TestToolMetrics:
 class TestAgentAnalytics:
     """Tests for AgentAnalytics class."""
 
-    def test_initial_state(self):
+    def test_initial_state(self) -> None:
         """Test initial analytics state."""
         analytics = AgentAnalytics()
         assert analytics.get_all_metrics() == {}
         assert analytics.summary() == "No tool usage data collected."
 
-    def test_record_successful_call(self):
+    def test_record_successful_call(self) -> None:
         """Test recording a successful tool call."""
         analytics = AgentAnalytics()
         analytics.record_tool_call(
@@ -169,7 +171,7 @@ class TestAgentAnalytics:
         assert metrics.total_duration == 1.5
         assert metrics.total_cost == 0.01
 
-    def test_record_failed_call(self):
+    def test_record_failed_call(self) -> None:
         """Test recording a failed tool call."""
         analytics = AgentAnalytics()
         analytics.record_tool_call(
@@ -186,7 +188,7 @@ class TestAgentAnalytics:
         assert metrics.successful_calls == 0
         assert metrics.failed_calls == 1
 
-    def test_record_multiple_calls(self):
+    def test_record_multiple_calls(self) -> None:
         """Test recording multiple calls to same tool."""
         analytics = AgentAnalytics()
 
@@ -201,7 +203,7 @@ class TestAgentAnalytics:
         assert metrics.total_duration == 3.5
         assert metrics.total_cost == 0.03
 
-    def test_parameter_usage_tracking(self):
+    def test_parameter_usage_tracking(self) -> None:
         """Test parameter usage tracking."""
         analytics = AgentAnalytics()
 
@@ -217,7 +219,7 @@ class TestAgentAnalytics:
         assert metrics.parameter_usage["limit"]["10"] == 2
         assert metrics.parameter_usage["limit"]["20"] == 1
 
-    def test_parameter_value_truncation(self):
+    def test_parameter_value_truncation(self) -> None:
         """Test that long parameter values are truncated."""
         analytics = AgentAnalytics()
 
@@ -231,12 +233,12 @@ class TestAgentAnalytics:
         assert len(tracked_values[0]) == 103  # 100 + "..."
         assert tracked_values[0].endswith("...")
 
-    def test_get_metrics_nonexistent(self):
+    def test_get_metrics_nonexistent(self) -> None:
         """Test getting metrics for nonexistent tool."""
         analytics = AgentAnalytics()
         assert analytics.get_metrics("nonexistent") is None
 
-    def test_get_all_metrics(self):
+    def test_get_all_metrics(self) -> None:
         """Test getting all metrics."""
         analytics = AgentAnalytics()
 
@@ -248,7 +250,7 @@ class TestAgentAnalytics:
         assert "tool1" in all_metrics
         assert "tool2" in all_metrics
 
-    def test_summary(self):
+    def test_summary(self) -> None:
         """Test summary generation."""
         analytics = AgentAnalytics()
 
@@ -264,7 +266,7 @@ class TestAgentAnalytics:
         assert "Calls: 2" in summary
         assert "Calls: 1" in summary
 
-    def test_to_dict(self):
+    def test_to_dict(self) -> None:
         """Test conversion to dictionary."""
         analytics = AgentAnalytics()
 
@@ -281,7 +283,7 @@ class TestAgentAnalytics:
         assert result["summary"]["total_calls"] == 2
         assert result["summary"]["total_cost"] == 0.03
 
-    def test_to_json(self):
+    def test_to_json(self) -> None:
         """Test JSON export."""
         analytics = AgentAnalytics()
         analytics.record_tool_call("tool1", True, 1.0, {"x": 1}, 0.01)
@@ -301,7 +303,7 @@ class TestAgentAnalytics:
         finally:
             temp_path.unlink()
 
-    def test_to_csv(self):
+    def test_to_csv(self) -> None:
         """Test CSV export."""
         analytics = AgentAnalytics()
         analytics.record_tool_call("tool1", True, 1.5, {}, 0.01)
@@ -328,7 +330,7 @@ class TestAgentAnalytics:
         finally:
             temp_path.unlink()
 
-    def test_to_csv_empty(self):
+    def test_to_csv_empty(self) -> None:
         """Test CSV export with no data."""
         analytics = AgentAnalytics()
 
@@ -347,7 +349,7 @@ class TestAgentAnalytics:
         finally:
             temp_path.unlink()
 
-    def test_reset(self):
+    def test_reset(self) -> None:
         """Test resetting analytics."""
         analytics = AgentAnalytics()
         analytics.record_tool_call("tool1", True, 1.0, {})
@@ -363,7 +365,7 @@ class TestAgentAnalytics:
 class TestAgentIntegration:
     """Tests for analytics integration with Agent."""
 
-    def test_analytics_disabled_by_default(self, simple_tool):
+    def test_analytics_disabled_by_default(self, simple_tool: Tool) -> None:
         """Test that analytics is disabled by default."""
         provider = FakeProvider(responses=["Done!"])
         agent = Agent(tools=[simple_tool], provider=provider)
@@ -371,7 +373,7 @@ class TestAgentIntegration:
         assert agent.analytics is None
         assert agent.get_analytics() is None
 
-    def test_analytics_enabled(self, simple_tool):
+    def test_analytics_enabled(self, simple_tool: Tool) -> None:
         """Test enabling analytics in agent config."""
         provider = FakeProvider(responses=["Done!"])
         config = AgentConfig(enable_analytics=True)
@@ -380,7 +382,7 @@ class TestAgentIntegration:
         assert agent.analytics is not None
         assert isinstance(agent.get_analytics(), AgentAnalytics)
 
-    def test_analytics_tracks_successful_call(self, simple_tool):
+    def test_analytics_tracks_successful_call(self, simple_tool: Tool) -> None:
         """Test that successful tool calls are tracked."""
         provider = FakeProvider(
             responses=[
@@ -401,7 +403,7 @@ class TestAgentIntegration:
         assert metrics.successful_calls >= 1
         assert metrics.failed_calls == 0
 
-    def test_analytics_tracks_failed_call(self, failing_tool):
+    def test_analytics_tracks_failed_call(self, failing_tool: Tool) -> None:
         """Test that failed tool calls are tracked."""
         provider = FakeProvider(
             responses=[
@@ -422,7 +424,7 @@ class TestAgentIntegration:
         assert metrics.failed_calls >= 1
         assert metrics.successful_calls == 0
 
-    def test_analytics_tracks_duration(self, simple_tool):
+    def test_analytics_tracks_duration(self, simple_tool: Tool) -> None:
         """Test that call duration is tracked."""
         provider = FakeProvider(
             responses=[
@@ -442,7 +444,7 @@ class TestAgentIntegration:
         assert metrics.total_duration > 0.0
         assert metrics.avg_duration > 0.0
 
-    def test_analytics_tracks_parameters(self, simple_tool):
+    def test_analytics_tracks_parameters(self, simple_tool: Tool) -> None:
         """Test that parameters are tracked."""
         provider = FakeProvider(
             responses=[
@@ -462,7 +464,7 @@ class TestAgentIntegration:
         assert "name" in metrics.parameter_usage
         assert "Charlie" in metrics.parameter_usage["name"]
 
-    def test_analytics_multiple_tools(self, simple_tool, calculator_tool):
+    def test_analytics_multiple_tools(self, simple_tool: Tool, calculator_tool: Tool) -> None:
         """Test analytics with multiple tools."""
         provider = FakeProvider(
             responses=[
@@ -487,7 +489,7 @@ class TestAgentIntegration:
         assert calc_metrics.total_calls >= 1
 
     @pytest.mark.asyncio
-    async def test_analytics_async_agent(self, simple_tool):
+    async def test_analytics_async_agent(self, simple_tool: Tool) -> None:
         """Test analytics with async agent execution."""
         provider = FakeProvider(
             responses=[
