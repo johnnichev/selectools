@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, Iterable, List, cast
+from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, Iterable, List, Union, cast
 
 from ..env import load_default_env
 from ..exceptions import ProviderConfigurationError
@@ -308,44 +308,81 @@ class OpenAIProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> AsyncIterable[str]:
+    ) -> AsyncIterable[Union[str, ToolCall]]:
         """
         Async version of stream() using AsyncOpenAI client.
-
-        Note: This is an async generator that yields chunks. Due to Python limitations,
-        async generators cannot return values, so usage stats are not returned.
-        Use acomplete() if you need usage stats.
         """
         formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
         model_name = model or self.default_model
 
+        args: Dict[str, Any] = {
+            "model": model_name,
+            "messages": cast(Any, formatted),
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": True,
+            "stream_options": {"include_usage": True},
+            "timeout": timeout,
+        }
+        if tools:
+            args["tools"] = [self._map_tool_to_openai(t) for t in tools]
+
         try:
-            response = cast(
-                Any,
-                await self._async_client.chat.completions.create(
-                    model=model_name,
-                    messages=cast(Any, formatted),
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    stream=True,
-                    stream_options={"include_usage": True},  # Get usage stats with streaming
-                    timeout=timeout,
-                ),
-            )
+            response = cast(Any, await self._async_client.chat.completions.create(**args))
         except Exception as exc:
             raise ProviderError(f"OpenAI async streaming failed: {exc}") from exc
 
+        # Track partial tool calls
+        tool_call_deltas: Dict[int, Dict[str, Any]] = {}
+
         async for chunk in response:
             try:
-                delta = chunk.choices[0].delta if chunk.choices else None
-                if not delta or not delta.content:
+                if not chunk.choices:
                     continue
-                content = delta.content
-                if isinstance(content, list):
-                    content = "".join(
-                        [part.text for part in content if getattr(part, "text", None)]
-                    )
-                yield content
+                delta = chunk.choices[0].delta
+
+                # 1. Handle text content
+                if delta.content:
+                    yield delta.content
+
+                # 2. Handle tool calls
+                if delta.tool_calls:
+                    for tc_delta in delta.tool_calls:
+                        index = tc_delta.index
+                        if index not in tool_call_deltas:
+                            tool_call_deltas[index] = {
+                                "id": tc_delta.id,
+                                "name": "",
+                                "arguments": "",
+                            }
+
+                        if tc_delta.id:
+                            tool_call_deltas[index]["id"] = tc_delta.id
+                        if tc_delta.function:
+                            if tc_delta.function.name:
+                                tool_call_deltas[index]["name"] += tc_delta.function.name
+                            if tc_delta.function.arguments:
+                                tool_call_deltas[index]["arguments"] += tc_delta.function.arguments
+
+                # Check for finish reason to emit completed tool calls
+                finish_reason = chunk.choices[0].finish_reason
+                if finish_reason == "tool_calls":
+                    for index in sorted(tool_call_deltas.keys()):
+                        tc_info = tool_call_deltas[index]
+                        try:
+                            params = (
+                                json.loads(tc_info["arguments"]) if tc_info["arguments"] else {}
+                            )
+                        except json.JSONDecodeError:
+                            params = {}
+
+                        yield ToolCall(
+                            tool_name=tc_info["name"],
+                            parameters=params,
+                            id=tc_info["id"],
+                        )
+                    tool_call_deltas = {}  # Clear for next iteration if any
+
             except Exception as exc:
                 raise ProviderError(f"OpenAI async stream parsing failed: {exc}") from exc
 

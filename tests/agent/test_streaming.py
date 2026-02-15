@@ -1,41 +1,21 @@
-from __future__ import annotations
-
-from typing import Any, AsyncGenerator, Generator, List, Tuple
+import asyncio
+from typing import Any, AsyncGenerator, List, Tuple, Union
 
 import pytest
 
-from selectools.agent.config import AgentConfig
-from selectools.agent.core import Agent
+from selectools.agent.core import Agent, AgentConfig
 from selectools.providers.base import Provider, ProviderError
-from selectools.tools import Tool
-from selectools.types import AgentResult, Message, Role, StreamChunk
+from selectools.tools import tool
+from selectools.types import AgentResult, Message, Role, StreamChunk, ToolCall
 from selectools.usage import UsageStats
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+_DUMMY_USAGE = UsageStats(0, 0, 0, 0.0, "mock", "mock")
 
 
-def _noop() -> str:
+@tool()
+def mock_tool():
+    """A mock tool."""
     return "ok"
-
-
-_DUMMY_TOOL = Tool(
-    name="noop",
-    description="Does nothing.",
-    parameters=[],
-    function=_noop,
-)
-
-
-_DUMMY_USAGE = UsageStats(
-    prompt_tokens=0,
-    completion_tokens=0,
-    total_tokens=0,
-    cost_usd=0.0,
-    model="mock",
-    provider="mock",
-)
 
 
 class MockStreamingProvider(Provider):
@@ -45,40 +25,33 @@ class MockStreamingProvider(Provider):
     supports_streaming = True
     supports_async = True
 
-    def __init__(self, chunks: List[str]) -> None:
+    def __init__(self, chunks: List[Union[str, ToolCall]]):
         self.chunks = chunks
         self.default_model = "mock-stream"
 
-    def complete(self, **kwargs: Any) -> Tuple[Message, UsageStats]:
-        return Message(role=Role.ASSISTANT, content="".join(self.chunks)), _DUMMY_USAGE
+    def complete(self, **kwargs) -> Tuple[Message, UsageStats]:
+        return Message(role=Role.ASSISTANT, content="Done"), _DUMMY_USAGE
 
-    def stream(self, **kwargs: Any) -> Generator[str, None, None]:  # type: ignore[override]
-        yield from self.chunks
+    def stream(self, **kwargs):
+        for chunk in self.chunks:
+            if isinstance(chunk, str):
+                yield chunk
 
-    async def acomplete(self, **kwargs: Any) -> Tuple[Message, UsageStats]:
-        return Message(role=Role.ASSISTANT, content="".join(self.chunks)), _DUMMY_USAGE
+    async def acomplete(self, **kwargs) -> Tuple[Message, UsageStats]:
+        return Message(role=Role.ASSISTANT, content="Done"), _DUMMY_USAGE
 
-    async def astream(self, **kwargs: Any) -> AsyncGenerator[str, None]:
+    async def astream(self, **kwargs) -> AsyncGenerator[Union[str, ToolCall], None]:
         for chunk in self.chunks:
             yield chunk
 
 
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.asyncio
-async def test_agent_astream_yields_chunks() -> None:
+async def test_agent_astream_yields_chunks():
     chunks = ["Hello", " ", "world", "!"]
     provider = MockStreamingProvider(chunks)
-    agent = Agent(
-        tools=[_DUMMY_TOOL],
-        provider=provider,
-        config=AgentConfig(max_iterations=1),
-    )
+    agent = Agent(tools=[mock_tool], provider=provider, config=AgentConfig(max_iterations=1))
 
-    streamed_content: List[str] = []
+    streamed_content = []
     final_result = None
 
     async for item in agent.astream([Message(role=Role.USER, content="Hi")]):
@@ -87,45 +60,36 @@ async def test_agent_astream_yields_chunks() -> None:
         elif isinstance(item, AgentResult):
             final_result = item
 
-    assert streamed_content == chunks
+    assert "".join(streamed_content) == "Hello world!"
     assert final_result is not None
     assert final_result.content == "Hello world!"
 
 
 @pytest.mark.asyncio
-async def test_agent_astream_fallback_without_astream_method() -> None:
+async def test_agent_astream_fallback_without_astream_method():
     """Verify fallback if provider doesn't implement astream."""
 
-    class MockNoStreamProvider:
-        """Provider without astream — only acomplete."""
-
+    class MockNoStreamProvider(Provider):
         name = "mock-no-stream"
         supports_streaming = False
         supports_async = True
 
-        def __init__(self) -> None:
+        def __init__(self):
             self.default_model = "mock-no-stream"
 
-        def complete(self, **kwargs: Any) -> Tuple[Message, UsageStats]:
+        def complete(self, **kwargs) -> Tuple[Message, UsageStats]:
             return Message(role=Role.ASSISTANT, content="Fallback response"), _DUMMY_USAGE
 
-        def stream(self, **kwargs: Any) -> Generator[str, None, None]:  # type: ignore[override]
+        def stream(self, **kwargs):
             yield "Fallback response"
 
-        async def acomplete(self, **kwargs: Any) -> Tuple[Message, UsageStats]:
+        async def acomplete(self, **kwargs) -> Tuple[Message, UsageStats]:
             return Message(role=Role.ASSISTANT, content="Fallback response"), _DUMMY_USAGE
 
     provider = MockNoStreamProvider()
-    # Remove astream so hasattr check returns False
-    assert not hasattr(provider, "astream")
+    agent = Agent(tools=[mock_tool], provider=provider, config=AgentConfig(max_iterations=1))
 
-    agent = Agent(
-        tools=[_DUMMY_TOOL],
-        provider=provider,
-        config=AgentConfig(max_iterations=1),
-    )
-
-    streamed_content: List[str] = []
+    streamed_content = []
     final_result = None
 
     async for item in agent.astream([Message(role=Role.USER, content="Hi")]):
@@ -135,5 +99,36 @@ async def test_agent_astream_fallback_without_astream_method() -> None:
             final_result = item
 
     assert streamed_content == ["Fallback response"]
-    assert final_result is not None
     assert final_result.content == "Fallback response"
+
+
+@pytest.mark.asyncio
+async def test_agent_astream_yields_tool_calls():
+    """Verify that astream yields ToolCall objects and handles them."""
+    chunks = [
+        "Thinking...",
+        ToolCall(tool_name="get_weather", parameters={"location": "San Francisco"}, id="call_123"),
+        "The weather is nice.",
+    ]
+
+    provider = MockStreamingProvider(chunks)
+
+    @tool()
+    def get_weather(location: str):
+        """Get weather"""
+        return f"Weather in {location} is 72F"
+
+    agent = Agent(tools=[get_weather], provider=provider, config=AgentConfig(max_iterations=2))
+
+    items = []
+    async for item in agent.astream([Message(role=Role.USER, content="Weather?")]):
+        items.append(item)
+
+    # Check that we got the text and the tool call
+    texts = [i.content for i in items if isinstance(i, StreamChunk) and i.content]
+    tool_calls = [i.tool_calls for i in items if isinstance(i, StreamChunk) and i.tool_calls]
+    results = [i for i in items if isinstance(i, AgentResult)]
+
+    assert "Thinking..." in texts
+    assert any(tc[0].tool_name == "get_weather" for tc in tool_calls)
+    assert len(results) > 0

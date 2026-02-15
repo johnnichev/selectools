@@ -195,10 +195,12 @@ class StreamChunk:
     Attributes:
         content: The text content of this chunk (delta).
         role: The role emitting this chunk (usually ASSISTANT).
+        tool_calls: Optional list of tool calls (if this chunk contains tool invocations).
     """
 
-    content: str
+    content: str = ""
     role: Role = Role.ASSISTANT
+    tool_calls: Optional[List[ToolCall]] = None
 
 
 class StreamHandler(Protocol):

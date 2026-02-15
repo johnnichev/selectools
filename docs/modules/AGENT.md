@@ -13,7 +13,9 @@
 6. [Sync vs Async Execution](#sync-vs-async-execution)
 7. [Hook System](#hook-system)
 8. [Memory Integration](#memory-integration)
-9. [Implementation Details](#implementation-details)
+9. [Streaming](#streaming)
+10. [Parallel Tool Execution](#parallel-tool-execution)
+11. [Implementation Details](#implementation-details)
 
 ---
 
@@ -30,6 +32,8 @@ The **Agent** class is the central orchestrator of the selectools framework. It 
 5. **Observability**: Invoke lifecycle hooks for monitoring
 6. **Cost Tracking**: Monitor token usage and costs
 7. **Analytics**: Track tool usage patterns (optional)
+8. **Parallel Execution**: Execute independent tool calls concurrently
+9. **Streaming**: Token-level streaming with native tool support
 
 ### Core Dependencies
 
@@ -372,6 +376,10 @@ class AgentConfig:
     verbose: bool = False
     enable_analytics: bool = False
     hooks: Optional[Hooks] = None
+
+    # Execution mode
+    routing_only: bool = False
+    parallel_tool_execution: bool = True
 
     # Streaming
     stream: bool = False
@@ -746,6 +754,109 @@ memory = ConversationMemory(
 ```
 
 When limits are exceeded, oldest messages are dropped (sliding window).
+
+---
+
+## Streaming
+
+### Agent.astream()
+
+The `astream()` method provides token-by-token streaming with native tool call support:
+
+```python
+async for item in agent.astream([Message(role=Role.USER, content="Search for Python")]):
+    if isinstance(item, StreamChunk):
+        print(item.content, end="", flush=True)
+    elif isinstance(item, AgentResult):
+        print(f"\nDone in {item.iterations} iterations")
+```
+
+### How It Works
+
+1. Provider streams text deltas and tool call deltas via `astream()`
+2. Text chunks are yielded as `StreamChunk` objects
+3. Tool calls are accumulated until complete, then executed
+4. Tool results are appended to history and the loop continues
+5. Final `AgentResult` is yielded when no more tool calls
+
+### Provider Protocol
+
+All providers implement `astream()` returning `Union[str, ToolCall]`:
+
+- **Text deltas**: Yielded as raw `str` chunks
+- **Tool calls**: Yielded as complete `ToolCall` objects when ready
+
+### Fallback Behavior
+
+If a provider doesn't support `astream()`, the agent falls back to:
+
+1. `acomplete()` (async non-streaming)
+2. `complete()` via executor (sync in async wrapper)
+
+The response is still yielded as a single `StreamChunk` for API consistency.
+
+---
+
+## Parallel Tool Execution
+
+### Overview
+
+When an LLM requests multiple tool calls in a single response (common with native function calling), the agent executes them concurrently instead of sequentially.
+
+### Configuration
+
+```python
+config = AgentConfig(
+    parallel_tool_execution=True  # Default: enabled
+)
+```
+
+Set to `False` to force sequential execution.
+
+### How It Works
+
+#### Async (`arun`, `astream`)
+
+Uses `asyncio.gather()` to run all tool calls concurrently:
+
+```python
+results = await asyncio.gather(*[run_tool(tc) for tc in tool_calls])
+```
+
+#### Sync (`run`)
+
+Uses `ThreadPoolExecutor` with one worker per tool call:
+
+```python
+with ThreadPoolExecutor(max_workers=len(tool_calls)) as pool:
+    futures = [pool.submit(run_tool, tc) for tc in tool_calls]
+    results = [f.result() for f in futures]
+```
+
+### Guarantees
+
+1. **Result ordering**: Tool results are appended to history in the same order as the original tool calls, regardless of completion order
+2. **Error isolation**: If one tool fails, others still complete successfully
+3. **Hook invocation**: `on_tool_start`, `on_tool_end`, and `on_tool_error` fire for every tool
+4. **Single tool optimization**: When only one tool is called, the sequential path is used (no overhead)
+
+### Example
+
+Three tools each taking 0.15s:
+- **Sequential**: ~0.45s total
+- **Parallel**: ~0.15s total (3x speedup)
+
+```python
+# Automatic - no code changes needed
+agent = Agent(
+    tools=[weather_tool, stock_tool, news_tool],
+    provider=OpenAIProvider(),
+    config=AgentConfig(parallel_tool_execution=True)
+)
+
+# LLM requests all 3 tools → executed concurrently
+result = await agent.arun([Message(role=Role.USER, content="...")])
+```
 
 ---
 

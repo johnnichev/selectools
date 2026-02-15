@@ -693,8 +693,15 @@ class Agent:
                 self._call_hook("on_iteration_start", iteration, self._history)
 
                 full_content = ""
+                current_tool_calls: List[ToolCall] = []
 
-                if not hasattr(self.provider, "astream"):
+                has_astream = (
+                    hasattr(self.provider, "astream")
+                    and self.provider.astream is not None
+                    and self.provider.supports_streaming
+                )
+
+                if not has_astream:
                     # Fallback: provider doesn't support astream, use acomplete
                     if hasattr(self.provider, "acomplete") and getattr(
                         self.provider, "supports_async", False
@@ -727,7 +734,7 @@ class Agent:
                     full_content = response_msg.content
                 else:
                     # Real async streaming
-                    async for chunk in self.provider.astream(
+                    gen = self.provider.astream(
                         model=self.config.model,
                         system_prompt=self._system_prompt,
                         messages=self._history,
@@ -735,21 +742,32 @@ class Agent:
                         temperature=self.config.temperature,
                         max_tokens=self.config.max_tokens,
                         timeout=self.config.request_timeout,
-                    ):
-                        yield StreamChunk(content=chunk)
-                        full_content += chunk
+                    )
+
+                    async for item in gen:
+                        if isinstance(item, str):
+                            yield StreamChunk(content=item)
+                            full_content += item
+                        elif isinstance(item, ToolCall):
+                            current_tool_calls.append(item)
+                            yield StreamChunk(tool_calls=[item])
 
                 # Reconstruct the response message
-                response_msg = Message(role=Role.ASSISTANT, content=full_content)
+                response_msg = Message(
+                    role=Role.ASSISTANT, content=full_content, tool_calls=current_tool_calls or None
+                )
                 self._history.append(response_msg)
                 if self.memory:
                     self.memory.add(response_msg)
 
-                # Tool parsing logic (same as run/arun)
+                # Tool parsing logic
                 tool_calls_to_execute = []
-                parse_result = self.parser.parse(full_content)
-                if parse_result.tool_call:
-                    tool_calls_to_execute.append(parse_result.tool_call)
+                if response_msg.tool_calls:
+                    tool_calls_to_execute = response_msg.tool_calls
+                else:
+                    parse_result = self.parser.parse(full_content)
+                    if parse_result.tool_call:
+                        tool_calls_to_execute.append(parse_result.tool_call)
 
                 if not tool_calls_to_execute:
                     final_response = response_msg

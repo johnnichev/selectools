@@ -1,7 +1,7 @@
 # Selectools Architecture
 
-**Version:** 0.8.0
-**Last Updated:** December 2025
+**Version:** 0.11.0
+**Last Updated:** February 2026
 
 ## Table of Contents
 
@@ -26,6 +26,9 @@ Selectools is a production-ready Python framework for building AI agents with to
 - **RAG Support**: 4 embedding providers, 4 vector stores, document loaders
 - **Developer-Friendly**: Type hints, `@tool` decorator, automatic schema inference
 - **Observable**: Built-in hooks, analytics, usage tracking, and cost monitoring
+- **Native Tool Calling**: OpenAI, Anthropic, and Gemini native function calling APIs
+- **Streaming**: E2E token-level streaming with native tool call support via `Agent.astream`
+- **Parallel Execution**: Concurrent tool execution via `asyncio.gather` / `ThreadPoolExecutor`
 
 ---
 
@@ -45,6 +48,7 @@ Selectools is a production-ready Python framework for building AI agents with to
 │  │  • Tool call detection                                           │  │
 │  │  • Error handling & retries                                      │  │
 │  │  • Hooks (observability)                                         │  │
+│  │  • Parallel tool execution                                       │  │
 │  └─────────┬────────────────────────┬──────────────────┬────────────┘  │
 │            │                        │                  │               │
 │            ▼                        ▼                  ▼               │
@@ -72,6 +76,7 @@ Selectools is a production-ready Python framework for building AI agents with to
 │                     │   • complete()        │                           │
 │                     │   • stream()          │                           │
 │                     │   • acomplete()       │                           │
+│                     │   • astream()         │                           │
 │                     └───────────────────────┘                           │
 └─────────────────────────────────────────────────────────────────────────┘
                                  │
@@ -115,7 +120,7 @@ Selectools is a production-ready Python framework for building AI agents with to
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌───────────┐  │
 │  │   Usage      │  │  Analytics   │  │   Pricing    │  │   Models  │  │
 │  │   Tracking   │  │  (analytics) │  │  (pricing)   │  │ (registry)│  │
-│  │   (usage.py) │  │  • Metrics   │  │  • Cost calc │  │  • 130+   │  │
+│  │   (usage.py) │  │  • Metrics   │  │  • Cost calc │  │  • 135+   │  │
 │  │   • Tokens   │  │  • Patterns  │  │  • Per model │  │   models  │  │
 │  │   • Cost     │  │  • Success   │  │              │  │           │  │
 │  └──────────────┘  └──────────────┘  └──────────────┘  └───────────┘  │
@@ -144,6 +149,8 @@ The **Agent** is the orchestrator that manages the iterative loop of:
 - Tool timeout enforcement
 - Hook invocation for observability
 - Async/sync execution support
+- Parallel tool execution for concurrent multi-tool calls
+- Streaming responses via `astream()`
 
 ### 2. Tools (`tools.py`)
 
@@ -165,7 +172,7 @@ The **Agent** is the orchestrator that manages the iterative loop of:
 - `GeminiProvider` - Google Generative AI
 - `OllamaProvider` - Local LLM execution
 
-Each implements the `Provider` protocol with `complete()` and `stream()` methods.
+Each implements the `Provider` protocol with `complete()`, `stream()`, `acomplete()`, and `astream()` methods. Native tool calling is supported via the `tools` parameter.
 
 ### 4. Parser (`parser.py`)
 
@@ -267,6 +274,7 @@ Single source of truth for 130+ models:
    │
    ├─→ Tool.validate(parameters)
    ├─→ Tool.execute(parameters, injected_kwargs)
+   ├─→ Parallel execution if multiple tools (asyncio.gather / ThreadPoolExecutor)
    ├─→ Handle timeout, errors, streaming
    │
 7. Feedback Loop [if tool executed]
@@ -473,6 +481,19 @@ Single source of truth for 130+ models:
 
 **Benefit:** Budget control and optimization.
 
+### 8. Performance
+
+**Problem:** Sequential tool execution wastes time when tools are independent.
+
+**Solution:** Automatic parallel execution:
+
+- `asyncio.gather()` for async (`arun`, `astream`)
+- `ThreadPoolExecutor` for sync (`run`)
+- Results preserved in original order
+- Enabled by default, configurable via `parallel_tool_execution`
+
+**Benefit:** Faster agent loops when LLM requests multiple independent tools.
+
 ---
 
 ## RAG Integration
@@ -583,6 +604,7 @@ agent = Agent(tools=[...], provider=provider, config=config)
 - Use `Agent.arun()` for non-blocking execution
 - Async tools with `async def`
 - Concurrent requests with `asyncio.gather()`
+- Parallel tool execution via `Agent.astream()` with `asyncio.gather()`
 - Better performance in web frameworks (FastAPI)
 
 ### Vector Store Selection

@@ -1,7 +1,7 @@
 # Selectools Implementation Documentation
 
-**Version:** 0.8.0
-**Last Updated:** December 2025
+**Version:** 0.11.0
+**Last Updated:** February 2026
 
 Welcome to the comprehensive technical documentation for selectools - a production-ready Python framework for building AI agents with tool-calling capabilities and RAG support.
 
@@ -17,7 +17,7 @@ Welcome to the comprehensive technical documentation for selectools - a producti
 
 Detailed technical documentation for each module:
 
-1. **[AGENT.md](modules/AGENT.md)** - Agent loop, tool selection, retry logic, and execution flow
+1. **[AGENT.md](modules/AGENT.md)** - Agent loop, tool selection, retry logic, streaming, parallel execution, and execution flow
 2. **[TOOLS.md](modules/TOOLS.md)** - Tool definition, validation, registry, and streaming
 3. **[PARSER.md](modules/PARSER.md)** - TOOL_CALL contract and JSON extraction strategies
 4. **[PROMPT.md](modules/PROMPT.md)** - System prompt generation and tool schema formatting
@@ -79,8 +79,8 @@ Detailed technical documentation for each module:
 ## 📊 Documentation Stats
 
 - **Total files:** 12 (1 main + 11 modules)
-- **Total lines:** 7,570+ lines
-- **Total words:** ~50,000 words
+- **Total lines:** 8,500+ lines
+- **Total words:** ~55,000 words
 - **ASCII diagrams:** 25+ diagrams
 - **Code examples:** 200+ examples
 
@@ -100,6 +100,8 @@ Detailed technical documentation for each module:
 4. PARSER extracts TOOL_CALL from response
    ↓
 5. TOOLS validates and executes
+   ↓
+5b. If multiple tools: PARALLEL execution (asyncio.gather)
    ↓
 6. USAGE tracks tokens and costs
    ↓
@@ -172,10 +174,13 @@ Detailed technical documentation for each module:
 4. **Developer Friendly** - Type hints, decorators, clear errors
 5. **Observable** - Hooks, analytics, usage tracking
 6. **Cost Aware** - Automatic tracking and warnings
+7. **Performance Optimized** - Parallel tool execution, async-first design
 
 ### Core Patterns
 
 - **Agent Loop** - Iterative tool calling until completion
+- **Native Tool Calling** - Provider-native function calling APIs
+- **Parallel Execution** - Concurrent tool calls via asyncio.gather
 - **Tool Calling Contract** - TOOL_CALL with JSON payload
 - **Schema Generation** - Automatic from type hints
 - **Injected Parameters** - Hide secrets from LLM

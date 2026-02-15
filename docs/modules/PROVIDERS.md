@@ -9,8 +9,9 @@
 2. [Provider Protocol](#provider-protocol)
 3. [Provider Implementations](#provider-implementations)
 4. [Message Formatting](#message-formatting)
-5. [Cost Calculation](#cost-calculation)
-6. [Implementation Details](#implementation-details)
+5. [Native Tool Calling](#native-tool-calling)
+6. [Cost Calculation](#cost-calculation)
+7. [Implementation Details](#implementation-details)
 
 ---
 
@@ -37,8 +38,9 @@
 ### Interface Definition
 
 ```python
-from typing import Protocol, runtime_checkable, List
-from ..types import Message
+from typing import Protocol, runtime_checkable, List, Optional, Union, AsyncGenerator
+from ..types import Message, ToolCall
+from ..tools import Tool
 from ..usage import UsageStats
 
 @runtime_checkable
@@ -55,42 +57,59 @@ class Provider(Protocol):
         model: str,
         system_prompt: str,
         messages: List[Message],
+        tools: Optional[List[Tool]] = None,  # Native tool calling
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> tuple[str, UsageStats]:
-        """Return assistant text and usage stats."""
+    ) -> tuple[Message, UsageStats]:
+        """Return assistant Message (with optional tool_calls) and usage stats."""
         ...
 
-    def stream(
+    def stream(self, *, model, system_prompt, messages, **kwargs):
+        """Yield assistant text chunks (no usage stats)."""
+        ...
+
+    async def acomplete(
         self,
         *,
         model: str,
         system_prompt: str,
         messages: List[Message],
+        tools: Optional[List[Tool]] = None,
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ):
-        """Yield assistant text chunks (no usage stats)."""
-        ...
-
-    # Optional async methods
-    async def acomplete(...) -> tuple[str, UsageStats]:
+    ) -> tuple[Message, UsageStats]:
         """Async version of complete()."""
         ...
 
-    def astream(...):
-        """Async version of stream()."""
+    async def astream(
+        self,
+        *,
+        model: str,
+        system_prompt: str,
+        messages: List[Message],
+        tools: Optional[List[Tool]] = None,
+        temperature: float = 0.0,
+        max_tokens: int = 1000,
+        timeout: float | None = None,
+    ) -> AsyncGenerator[Union[str, ToolCall], None]:
+        """Async streaming with native tool call support.
+
+        Yields:
+            str: Text content deltas
+            ToolCall: Complete tool call objects when ready
+        """
         ...
 ```
 
 ### Key Requirements
 
 1. **Sync Methods**: `complete()` and `stream()` must be implemented
-2. **Return Types**: `complete()` returns `(str, UsageStats)`
-3. **Streaming**: `stream()` yields strings, no usage stats
-4. **Async**: Optional but recommended for performance
+2. **Return Types**: `complete()` returns `(Message, UsageStats)` — Message may contain `tool_calls`
+3. **Streaming**: `stream()` yields strings; `astream()` yields `Union[str, ToolCall]`
+4. **Native Tool Calling**: Pass `tools` parameter for provider-native function calling
+5. **Async**: Recommended for performance; `acomplete()` and `astream()`
 
 ---
 
@@ -112,6 +131,7 @@ provider = OpenAIProvider(
 # - Async support (acomplete/astream)
 # - Vision support (image_path in messages)
 # - Full usage stats
+# - Native tool calling (function calling API)
 ```
 
 **API:** OpenAI Chat Completions API
@@ -124,7 +144,7 @@ from selectools.models import Anthropic
 
 provider = AnthropicProvider(
     api_key="sk-ant-...",  # Or set ANTHROPIC_API_KEY
-    default_model=Anthropic.SONNET_3_5_20241022.id
+    default_model=Anthropic.SONNET_4_5.id
 )
 
 # Features:
@@ -132,6 +152,7 @@ provider = AnthropicProvider(
 # - Async support
 # - Vision support (model-dependent)
 # - Full usage stats
+# - Native tool calling (function calling API)
 ```
 
 **API:** Anthropic Messages API
@@ -152,6 +173,7 @@ provider = GeminiProvider(
 # - Async support
 # - Vision support (model-dependent)
 # - Free embeddings
+# - Native tool calling (function calling API)
 ```
 
 **API:** Google Generative AI
@@ -288,6 +310,54 @@ def _format_messages(self, system_prompt: str, messages: List[Message]):
 
 ---
 
+## Native Tool Calling
+
+### Overview
+
+All providers support native function calling APIs, which provide structured tool calls directly in the response instead of requiring text parsing.
+
+### How It Works
+
+1. Agent passes `tools` parameter to `complete()`/`acomplete()`
+2. Provider converts tool schemas to provider-native format
+3. LLM returns structured tool calls in `Message.tool_calls`
+4. Agent detects `tool_calls` and executes them directly (no regex parsing needed)
+
+### Provider Formats
+
+#### OpenAI
+```python
+# Tools converted to OpenAI function format
+tools=[{"type": "function", "function": {"name": "...", "parameters": {...}}}]
+
+# Response contains tool_calls
+response.choices[0].message.tool_calls  # List of tool call objects
+```
+
+#### Anthropic
+```python
+# Tools converted to Anthropic tool format
+tools=[{"name": "...", "description": "...", "input_schema": {...}}]
+
+# Response contains tool_use content blocks
+response.content  # May contain ToolUse blocks with name and input
+```
+
+#### Gemini
+```python
+# Tools converted to Gemini function declarations
+tools=[Tool(function_declarations=[...])]
+
+# Response candidates contain function calls
+response.candidates[0].content.parts  # May contain function_call parts
+```
+
+### Fallback
+
+If a provider doesn't support native tool calling (e.g., Ollama), or if native calls are not present in the response, the agent falls back to regex-based parsing via `ToolCallParser`.
+
+---
+
 ## Cost Calculation
 
 ### Usage Stats Extraction
@@ -411,6 +481,30 @@ class OpenAIProvider(Provider):
             if delta and delta.content:
                 yield delta.content
 ```
+
+### Async Streaming (`astream`)
+
+All providers implement `astream()` for E2E streaming with native tool support:
+
+```python
+async def astream(self, *, model, system_prompt, messages, tools=None, ...):
+    """Yield text deltas and ToolCall objects."""
+    # Stream response from provider
+    async for chunk in self._async_client.chat.completions.create(stream=True, ...):
+        # Yield text deltas
+        if delta.content:
+            yield delta.content
+
+        # Accumulate tool call deltas
+        if delta.tool_calls:
+            # ... accumulate until complete ...
+            yield ToolCall(tool_name=name, parameters=args, id=tc_id)
+```
+
+The agent's `astream()` method consumes these and:
+- Yields `StreamChunk` objects for text
+- Executes tool calls when received
+- Continues the agent loop until completion
 
 ### Error Handling
 

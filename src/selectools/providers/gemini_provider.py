@@ -11,7 +11,7 @@ import base64
 import json
 import os
 import uuid
-from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, Iterable, List, cast
+from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, Iterable, List, Union, cast
 
 if TYPE_CHECKING:
     from ..tools.base import Tool
@@ -384,7 +384,7 @@ class GeminiProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> AsyncIterable[str]:
+    ) -> AsyncIterable[Union[str, ToolCall]]:
         """
         Async version of stream() using client.aio.
 

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, Iterable, List, cast
+from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, Iterable, List, Union, cast
 
 from ..models import Ollama as OllamaModels
 
@@ -343,7 +343,7 @@ class OllamaProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> AsyncIterable[str]:
+    ) -> AsyncIterable[Union[str, ToolCall]]:
         """Async version of stream() using AsyncOpenAI client."""
         formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
         model_name = model or self.default_model

@@ -5,6 +5,95 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-02-14
+
+### Added - E2E Streaming & Parallel Execution
+
+#### E2E Native Tool Streaming
+
+- **`Agent.astream`** now supports native tool calls from all providers
+  - Streams both text chunks and `ToolCall` objects in a unified flow
+  - Yields `StreamChunk` for text deltas and full `ToolCall` objects when ready
+  - Robust fallback: gracefully degrades to non-streaming `acomplete` when provider lacks streaming
+- **Provider `astream` protocol** - All providers now implement `astream` returning `Union[str, ToolCall]`
+  - `OpenAIProvider.astream` - Streams tool call deltas and text content
+  - `AnthropicProvider.astream` - Streams tool call deltas and text content
+  - `GeminiProvider.astream` - Streams tool call deltas and text content
+- **`StreamChunk`** updated to support optional `tool_calls` field
+
+#### Parallel Tool Execution
+
+- **Concurrent tool execution** when LLM requests multiple tools in a single response
+  - `asyncio.gather()` for async execution (`arun`, `astream`)
+  - `ThreadPoolExecutor` for sync execution (`run`)
+  - Enabled by default: `AgentConfig(parallel_tool_execution=True)`
+  - Results appended to history in original request order (ordering preserved)
+  - Per-tool error isolation: one tool failure doesn't block others
+  - All hooks (`on_tool_start`, `on_tool_end`, `on_tool_error`) fire for every tool
+- **New config option**: `parallel_tool_execution: bool = True`
+
+#### Full Type Safety
+
+- 0 mypy errors across all 48 source files and 32 test files
+- `from __future__ import annotations` added to all test files
+- Full parameter and return type annotations on all test helpers, fixtures, and mock providers
+- `disallow_untyped_defs = true` enforced and verified
+
+### Changed
+
+- `StreamChunk` dataclass extended with optional `tool_calls` field
+- Provider `astream` methods now yield `Union[str, ToolCall]` instead of just `str`
+- `Agent.astream` rewritten with tool delta accumulation and native tool call yielding
+- `GeminiProvider` improved null-safety for `Optional[Content].parts` access
+
+### Fixed
+
+- Fixed mypy union-attr errors in `gemini_provider.py` for nullable `Content.parts`
+- Fixed `ToolCall.tool_name` type narrowing from `Union[str, Any, None]` to `str`
+- Black and isort applied across entire codebase
+
+---
+
+## [0.10.0] - 2026-02-13
+
+### Added - Critical Architecture
+
+#### Native Function Calling
+
+- **All providers** now use native tool calling APIs instead of regex parsing
+  - `OpenAIProvider` - Uses OpenAI function calling with `tools` parameter
+  - `AnthropicProvider` - Uses Anthropic tool use blocks
+  - `GeminiProvider` - Uses Gemini function calling declarations
+- **`Message.tool_calls`** field carries native `ToolCall` objects from provider responses
+- **Fallback**: Regex-based `ToolCallParser` still used when provider returns text-only responses
+- `complete()` and `acomplete()` now accept `tools` parameter for native tool schemas
+
+#### Context Propagation (Async)
+
+- **`contextvars.copy_context()`** ensures tracing/auth context flows into async tool execution
+- Safe propagation across `asyncio.gather()` and executor boundaries
+
+#### Routing Mode
+
+- **`AgentConfig(routing_only=True)`** returns tool selection without executing
+- Ideal for classification, intent routing, and tool selection pipelines
+- Returns `AgentResult` with `tool_name` and `tool_args` immediately
+
+### Changed
+
+- Provider `complete()` signature extended with `tools: Optional[List[Tool]] = None`
+- Agent loop checks `response_msg.tool_calls` before falling back to parser
+- Default Anthropic model updated from retired `claude-3-5-sonnet-20241022` to `claude-sonnet-4-5-20250514`
+
+### Fixed
+
+- Fixed 75+ test failures from `FakeProvider` stubs not conforming to updated `Provider` protocol
+- Fixed API key isolation tests using `monkeypatch.delenv` + `unittest.mock.patch`
+- Fixed E2E test failures from retired Anthropic model
+- Updated model registry assertion counts to match current 135+ model entries
+
+---
+
 ## [0.8.0] - 2025-12-10
 
 ### Added - RAG & Embeddings 🎉
@@ -415,6 +504,9 @@ agent = RAGAgent.from_directory(
 
 ## Release Links
 
+- [0.11.0 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.11.0)
+- [0.10.0 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.10.0)
+- [0.8.0 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.8.0)
 - [0.7.0 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.7.0)
 - [0.6.1 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.6.1)
 - [0.6.0 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.6.0)

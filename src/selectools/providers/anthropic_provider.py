@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, Iterable, List, cast
 if TYPE_CHECKING:
     from ..tools.base import Tool
 
+from typing import Union
+
 from ..env import load_default_env
 from ..exceptions import ProviderConfigurationError
 from ..models import Anthropic as AnthropicModels
@@ -329,7 +331,7 @@ class AnthropicProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> AsyncIterable[str]:
+    ) -> AsyncIterable[Union[str, ToolCall]]:
         """Async version of stream() using AsyncAnthropic client."""
         payload = self._format_messages(messages)
         model_name = model or self.default_model

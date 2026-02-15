@@ -4,9 +4,9 @@ Provider abstraction for model-agnostic tool calling.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, AsyncIterable, Iterable, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, AsyncIterable, Iterable, Protocol, Union, runtime_checkable
 
-from ..types import Message
+from ..types import Message, ToolCall
 
 if TYPE_CHECKING:
     from ..tools.base import Tool
@@ -104,11 +104,16 @@ class Provider(Protocol):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> AsyncIterable[str]:
+    ) -> AsyncIterable[Union[str, ToolCall]]:
         """
-        Async version of stream().
+        Async streaming with native tool call support.
 
-        Providers can implement this for native async streaming support.
+        Implementations should be ``async def`` with ``yield`` (async generators).
+        The protocol declares this as a plain ``def`` so that mypy correctly
+        treats the return value as ``AsyncIterable`` rather than
+        ``Coroutine[..., AsyncIterable[...]]``.
+
+        Yields text chunks (str) or full ToolCall objects as they become ready.
 
         Note: Async streaming methods do not return usage stats due to Python
         async generator limitations. Use acomplete() if you need usage tracking.

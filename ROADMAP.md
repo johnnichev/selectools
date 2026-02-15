@@ -23,29 +23,39 @@ Recent major improvements focusing on agent control and reliability (Agent v0.9)
 
 ---
 
-## v0.10.0: Critical Architecture (Planned)
+## v0.10.0: Critical Architecture (Complete)
 
 Focus: Fixing architectural limitations and enabling production scaling.
 
-| Feature                         | Priority    | Impact | Description                                                    |
-| ------------------------------- | ----------- | ------ | -------------------------------------------------------------- |
-| **Native Function Calling**     | 🔴 Critical | High   | Use OpenAI/Anthropic native tool APIs instead of regex parsing |
-| **Context Propagation (Async)** | 🔴 Critical | High   | `contextvars.copy_context()` for tracing/auth in async tools   |
-
-| **Select-Only / Routing Mode** | 🟠 High | High | Run agent for classification/routing without executing the selected tool |
+| Feature                         | Status     | Impact | Description                                                    |
+| ------------------------------- | ---------- | ------ | -------------------------------------------------------------- |
+| **Native Function Calling**     | ✅ v0.10.0 | High   | Use OpenAI/Anthropic/Gemini native tool APIs instead of regex parsing |
+| **Context Propagation (Async)** | ✅ v0.10.0 | High   | `contextvars.copy_context()` for tracing/auth in async tools   |
+| **Select-Only / Routing Mode**  | ✅ v0.10.0 | High   | Run agent for classification/routing without executing the selected tool |
 
 ---
 
-## v0.11.0: Advanced Data & Performance (Planned)
+## v0.11.0: Streaming & Performance (Complete)
 
-Focus: Advanced RAG capabilities, streaming, and caching. (Original v0.9.0 plan)
+Focus: E2E streaming, parallel execution, and type safety.
+
+| Feature                         | Status     | Notes                                                                  |
+| ------------------------------- | ---------- | ---------------------------------------------------------------------- |
+| **E2E Streaming Response**      | ✅ v0.11.0 | Native tool streaming via `Agent.astream` with `Union[str, ToolCall]` provider protocol |
+| **Parallel Tool Execution**     | ✅ v0.11.0 | `asyncio.gather` for async, `ThreadPoolExecutor` for sync; `AgentConfig(parallel_tool_execution=True)` |
+| **Full Type Safety**            | ✅ v0.11.0 | 0 mypy errors across all source and test files; `disallow_untyped_defs` enforced |
+
+---
+
+## v0.12.0: Advanced Data & RAG (Planned)
+
+Focus: Advanced RAG capabilities and caching.
 
 | Feature                      | Priority  | Notes                                                                  |
 | ---------------------------- | --------- | ---------------------------------------------------------------------- |
 | **Hybrid Search**            | 🟠 High   | Vector + BM25 keyword search                                           |
 | **Reranking Models**         | 🟡 Medium | Cohere/Jina rerankers for better search relevance                      |
 | **Advanced Chunking**        | 🟡 Medium | Agentic/Contextual document chunking                                   |
-| **Streaming Response (E2E)** | 🟠 High   | Token-level streaming from LLM → Tool → Client (SSE/WebSocket support) |
 | **Response Caching**         | 🟡 Medium | Built-in TTL/LRU caching for identical queries (Redis + In-Memory)     |
 | **Dynamic Tool Loading**     | 🟡 Medium | Hot-reload tools without restart                                       |
 
@@ -69,10 +79,10 @@ Focus: Stability, observability, and advanced orchestration.
 
 ### High-Impact Complex Features
 
-| Feature                 | Status     | Notes                         |
-| ----------------------- | ---------- | ----------------------------- |
-| Parallel Tool Execution | 🟡 Planned | Auto-detect independent tools |
-| Tool Composition        | 🟡 Planned | `@compose` decorator          |
+| Feature                 | Status         | Notes                         |
+| ----------------------- | -------------- | ----------------------------- |
+| Parallel Tool Execution | ✅ Implemented | `asyncio.gather` / `ThreadPoolExecutor` |
+| Tool Composition        | 🟡 Planned     | `@compose` decorator          |
 
 ### Context Management
 
@@ -87,18 +97,18 @@ Focus: Stability, observability, and advanced orchestration.
 | Feature                   | Status     | Notes                     |
 | ------------------------- | ---------- | ------------------------- |
 | Dynamic Tool Loading      | 🟡 Planned | Hot-reload tools          |
-| Tool Usage Analytics      | 🟡 Planned | Track performance metrics |
+| Tool Usage Analytics      | ✅ v0.6.0  | Track performance metrics |
 | Tool Marketplace/Registry | 🟡 Planned | Community tool sharing    |
 
 ### Provider Enhancements
 
-| Feature                  | Status     | Notes                                                   |
-| ------------------------ | ---------- | ------------------------------------------------------- |
-| Universal Vision Support | 🟡 Planned | Unified vision API                                      |
-| Provider Auto-Selection  | 🟡 Planned | Automatic fallback chains                               |
-| Streaming Improvements   | 🟡 Planned | SSE, WebSocket support                                  |
-| Local Model Support      | 🟡 Planned | Ollama, LM Studio integration                           |
-| AWS Bedrock Provider     | 🟡 Planned | Secure VPC-native model access (Claude, Llama, Mistral) |
+| Feature                  | Status         | Notes                                                   |
+| ------------------------ | -------------- | ------------------------------------------------------- |
+| Universal Vision Support | 🟡 Planned     | Unified vision API                                      |
+| Provider Auto-Selection  | 🟡 Planned     | Automatic fallback chains                               |
+| Streaming Improvements   | ✅ Implemented | Native tool streaming via `astream`                     |
+| Local Model Support      | ✅ v0.6.0      | Ollama, LM Studio integration                           |
+| AWS Bedrock Provider     | 🟡 Planned     | Secure VPC-native model access (Claude, Llama, Mistral) |
 
 ### Production Reliability
 
@@ -111,13 +121,13 @@ Focus: Stability, observability, and advanced orchestration.
 
 ### Developer Experience
 
-| Feature                    | Status     | Notes                               |
-| -------------------------- | ---------- | ----------------------------------- |
-| Interactive Debug Mode     | 🟡 Planned | Step-through agent execution        |
-| Visual Agent Builder       | 🟡 Planned | Web UI for agent design             |
-| Enhanced Testing Framework | 🟡 Planned | Snapshot testing, load tests        |
-| Documentation Generation   | 🟡 Planned | Auto-generate from tool definitions |
-| Type Safety Improvements   | 🟡 Planned | Better type inference               |
+| Feature                    | Status         | Notes                               |
+| -------------------------- | -------------- | ----------------------------------- |
+| Interactive Debug Mode     | 🟡 Planned     | Step-through agent execution        |
+| Visual Agent Builder       | 🟡 Planned     | Web UI for agent design             |
+| Enhanced Testing Framework | 🟡 Planned     | Snapshot testing, load tests        |
+| Documentation Generation   | 🟡 Planned     | Auto-generate from tool definitions |
+| Type Safety Improvements   | ✅ Implemented | Full mypy coverage, all annotations |
 
 ### Ecosystem Integration
 
@@ -138,6 +148,24 @@ Focus: Stability, observability, and advanced orchestration.
 ---
 
 ## Release History
+
+### v0.11.0 - Streaming & Parallel Execution
+
+- ✅ **E2E Streaming**: Native tool streaming via `Agent.astream` with `Union[str, ToolCall]` provider protocol
+- ✅ **Parallel Tool Execution**: `asyncio.gather` for async, `ThreadPoolExecutor` for sync; enabled by default
+- ✅ **Full Type Safety**: 0 mypy errors across 80+ source and test files
+
+### v0.10.0 - Critical Architecture
+
+- ✅ **Native Function Calling**: OpenAI, Anthropic, and Gemini native tool APIs
+- ✅ **Context Propagation**: `contextvars.copy_context()` for async tool execution
+- ✅ **Routing Mode**: `AgentConfig(routing_only=True)` for classification without execution
+
+### v0.9.0 - Core Capabilities & Reliability
+
+- ✅ **Custom System Prompt**: `AgentConfig(system_prompt=...)` for domain instructions
+- ✅ **Structured AgentResult**: `run()` returns `AgentResult` with tool calls, args, and iterations
+- ✅ **Reusable Agent Instances**: `Agent.reset()` clears history/memory for clean reuse
 
 ### v0.8.0 - Embeddings & RAG
 

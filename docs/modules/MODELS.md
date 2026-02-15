@@ -19,7 +19,7 @@
 
 The **Models** module provides a **single source of truth** for all supported LLM and embedding models. It includes:
 
-- 130+ models across 5 providers
+- 135+ models across 5 providers
 - Pricing per 1M tokens
 - Context windows
 - Max output tokens

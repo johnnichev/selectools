@@ -6,9 +6,9 @@ This provider doesn't call any external API and simply echoes user messages.
 
 from __future__ import annotations
 
-from typing import Any, AsyncGenerator, AsyncIterable, Iterable, List
+from typing import Any, AsyncGenerator, AsyncIterable, Iterable, List, Union
 
-from ..types import Message, Role
+from ..types import Message, Role, ToolCall
 from ..usage import UsageStats
 from .base import Provider
 
@@ -100,11 +100,9 @@ class LocalProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> AsyncIterable[str]:
+    ) -> AsyncIterable[Union[str, ToolCall]]:
         raise NotImplementedError("LocalProvider does not support async operations")
-        # Make mypy happy with async generator type
-        if False:
-            yield ""  # pragma: no cover
+        yield ""  # pragma: no cover  # makes this an async generator for mypy
 
 
 __all__ = ["LocalProvider"]
