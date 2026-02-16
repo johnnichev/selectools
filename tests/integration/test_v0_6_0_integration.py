@@ -12,9 +12,6 @@ Tests that Ollama provider and Analytics work well with:
 
 from __future__ import annotations
 
-# Import FakeProvider from test_framework
-import sys
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -23,10 +20,7 @@ from selectools import Agent, AgentConfig, Message, Role, Tool, ToolParameter
 from selectools.memory import ConversationMemory
 from selectools.providers.stubs import LocalProvider
 from selectools.toolbox import get_tools_by_category
-
-tests_dir = Path(__file__).parent
-sys.path.insert(0, str(tests_dir))
-from tests.core.test_framework import FakeProvider  # noqa: E402
+from tests.core.test_framework import FakeProvider
 
 
 @pytest.fixture

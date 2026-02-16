@@ -5,22 +5,13 @@ High-concurrency stress tests to validate production readiness under load.
 from __future__ import annotations
 
 import asyncio
-import sys
 import time
-from pathlib import Path
 from typing import Any, List, Tuple
 
 import pytest
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-SRC_DIR = PROJECT_ROOT / "src"
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
-
 import selectools
-from agent import Agent, AgentConfig, Message, Role
+from selectools import Agent, AgentConfig, Message, Role
 from selectools.memory import ConversationMemory
 from selectools.providers.stubs import LocalProvider
 

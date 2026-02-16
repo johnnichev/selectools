@@ -5,9 +5,6 @@ Tests for the analytics module and agent integration.
 from __future__ import annotations
 
 import json
-
-# Import FakeProvider from test_framework
-import sys
 import tempfile
 from pathlib import Path
 
@@ -15,10 +12,7 @@ import pytest
 
 from selectools import Agent, AgentConfig, Message, Role, Tool, ToolParameter
 from selectools.analytics import AgentAnalytics, ToolMetrics
-
-tests_dir = Path(__file__).parent
-sys.path.insert(0, str(tests_dir))
-from tests.core.test_framework import FakeProvider  # noqa: E402
+from tests.core.test_framework import FakeProvider
 
 
 @pytest.fixture

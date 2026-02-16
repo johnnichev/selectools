@@ -17,15 +17,8 @@ from typing import Any, Callable, Coroutine, Dict, Generator, List, Optional
 
 import pytest
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-SRC_DIR = PROJECT_ROOT / "src"
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
-
 import selectools
-from agent import Agent, AgentConfig, Message, Role, Tool, ToolParameter
+from selectools import Agent, AgentConfig, Message, Role, Tool, ToolParameter
 from selectools.cli import _default_tools, build_parser, run_agent
 from selectools.memory import ConversationMemory
 from selectools.parser import ToolCallParser
