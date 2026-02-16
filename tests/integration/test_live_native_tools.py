@@ -30,6 +30,8 @@ def weather_agent(request: pytest.FixtureRequest) -> Agent:
     return Agent(config=AgentConfig(), provider=provider, tools=[get_random_number])
 
 
+@pytest.mark.e2e
+@pytest.mark.openai
 @pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"), reason="OPENAI_API_KEY not set")
 def test_openai_native_tool_call() -> None:
     print("\nTesting OpenAI native tool call...")
@@ -49,6 +51,8 @@ def test_openai_native_tool_call() -> None:
     assert "42" in response.message.content or "42" in str(response.tool_calls)
 
 
+@pytest.mark.e2e
+@pytest.mark.anthropic
 @pytest.mark.skipif(not os.getenv("ANTHROPIC_API_KEY"), reason="ANTHROPIC_API_KEY not set")
 def test_anthropic_native_tool_call() -> None:
     print("\nTesting Anthropic native tool call...")
@@ -71,6 +75,8 @@ def test_anthropic_native_tool_call() -> None:
     assert response.tool_calls[0].tool_name == "get_random_number"
 
 
+@pytest.mark.e2e
+@pytest.mark.gemini
 @pytest.mark.skipif(not os.getenv("GEMINI_API_KEY"), reason="GEMINI_API_KEY not set")
 def test_gemini_native_tool_call() -> None:
     print("\nTesting Gemini native tool call...")
@@ -93,6 +99,8 @@ def test_gemini_native_tool_call() -> None:
     assert response.tool_calls[0].tool_name == "get_random_number"
 
 
+@pytest.mark.e2e
+@pytest.mark.ollama
 def test_ollama_native_tool_call() -> None:
     print("\nTesting Ollama native tool call...")
     try:

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "selectools"
-version = "0.8.0"
-description = "Build AI agents that call your custom Python functions. Connect LLMs to tools, APIs, and databases with any provider (OpenAI, Anthropic, Gemini, Ollama)."
+version = "0.12.0"
+description = "Production-ready AI agents with tool calling, RAG, and hybrid search. Provider-agnostic (OpenAI, Anthropic, Gemini, Ollama), with streaming, caching, dynamic tools, and cost tracking."
 readme = "README.md"
 requires-python = ">=3.9"
 license = "LGPL-3.0-or-later"
@@ -16,7 +16,7 @@ dependencies = [
     "google-genai>=1.0.0",
     "numpy>=1.24.0,<3.0.0",
 ]
-keywords = ["llm", "tools", "ai", "openai", "agent"]
+keywords = ["llm", "tools", "ai", "openai", "agent", "rag", "embeddings", "vector-search", "hybrid-search", "tool-calling", "anthropic", "gemini"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -34,6 +34,7 @@ Homepage = "https://github.com/johnnichev/selectools"
 Repository = "https://github.com/johnnichev/selectools"
 Issues = "https://github.com/johnnichev/selectools/issues"
 Documentation = "https://github.com/johnnichev/selectools#readme"
+Changelog = "https://github.com/johnnichev/selectools/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [

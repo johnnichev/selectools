@@ -1,5 +1,7 @@
 """Public exports for the selectools package."""
 
+__version__ = "0.12.0"
+
 # Import submodules (lazy loading for optional dependencies)
 from . import embeddings, models, rag, toolbox
 from .agent import Agent, AgentConfig

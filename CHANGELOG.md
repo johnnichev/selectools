@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.12.0] - 2026-02-16
+
 ### Added - Hybrid Search (Vector + BM25)
 
 #### BM25 Keyword Search Engine
@@ -87,7 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Contextual Chunker
 
 - **`ContextualChunker`** - Wraps any chunker and enriches each chunk with LLM-generated context
-  - Inspired by Anthropic's *Contextual Retrieval* technique
+  - Inspired by Anthropic's _Contextual Retrieval_ technique
   - For each chunk, generates a 1-2 sentence situating description using the full document as context
   - Prepends the context to the chunk text to improve embedding quality and retrieval relevance
   - Composable: works with `TextSplitter`, `RecursiveTextSplitter`, `SemanticChunker`, or any object with `split_documents()`
@@ -112,16 +116,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`Agent.remove_tool(tool_name)`** - Remove a tool by name; validates at least one remains
 - **`Agent.replace_tool(tool)`** - Swap an existing tool with an updated version (or add if new)
 - All methods rebuild the system prompt so the LLM immediately sees the updated tool set
-
-### Changed
-
-- `selectools.rag` now exports `BM25`, `HybridSearcher`, `FusionMethod`, `HybridSearchTool`, `Reranker`, `CohereReranker`, `JinaReranker`, `SemanticChunker`, and `ContextualChunker`
-- `selectools.tools` now exports `ToolLoader`
-- `HybridSearcher.__init__` accepts new optional `reranker` parameter
-
----
-
-## [0.12.0] - 2026-02-15
 
 ### Added - Response Caching
 
@@ -152,6 +146,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `selectools.rag` now exports `BM25`, `HybridSearcher`, `FusionMethod`, `HybridSearchTool`, `Reranker`, `CohereReranker`, `JinaReranker`, `SemanticChunker`, and `ContextualChunker`
+- `selectools.tools` now exports `ToolLoader`
+- `HybridSearcher.__init__` accepts new optional `reranker` parameter
 - `AgentConfig` extended with `cache: Optional[Cache] = None` field
 - `Agent._call_provider()` and `Agent._acall_provider()` now check cache before retry loop
 - New exports in `selectools.__init__`: `Cache`, `CacheStats`, `CacheKeyBuilder`, `InMemoryCache`
@@ -703,11 +700,11 @@ This section covers all breaking changes for consumers upgrading from v0.8.0.
 
 ### Summary of Breaking Changes
 
-| Version | Change | Impact |
-|---------|--------|--------|
-| v0.9.0  | `run()` / `arun()` return `AgentResult` instead of `Message` | Low (backward-compat properties) |
+| Version | Change                                                                               | Impact                                  |
+| ------- | ------------------------------------------------------------------------------------ | --------------------------------------- |
+| v0.9.0  | `run()` / `arun()` return `AgentResult` instead of `Message`                         | Low (backward-compat properties)        |
 | v0.10.0 | `Provider.complete()` returns `(Message, UsageStats)` instead of `(str, UsageStats)` | Low (only if calling provider directly) |
-| v0.10.0 | `Provider.complete()` signature adds `tools` parameter | None (has default) |
+| v0.10.0 | `Provider.complete()` signature adds `tools` parameter                               | None (has default)                      |
 
 ### Step-by-Step Migration
 
@@ -780,6 +777,26 @@ agent = Agent(tools=[...], provider=provider, config=config)
 
 # NEW in v0.9.0 — reuse agent between requests
 agent.reset()
+
+# NEW in v0.12.0 — dynamic tool loading
+from selectools.tools import ToolLoader
+tools = ToolLoader.from_directory("./plugins", recursive=True)
+agent.add_tools(tools)
+agent.remove_tool("old_tool")
+agent.replace_tool(updated_tool)
+
+# NEW in v0.12.0 — hybrid search (BM25 + vector)
+from selectools.rag import HybridSearcher, FusionMethod, CohereReranker
+searcher = HybridSearcher(
+    vector_store=store,
+    fusion=FusionMethod.RRF,
+    reranker=CohereReranker(),
+)
+
+# NEW in v0.12.0 — advanced chunking
+from selectools.rag import SemanticChunker, ContextualChunker
+semantic = SemanticChunker(embedder=embedder, similarity_threshold=0.75)
+contextual = ContextualChunker(base_chunker=semantic, provider=provider)
 ```
 
 ---
