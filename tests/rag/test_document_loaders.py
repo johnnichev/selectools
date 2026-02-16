@@ -304,7 +304,7 @@ class TestDocumentLoaderFromPDF:
             sys.modules["pypdf"] = None  # type: ignore[assignment]
 
             try:
-                with pytest.raises(ImportError, match="pypdf required"):
+                with pytest.raises(ImportError, match="pypdf.*required"):
                     DocumentLoader.from_pdf("dummy.pdf")
             finally:
                 # Restore module

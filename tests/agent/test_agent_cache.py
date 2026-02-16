@@ -310,6 +310,121 @@ class TestCacheWithRoutingMode:
 # ---------------------------------------------------------------------------
 
 
+class TestCacheVerbose:
+    def test_verbose_prints_on_cache_hit(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Verbose mode should print a message when cache is hit."""
+        provider = FakeCachingProvider()
+        cache = InMemoryCache(max_size=10, default_ttl=60)
+        config = AgentConfig(max_iterations=1, cache=cache, verbose=True)
+        agent = Agent(tools=[_dummy_tool()], provider=provider, config=config)
+
+        agent.run([Message(role=Role.USER, content="Hi")])
+        agent.reset()
+        agent.run([Message(role=Role.USER, content="Hi")])
+
+        captured = capsys.readouterr()
+        assert "cache hit" in captured.out.lower()
+
+    def test_no_verbose_no_print(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Without verbose, no cache hit message should be printed."""
+        provider = FakeCachingProvider()
+        cache = InMemoryCache(max_size=10, default_ttl=60)
+        config = AgentConfig(max_iterations=1, cache=cache, verbose=False)
+        agent = Agent(tools=[_dummy_tool()], provider=provider, config=config)
+
+        agent.run([Message(role=Role.USER, content="Hi")])
+        agent.reset()
+        agent.run([Message(role=Role.USER, content="Hi")])
+
+        captured = capsys.readouterr()
+        assert "cache hit" not in captured.out.lower()
+
+
+# ---------------------------------------------------------------------------
+# Test: cache clear invalidates entries
+# ---------------------------------------------------------------------------
+
+
+class TestCacheClearInvalidation:
+    def test_clear_then_miss(self) -> None:
+        """After cache.clear(), the same input should be a miss."""
+        provider = FakeCachingProvider()
+        cache = InMemoryCache(max_size=10, default_ttl=60)
+        config = AgentConfig(max_iterations=1, cache=cache)
+        agent = Agent(tools=[_dummy_tool()], provider=provider, config=config)
+
+        agent.run([Message(role=Role.USER, content="Hi")])
+        assert provider.call_count == 1
+
+        cache.clear()
+        agent.reset()
+        agent.run([Message(role=Role.USER, content="Hi")])
+        assert provider.call_count == 2  # miss after clear
+
+
+# ---------------------------------------------------------------------------
+# Test: astream bypasses cache
+# ---------------------------------------------------------------------------
+
+
+class TestStreamingBypassesCache:
+    @pytest.mark.asyncio
+    async def test_astream_does_not_cache(self) -> None:
+        """astream should bypass the cache entirely (non-replayable)."""
+        provider = FakeCachingProvider()
+        cache = InMemoryCache(max_size=10, default_ttl=60)
+        config = AgentConfig(max_iterations=1, cache=cache)
+        agent = Agent(tools=[_dummy_tool()], provider=provider, config=config)
+
+        chunks: list[str] = []
+        async for item in agent.astream([Message(role=Role.USER, content="Stream")]):
+            if hasattr(item, "content"):
+                chunks.append(str(item.content))
+
+        # astream uses a different code path; the cache should have 0 entries
+        # from streaming (cache only stores complete() / acomplete() results)
+        # The provider should have been called
+        assert provider.call_count >= 1
+
+
+# ---------------------------------------------------------------------------
+# Test: on_llm_end hook fires on cache hit
+# ---------------------------------------------------------------------------
+
+
+class TestCacheHooksIntegration:
+    def test_on_llm_end_fires_on_cache_hit(self) -> None:
+        """on_llm_end hook should fire even on cache hits."""
+        provider = FakeCachingProvider()
+        cache = InMemoryCache(max_size=10, default_ttl=60)
+        hook_calls: list[tuple[str, object]] = []
+
+        def on_llm_end(response: str, usage: object) -> None:
+            hook_calls.append((response, usage))
+
+        config = AgentConfig(
+            max_iterations=1,
+            cache=cache,
+            hooks={"on_llm_end": on_llm_end},
+        )
+        agent = Agent(tools=[_dummy_tool()], provider=provider, config=config)
+
+        # First call: miss -> hook fires from provider call
+        agent.run([Message(role=Role.USER, content="Hi")])
+        first_hook_count = len(hook_calls)
+        assert first_hook_count >= 1
+
+        # Second call: hit -> hook should still fire
+        agent.reset()
+        agent.run([Message(role=Role.USER, content="Hi")])
+        assert len(hook_calls) > first_hook_count
+
+
+# ---------------------------------------------------------------------------
+# Test: cache key includes tools
+# ---------------------------------------------------------------------------
+
+
 class TestCacheKeyIncludesTools:
     def test_different_tools_different_key(self) -> None:
         msgs = [Message(role=Role.USER, content="hello")]

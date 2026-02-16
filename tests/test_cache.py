@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from selectools.cache import CacheKeyBuilder, CacheStats, InMemoryCache
+from selectools.tools import Tool
 from selectools.types import Message, Role, ToolCall
 
 # ---------------------------------------------------------------------------
@@ -367,3 +368,57 @@ class TestCacheKeyBuilder:
         key = CacheKeyBuilder.build(model="m", system_prompt="s", messages=[], temperature=0.0)
         assert isinstance(key, str)
         assert len(key) > 20
+
+    def test_empty_tools_list_same_as_none(self) -> None:
+        msgs = [Message(role=Role.USER, content="hi")]
+        k1 = CacheKeyBuilder.build(
+            model="m", system_prompt="s", messages=msgs, tools=[], temperature=0.0
+        )
+        k2 = CacheKeyBuilder.build(
+            model="m", system_prompt="s", messages=msgs, tools=None, temperature=0.0
+        )
+        assert k1 == k2
+
+    def test_order_of_tools_matters(self) -> None:
+        msgs = [Message(role=Role.USER, content="hi")]
+        tool_a = Tool(
+            name="alpha",
+            description="Alpha tool for testing key ordering",
+            parameters=[],
+            function=lambda: "a",
+        )
+        tool_b = Tool(
+            name="beta",
+            description="Beta tool for testing key ordering",
+            parameters=[],
+            function=lambda: "b",
+        )
+        k1 = CacheKeyBuilder.build(
+            model="m", system_prompt="s", messages=msgs, tools=[tool_a, tool_b], temperature=0.0
+        )
+        k2 = CacheKeyBuilder.build(
+            model="m", system_prompt="s", messages=msgs, tools=[tool_b, tool_a], temperature=0.0
+        )
+        assert k1 != k2
+
+
+# ---------------------------------------------------------------------------
+# RedisCache import guard
+# ---------------------------------------------------------------------------
+
+
+class TestRedisCacheImportGuard:
+    def test_import_error_without_redis(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """RedisCache should raise a clear ImportError when redis is not installed."""
+        import selectools.cache_redis as mod
+
+        original_import = __builtins__.__import__ if hasattr(__builtins__, "__import__") else __import__  # type: ignore[union-attr]
+
+        def mock_import(name: str, *args: Any, **kwargs: Any) -> Any:
+            if name == "redis":
+                raise ImportError("No module named 'redis'")
+            return original_import(name, *args, **kwargs)
+
+        monkeypatch.setattr("builtins.__import__", mock_import)
+        with pytest.raises(ImportError, match="selectools\\[cache\\]"):
+            mod.RedisCache()
