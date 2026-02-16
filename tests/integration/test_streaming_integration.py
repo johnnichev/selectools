@@ -15,12 +15,10 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 from typing import Any, AsyncGenerator, Generator
-from unittest.mock import MagicMock
 
 import pytest
 
 from selectools import Agent, AgentConfig, ConversationMemory, Message, Role, tool
-from selectools.providers.stubs import LocalProvider
 from tests.core.test_framework import FakeProvider
 
 

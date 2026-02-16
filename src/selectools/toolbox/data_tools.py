@@ -6,7 +6,7 @@ import csv
 import json
 from io import StringIO
 from pathlib import Path
-from typing import Generator, Optional
+from typing import Generator
 
 from ..tools import tool
 

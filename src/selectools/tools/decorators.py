@@ -4,20 +4,8 @@ Decorators for tool definition and registration.
 
 from __future__ import annotations
 
-import functools
 import inspect
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Type,
-    Union,
-    get_args,
-    get_origin,
-    get_type_hints,
-)
+from typing import Any, Callable, Dict, List, Optional, Union, get_args, get_origin, get_type_hints
 
 from .base import ParamMetadata, Tool, ToolParameter
 

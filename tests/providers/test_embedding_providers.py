@@ -10,8 +10,8 @@ Tests all 4 embedding providers:
 
 from __future__ import annotations
 
-from typing import Any, List, Optional, Type
-from unittest.mock import MagicMock, Mock, patch
+from typing import Any
+from unittest.mock import Mock, patch
 
 import pytest
 

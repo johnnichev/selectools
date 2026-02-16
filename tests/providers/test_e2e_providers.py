@@ -24,7 +24,6 @@ Required environment variables:
 
 from __future__ import annotations
 
-import asyncio
 import os
 import sys
 from pathlib import Path
@@ -38,7 +37,7 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from selectools import Agent, AgentConfig, Message, Role, Tool, ToolParameter, tool
+from selectools import Agent, AgentConfig, Message, Role, Tool, tool
 from selectools.memory import ConversationMemory
 
 # =============================================================================

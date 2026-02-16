@@ -19,10 +19,9 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 import selectools
-from agent import Agent, AgentConfig, Message, Role, Tool, ToolParameter
+from agent import Agent, AgentConfig, Message, Role, Tool
 from selectools.memory import ConversationMemory
 from selectools.providers.stubs import LocalProvider
-from selectools.tools import ToolRegistry
 
 
 @pytest.mark.asyncio

@@ -1,10 +1,9 @@
-import asyncio
-from typing import Any, AsyncGenerator, List, Tuple, Union
+from typing import AsyncGenerator, List, Tuple, Union
 
 import pytest
 
 from selectools.agent.core import Agent, AgentConfig
-from selectools.providers.base import Provider, ProviderError
+from selectools.providers.base import Provider
 from selectools.tools import tool
 from selectools.types import AgentResult, Message, Role, StreamChunk, ToolCall
 from selectools.usage import UsageStats

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from typing import Callable, Dict, List, Optional
+from typing import Dict, List
 
 from .agent import Agent, AgentConfig
 from .parser import ToolCallParser
@@ -21,7 +21,7 @@ from .providers.base import Provider
 from .providers.gemini_provider import GeminiProvider
 from .providers.openai_provider import OpenAIProvider
 from .providers.stubs import LocalProvider
-from .tools import Tool, ToolParameter, ToolRegistry
+from .tools import Tool, ToolRegistry
 from .types import Message, Role
 
 

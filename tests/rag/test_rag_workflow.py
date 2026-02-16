@@ -10,7 +10,7 @@ import os
 import tempfile
 from pathlib import Path
 from typing import Any, Generator, Tuple
-from unittest.mock import MagicMock, Mock
+from unittest.mock import Mock
 
 import pytest
 

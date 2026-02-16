@@ -35,14 +35,14 @@ __all__ = [
 
 # Reranker implementations are imported conditionally (optional dependencies)
 try:
-    from .reranker import CohereReranker
+    from .reranker import CohereReranker  # noqa: F401
 
     __all__.append("CohereReranker")
 except ImportError:
     pass
 
 try:
-    from .reranker import JinaReranker
+    from .reranker import JinaReranker  # noqa: F401
 
     __all__.append("JinaReranker")
 except ImportError:

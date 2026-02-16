@@ -19,13 +19,11 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any, Dict, List, Optional, Tuple
-from unittest.mock import MagicMock
+from typing import Any, List, Tuple
 
 import pytest
 
 from selectools import Agent, AgentConfig, Message, Role, tool
-from selectools.tools import Tool
 from selectools.types import ToolCall
 from selectools.usage import UsageStats
 

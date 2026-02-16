@@ -6,12 +6,12 @@ Tests the core RAG workflow without requiring external API calls.
 
 from __future__ import annotations
 
-from typing import Any, List
+from typing import List
 
 import pytest
 
 try:
-    import numpy as np
+    import numpy
 
     NUMPY_AVAILABLE = True
 except ImportError:

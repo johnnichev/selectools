@@ -8,13 +8,12 @@ from __future__ import annotations
 
 import os
 import tempfile
-from typing import Any, Dict, Generator, List
+from typing import Any, Dict, Generator
 from unittest.mock import Mock
 
-import numpy as np
 import pytest
 
-from selectools.rag import Document, VectorStore
+from selectools.rag import Document
 from selectools.rag.stores.memory import InMemoryVectorStore
 from selectools.rag.stores.sqlite import SQLiteVectorStore
 

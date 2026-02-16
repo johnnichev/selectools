@@ -5,7 +5,7 @@ All file operations are relative to the current working directory by default.
 """
 
 from pathlib import Path
-from typing import Generator, Optional
+from typing import Generator
 
 from ..tools import tool
 

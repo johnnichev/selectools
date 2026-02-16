@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import os
 import tempfile
-import types
 from pathlib import Path
 from typing import Generator
 
@@ -285,7 +284,7 @@ class TestDocumentLoaderFromPDF:
     def test_pdf_nonexistent_file(self) -> None:
         """Test error handling for missing PDF."""
         try:
-            from pypdf import PdfReader  # Check if pypdf is available
+            import pypdf  # noqa: F401
         except ImportError:
             pytest.skip("pypdf not installed")
 

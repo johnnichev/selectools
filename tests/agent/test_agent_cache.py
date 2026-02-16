@@ -3,15 +3,13 @@
 from __future__ import annotations
 
 from typing import Any, List, Optional, Tuple
-from unittest.mock import MagicMock
 
 import pytest
-import pytest_asyncio
 
 from selectools import Agent, AgentConfig, InMemoryCache
 from selectools.cache import CacheKeyBuilder
 from selectools.tools import Tool, ToolParameter
-from selectools.types import AgentResult, Message, Role, ToolCall
+from selectools.types import Message, Role, ToolCall
 from selectools.usage import UsageStats
 
 # ---------------------------------------------------------------------------

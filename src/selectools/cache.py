@@ -13,13 +13,12 @@ import json
 import threading
 import time
 from collections import OrderedDict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple, runtime_checkable
 
 if TYPE_CHECKING:
     from .tools.base import Tool
     from .types import Message
-    from .usage import UsageStats
 
 
 # ---------------------------------------------------------------------------

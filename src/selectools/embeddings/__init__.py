@@ -9,28 +9,28 @@ __all__ = [
 
 # Try to import optional embedding providers
 try:
-    from .openai import OpenAIEmbeddingProvider
+    from .openai import OpenAIEmbeddingProvider  # noqa: F401
 
     __all__.append("OpenAIEmbeddingProvider")
 except ImportError:
     pass
 
 try:
-    from .anthropic import AnthropicEmbeddingProvider
+    from .anthropic import AnthropicEmbeddingProvider  # noqa: F401
 
     __all__.append("AnthropicEmbeddingProvider")
 except ImportError:
     pass
 
 try:
-    from .gemini import GeminiEmbeddingProvider
+    from .gemini import GeminiEmbeddingProvider  # noqa: F401
 
     __all__.append("GeminiEmbeddingProvider")
 except ImportError:
     pass
 
 try:
-    from .cohere import CohereEmbeddingProvider
+    from .cohere import CohereEmbeddingProvider  # noqa: F401
 
     __all__.append("CohereEmbeddingProvider")
 except ImportError:

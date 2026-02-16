@@ -12,7 +12,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
-from .vector_store import Document, SearchResult
+from .vector_store import SearchResult
 
 logger = logging.getLogger(__name__)
 

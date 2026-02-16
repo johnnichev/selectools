@@ -16,13 +16,10 @@ import asyncio
 import inspect
 from pathlib import Path
 from typing import AsyncGenerator, Generator
-from unittest.mock import MagicMock
 
 import pytest
 
 from selectools import Agent, AgentConfig, Message, Role, Tool, ToolParameter, tool
-from selectools.analytics import AgentAnalytics
-from selectools.providers.stubs import LocalProvider
 from tests.core.test_framework import FakeProvider
 
 

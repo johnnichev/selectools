@@ -3,7 +3,7 @@ Text processing and manipulation tools.
 """
 
 import re
-from typing import List, Optional
+from typing import List
 
 from ..tools import tool
 

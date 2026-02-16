@@ -4,19 +4,18 @@ Tests for hybrid search combining vector and BM25 retrieval.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, List
 
 import pytest
 
 try:
-    import numpy as np
+    import numpy  # noqa: F401
 
     NUMPY_AVAILABLE = True
 except ImportError:
     NUMPY_AVAILABLE = False
 
 from selectools.rag import Document, SearchResult
-from selectools.rag.bm25 import BM25
 from selectools.rag.hybrid import FusionMethod, HybridSearcher
 
 

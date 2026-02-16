@@ -6,7 +6,7 @@ This provider doesn't call any external API and simply echoes user messages.
 
 from __future__ import annotations
 
-from typing import Any, AsyncGenerator, AsyncIterable, Iterable, List, Union
+from typing import Any, AsyncIterable, Iterable, List, Union
 
 from ..types import Message, Role, ToolCall
 from ..usage import UsageStats

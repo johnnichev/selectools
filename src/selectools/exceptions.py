@@ -9,7 +9,7 @@ These exceptions provide PyTorch-style error messages with:
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 
 class SelectoolsError(Exception):

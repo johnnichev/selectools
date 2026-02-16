@@ -13,13 +13,11 @@ To run them: pytest --run-e2e tests/test_agent_e2e.py
 from __future__ import annotations
 
 import os
-from typing import Any
 
 import pytest
 
 from selectools import Agent, AgentConfig, AgentResult, Message, Role, tool
 from selectools.providers.openai_provider import OpenAIProvider
-from selectools.providers.stubs import LocalProvider
 
 # Helper to skip if not running E2E
 pytestmark = pytest.mark.e2e

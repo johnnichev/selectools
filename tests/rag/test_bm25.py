@@ -4,8 +4,6 @@ Tests for BM25 keyword search engine.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
-
 import pytest
 
 from selectools.rag import Document

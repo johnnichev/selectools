@@ -7,13 +7,13 @@ without requiring external API keys.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 try:
-    import numpy as np
+    import numpy
 
     NUMPY_AVAILABLE = True
 except ImportError:

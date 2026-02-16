@@ -8,10 +8,9 @@ See: https://ai.google.dev/gemini-api/docs/migrate
 from __future__ import annotations
 
 import base64
-import json
 import os
 import uuid
-from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, Iterable, List, Union, cast
+from typing import TYPE_CHECKING, Any, AsyncIterable, Iterable, List, Union
 
 if TYPE_CHECKING:
     from ..tools.base import Tool

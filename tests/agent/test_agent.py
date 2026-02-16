@@ -23,7 +23,6 @@ if str(SRC_DIR) not in sys.path:
 from agent import Agent, AgentConfig, Message, Role, Tool, ToolParameter
 from selectools import AgentResult, UsageStats
 from selectools.memory import ConversationMemory
-from selectools.types import ToolCall
 
 # ---------------------------------------------------------------------------
 # Helpers
