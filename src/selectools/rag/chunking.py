@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Callable, List, Optional
+import math
+import re
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from .vector_store import Document
+
+if TYPE_CHECKING:
+    from ..embeddings.provider import EmbeddingProvider
+    from ..providers.base import Provider
 
 
 class TextSplitter:
@@ -261,4 +267,269 @@ class RecursiveTextSplitter(TextSplitter):
         return final_chunks
 
 
-__all__ = ["TextSplitter", "RecursiveTextSplitter"]
+def _split_into_sentences(text: str) -> List[str]:
+    """Split text into sentences using a simple regex heuristic.
+
+    Handles common abbreviations and decimal numbers to avoid false splits.
+    """
+    sentence_endings = re.compile(r'(?<=[.!?])\s+(?=[A-Z"\'(\[])')
+    sentences = sentence_endings.split(text)
+    return [s.strip() for s in sentences if s.strip()]
+
+
+def _cosine_similarity(a: List[float], b: List[float]) -> float:
+    """Compute cosine similarity between two vectors without numpy."""
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = math.sqrt(sum(x * x for x in a))
+    norm_b = math.sqrt(sum(x * x for x in b))
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
+class SemanticChunker:
+    """
+    Split documents at semantic boundaries using embedding similarity.
+
+    Instead of fixed-size windows, SemanticChunker groups consecutive sentences
+    whose embeddings are similar, and splits when the similarity drops below a
+    threshold.  This produces chunks that respect topic boundaries.
+
+    Requires an ``EmbeddingProvider`` to compute sentence embeddings.
+
+    Example:
+        >>> from selectools.embeddings import OpenAIEmbeddingProvider
+        >>> from selectools.rag import SemanticChunker, Document
+        >>>
+        >>> embedder = OpenAIEmbeddingProvider()
+        >>> chunker = SemanticChunker(embedder, similarity_threshold=0.75)
+        >>> docs = [Document(text="Long multi-topic text...")]
+        >>> chunks = chunker.split_documents(docs)
+    """
+
+    def __init__(
+        self,
+        embedder: "EmbeddingProvider",
+        similarity_threshold: float = 0.75,
+        min_chunk_sentences: int = 1,
+        max_chunk_sentences: int = 50,
+    ) -> None:
+        """Initialize the semantic chunker.
+
+        Args:
+            embedder: Embedding provider for computing sentence vectors.
+            similarity_threshold: Cosine similarity below which a new chunk starts
+                (range 0.0-1.0, default 0.75).
+            min_chunk_sentences: Minimum sentences per chunk (default 1).
+            max_chunk_sentences: Maximum sentences before forcing a split (default 50).
+        """
+        if similarity_threshold < 0.0 or similarity_threshold > 1.0:
+            raise ValueError("similarity_threshold must be between 0.0 and 1.0")
+        if min_chunk_sentences < 1:
+            raise ValueError("min_chunk_sentences must be at least 1")
+        if max_chunk_sentences < min_chunk_sentences:
+            raise ValueError("max_chunk_sentences must be >= min_chunk_sentences")
+
+        self.embedder = embedder
+        self.similarity_threshold = similarity_threshold
+        self.min_chunk_sentences = min_chunk_sentences
+        self.max_chunk_sentences = max_chunk_sentences
+
+    def split_text(self, text: str) -> List[str]:
+        """
+        Split text into semantically coherent chunks.
+
+        Args:
+            text: Input text to split.
+
+        Returns:
+            List of text chunks split at topic boundaries.
+        """
+        if not text or not text.strip():
+            return []
+
+        sentences = _split_into_sentences(text)
+        if len(sentences) <= 1:
+            return [text.strip()] if text.strip() else []
+
+        embeddings = self.embedder.embed_texts(sentences)
+
+        chunks: List[str] = []
+        current_group: List[str] = [sentences[0]]
+
+        for i in range(1, len(sentences)):
+            sim = _cosine_similarity(embeddings[i - 1], embeddings[i])
+            at_max = len(current_group) >= self.max_chunk_sentences
+            below_threshold = (
+                sim < self.similarity_threshold and len(current_group) >= self.min_chunk_sentences
+            )
+
+            if at_max or below_threshold:
+                chunks.append(" ".join(current_group))
+                current_group = [sentences[i]]
+            else:
+                current_group.append(sentences[i])
+
+        if current_group:
+            chunks.append(" ".join(current_group))
+
+        return chunks
+
+    def split_documents(self, documents: List[Document]) -> List[Document]:
+        """
+        Split documents into semantically coherent chunked documents.
+
+        Args:
+            documents: List of documents to split.
+
+        Returns:
+            List of chunked documents with preserved and enriched metadata.
+        """
+        chunked: List[Document] = []
+        for doc in documents:
+            text_chunks = self.split_text(doc.text)
+            for i, chunk in enumerate(text_chunks):
+                metadata = doc.metadata.copy()
+                metadata["chunk"] = i
+                metadata["total_chunks"] = len(text_chunks)
+                metadata["chunker"] = "semantic"
+                chunked.append(Document(text=chunk, metadata=metadata))
+        return chunked
+
+
+class ContextualChunker:
+    """
+    Wrap any chunker and prepend LLM-generated context to each chunk.
+
+    Inspired by Anthropic's *Contextual Retrieval* technique: for every chunk,
+    an LLM generates a short situating description using the **full** document as
+    context.  The description is prepended to the chunk text so that the
+    embedding (and later retrieval) captures the chunk's role within the
+    document.
+
+    The underlying splitting can be any object with a ``split_documents``
+    method (``TextSplitter``, ``RecursiveTextSplitter``, ``SemanticChunker``).
+
+    Example:
+        >>> from selectools.rag import ContextualChunker, RecursiveTextSplitter
+        >>> from selectools import OpenAIProvider
+        >>>
+        >>> base = RecursiveTextSplitter(chunk_size=1000, chunk_overlap=200)
+        >>> provider = OpenAIProvider()
+        >>> chunker = ContextualChunker(base_chunker=base, provider=provider)
+        >>> docs = [Document(text="Full document text...")]
+        >>> enriched = chunker.split_documents(docs)
+    """
+
+    _DEFAULT_PROMPT = (
+        "Document:\n<document>\n{document}\n</document>\n\n"
+        "Chunk:\n<chunk>\n{chunk}\n</chunk>\n\n"
+        "Give a short (1-2 sentence) description that situates this chunk "
+        "within the overall document for search and retrieval purposes. "
+        "Respond ONLY with the description, nothing else."
+    )
+
+    def __init__(
+        self,
+        base_chunker: Any,
+        provider: "Provider",
+        model: str = "gpt-4o-mini",
+        prompt_template: Optional[str] = None,
+        max_document_chars: int = 50_000,
+        context_prefix: str = "[Context] ",
+    ) -> None:
+        """Initialize the contextual chunker.
+
+        Args:
+            base_chunker: Underlying chunker with a ``split_documents`` method
+                (e.g. ``RecursiveTextSplitter``, ``SemanticChunker``).
+            provider: LLM provider for generating chunk context descriptions.
+            model: Model to use for context generation (default ``"gpt-4o-mini"``).
+            prompt_template: Custom prompt with ``{document}`` and ``{chunk}``
+                placeholders.  Falls back to a sensible default.
+            max_document_chars: Truncate the full document to this many chars
+                before inserting into the prompt (default 50 000).
+            context_prefix: Prefix prepended before the generated context line
+                (default ``"[Context] "``).
+        """
+        if not hasattr(base_chunker, "split_documents"):
+            raise TypeError("base_chunker must have a split_documents(documents) method")
+
+        self.base_chunker = base_chunker
+        self.provider = provider
+        self.model = model
+        self.prompt_template = prompt_template or self._DEFAULT_PROMPT
+        self.max_document_chars = max_document_chars
+        self.context_prefix = context_prefix
+
+    def split_documents(self, documents: List[Document]) -> List[Document]:
+        """Split documents and enrich each chunk with LLM-generated context.
+
+        Args:
+            documents: List of documents to split and enrich.
+
+        Returns:
+            List of contextually enriched chunked documents.
+        """
+        from ..types import Message, Role
+
+        doc_text_map: Dict[int, str] = {}
+        for idx, doc in enumerate(documents):
+            doc_text_map[idx] = doc.text
+
+        all_base_chunks: List[Document] = []
+        chunk_origins: List[int] = []
+        for idx, doc in enumerate(documents):
+            chunks = self.base_chunker.split_documents([doc])
+            all_base_chunks.extend(chunks)
+            chunk_origins.extend([idx] * len(chunks))
+
+        enriched: List[Document] = []
+        for chunk_doc, origin_idx in zip(all_base_chunks, chunk_origins):
+            full_text = doc_text_map[origin_idx]
+            truncated_doc = full_text[: self.max_document_chars]
+
+            prompt = self.prompt_template.format(
+                document=truncated_doc,
+                chunk=chunk_doc.text,
+            )
+
+            response_msg, _ = self.provider.complete(
+                model=self.model,
+                system_prompt="You are a concise technical writer.",
+                messages=[Message(role=Role.USER, content=prompt)],
+                tools=[],
+                temperature=0.0,
+            )
+
+            context_line = response_msg.content.strip()
+            enriched_text = f"{self.context_prefix}{context_line}\n\n{chunk_doc.text}"
+
+            metadata = chunk_doc.metadata.copy()
+            metadata["context"] = context_line
+            metadata["chunker"] = "contextual"
+
+            enriched.append(Document(text=enriched_text, metadata=metadata))
+
+        return enriched
+
+    def split_text(self, text: str) -> List[str]:
+        """
+        Convenience: wrap text in a Document, split, return text chunks.
+
+        Args:
+            text: Raw text to split and enrich.
+
+        Returns:
+            List of contextually enriched text chunks.
+        """
+        docs = self.split_documents([Document(text=text)])
+        return [d.text for d in docs]
+
+
+__all__ = [
+    "TextSplitter",
+    "RecursiveTextSplitter",
+    "SemanticChunker",
+    "ContextualChunker",
+]

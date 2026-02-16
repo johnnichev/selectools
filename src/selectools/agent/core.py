@@ -122,6 +122,101 @@ class Agent:
         self._system_prompt = self.prompt_builder.build(self.tools)
         self._history: List[Message] = []
 
+    # ------------------------------------------------------------------
+    # Dynamic tool management
+    # ------------------------------------------------------------------
+
+    def add_tool(self, tool: Tool) -> None:
+        """
+        Add a tool to the agent at runtime.
+
+        The system prompt is rebuilt to include the new tool's schema so that
+        the LLM can immediately use it in subsequent iterations.
+
+        Args:
+            tool: Tool instance to add.
+
+        Raises:
+            ValueError: If a tool with the same name already exists.
+        """
+        if tool.name in self._tools_by_name:
+            raise ValueError(
+                f"Tool '{tool.name}' already exists. " f"Use replace_tool() to update it."
+            )
+        self.tools.append(tool)
+        self._tools_by_name[tool.name] = tool
+        self._system_prompt = self.prompt_builder.build(self.tools)
+
+    def add_tools(self, tools: List[Tool]) -> None:
+        """
+        Add multiple tools to the agent at runtime.
+
+        Args:
+            tools: List of Tool instances to add.
+
+        Raises:
+            ValueError: If any tool name already exists.
+        """
+        for t in tools:
+            if t.name in self._tools_by_name:
+                raise ValueError(
+                    f"Tool '{t.name}' already exists. " f"Use replace_tool() to update it."
+                )
+        for t in tools:
+            self.tools.append(t)
+            self._tools_by_name[t.name] = t
+        self._system_prompt = self.prompt_builder.build(self.tools)
+
+    def remove_tool(self, tool_name: str) -> Tool:
+        """
+        Remove a tool from the agent by name.
+
+        Args:
+            tool_name: Name of the tool to remove.
+
+        Returns:
+            The removed Tool instance.
+
+        Raises:
+            KeyError: If no tool with that name exists.
+            ValueError: If removing would leave the agent with zero tools.
+        """
+        if tool_name not in self._tools_by_name:
+            raise KeyError(
+                f"Tool '{tool_name}' not found. "
+                f"Available: {', '.join(self._tools_by_name.keys())}"
+            )
+        if len(self.tools) <= 1:
+            raise ValueError("Agent requires at least one tool.")
+
+        removed = self._tools_by_name.pop(tool_name)
+        self.tools = [t for t in self.tools if t.name != tool_name]
+        self._system_prompt = self.prompt_builder.build(self.tools)
+        return removed
+
+    def replace_tool(self, tool: Tool) -> Optional[Tool]:
+        """
+        Replace an existing tool with an updated version (same or new name).
+
+        If a tool with the given name already exists it is swapped out;
+        otherwise the tool is simply added.
+
+        Args:
+            tool: The new Tool instance.
+
+        Returns:
+            The old Tool instance that was replaced, or ``None`` if no tool
+            with that name existed.
+        """
+        old = self._tools_by_name.get(tool.name)
+        if old is not None:
+            self.tools = [t if t.name != tool.name else tool for t in self.tools]
+        else:
+            self.tools.append(tool)
+        self._tools_by_name[tool.name] = tool
+        self._system_prompt = self.prompt_builder.build(self.tools)
+        return old
+
     def reset(self) -> None:
         """Reset agent state for reuse. Clears history, usage stats, and memory."""
         self._history = []

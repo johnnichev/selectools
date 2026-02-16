@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, List, Optional
 
 from .bm25 import BM25
-from .chunking import RecursiveTextSplitter, TextSplitter
+from .chunking import ContextualChunker, RecursiveTextSplitter, SemanticChunker, TextSplitter
 from .hybrid import FusionMethod, HybridSearcher
 from .loaders import DocumentLoader
 from .reranker import Reranker
@@ -23,6 +23,8 @@ __all__ = [
     "DocumentLoader",
     "TextSplitter",
     "RecursiveTextSplitter",
+    "SemanticChunker",
+    "ContextualChunker",
     "RAGTool",
     "SemanticSearchTool",
     "HybridSearchTool",

@@ -72,9 +72,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Works with both RRF and weighted fusion strategies
   - Reranker receives the full fused candidate pool for maximum recall
 
+### Added - Advanced Chunking
+
+#### Semantic Chunker
+
+- **`SemanticChunker`** - Splits documents at topic boundaries using embedding similarity
+  - Groups consecutive sentences whose embeddings have cosine similarity above a threshold
+  - Configurable `similarity_threshold` (0.0-1.0, default 0.75), `min_chunk_sentences`, and `max_chunk_sentences`
+  - Uses any `EmbeddingProvider` for computing sentence vectors
+  - Pure-Python cosine similarity (zero numpy dependency)
+  - Produces chunks aligned with natural topic shifts instead of fixed character windows
+  - `split_text()` and `split_documents()` API matching existing chunkers
+
+#### Contextual Chunker
+
+- **`ContextualChunker`** - Wraps any chunker and enriches each chunk with LLM-generated context
+  - Inspired by Anthropic's *Contextual Retrieval* technique
+  - For each chunk, generates a 1-2 sentence situating description using the full document as context
+  - Prepends the context to the chunk text to improve embedding quality and retrieval relevance
+  - Composable: works with `TextSplitter`, `RecursiveTextSplitter`, `SemanticChunker`, or any object with `split_documents()`
+  - Configurable `prompt_template`, `model`, `max_document_chars`, and `context_prefix`
+  - Stores generated context in `metadata["context"]` for downstream access
+
+### Added - Dynamic Tool Loading
+
+#### Tool Loader
+
+- **`ToolLoader`** - Discover and load `@tool`-decorated functions from Python modules and directories
+  - `from_module(module_path)` - Import a dotted module path and collect all `Tool` objects
+  - `from_file(file_path)` - Load a single `.py` file and collect all `Tool` objects
+  - `from_directory(directory)` - Scan a directory for `.py` files and load tools (optional `recursive` and `exclude`)
+  - `reload_module(module_path)` / `reload_file(file_path)` - Hot-reload tools after code changes
+  - Skips private files (names starting with `_`) by default
+
+#### Agent Dynamic Tool Management
+
+- **`Agent.add_tool(tool)`** - Add a tool at runtime; rebuilds system prompt
+- **`Agent.add_tools(tools)`** - Batch add multiple tools
+- **`Agent.remove_tool(tool_name)`** - Remove a tool by name; validates at least one remains
+- **`Agent.replace_tool(tool)`** - Swap an existing tool with an updated version (or add if new)
+- All methods rebuild the system prompt so the LLM immediately sees the updated tool set
+
 ### Changed
 
-- `selectools.rag` now exports `BM25`, `HybridSearcher`, `FusionMethod`, `HybridSearchTool`, `Reranker`, `CohereReranker`, and `JinaReranker`
+- `selectools.rag` now exports `BM25`, `HybridSearcher`, `FusionMethod`, `HybridSearchTool`, `Reranker`, `CohereReranker`, `JinaReranker`, `SemanticChunker`, and `ContextualChunker`
+- `selectools.tools` now exports `ToolLoader`
 - `HybridSearcher.__init__` accepts new optional `reranker` parameter
 
 ---

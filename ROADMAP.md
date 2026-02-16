@@ -47,30 +47,59 @@ Focus: E2E streaming, parallel execution, and type safety.
 
 ---
 
-## v0.12.0: Caching & Data (In Progress)
+## v0.12.0: Caching & Data (Complete)
 
 Focus: Response caching and advanced RAG capabilities.
 
-| Feature                  | Status     | Notes                                                                  |
-| ------------------------ | ---------- | ---------------------------------------------------------------------- |
-| **Response Caching**     | ✅ v0.12.0 | `InMemoryCache` (LRU+TTL) and `RedisCache`; `AgentConfig(cache=...)`   |
-| **Hybrid Search**        | ✅ v0.12.x | `BM25` + `HybridSearcher` with RRF/weighted fusion; `HybridSearchTool` |
-| **Reranking Models**     | ✅ v0.12.x | `CohereReranker` + `JinaReranker`; `HybridSearcher(reranker=...)`      |
-| **Advanced Chunking**    | 🟡 Planned | Agentic/Contextual document chunking                                   |
-| **Dynamic Tool Loading** | 🟡 Planned | Hot-reload tools without restart                                       |
+| Feature                  | Status     | Notes                                                                      |
+| ------------------------ | ---------- | -------------------------------------------------------------------------- |
+| **Response Caching**     | ✅ v0.12.0 | `InMemoryCache` (LRU+TTL) and `RedisCache`; `AgentConfig(cache=...)`       |
+| **Hybrid Search**        | ✅ v0.12.x | `BM25` + `HybridSearcher` with RRF/weighted fusion; `HybridSearchTool`     |
+| **Reranking Models**     | ✅ v0.12.x | `CohereReranker` + `JinaReranker`; `HybridSearcher(reranker=...)`          |
+| **Advanced Chunking**    | ✅ v0.12.x | `SemanticChunker` (embedding similarity) + `ContextualChunker` (LLM context) |
+| **Dynamic Tool Loading** | ✅ v0.12.x | `ToolLoader` + `Agent.add_tool/remove_tool/replace_tool`; hot-reload       |
+
+---
+
+## v0.13.0: Safety & Agent Control (Next)
+
+Focus: Tool execution safety, policy enforcement, and human oversight.
+See [FEATURE_PROPOSALS.md](./FEATURE_PROPOSALS.md) for detailed designs.
+
+| Feature                               | Priority  | Impact | Description                                                                     |
+| ------------------------------------- | --------- | ------ | ------------------------------------------------------------------------------- |
+| **Tool-Pair-Aware Trimming**          | 🟡 High   | High   | Never split `tool_use`/`tool_result` pairs during conversation trimming         |
+| **Tool Policy Engine**                | 🟡 High   | High   | Declarative allow/review/deny rules with glob patterns and arg-level conditions |
+| **Human-in-the-Loop Approval**        | 🟡 High   | High   | Confirmation callback for `review`-flagged tools; async support + timeout       |
+
+---
+
+## v0.14.0: Memory & Persistence
+
+Focus: Durable conversation state and cross-session knowledge.
+See [FEATURE_PROPOSALS.md](./FEATURE_PROPOSALS.md) for detailed designs.
+
+| Feature                            | Priority  | Impact | Description                                                                  |
+| ---------------------------------- | --------- | ------ | ---------------------------------------------------------------------------- |
+| **Persistent Conversation Sessions** | 🟡 High | High   | `SessionStore` protocol with JSON file, SQLite, and Redis backends; auto-save + TTL |
+| **Summarize-on-Trim**               | 🟡 Medium | Medium | LLM-generated summary replaces trimmed messages instead of silent drop       |
+| **Cross-Session Knowledge Memory**   | 🟡 Medium | Medium | Daily log + long-term `MEMORY.md`; built-in `remember` tool; system prompt injection |
 
 ---
 
 ## v1.0.0: Enterprise Reliability (Future)
 
-Focus: Stability, observability, and advanced orchestration.
+Focus: Stability, observability, security hardening, and advanced orchestration.
 
-| Feature                     | Priority  | Impact | Description                                                          |
-| --------------------------- | --------- | ------ | -------------------------------------------------------------------- | --- |
-| **Retry Policies**          | 🟡 Medium | Medium | Declarative retries (exponential backoff) on tool definitions        |
-| **Provider Fallback Chain** | 🟡 Medium | High   | Auto-switch providers on failure (OpenAI → Anthropic → Local)        |
-| **Tool Middleware**         | 🟡 Medium | Medium | Cross-cutting concerns (auth, rate limiting) via middleware pipeline |     |
-| **Circuit Breakers**        | 🟡 Medium | High   | Stop cascading failures when downstream services are down            |
+| Feature                     | Priority  | Impact | Description                                                                  |
+| --------------------------- | --------- | ------ | ---------------------------------------------------------------------------- |
+| **Retry Policies**          | 🟡 Medium | Medium | Declarative retries (exponential backoff) on tool definitions                |
+| **Provider Fallback Chain** | 🟡 Medium | High   | Auto-switch providers on failure (OpenAI → Anthropic → Local)                |
+| **Tool Middleware**         | 🟡 Medium | Medium | Cross-cutting concerns (auth, rate limiting) via middleware pipeline          |
+| **Circuit Breakers**        | 🟡 Medium | High   | Stop cascading failures when downstream services are down                    |
+| **Audit Logging**           | 🟡 Medium | Medium | JSONL append-only log with privacy controls (hashed inputs, arg keys only)   |
+| **Tool Output Screening**   | 🟡 Medium | Medium | Detect prompt injection in tool results before feeding back to LLM           |
+| **Coherence Checking**      | 🟡 Medium | Medium | Verify tool calls match user's original intent to prevent injection hijacking |
 
 ---
 
@@ -83,21 +112,13 @@ Focus: Stability, observability, and advanced orchestration.
 | Parallel Tool Execution | ✅ Implemented | `asyncio.gather` / `ThreadPoolExecutor` |
 | Tool Composition        | 🟡 Planned     | `@compose` decorator                    |
 
-### Context Management
-
-| Feature                              | Status     | Notes                           |
-| ------------------------------------ | ---------- | ------------------------------- |
-| Automatic Conversation Summarization | 🟡 Planned | Handle long conversations       |
-| Sliding Window with Smart Retention  | 🟡 Planned | Keep important context          |
-| Multi-Turn Memory System             | 🟡 Planned | Persistent cross-session memory |
-
 ### Tool Capabilities
 
-| Feature                   | Status     | Notes                     |
-| ------------------------- | ---------- | ------------------------- |
-| Dynamic Tool Loading      | 🟡 Planned | Hot-reload tools          |
-| Tool Usage Analytics      | ✅ v0.6.0  | Track performance metrics |
-| Tool Marketplace/Registry | 🟡 Planned | Community tool sharing    |
+| Feature                   | Status         | Notes                                                       |
+| ------------------------- | -------------- | ----------------------------------------------------------- |
+| Dynamic Tool Loading      | ✅ Implemented | `ToolLoader` + `Agent.add_tool/remove_tool/replace_tool`    |
+| Tool Usage Analytics      | ✅ v0.6.0      | Track performance metrics                                   |
+| Tool Marketplace/Registry | 🟡 Planned     | Community tool sharing                                      |
 
 ### Provider Enhancements
 
@@ -116,7 +137,6 @@ Focus: Stability, observability, and advanced orchestration.
 | Advanced Error Recovery   | 🟡 Planned | Circuit breaker, graceful degradation |
 | Observability & Debugging | 🟡 Planned | OpenTelemetry, execution replay       |
 | Rate Limiting & Quotas    | 🟡 Planned | Per-tool and user quotas              |
-| Security Hardening        | 🟡 Planned | Sandboxing, audit logging             |
 
 ### Developer Experience
 
@@ -148,7 +168,7 @@ Focus: Stability, observability, and advanced orchestration.
 
 ## Release History
 
-### v0.12.x - Hybrid Search & Reranking
+### v0.12.x - Hybrid Search, Reranking, Advanced Chunking & Dynamic Tools
 
 - ✅ **BM25**: Pure-Python Okapi BM25 keyword search; configurable k1/b; stop word removal; zero dependencies
 - ✅ **HybridSearcher**: Vector + BM25 fusion via RRF or weighted linear combination
@@ -158,6 +178,10 @@ Focus: Stability, observability, and advanced orchestration.
 - ✅ **CohereReranker**: Cohere Rerank API v2 (`rerank-v3.5` default)
 - ✅ **JinaReranker**: Jina AI Rerank API (`jina-reranker-v2-base-multilingual` default)
 - ✅ **HybridSearcher integration**: Optional `reranker=` param for post-fusion re-scoring
+- ✅ **SemanticChunker**: Embedding-based topic-boundary splitting; cosine similarity threshold
+- ✅ **ContextualChunker**: LLM-generated context prepended to each chunk (Anthropic-style contextual retrieval)
+- ✅ **ToolLoader**: Discover `@tool` functions from modules, files, and directories; hot-reload support
+- ✅ **Agent dynamic tools**: `add_tool`, `add_tools`, `remove_tool`, `replace_tool` with prompt rebuild
 
 ### v0.12.0 - Response Caching
 
