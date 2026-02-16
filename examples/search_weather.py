@@ -10,7 +10,7 @@ import argparse
 import json
 from typing import List
 
-from selectools import Agent, AgentConfig, Message, Role, ToolRegistry, tool
+from selectools import Agent, AgentConfig, Message, Role, ToolRegistry
 from selectools.parser import ToolCallParser
 from selectools.prompt import PromptBuilder
 from selectools.providers.stubs import LocalProvider
