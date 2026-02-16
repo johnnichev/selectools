@@ -5,6 +5,80 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added - Hybrid Search (Vector + BM25)
+
+#### BM25 Keyword Search Engine
+
+- **`BM25`** - Pure-Python Okapi BM25 keyword search with zero external dependencies
+  - Standard BM25 scoring with configurable `k1` (term frequency saturation) and `b` (length normalisation) parameters
+  - Built-in English stop word removal (configurable)
+  - Regex-based tokenization with lowercase normalisation
+  - Incremental indexing via `add_documents()` or full rebuild via `index_documents()`
+  - Metadata filtering support matching the `VectorStore.search()` interface
+  - Returns `SearchResult` objects for full compatibility with existing RAG tools
+
+#### Hybrid Searcher
+
+- **`HybridSearcher`** - Combines vector (semantic) and BM25 (keyword) retrieval with score fusion
+  - **Reciprocal Rank Fusion (RRF)** - Default fusion strategy; rank-based, no score normalisation needed
+  - **Weighted Linear Combination** - Alternative fusion with min-max normalised scores
+  - Configurable `vector_weight` and `keyword_weight` for tuning semantic vs keyword balance
+  - Automatic deduplication of documents appearing in both result sets
+  - Configurable candidate pool sizes (`vector_top_k`, `keyword_top_k`) for fusion quality
+  - `add_documents()` forwards to both vector store and BM25 index
+  - `index_existing_documents()` for building BM25 index from pre-populated vector stores
+  - Metadata filtering applied to both retrievers
+- **`FusionMethod`** enum - `RRF` and `WEIGHTED` fusion strategies
+
+#### Agent Integration
+
+- **`HybridSearchTool`** - Pre-built `@tool`-decorated search for agent integration
+  - `search_knowledge_base(query)` returns formatted context with source attribution
+  - `search(query, filter)` returns structured `SearchResult` list
+  - Configurable `score_threshold`, `top_k`, and `include_scores`
+  - Drop-in replacement for `RAGTool` with better recall for exact terms, names, and acronyms
+
+### Added - Reranking Models
+
+#### Reranker Protocol
+
+- **`Reranker`** - Abstract base class for all reranker implementations
+  - `rerank(query, results, top_k)` re-scores candidates using a cross-encoder model
+  - Replaces fusion scores with cross-encoder relevance scores for better precision
+  - Returns `SearchResult` objects preserving original document references and metadata
+
+#### Cohere Reranker
+
+- **`CohereReranker`** - Reranker using the Cohere Rerank API v2
+  - Uses `cohere.ClientV2.rerank()` with model `rerank-v3.5` (default)
+  - Supports `top_n` for server-side result limiting
+  - API key via constructor or `COHERE_API_KEY` environment variable
+  - Requires `cohere>=5.0.0` (already in `selectools[rag]`)
+
+#### Jina Reranker
+
+- **`JinaReranker`** - Reranker using the Jina AI Rerank API
+  - Calls `POST /v1/rerank` via HTTP (uses `requests`, no extra SDK)
+  - Default model: `jina-reranker-v2-base-multilingual`
+  - Supports `top_n` for server-side result limiting
+  - API key via constructor or `JINA_API_KEY` environment variable
+
+#### HybridSearcher Integration
+
+- **`HybridSearcher(reranker=...)`** - Optional reranker applied as a post-fusion step
+  - Fused candidates are re-scored before the final `top_k` cut
+  - Works with both RRF and weighted fusion strategies
+  - Reranker receives the full fused candidate pool for maximum recall
+
+### Changed
+
+- `selectools.rag` now exports `BM25`, `HybridSearcher`, `FusionMethod`, `HybridSearchTool`, `Reranker`, `CohereReranker`, and `JinaReranker`
+- `HybridSearcher.__init__` accepts new optional `reranker` parameter
+
+---
+
 ## [0.12.0] - 2026-02-15
 
 ### Added - Response Caching

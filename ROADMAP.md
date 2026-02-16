@@ -27,10 +27,10 @@ Recent major improvements focusing on agent control and reliability (Agent v0.9)
 
 Focus: Fixing architectural limitations and enabling production scaling.
 
-| Feature                         | Status     | Impact | Description                                                    |
-| ------------------------------- | ---------- | ------ | -------------------------------------------------------------- |
-| **Native Function Calling**     | ✅ v0.10.0 | High   | Use OpenAI/Anthropic/Gemini native tool APIs instead of regex parsing |
-| **Context Propagation (Async)** | ✅ v0.10.0 | High   | `contextvars.copy_context()` for tracing/auth in async tools   |
+| Feature                         | Status     | Impact | Description                                                              |
+| ------------------------------- | ---------- | ------ | ------------------------------------------------------------------------ |
+| **Native Function Calling**     | ✅ v0.10.0 | High   | Use OpenAI/Anthropic/Gemini native tool APIs instead of regex parsing    |
+| **Context Propagation (Async)** | ✅ v0.10.0 | High   | `contextvars.copy_context()` for tracing/auth in async tools             |
 | **Select-Only / Routing Mode**  | ✅ v0.10.0 | High   | Run agent for classification/routing without executing the selected tool |
 
 ---
@@ -39,11 +39,11 @@ Focus: Fixing architectural limitations and enabling production scaling.
 
 Focus: E2E streaming, parallel execution, and type safety.
 
-| Feature                         | Status     | Notes                                                                  |
-| ------------------------------- | ---------- | ---------------------------------------------------------------------- |
-| **E2E Streaming Response**      | ✅ v0.11.0 | Native tool streaming via `Agent.astream` with `Union[str, ToolCall]` provider protocol |
-| **Parallel Tool Execution**     | ✅ v0.11.0 | `asyncio.gather` for async, `ThreadPoolExecutor` for sync; `AgentConfig(parallel_tool_execution=True)` |
-| **Full Type Safety**            | ✅ v0.11.0 | 0 mypy errors across all source and test files; `disallow_untyped_defs` enforced |
+| Feature                     | Status     | Notes                                                                                                  |
+| --------------------------- | ---------- | ------------------------------------------------------------------------------------------------------ |
+| **E2E Streaming Response**  | ✅ v0.11.0 | Native tool streaming via `Agent.astream` with `Union[str, ToolCall]` provider protocol                |
+| **Parallel Tool Execution** | ✅ v0.11.0 | `asyncio.gather` for async, `ThreadPoolExecutor` for sync; `AgentConfig(parallel_tool_execution=True)` |
+| **Full Type Safety**        | ✅ v0.11.0 | 0 mypy errors across all source and test files; `disallow_untyped_defs` enforced                       |
 
 ---
 
@@ -51,13 +51,13 @@ Focus: E2E streaming, parallel execution, and type safety.
 
 Focus: Response caching and advanced RAG capabilities.
 
-| Feature                      | Status     | Notes                                                                  |
-| ---------------------------- | ---------- | ---------------------------------------------------------------------- |
-| **Response Caching**         | ✅ v0.12.0 | `InMemoryCache` (LRU+TTL) and `RedisCache`; `AgentConfig(cache=...)` |
-| **Hybrid Search**            | 🟡 Planned | Vector + BM25 keyword search                                           |
-| **Reranking Models**         | 🟡 Planned | Cohere/Jina rerankers for better search relevance                      |
-| **Advanced Chunking**        | 🟡 Planned | Agentic/Contextual document chunking                                   |
-| **Dynamic Tool Loading**     | 🟡 Planned | Hot-reload tools without restart                                       |
+| Feature                  | Status     | Notes                                                                  |
+| ------------------------ | ---------- | ---------------------------------------------------------------------- |
+| **Response Caching**     | ✅ v0.12.0 | `InMemoryCache` (LRU+TTL) and `RedisCache`; `AgentConfig(cache=...)`   |
+| **Hybrid Search**        | ✅ v0.12.x | `BM25` + `HybridSearcher` with RRF/weighted fusion; `HybridSearchTool` |
+| **Reranking Models**     | ✅ v0.12.x | `CohereReranker` + `JinaReranker`; `HybridSearcher(reranker=...)`      |
+| **Advanced Chunking**    | 🟡 Planned | Agentic/Contextual document chunking                                   |
+| **Dynamic Tool Loading** | 🟡 Planned | Hot-reload tools without restart                                       |
 
 ---
 
@@ -66,11 +66,10 @@ Focus: Response caching and advanced RAG capabilities.
 Focus: Stability, observability, and advanced orchestration.
 
 | Feature                     | Priority  | Impact | Description                                                          |
-| --------------------------- | --------- | ------ | -------------------------------------------------------------------- |
+| --------------------------- | --------- | ------ | -------------------------------------------------------------------- | --- |
 | **Retry Policies**          | 🟡 Medium | Medium | Declarative retries (exponential backoff) on tool definitions        |
 | **Provider Fallback Chain** | 🟡 Medium | High   | Auto-switch providers on failure (OpenAI → Anthropic → Local)        |
-| **Tool Middleware**         | 🟡 Medium | Medium | Cross-cutting concerns (auth, rate limiting) via middleware pipeline |
-| **Azure OpenAI Provider**   | 🟡 Medium | Medium | Enterprise-grade Azure deployment integration                        |
+| **Tool Middleware**         | 🟡 Medium | Medium | Cross-cutting concerns (auth, rate limiting) via middleware pipeline |     |
 | **Circuit Breakers**        | 🟡 Medium | High   | Stop cascading failures when downstream services are down            |
 
 ---
@@ -79,10 +78,10 @@ Focus: Stability, observability, and advanced orchestration.
 
 ### High-Impact Complex Features
 
-| Feature                 | Status         | Notes                         |
-| ----------------------- | -------------- | ----------------------------- |
+| Feature                 | Status         | Notes                                   |
+| ----------------------- | -------------- | --------------------------------------- |
 | Parallel Tool Execution | ✅ Implemented | `asyncio.gather` / `ThreadPoolExecutor` |
-| Tool Composition        | 🟡 Planned     | `@compose` decorator          |
+| Tool Composition        | 🟡 Planned     | `@compose` decorator                    |
 
 ### Context Management
 
@@ -139,15 +138,26 @@ Focus: Stability, observability, and advanced orchestration.
 
 ### Performance Optimizations (Backend)
 
-| Feature             | Status     | Notes                              |
-| ------------------- | ---------- | ---------------------------------- |
+| Feature             | Status         | Notes                                    |
+| ------------------- | -------------- | ---------------------------------------- |
 | Caching Layer       | ✅ Implemented | `InMemoryCache` (LRU+TTL) + `RedisCache` |
-| Batch Processing    | 🟡 Planned | Efficient multi-request handling   |
-| Prompt Optimization | 🟡 Planned | Automatic prompt compression       |
+| Batch Processing    | 🟡 Planned     | Efficient multi-request handling         |
+| Prompt Optimization | 🟡 Planned     | Automatic prompt compression             |
 
 ---
 
 ## Release History
+
+### v0.12.x - Hybrid Search & Reranking
+
+- ✅ **BM25**: Pure-Python Okapi BM25 keyword search; configurable k1/b; stop word removal; zero dependencies
+- ✅ **HybridSearcher**: Vector + BM25 fusion via RRF or weighted linear combination
+- ✅ **HybridSearchTool**: Agent-ready `@tool` with source attribution and score thresholds
+- ✅ **FusionMethod**: `RRF` (rank-based) and `WEIGHTED` (normalised score) strategies
+- ✅ **Reranker ABC**: Protocol for cross-encoder reranking with `rerank(query, results, top_k)`
+- ✅ **CohereReranker**: Cohere Rerank API v2 (`rerank-v3.5` default)
+- ✅ **JinaReranker**: Jina AI Rerank API (`jina-reranker-v2-base-multilingual` default)
+- ✅ **HybridSearcher integration**: Optional `reranker=` param for post-fusion re-scoring
 
 ### v0.12.0 - Response Caching
 

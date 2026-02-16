@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from ..tools import tool
 
 if TYPE_CHECKING:
+    from .hybrid import HybridSearcher
     from .vector_store import VectorStore
 
 
@@ -223,4 +224,116 @@ class SemanticSearchTool:
         return "\n".join(output_parts)
 
 
-__all__ = ["RAGTool", "SemanticSearchTool"]
+class HybridSearchTool:
+    """
+    Pre-built tool for hybrid (vector + keyword) knowledge base search.
+
+    Combines semantic search from a vector store with BM25 keyword matching
+    to provide better recall than either approach alone.
+
+    Example:
+        >>> from selectools import Agent, OpenAIProvider
+        >>> from selectools.embeddings import OpenAIEmbeddingProvider
+        >>> from selectools.rag import VectorStore, DocumentLoader
+        >>> from selectools.rag.hybrid import HybridSearcher
+        >>> from selectools.rag.tools import HybridSearchTool
+        >>>
+        >>> embedder = OpenAIEmbeddingProvider()
+        >>> store = VectorStore.create("memory", embedder=embedder)
+        >>>
+        >>> searcher = HybridSearcher(vector_store=store)
+        >>> docs = DocumentLoader.from_directory("./docs")
+        >>> searcher.add_documents(docs)
+        >>>
+        >>> hybrid_tool = HybridSearchTool(searcher=searcher, top_k=5)
+        >>> agent = Agent(tools=[hybrid_tool.search_knowledge_base], provider=OpenAIProvider())
+        >>> response = agent.run("What are the main features?")
+    """
+
+    def __init__(
+        self,
+        searcher: "HybridSearcher",
+        top_k: int = 5,
+        score_threshold: float = 0.0,
+        include_scores: bool = True,
+    ):
+        """
+        Initialize hybrid search tool.
+
+        Args:
+            searcher: A configured ``HybridSearcher`` instance.
+            top_k: Number of documents to retrieve (default: 5).
+            score_threshold: Minimum fused score to include (default: 0.0).
+            include_scores: Whether to include scores in results (default: True).
+        """
+        self.searcher = searcher
+        self.top_k = top_k
+        self.score_threshold = score_threshold
+        self.include_scores = include_scores
+
+    @tool(
+        description=(
+            "Search the knowledge base using both semantic similarity and keyword matching. "
+            "This hybrid approach finds results that pure vector search might miss, "
+            "especially for exact terms, names, and acronyms."
+        )
+    )
+    def search_knowledge_base(self, query: str) -> str:
+        """
+        Search the knowledge base using hybrid (vector + keyword) search.
+
+        Args:
+            query: The question or search query.
+
+        Returns:
+            Relevant information from the knowledge base with sources.
+        """
+        results = self.searcher.search(query, top_k=self.top_k)
+
+        results = [r for r in results if r.score >= self.score_threshold]
+
+        if not results:
+            return (
+                "No relevant information found in the knowledge base. "
+                "The answer may not be available in the provided documents."
+            )
+
+        context_parts: List[str] = []
+        for i, result in enumerate(results):
+            source = result.document.metadata.get("source", "Unknown")
+            filename = result.document.metadata.get("filename", source)
+            page = result.document.metadata.get("page")
+
+            source_str = f"{filename}"
+            if page is not None:
+                source_str += f" (page {page})"
+
+            if self.include_scores:
+                header = f"[Source {i+1}: {source_str}, Relevance: {result.score:.4f}]"
+            else:
+                header = f"[Source {i+1}: {source_str}]"
+
+            context_parts.append(f"{header}\n{result.document.text}\n")
+
+        return "\n".join(context_parts)
+
+    def search(
+        self,
+        query: str,
+        filter: Optional[Dict[str, Any]] = None,
+    ) -> List:
+        """
+        Search and return structured results.
+
+        Args:
+            query: Search query.
+            filter: Optional metadata filter.
+
+        Returns:
+            List of SearchResult objects.
+        """
+        results = self.searcher.search(query, top_k=self.top_k, filter=filter)
+        return [r for r in results if r.score >= self.score_threshold]
+
+
+__all__ = ["RAGTool", "SemanticSearchTool", "HybridSearchTool"]

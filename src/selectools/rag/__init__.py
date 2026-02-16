@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, List, Optional
 
+from .bm25 import BM25
 from .chunking import RecursiveTextSplitter, TextSplitter
+from .hybrid import FusionMethod, HybridSearcher
 from .loaders import DocumentLoader
-from .tools import RAGTool, SemanticSearchTool
+from .reranker import Reranker
+from .tools import HybridSearchTool, RAGTool, SemanticSearchTool
 from .vector_store import Document, SearchResult, VectorStore
 
 if TYPE_CHECKING:
@@ -22,8 +25,28 @@ __all__ = [
     "RecursiveTextSplitter",
     "RAGTool",
     "SemanticSearchTool",
+    "HybridSearchTool",
+    "HybridSearcher",
+    "FusionMethod",
+    "BM25",
+    "Reranker",
     "RAGAgent",
 ]
+
+# Reranker implementations are imported conditionally (optional dependencies)
+try:
+    from .reranker import CohereReranker
+
+    __all__.append("CohereReranker")
+except ImportError:
+    pass
+
+try:
+    from .reranker import JinaReranker
+
+    __all__.append("JinaReranker")
+except ImportError:
+    pass
 
 
 class RAGAgent:
