@@ -460,15 +460,7 @@ Includes:
   - Performance tuning
   - Cost management
   - Search relevance tuning
-- **Future Roadmap** - `.docs/v0.9.0-future-enhancements.md`
-  - 6 major features planned for v0.9.0-v0.10.0
-  - Reranking support (Cohere, Jina)
-  - Hybrid search (vector + BM25)
-  - Advanced chunking strategies
-  - Multi-modal RAG (images, tables)
-  - RAG evaluation metrics
-  - Streaming RAG responses
-  - Implementation priorities and timelines
+- **Future Roadmap** — See [ROADMAP.md](./ROADMAP.md) for current plans
 
 ### Fixed
 

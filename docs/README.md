@@ -17,6 +17,11 @@ Welcome to the comprehensive technical documentation for selectools - a producti
 
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - Complete system overview, architecture diagrams, data flows, and design principles.
 
+### Reference
+
+- **[KEYS.md](KEYS.md)** - Environment variables and API keys for all providers
+- **[RELEASE_GUIDE.md](RELEASE_GUIDE.md)** - PyPI release process and checklist
+
 ### Module Documentation
 
 Detailed technical documentation for each module:
