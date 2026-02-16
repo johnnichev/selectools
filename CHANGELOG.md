@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.12.1] - 2026-02-16
+
+### Fixed
+
+- **Packaging: missing `selectools.agent` and `selectools.tools` subpackages in published wheel** — `import selectools` raised `ModuleNotFoundError` because `pyproject.toml` had a hardcoded package list that was missing both subpackages. Switched to automatic package discovery (`[tool.setuptools.packages.find]`) so new subpackages are always included.
+
+### Changed
+
+- Replaced explicit `packages = [...]` list in `pyproject.toml` with `[tool.setuptools.packages.find]` for automatic subpackage discovery
+
+---
+
 ## [0.12.0] - 2026-02-16
 
 ### Added - Hybrid Search (Vector + BM25)

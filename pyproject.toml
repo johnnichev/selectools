@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "selectools"
-version = "0.12.0"
+version = "0.12.1"
 description = "Production-ready AI agents with tool calling, RAG, and hybrid search. Provider-agnostic (OpenAI, Anthropic, Gemini, Ollama), with streaming, caching, dynamic tools, and cost tracking."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -63,14 +63,9 @@ selectools = "selectools.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-packages = [
-    "selectools",
-    "selectools.providers",
-    "selectools.toolbox",
-    "selectools.embeddings",
-    "selectools.rag",
-    "selectools.rag.stores",
-]
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.black]
 line-length = 100
