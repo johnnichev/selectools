@@ -27,7 +27,7 @@ from selectools.rag import (
 )
 
 
-def main():
+def main() -> None:
     """Run advanced RAG demonstration."""
 
     # Check for API key

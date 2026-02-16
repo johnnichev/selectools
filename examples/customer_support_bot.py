@@ -439,7 +439,7 @@ Remember: You're representing the company, so maintain professionalism while bei
 # ============================================================================
 
 
-def example_order_tracking():
+def example_order_tracking() -> None:
     """Example: Customer checks order status."""
     print("=" * 70)
     print("EXAMPLE 1: Order Tracking")
@@ -460,7 +460,7 @@ def example_order_tracking():
     print(f"🤖 Agent: {response.content}\n")
 
 
-def example_refund_request():
+def example_refund_request() -> None:
     """Example: Customer requests a refund."""
     print("=" * 70)
     print("EXAMPLE 2: Refund Request")
@@ -480,7 +480,7 @@ def example_refund_request():
     print(f"\n🤖 Agent: {response.content}\n")
 
 
-def example_knowledge_base():
+def example_knowledge_base() -> None:
     """Example: Customer asks about shipping policy."""
     print("=" * 70)
     print("EXAMPLE 3: Policy Question")
@@ -499,7 +499,7 @@ def example_knowledge_base():
     print(f"\n🤖 Agent: {response.content}\n")
 
 
-async def example_concurrent_requests():
+async def example_concurrent_requests() -> None:
     """Example: Handle multiple customer requests concurrently."""
     print("=" * 70)
     print("EXAMPLE 4: Concurrent Requests (Async)")
@@ -536,7 +536,7 @@ async def example_concurrent_requests():
 # ============================================================================
 
 
-def main():
+def main() -> None:
     """Run all customer support examples."""
     print("\n🎯 Customer Support Bot Examples\n")
 

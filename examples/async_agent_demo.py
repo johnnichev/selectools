@@ -41,7 +41,7 @@ def calculate_sum(a: int, b: int) -> str:
     return f"The sum of {a} and {b} is {a + b}"
 
 
-async def example_basic_async():
+async def example_basic_async() -> None:
     """Basic async agent usage."""
     print("\n=== Example 1: Basic Async Agent ===")
 
@@ -61,7 +61,7 @@ async def example_basic_async():
     print(f"Time taken: {elapsed:.2f}s")
 
 
-async def example_concurrent_agents():
+async def example_concurrent_agents() -> None:
     """Run multiple agents concurrently."""
     print("\n=== Example 2: Concurrent Agent Execution ===")
 
@@ -92,7 +92,7 @@ async def example_concurrent_agents():
     print(f"Total time (concurrent): {elapsed:.2f}s")
 
 
-async def example_async_with_memory():
+async def example_async_with_memory() -> None:
     """Async agent with conversation memory."""
     print("\n=== Example 3: Async Agent with Memory ===")
 
@@ -118,7 +118,7 @@ async def example_async_with_memory():
     print(f"Memory size: {len(memory)} messages")
 
 
-async def example_async_streaming():
+async def example_async_streaming() -> None:
     """Async agent with streaming responses."""
     print("\n=== Example 4: Async Agent with Streaming ===")
 
@@ -130,7 +130,7 @@ async def example_async_streaming():
         ),  # Enable streaming
     )
 
-    def stream_handler(chunk: str):
+    def stream_handler(chunk: str) -> None:
         print(chunk, end="", flush=True)
 
     print("Streaming response: ", end="")
@@ -141,7 +141,7 @@ async def example_async_streaming():
     print()  # New line after streaming
 
 
-async def example_fastapi_integration():
+async def example_fastapi_integration() -> None:
     """Example showing how to use async agent in FastAPI."""
     print("\n=== Example 5: FastAPI Integration Pattern ===")
 
@@ -176,7 +176,7 @@ async def chat(message: str):
     )
 
 
-async def main():
+async def main() -> None:
     """Run all examples."""
     print("Async Selectools Examples")
     print("=" * 50)

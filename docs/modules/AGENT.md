@@ -1303,6 +1303,7 @@ def divide(a: float, b: float) -> str:
 ## Further Reading
 
 - [Tools Module](TOOLS.md) - Tool definition and validation
+- [Dynamic Tools Module](DYNAMIC_TOOLS.md) - Dynamic tool loading and runtime management
 - [Parser Module](PARSER.md) - Tool call parsing details
 - [Providers Module](PROVIDERS.md) - Provider implementations
 - [Memory Module](MEMORY.md) - Conversation memory

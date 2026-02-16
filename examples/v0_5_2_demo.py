@@ -9,6 +9,7 @@ Run: python examples/v0_5_2_demo.py
 """
 
 import time
+from typing import Any, Dict
 
 from selectools import (
     Agent,
@@ -39,7 +40,7 @@ except Exception:
 # =============================================================================
 
 
-def demo_tool_validation():
+def demo_tool_validation() -> None:
     """Demonstrate tool validation catching errors at registration time."""
     print("\n" + "=" * 70)
     print("FEATURE 1: TOOL VALIDATION AT REGISTRATION")
@@ -116,7 +117,7 @@ def demo_tool_validation():
 # =============================================================================
 
 
-def demo_observability_hooks():
+def demo_observability_hooks() -> None:
     """Demonstrate observability hooks for monitoring and debugging."""
     print("\n" + "=" * 70)
     print("FEATURE 2: OBSERVABILITY HOOKS")
@@ -135,7 +136,7 @@ def demo_observability_hooks():
         return f"Result: {eval(expression)}"  # Don't do this in production!
 
     # Set up hooks for monitoring
-    metrics = {
+    metrics: Dict[str, Any] = {
         "agent_starts": 0,
         "iterations": 0,
         "tool_calls": [],
@@ -143,34 +144,34 @@ def demo_observability_hooks():
         "total_tokens": 0,
     }
 
-    def on_agent_start(messages):
+    def on_agent_start(messages: Any) -> None:
         metrics["agent_starts"] += 1
         print(f"\n🚀 Agent started with {len(messages)} message(s)")
 
-    def on_iteration_start(iteration, messages):
+    def on_iteration_start(iteration: Any, messages: Any) -> None:
         metrics["iterations"] = iteration
         print(f"\n🔄 Iteration {iteration} starting...")
 
-    def on_tool_start(tool_name, tool_args):
+    def on_tool_start(tool_name: str, tool_args: Any) -> None:
         print(f"   🔧 Calling tool: {tool_name}")
         print(f"      Args: {tool_args}")
 
-    def on_tool_end(tool_name, result, duration):
+    def on_tool_end(tool_name: str, result: str, duration: float) -> None:
         metrics["tool_calls"].append({"name": tool_name, "duration": duration})
         print(f"   ✅ Tool completed: {tool_name}")
         print(f"      Duration: {duration:.3f}s")
         print(f"      Result preview: {result[:50]}...")
 
-    def on_llm_start(messages, model):
+    def on_llm_start(messages: Any, model: str) -> None:
         metrics["llm_calls"] += 1
         print(f"   🤖 LLM call #{metrics['llm_calls']} to {model}")
 
-    def on_llm_end(response, usage):
+    def on_llm_end(response: Any, usage: Any) -> None:
         if usage:
             metrics["total_tokens"] += usage.total_tokens
             print(f"   📊 Tokens: {usage.total_tokens} (${usage.cost_usd:.6f})")
 
-    def on_agent_end(response, usage):
+    def on_agent_end(response: Any, usage: Any) -> None:
         print(f"\n✨ Agent finished!")
         print(f"   Final response length: {len(response.content)} characters")
         print(f"\n📊 Session Metrics:")
@@ -221,7 +222,7 @@ def demo_observability_hooks():
 # =============================================================================
 
 
-def demo_production_ready():
+def demo_production_ready() -> None:
     """Demonstrate using both features for a production-ready agent."""
     print("\n" + "=" * 70)
     print("COMBINED: PRODUCTION-READY AGENT")
@@ -242,7 +243,7 @@ def demo_production_ready():
     print("\n✅ Setting up observability hooks...")
     logs = []
 
-    def log_hook(event, *args):
+    def log_hook(event: str, *args: Any) -> None:
         logs.append({"event": event, "timestamp": time.time(), "args": args})
 
     print("   ✓ Hooks configured for: tool calls, errors, and completion")

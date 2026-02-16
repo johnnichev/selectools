@@ -28,7 +28,7 @@ def remember_fact(fact: str) -> str:
     return f"I'll remember that: {fact}"
 
 
-def main():
+def main() -> None:
     # Create a conversation memory with a limit of 20 messages
     memory = ConversationMemory(max_messages=20)
 

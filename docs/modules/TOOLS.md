@@ -975,6 +975,7 @@ def log_message(msg: str) -> str:
 ## Further Reading
 
 - [Agent Module](AGENT.md) - How agents use tools
+- [Dynamic Tools Module](DYNAMIC_TOOLS.md) - ToolLoader, hot-reload, plugin systems
 - [Parser Module](PARSER.md) - How tool calls are parsed
 - [Prompt Module](PROMPT.md) - How tool schemas are formatted
 

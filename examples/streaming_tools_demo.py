@@ -132,14 +132,14 @@ async def fetch_data_async(url: str, chunks: int = 5) -> AsyncGenerator[str, Non
 # === Demo functions ===
 
 
-def demo_basic_streaming():
+def demo_basic_streaming() -> None:
     """Demonstrate basic streaming with real-time output."""
     print("\n" + "=" * 60)
     print("Demo 1: Basic Streaming with Real-time Display")
     print("=" * 60)
 
     # Callback to display chunks as they arrive
-    def display_chunk(tool_name: str, chunk: str):
+    def display_chunk(tool_name: str, chunk: str) -> None:
         print(chunk, end="", flush=True)
 
     provider = LocalProvider(
@@ -162,13 +162,13 @@ def demo_basic_streaming():
     print(f"\n🤖 Agent: {response.content}\n")
 
 
-def demo_log_search_streaming():
+def demo_log_search_streaming() -> None:
     """Demonstrate streaming log search."""
     print("\n" + "=" * 60)
     print("Demo 2: Streaming Log Search")
     print("=" * 60)
 
-    def display_chunk(tool_name: str, chunk: str):
+    def display_chunk(tool_name: str, chunk: str) -> None:
         print(chunk, end="", flush=True)
 
     provider = LocalProvider(
@@ -191,13 +191,13 @@ def demo_log_search_streaming():
     print(f"\n🤖 Agent: {response.content}\n")
 
 
-async def demo_async_streaming():
+async def demo_async_streaming() -> None:
     """Demonstrate async streaming."""
     print("\n" + "=" * 60)
     print("Demo 3: Async Streaming")
     print("=" * 60)
 
-    def display_chunk(tool_name: str, chunk: str):
+    def display_chunk(tool_name: str, chunk: str) -> None:
         print(chunk, end="", flush=True)
 
     provider = LocalProvider(
@@ -220,7 +220,7 @@ async def demo_async_streaming():
     print(f"\n🤖 Agent: {response.content}\n")
 
 
-def demo_streaming_with_analytics():
+def demo_streaming_with_analytics() -> None:
     """Demonstrate streaming with analytics tracking."""
     print("\n" + "=" * 60)
     print("Demo 4: Streaming with Analytics")
@@ -228,7 +228,7 @@ def demo_streaming_with_analytics():
 
     chunk_counter = {"count": 0}
 
-    def count_chunks(tool_name: str, chunk: str):
+    def count_chunks(tool_name: str, chunk: str) -> None:
         chunk_counter["count"] += 1
         # Display only milestone chunks to avoid clutter
         if "Milestone" in chunk or "🚀" in chunk or "🎉" in chunk:
@@ -262,7 +262,7 @@ def demo_streaming_with_analytics():
     print(analytics.summary())
 
 
-def demo_toolbox_streaming(tmp_path: Path):
+def demo_toolbox_streaming(tmp_path: Path) -> None:
     """Demonstrate streaming tools from toolbox."""
     print("\n" + "=" * 60)
     print("Demo 5: Toolbox Streaming Tools")
@@ -284,7 +284,7 @@ def demo_toolbox_streaming(tmp_path: Path):
     from selectools.toolbox.data_tools import process_csv_stream
     from selectools.toolbox.file_tools import read_file_stream
 
-    def display_chunk(tool_name: str, chunk: str):
+    def display_chunk(tool_name: str, chunk: str) -> None:
         print(chunk, end="", flush=True)
 
     # Demo 5a: Read file stream
@@ -326,7 +326,7 @@ def demo_toolbox_streaming(tmp_path: Path):
     print(f"\n🤖 Agent: {response2.content}\n")
 
 
-def main():
+def main() -> None:
     """Run all demos."""
     print("\n" + "#" * 60)
     print("# Streaming Tools Demo")

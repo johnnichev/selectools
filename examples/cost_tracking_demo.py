@@ -33,7 +33,7 @@ def get_weather(location: str) -> str:
     return f"Weather in {location}: Sunny, 72°F"
 
 
-def main():
+def main() -> None:
     """Run the cost tracking demo."""
     print("=" * 60)
     print("Cost Tracking Demo")

@@ -82,14 +82,14 @@ SAMPLE_DOCUMENTS = [
 ]
 
 
-def setup_vector_store(embedder, documents: List[Document]) -> VectorStore:
+def setup_vector_store(embedder: Any, documents: List[Document]) -> VectorStore:
     """Set up a vector store with the given embedder and documents."""
     vector_store = VectorStore.create("memory", embedder=embedder)
     vector_store.add_documents(documents)
     return vector_store
 
 
-def run_search_comparison(queries: List[str]):
+def run_search_comparison(queries: List[str]) -> None:
     """Compare semantic search across different embedding providers."""
 
     print("=" * 100)
@@ -261,7 +261,7 @@ def run_search_comparison(queries: List[str]):
     )
 
 
-def demonstrate_metadata_filtering():
+def demonstrate_metadata_filtering() -> None:
     """Demonstrate how to use metadata filters in semantic search."""
 
     print("\n" + "=" * 100)
@@ -315,7 +315,7 @@ def demonstrate_metadata_filtering():
     print("   - Combine semantic search with structured filters")
 
 
-def main():
+def main() -> None:
     """Run all demonstrations."""
 
     # Test queries covering different topics

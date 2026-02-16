@@ -281,12 +281,10 @@ def filter_data(dataset_name: str, column_name: str, operator: str, value: str) 
     data = DATASETS[dataset_name]
 
     # Parse value type
+    compare_value: Any = value
     try:
-        # Try to convert to number
-        numeric_value = float(value)
-        value = numeric_value
+        compare_value = float(value)
     except ValueError:
-        # Keep as string
         pass
 
     # Apply filter
@@ -299,13 +297,13 @@ def filter_data(dataset_name: str, column_name: str, operator: str, value: str) 
 
         match = False
         if operator == "equals":
-            match = row_value == value
+            match = row_value == compare_value
         elif operator == "greater_than":
-            match = float(row_value) > float(value)
+            match = float(row_value) > float(compare_value)
         elif operator == "less_than":
-            match = float(row_value) < float(value)
+            match = float(row_value) < float(compare_value)
         elif operator == "contains":
-            match = str(value).lower() in str(row_value).lower()
+            match = str(compare_value).lower() in str(row_value).lower()
         else:
             return f"Unknown operator '{operator}'. Use: equals, greater_than, less_than, contains"
 
@@ -313,7 +311,7 @@ def filter_data(dataset_name: str, column_name: str, operator: str, value: str) 
             filtered.append(row)
 
     # Generate result
-    result = f"Filter: {column_name} {operator} {value}\n"
+    result = f"Filter: {column_name} {operator} {compare_value}\n"
     result += f"Matched {len(filtered)} out of {len(data)} rows\n\n"
 
     if filtered:
@@ -475,7 +473,13 @@ def calculate_correlation(dataset_name: str, column1: str, column2: str) -> str:
     x_values = [p[0] for p in pairs]
     y_values = [p[1] for p in pairs]
 
-    correlation = statistics.correlation(x_values, y_values)
+    n = len(x_values)
+    mean_x = statistics.mean(x_values)
+    mean_y = statistics.mean(y_values)
+    stdev_x = statistics.stdev(x_values)
+    stdev_y = statistics.stdev(y_values)
+    covariance = sum((x - mean_x) * (y - mean_y) for x, y in zip(x_values, y_values)) / (n - 1)
+    correlation = covariance / (stdev_x * stdev_y) if stdev_x and stdev_y else 0.0
 
     # Interpret correlation
     if abs(correlation) > 0.7:
@@ -694,7 +698,7 @@ Remember: Your goal is to help users understand their data, not just run tools."
 # ============================================================================
 
 
-def example_basic_stats():
+def example_basic_stats() -> None:
     """Example: Get basic statistics for the sales dataset."""
     print("=" * 70)
     print("EXAMPLE 1: Basic Statistics")
@@ -714,7 +718,7 @@ def example_basic_stats():
     print(f"\n📊 Analyst: {response.content}\n")
 
 
-def example_grouping():
+def example_grouping() -> None:
     """Example: Group by analysis."""
     print("=" * 70)
     print("EXAMPLE 2: Sales by Region")
@@ -734,7 +738,7 @@ def example_grouping():
     print(f"\n📊 Analyst: {response.content}\n")
 
 
-def example_filtering():
+def example_filtering() -> None:
     """Example: Filter and analyze specific data."""
     print("=" * 70)
     print("EXAMPLE 3: High-Value Orders")
@@ -754,7 +758,7 @@ def example_filtering():
     print(f"\n📊 Analyst: {response.content}\n")
 
 
-def example_multi_turn_analysis():
+def example_multi_turn_analysis() -> None:
     """Example: Multi-turn conversation with context."""
     print("=" * 70)
     print("EXAMPLE 4: Multi-Turn Analysis (With Memory)")
@@ -781,7 +785,7 @@ def example_multi_turn_analysis():
     print(f"📊 Analyst: {response.content}\n")
 
 
-def example_category_analysis():
+def example_category_analysis() -> None:
     """Example: Analyze categorical data."""
     print("=" * 70)
     print("EXAMPLE 5: Category Distribution")
@@ -806,7 +810,7 @@ def example_category_analysis():
 # ============================================================================
 
 
-def main():
+def main() -> None:
     """Run all data analysis examples."""
     print("\n📊 Data Analysis Agent Examples\n")
 

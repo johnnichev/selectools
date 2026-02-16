@@ -119,7 +119,7 @@ def create_sample_docs(directory: Path) -> List[str]:
 
 def test_configuration(
     config_name: str,
-    embedder,
+    embedder: Any,
     vector_store_type: str,
     chunk_size: int,
     chunk_overlap: int,
@@ -209,7 +209,7 @@ def test_configuration(
     }
 
 
-def compare_embedding_providers():
+def compare_embedding_providers() -> List[Dict[str, Any]]:
     """Compare different embedding providers."""
 
     print("\n" + "=" * 100)
@@ -267,7 +267,7 @@ def compare_embedding_providers():
     return results
 
 
-def compare_vector_stores():
+def compare_vector_stores() -> List[Dict[str, Any]]:
     """Compare different vector store backends."""
 
     print("\n" + "=" * 100)
@@ -315,7 +315,7 @@ def compare_vector_stores():
     return results
 
 
-def compare_chunk_sizes():
+def compare_chunk_sizes() -> List[Dict[str, Any]]:
     """Compare different chunk size configurations."""
 
     print("\n" + "=" * 100)
@@ -352,7 +352,7 @@ def compare_chunk_sizes():
     return results
 
 
-def compare_top_k():
+def compare_top_k() -> List[Dict[str, Any]]:
     """Compare different top-k values."""
 
     print("\n" + "=" * 100)
@@ -388,7 +388,7 @@ def compare_top_k():
     return results
 
 
-def print_summary_table(all_results: List[Dict[str, Any]]):
+def print_summary_table(all_results: List[Dict[str, Any]]) -> None:
     """Print a summary table of all results."""
 
     if not all_results:
@@ -446,7 +446,7 @@ def print_summary_table(all_results: List[Dict[str, Any]]):
     )
 
 
-def cost_analysis():
+def cost_analysis() -> None:
     """Provide detailed cost analysis."""
 
     print("\n" + "=" * 100)
@@ -495,7 +495,7 @@ Cost-Optimized Stack:
     )
 
 
-def main():
+def main() -> None:
     """Run all comparisons."""
 
     print("=" * 100)

@@ -17,7 +17,7 @@ from selectools.models import OpenAI
 from selectools.rag import Document, DocumentLoader, RAGAgent, VectorStore
 
 
-def main():
+def main() -> None:
     print("\n" + "=" * 70)
     print("🤖 RAG Demo: Question Answering with Document Knowledge")
     print("=" * 70 + "\n")

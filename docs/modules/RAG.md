@@ -261,6 +261,10 @@ splitter = RecursiveTextSplitter(
 }
 ```
 
+### Advanced Chunking
+
+For semantic (topic-boundary) splitting and LLM-context enrichment, see [Advanced Chunking](ADVANCED_CHUNKING.md).
+
 ---
 
 ## Vector Storage
@@ -656,6 +660,7 @@ embedder = GeminiEmbeddingProvider()  # FREE
 
 ## Further Reading
 
+- [Advanced Chunking](ADVANCED_CHUNKING.md) - SemanticChunker and ContextualChunker
 - [Embeddings Module](EMBEDDINGS.md) - Embedding providers
 - [Vector Stores Module](VECTOR_STORES.md) - Storage implementations
 - [Usage Module](USAGE.md) - Cost tracking

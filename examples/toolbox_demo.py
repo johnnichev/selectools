@@ -27,7 +27,7 @@ except Exception:
     print("Using LocalProvider (no API calls)")
 
 
-def demo_file_operations():
+def demo_file_operations() -> None:
     """Demo file operation tools."""
     print("\n" + "=" * 60)
     print("FILE OPERATIONS DEMO")
@@ -50,7 +50,7 @@ def demo_file_operations():
     print(f"\nAgent: {response.content}")
 
 
-def demo_data_processing():
+def demo_data_processing() -> None:
     """Demo data processing tools."""
     print("\n" + "=" * 60)
     print("DATA PROCESSING DEMO")
@@ -74,7 +74,7 @@ def demo_data_processing():
     print(f"\nAgent: {response.content}")
 
 
-def demo_text_processing():
+def demo_text_processing() -> None:
     """Demo text processing tools."""
     print("\n" + "=" * 60)
     print("TEXT PROCESSING DEMO")
@@ -102,7 +102,7 @@ def demo_text_processing():
     print(f"\nAgent: {response.content}")
 
 
-def demo_datetime_utilities():
+def demo_datetime_utilities() -> None:
     """Demo datetime tools."""
     print("\n" + "=" * 60)
     print("DATETIME UTILITIES DEMO")
@@ -124,7 +124,7 @@ def demo_datetime_utilities():
     print(f"\nAgent: {response.content}")
 
 
-def demo_all_tools():
+def demo_all_tools() -> None:
     """Demo using all tools together."""
     print("\n" + "=" * 60)
     print("ALL TOOLS DEMO - Multi-step Task")
@@ -155,7 +155,7 @@ def demo_all_tools():
     print(f"\nAgent: {response.content}")
 
 
-def list_available_tools():
+def list_available_tools() -> None:
     """List all available tools in the toolbox."""
     print("\n" + "=" * 60)
     print("AVAILABLE TOOLS IN TOOLBOX")
