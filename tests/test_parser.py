@@ -17,8 +17,6 @@ Tests cover:
 
 from __future__ import annotations
 
-import pytest
-
 from selectools.parser import ParseResult, ToolCallParser
 
 

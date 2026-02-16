@@ -14,7 +14,6 @@ Tests cover:
 
 from __future__ import annotations
 
-import pickle
 from typing import Any, Dict, Optional
 from unittest.mock import MagicMock, patch
 

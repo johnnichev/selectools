@@ -1,12 +1,9 @@
 """
-Semantic Search Demo: Pure Embedding-Based Search
+Semantic Search — pure embedding-based search with metadata filtering.
 
-This example demonstrates:
-- Using SemanticSearchTool for pure semantic search (no LLM)
-- Comparing different embedding providers
-- Analyzing similarity scores
-- Building a simple search interface
-- Performance and cost comparison
+Prerequisites: OPENAI_API_KEY (examples 14)
+    pip install selectools[rag]
+Run: python examples/15_semantic_search.py
 """
 
 import os

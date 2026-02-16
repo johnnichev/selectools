@@ -1,17 +1,9 @@
 #!/usr/bin/env python3
 """
-Routing Mode Demo: AgentResult, Custom System Prompt, and agent.reset().
+Routing Mode — Agent selects a tool without executing it. Intent classification.
 
-Demonstrates routing_only mode where the agent selects a tool WITHOUT executing it.
-Useful for intent classification, tool routing, and structured decision-making.
-Shows AgentResult fields (tool_name, tool_args, iterations) and agent.reset()
-for handling multiple independent requests.
-
-Requirements:
-    pip install selectools
-
-Run:
-    python examples/routing_mode_demo.py
+Prerequisites: OPENAI_API_KEY (examples 01-05)
+Run: python examples/10_routing_mode.py
 """
 
 from typing import Any, List, Optional, Tuple

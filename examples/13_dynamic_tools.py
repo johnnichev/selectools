@@ -1,16 +1,8 @@
 """
-Dynamic Tools Demo: ToolLoader and Dynamic Tool Management
+Dynamic Tools — ToolLoader, plugin directories, hot-reload, runtime tool management.
 
-This example demonstrates:
-- Loading tools with ToolLoader.from_file() and from_directory()
-- Creating an agent with base tools
-- Dynamically adding loaded tools to the agent
-- Removing a tool and showing agent adapts
-- Replacing a tool with an updated version
-- Hot-reloading a modified plugin file
-
-Requirements:
-    pip install selectools
+Prerequisites: OPENAI_API_KEY (examples 01-05)
+Run: python examples/13_dynamic_tools.py
 """
 
 import os

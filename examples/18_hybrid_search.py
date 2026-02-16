@@ -1,15 +1,9 @@
 """
-Hybrid Search Demo: BM25 + Vector + Reranking
+Hybrid Search — BM25 keyword + vector semantic search with RRF/weighted fusion and reranking.
 
-This example demonstrates:
-- Pure semantic search (RAGTool) vs pure BM25 vs hybrid search
-- RRF and weighted fusion methods
-- Optional reranking with mock CohereReranker
-- Side-by-side comparison of search strategies
-- HybridSearchTool with agent integration
-
-Requirements:
-    pip install selectools
+Prerequisites: OPENAI_API_KEY (examples 14-16)
+    pip install selectools[rag]
+Run: python examples/18_hybrid_search.py
 """
 
 import os

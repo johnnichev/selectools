@@ -1,15 +1,9 @@
 #!/usr/bin/env python3
 """
-Streaming and Parallel Tool Execution Demo.
+Streaming and Parallel Tool Execution — astream(), asyncio.gather, StreamChunk.
 
-Demonstrates E2E streaming (Agent.astream), parallel tool execution,
-StreamChunk vs AgentResult, async tools with arun(), and native function calling.
-
-Requirements:
-    pip install selectools
-
-Run:
-    python examples/streaming_parallel_demo.py
+Prerequisites: OPENAI_API_KEY (examples 01-07)
+Run: python examples/08_streaming_parallel.py
 """
 
 import asyncio

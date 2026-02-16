@@ -13,8 +13,6 @@ Tests cover:
 
 from __future__ import annotations
 
-from io import StringIO
-from typing import Any, Dict
 from unittest.mock import patch
 
 import pytest
@@ -22,7 +20,6 @@ import pytest
 from selectools.cli import _build_provider, _default_tools, build_parser, list_tools, main
 from selectools.providers.openai_provider import OpenAIProvider
 from selectools.providers.stubs import LocalProvider
-from selectools.tools import Tool
 
 
 class TestBuildParser:

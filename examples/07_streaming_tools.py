@@ -1,15 +1,8 @@
 """
-Demonstrate streaming tools for long-running operations.
+Streaming Tools — Generator-based progressive output for long-running operations.
 
-This example shows how to use streaming tools that yield results progressively,
-providing better user experience for long-running operations.
-
-Features demonstrated:
-- Basic streaming tools with Generator return type
-- Async streaming tools with AsyncGenerator
-- Real-time chunk display via on_tool_chunk hook
-- Analytics tracking for streaming tools
-- Toolbox streaming tools (read_file_stream, process_csv_stream)
+Prerequisites: OPENAI_API_KEY (examples 01-05)
+Run: python examples/07_streaming_tools.py
 """
 
 import asyncio

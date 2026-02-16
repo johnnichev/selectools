@@ -1,8 +1,8 @@
 """
-Cost Tracking Demo
+Cost Tracking — token counting, cost estimation, and usage summaries.
 
-Demonstrates automatic cost and token tracking across multiple tool calls.
-Shows how to access usage statistics, set cost warnings, and monitor per-tool usage.
+Prerequisites: OPENAI_API_KEY (examples 01-03)
+Run: python examples/05_cost_tracking.py
 """
 
 import selectools

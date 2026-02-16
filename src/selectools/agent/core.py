@@ -236,8 +236,65 @@ class Agent:
             # Silently ignore hook errors to prevent them from breaking agent execution
             pass
 
+    @staticmethod
+    def _normalize_messages(messages: Union[str, List[Message]]) -> List[Message]:
+        """Convert a string prompt to a message list, or pass through as-is."""
+        if isinstance(messages, str):
+            return [Message(role=Role.USER, content=messages)]
+        return messages
+
+    def ask(
+        self,
+        prompt: str,
+        stream_handler: Optional[Callable[[str], None]] = None,
+    ) -> AgentResult:
+        """
+        Send a single user prompt and return the agent's response.
+
+        Convenience wrapper around :meth:`run` that removes the need to
+        construct ``Message`` and ``Role`` objects manually.
+
+        Args:
+            prompt: Plain-text question or instruction.
+            stream_handler: Optional callback for streaming responses.
+
+        Returns:
+            AgentResult with the response and metadata.
+
+        Example:
+            >>> result = agent.ask("What is the capital of France?")
+            >>> print(result.content)
+            Paris
+        """
+        return self.run([Message(role=Role.USER, content=prompt)], stream_handler=stream_handler)
+
+    async def aask(
+        self,
+        prompt: str,
+        stream_handler: Optional[Callable[[str], None]] = None,
+    ) -> AgentResult:
+        """
+        Async version of :meth:`ask`.
+
+        Args:
+            prompt: Plain-text question or instruction.
+            stream_handler: Optional callback for streaming responses.
+
+        Returns:
+            AgentResult with the response and metadata.
+
+        Example:
+            >>> result = await agent.aask("What is the capital of France?")
+            >>> print(result.content)
+        """
+        return await self.arun(
+            [Message(role=Role.USER, content=prompt)], stream_handler=stream_handler
+        )
+
     def run(
-        self, messages: List[Message], stream_handler: Optional[Callable[[str], None]] = None
+        self,
+        messages: Union[str, List[Message]],
+        stream_handler: Optional[Callable[[str], None]] = None,
     ) -> AgentResult:
         """
         Execute the agent loop with the provided conversation history.
@@ -247,12 +304,18 @@ class Agent:
         will be automatically saved to memory.
 
         Args:
-            messages: New messages for this turn (typically a single user message).
+            messages: A plain-text prompt (str) or list of Message objects.
+                A string is automatically wrapped as a single user message.
             stream_handler: Optional callback for streaming responses.
 
         Returns:
             AgentResult with the final response and tool call metadata.
+
+        Examples:
+            >>> result = agent.run("What is Python?")
+            >>> result = agent.run([Message(role=Role.USER, content="Hello")])
         """
+        messages = self._normalize_messages(messages)
         # Call on_agent_start hook
         self._call_hook("on_agent_start", messages)
 
@@ -787,15 +850,19 @@ class Agent:
 
     # Async methods
     async def astream(
-        self, messages: List[Message]
+        self, messages: Union[str, List[Message]]
     ) -> AsyncGenerator[Union[StreamChunk, AgentResult], None]:
         """
         Stream the agent's response token-by-token.
+
+        Args:
+            messages: A plain-text prompt (str) or list of Message objects.
 
         Yields:
             StreamChunk: Intermediate content chunks.
             AgentResult: The final result object (yielded at the very end).
         """
+        messages = self._normalize_messages(messages)
         self._call_hook("on_agent_start", messages)
 
         try:
@@ -971,7 +1038,9 @@ class Agent:
             raise
 
     async def arun(
-        self, messages: List[Message], stream_handler: Optional[Callable[[str], None]] = None
+        self,
+        messages: Union[str, List[Message]],
+        stream_handler: Optional[Callable[[str], None]] = None,
     ) -> AgentResult:
         """
         Async version of run().
@@ -980,12 +1049,13 @@ class Agent:
         Uses provider async methods if available, falls back to sync in executor.
 
         Args:
-            messages: New messages for this turn (typically a single user message).
+            messages: A plain-text prompt (str) or list of Message objects.
             stream_handler: Optional callback for streaming responses.
 
         Returns:
             AgentResult with the final response and tool call metadata.
         """
+        messages = self._normalize_messages(messages)
         self._call_hook("on_agent_start", messages)
 
         try:

@@ -1,11 +1,8 @@
 """
-v0.5.2 Feature Demo: Tool Validation at Registration & Observability Hooks
+Observability Hooks — lifecycle callbacks and tool validation at registration time.
 
-This example demonstrates the two new features in v0.5.2:
-1. Tool Validation at Registration - catches errors when defining tools
-2. Observability Hooks - track agent behavior for monitoring and debugging
-
-Run: python examples/v0_5_2_demo.py
+Prerequisites: OPENAI_API_KEY (examples 01-05)
+Run: python examples/12_observability_hooks.py
 """
 
 import time

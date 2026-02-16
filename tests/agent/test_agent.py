@@ -403,3 +403,172 @@ async def test_arun_returns_agent_result() -> None:
     assert result.tool_name == "noop"
     assert result.iterations == 2
     assert len(result.tool_calls) == 1
+
+
+# ---------------------------------------------------------------------------
+# ask() / aask() convenience methods
+# ---------------------------------------------------------------------------
+
+
+class TestAskConvenience:
+    """Tests for Agent.ask() and Agent.aask() convenience methods."""
+
+    def test_ask_returns_agent_result(self) -> None:
+        provider = FakeProvider(responses=["Hello there!"])
+        agent = Agent(
+            tools=[_noop_tool()],
+            provider=provider,
+            config=AgentConfig(max_iterations=1, model="fake"),
+        )
+        result = agent.ask("Hi")
+
+        assert isinstance(result, AgentResult)
+        assert result.content == "Hello there!"
+
+    def test_ask_equivalent_to_run_with_message(self) -> None:
+        provider1 = FakeProvider(responses=["Same answer"])
+        provider2 = FakeProvider(responses=["Same answer"])
+
+        agent1 = Agent(
+            tools=[_noop_tool()],
+            provider=provider1,
+            config=AgentConfig(max_iterations=1, model="fake"),
+        )
+        agent2 = Agent(
+            tools=[_noop_tool()],
+            provider=provider2,
+            config=AgentConfig(max_iterations=1, model="fake"),
+        )
+
+        result_ask = agent1.ask("Hello")
+        result_run = agent2.run([Message(role=Role.USER, content="Hello")])
+
+        assert result_ask.content == result_run.content
+
+    def test_ask_with_tool_execution(self) -> None:
+        provider = FakeProvider(
+            responses=[
+                'TOOL_CALL: {"tool_name": "noop", "parameters": {}}',
+                "Tool executed!",
+            ]
+        )
+        agent = Agent(
+            tools=[_noop_tool()],
+            provider=provider,
+            config=AgentConfig(max_iterations=3, model="fake"),
+        )
+        result = agent.ask("Do the thing")
+
+        assert result.content == "Tool executed!"
+        assert len(result.tool_calls) == 1
+
+    @pytest.mark.asyncio
+    async def test_aask_returns_agent_result(self) -> None:
+        provider = FakeProvider(responses=["Async hello!"])
+        agent = Agent(
+            tools=[_noop_tool()],
+            provider=provider,
+            config=AgentConfig(max_iterations=1, model="fake"),
+        )
+        result = await agent.aask("Hi async")
+
+        assert isinstance(result, AgentResult)
+        assert result.content == "Async hello!"
+
+    @pytest.mark.asyncio
+    async def test_aask_equivalent_to_arun_with_message(self) -> None:
+        provider1 = FakeProvider(responses=["Async same"])
+        provider2 = FakeProvider(responses=["Async same"])
+
+        agent1 = Agent(
+            tools=[_noop_tool()],
+            provider=provider1,
+            config=AgentConfig(max_iterations=1, model="fake"),
+        )
+        agent2 = Agent(
+            tools=[_noop_tool()],
+            provider=provider2,
+            config=AgentConfig(max_iterations=1, model="fake"),
+        )
+
+        result_aask = await agent1.aask("Hello")
+        result_arun = await agent2.arun([Message(role=Role.USER, content="Hello")])
+
+        assert result_aask.content == result_arun.content
+
+
+# ---------------------------------------------------------------------------
+# run() / arun() string shorthand
+# ---------------------------------------------------------------------------
+
+
+class TestRunStringShorthand:
+    """Tests for passing a string directly to run()/arun()."""
+
+    def test_run_accepts_string(self) -> None:
+        provider = FakeProvider(responses=["Got it!"])
+        agent = Agent(
+            tools=[_noop_tool()],
+            provider=provider,
+            config=AgentConfig(max_iterations=1, model="fake"),
+        )
+        result = agent.run("Just a string prompt")
+
+        assert isinstance(result, AgentResult)
+        assert result.content == "Got it!"
+
+    def test_run_string_equivalent_to_message_list(self) -> None:
+        provider1 = FakeProvider(responses=["Same output"])
+        provider2 = FakeProvider(responses=["Same output"])
+
+        agent1 = Agent(
+            tools=[_noop_tool()],
+            provider=provider1,
+            config=AgentConfig(max_iterations=1, model="fake"),
+        )
+        agent2 = Agent(
+            tools=[_noop_tool()],
+            provider=provider2,
+            config=AgentConfig(max_iterations=1, model="fake"),
+        )
+
+        result_str = agent1.run("Hello")
+        result_msg = agent2.run([Message(role=Role.USER, content="Hello")])
+
+        assert result_str.content == result_msg.content
+
+    def test_run_still_accepts_message_list(self) -> None:
+        provider = FakeProvider(responses=["List works too"])
+        agent = Agent(
+            tools=[_noop_tool()],
+            provider=provider,
+            config=AgentConfig(max_iterations=1, model="fake"),
+        )
+        result = agent.run([Message(role=Role.USER, content="List")])
+
+        assert result.content == "List works too"
+
+    @pytest.mark.asyncio
+    async def test_arun_accepts_string(self) -> None:
+        provider = FakeProvider(responses=["Async got it!"])
+        agent = Agent(
+            tools=[_noop_tool()],
+            provider=provider,
+            config=AgentConfig(max_iterations=1, model="fake"),
+        )
+        result = await agent.arun("Async string prompt")
+
+        assert isinstance(result, AgentResult)
+        assert result.content == "Async got it!"
+
+    @pytest.mark.asyncio
+    async def test_arun_still_accepts_message_list(self) -> None:
+        provider = FakeProvider(responses=["Async list works"])
+        agent = Agent(
+            tools=[_noop_tool()],
+            provider=provider,
+            config=AgentConfig(max_iterations=1, model="fake"),
+        )
+        result = await agent.arun([Message(role=Role.USER, content="List")])
+
+        assert result.content == "Async list works"

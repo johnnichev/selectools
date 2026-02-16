@@ -51,10 +51,33 @@ export OPENAI_API_KEY="sk-..."
 
 ## Quick Start
 
-### Tool Calling Agent
+> **New to Selectools?** Follow the [5-minute Quickstart tutorial](docs/QUICKSTART.md) — no API key needed.
+
+### Tool Calling Agent (No API Key)
 
 ```python
-from selectools import Agent, AgentConfig, Message, Role, tool, OpenAIProvider
+from selectools import Agent, AgentConfig, tool
+from selectools.providers.stubs import LocalProvider
+
+@tool(description="Look up the price of a product")
+def get_price(product: str) -> str:
+    prices = {"laptop": "$999", "phone": "$699", "headphones": "$149"}
+    return prices.get(product.lower(), f"No price found for {product}")
+
+agent = Agent(
+    tools=[get_price],
+    provider=LocalProvider(),
+    config=AgentConfig(max_iterations=3),
+)
+
+result = agent.ask("How much is a laptop?")
+print(result.content)
+```
+
+### Tool Calling Agent (OpenAI)
+
+```python
+from selectools import Agent, AgentConfig, OpenAIProvider, tool
 from selectools.models import OpenAI
 
 @tool(description="Search the web for information")
@@ -64,14 +87,14 @@ def search(query: str) -> str:
 agent = Agent(
     tools=[search],
     provider=OpenAIProvider(default_model=OpenAI.GPT_4O_MINI.id),
-    config=AgentConfig(max_iterations=5)
+    config=AgentConfig(max_iterations=5),
 )
 
-response = agent.run([Message(role=Role.USER, content="Search for Python tutorials")])
-print(response.content)
+result = agent.ask("Search for Python tutorials")
+print(result.content)
 ```
 
-### RAG Agent (3 Lines)
+### RAG Agent
 
 ```python
 from selectools import OpenAIProvider
@@ -86,11 +109,11 @@ agent = RAGAgent.from_directory(
     directory="./docs",
     provider=OpenAIProvider(default_model=OpenAI.GPT_4O_MINI.id),
     vector_store=store,
-    chunk_size=500, top_k=3
+    chunk_size=500, top_k=3,
 )
 
-response = agent.run("What are the main features?")
-print(response.content)
+result = agent.ask("What are the main features?")
+print(result.content)
 print(agent.get_usage_summary())  # LLM + embedding costs
 ```
 
@@ -119,16 +142,16 @@ agent = Agent(tools=[hybrid_tool.search_knowledge_base], provider=provider)
 
 ```python
 import asyncio
-from selectools import Agent, AgentConfig, Message, Role
+from selectools import Agent, AgentConfig
 from selectools.types import StreamChunk, AgentResult
 
 agent = Agent(
     tools=[tool_a, tool_b, tool_c],
     provider=provider,
-    config=AgentConfig(parallel_tool_execution=True)  # Default: enabled
+    config=AgentConfig(parallel_tool_execution=True),  # Default: enabled
 )
 
-async for item in agent.astream([Message(role=Role.USER, content="Run all tasks")]):
+async for item in agent.astream("Run all tasks"):
     if isinstance(item, StreamChunk):
         print(item.content, end="", flush=True)
     elif isinstance(item, AgentResult):
@@ -203,13 +226,13 @@ cache = InMemoryCache(max_size=1000, default_ttl=300)
 agent = Agent(
     tools=[...],
     provider=provider,
-    config=AgentConfig(cache=cache)
+    config=AgentConfig(cache=cache),
 )
 
 # Same question twice -> second call is instant (cache hit)
-agent.run([Message(role=Role.USER, content="What is Python?")])
+agent.ask("What is Python?")
 agent.reset()
-agent.run([Message(role=Role.USER, content="What is Python?")])
+agent.ask("What is Python?")
 
 print(cache.stats)  # CacheStats(hits=1, misses=1, hit_rate=50.00%)
 ```
@@ -224,7 +247,7 @@ Agent selects a tool without executing it -- use for intent classification:
 config = AgentConfig(routing_only=True)
 agent = Agent(tools=[send_email, schedule_meeting, search_kb], provider=provider, config=config)
 
-result = agent.run([Message(role=Role.USER, content="Book a meeting with Alice tomorrow")])
+result = agent.ask("Book a meeting with Alice tomorrow")
 print(result.tool_name)  # "schedule_meeting"
 print(result.tool_args)  # {"attendee": "Alice", "date": "tomorrow"}
 ```
@@ -370,14 +393,14 @@ from selectools import Agent, ConversationMemory
 memory = ConversationMemory(max_messages=20)
 agent = Agent(tools=[...], provider=provider, memory=memory)
 
-agent.run([Message(role=Role.USER, content="My name is Alice")])
-agent.run([Message(role=Role.USER, content="What's my name?")])  # Remembers "Alice"
+agent.ask("My name is Alice")
+agent.ask("What's my name?")  # Remembers "Alice"
 ```
 
 ## Cost Tracking
 
 ```python
-response = agent.run([Message(role=Role.USER, content="Search and summarize")])
+result = agent.ask("Search and summarize")
 
 print(f"Total cost: ${agent.total_cost:.6f}")
 print(f"Total tokens: {agent.total_tokens:,}")
@@ -387,31 +410,38 @@ print(agent.get_usage_summary())
 
 ## Examples
 
-| Example | Features Demonstrated |
-|---|---|
-| `rag_basic_demo.py` | RAG pipeline, document loading, vector search |
-| `hybrid_search_demo.py` | BM25 + vector fusion, RRF/weighted, reranking |
-| `advanced_chunking_demo.py` | Semantic and contextual chunking comparison |
-| `dynamic_tools_demo.py` | ToolLoader, plugin directory, hot-reload |
-| `caching_demo.py` | InMemoryCache, cache stats, agent reset |
-| `routing_mode_demo.py` | Routing mode, AgentResult, intent classification |
-| `streaming_parallel_demo.py` | astream(), parallel execution, StreamChunk |
-| `streaming_tools_demo.py` | Generator-based streaming tools |
-| `async_agent_demo.py` | arun(), concurrent agents, FastAPI pattern |
-| `conversation_memory_demo.py` | Multi-turn conversations with memory |
-| `cost_tracking_demo.py` | Token counting, cost warnings |
-| `toolbox_demo.py` | Pre-built tools (file, data, text, datetime) |
-| `customer_support_bot.py` | Multi-tool customer support workflow |
-| `data_analysis_agent.py` | Data exploration and analysis tools |
-| `rag_advanced_demo.py` | PDFs, SQLite persistence, metadata filtering |
-| `rag_multi_provider_demo.py` | Embedding/store/chunk-size comparisons |
-| `semantic_search_demo.py` | Pure semantic search, metadata filtering |
-| `ollama_demo.py` | Local LLM execution with Ollama |
+Examples are numbered by difficulty. Start from 01 and work your way up.
+
+| # | Example | Features | API Key? |
+|---|---|---|---|
+| 01 | `01_hello_world.py` | First agent, `@tool`, `ask()` | No |
+| 02 | `02_search_weather.py` | ToolRegistry, multiple tools | No |
+| 03 | `03_toolbox.py` | 22 pre-built tools (file, data, text, datetime) | No |
+| 04 | `04_conversation_memory.py` | Multi-turn memory | Yes |
+| 05 | `05_cost_tracking.py` | Token counting, cost warnings | Yes |
+| 06 | `06_async_agent.py` | `arun()`, concurrent agents, FastAPI | Yes |
+| 07 | `07_streaming_tools.py` | Generator-based streaming | Yes |
+| 08 | `08_streaming_parallel.py` | `astream()`, parallel execution, StreamChunk | Yes |
+| 09 | `09_caching.py` | InMemoryCache, RedisCache, cache stats | Yes |
+| 10 | `10_routing_mode.py` | Routing mode, intent classification | Yes |
+| 11 | `11_tool_analytics.py` | Call counts, success rates, timing | Yes |
+| 12 | `12_observability_hooks.py` | Lifecycle hooks, tool validation | Yes |
+| 13 | `13_dynamic_tools.py` | ToolLoader, plugins, hot-reload | Yes |
+| 14 | `14_rag_basic.py` | RAG pipeline, document loading, vector search | Yes + `[rag]` |
+| 15 | `15_semantic_search.py` | Pure semantic search, metadata filtering | Yes + `[rag]` |
+| 16 | `16_rag_advanced.py` | PDFs, SQLite persistence, custom chunking | Yes + `[rag]` |
+| 17 | `17_rag_multi_provider.py` | Embedding/store/chunk-size comparisons | Yes + `[rag]` |
+| 18 | `18_hybrid_search.py` | BM25 + vector fusion, RRF, reranking | Yes + `[rag]` |
+| 19 | `19_advanced_chunking.py` | Semantic and contextual chunking | Yes + `[rag]` |
+| 20 | `20_customer_support_bot.py` | Multi-tool customer support workflow | Yes |
+| 21 | `21_data_analysis_agent.py` | Data exploration and analysis | Yes |
+| 22 | `22_ollama_local.py` | Fully local LLM via Ollama | No (Ollama) |
 
 Run any example:
 
 ```bash
-python examples/hybrid_search_demo.py
+python examples/01_hello_world.py   # No API key needed
+python examples/14_rag_basic.py     # Needs OPENAI_API_KEY
 ```
 
 ## Documentation

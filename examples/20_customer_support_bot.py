@@ -1,24 +1,8 @@
 """
-Customer Support Bot Example
+Customer Support Bot — multi-tool workflow combining search, ticketing, and escalation.
 
-This example demonstrates how to build a production-ready customer support bot using Selectools.
-
-Features demonstrated:
-- Multiple tools for common support tasks (order lookup, refunds, knowledge base)
-- Conversation memory for maintaining context across multiple turns
-- Async support for handling concurrent requests
-- Error handling and graceful degradation
-- Realistic mock data for testing
-
-Usage:
-    # Set your OpenAI API key
-    export OPENAI_API_KEY="sk-..."
-
-    # Run the example
-    python examples/customer_support_bot.py
-
-Requirements:
-    pip install selectools
+Prerequisites: OPENAI_API_KEY (examples 01-13)
+Run: python examples/20_customer_support_bot.py
 """
 
 import asyncio

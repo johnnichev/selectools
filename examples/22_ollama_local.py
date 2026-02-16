@@ -1,18 +1,8 @@
 """
-Ollama Local Model Demo
+Ollama Local Model — run agents with fully local LLMs via Ollama. No cloud API needed.
 
-This example demonstrates using selectools with local Ollama models for:
-- Privacy-preserving agent execution (no data sent to cloud)
-- Zero-cost inference (no API fees)
-- Offline development and testing
-
-Prerequisites:
-1. Install Ollama: https://ollama.ai
-2. Pull a model: `ollama pull llama3.2`
-3. Start Ollama server: `ollama serve`
-
-Run this demo:
-    python examples/ollama_demo.py
+Prerequisites: Ollama installed and running (https://ollama.ai) (examples 01-05)
+Run: python examples/22_ollama_local.py
 """
 
 from selectools import Agent, AgentConfig, Message, Role, Tool, ToolParameter

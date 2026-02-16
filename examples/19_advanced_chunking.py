@@ -1,15 +1,9 @@
 """
-Advanced Chunking Demo: SemanticChunker and ContextualChunker
+Advanced Chunking — SemanticChunker (embedding-based) and ContextualChunker (LLM-enriched).
 
-This example demonstrates:
-- TextSplitter (fixed-size) vs RecursiveTextSplitter vs SemanticChunker
-- ContextualChunker wrapping RecursiveTextSplitter
-- SemanticChunker + ContextualChunker composition
-- Chunk count and quality comparison
-- Full pipeline: contextual chunks → vector store → search
-
-Requirements:
-    pip install selectools
+Prerequisites: OPENAI_API_KEY (examples 14-16)
+    pip install selectools[rag]
+Run: python examples/19_advanced_chunking.py
 """
 
 import os

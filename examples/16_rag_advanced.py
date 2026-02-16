@@ -1,13 +1,9 @@
 """
-Advanced RAG Demo: PDFs, Persistent Storage, and Custom Chunking
+Advanced RAG — PDFs, SQLite persistent storage, custom chunking, metadata filtering.
 
-This example demonstrates:
-- Loading documents from PDFs
-- Using SQLite for persistent storage
-- Custom chunking strategies with RecursiveTextSplitter
-- Metadata filtering
-- Cost tracking integration
-- Multiple document sources
+Prerequisites: OPENAI_API_KEY (examples 14-15)
+    pip install selectools[rag]
+Run: python examples/16_rag_advanced.py
 """
 
 import os

@@ -1,14 +1,9 @@
 """
-Basic RAG (Retrieval-Augmented Generation) Demo
+Basic RAG — document loading, chunking, embedding, vector search, and question answering.
 
-This example demonstrates how to use selectools to create an AI agent
-that can answer questions about your documents using RAG.
-
-Requirements:
-    pip install selectools numpy
-
-Optional (for other vector stores):
-    pip install selectools[rag]  # Includes chromadb, pinecone, etc.
+Prerequisites: OPENAI_API_KEY (examples 01-05)
+    pip install selectools[rag]
+Run: python examples/14_rag_basic.py
 """
 
 from selectools import OpenAIProvider

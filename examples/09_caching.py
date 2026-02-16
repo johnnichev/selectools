@@ -1,18 +1,10 @@
 #!/usr/bin/env python3
 """
-Response Caching Demo with InMemoryCache and RedisCache.
+Response Caching — InMemoryCache (LRU+TTL) and RedisCache for avoiding redundant LLM calls.
 
-Demonstrates how to use selectools response caching to avoid redundant LLM calls
-for identical requests. Covers InMemoryCache (LRU + TTL), cache stats, agent.reset()
-vs cache persistence, cache.clear(), and optional RedisCache for distributed setups.
-
-Requirements:
-    pip install selectools
-    # Optional, for Redis:
-    pip install selectools[cache]
-
-Run:
-    python examples/caching_demo.py
+Prerequisites: OPENAI_API_KEY (examples 01-05)
+    pip install selectools[cache]  # For RedisCache
+Run: python examples/09_caching.py
 """
 
 from typing import Any, List, Optional, Tuple

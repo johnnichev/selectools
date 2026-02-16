@@ -1,14 +1,10 @@
 """
-Toolbox Demo - Showcase pre-built tools from the selectools toolbox.
+Pre-built Toolbox — 22 ready-made tools for files, data, text, datetime, and web.
 
-This example demonstrates using the built-in tools for:
-- File operations
-- Data processing
-- Text manipulation
-- Date/time utilities
-- Web requests (commented out to avoid external dependencies)
+No API key needed for exploring tool schemas.
 
-Run: python examples/toolbox_demo.py
+Prerequisites: None (examples 01-02)
+Run: python examples/03_toolbox.py
 """
 
 from selectools import Agent, AgentConfig, Message, Role

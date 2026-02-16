@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Demonstration of ConversationMemory for multi-turn conversations.
+Multi-turn Conversation Memory with automatic context preservation.
 
-This example shows how to use ConversationMemory to maintain context
-across multiple agent interactions without manually managing message history.
+Prerequisites: OPENAI_API_KEY (examples 01-03)
+Run: python examples/04_conversation_memory.py
 """
 
 from selectools import Agent, AgentConfig, ConversationMemory, Message, Role, tool

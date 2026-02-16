@@ -1,12 +1,10 @@
 """
-Multi-Provider RAG Comparison Demo
+Multi-Provider RAG Comparison — compare embeddings, stores, and chunk sizes across providers.
 
-This example demonstrates:
-- Comparing OpenAI vs Gemini embeddings
-- In-memory vs SQLite performance comparison
-- Impact of different chunk sizes
-- Top-k parameter tuning
-- Comprehensive cost analysis
+Prerequisites: OPENAI_API_KEY (examples 14-16)
+    pip install selectools[rag]
+    Optional: ANTHROPIC_API_KEY, GOOGLE_API_KEY for cross-provider comparisons
+Run: python examples/17_rag_multi_provider.py
 """
 
 import os

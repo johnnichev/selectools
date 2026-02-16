@@ -1,15 +1,8 @@
 """
-Async Agent Demo using Selectools
+Async Agent — arun(), concurrent agents, and FastAPI integration patterns.
 
-This example demonstrates the async capabilities of Selectools, including:
-- Async tool functions
-- Async agent execution with Agent.arun()
-- Concurrent agent execution
-- Async with conversation memory
-
-Requirements:
-- Set OPENAI_API_KEY in your environment or .env file
-- Install: pip install selectools
+Prerequisites: OPENAI_API_KEY (examples 01-05)
+Run: python examples/06_async_agent.py
 """
 
 import asyncio

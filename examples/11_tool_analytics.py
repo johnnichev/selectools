@@ -1,16 +1,8 @@
 """
-Tool Usage Analytics Demo
+Tool Usage Analytics — call counts, success rates, timing, cost attribution.
 
-This example demonstrates the tool analytics feature for tracking and analyzing
-agent performance:
-- Call frequency and success rates
-- Execution times and performance metrics
-- Parameter usage patterns
-- Cost attribution per tool
-- Export analytics to JSON/CSV
-
-Run this demo:
-    python examples/tool_analytics_demo.py
+Prerequisites: OPENAI_API_KEY (examples 01-05)
+Run: python examples/11_tool_analytics.py
 """
 
 import os

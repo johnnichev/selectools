@@ -1,7 +1,10 @@
 """
-Minimal search + weather examples using ToolRegistry and @tool.
+Search and Weather tools with ToolRegistry and @tool.
 
-Runs with the LocalProvider by default (no network calls).
+No API key needed — runs with the built-in LocalProvider.
+
+Prerequisites: None (examples 01)
+Run: python examples/02_search_weather.py
 """
 
 from __future__ import annotations

@@ -9,9 +9,13 @@ Welcome to the comprehensive technical documentation for selectools - a producti
 
 ## 📚 Documentation Structure
 
+### Getting Started
+
+- **[QUICKSTART.md](QUICKSTART.md)** - **Start here.** Build your first agent in 5 minutes, no API key needed.
+
 ### Main Documentation
 
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Start here for a complete system overview, architecture diagrams, data flows, and design principles.
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Complete system overview, architecture diagrams, data flows, and design principles.
 
 ### Module Documentation
 
@@ -159,10 +163,10 @@ Detailed technical documentation for each module:
 
 ### Beginner
 
-1. Read [ARCHITECTURE.md](ARCHITECTURE.md) - Get the big picture
-2. Read [AGENT.md](modules/AGENT.md) - Understand the core loop
-3. Read [TOOLS.md](modules/TOOLS.md) - Learn to create tools
-4. Build your first agent!
+1. Follow [QUICKSTART.md](QUICKSTART.md) - Build your first agent in 5 minutes
+2. Read [ARCHITECTURE.md](ARCHITECTURE.md) - Get the big picture
+3. Read [AGENT.md](modules/AGENT.md) - Understand the core loop
+4. Read [TOOLS.md](modules/TOOLS.md) - Learn to create tools
 
 ### Intermediate
 

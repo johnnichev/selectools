@@ -1,28 +1,8 @@
 """
-Data Analysis Agent Example
+Data Analysis Agent — data exploration, filtering, aggregation, and visualization tools.
 
-This example demonstrates how to build an AI-powered data analysis assistant using Selectools.
-
-Features demonstrated:
-- Data loading and inspection tools (CSV, JSON, dictionary)
-- Statistical analysis (mean, median, correlation, distribution)
-- Data filtering and aggregation
-- Natural language interface for data exploration
-- Conversation memory to maintain analysis context
-- Error handling for data operations
-
-Usage:
-    # Set your OpenAI API key
-    export OPENAI_API_KEY="sk-..."
-
-    # Run the example
-    python examples/data_analysis_agent.py
-
-Requirements:
-    pip install selectools
-
-Note: This example uses built-in Python libraries only. For production use,
-      consider adding pandas, numpy, and matplotlib for more advanced analytics.
+Prerequisites: OPENAI_API_KEY (examples 01-13)
+Run: python examples/21_data_analysis_agent.py
 """
 
 import json
