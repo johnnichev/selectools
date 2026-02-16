@@ -416,7 +416,9 @@ agent = Agent(tools=registry.tools, provider=provider)
 **Suggested implementation order:**
 
 ```
-Phase 1 (v0.13.0): #3 → #1 → #2        (Safety foundation)
-Phase 2 (v0.14.0): #4 → #6 → #5        (Memory persistence)
-Phase 3 (v1.0.0):  #9 → #7 → #8 → #10  (Enterprise readiness)
+Phase 1 (v0.13.0): #3 → #1 → #2                    (Safety foundation)
+Phase 2 (v0.14.0): #4 → #6 → #5 + entity/KG memory (Memory persistence & advanced memory types)
+Phase 3 (v0.15.0): Structured output → MCP client/server (Interoperability)
+Phase 4 (v0.16.0): Multi-agent graphs → handoffs → supervisor (Orchestration)
+Phase 5 (v1.0.0):  #9 → #7 → #8 → #10 + guardrails engine (Enterprise readiness)
 ```

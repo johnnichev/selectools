@@ -76,30 +76,62 @@ See [FEATURE_PROPOSALS.md](./FEATURE_PROPOSALS.md) for detailed designs.
 
 ## v0.14.0: Memory & Persistence
 
-Focus: Durable conversation state and cross-session knowledge.
+Focus: Durable conversation state, cross-session knowledge, and advanced memory strategies.
 See [FEATURE_PROPOSALS.md](./FEATURE_PROPOSALS.md) for detailed designs.
 
-| Feature                            | Priority  | Impact | Description                                                                  |
-| ---------------------------------- | --------- | ------ | ---------------------------------------------------------------------------- |
-| **Persistent Conversation Sessions** | 🟡 High | High   | `SessionStore` protocol with JSON file, SQLite, and Redis backends; auto-save + TTL |
+| Feature                              | Priority  | Impact | Description                                                                  |
+| ------------------------------------ | --------- | ------ | ---------------------------------------------------------------------------- |
+| **Persistent Conversation Sessions** | 🟡 High   | High   | `SessionStore` protocol with JSON file, SQLite, and Redis backends; auto-save + TTL |
 | **Summarize-on-Trim**               | 🟡 Medium | Medium | LLM-generated summary replaces trimmed messages instead of silent drop       |
 | **Cross-Session Knowledge Memory**   | 🟡 Medium | Medium | Daily log + long-term `MEMORY.md`; built-in `remember` tool; system prompt injection |
+| **Buffer Memory**                    | 🟡 Medium | Medium | Fixed-size token/message buffer with configurable eviction; pass-through mode for short conversations |
+| **Entity Memory**                    | 🟡 Medium | High   | Extract and track named entities (people, orgs, projects) across turns; inject relevant entity context into prompts |
+| **Knowledge Graph Memory**           | 🟡 Low    | High   | Build and query a graph of (subject, relation, object) triples extracted from conversations; persistent storage via SQLite or Neo4j |
+
+---
+
+## v0.15.0: Structured Output & MCP
+
+Focus: Structured responses, interoperability, and standardised tool protocols.
+
+| Feature                          | Priority  | Impact | Description                                                                                      |
+| -------------------------------- | --------- | ------ | ------------------------------------------------------------------------------------------------ |
+| **Structured Output Parsers**    | 🟡 High   | High   | Enforce response schemas via Pydantic models or JSON Schema; `agent.ask(..., response_format=Model)` returns typed objects; provider-native structured output where available (OpenAI JSON mode, Anthropic tool-use schemas) with fallback regex extraction |
+| **MCP Support (Client)**         | 🟡 High   | High   | Implement Model Context Protocol client; discover and call MCP-compliant tool servers; `MCPToolProvider.from_server(url)` auto-registers remote tools with the agent |
+| **MCP Support (Server)**         | 🟡 Medium | Medium | Expose selectools agents and tools as MCP-compliant servers; any MCP client (Cursor, Claude Desktop, etc.) can call selectools tools natively |
+
+---
+
+## v0.16.0: Multi-Agent Orchestration
+
+Focus: Composable agent graphs, delegation, and collaborative workflows.
+
+| Feature                          | Priority  | Impact | Description                                                                                      |
+| -------------------------------- | --------- | ------ | ------------------------------------------------------------------------------------------------ |
+| **Multi-Agent Graphs**           | 🟡 High   | High   | Define agent graphs with nodes (agents) and edges (handoffs); sequential, parallel, and conditional routing between agents; `AgentGraph` builder API |
+| **Agent Handoffs**               | 🟡 High   | High   | First-class `handoff()` mechanism for one agent to delegate to another with context transfer; supports typed payloads between agents |
+| **Supervisor Agent**             | 🟡 Medium | High   | Meta-agent that decomposes tasks, delegates to specialist agents, and synthesises results; configurable delegation strategy |
+| **Shared State & Blackboard**    | 🟡 Medium | Medium | Thread-safe shared state dict accessible by all agents in a graph; supports read/write scoping per agent |
+| **Graph Checkpointing**          | 🟡 Low    | Medium | Persist graph execution state for pause/resume; enables long-running workflows and human-in-the-loop at graph level |
 
 ---
 
 ## v1.0.0: Enterprise Reliability (Future)
 
-Focus: Stability, observability, security hardening, and advanced orchestration.
+Focus: Stability, observability, security hardening, and guardrails.
 
-| Feature                     | Priority  | Impact | Description                                                                  |
-| --------------------------- | --------- | ------ | ---------------------------------------------------------------------------- |
-| **Retry Policies**          | 🟡 Medium | Medium | Declarative retries (exponential backoff) on tool definitions                |
-| **Provider Fallback Chain** | 🟡 Medium | High   | Auto-switch providers on failure (OpenAI → Anthropic → Local)                |
-| **Tool Middleware**         | 🟡 Medium | Medium | Cross-cutting concerns (auth, rate limiting) via middleware pipeline          |
-| **Circuit Breakers**        | 🟡 Medium | High   | Stop cascading failures when downstream services are down                    |
-| **Audit Logging**           | 🟡 Medium | Medium | JSONL append-only log with privacy controls (hashed inputs, arg keys only)   |
-| **Tool Output Screening**   | 🟡 Medium | Medium | Detect prompt injection in tool results before feeding back to LLM           |
-| **Coherence Checking**      | 🟡 Medium | Medium | Verify tool calls match user's original intent to prevent injection hijacking |
+| Feature                         | Priority  | Impact | Description                                                                  |
+| ------------------------------- | --------- | ------ | ---------------------------------------------------------------------------- |
+| **Guardrails Engine**           | 🟡 High   | High   | Pluggable input/output guardrails pipeline; content moderation, PII detection, topic restriction, and custom validators; runs before LLM call (input) and after response (output) |
+| **Input Guardrails**            | 🟡 High   | High   | Pre-LLM filters: topic allow/deny lists, PII redaction, prompt injection detection, token budget enforcement |
+| **Output Guardrails**           | 🟡 High   | High   | Post-LLM filters: factuality checks, hallucination detection, format validation, content policy enforcement |
+| **Retry Policies**              | 🟡 Medium | Medium | Declarative retries (exponential backoff) on tool definitions                |
+| **Provider Fallback Chain**     | 🟡 Medium | High   | Auto-switch providers on failure (OpenAI → Anthropic → Local)                |
+| **Tool Middleware**             | 🟡 Medium | Medium | Cross-cutting concerns (auth, rate limiting) via middleware pipeline          |
+| **Circuit Breakers**            | 🟡 Medium | High   | Stop cascading failures when downstream services are down                    |
+| **Audit Logging**               | 🟡 Medium | Medium | JSONL append-only log with privacy controls (hashed inputs, arg keys only)   |
+| **Tool Output Screening**       | 🟡 Medium | Medium | Detect prompt injection in tool results before feeding back to LLM           |
+| **Coherence Checking**          | 🟡 Medium | Medium | Verify tool calls match user's original intent to prevent injection hijacking |
 
 ---
 
@@ -107,10 +139,14 @@ Focus: Stability, observability, security hardening, and advanced orchestration.
 
 ### High-Impact Complex Features
 
-| Feature                 | Status         | Notes                                   |
-| ----------------------- | -------------- | --------------------------------------- |
-| Parallel Tool Execution | ✅ Implemented | `asyncio.gather` / `ThreadPoolExecutor` |
-| Tool Composition        | 🟡 Planned     | `@compose` decorator                    |
+| Feature                    | Status         | Notes                                                                |
+| -------------------------- | -------------- | -------------------------------------------------------------------- |
+| Parallel Tool Execution    | ✅ Implemented | `asyncio.gather` / `ThreadPoolExecutor`                              |
+| Tool Composition           | 🟡 Planned     | `@compose` decorator                                                 |
+| Multi-Agent Graphs         | 🟡 Planned     | `AgentGraph` with nodes, edges, handoffs; v0.16.0                    |
+| Structured Output Parsers  | 🟡 Planned     | Pydantic/JSON Schema response enforcement; v0.15.0                   |
+| MCP Support                | 🟡 Planned     | Client + server for Model Context Protocol; v0.15.0                  |
+| Guardrails Engine          | 🟡 Planned     | Input/output guardrails pipeline with pluggable validators; v1.0.0   |
 
 ### Tool Capabilities
 
@@ -148,10 +184,23 @@ Focus: Stability, observability, security hardening, and advanced orchestration.
 | Documentation Generation   | 🟡 Planned     | Auto-generate from tool definitions |
 | Type Safety Improvements   | ✅ Implemented | Full mypy coverage, all annotations |
 
+### Memory Systems
+
+| Feature                  | Status         | Notes                                                        |
+| ------------------------ | -------------- | ------------------------------------------------------------ |
+| Conversation Memory      | ✅ Implemented | Sliding window with configurable limits                      |
+| Summarize-on-Trim        | 🟡 Planned     | LLM-generated summary replaces trimmed messages; v0.14.0     |
+| Buffer Memory            | 🟡 Planned     | Fixed-size token/message buffer with eviction; v0.14.0       |
+| Entity Memory            | 🟡 Planned     | Extract/track named entities across turns; v0.14.0           |
+| Knowledge Graph Memory   | 🟡 Planned     | (subject, relation, object) triples with graph storage; v0.14.0 |
+| Cross-Session Knowledge  | 🟡 Planned     | Daily logs + long-term memory with system prompt injection; v0.14.0 |
+
 ### Ecosystem Integration
 
 | Feature                | Status     | Notes                             |
 | ---------------------- | ---------- | --------------------------------- |
+| MCP Client             | 🟡 Planned | Discover and call MCP tool servers; v0.15.0 |
+| MCP Server             | 🟡 Planned | Expose selectools tools as MCP servers; v0.15.0 |
 | Framework Integrations | 🟡 Planned | FastAPI, Flask, LangChain adapter |
 | CRM & Business Tools   | 🟡 Planned | HubSpot, Salesforce, etc          |
 | Data Source Connectors | 🟡 Planned | SQL, vector DBs, cloud storage    |
