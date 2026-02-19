@@ -416,9 +416,18 @@ agent = Agent(tools=registry.tools, provider=provider)
 **Suggested implementation order:**
 
 ```
-Phase 1 (v0.13.0): #3 → #1 → #2                    (Safety foundation)
-Phase 2 (v0.14.0): #4 → #6 → #5 + entity/KG memory (Memory persistence & advanced memory types)
-Phase 3 (v0.15.0): Structured output → MCP client/server (Interoperability)
-Phase 4 (v0.16.0): Multi-agent graphs → handoffs → supervisor (Orchestration)
-Phase 5 (v1.0.0):  #9 → #7 → #8 → #10 + guardrails engine (Enterprise readiness)
+Phase 1 (v0.13.0): #3 → Structured output → Fallback providers → Batch → #1 → #2
+                    (Routing infrastructure + safety foundation)
+
+Phase 2 (v0.14.0): Multi-agent graphs → handoffs → shared state → supervisor
+                    (Orchestration — the full classify-then-delegate pattern)
+
+Phase 3 (v0.15.0): MCP client → MCP server → FastAPI/Flask integrations
+                    (Ecosystem interoperability)
+
+Phase 4 (v0.16.0): #4 → #6 → #5 + entity/KG memory
+                    (Memory persistence & advanced memory types)
+
+Phase 5 (v1.0.0):  Guardrails → #9 → #7 → #8 → #10
+                    (Enterprise readiness)
 ```
