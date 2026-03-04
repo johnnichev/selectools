@@ -416,8 +416,9 @@ agent = Agent(tools=registry.tools, provider=provider)
 **Suggested implementation order:**
 
 ```
-Phase 1 (v0.13.0): #3 → Structured output → Fallback providers → Batch → #1 → #2
-                    (Routing infrastructure + safety foundation)
+Phase 1 (v0.13.0): #3 → Structured output → Execution traces → Reasoning visibility
+                    → Fallback providers → Batch → #1 → #2
+                    (Routing infrastructure + observability + safety foundation)
 
 Phase 2 (v0.14.0): Multi-agent graphs → handoffs → shared state → supervisor
                     (Orchestration — the full classify-then-delegate pattern)

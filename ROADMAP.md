@@ -61,9 +61,9 @@ Focus: Response caching and advanced RAG capabilities.
 
 ---
 
-## v0.13.0: Structured Output & Safety (Next)
+## v0.13.0: Structured Output, Observability & Safety (Next)
 
-Focus: Typed classification results, tool execution safety, and production resilience.
+Focus: Typed classification results, agent execution transparency, tool execution safety, and production resilience.
 This is the highest-impact release for routing/classification use cases (traffic cops, intent classifiers, request routers).
 
 ### Structured Output Parsers
@@ -172,6 +172,79 @@ results = agent.batch(tickets, max_concurrency=5)
 
 **Touches**: `agent/core.py` (new methods), uses existing `run()` / `arun()` internally.
 
+### Execution Traces (`AgentTrace`)
+
+**Problem**: Hooks fire individual events but there's no unified, structured record of what happened during a run. Users have to wire up multiple hooks and manually correlate them to understand the full picture. There's no way to answer "what exactly did the agent do and how long did each step take?" without custom glue code.
+
+**What it does**: Every `agent.run()` / `agent.arun()` automatically produces an `AgentTrace` — a list of typed `TraceStep` objects capturing the full execution timeline: every LLM call, tool selection decision, tool execution, cache hit, and error, with timestamps and durations.
+
+**API**:
+
+```python
+result = agent.run("Classify this ticket")
+
+for step in result.trace:
+    print(f"{step.type} | {step.duration_ms}ms | {step.summary}")
+# llm_call       | 312ms | gpt-4o-mini → tool_use(route_billing)
+# tool_selection  | 0ms   | Selected route_billing(customer_id="abc")
+# tool_execution  | 45ms  | route_billing → {"queue": "billing", "priority": "high"}
+
+# Export for debugging or dashboards
+result.trace.to_dict()
+result.trace.to_json("trace.json")
+result.trace.timeline()  # human-readable timeline string
+
+# Filter by step type
+llm_steps = result.trace.filter(type="llm_call")
+total_llm_ms = sum(s.duration_ms for s in llm_steps)
+```
+
+**Scope**:
+
+- `TraceStep` union type: `LLMCall`, `ToolSelection`, `ToolExecution`, `CacheHit`, `Error`
+- Each step captures: type, timestamp, duration_ms, input/output summaries, token usage (for LLM steps)
+- `AgentTrace` container with `.to_dict()`, `.to_json()`, `.timeline()`, `.filter(type=...)` methods
+- `result.trace` property on `AgentResult` — always populated, zero-cost when not accessed
+- Opt-in detailed mode via `AgentConfig(trace_level="full")` to include raw messages; default `"summary"` for lightweight traces
+- Builds on existing hook infrastructure internally (no performance overhead for current users)
+
+**Touches**: `agent/core.py`, new `trace.py` module, `AgentResult` (new `trace` field), `AgentConfig` (new `trace_level`).
+
+### Reasoning Visibility
+
+**Problem**: Users can see *that* the agent picked a tool, but not *why*. LLMs often return explanatory text alongside tool calls (e.g., "The customer is asking about billing, so I'll route to billing_support"), but this reasoning text is currently discarded by the response parser. For routing/classification use cases this is critical — operators need to understand and audit why a request was classified a certain way.
+
+**What it does**: Capture and surface the LLM's reasoning text that accompanies tool call decisions. Available as a top-level property on `AgentResult` and per-step in the execution trace. No extra LLM calls required — purely extracting what providers already return.
+
+**API**:
+
+```python
+result = agent.run("Route this customer request", routing_only=True)
+
+print(result.reasoning)
+# "The customer is asking about billing charges, routing to billing_support"
+
+# Per-step in trace:
+for step in result.trace:
+    if step.type == "tool_selection" and step.reasoning:
+        print(f"Selected {step.tool_name} because: {step.reasoning}")
+
+# Multi-iteration agents accumulate reasoning per iteration
+for i, reasoning in enumerate(result.reasoning_history):
+    print(f"Iteration {i}: {reasoning}")
+```
+
+**Scope**:
+
+- Extract text content from LLM responses that accompany tool_use blocks (OpenAI, Anthropic, Gemini all return text alongside tool calls)
+- `result.reasoning` — the text from the final tool selection response
+- `result.reasoning_history` — list of reasoning strings, one per agent iteration
+- `step.reasoning` on `ToolSelection` trace steps
+- No extra LLM calls — purely extracting what's already returned but currently discarded
+- Works with all providers (OpenAI, Anthropic, Gemini, Ollama)
+
+**Touches**: `agent/core.py` (response parsing), `AgentResult` (new `reasoning` and `reasoning_history` fields), `trace.py` (`ToolSelection` step).
+
 ### Tool-Pair-Aware Trimming
 
 **Problem**: `ConversationMemory._enforce_limits()` uses naive sliding-window trimming. If the cut happens between an assistant `tool_use` message and its `tool_result`, the LLM receives a malformed conversation that violates provider API contracts.
@@ -256,6 +329,8 @@ config = AgentConfig(
 | Feature                        | Priority  | Impact | Effort |
 | ------------------------------ | --------- | ------ | ------ |
 | **Structured Output Parsers**  | 🟡 High   | High   | Medium |
+| **Execution Traces**           | 🟡 High   | High   | Medium |
+| **Reasoning Visibility**       | 🟡 High   | High   | Small  |
 | **Provider Fallback Chain**    | 🟡 High   | High   | Medium |
 | **Batch Processing**           | 🟡 High   | High   | Small  |
 | **Tool-Pair-Aware Trimming**   | 🟡 High   | High   | Small  |
@@ -734,9 +809,9 @@ agent = Agent(tools=[...], provider=provider, config=AgentConfig(guardrails=guar
 ## Implementation Order
 
 ```
-v0.13.0  Structured Output + Safety Foundation
-         Tool-pair trimming → Structured output → Fallback providers → Batch
-         → Tool policy engine → Human-in-the-loop
+v0.13.0  Structured Output + Observability + Safety Foundation
+         Tool-pair trimming → Structured output → Execution traces → Reasoning visibility
+         → Fallback providers → Batch → Tool policy engine → Human-in-the-loop
 
 v0.14.0  Multi-Agent Orchestration
          Agent graphs → Handoffs → Shared state → Supervisor
@@ -761,9 +836,7 @@ v1.0.0   Enterprise Reliability
 | Tool Marketplace/Registry  | Community tool sharing                           |
 | Universal Vision Support   | Unified vision API across providers              |
 | AWS Bedrock Provider       | VPC-native model access (Claude, Llama, Mistral) |
-| Observability & Debugging  | OpenTelemetry traces, execution replay           |
 | Rate Limiting & Quotas     | Per-tool and per-user quotas                     |
-| Interactive Debug Mode     | Step-through agent execution                     |
 | Visual Agent Builder       | Web UI for agent design                          |
 | Enhanced Testing Framework | Snapshot testing, load tests                     |
 | Documentation Generation   | Auto-generate docs from tool definitions         |
