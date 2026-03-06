@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from .types import Message
+from .types import Message, Role
 
 
 class ConversationMemory:
@@ -134,8 +134,9 @@ class ConversationMemory:
         """
         Enforce configured limits by removing oldest messages.
 
-        Implements a sliding window that keeps the most recent messages.
-        Checks both message count and token count limits if configured.
+        Uses a tool-pair-aware sliding window: after trimming, the cut point
+        is advanced past any orphaned tool results so the conversation always
+        starts at a safe boundary (a user or system text message).
         """
         # Enforce message count limit
         if len(self._messages) > self.max_messages:
@@ -144,7 +145,7 @@ class ConversationMemory:
 
         # Enforce token count limit if configured
         if self.max_tokens is not None:
-            while len(self._messages) > 1:  # Keep at least 1 message
+            while len(self._messages) > 1:
                 total_tokens = sum(
                     getattr(msg, "estimate_tokens", lambda: len(msg.content) // 4)()
                     for msg in self._messages
@@ -153,8 +154,29 @@ class ConversationMemory:
                 if total_tokens <= self.max_tokens:
                     break
 
-                # Remove oldest message
                 self._messages.pop(0)
+
+        self._fix_tool_pair_boundary()
+
+    def _fix_tool_pair_boundary(self) -> None:
+        """Advance past orphaned tool results / assistant tool_use messages.
+
+        After a naive trim the first message might be a TOOL result whose
+        matching ASSISTANT tool_use was dropped, or an ASSISTANT message
+        whose tool results follow but the pair is incomplete.  Scan forward
+        until we reach a safe starting point: a USER text message (without
+        ``tool_call_id``) or a SYSTEM message.  Always keep at least one
+        message.
+        """
+        while len(self._messages) > 1:
+            first = self._messages[0]
+            if first.role == Role.TOOL:
+                self._messages.pop(0)
+                continue
+            if first.role == Role.ASSISTANT and first.tool_calls:
+                self._messages.pop(0)
+                continue
+            break
 
     def __len__(self) -> int:
         """Return the number of messages in history."""

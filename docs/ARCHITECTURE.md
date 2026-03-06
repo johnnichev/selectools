@@ -1,6 +1,6 @@
 # Selectools Architecture
 
-**Version:** 0.12.0
+**Version:** 0.13.0
 **Last Updated:** February 2026
 
 ## Table of Contents
@@ -30,6 +30,13 @@ Selectools is a production-ready Python framework for building AI agents with to
 - **Streaming**: E2E token-level streaming with native tool call support via `Agent.astream`
 - **Parallel Execution**: Concurrent tool execution via `asyncio.gather` / `ThreadPoolExecutor`
 - **Response Caching**: Built-in LRU+TTL cache (`InMemoryCache`) and distributed `RedisCache`
+- **Structured Output**: Pydantic / JSON Schema `response_format` with auto-retry on validation failure
+- **Execution Traces**: `AgentTrace` with typed `TraceStep` timeline on every `run()` / `arun()`
+- **Reasoning Visibility**: `result.reasoning` surfaces *why* the agent chose a tool
+- **Provider Fallback**: `FallbackProvider` with priority ordering and circuit breaker
+- **Batch Processing**: `agent.batch()` / `agent.abatch()` for concurrent multi-prompt execution
+- **Tool Policy Engine**: Declarative allow/review/deny rules with human-in-the-loop approval
+- **Tool-Pair-Aware Trimming**: Memory sliding window preserves tool_use/tool_result pairs
 
 ---
 
@@ -44,12 +51,16 @@ Selectools is a production-ready Python framework for building AI agents with to
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                              AGENT                                       │
 │  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │  Agent Loop (agent.py)                                           │  │
+│  │  Agent Loop (agent/core.py)                                      │  │
 │  │  • Iterative execution                                           │  │
-│  │  • Tool call detection                                           │  │
+│  │  • Tool call detection & policy enforcement                      │  │
+│  │  • Structured output parsing & validation                        │  │
+│  │  • Execution traces (AgentTrace)                                 │  │
+│  │  • Reasoning extraction                                          │  │
 │  │  • Error handling & retries                                      │  │
 │  │  • Hooks (observability)                                         │  │
 │  │  • Parallel tool execution                                       │  │
+│  │  • Batch processing (batch/abatch)                               │  │
 │  │  • Response caching (LRU+TTL)                                    │  │
 │  └─────────┬────────────────────────┬──────────────────┬────────────┘  │
 │            │                        │                  │               │
@@ -69,6 +80,15 @@ Selectools is a production-ready Python framework for building AI agents with to
 │  │   OpenAI     │  │  Anthropic   │  │    Gemini    │  │   Ollama  │  │
 │  │   Provider   │  │   Provider   │  │   Provider   │  │  Provider │  │
 │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └─────┬─────┘  │
+│         │                 │                  │                │         │
+│         └─────────────┬───┴──────────────────┴────────────────┘         │
+│                       ▼                                                 │
+│         ┌─────────────────────────────┐                                │
+│         │  FallbackProvider           │                                │
+│         │  • Priority ordering        │                                │
+│         │  • Circuit breaker          │                                │
+│         │  • Auto-failover            │                                │
+│         └─────────────────────────────┘                                │
 │         │                 │                  │                │         │
 │         └─────────────────┴──────────────────┴────────────────┘         │
 │                                 │                                        │
@@ -133,19 +153,27 @@ Selectools is a production-ready Python framework for building AI agents with to
 
 ## Core Components
 
-### 1. Agent (`agent.py`)
+### 1. Agent (`agent/core.py`)
 
 The **Agent** is the orchestrator that manages the iterative loop of:
 
 1. Sending messages to the LLM provider
-2. Parsing responses for tool calls
-3. Executing requested tools
-4. Feeding results back to the LLM
-5. Repeating until task completion or max iterations
+2. Parsing responses for tool calls (with optional structured output validation)
+3. Evaluating tool policies and requesting human approval if needed
+4. Executing requested tools
+5. Feeding results back to the LLM
+6. Recording execution traces for every step
+7. Repeating until task completion or max iterations
 
 **Key Responsibilities:**
 
 - Conversation management with optional memory
+- Structured output parsing and validation (`response_format`)
+- Execution trace recording (`AgentTrace` on every run)
+- Reasoning extraction from LLM responses
+- Tool policy enforcement (allow/review/deny)
+- Human-in-the-loop approval for flagged tools
+- Batch processing (`batch()` / `abatch()`)
 - Retry logic with exponential backoff
 - Rate limit detection and handling
 - Tool timeout enforcement
@@ -201,6 +229,7 @@ Each implements the `Provider` protocol with `complete()`, `stream()`, `acomplet
 
 - Sliding window with configurable limits (message count, token count)
 - Automatic pruning when limits exceeded
+- Tool-pair-aware trimming: never orphans a tool_use without its tool_result
 - Integrates seamlessly with Agent
 
 ### 7. RAG System (`rag/`)
@@ -233,7 +262,44 @@ Tool usage analytics with:
 - Streaming metrics
 - Export to JSON/CSV
 
-### 10. Model Registry (`models.py`)
+### 10. Structured Output (`structured.py`)
+
+Enforces typed responses from LLMs:
+
+- Pydantic `BaseModel` or dict JSON Schema support
+- Schema instruction injection into system prompt
+- JSON extraction from LLM response text
+- Validation with auto-retry on failure
+- `result.parsed` returns the typed object
+
+### 11. Execution Traces (`trace.py`)
+
+Structured timeline of every agent execution:
+
+- `TraceStep` types: `llm_call`, `tool_selection`, `tool_execution`, `cache_hit`, `error`, `structured_retry`
+- Captures timestamps, durations, input/output summaries, token usage
+- `AgentTrace` container with `.to_dict()`, `.to_json()`, `.timeline()`, `.filter()`
+- Always populated on `result.trace` — zero cost when not accessed
+
+### 12. Tool Policy (`policy.py`)
+
+Declarative tool execution safety:
+
+- Glob-based `allow`, `review`, `deny` rules
+- Argument-level `deny_when` conditions
+- Evaluation order: deny → review → allow → default (review)
+- Integration point in agent loop before tool execution
+
+### 13. Provider Fallback (`providers/fallback.py`)
+
+Resilient provider orchestration:
+
+- Wraps multiple providers in priority order
+- Automatic failover on timeout, 5xx, rate limit, connection error
+- Circuit breaker: skip failed providers for configurable cooldown
+- `on_fallback` callback for observability
+
+### 14. Model Registry (`models.py`)
 
 Single source of truth for 130+ models:
 
@@ -279,23 +345,37 @@ Single source of truth for 130+ models:
    ├─→ ToolCallParser.parse(response_text)
    ├─→ Extract: tool_name, parameters
    │
-7. Tool Execution [if tool call detected]
+7. Tool Policy Check [if tool call detected]
+   │
+   ├─→ ToolPolicy.evaluate(tool_name, tool_args) → allow/review/deny
+   ├─→ If deny → return error message to LLM, skip execution
+   ├─→ If review → invoke confirm_action callback → approve/deny
+   │
+8. Tool Execution [if allowed]
    │
    ├─→ Tool.validate(parameters)
    ├─→ Tool.execute(parameters, injected_kwargs)
    ├─→ Parallel execution if multiple tools (asyncio.gather / ThreadPoolExecutor)
    ├─→ Handle timeout, errors, streaming
+   ├─→ Record TraceStep (tool_execution) with duration
    │
-8. Feedback Loop [if tool executed]
+9. Feedback Loop [if tool executed]
    │
    ├─→ Append ASSISTANT message (tool call)
    ├─→ Append TOOL message (result)
    ├─→ Return to step 4 (next iteration)
    │
-9. Final Response [no tool call]
+10. Structured Output Validation [if response_format set]
+   │
+   ├─→ extract_json(response_text) → parse_and_validate(json, schema)
+   ├─→ If valid → result.parsed = typed object
+   ├─→ If invalid → retry with error feedback to LLM
+   │
+11. Final Response [no tool call]
    │
    ├─→ Memory.add(response) [if enabled]
-   ├─→ Return to user
+   ├─→ Populate result.trace, result.reasoning, result.parsed
+   ├─→ Return AgentResult to user
 ```
 
 ### RAG-Enhanced Flow
@@ -341,12 +421,16 @@ Single source of truth for 130+ models:
 │   __init__.py  │  (Public API)
 └────────┬───────┘
          │
-         ├─→ agent.py
-         │    ├─→ types.py (Message, Role, ToolCall)
+         ├─→ agent/core.py
+         │    ├─→ types.py (Message, Role, ToolCall, AgentResult)
          │    ├─→ tools.py (Tool)
          │    ├─→ prompt.py (PromptBuilder)
          │    ├─→ parser.py (ToolCallParser)
+         │    ├─→ structured.py (parse_and_validate, extract_json)
+         │    ├─→ trace.py (AgentTrace, TraceStep)
+         │    ├─→ policy.py (ToolPolicy, PolicyDecision, PolicyResult)
          │    ├─→ providers/base.py (Provider)
+         │    ├─→ providers/fallback.py (FallbackProvider)
          │    ├─→ memory.py (ConversationMemory)
          │    ├─→ usage.py (AgentUsage, UsageStats)
          │    ├─→ analytics.py (AgentAnalytics)
@@ -367,8 +451,10 @@ Single source of truth for 130+ models:
          │    ├─→ openai_provider.py
          │    ├─→ anthropic_provider.py
          │    ├─→ gemini_provider.py
-         │    └─→ ollama_provider.py
-         │         └─→ types.py, usage.py, pricing.py
+         │    ├─→ ollama_provider.py
+         │    │    └─→ types.py, usage.py, pricing.py
+         │    └─→ fallback.py (FallbackProvider)
+         │         └─→ base.py, types.py
          │
          ├─→ rag/
          │    ├─→ vector_store.py (Document, SearchResult, VectorStore)

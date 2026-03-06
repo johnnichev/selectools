@@ -1,6 +1,6 @@
 # Agent Module
 
-**File:** `src/selectools/agent.py`
+**File:** `src/selectools/agent/core.py`
 **Classes:** `Agent`, `AgentConfig`
 
 ## Table of Contents
@@ -16,7 +16,13 @@
 9. [Streaming](#streaming)
 10. [Parallel Tool Execution](#parallel-tool-execution)
 11. [Response Caching](#response-caching)
-12. [Implementation Details](#implementation-details)
+12. [Structured Output](#structured-output)
+13. [Execution Traces](#execution-traces)
+14. [Reasoning Visibility](#reasoning-visibility)
+15. [Provider Fallback](#provider-fallback)
+16. [Batch Processing](#batch-processing)
+17. [Tool Policy & Human-in-the-Loop](#tool-policy--human-in-the-loop)
+18. [Implementation Details](#implementation-details)
 
 ---
 
@@ -27,15 +33,20 @@ The **Agent** class is the central orchestrator of the selectools framework. It 
 ### Key Responsibilities
 
 1. **Conversation Management**: Maintain message history with optional memory
-2. **Provider Communication**: Call LLM APIs through provider abstraction
-3. **Tool Orchestration**: Detect, validate, and execute tool calls
-4. **Error Recovery**: Handle failures with retries and backoff
-5. **Observability**: Invoke lifecycle hooks for monitoring
-6. **Cost Tracking**: Monitor token usage and costs
-7. **Analytics**: Track tool usage patterns (optional)
-8. **Parallel Execution**: Execute independent tool calls concurrently
-9. **Streaming**: Token-level streaming with native tool support
-10. **Response Caching**: Avoid redundant LLM calls via pluggable cache layer
+2. **Provider Communication**: Call LLM APIs through provider abstraction (with fallback)
+3. **Tool Orchestration**: Detect, validate, enforce policies, and execute tool calls
+4. **Structured Output**: Validate LLM responses against Pydantic/JSON Schema with auto-retry
+5. **Execution Traces**: Record structured timeline of every step (`AgentTrace`)
+6. **Reasoning Visibility**: Extract and surface *why* the agent chose a tool
+7. **Error Recovery**: Handle failures with retries and backoff
+8. **Observability**: Invoke lifecycle hooks for monitoring
+9. **Cost Tracking**: Monitor token usage and costs
+10. **Analytics**: Track tool usage patterns (optional)
+11. **Parallel Execution**: Execute independent tool calls concurrently
+12. **Batch Processing**: Process multiple prompts concurrently
+13. **Streaming**: Token-level streaming with native tool support
+14. **Response Caching**: Avoid redundant LLM calls via pluggable cache layer
+15. **Tool Policy & HITL**: Declarative allow/review/deny rules with human approval
 
 ### Core Dependencies
 
@@ -44,7 +55,11 @@ from .types import Message, Role
 from .tools import Tool
 from .prompt import PromptBuilder
 from .parser import ToolCallParser
+from .structured import parse_and_validate, build_schema_instruction
+from .trace import AgentTrace, TraceStep
+from .policy import ToolPolicy, PolicyDecision
 from .providers.base import Provider
+from .providers.fallback import FallbackProvider
 from .memory import ConversationMemory  # Optional
 from .usage import AgentUsage
 from .analytics import AgentAnalytics  # Optional
@@ -388,6 +403,11 @@ class AgentConfig:
 
     # Caching
     cache: Optional[Cache] = None  # InMemoryCache, RedisCache, or custom
+
+    # Tool Safety
+    tool_policy: Optional[ToolPolicy] = None  # allow/review/deny rules
+    confirm_action: Optional[ConfirmAction] = None  # Human-in-the-loop callback
+    approval_timeout: float = 60.0  # Seconds before auto-deny
 ```
 
 ### Configuration Patterns
@@ -1050,6 +1070,228 @@ Cache hits still contribute to `AgentUsage`. The stored `UsageStats` is replayed
 
 ---
 
+## Structured Output
+
+### Overview
+
+Pass a Pydantic `BaseModel` or dict JSON Schema as `response_format` to get typed, validated results from the LLM. The agent injects schema instructions into the system prompt, extracts JSON from the response, validates it, and retries on failure.
+
+### Usage
+
+```python
+from pydantic import BaseModel
+from typing import Literal
+
+class Classification(BaseModel):
+    intent: Literal["billing", "support", "sales", "cancel"]
+    confidence: float
+    priority: Literal["low", "medium", "high"]
+
+result = agent.ask("I want to cancel my account", response_format=Classification)
+print(result.parsed)  # Classification(intent="cancel", confidence=0.95, priority="high")
+print(result.content)  # Raw JSON string
+```
+
+### How It Works
+
+1. `build_schema_instruction(schema)` generates a prompt fragment describing the expected JSON shape
+2. Schema instruction is appended to the system prompt for the duration of the run
+3. LLM response is passed through `extract_json()` to isolate the JSON block
+4. `parse_and_validate()` validates against the Pydantic model or JSON Schema
+5. On validation failure, the error is fed back to the LLM for a retry
+6. `result.parsed` contains the typed object; `result.content` has the raw string
+
+### Supported Formats
+
+- **Pydantic v2 `BaseModel`**: Full schema generation with type coercion
+- **`dict` JSON Schema**: Raw JSON Schema for non-Pydantic users
+
+---
+
+## Execution Traces
+
+### Overview
+
+Every `run()` / `arun()` automatically produces an `AgentTrace` — a structured timeline of the entire execution. Access it via `result.trace`.
+
+### Usage
+
+```python
+result = agent.run("Classify this ticket")
+
+for step in result.trace:
+    print(f"{step.type} | {step.duration_ms:.0f}ms | {step.summary}")
+
+result.trace.to_json("trace.json")
+print(result.trace.timeline())
+
+llm_steps = result.trace.filter(type="llm_call")
+total_llm_ms = sum(s.duration_ms for s in llm_steps)
+```
+
+### TraceStep Types
+
+| Type | Description |
+|---|---|
+| `llm_call` | Provider API call with model, tokens, duration |
+| `tool_selection` | LLM chose a tool (name, args, reasoning) |
+| `tool_execution` | Tool was executed (name, result summary, duration) |
+| `cache_hit` | Response served from cache |
+| `error` | Error during execution |
+| `structured_retry` | Structured output validation failed, retrying |
+
+### AgentTrace Methods
+
+- `trace.to_dict()` — Serialize to dict
+- `trace.to_json(filepath)` — Write JSON to file
+- `trace.timeline()` — Human-readable timeline string
+- `trace.filter(type=...)` — Filter steps by type
+- `trace.total_duration_ms` — Total execution time
+
+---
+
+## Reasoning Visibility
+
+### Overview
+
+LLMs often return explanatory text alongside tool calls. This reasoning is now captured and surfaced on `AgentResult`.
+
+### Usage
+
+```python
+result = agent.run("Route this customer request")
+
+print(result.reasoning)
+# "The customer is asking about billing charges, routing to billing_support"
+
+for i, reasoning in enumerate(result.reasoning_history):
+    print(f"Iteration {i}: {reasoning}")
+```
+
+### How It Works
+
+The agent extracts text content from LLM responses that precede or accompany tool call decisions. No extra LLM calls are needed — it purely captures what providers already return but previously discarded.
+
+- `result.reasoning` — reasoning text from the final tool selection
+- `result.reasoning_history` — list of reasoning strings, one per iteration
+- `step.reasoning` on `tool_selection` trace steps
+
+---
+
+## Provider Fallback
+
+### Overview
+
+`FallbackProvider` wraps multiple providers in priority order. If one fails, the next is tried automatically with circuit breaker protection.
+
+### Usage
+
+```python
+from selectools import FallbackProvider, OpenAIProvider, AnthropicProvider
+
+provider = FallbackProvider([
+    OpenAIProvider(default_model="gpt-4o-mini"),
+    AnthropicProvider(default_model="claude-haiku"),
+])
+agent = Agent(tools=[...], provider=provider)
+```
+
+### Circuit Breaker
+
+After `max_failures` consecutive failures, a provider is skipped for `cooldown_seconds`:
+
+```python
+provider = FallbackProvider(
+    providers=[openai, anthropic, local],
+    max_failures=3,
+    cooldown_seconds=60,
+    on_fallback=lambda name, error: print(f"Skipping {name}: {error}"),
+)
+```
+
+### Supported Methods
+
+`FallbackProvider` implements the full `Provider` protocol: `complete()`, `acomplete()`, `stream()`, `astream()`.
+
+---
+
+## Batch Processing
+
+### Overview
+
+Process multiple prompts concurrently with configurable parallelism.
+
+### Usage
+
+```python
+# Sync
+results = agent.batch(
+    ["Cancel my sub", "How do I upgrade?", "Payment failed"],
+    max_concurrency=5,
+)
+
+# Async
+results = await agent.abatch(
+    ["Cancel my sub", "How do I upgrade?", "Payment failed"],
+    max_concurrency=10,
+)
+```
+
+### Guarantees
+
+- Returns `list[AgentResult]` in same order as input
+- Per-request error isolation (one failure doesn't cancel the batch)
+- Respects `response_format` if provided
+- `on_progress(completed, total)` callback for monitoring
+
+---
+
+## Tool Policy & Human-in-the-Loop
+
+### Overview
+
+Declarative allow/review/deny rules evaluated before every tool execution, with optional human approval for flagged tools.
+
+### Tool Policy
+
+```python
+from selectools import ToolPolicy
+
+policy = ToolPolicy(
+    allow=["search_*", "read_*", "get_*"],
+    review=["send_*", "create_*", "update_*"],
+    deny=["delete_*", "drop_*"],
+    deny_when=[{"tool": "send_email", "arg": "to", "pattern": "*@external.com"}],
+)
+config = AgentConfig(tool_policy=policy)
+```
+
+**Evaluation order**: `deny` → `review` → `allow` → unknown defaults to `review`.
+
+### Human-in-the-Loop
+
+```python
+async def confirm(tool_name: str, tool_args: dict, reason: str) -> bool:
+    return await get_user_approval(tool_name, tool_args)
+
+config = AgentConfig(
+    tool_policy=policy,
+    confirm_action=confirm,
+    approval_timeout=60,
+)
+```
+
+**Agent loop behaviour:**
+
+| Policy Decision | Behaviour |
+|---|---|
+| `allow` | Execute immediately |
+| `review` + `confirm_action` | Call callback; execute if approved, deny if rejected |
+| `review` + no callback | Deny with error message to LLM |
+| `deny` | Return error to LLM, never execute |
+
+---
+
 ## Implementation Details
 
 ### Key Attributes
@@ -1305,9 +1547,10 @@ def divide(a: float, b: float) -> str:
 - [Tools Module](TOOLS.md) - Tool definition and validation
 - [Dynamic Tools Module](DYNAMIC_TOOLS.md) - Dynamic tool loading and runtime management
 - [Parser Module](PARSER.md) - Tool call parsing details
-- [Providers Module](PROVIDERS.md) - Provider implementations
-- [Memory Module](MEMORY.md) - Conversation memory
+- [Providers Module](PROVIDERS.md) - Provider implementations and FallbackProvider
+- [Memory Module](MEMORY.md) - Conversation memory and tool-pair-aware trimming
 - [Usage Module](USAGE.md) - Cost tracking
+- [Architecture](../ARCHITECTURE.md) - System-level overview including new modules
 
 ---
 

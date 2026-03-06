@@ -5,14 +5,20 @@ Configuration options for the agent.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Dict, Optional
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, Optional, Union
 
 if TYPE_CHECKING:
     from ..cache import Cache
+    from ..policy import ToolPolicy
 
 # Hook type definitions
 HookCallable = Callable[..., None]
 Hooks = Dict[str, HookCallable]
+
+ConfirmAction = Union[
+    Callable[[str, Dict[str, Any], str], bool],
+    Callable[[str, Dict[str, Any], str], Coroutine[Any, Any, bool]],
+]
 
 
 @dataclass
@@ -60,6 +66,14 @@ class AgentConfig:
                before calling the LLM provider and stores successful responses.
                Any object satisfying the ``Cache`` protocol can be used (e.g.
                ``InMemoryCache``, ``RedisCache``).  Default: None (caching disabled).
+        tool_policy: Optional ToolPolicy with allow/review/deny rules.
+               Evaluated before every tool execution. Default: None (no policy).
+        confirm_action: Callback invoked for tools whose policy decision is
+               ``review``.  Signature: ``(tool_name, tool_args, reason) -> bool``.
+               Async callables are also supported.  If ``None``, reviewed tools
+               are denied by default.  Default: None.
+        approval_timeout: Seconds to wait for a confirm_action response before
+               denying the call.  Default: 60.
     """
 
     model: str = "gpt-4o"
@@ -80,3 +94,6 @@ class AgentConfig:
     routing_only: bool = False
     parallel_tool_execution: bool = True
     cache: Optional[Cache] = None
+    tool_policy: Optional[ToolPolicy] = None
+    confirm_action: Optional[ConfirmAction] = None
+    approval_timeout: float = 60.0

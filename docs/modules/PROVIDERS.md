@@ -1,7 +1,7 @@
 # Providers Module
 
 **Directory:** `src/selectools/providers/`
-**Files:** `base.py`, `openai_provider.py`, `anthropic_provider.py`, `gemini_provider.py`, `ollama_provider.py`
+**Files:** `base.py`, `openai_provider.py`, `anthropic_provider.py`, `gemini_provider.py`, `ollama_provider.py`, `fallback.py`
 
 ## Table of Contents
 
@@ -685,6 +685,66 @@ def test_provider_switching():
         response = agent.run([Message(role=Role.USER, content="Test")])
         assert response.content
 ```
+
+---
+
+## FallbackProvider
+
+### Overview
+
+`FallbackProvider` wraps multiple providers in priority order with automatic failover and circuit breaker protection. If the primary provider fails, the next one is tried automatically.
+
+### Usage
+
+```python
+from selectools import FallbackProvider, OpenAIProvider, AnthropicProvider
+from selectools.providers.stubs import LocalProvider
+
+provider = FallbackProvider([
+    OpenAIProvider(default_model="gpt-4o-mini"),
+    AnthropicProvider(default_model="claude-haiku"),
+    LocalProvider(),
+])
+
+agent = Agent(tools=[...], provider=provider)
+```
+
+### Circuit Breaker
+
+After consecutive failures, a provider is temporarily skipped:
+
+```python
+provider = FallbackProvider(
+    providers=[openai, anthropic, local],
+    max_failures=3,          # Skip after 3 consecutive failures
+    cooldown_seconds=60,     # Skip for 60 seconds
+    on_fallback=lambda name, error: log.warning(f"Skipping {name}: {error}"),
+)
+```
+
+### Failure Conditions
+
+The provider falls through to the next on:
+
+- **Timeout errors**
+- **HTTP 5xx** (server errors)
+- **HTTP 429** (rate limits)
+- **Connection errors**
+
+### Protocol Support
+
+`FallbackProvider` implements the full `Provider` protocol:
+
+- `complete()` — sync completion
+- `acomplete()` — async completion
+- `stream()` — sync streaming
+- `astream()` — async streaming
+
+### Properties
+
+- `provider.supports_streaming` — `True` if any child provider supports streaming
+- `provider.supports_async` — `True` if any child provider supports async
+- `provider.name` — `"fallback"`
 
 ---
 

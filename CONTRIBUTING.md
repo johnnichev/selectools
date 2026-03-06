@@ -2,8 +2,8 @@
 
 Thank you for your interest in contributing to Selectools! We welcome contributions from the community.
 
-**Current Version:** v0.12.0
-**Test Status:** ✅ 921 tests passing (100%)
+**Current Version:** v0.13.0
+**Test Status:** ✅ 883 tests passing (100%)
 **Python:** 3.9+
 
 ## Getting Started
@@ -238,10 +238,13 @@ selectools/
 │   ├── agent/                  # Agent loop and orchestration
 │   │   ├── core.py             # Agent class
 │   │   └── config.py           # AgentConfig
+│   ├── structured.py           # Structured output parsing & validation
+│   ├── trace.py                # AgentTrace & TraceStep
+│   ├── policy.py               # ToolPolicy (allow/review/deny)
 │   ├── cli.py                  # CLI interface
 │   ├── env.py                  # Environment variable loading
 │   ├── exceptions.py           # Custom exception classes
-│   ├── memory.py               # ConversationMemory
+│   ├── memory.py               # ConversationMemory (tool-pair-aware)
 │   ├── models.py               # Model registry (120+ models)
 │   ├── parser.py               # ToolCallParser
 │   ├── pricing.py              # LLM pricing data and cost calculation
@@ -257,6 +260,7 @@ selectools/
 │   │   ├── anthropic_provider.py # Anthropic
 │   │   ├── gemini_provider.py  # Google Gemini
 │   │   ├── ollama_provider.py  # Ollama local models
+│   │   ├── fallback.py         # FallbackProvider (auto-failover)
 │   │   └── stubs.py            # LocalProvider / test stubs
 │   ├── embeddings/             # Embedding providers
 │   ├── rag/                    # RAG: vector stores, chunking, loaders
@@ -267,7 +271,7 @@ selectools/
 │   ├── tools/                  # Tool tests
 │   ├── core/                   # Core framework tests
 │   └── integration/            # E2E tests (require API keys)
-├── examples/                   # 22 numbered examples (01–22)
+├── examples/                   # 27 numbered examples (01–27)
 ├── docs/                       # Detailed documentation
 │   ├── QUICKSTART.md           # 5-minute getting started
 │   ├── ARCHITECTURE.md         # Architecture overview

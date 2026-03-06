@@ -165,6 +165,24 @@ result = agent.ask("How long does shipping take for premium members?")
 print(result.content)
 ```
 
+## Step 6: Get Structured Output
+
+Get typed, validated results from the LLM:
+
+```python
+from pydantic import BaseModel
+from typing import Literal
+
+class Classification(BaseModel):
+    intent: Literal["billing", "support", "sales"]
+    confidence: float
+
+result = agent.ask("I need help with my bill", response_format=Classification)
+print(result.parsed)       # Classification(intent="billing", confidence=0.95)
+print(result.trace.timeline())  # See what the agent did
+print(result.reasoning)    # Why it chose that classification
+```
+
 ## What's Next?
 
 You now know the core API. Here is where to go from here:
@@ -172,14 +190,19 @@ You now know the core API. Here is where to go from here:
 | Goal | Read |
 |---|---|
 | Define more complex tools | [Tools Guide](modules/TOOLS.md) |
+| Get typed LLM responses | [Agent Guide — Structured Output](modules/AGENT.md#structured-output) |
+| See what the agent did | [Agent Guide — Execution Traces](modules/AGENT.md#execution-traces) |
 | Switch between providers | [Providers Guide](modules/PROVIDERS.md) |
+| Auto-failover between providers | [Providers Guide — Fallback](modules/PROVIDERS.md#fallbackprovider) |
+| Classify multiple requests at once | [Agent Guide — Batch Processing](modules/AGENT.md#batch-processing) |
+| Control which tools can run | [Agent Guide — Tool Policy](modules/AGENT.md#tool-policy--human-in-the-loop) |
 | Stream responses in real time | [Streaming Guide](modules/STREAMING.md) |
 | Use hybrid search (keyword + semantic) | [Hybrid Search Guide](modules/HYBRID_SEARCH.md) |
 | Load tools from plugin files | [Dynamic Tools Guide](modules/DYNAMIC_TOOLS.md) |
 | Cache LLM responses to save money | [Agent Guide — Caching](modules/AGENT.md#response-caching) |
 | Track costs and token usage | [Usage Guide](modules/USAGE.md) |
 | Understand the full architecture | [Architecture](ARCHITECTURE.md) |
-| See working examples | [examples/](../examples/) (22 numbered scripts, 01–22) |
+| See working examples | [examples/](../examples/) (27 numbered scripts, 01–27) |
 
 ---
 
@@ -188,10 +211,14 @@ You now know the core API. Here is where to go from here:
 | You want to... | Code |
 |---|---|
 | Ask a question (simple) | `agent.ask("What is X?")` |
+| Get typed results | `agent.ask("...", response_format=MyModel)` |
 | Send structured messages | `agent.run([Message(role=Role.USER, content="...")])` |
 | Ask asynchronously | `await agent.aask("What is X?")` |
 | Stream tokens | `async for chunk in agent.astream("What is X?"): ...` |
+| Classify a batch | `agent.batch(["msg1", "msg2"], max_concurrency=5)` |
 | Check cost | `agent.total_cost`, `agent.get_usage_summary()` |
+| See execution trace | `result.trace.timeline()` |
+| See reasoning | `result.reasoning` |
 | Reset state | `agent.reset()` |
 | Add a tool at runtime | `agent.add_tool(my_tool)` |
 | Remove a tool | `agent.remove_tool("tool_name")` |

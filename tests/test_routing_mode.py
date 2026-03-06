@@ -56,12 +56,7 @@ def test_routing_mode_sync() -> None:
     # Verify tool was NOT executed
     tool.function.assert_not_called()
 
-    # Verify history does NOT contain the tool result
-    # The last message in history should be the prompt, NOT the assistant response
-    # (based on the implementation, we don't append until execution loop continues)
-    # Actually looking at the implementation:
-    # `self._history.append(response_msg)` happens AFTER the routing check block.
-    # So history should only contain the initial user message.
+    # routing_only with tool call exits before appending — only the user message is in history
     assert len(agent._history) == 1
     assert agent._history[0].role == Role.USER
 
@@ -145,10 +140,8 @@ def test_routing_mode_text_only() -> None:
     assert result.content == "Just chatting"
     assert not result.tool_calls
 
-    # History SHOULD be updated normally for text responses... wait, actually Agent does NOT append final response to _history if no memory!
-    # So length should be 1 (just the user message)
-    # This behavior is consistent with standard agent config (no memory = transient history of inputs)
-    assert len(agent._history) == 1
+    # History should contain user message + assistant text response
+    assert len(agent._history) == 2
     # Check return object for the response
     assert result.message.role == Role.ASSISTANT
     assert result.message.content == "Just chatting"

@@ -1,6 +1,6 @@
 """Public exports for the selectools package."""
 
-__version__ = "0.12.1"
+__version__ = "0.13.0"
 
 # Import submodules (lazy loading for optional dependencies)
 from . import embeddings, models, rag, toolbox
@@ -17,14 +17,18 @@ from .exceptions import (
 from .memory import ConversationMemory
 from .models import ALL_MODELS, MODELS_BY_ID, Anthropic, Cohere, Gemini, ModelInfo, Ollama, OpenAI
 from .parser import ToolCallParser
+from .policy import PolicyDecision, PolicyResult, ToolPolicy
 from .pricing import PRICING, calculate_cost, calculate_embedding_cost, get_model_pricing
 from .prompt import PromptBuilder
 from .providers.anthropic_provider import AnthropicProvider
+from .providers.fallback import FallbackProvider
 from .providers.gemini_provider import GeminiProvider
 from .providers.ollama_provider import OllamaProvider
 from .providers.openai_provider import OpenAIProvider
 from .providers.stubs import LocalProvider
+from .structured import ResponseFormat
 from .tools import Tool, ToolParameter, ToolRegistry, tool
+from .trace import AgentTrace, TraceStep
 from .types import AgentResult, Message, Role, ToolCall
 from .usage import AgentUsage, UsageStats
 
@@ -47,6 +51,7 @@ __all__ = [
     "GeminiProvider",
     "OllamaProvider",
     "LocalProvider",
+    "FallbackProvider",
     "ToolRegistry",
     "tool",
     # Exceptions
@@ -78,6 +83,15 @@ __all__ = [
     "CacheStats",
     "CacheKeyBuilder",
     "InMemoryCache",
+    # Tool policy
+    "ToolPolicy",
+    "PolicyDecision",
+    "PolicyResult",
+    # Structured output
+    "ResponseFormat",
+    # Tracing
+    "AgentTrace",
+    "TraceStep",
     # Submodules (for lazy loading)
     "embeddings",
     "rag",

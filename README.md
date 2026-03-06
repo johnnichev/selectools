@@ -11,6 +11,12 @@
 | Capability | What You Get |
 |---|---|
 | **Provider Agnostic** | Switch between OpenAI, Anthropic, Gemini, Ollama with one line. Your tools stay identical. |
+| **Structured Output** | Pydantic or JSON Schema `response_format` with auto-retry on validation failure. |
+| **Execution Traces** | Every `run()` returns `result.trace` — structured timeline of LLM calls, tool picks, and executions. |
+| **Reasoning Visibility** | `result.reasoning` surfaces *why* the agent chose a tool, extracted from LLM responses. |
+| **Provider Fallback** | `FallbackProvider` tries providers in priority order with circuit breaker on failure. |
+| **Batch Processing** | `agent.batch()` / `agent.abatch()` for concurrent multi-prompt classification. |
+| **Tool Policy Engine** | Declarative allow/review/deny rules with glob patterns. Human-in-the-loop approval callbacks. |
 | **Hybrid Search** | BM25 keyword + vector semantic search with RRF/weighted fusion and cross-encoder reranking. |
 | **Advanced Chunking** | Fixed, recursive, semantic (embedding-based), and contextual (LLM-enriched) chunking strategies. |
 | **E2E Streaming** | Token-level `astream()` with native tool call support. Parallel tool execution via `asyncio.gather`. |
@@ -22,7 +28,12 @@
 
 ## What's Included
 
-- **4 LLM Providers**: OpenAI, Anthropic, Gemini, Ollama with unified interface
+- **5 LLM Providers**: OpenAI, Anthropic, Gemini, Ollama + FallbackProvider (auto-failover)
+- **Structured Output**: Pydantic / JSON Schema `response_format` with auto-retry
+- **Execution Traces**: `result.trace` with typed timeline of every agent step
+- **Reasoning Visibility**: `result.reasoning` explains *why* the agent chose a tool
+- **Batch Processing**: `agent.batch()` / `agent.abatch()` for concurrent classification
+- **Tool Policy Engine**: Declarative allow/review/deny rules with human-in-the-loop
 - **4 Embedding Providers**: OpenAI, Anthropic/Voyage, Gemini (free!), Cohere
 - **4 Vector Stores**: In-memory, SQLite, Chroma, Pinecone
 - **Hybrid Search**: BM25 + vector fusion with Cohere/Jina reranking
@@ -31,8 +42,8 @@
 - **Response Caching**: InMemoryCache and RedisCache with stats tracking
 - **120 Model Registry**: Type-safe constants with pricing and metadata
 - **Pre-built Toolbox**: 22 tools for files, data, text, datetime, web
-- **18 Examples**: RAG, hybrid search, streaming, caching, routing, and more
-- **400+ Tests**: Unit, integration, and E2E with real API calls
+- **27 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, and more
+- **880+ Tests**: Unit, integration, and E2E with real API calls
 
 ## Install
 
@@ -252,6 +263,88 @@ print(result.tool_name)  # "schedule_meeting"
 print(result.tool_args)  # {"attendee": "Alice", "date": "tomorrow"}
 ```
 
+### Structured Output
+
+Get typed, validated results from the LLM:
+
+```python
+from pydantic import BaseModel
+from typing import Literal
+
+class Classification(BaseModel):
+    intent: Literal["billing", "support", "sales", "cancel"]
+    confidence: float
+    priority: Literal["low", "medium", "high"]
+
+result = agent.ask("I want to cancel my account", response_format=Classification)
+print(result.parsed)  # Classification(intent="cancel", confidence=0.95, priority="high")
+```
+
+Auto-retries with error feedback when validation fails.
+
+### Execution Traces & Reasoning
+
+See exactly what your agent did and why:
+
+```python
+result = agent.run("Classify this ticket")
+
+# Structured timeline of every step
+for step in result.trace:
+    print(f"{step.type} | {step.duration_ms:.0f}ms | {step.summary}")
+
+# Why the agent chose a tool
+print(result.reasoning)  # "Customer is asking about billing, routing to billing_support"
+
+# Export for dashboards
+result.trace.to_json("trace.json")
+```
+
+### Provider Fallback
+
+Automatic failover with circuit breaker:
+
+```python
+from selectools import FallbackProvider, OpenAIProvider, AnthropicProvider
+
+provider = FallbackProvider([
+    OpenAIProvider(default_model="gpt-4o-mini"),
+    AnthropicProvider(default_model="claude-haiku"),
+])
+agent = Agent(tools=[...], provider=provider)
+# If OpenAI is down → tries Anthropic automatically
+```
+
+### Batch Processing
+
+Classify multiple requests concurrently:
+
+```python
+results = await agent.abatch(
+    ["Cancel my subscription", "How do I upgrade?", "My payment failed"],
+    max_concurrency=10,
+)
+```
+
+### Tool Policy & Human-in-the-Loop
+
+Declarative safety rules with approval callbacks:
+
+```python
+from selectools import ToolPolicy
+
+policy = ToolPolicy(
+    allow=["search_*", "read_*"],
+    review=["send_*", "create_*"],
+    deny=["delete_*"],
+)
+
+async def confirm(tool_name, tool_args, reason):
+    return await get_user_approval(tool_name, tool_args)
+
+config = AgentConfig(tool_policy=policy, confirm_action=confirm)
+```
+
 ### E2E Streaming & Parallel Execution
 
 - `agent.astream()` yields `StreamChunk` (text deltas) then `AgentResult` (final)
@@ -269,6 +362,7 @@ See [docs/modules/STREAMING.md](docs/modules/STREAMING.md) for full documentatio
 | **Anthropic** | Yes | Yes | Yes | Paid |
 | **Gemini** | Yes | Yes | Yes | Free tier |
 | **Ollama** | Yes | No | No | Free (local) |
+| **Fallback** | Yes | Yes | Yes | Varies (wraps others) |
 | **Local** | No | No | No | Free (testing) |
 
 ```python
@@ -319,6 +413,9 @@ config = AgentConfig(
     routing_only=False,
     stream=False,
     cache=None,                  # InMemoryCache or RedisCache
+    tool_policy=None,            # ToolPolicy with allow/review/deny rules
+    confirm_action=None,         # Human-in-the-loop approval callback
+    approval_timeout=60.0,       # Seconds before auto-deny
     enable_analytics=True,
     verbose=False,
     hooks={                      # Lifecycle callbacks
@@ -436,6 +533,11 @@ Examples are numbered by difficulty. Start from 01 and work your way up.
 | 20 | `20_customer_support_bot.py` | Multi-tool customer support workflow | Yes |
 | 21 | `21_data_analysis_agent.py` | Data exploration and analysis | Yes |
 | 22 | `22_ollama_local.py` | Fully local LLM via Ollama | No (Ollama) |
+| 23 | `23_structured_output.py` | Pydantic response_format, auto-retry, JSON extraction | No |
+| 24 | `24_traces_and_reasoning.py` | AgentTrace timeline, reasoning visibility, JSON export | No |
+| 25 | `25_provider_fallback.py` | FallbackProvider, circuit breaker, failover chain | No |
+| 26 | `26_batch_processing.py` | batch(), abatch(), structured batch, error isolation | No |
+| 27 | `27_tool_policy.py` | ToolPolicy, deny_when, HITL approval, memory trimming | No |
 
 Run any example:
 
@@ -450,7 +552,7 @@ Comprehensive technical documentation is available in [`docs/`](docs/README.md):
 
 | Module | Description |
 |---|---|
-| [AGENT](docs/modules/AGENT.md) | Agent loop, retry logic, caching, hooks |
+| [AGENT](docs/modules/AGENT.md) | Agent loop, structured output, traces, reasoning, batch, policy |
 | [STREAMING](docs/modules/STREAMING.md) | E2E streaming, parallel execution, routing |
 | [TOOLS](docs/modules/TOOLS.md) | Tool definition, validation, registry |
 | [DYNAMIC_TOOLS](docs/modules/DYNAMIC_TOOLS.md) | ToolLoader, plugins, hot-reload |
@@ -459,8 +561,8 @@ Comprehensive technical documentation is available in [`docs/`](docs/README.md):
 | [RAG](docs/modules/RAG.md) | Complete RAG pipeline |
 | [EMBEDDINGS](docs/modules/EMBEDDINGS.md) | Embedding providers |
 | [VECTOR_STORES](docs/modules/VECTOR_STORES.md) | Storage backends |
-| [PROVIDERS](docs/modules/PROVIDERS.md) | LLM provider adapters |
-| [MEMORY](docs/modules/MEMORY.md) | Conversation memory |
+| [PROVIDERS](docs/modules/PROVIDERS.md) | LLM provider adapters + FallbackProvider |
+| [MEMORY](docs/modules/MEMORY.md) | Conversation memory + tool-pair trimming |
 | [USAGE](docs/modules/USAGE.md) | Cost tracking & analytics |
 | [MODELS](docs/modules/MODELS.md) | Model registry & pricing |
 | [PARSER](docs/modules/PARSER.md) | Tool call parsing |

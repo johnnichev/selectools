@@ -61,7 +61,7 @@ Focus: Response caching and advanced RAG capabilities.
 
 ---
 
-## v0.13.0: Structured Output, Observability & Safety (Next)
+## v0.13.0: Structured Output, Observability & Safety (Complete)
 
 Focus: Typed classification results, agent execution transparency, tool execution safety, and production resilience.
 This is the highest-impact release for routing/classification use cases (traffic cops, intent classifiers, request routers).
@@ -326,16 +326,16 @@ config = AgentConfig(
 
 **Touches**: `agent/core.py`, `AgentConfig`, new `approvals.py`.
 
-| Feature                        | Priority  | Impact | Effort |
-| ------------------------------ | --------- | ------ | ------ |
-| **Structured Output Parsers**  | 🟡 High   | High   | Medium |
-| **Execution Traces**           | 🟡 High   | High   | Medium |
-| **Reasoning Visibility**       | 🟡 High   | High   | Small  |
-| **Provider Fallback Chain**    | 🟡 High   | High   | Medium |
-| **Batch Processing**           | 🟡 High   | High   | Small  |
-| **Tool-Pair-Aware Trimming**   | 🟡 High   | High   | Small  |
-| **Tool Policy Engine**         | 🟡 High   | High   | Medium |
-| **Human-in-the-Loop Approval** | 🟡 Medium | High   | Medium |
+| Feature                        | Status     | Impact | Effort |
+| ------------------------------ | ---------- | ------ | ------ |
+| **Structured Output Parsers**  | ✅ v0.13.0 | High   | Medium |
+| **Execution Traces**           | ✅ v0.13.0 | High   | Medium |
+| **Reasoning Visibility**       | ✅ v0.13.0 | High   | Small  |
+| **Provider Fallback Chain**    | ✅ v0.13.0 | High   | Medium |
+| **Batch Processing**           | ✅ v0.13.0 | High   | Small  |
+| **Tool-Pair-Aware Trimming**   | ✅ v0.13.0 | High   | Small  |
+| **Tool Policy Engine**         | ✅ v0.13.0 | High   | Medium |
+| **Human-in-the-Loop Approval** | ✅ v0.13.0 | High   | Medium |
 
 ---
 
@@ -809,7 +809,7 @@ agent = Agent(tools=[...], provider=provider, config=AgentConfig(guardrails=guar
 ## Implementation Order
 
 ```
-v0.13.0  Structured Output + Observability + Safety Foundation
+v0.13.0  ✅ Structured Output + Observability + Safety Foundation (Complete)
          Tool-pair trimming → Structured output → Execution traces → Reasoning visibility
          → Fallback providers → Batch → Tool policy engine → Human-in-the-loop
 
@@ -848,6 +848,17 @@ v1.0.0   Enterprise Reliability
 ---
 
 ## Release History
+
+### v0.13.0 - Structured Output, Observability & Safety
+
+- ✅ **Structured Output Parsers**: Pydantic / JSON Schema `response_format` on `run()` / `arun()` / `ask()` with auto-retry
+- ✅ **Execution Traces**: `result.trace` with `TraceStep` timeline (`llm_call`, `tool_selection`, `tool_execution`, `error`)
+- ✅ **Reasoning Visibility**: `result.reasoning` and `result.reasoning_history` extracted from LLM responses
+- ✅ **Provider Fallback Chain**: `FallbackProvider` with circuit breaker and `on_fallback` callback
+- ✅ **Batch Processing**: `agent.batch()` / `agent.abatch()` with `max_concurrency` and per-request error isolation
+- ✅ **Tool-Pair-Aware Trimming**: `ConversationMemory` preserves tool_use/tool_result pairs during sliding window trim
+- ✅ **Tool Policy Engine**: `ToolPolicy` with glob-based allow/review/deny rules and argument-level conditions
+- ✅ **Human-in-the-Loop Approval**: `confirm_action` callback for `review` tools with `approval_timeout`
 
 ### v0.12.x - Hybrid Search, Reranking, Advanced Chunking & Dynamic Tools
 

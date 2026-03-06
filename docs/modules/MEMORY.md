@@ -60,6 +60,27 @@ Add: ASSISTANT("4")
 └─→ [ASSISTANT("Hi!"), USER("What's 2+2?"), ASSISTANT("4")]
 ```
 
+### Tool-Pair-Aware Trimming
+
+After the sliding window trim, the memory scans forward to find the first safe boundary. This prevents orphaning a `TOOL` result without its preceding `ASSISTANT` tool-use message, which would violate provider API contracts.
+
+```python
+def _fix_tool_pair_boundary(self) -> None:
+    while len(self._messages) > 1:
+        first = self._messages[0]
+        if first.role == Role.TOOL:
+            self._messages.pop(0)
+            continue
+        if first.role == Role.ASSISTANT and first.tool_calls:
+            self._messages.pop(0)
+            continue
+        break
+```
+
+**Before fix**: Trim might leave `[TOOL("result..."), USER("next question")]` — invalid.
+
+**After fix**: Advances past orphaned messages to `[USER("next question")]` — valid.
+
 ### Implementation
 
 ```python
@@ -82,6 +103,9 @@ def _enforce_limits(self) -> None:
 
             # Remove oldest message
             self._messages.pop(0)
+
+    # 3. Fix tool-pair boundary
+    self._fix_tool_pair_boundary()
 ```
 
 ---
@@ -337,13 +361,13 @@ memory = ConversationMemory(max_messages=20)
 
 ## Future Enhancements
 
-Potential improvements (not currently implemented):
+Potential improvements (see [ROADMAP.md](../../ROADMAP.md)):
 
-1. **Summarization**: Auto-summarize old messages instead of dropping
-2. **Importance-Based**: Keep important messages regardless of age
-3. **Semantic Pruning**: Remove similar/redundant messages
-4. **Persistence**: Auto-save/load from disk or database
-5. **Compression**: Store messages in compact format
+1. **Summarize-on-Trim**: Auto-summarize old messages instead of dropping (v0.16.0)
+2. **Persistent Sessions**: Auto-save/load from disk or database (v0.16.0)
+3. **Entity Memory**: Track named entities across turns (v0.16.0)
+4. **Knowledge Graph Memory**: Build relationship graphs from conversations (v0.16.0)
+5. **Semantic Pruning**: Remove similar/redundant messages
 
 ---
 

@@ -9,6 +9,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.13.0] - 2026-02-16
+
+### Added - Structured Output, Observability & Safety
+
+#### Structured Output Parsers
+
+- **`response_format` parameter** on `run()`, `arun()`, `ask()`, `aask()` — pass a Pydantic `BaseModel` class or dict JSON Schema
+- Schema instruction injected into system prompt; JSON extracted and validated from LLM response
+- **Auto-retry**: validation errors trigger a retry with the error fed back to the LLM
+- **`result.parsed`** returns the validated typed object; `result.content` still available as raw string
+- New `structured.py` module with `parse_and_validate()`, `extract_json()`, `build_schema_instruction()`
+
+#### Execution Traces (`AgentTrace`)
+
+- **`result.trace`** populated on every `run()` / `arun()` — structured timeline of the entire agent execution
+- **`TraceStep`** types: `llm_call`, `tool_selection`, `tool_execution`, `cache_hit`, `error`, `structured_retry`
+- Each step captures type, timestamp, duration_ms, input/output summaries, token usage (for LLM steps)
+- **`AgentTrace`** container with `.to_dict()`, `.to_json(filepath)`, `.timeline()`, `.filter(type=...)` methods
+- New `trace.py` module with `AgentTrace`, `TraceStep`, `StepType`
+
+#### Reasoning Visibility
+
+- **`result.reasoning`** — text the LLM returned alongside its final tool selection (no extra LLM calls)
+- **`result.reasoning_history`** — list of reasoning strings, one per agent iteration
+- **`step.reasoning`** on `tool_selection` trace steps
+- Works with all providers (OpenAI, Anthropic, Gemini, Ollama)
+
+#### Provider Fallback Chain
+
+- **`FallbackProvider`** wraps multiple providers in priority order with automatic failover
+- Tries next provider on timeout, 5xx, rate limit (429), or connection errors
+- **Circuit breaker**: after N consecutive failures, skip provider for M seconds
+- **`on_fallback`** callback fires when a provider is skipped
+- **`provider_used`** property reports which provider handled the request
+- Supports `complete()`, `acomplete()`, `stream()`, `astream()`
+
+#### Batch Processing
+
+- **`agent.batch(prompts, max_concurrency=5)`** — sync, uses `ThreadPoolExecutor`
+- **`agent.abatch(prompts, max_concurrency=10)`** — async, uses `asyncio.Semaphore` + `gather`
+- Returns `list[AgentResult]` in same order as input; per-request error isolation
+- Respects `response_format`; `on_progress(completed, total)` callback
+
+#### Tool-Pair-Aware Trimming
+
+- **`ConversationMemory._enforce_limits()`** now preserves tool call / tool result pairs
+- After trimming, advances past orphaned TOOL results and ASSISTANT tool_use messages
+- Conversation always starts at a safe boundary (USER text or SYSTEM message)
+
+#### Tool Policy Engine
+
+- **`ToolPolicy`** with glob-based `allow`, `review`, `deny` rules
+- Argument-level `deny_when` conditions (e.g., deny `send_email` when `to` matches `*@external.com`)
+- Evaluation order: `deny` → `review` → `allow` → default (review)
+- **`AgentConfig(tool_policy=...)`** — evaluated before every tool execution
+
+#### Human-in-the-Loop Approval
+
+- **`AgentConfig(confirm_action=...)`** — sync or async callback `(tool_name, tool_args, reason) -> bool`
+- Invoked for tools whose policy decision is `review`
+- **`approval_timeout`** with deny-on-timeout default (60s)
+- Agent loop: allow → execute, review → callback → execute/deny, deny → error to LLM
+
+### Changed
+
+- `AgentResult` extended with `parsed`, `reasoning`, `reasoning_history`, `trace` fields
+- `AgentConfig` extended with `tool_policy`, `confirm_action`, `approval_timeout` fields
+- `ConversationMemory` imports `Role` for tool-pair boundary detection
+- New public exports: `FallbackProvider`, `ToolPolicy`, `PolicyDecision`, `PolicyResult`, `ResponseFormat`, `AgentTrace`, `TraceStep`
+
+---
+
 ## [0.12.1] - 2026-02-16
 
 ### Fixed
@@ -698,7 +770,7 @@ agent = RAGAgent.from_directory(
 
 ---
 
-## Migration Guide: v0.8.0 → v0.12.0
+## Migration Guide: v0.8.0 → v0.13.0
 
 This section covers all breaking changes for consumers upgrading from v0.8.0.
 
@@ -775,12 +847,36 @@ config = AgentConfig(
 
     # NEW in v0.12.0 — response caching
     cache=InMemoryCache(max_size=1000, default_ttl=300),
+
+    # NEW in v0.13.0 — tool safety policies
+    tool_policy=ToolPolicy(allow=["search_*"], deny=["delete_*"]),
+
+    # NEW in v0.13.0 — human-in-the-loop approval
+    confirm_action=lambda name, args, reason: True,
 )
 
 agent = Agent(tools=[...], provider=provider, config=config)
 
 # NEW in v0.9.0 — reuse agent between requests
 agent.reset()
+
+# NEW in v0.13.0 — structured output
+from pydantic import BaseModel
+class Intent(BaseModel):
+    intent: str
+    confidence: float
+result = agent.ask("Cancel my sub", response_format=Intent)
+print(result.parsed)  # Intent(intent="cancel", confidence=0.95)
+
+# NEW in v0.13.0 — execution traces
+print(result.trace.timeline())
+
+# NEW in v0.13.0 — batch processing
+results = agent.batch(["msg1", "msg2", "msg3"], max_concurrency=5)
+
+# NEW in v0.13.0 — provider fallback
+from selectools import FallbackProvider
+fallback = FallbackProvider([primary_provider, backup_provider])
 
 # NEW in v0.12.0 — dynamic tool loading
 from selectools.tools import ToolLoader
@@ -807,6 +903,8 @@ contextual = ContextualChunker(base_chunker=semantic, provider=provider)
 
 ## Release Links
 
+- [0.13.0 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.13.0)
+- [0.12.1 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.12.1)
 - [0.12.0 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.12.0)
 - [0.11.0 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.11.0)
 - [0.10.0 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.10.0)

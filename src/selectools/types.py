@@ -157,6 +157,11 @@ class AgentResult:
         tool_args: Parameters passed to the last tool call.
         iterations: Number of loop iterations used.
         tool_calls: Ordered list of all tool calls made during the run.
+        parsed: Validated structured output when ``response_format`` was used.
+        reasoning: LLM reasoning text accompanying the final tool selection.
+        reasoning_history: Reasoning text from each iteration that selected a tool.
+        trace: Execution trace capturing every step of the agent run.
+        provider_used: Name of the provider that handled the run (useful with FallbackProvider).
 
     Example:
         >>> result = agent.run([Message(role=Role.USER, content="Search for Python")])
@@ -175,6 +180,11 @@ class AgentResult:
     tool_args: Dict[str, Any] = field(default_factory=dict)
     iterations: int = 0
     tool_calls: List["ToolCall"] = field(default_factory=list)
+    parsed: Optional[Any] = None
+    reasoning: Optional[str] = None
+    reasoning_history: List[str] = field(default_factory=list)
+    trace: Optional[Any] = None
+    provider_used: Optional[str] = None
 
     @property
     def content(self) -> str:

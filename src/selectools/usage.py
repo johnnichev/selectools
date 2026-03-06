@@ -93,6 +93,24 @@ class AgentUsage:
             self.tool_usage[tool_name] = self.tool_usage.get(tool_name, 0) + 1
             self.tool_tokens[tool_name] = self.tool_tokens.get(tool_name, 0) + stats.total_tokens
 
+    def merge(self, other: "AgentUsage") -> None:
+        """Add all stats from *other* into this instance (for batch aggregation).
+
+        Args:
+            other: Another ``AgentUsage`` whose stats will be folded in.
+        """
+        self.total_prompt_tokens += other.total_prompt_tokens
+        self.total_completion_tokens += other.total_completion_tokens
+        self.total_tokens += other.total_tokens
+        self.total_cost_usd += other.total_cost_usd
+        self.total_embedding_tokens += other.total_embedding_tokens
+        self.total_embedding_cost_usd += other.total_embedding_cost_usd
+        self.iterations.extend(other.iterations)
+        for tool_name, count in other.tool_usage.items():
+            self.tool_usage[tool_name] = self.tool_usage.get(tool_name, 0) + count
+        for tool_name, tokens in other.tool_tokens.items():
+            self.tool_tokens[tool_name] = self.tool_tokens.get(tool_name, 0) + tokens
+
     def to_dict(self) -> Dict[str, Any]:
         """
         Serialize to dictionary for logging/display.

@@ -1,6 +1,6 @@
 # Selectools Implementation Documentation
 
-**Version:** 0.12.x
+**Version:** 0.13.0
 **Last Updated:** February 2026
 
 Welcome to the comprehensive technical documentation for selectools - a production-ready Python framework for building AI agents with tool-calling capabilities and RAG support.
@@ -26,14 +26,14 @@ Welcome to the comprehensive technical documentation for selectools - a producti
 
 Detailed technical documentation for each module:
 
-1. **[AGENT.md](modules/AGENT.md)** - Agent loop, tool selection, retry logic, caching, and execution flow
+1. **[AGENT.md](modules/AGENT.md)** - Agent loop, structured output, traces, reasoning, batch, policy, caching
 2. **[STREAMING.md](modules/STREAMING.md)** - E2E streaming, parallel execution, routing mode, AgentResult, context propagation
 3. **[TOOLS.md](modules/TOOLS.md)** - Tool definition, validation, registry, and streaming
 4. **[DYNAMIC_TOOLS.md](modules/DYNAMIC_TOOLS.md)** - ToolLoader, dynamic tool loading, hot-reload, plugin systems
 5. **[PARSER.md](modules/PARSER.md)** - TOOL_CALL contract and JSON extraction strategies
 6. **[PROMPT.md](modules/PROMPT.md)** - System prompt generation and tool schema formatting
-7. **[PROVIDERS.md](modules/PROVIDERS.md)** - LLM provider adapters and message formatting
-8. **[MEMORY.md](modules/MEMORY.md)** - Conversation memory management and sliding windows
+7. **[PROVIDERS.md](modules/PROVIDERS.md)** - LLM provider adapters, message formatting, and FallbackProvider
+8. **[MEMORY.md](modules/MEMORY.md)** - Conversation memory, sliding windows, and tool-pair-aware trimming
 9. **[USAGE.md](modules/USAGE.md)** - Usage tracking, cost calculation, and analytics
 10. **[RAG.md](modules/RAG.md)** - Complete RAG pipeline from documents to answers
 11. **[HYBRID_SEARCH.md](modules/HYBRID_SEARCH.md)** - BM25, hybrid search, fusion methods, and reranking
@@ -113,21 +113,27 @@ Detailed technical documentation for each module:
 ```
 1. User Query
    ↓
-2. AGENT loads history (MEMORY) and calls PROVIDER
+2. AGENT loads history (MEMORY) and calls PROVIDER (or FALLBACK chain)
    ↓
 3. CACHE checked (if configured) → hit? Return cached response
    ↓
-4. PROVIDER formats prompt (PROMPT) and calls LLM → CACHE stores result
+4. PROVIDER formats prompt (PROMPT + STRUCTURED schema) and calls LLM → CACHE stores result
    ↓
-5. PARSER extracts TOOL_CALL from response
+5. PARSER extracts TOOL_CALL from response; REASONING extracted
    ↓
-6. TOOLS validates and executes
+6. POLICY ENGINE evaluates tool call → allow/review/deny
    ↓
-6b. If multiple tools: PARALLEL execution (asyncio.gather)
+6b. If review: HUMAN-IN-THE-LOOP callback → approve/reject
    ↓
-7. USAGE tracks tokens and costs
+7. TOOLS validates and executes (parallel if multiple)
    ↓
-8. Loop continues or returns final response
+8. TRACE records each step (llm_call, tool_selection, tool_execution)
+   ↓
+9. USAGE tracks tokens and costs
+   ↓
+10. If response_format: STRUCTURED validates → retry on failure
+   ↓
+11. Loop continues or returns AgentResult (with .parsed, .trace, .reasoning)
 ```
 
 **Read:**
@@ -206,6 +212,12 @@ Detailed technical documentation for each module:
 ### Core Patterns
 
 - **Agent Loop** - Iterative tool calling until completion
+- **Structured Output** - Pydantic/JSON Schema validation with auto-retry
+- **Execution Traces** - Structured timeline on every run (`result.trace`)
+- **Reasoning Visibility** - Why the agent chose a tool (`result.reasoning`)
+- **Provider Fallback** - Priority-ordered providers with circuit breaker
+- **Batch Processing** - Concurrent multi-prompt execution
+- **Tool Policy Engine** - Declarative allow/review/deny with HITL approval
 - **Native Tool Calling** - Provider-native function calling APIs
 - **Parallel Execution** - Concurrent tool calls via asyncio.gather
 - **Tool Calling Contract** - TOOL_CALL with JSON payload
@@ -235,6 +247,26 @@ See: [TOOLS.md](modules/TOOLS.md)
 ### Add RAG
 
 See: [RAG.md](modules/RAG.md)
+
+### Get Structured Output
+
+See: [AGENT.md — Structured Output](modules/AGENT.md#structured-output)
+
+### See Execution Traces
+
+See: [AGENT.md — Execution Traces](modules/AGENT.md#execution-traces)
+
+### Add Provider Fallback
+
+See: [PROVIDERS.md — FallbackProvider](modules/PROVIDERS.md#fallbackprovider)
+
+### Batch Processing
+
+See: [AGENT.md — Batch Processing](modules/AGENT.md#batch-processing)
+
+### Add Tool Policies
+
+See: [AGENT.md — Tool Policy](modules/AGENT.md#tool-policy--human-in-the-loop)
 
 ### Switch Providers
 

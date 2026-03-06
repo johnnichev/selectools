@@ -5,18 +5,30 @@ Provider-agnostic agent loop implementing the TOOL_CALL contract.
 from __future__ import annotations
 
 import asyncio
+import copy
+import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, AsyncGenerator, Callable, Dict, List, Optional, Union, cast
 
 from ..analytics import AgentAnalytics
 from ..cache import CacheKeyBuilder
 from ..parser import ToolCallParser
+from ..policy import PolicyDecision, ToolPolicy
 from ..prompt import PromptBuilder
 from ..providers.base import Provider, ProviderError
 from ..providers.openai_provider import OpenAIProvider
+from ..structured import (
+    ResponseFormat,
+    build_schema_instruction,
+    parse_and_validate,
+    schema_from_response_format,
+    validation_retry_message,
+)
 from ..tools import Tool
+from ..trace import AgentTrace, StepType, TraceStep
 from ..types import AgentResult, Message, Role, StreamChunk, ToolCall
 from ..usage import AgentUsage
 from .config import AgentConfig
@@ -243,10 +255,102 @@ class Agent:
             return [Message(role=Role.USER, content=messages)]
         return messages
 
+    @staticmethod
+    def _extract_reasoning(response_msg: Message, tool_calls: List[ToolCall]) -> Optional[str]:
+        """Return explanatory text the LLM sent alongside tool calls.
+
+        Providers typically return both text content and tool_use blocks in
+        the same response.  The text portion explains *why* the tool was
+        chosen.  If no tool calls were made or the text is empty, returns
+        ``None``.
+        """
+        if not tool_calls:
+            return None
+        text = (response_msg.content or "").strip()
+        return text if text else None
+
+    def _check_policy(self, tool_name: str, tool_args: Dict[str, Any]) -> Optional[str]:
+        """Evaluate tool policy and confirm_action. Returns error string or None."""
+        if not self.config.tool_policy:
+            return None
+
+        result = self.config.tool_policy.evaluate(tool_name, tool_args)
+
+        if result.decision == PolicyDecision.ALLOW:
+            return None
+
+        if result.decision == PolicyDecision.DENY:
+            return f"Tool '{tool_name}' denied by policy: {result.reason}"
+
+        if result.decision == PolicyDecision.REVIEW:
+            if self.config.confirm_action is None:
+                return f"Tool '{tool_name}' requires approval but no confirm_action configured: {result.reason}"
+            try:
+                with ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(
+                        self.config.confirm_action, tool_name, tool_args, result.reason
+                    )
+                    try:
+                        approved = future.result(timeout=self.config.approval_timeout)
+                    except FuturesTimeoutError:
+                        return (
+                            f"Tool '{tool_name}' approval timed out "
+                            f"after {self.config.approval_timeout}s"
+                        )
+                if not approved:
+                    return f"Tool '{tool_name}' rejected by reviewer: {result.reason}"
+            except FuturesTimeoutError:
+                return (
+                    f"Tool '{tool_name}' approval timed out after {self.config.approval_timeout}s"
+                )
+            except Exception as exc:
+                return f"Tool '{tool_name}' approval failed: {exc}"
+
+        return None
+
+    async def _acheck_policy(self, tool_name: str, tool_args: Dict[str, Any]) -> Optional[str]:
+        """Async version of _check_policy."""
+        if not self.config.tool_policy:
+            return None
+
+        result = self.config.tool_policy.evaluate(tool_name, tool_args)
+
+        if result.decision == PolicyDecision.ALLOW:
+            return None
+
+        if result.decision == PolicyDecision.DENY:
+            return f"Tool '{tool_name}' denied by policy: {result.reason}"
+
+        if result.decision == PolicyDecision.REVIEW:
+            if self.config.confirm_action is None:
+                return f"Tool '{tool_name}' requires approval but no confirm_action configured: {result.reason}"
+            try:
+                import asyncio
+                import inspect
+
+                if inspect.iscoroutinefunction(self.config.confirm_action):
+                    approved = await asyncio.wait_for(
+                        self.config.confirm_action(tool_name, tool_args, result.reason),
+                        timeout=self.config.approval_timeout,
+                    )
+                else:
+                    approved = self.config.confirm_action(tool_name, tool_args, result.reason)
+                if not approved:
+                    return f"Tool '{tool_name}' rejected by reviewer: {result.reason}"
+            except asyncio.TimeoutError:
+                return (
+                    f"Tool '{tool_name}' approval timed out after {self.config.approval_timeout}s"
+                )
+            except Exception as exc:
+                return f"Tool '{tool_name}' approval failed: {exc}"
+
+        return None
+
     def ask(
         self,
         prompt: str,
         stream_handler: Optional[Callable[[str], None]] = None,
+        response_format: Optional[ResponseFormat] = None,
     ) -> AgentResult:
         """
         Send a single user prompt and return the agent's response.
@@ -257,6 +361,9 @@ class Agent:
         Args:
             prompt: Plain-text question or instruction.
             stream_handler: Optional callback for streaming responses.
+            response_format: Optional Pydantic model class or JSON Schema dict.
+                When provided the LLM is instructed to return valid JSON and
+                the result is validated. Access via ``result.parsed``.
 
         Returns:
             AgentResult with the response and metadata.
@@ -266,12 +373,17 @@ class Agent:
             >>> print(result.content)
             Paris
         """
-        return self.run([Message(role=Role.USER, content=prompt)], stream_handler=stream_handler)
+        return self.run(
+            [Message(role=Role.USER, content=prompt)],
+            stream_handler=stream_handler,
+            response_format=response_format,
+        )
 
     async def aask(
         self,
         prompt: str,
         stream_handler: Optional[Callable[[str], None]] = None,
+        response_format: Optional[ResponseFormat] = None,
     ) -> AgentResult:
         """
         Async version of :meth:`ask`.
@@ -279,6 +391,7 @@ class Agent:
         Args:
             prompt: Plain-text question or instruction.
             stream_handler: Optional callback for streaming responses.
+            response_format: Optional Pydantic model class or JSON Schema dict.
 
         Returns:
             AgentResult with the response and metadata.
@@ -288,13 +401,128 @@ class Agent:
             >>> print(result.content)
         """
         return await self.arun(
-            [Message(role=Role.USER, content=prompt)], stream_handler=stream_handler
+            [Message(role=Role.USER, content=prompt)],
+            stream_handler=stream_handler,
+            response_format=response_format,
         )
+
+    def batch(
+        self,
+        prompts: List[str],
+        max_concurrency: int = 5,
+        response_format: Optional[ResponseFormat] = None,
+        on_progress: Optional[Callable[[int, int], None]] = None,
+    ) -> List[AgentResult]:
+        """
+        Process multiple prompts concurrently using a thread pool.
+
+        Each prompt is processed in full isolation — a lightweight clone of the
+        agent is used per item so that concurrent threads never share ``_history``
+        or ``usage`` state.  Results are returned in the same order as the input
+        prompts.  Individual failures are captured per-result without cancelling
+        the rest of the batch.
+
+        Token usage from all items is aggregated back to ``self.usage`` after
+        the batch completes.
+
+        Args:
+            prompts: List of plain-text prompts.
+            max_concurrency: Maximum parallel requests. Default: 5.
+            response_format: Optional Pydantic model or JSON Schema applied to each prompt.
+            on_progress: Optional ``(completed, total)`` callback.
+
+        Returns:
+            List of AgentResult in the same order as *prompts*.
+        """
+        usage_lock = threading.Lock()
+        progress_lock = threading.Lock()
+        completed = 0
+
+        def _run_one(prompt: str) -> AgentResult:
+            nonlocal completed
+            clone = copy.copy(self)
+            clone._history = []
+            clone.usage = AgentUsage()
+            clone.memory = None
+            clone.analytics = None
+            try:
+                result = clone.run(prompt, response_format=response_format)
+            except Exception as exc:
+                result = AgentResult(
+                    message=Message(role=Role.ASSISTANT, content=f"Batch error: {exc}"),
+                )
+            with usage_lock:
+                self.usage.merge(clone.usage)
+            with progress_lock:
+                completed += 1
+                count = completed
+            if on_progress:
+                try:
+                    on_progress(count, len(prompts))
+                except Exception:  # nosec B110
+                    pass
+            return result
+
+        with ThreadPoolExecutor(max_workers=max_concurrency) as pool:
+            futures = [pool.submit(_run_one, p) for p in prompts]
+            return [cast(AgentResult, f.result()) for f in futures]
+
+    async def abatch(
+        self,
+        prompts: List[str],
+        max_concurrency: int = 10,
+        response_format: Optional[ResponseFormat] = None,
+        on_progress: Optional[Callable[[int, int], None]] = None,
+    ) -> List[AgentResult]:
+        """
+        Async version of :meth:`batch`.
+
+        Each prompt runs in an isolated clone of the agent (fresh ``_history``
+        and ``usage``).  Usage is aggregated back to ``self.usage`` after the
+        batch completes.
+
+        Args:
+            prompts: List of plain-text prompts.
+            max_concurrency: Maximum parallel requests. Default: 10.
+            response_format: Optional Pydantic model or JSON Schema applied to each prompt.
+            on_progress: Optional ``(completed, total)`` callback.
+
+        Returns:
+            List of AgentResult in the same order as *prompts*.
+        """
+        semaphore = asyncio.Semaphore(max_concurrency)
+        completed = 0
+
+        async def _run_one(prompt: str) -> AgentResult:
+            nonlocal completed
+            clone = copy.copy(self)
+            clone._history = []
+            clone.usage = AgentUsage()
+            clone.memory = None
+            clone.analytics = None
+            async with semaphore:
+                try:
+                    result = await clone.arun(prompt, response_format=response_format)
+                except Exception as exc:
+                    result = AgentResult(
+                        message=Message(role=Role.ASSISTANT, content=f"Batch error: {exc}"),
+                    )
+            self.usage.merge(clone.usage)
+            completed += 1
+            if on_progress:
+                try:
+                    on_progress(completed, len(prompts))
+                except Exception:  # nosec B110
+                    pass
+            return result
+
+        return list(await asyncio.gather(*[_run_one(p) for p in prompts]))
 
     def run(
         self,
         messages: Union[str, List[Message]],
         stream_handler: Optional[Callable[[str], None]] = None,
+        response_format: Optional[ResponseFormat] = None,
     ) -> AgentResult:
         """
         Execute the agent loop with the provided conversation history.
@@ -307,6 +535,9 @@ class Agent:
             messages: A plain-text prompt (str) or list of Message objects.
                 A string is automatically wrapped as a single user message.
             stream_handler: Optional callback for streaming responses.
+            response_format: Optional Pydantic model class or JSON Schema dict.
+                When provided the LLM is instructed to return valid JSON and
+                the result is validated and available via ``result.parsed``.
 
         Returns:
             AgentResult with the final response and tool call metadata.
@@ -316,45 +547,88 @@ class Agent:
             >>> result = agent.run([Message(role=Role.USER, content="Hello")])
         """
         messages = self._normalize_messages(messages)
-        # Call on_agent_start hook
         self._call_hook("on_agent_start", messages)
 
+        original_system_prompt = self._system_prompt
+        if response_format is not None:
+            schema = schema_from_response_format(response_format)
+            self._system_prompt = self._system_prompt + build_schema_instruction(schema)
+
+        trace = AgentTrace()
+        _history_checkpoint = len(self._history)
+        iteration = 0
+
         try:
-            # Load history from memory if available, then append new messages
             if self.memory:
                 self._history = self.memory.get_history() + list(messages)
-                # Add new user messages to memory
                 self.memory.add_many(messages)
             else:
                 self._history.extend(messages)
 
-            iteration = 0
             all_tool_calls: List[ToolCall] = []
             last_tool_name: Optional[str] = None
             last_tool_args: Dict[str, Any] = {}
+            reasoning_history: List[str] = []
 
             while iteration < self.config.max_iterations:
                 iteration += 1
                 self._call_hook("on_iteration_start", iteration, self._history)
 
-                response_msg = self._call_provider(stream_handler=stream_handler)
+                response_msg = self._call_provider(stream_handler=stream_handler, trace=trace)
                 response_text = response_msg.content
 
-                # Determine tools to call
                 tool_calls_to_execute = []
                 if response_msg.tool_calls:
-                    # Native tool calls
                     tool_calls_to_execute = response_msg.tool_calls
                 else:
-                    # Fallback to regex parsing for text-only responses
                     parse_result = self.parser.parse(response_text)
                     if parse_result.tool_call:
                         tool_calls_to_execute.append(parse_result.tool_call)
 
+                reasoning_text = self._extract_reasoning(response_msg, tool_calls_to_execute)
+                if reasoning_text:
+                    reasoning_history.append(reasoning_text)
+
+                if tool_calls_to_execute:
+                    for tc in tool_calls_to_execute:
+                        trace.add(
+                            TraceStep(
+                                type="tool_selection",
+                                tool_name=tc.tool_name,
+                                tool_args=tc.parameters,
+                                reasoning=reasoning_text,
+                                summary=f"Selected {tc.tool_name}",
+                            )
+                        )
+
                 if not tool_calls_to_execute:
+                    parsed = None
+                    if response_format is not None:
+                        try:
+                            parsed = parse_and_validate(response_text, response_format)
+                        except (ValueError, TypeError) as exc:
+                            if iteration < self.config.max_iterations:
+                                trace.add(
+                                    TraceStep(
+                                        type="structured_retry",
+                                        error=str(exc),
+                                        summary=f"Validation failed: {exc}",
+                                    )
+                                )
+                                retry_msg = Message(
+                                    role=Role.USER,
+                                    content=validation_retry_message(exc),
+                                )
+                                self._history.append(
+                                    Message(role=Role.ASSISTANT, content=response_text)
+                                )
+                                self._history.append(retry_msg)
+                                self._call_hook("on_iteration_end", iteration, response_text)
+                                continue
+
                     final_response = Message(role=Role.ASSISTANT, content=response_text)
+                    self._history.append(final_response)
                     self._call_hook("on_iteration_end", iteration, response_text)
-                    # Save final response to memory if available
                     if self.memory:
                         self.memory.add(final_response)
                     self._call_hook("on_agent_end", final_response, self.usage)
@@ -364,21 +638,26 @@ class Agent:
                         tool_args=last_tool_args,
                         iterations=iteration,
                         tool_calls=all_tool_calls,
+                        parsed=parsed,
+                        reasoning=reasoning_history[-1] if reasoning_history else None,
+                        reasoning_history=reasoning_history,
+                        trace=trace,
+                        provider_used=getattr(self.provider, "provider_used", None),
                     )
 
                 if self.config.routing_only and tool_calls_to_execute:
-                    # In routing mode, we return the selection without executing.
-                    # We do NOT append to history because the action wasn't completed.
                     return AgentResult(
                         message=response_msg,
                         tool_name=tool_calls_to_execute[-1].tool_name,
                         tool_args=tool_calls_to_execute[-1].parameters,
                         iterations=iteration,
                         tool_calls=tool_calls_to_execute,
+                        reasoning=reasoning_text,
+                        reasoning_history=reasoning_history,
+                        trace=trace,
+                        provider_used=getattr(self.provider, "provider_used", None),
                     )
 
-                # Append the ASSISTANT message (with tool_calls) to history once,
-                # then execute all requested tools and append TOOL results.
                 self._history.append(response_msg)
                 if self.memory:
                     self.memory.add(response_msg)
@@ -389,12 +668,15 @@ class Agent:
 
                 if use_parallel:
                     _last_name, _last_args = self._execute_tools_parallel(
-                        tool_calls_to_execute, all_tool_calls, iteration, response_text
+                        tool_calls_to_execute,
+                        all_tool_calls,
+                        iteration,
+                        response_text,
+                        trace=trace,
                     )
                     last_tool_name = _last_name
                     last_tool_args = _last_args
                 else:
-                    # Sequential execution (single tool call or parallel disabled)
                     for tool_call in tool_calls_to_execute:
                         tool_name = tool_call.tool_name
                         parameters = tool_call.parameters
@@ -411,6 +693,27 @@ class Agent:
                         if not tool:
                             error_message = f"Unknown tool '{tool_name}'. Available tools: {', '.join(self._tools_by_name.keys())}"
                             self._append_tool_result(error_message, tool_name, tool_call.id)
+                            trace.add(
+                                TraceStep(
+                                    type="error",
+                                    tool_name=tool_name,
+                                    error=error_message,
+                                    summary=f"Unknown tool {tool_name}",
+                                )
+                            )
+                            continue
+
+                        policy_error = self._check_policy(tool_name, parameters)
+                        if policy_error:
+                            self._append_tool_result(policy_error, tool_name, tool_call.id)
+                            trace.add(
+                                TraceStep(
+                                    type="error",
+                                    tool_name=tool_name,
+                                    error=policy_error,
+                                    summary=f"Policy denied {tool_name}",
+                                )
+                            )
                             continue
 
                         try:
@@ -428,6 +731,17 @@ class Agent:
                             )
                             duration = time.time() - start_time
                             self._call_hook("on_tool_end", tool_name, result, duration)
+
+                            trace.add(
+                                TraceStep(
+                                    type="tool_execution",
+                                    duration_ms=duration * 1000,
+                                    tool_name=tool_name,
+                                    tool_args=parameters,
+                                    tool_result=result[:200] if result else None,
+                                    summary=f"{tool_name} → {len(result)} chars",
+                                )
+                            )
 
                             if self.analytics:
                                 self.analytics.record_tool_call(
@@ -454,6 +768,15 @@ class Agent:
                         except Exception as exc:
                             duration = time.time() - start_time
                             self._call_hook("on_tool_error", tool_name, exc, parameters)
+                            trace.add(
+                                TraceStep(
+                                    type="error",
+                                    duration_ms=duration * 1000,
+                                    tool_name=tool_name,
+                                    error=str(exc),
+                                    summary=f"{tool_name} failed: {exc}",
+                                )
+                            )
                             if self.analytics:
                                 self.analytics.record_tool_call(
                                     tool_name=tool.name,
@@ -468,13 +791,13 @@ class Agent:
                             self._append_tool_result(error_message, tool_name, tool_call.id)
 
                 self._call_hook("on_iteration_end", iteration, response_text)
-                continue  # Continue to next iteration
+                continue
 
             final_response = Message(
                 role=Role.ASSISTANT,
                 content=f"Maximum iterations ({self.config.max_iterations}) reached without resolution.",
             )
-            # Save final response to memory if available
+            self._history.append(final_response)
             if self.memory:
                 self.memory.add(final_response)
             self._call_hook("on_agent_end", final_response, self.usage)
@@ -484,12 +807,26 @@ class Agent:
                 tool_args=last_tool_args,
                 iterations=iteration,
                 tool_calls=all_tool_calls,
+                reasoning=reasoning_history[-1] if reasoning_history else None,
+                reasoning_history=reasoning_history,
+                trace=trace,
+                provider_used=getattr(self.provider, "provider_used", None),
             )
         except Exception as exc:
+            if not self.memory:
+                self._history = self._history[:_history_checkpoint]
             self._call_hook("on_error", exc, {"messages": messages, "iteration": iteration})
             raise
+        finally:
+            self._system_prompt = original_system_prompt
 
-    def _call_provider(self, stream_handler: Optional[Callable[[str], None]] = None) -> Message:
+    def _call_provider(
+        self,
+        stream_handler: Optional[Callable[[str], None]] = None,
+        trace: Optional[AgentTrace] = None,
+    ) -> Message:
+        call_start = time.time()
+
         # --- Cache lookup (before any retries / API calls) ---
         cache_key: Optional[str] = None
         if self.config.cache and not (
@@ -510,6 +847,15 @@ class Agent:
                 self._call_hook("on_llm_end", cached_msg.content, cached_usage)
                 if self.config.verbose:
                     print("[agent] cache hit -- skipping provider call")
+                if trace is not None:
+                    trace.add(
+                        TraceStep(
+                            type="cache_hit",
+                            duration_ms=(time.time() - call_start) * 1000,
+                            model=self.config.model,
+                            summary=f"Cache hit: {self.config.model}",
+                        )
+                    )
                 return cached_msg
 
         attempts = 0
@@ -566,6 +912,17 @@ class Agent:
                         f"cost: ${usage_stats.cost_usd:.6f}"
                     )
 
+                if trace is not None:
+                    trace.add(
+                        TraceStep(
+                            type="llm_call",
+                            duration_ms=(time.time() - call_start) * 1000,
+                            model=self.config.model,
+                            prompt_tokens=usage_stats.prompt_tokens,
+                            completion_tokens=usage_stats.completion_tokens,
+                            summary=f"{self.config.model} → {len(response_text)} chars",
+                        )
+                    )
                 return response_msg
             except ProviderError as exc:
                 last_error = str(exc)
@@ -583,6 +940,16 @@ class Agent:
                 if self.config.retry_backoff_seconds:
                     time.sleep(self.config.retry_backoff_seconds * attempts)
 
+        if trace is not None:
+            trace.add(
+                TraceStep(
+                    type="llm_call",
+                    duration_ms=(time.time() - call_start) * 1000,
+                    model=self.config.model,
+                    error=last_error,
+                    summary=f"Provider error: {last_error}",
+                )
+            )
         return Message(
             role=Role.ASSISTANT, content=f"Provider error: {last_error or 'unknown error'}"
         )
@@ -637,6 +1004,7 @@ class Agent:
         all_tool_calls: List[ToolCall],
         iteration: int,
         response_text: str,
+        trace: Optional[AgentTrace] = None,
     ) -> tuple:
         """Execute multiple tool calls concurrently using ThreadPoolExecutor.
 
@@ -724,7 +1092,20 @@ class Agent:
                     + self.usage.iterations[-1].total_tokens
                 )
 
-            # Append result to history (in order)
+            if trace is not None:
+                step_type: StepType = "error" if r.is_error else "tool_execution"
+                trace.add(
+                    TraceStep(
+                        type=step_type,
+                        duration_ms=r.duration * 1000,
+                        tool_name=r.tool_call.tool_name,
+                        tool_args=r.tool_call.parameters,
+                        tool_result=r.result[:200] if not r.is_error and r.result else None,
+                        error=r.result if r.is_error else None,
+                        summary=f"{r.tool_call.tool_name} → {'error' if r.is_error else f'{len(r.result)} chars'}",
+                    )
+                )
+
             if r.is_error:
                 self._append_tool_result(r.result, r.tool_call.tool_name, r.tool_call.id)
             else:
@@ -740,6 +1121,7 @@ class Agent:
         all_tool_calls: List[ToolCall],
         iteration: int,
         response_text: str,
+        trace: Optional[AgentTrace] = None,
     ) -> tuple:
         """Execute multiple tool calls concurrently using asyncio.gather.
 
@@ -817,6 +1199,20 @@ class Agent:
                     chunk_count=r.chunk_count,
                 )
 
+            if trace is not None:
+                step_type: StepType = "error" if r.is_error else "tool_execution"
+                trace.add(
+                    TraceStep(
+                        type=step_type,
+                        duration_ms=r.duration * 1000,
+                        tool_name=r.tool_call.tool_name,
+                        tool_args=r.tool_call.parameters,
+                        tool_result=r.result[:200] if not r.is_error and r.result else None,
+                        error=r.result if r.is_error else None,
+                        summary=f"{r.tool_call.tool_name} → {'error' if r.is_error else f'{len(r.result)} chars'}",
+                    )
+                )
+
             # Append result to history (in order)
             if r.is_error:
                 self._append_tool_result(r.result, r.tool_call.tool_name, r.tool_call.id)
@@ -834,15 +1230,18 @@ class Agent:
         if not self.config.tool_timeout_seconds:
             return tool.execute(parameters, chunk_callback=chunk_callback)
 
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(tool.execute, parameters, chunk_callback)
-            try:
-                return future.result(timeout=self.config.tool_timeout_seconds)
-            except TimeoutError:
-                future.cancel()
-                raise TimeoutError(
-                    f"Tool '{tool.name}' timed out after {self.config.tool_timeout_seconds} seconds"
-                )
+        executor = ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(tool.execute, parameters, chunk_callback)
+        try:
+            return future.result(timeout=self.config.tool_timeout_seconds)
+        except FuturesTimeoutError:
+            future.cancel()
+            executor.shutdown(wait=False)
+            raise TimeoutError(
+                f"Tool '{tool.name}' timed out after {self.config.tool_timeout_seconds} seconds"
+            )
+        finally:
+            executor.shutdown(wait=False)
 
     def _is_rate_limit_error(self, message: str) -> bool:
         lowered = message.lower()
@@ -864,6 +1263,8 @@ class Agent:
         """
         messages = self._normalize_messages(messages)
         self._call_hook("on_agent_start", messages)
+        _history_checkpoint = len(self._history)
+        iteration = 0
 
         try:
             if self.memory:
@@ -872,7 +1273,6 @@ class Agent:
             else:
                 self._history.extend(messages)
 
-            iteration = 0
             all_tool_calls: List[ToolCall] = []
             last_tool_name: Optional[str] = None
             last_tool_args: Dict[str, Any] = {}
@@ -988,7 +1388,7 @@ class Agent:
 
                 if use_parallel:
                     _last_name, _last_args = await self._aexecute_tools_parallel(
-                        tool_calls_to_execute, all_tool_calls, iteration, full_content
+                        tool_calls_to_execute, all_tool_calls, iteration, full_content, trace=None
                     )
                     last_tool_name = _last_name
                     last_tool_args = _last_args
@@ -1004,6 +1404,11 @@ class Agent:
                         if not tool:
                             result = f"Error: Tool {tool_name} not found"
                             self._append_tool_result(result, tool_name, tool_call.id)
+                            continue
+
+                        policy_error = await self._acheck_policy(tool_name, parameters)
+                        if policy_error:
+                            self._append_tool_result(policy_error, tool_name, tool_call.id)
                             continue
 
                         try:
@@ -1022,6 +1427,7 @@ class Agent:
                 role=Role.ASSISTANT,
                 content=f"Maximum iterations ({self.config.max_iterations}) reached without resolution.",
             )
+            self._history.append(final_msg)
             yield AgentResult(
                 message=final_msg,
                 tool_name=last_tool_name,
@@ -1034,13 +1440,16 @@ class Agent:
             self._call_hook("on_agent_end", final_msg, self.usage)
             return
         except Exception as exc:
-            self._call_hook("on_error", exc, {"messages": messages, "iteration": 0})
+            if not self.memory:
+                self._history = self._history[:_history_checkpoint]
+            self._call_hook("on_error", exc, {"messages": messages, "iteration": iteration})
             raise
 
     async def arun(
         self,
         messages: Union[str, List[Message]],
         stream_handler: Optional[Callable[[str], None]] = None,
+        response_format: Optional[ResponseFormat] = None,
     ) -> AgentResult:
         """
         Async version of run().
@@ -1051,6 +1460,7 @@ class Agent:
         Args:
             messages: A plain-text prompt (str) or list of Message objects.
             stream_handler: Optional callback for streaming responses.
+            response_format: Optional Pydantic model class or JSON Schema dict.
 
         Returns:
             AgentResult with the final response and tool call metadata.
@@ -1058,39 +1468,87 @@ class Agent:
         messages = self._normalize_messages(messages)
         self._call_hook("on_agent_start", messages)
 
+        original_system_prompt = self._system_prompt
+        if response_format is not None:
+            schema = schema_from_response_format(response_format)
+            self._system_prompt = self._system_prompt + build_schema_instruction(schema)
+
+        trace = AgentTrace()
+        _history_checkpoint = len(self._history)
+        iteration = 0
+
         try:
-            # Load history from memory if available, then append new messages
             if self.memory:
                 self._history = self.memory.get_history() + list(messages)
                 self.memory.add_many(messages)
             else:
-                self._history = list(messages)
+                self._history.extend(messages)
 
-            iteration = 0
             all_tool_calls: List[ToolCall] = []
             last_tool_name: Optional[str] = None
             last_tool_args: Dict[str, Any] = {}
+            reasoning_history: List[str] = []
 
             while iteration < self.config.max_iterations:
                 iteration += 1
                 self._call_hook("on_iteration_start", iteration, self._history)
 
-                response_msg = await self._acall_provider(stream_handler=stream_handler)
+                response_msg = await self._acall_provider(
+                    stream_handler=stream_handler, trace=trace
+                )
                 response_text = response_msg.content
 
-                # Determine tools to call
                 tool_calls_to_execute = []
                 if response_msg.tool_calls:
-                    # Native tool calls
                     tool_calls_to_execute = response_msg.tool_calls
                 else:
-                    # Fallback to regex parsing for text-only responses
                     parse_result = self.parser.parse(response_text)
                     if parse_result.tool_call:
                         tool_calls_to_execute.append(parse_result.tool_call)
 
+                reasoning_text = self._extract_reasoning(response_msg, tool_calls_to_execute)
+                if reasoning_text:
+                    reasoning_history.append(reasoning_text)
+
+                if tool_calls_to_execute:
+                    for tc in tool_calls_to_execute:
+                        trace.add(
+                            TraceStep(
+                                type="tool_selection",
+                                tool_name=tc.tool_name,
+                                tool_args=tc.parameters,
+                                reasoning=reasoning_text,
+                                summary=f"Selected {tc.tool_name}",
+                            )
+                        )
+
                 if not tool_calls_to_execute:
+                    parsed = None
+                    if response_format is not None:
+                        try:
+                            parsed = parse_and_validate(response_text, response_format)
+                        except (ValueError, TypeError) as exc:
+                            if iteration < self.config.max_iterations:
+                                trace.add(
+                                    TraceStep(
+                                        type="structured_retry",
+                                        error=str(exc),
+                                        summary=f"Validation failed: {exc}",
+                                    )
+                                )
+                                retry_msg = Message(
+                                    role=Role.USER,
+                                    content=validation_retry_message(exc),
+                                )
+                                self._history.append(
+                                    Message(role=Role.ASSISTANT, content=response_text)
+                                )
+                                self._history.append(retry_msg)
+                                self._call_hook("on_iteration_end", iteration, response_text)
+                                continue
+
                     final_response = Message(role=Role.ASSISTANT, content=response_text)
+                    self._history.append(final_response)
                     self._call_hook("on_iteration_end", iteration, response_text)
                     if self.memory:
                         self.memory.add(final_response)
@@ -1101,6 +1559,11 @@ class Agent:
                         tool_args=last_tool_args,
                         iterations=iteration,
                         tool_calls=all_tool_calls,
+                        parsed=parsed,
+                        reasoning=reasoning_history[-1] if reasoning_history else None,
+                        reasoning_history=reasoning_history,
+                        trace=trace,
+                        provider_used=getattr(self.provider, "provider_used", None),
                     )
 
                 if self.config.routing_only and tool_calls_to_execute:
@@ -1110,6 +1573,10 @@ class Agent:
                         tool_args=tool_calls_to_execute[-1].parameters,
                         iterations=iteration,
                         tool_calls=tool_calls_to_execute,
+                        reasoning=reasoning_text,
+                        reasoning_history=reasoning_history,
+                        trace=trace,
+                        provider_used=getattr(self.provider, "provider_used", None),
                     )
 
                 # Execute tool calls
@@ -1123,7 +1590,7 @@ class Agent:
 
                 if use_parallel:
                     _last_name, _last_args = await self._aexecute_tools_parallel(
-                        tool_calls_to_execute, all_tool_calls, iteration, response_text
+                        tool_calls_to_execute, all_tool_calls, iteration, response_text, trace=trace
                     )
                     last_tool_name = _last_name
                     last_tool_args = _last_args
@@ -1145,6 +1612,27 @@ class Agent:
                         if not tool:
                             error_message = f"Unknown tool '{tool_name}'. Available tools: {', '.join(self._tools_by_name.keys())}"
                             self._append_tool_result(error_message, tool_name, tool_call.id)
+                            trace.add(
+                                TraceStep(
+                                    type="error",
+                                    tool_name=tool_name,
+                                    error=error_message,
+                                    summary=f"Unknown tool {tool_name}",
+                                )
+                            )
+                            continue
+
+                        policy_error = await self._acheck_policy(tool_name, parameters)
+                        if policy_error:
+                            self._append_tool_result(policy_error, tool_name, tool_call.id)
+                            trace.add(
+                                TraceStep(
+                                    type="error",
+                                    tool_name=tool_name,
+                                    error=policy_error,
+                                    summary=f"Policy denied {tool_name}",
+                                )
+                            )
                             continue
 
                         try:
@@ -1163,6 +1651,17 @@ class Agent:
                             duration = time.time() - start_time
                             self._call_hook("on_tool_end", tool_name, result, duration)
 
+                            trace.add(
+                                TraceStep(
+                                    type="tool_execution",
+                                    duration_ms=duration * 1000,
+                                    tool_name=tool_name,
+                                    tool_args=parameters,
+                                    tool_result=result[:200] if result else None,
+                                    summary=f"{tool_name} → {len(result)} chars",
+                                )
+                            )
+
                             if self.analytics:
                                 self.analytics.record_tool_call(
                                     tool_name=tool.name,
@@ -1175,6 +1674,15 @@ class Agent:
                         except Exception as exc:
                             duration = time.time() - start_time
                             self._call_hook("on_tool_error", tool.name, exc, parameters)
+                            trace.add(
+                                TraceStep(
+                                    type="error",
+                                    duration_ms=duration * 1000,
+                                    tool_name=tool.name,
+                                    error=str(exc),
+                                    summary=f"{tool.name} failed: {exc}",
+                                )
+                            )
 
                             if self.analytics:
                                 self.analytics.record_tool_call(
@@ -1200,6 +1708,7 @@ class Agent:
                 role=Role.ASSISTANT,
                 content=f"Maximum iterations ({self.config.max_iterations}) reached without resolution.",
             )
+            self._history.append(final_response)
             if self.memory:
                 self.memory.add(final_response)
             self._call_hook("on_agent_end", final_response, self.usage)
@@ -1209,15 +1718,27 @@ class Agent:
                 tool_args=last_tool_args,
                 iterations=iteration,
                 tool_calls=all_tool_calls,
+                reasoning=reasoning_history[-1] if reasoning_history else None,
+                reasoning_history=reasoning_history,
+                trace=trace,
+                provider_used=getattr(self.provider, "provider_used", None),
             )
         except Exception as exc:
+            if not self.memory:
+                self._history = self._history[:_history_checkpoint]
             self._call_hook("on_error", exc, {"messages": messages, "iteration": iteration})
             raise
+        finally:
+            self._system_prompt = original_system_prompt
 
     async def _acall_provider(
-        self, stream_handler: Optional[Callable[[str], None]] = None
+        self,
+        stream_handler: Optional[Callable[[str], None]] = None,
+        trace: Optional[AgentTrace] = None,
     ) -> Message:
         """Async version of _call_provider with retry logic."""
+        call_start = time.time()
+
         # --- Cache lookup (before any retries / API calls) ---
         cache_key: Optional[str] = None
         if self.config.cache and not (
@@ -1238,6 +1759,15 @@ class Agent:
                 self._call_hook("on_llm_end", cached_msg.content, cached_usage)
                 if self.config.verbose:
                     print("[agent] cache hit -- skipping provider call")
+                if trace is not None:
+                    trace.add(
+                        TraceStep(
+                            type="cache_hit",
+                            duration_ms=(time.time() - call_start) * 1000,
+                            model=self.config.model,
+                            summary=f"Cache hit: {self.config.model}",
+                        )
+                    )
                 return cached_msg
 
         attempts = 0
@@ -1313,6 +1843,17 @@ class Agent:
                         f"cost: ${usage_stats.cost_usd:.6f}"
                     )
 
+                if trace is not None:
+                    trace.add(
+                        TraceStep(
+                            type="llm_call",
+                            duration_ms=(time.time() - call_start) * 1000,
+                            model=self.config.model,
+                            prompt_tokens=usage_stats.prompt_tokens,
+                            completion_tokens=usage_stats.completion_tokens,
+                            summary=f"{self.config.model} → {len(response_text)} chars",
+                        )
+                    )
                 return response_msg
             except ProviderError as exc:
                 last_error = str(exc)
@@ -1330,6 +1871,16 @@ class Agent:
                 if self.config.retry_backoff_seconds:
                     await asyncio.sleep(self.config.retry_backoff_seconds * attempts)
 
+        if trace is not None:
+            trace.add(
+                TraceStep(
+                    type="llm_call",
+                    duration_ms=(time.time() - call_start) * 1000,
+                    model=self.config.model,
+                    error=last_error,
+                    summary=f"Provider error: {last_error}",
+                )
+            )
         return Message(
             role=Role.ASSISTANT, content=f"Provider error: {last_error or 'unknown error'}"
         )
