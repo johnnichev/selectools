@@ -81,6 +81,20 @@ def _fix_tool_pair_boundary(self) -> None:
 
 **After fix**: Advances past orphaned messages to `[USER("next question")]` — valid.
 
+### Observer Notifications
+
+When an `AgentObserver` is registered, the agent fires `on_memory_trim` whenever trimming occurs — both for messages added during the run (via `_memory_add`) and for the initial user messages added at the start of `run()`/`arun()`/`astream()` (via `_memory_add_many`):
+
+```python
+from selectools import AgentObserver
+
+class MemoryWatcher(AgentObserver):
+    def on_memory_trim(self, run_id, messages_removed, messages_remaining, reason):
+        print(f"[{run_id}] Trimmed {messages_removed} messages, {messages_remaining} remaining")
+```
+
+The `reason` parameter is `"enforce_limits"` for sliding window / max-tokens trimming.
+
 ### Implementation
 
 ```python

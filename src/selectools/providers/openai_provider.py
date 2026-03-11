@@ -1,12 +1,16 @@
 """
 OpenAI provider adapter for the tool-calling library.
+
+Handles the ``max_tokens`` → ``max_completion_tokens`` migration
+automatically based on model family.  Newer models (GPT-5.x, GPT-4.1,
+o-series, codex) reject the legacy ``max_tokens`` parameter.
 """
 
 from __future__ import annotations
 
 import json
 import os
-from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, Iterable, List, Union, cast
+from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, Iterable, List, Tuple, Union, cast
 
 from ..env import load_default_env
 from ..exceptions import ProviderConfigurationError
@@ -19,6 +23,20 @@ if TYPE_CHECKING:
     from ..tools.base import Tool
 
 from .base import Provider, ProviderError
+
+_MAX_COMPLETION_TOKENS_PREFIXES: Tuple[str, ...] = (
+    "gpt-5",
+    "gpt-4.1",
+    "o1",
+    "o3",
+    "o4",
+    "codex",
+)
+
+
+def _uses_max_completion_tokens(model: str) -> bool:
+    """Return True if *model* requires ``max_completion_tokens`` instead of ``max_tokens``."""
+    return any(model.startswith(p) for p in _MAX_COMPLETION_TOKENS_PREFIXES)
 
 
 class OpenAIProvider(Provider):
@@ -63,11 +81,14 @@ class OpenAIProvider(Provider):
         formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
         model_name = model or self.default_model
 
+        token_key = (
+            "max_completion_tokens" if _uses_max_completion_tokens(model_name) else "max_tokens"
+        )
         args: Dict[str, Any] = {
             "model": model_name,
             "messages": cast(Any, formatted),
             "temperature": temperature,
-            "max_tokens": max_tokens,
+            token_key: max_tokens,
             "timeout": timeout,
         }
 
@@ -136,18 +157,19 @@ class OpenAIProvider(Provider):
         formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
         model_name = model or self.default_model
 
+        token_key = (
+            "max_completion_tokens" if _uses_max_completion_tokens(model_name) else "max_tokens"
+        )
+        args: Dict[str, Any] = {
+            "model": model_name,
+            "messages": cast(Any, formatted),
+            "temperature": temperature,
+            token_key: max_tokens,
+            "stream": True,
+            "timeout": timeout,
+        }
         try:
-            response = cast(
-                Any,
-                self._client.chat.completions.create(
-                    model=model_name,
-                    messages=cast(Any, formatted),
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    stream=True,
-                    timeout=timeout,
-                ),
-            )
+            response = cast(Any, self._client.chat.completions.create(**args))
         except Exception as exc:  # noqa: BLE001
             raise ProviderError(f"OpenAI streaming failed: {exc}") from exc
 
@@ -240,11 +262,14 @@ class OpenAIProvider(Provider):
         formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
         model_name = model or self.default_model
 
+        token_key = (
+            "max_completion_tokens" if _uses_max_completion_tokens(model_name) else "max_tokens"
+        )
         args: Dict[str, Any] = {
             "model": model_name,
             "messages": cast(Any, formatted),
             "temperature": temperature,
-            "max_tokens": max_tokens,
+            token_key: max_tokens,
             "timeout": timeout,
         }
 
@@ -315,11 +340,14 @@ class OpenAIProvider(Provider):
         formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
         model_name = model or self.default_model
 
+        token_key = (
+            "max_completion_tokens" if _uses_max_completion_tokens(model_name) else "max_tokens"
+        )
         args: Dict[str, Any] = {
             "model": model_name,
             "messages": cast(Any, formatted),
             "temperature": temperature,
-            "max_tokens": max_tokens,
+            token_key: max_tokens,
             "stream": True,
             "stream_options": {"include_usage": True},
             "timeout": timeout,

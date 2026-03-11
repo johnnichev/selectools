@@ -19,7 +19,7 @@
 
 The **Models** module provides a **single source of truth** for all supported LLM and embedding models. It includes:
 
-- 135+ models across 5 providers
+- 145 models across 5 providers
 - Pricing per 1M tokens
 - Context windows
 - Max output tokens
@@ -77,7 +77,7 @@ Anthropic.SONNET_3_5       # ModelInfo instance
 Gemini.FLASH_2_0           # ModelInfo instance
 
 # Complete list
-ALL_MODELS                 # List[ModelInfo] - all 130+ models
+ALL_MODELS                 # List[ModelInfo] - all 145 models
 
 # Quick lookup
 MODELS_BY_ID               # Dict[str, ModelInfo] - O(1) lookup
@@ -87,29 +87,35 @@ MODELS_BY_ID               # Dict[str, ModelInfo] - O(1) lookup
 
 ## Model Classes
 
-### OpenAI Models (65 models)
+### OpenAI Models (77 models)
 
 ```python
 from selectools.models import OpenAI
 
-# GPT-5 Series (Latest)
+# GPT-5.4 Series (Latest Flagship — 1.05M context)
+OpenAI.GPT_5_4              # $5.00 / $22.50 per 1M tokens
+OpenAI.GPT_5_4_PRO          # $30.00 / $180.00 per 1M tokens
+
+# GPT-5.x Series
+OpenAI.GPT_5_2              # $1.75 / $14.00 per 1M tokens
 OpenAI.GPT_5_1              # $1.25 / $10.00 per 1M tokens
 OpenAI.GPT_5_MINI           # $0.25 / $2.00 per 1M tokens
 OpenAI.GPT_5_NANO           # $0.05 / $0.40 per 1M tokens
+
+# GPT-4.1 Series (1M context)
+OpenAI.GPT_4_1              # $2.00 / $8.00 per 1M tokens
+OpenAI.GPT_4_1_MINI         # $0.40 / $1.60 per 1M tokens
+OpenAI.GPT_4_1_NANO         # $0.10 / $0.40 per 1M tokens
 
 # GPT-4o Series
 OpenAI.GPT_4O               # $2.50 / $10.00 per 1M tokens
 OpenAI.GPT_4O_MINI          # $0.15 / $0.60 per 1M tokens ⭐ Best value
 
 # o-series (Reasoning)
+OpenAI.O3_PRO               # $20.00 / $80.00 per 1M tokens
+OpenAI.O3                   # $2.00 / $8.00 per 1M tokens
+OpenAI.O4_MINI              # $1.10 / $4.40 per 1M tokens
 OpenAI.O1                   # $15.00 / $60.00 per 1M tokens
-OpenAI.O3_MINI              # $1.10 / $4.40 per 1M tokens
-
-# GPT-4 Turbo
-OpenAI.GPT_4_TURBO          # $10.00 / $30.00 per 1M tokens
-
-# GPT-3.5 Turbo
-OpenAI.GPT_3_5_TURBO        # $0.50 / $1.50 per 1M tokens
 
 # Embeddings
 OpenAI.Embeddings.TEXT_EMBEDDING_3_SMALL  # $0.02 per 1M tokens ⭐
@@ -117,10 +123,14 @@ OpenAI.Embeddings.TEXT_EMBEDDING_3_LARGE  # $0.13 per 1M tokens
 OpenAI.Embeddings.ADA_002                 # $0.10 per 1M tokens
 ```
 
-### Anthropic Models (18 models)
+### Anthropic Models (22 models)
 
 ```python
 from selectools.models import Anthropic
+
+# Claude 4.6 Series (Latest)
+Anthropic.OPUS_4_6          # $5.00 / $25.00 per 1M tokens
+Anthropic.SONNET_4_6        # $3.00 / $15.00 per 1M tokens
 
 # Claude 4.5 Series
 Anthropic.OPUS_4_5          # $5.00 / $25.00 per 1M tokens
@@ -128,7 +138,7 @@ Anthropic.SONNET_4_5        # $3.00 / $15.00 per 1M tokens
 Anthropic.HAIKU_4_5         # $1.00 / $5.00 per 1M tokens
 
 # Claude 3.5 Series
-Anthropic.SONNET_3_5_20241022  # $3.00 / $15.00 per 1M tokens ⭐
+Anthropic.SONNET_3_5_20241022  # $3.00 / $15.00 per 1M tokens
 Anthropic.HAIKU_3_5_20241022   # $0.80 / $4.00 per 1M tokens
 
 # Embeddings (Voyage AI)
@@ -136,10 +146,18 @@ Anthropic.Embeddings.VOYAGE_3       # $0.06 per 1M tokens
 Anthropic.Embeddings.VOYAGE_3_LITE  # $0.02 per 1M tokens
 ```
 
-### Gemini Models (26 models)
+### Gemini Models (30 models)
 
 ```python
 from selectools.models import Gemini
+
+# Gemini 3.1 Series (Latest)
+Gemini.PRO_3_1              # $2.00 / $12.00 per 1M tokens (1M context)
+Gemini.FLASH_LITE_3_1_PREVIEW  # $0.10 / $0.40 per 1M tokens
+
+# Gemini 3 Series
+Gemini.PRO_3                # $2.00 / $12.00 per 1M tokens (2M context)
+Gemini.FLASH_3_PREVIEW      # $0.50 / $3.00 per 1M tokens
 
 # Gemini 2.5 Series
 Gemini.PRO_2_5              # $1.25 / $10.00 per 1M tokens
@@ -148,10 +166,6 @@ Gemini.FLASH_LITE_2_5       # $0.10 / $0.40 per 1M tokens
 
 # Gemini 2.0 Series
 Gemini.FLASH_2_0            # $0.10 / $0.40 per 1M tokens ⭐ Great value
-
-# Gemini 1.5 Series
-Gemini.PRO_1_5              # $1.25 / $5.00 per 1M tokens
-Gemini.FLASH_1_5            # $0.075 / $0.30 per 1M tokens
 
 # Embeddings
 Gemini.Embeddings.EMBEDDING_004  # FREE ⭐⭐⭐
@@ -280,7 +294,7 @@ else:
 ```python
 from selectools.models import ALL_MODELS
 
-# All 130+ models
+# All 145 models
 print(f"Total models: {len(ALL_MODELS)}")
 
 # Filter by provider
@@ -529,7 +543,7 @@ def test_model_registry():
     assert model.context_window > 0
 
     # Test registry
-    assert len(ALL_MODELS) >= 130
+    assert len(ALL_MODELS) >= 145
     assert "gpt-4o-mini" in MODELS_BY_ID
 
     # Test lookup

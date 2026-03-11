@@ -25,7 +25,7 @@ Selectools is a production-ready Python framework for building AI agents with to
 - **Production-Ready**: Robust error handling, retry logic, timeouts, and validation
 - **RAG Support**: 4 embedding providers, 4 vector stores, document loaders
 - **Developer-Friendly**: Type hints, `@tool` decorator, automatic schema inference
-- **Observable**: Built-in hooks, analytics, usage tracking, and cost monitoring
+- **Observable**: Built-in hooks, `AgentObserver` protocol (15 events with `run_id`), `LoggingObserver`, analytics, usage tracking, and cost monitoring
 - **Native Tool Calling**: OpenAI, Anthropic, and Gemini native function calling APIs
 - **Streaming**: E2E token-level streaming with native tool call support via `Agent.astream`
 - **Parallel Execution**: Concurrent tool execution via `asyncio.gather` / `ThreadPoolExecutor`
@@ -58,7 +58,7 @@ Selectools is a production-ready Python framework for building AI agents with to
 │  │  • Execution traces (AgentTrace)                                 │  │
 │  │  • Reasoning extraction                                          │  │
 │  │  • Error handling & retries                                      │  │
-│  │  • Hooks (observability)                                         │  │
+│  │  • Hooks + AgentObserver (observability)                          │  │
 │  │  • Parallel tool execution                                       │  │
 │  │  • Batch processing (batch/abatch)                               │  │
 │  │  • Response caching (LRU+TTL)                                    │  │
@@ -142,7 +142,7 @@ Selectools is a production-ready Python framework for building AI agents with to
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌───────────┐  │
 │  │   Usage      │  │  Analytics   │  │   Pricing    │  │   Models  │  │
 │  │   Tracking   │  │  (analytics) │  │  (pricing)   │  │ (registry)│  │
-│  │   (usage.py) │  │  • Metrics   │  │  • Cost calc │  │  • 135+   │  │
+│  │   (usage.py) │  │  • Metrics   │  │  • Cost calc │  │  • 145    │  │
 │  │   • Tokens   │  │  • Patterns  │  │  • Per model │  │   models  │  │
 │  │   • Cost     │  │  • Success   │  │              │  │           │  │
 │  └──────────────┘  └──────────────┘  └──────────────┘  └───────────┘  │
@@ -299,9 +299,19 @@ Resilient provider orchestration:
 - Circuit breaker: skip failed providers for configurable cooldown
 - `on_fallback` callback for observability
 
-### 14. Model Registry (`models.py`)
+### 14. AgentObserver Protocol (`observer.py`)
 
-Single source of truth for 130+ models:
+Class-based lifecycle observability:
+
+- 15 event methods with `run_id` correlation for concurrent requests
+- `call_id` for matching parallel tool start/end pairs
+- Built-in `LoggingObserver` for structured JSON log output
+- OpenTelemetry span export via `AgentTrace.to_otel_spans()`
+- Designed for Langfuse, Datadog, custom integrations
+
+### 15. Model Registry (`models.py`)
+
+Single source of truth for 145 models:
 
 - Pricing per 1M tokens
 - Context windows
@@ -434,6 +444,7 @@ Single source of truth for 130+ models:
          │    ├─→ memory.py (ConversationMemory)
          │    ├─→ usage.py (AgentUsage, UsageStats)
          │    ├─→ analytics.py (AgentAnalytics)
+         │    ├─→ observer.py (AgentObserver, LoggingObserver)
          │    └─→ cache.py (Cache, InMemoryCache, CacheKeyBuilder)
          │
          ├─→ cache.py (core caching)

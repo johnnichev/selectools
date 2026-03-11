@@ -683,6 +683,18 @@ def parse_verbose(text: str):
 
 ---
 
+## Interaction with Structured Output
+
+When `response_format` is set on `run()` / `arun()`, the text-based parser is **automatically skipped**. This prevents the parser from incorrectly matching structured JSON output (e.g. `{"name": "test", "age": 25}`) as a tool call, since the parser's fallback mode looks for any JSON object with a `"name"` field.
+
+The parser is only active when:
+- The provider does not return native `tool_calls` (i.e. `response_msg.tool_calls` is empty), **and**
+- No `response_format` is set
+
+When both native tool_calls and `response_format` are absent, the parser extracts tool calls from the response text as before.
+
+---
+
 ## Limitations
 
 ### 1. One Tool Call Per Response

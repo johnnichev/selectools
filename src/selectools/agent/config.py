@@ -4,11 +4,12 @@ Configuration options for the agent.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, Optional, Union
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, List, Optional, Union
 
 if TYPE_CHECKING:
     from ..cache import Cache
+    from ..observer import AgentObserver
     from ..policy import ToolPolicy
 
 # Hook type definitions
@@ -56,8 +57,12 @@ class AgentConfig:
                - 'on_tool_error': Called on tool error with (tool_name, error, tool_args)
                - 'on_llm_start': Called before LLM call with (messages, model)
                - 'on_llm_end': Called after LLM call with (response, usage)
-               - 'on_llm_end': Called after LLM call with (response, usage)
                - 'on_error': Called on any error with (error, context)
+        observers: List of AgentObserver instances for structured lifecycle events.
+               Observers receive richer data than hooks (run_id, call_id, system_prompt)
+               and are the recommended integration path for tracing systems like
+               Langfuse, OpenTelemetry, and Datadog.  Existing hooks continue to
+               work unchanged.  Default: [].
         routing_only: If True, returns tool selection without executing it. Default: False.
         parallel_tool_execution: Execute multiple tool calls concurrently when the LLM
                requests more than one tool in a single response. Uses asyncio.gather for
@@ -74,6 +79,15 @@ class AgentConfig:
                are denied by default.  Default: None.
         approval_timeout: Seconds to wait for a confirm_action response before
                denying the call.  Default: 60.
+        trace_tool_result_chars: Maximum characters of tool result text stored in
+               TraceStep entries.  Set to ``None`` for unlimited.  Default: 200.
+        trace_metadata: Arbitrary key-value pairs attached to every ``AgentTrace``
+               created by this agent (e.g. ``{"user_id": "u123", "env": "prod"}``).
+               Default: {} (empty).
+        parent_run_id: Optional run-ID of a parent agent.  When set, every
+               ``AgentTrace`` created by this agent records a ``parent_run_id``
+               so nested/chained agent calls can be linked in tracing systems.
+               Default: None.
     """
 
     model: str = "gpt-4o"
@@ -91,9 +105,13 @@ class AgentConfig:
     enable_analytics: bool = False
     system_prompt: Optional[str] = None
     hooks: Optional[Hooks] = None
+    observers: List[AgentObserver] = field(default_factory=list)
     routing_only: bool = False
     parallel_tool_execution: bool = True
     cache: Optional[Cache] = None
     tool_policy: Optional[ToolPolicy] = None
     confirm_action: Optional[ConfirmAction] = None
     approval_timeout: float = 60.0
+    trace_tool_result_chars: Optional[int] = 200
+    trace_metadata: Dict[str, Any] = field(default_factory=dict)
+    parent_run_id: Optional[str] = None

@@ -270,8 +270,9 @@ Returns `AgentResult` with:
 - `tool_name` — Selected tool
 - `tool_args` — Parsed arguments
 - `message` — Assistant message containing the selection
+- `trace` — Execution trace (LLM call + tool selection steps)
 
-No tool execution; only one LLM call.
+No tool execution; only one LLM call. Observer events `on_iteration_start` and `on_iteration_end` both fire for the single iteration, along with `on_run_start`/`on_run_end`.
 
 ### Use Cases
 

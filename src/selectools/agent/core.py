@@ -8,6 +8,7 @@ import asyncio
 import copy
 import threading
 import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
@@ -245,8 +246,147 @@ class Agent:
         try:
             self.config.hooks[hook_name](*args, **kwargs)
         except Exception:  # noqa: BLE001 # nosec B110
-            # Silently ignore hook errors to prevent them from breaking agent execution
             pass
+
+    def _notify_observers(self, method: str, *args: Any) -> None:
+        """Call *method* on every registered observer, swallowing errors."""
+        for obs in self.config.observers:
+            try:
+                getattr(obs, method)(*args)
+            except Exception:  # noqa: BLE001 # nosec B110
+                pass
+
+    def _truncate_tool_result(self, result: Optional[str]) -> Optional[str]:
+        """Truncate tool result text for trace storage."""
+        if result is None:
+            return None
+        limit = self.config.trace_tool_result_chars
+        if limit is None:
+            return result
+        return result[:limit]
+
+    _fallback_run_id: threading.local = threading.local()
+    _lock_type: type = type(threading.Lock())
+
+    def _wire_fallback_observer(self, run_id: Optional[str]) -> None:
+        """If the provider is a FallbackProvider, wire its on_fallback to observers.
+
+        Thread-safe: uses a lock + refcount so multiple concurrent ``run()``
+        calls (e.g. from ``batch()``) share a single callback on the provider
+        while each thread's ``run_id`` is carried via a thread-local.
+        The lock persists on the provider to avoid races from delete-then-recreate.
+        """
+        if not run_id or not self.config.observers:
+            return
+        provider = self.provider
+        if not hasattr(provider, "on_fallback"):
+            return
+
+        Agent._fallback_run_id.value = run_id
+
+        raw_lock = getattr(provider, "_fb_wire_lock", None)
+        if not isinstance(raw_lock, Agent._lock_type):
+            raw_lock = threading.Lock()
+            provider._fb_wire_lock = raw_lock  # type: ignore[attr-defined]
+        lock = cast(threading.Lock, raw_lock)
+
+        agent_ref = self
+
+        with lock:
+            refcount: int = getattr(provider, "_fb_wire_refcount", 0)
+            if refcount == 0:
+                provider._fb_original_on_fallback = provider.on_fallback  # type: ignore[attr-defined]
+                user_cb = provider.on_fallback
+
+                def _observer_fallback(
+                    failed: str,
+                    next_p: str,
+                    exc: Exception,
+                ) -> None:
+                    rid = getattr(Agent._fallback_run_id, "value", "")
+                    agent_ref._notify_observers(
+                        "on_provider_fallback",
+                        rid,
+                        failed,
+                        next_p,
+                        exc,
+                    )
+                    if user_cb:
+                        try:
+                            user_cb(failed, next_p, exc)
+                        except Exception:  # nosec B110
+                            pass
+
+                provider.on_fallback = _observer_fallback  # type: ignore[attr-defined]
+
+            provider._fb_wire_refcount = refcount + 1  # type: ignore[attr-defined]
+
+    def _unwire_fallback_observer(self) -> None:
+        """Restore FallbackProvider's original on_fallback callback (thread-safe).
+
+        The lock is kept on the provider (never deleted) to prevent races when
+        concurrent threads overlap wire / unwire calls.
+        """
+        provider = self.provider
+        raw_lock = getattr(provider, "_fb_wire_lock", None)
+        if not isinstance(raw_lock, Agent._lock_type):
+            return
+        lock = cast(threading.Lock, raw_lock)
+
+        with lock:
+            refcount: int = getattr(provider, "_fb_wire_refcount", 0) - 1
+            if refcount < 0:
+                refcount = 0
+            provider._fb_wire_refcount = refcount  # type: ignore[attr-defined]
+            if refcount == 0:
+                original = getattr(provider, "_fb_original_on_fallback", None)
+                provider.on_fallback = original  # type: ignore[attr-defined]
+                if hasattr(provider, "_fb_original_on_fallback"):
+                    try:
+                        delattr(provider, "_fb_original_on_fallback")
+                    except Exception:  # nosec B110
+                        pass
+
+    def _memory_add(self, msg: Message, run_id: str) -> None:
+        """Add message to memory and notify observers if trimming occurred."""
+        if not self.memory:
+            return
+        before = len(self.memory)
+        self.memory.add(msg)
+        after = len(self.memory)
+        removed = (before + 1) - after
+        if removed > 0:
+            self._notify_observers(
+                "on_memory_trim",
+                run_id,
+                removed,
+                after,
+                "enforce_limits",
+            )
+
+    def _memory_add_many(self, msgs: List[Message], run_id: str) -> None:
+        """Add multiple messages to memory and notify observers if trimming occurred."""
+        if not self.memory or not msgs:
+            return
+        before = len(self.memory)
+        self.memory.add_many(msgs)
+        after = len(self.memory)
+        removed = (before + len(msgs)) - after
+        if removed > 0:
+            self._notify_observers(
+                "on_memory_trim",
+                run_id,
+                removed,
+                after,
+                "enforce_limits",
+            )
+
+    def _new_trace(self) -> AgentTrace:
+        """Create an ``AgentTrace`` pre-configured from ``AgentConfig``."""
+        return AgentTrace(
+            parent_run_id=self.config.parent_run_id,
+            metadata=dict(self.config.trace_metadata),
+        )
 
     @staticmethod
     def _normalize_messages(messages: Union[str, List[Message]]) -> List[Message]:
@@ -269,12 +409,28 @@ class Agent:
         text = (response_msg.content or "").strip()
         return text if text else None
 
-    def _check_policy(self, tool_name: str, tool_args: Dict[str, Any]) -> Optional[str]:
+    def _check_policy(
+        self,
+        tool_name: str,
+        tool_args: Dict[str, Any],
+        run_id: str = "",
+    ) -> Optional[str]:
         """Evaluate tool policy and confirm_action. Returns error string or None."""
         if not self.config.tool_policy:
             return None
 
         result = self.config.tool_policy.evaluate(tool_name, tool_args)
+        decision_str = result.decision.value
+
+        if run_id:
+            self._notify_observers(
+                "on_policy_decision",
+                run_id,
+                tool_name,
+                decision_str,
+                result.reason,
+                tool_args,
+            )
 
         if result.decision == PolicyDecision.ALLOW:
             return None
@@ -308,12 +464,28 @@ class Agent:
 
         return None
 
-    async def _acheck_policy(self, tool_name: str, tool_args: Dict[str, Any]) -> Optional[str]:
+    async def _acheck_policy(
+        self,
+        tool_name: str,
+        tool_args: Dict[str, Any],
+        run_id: str = "",
+    ) -> Optional[str]:
         """Async version of _check_policy."""
         if not self.config.tool_policy:
             return None
 
         result = self.config.tool_policy.evaluate(tool_name, tool_args)
+        decision_str = result.decision.value
+
+        if run_id:
+            self._notify_observers(
+                "on_policy_decision",
+                run_id,
+                tool_name,
+                decision_str,
+                result.reason,
+                tool_args,
+            )
 
         if result.decision == PolicyDecision.ALLOW:
             return None
@@ -334,7 +506,17 @@ class Agent:
                         timeout=self.config.approval_timeout,
                     )
                 else:
-                    approved = self.config.confirm_action(tool_name, tool_args, result.reason)
+                    loop = asyncio.get_event_loop()
+                    approved = await asyncio.wait_for(
+                        loop.run_in_executor(
+                            None,
+                            self.config.confirm_action,
+                            tool_name,
+                            tool_args,
+                            result.reason,
+                        ),
+                        timeout=self.config.approval_timeout,
+                    )
                 if not approved:
                     return f"Tool '{tool_name}' rejected by reviewer: {result.reason}"
             except asyncio.TimeoutError:
@@ -434,6 +616,10 @@ class Agent:
         Returns:
             List of AgentResult in the same order as *prompts*.
         """
+        batch_id = uuid.uuid4().hex
+        batch_start = time.time()
+        self._notify_observers("on_batch_start", batch_id, len(prompts))
+
         usage_lock = threading.Lock()
         progress_lock = threading.Lock()
         completed = 0
@@ -465,7 +651,17 @@ class Agent:
 
         with ThreadPoolExecutor(max_workers=max_concurrency) as pool:
             futures = [pool.submit(_run_one, p) for p in prompts]
-            return [cast(AgentResult, f.result()) for f in futures]
+            results = [cast(AgentResult, f.result()) for f in futures]
+
+        errors = sum(1 for r in results if r.content and r.content.startswith("Batch error:"))
+        self._notify_observers(
+            "on_batch_end",
+            batch_id,
+            len(results),
+            errors,
+            (time.time() - batch_start) * 1000,
+        )
+        return results
 
     async def abatch(
         self,
@@ -490,6 +686,10 @@ class Agent:
         Returns:
             List of AgentResult in the same order as *prompts*.
         """
+        batch_id = uuid.uuid4().hex
+        batch_start = time.time()
+        self._notify_observers("on_batch_start", batch_id, len(prompts))
+
         semaphore = asyncio.Semaphore(max_concurrency)
         completed = 0
 
@@ -516,7 +716,16 @@ class Agent:
                     pass
             return result
 
-        return list(await asyncio.gather(*[_run_one(p) for p in prompts]))
+        results = list(await asyncio.gather(*[_run_one(p) for p in prompts]))
+        errors = sum(1 for r in results if r.content and r.content.startswith("Batch error:"))
+        self._notify_observers(
+            "on_batch_end",
+            batch_id,
+            len(results),
+            errors,
+            (time.time() - batch_start) * 1000,
+        )
+        return results
 
     def run(
         self,
@@ -554,14 +763,18 @@ class Agent:
             schema = schema_from_response_format(response_format)
             self._system_prompt = self._system_prompt + build_schema_instruction(schema)
 
-        trace = AgentTrace()
+        trace = self._new_trace()
+        run_id = trace.run_id
         _history_checkpoint = len(self._history)
         iteration = 0
+
+        self._wire_fallback_observer(run_id)
+        self._notify_observers("on_run_start", run_id, messages, self._system_prompt)
 
         try:
             if self.memory:
                 self._history = self.memory.get_history() + list(messages)
-                self.memory.add_many(messages)
+                self._memory_add_many(list(messages), run_id)
             else:
                 self._history.extend(messages)
 
@@ -573,14 +786,17 @@ class Agent:
             while iteration < self.config.max_iterations:
                 iteration += 1
                 self._call_hook("on_iteration_start", iteration, self._history)
+                self._notify_observers("on_iteration_start", run_id, iteration, self._history)
 
-                response_msg = self._call_provider(stream_handler=stream_handler, trace=trace)
-                response_text = response_msg.content
+                response_msg = self._call_provider(
+                    stream_handler=stream_handler, trace=trace, run_id=run_id
+                )
+                response_text = response_msg.content or ""
 
                 tool_calls_to_execute = []
                 if response_msg.tool_calls:
                     tool_calls_to_execute = response_msg.tool_calls
-                else:
+                elif response_format is None:
                     parse_result = self.parser.parse(response_text)
                     if parse_result.tool_call:
                         tool_calls_to_execute.append(parse_result.tool_call)
@@ -606,7 +822,20 @@ class Agent:
                     if response_format is not None:
                         try:
                             parsed = parse_and_validate(response_text, response_format)
+                            self._notify_observers(
+                                "on_structured_validate",
+                                run_id,
+                                True,
+                                iteration,
+                            )
                         except (ValueError, TypeError) as exc:
+                            self._notify_observers(
+                                "on_structured_validate",
+                                run_id,
+                                False,
+                                iteration,
+                                str(exc),
+                            )
                             if iteration < self.config.max_iterations:
                                 trace.add(
                                     TraceStep(
@@ -624,15 +853,20 @@ class Agent:
                                 )
                                 self._history.append(retry_msg)
                                 self._call_hook("on_iteration_end", iteration, response_text)
+                                self._notify_observers(
+                                    "on_iteration_end", run_id, iteration, response_text or ""
+                                )
                                 continue
 
                     final_response = Message(role=Role.ASSISTANT, content=response_text)
                     self._history.append(final_response)
                     self._call_hook("on_iteration_end", iteration, response_text)
-                    if self.memory:
-                        self.memory.add(final_response)
+                    self._notify_observers(
+                        "on_iteration_end", run_id, iteration, response_text or ""
+                    )
+                    self._memory_add(final_response, run_id)
                     self._call_hook("on_agent_end", final_response, self.usage)
-                    return AgentResult(
+                    _result = AgentResult(
                         message=final_response,
                         tool_name=last_tool_name,
                         tool_args=last_tool_args,
@@ -643,10 +877,17 @@ class Agent:
                         reasoning_history=reasoning_history,
                         trace=trace,
                         provider_used=getattr(self.provider, "provider_used", None),
+                        usage=copy.copy(self.usage),
                     )
+                    self._notify_observers("on_run_end", run_id, _result)
+                    return _result
 
                 if self.config.routing_only and tool_calls_to_execute:
-                    return AgentResult(
+                    self._call_hook("on_iteration_end", iteration, response_text)
+                    self._notify_observers(
+                        "on_iteration_end", run_id, iteration, response_text or ""
+                    )
+                    _result = AgentResult(
                         message=response_msg,
                         tool_name=tool_calls_to_execute[-1].tool_name,
                         tool_args=tool_calls_to_execute[-1].parameters,
@@ -656,11 +897,13 @@ class Agent:
                         reasoning_history=reasoning_history,
                         trace=trace,
                         provider_used=getattr(self.provider, "provider_used", None),
+                        usage=copy.copy(self.usage),
                     )
+                    self._notify_observers("on_run_end", run_id, _result)
+                    return _result
 
                 self._history.append(response_msg)
-                if self.memory:
-                    self.memory.add(response_msg)
+                self._memory_add(response_msg, run_id)
 
                 use_parallel = (
                     self.config.parallel_tool_execution and len(tool_calls_to_execute) > 1
@@ -673,6 +916,7 @@ class Agent:
                         iteration,
                         response_text,
                         trace=trace,
+                        run_id=run_id,
                     )
                     last_tool_name = _last_name
                     last_tool_args = _last_args
@@ -680,6 +924,7 @@ class Agent:
                     for tool_call in tool_calls_to_execute:
                         tool_name = tool_call.tool_name
                         parameters = tool_call.parameters
+                        call_id = tool_call.id or ""
                         all_tool_calls.append(tool_call)
                         last_tool_name = tool_name
                         last_tool_args = parameters
@@ -692,7 +937,12 @@ class Agent:
                         tool = self._tools_by_name.get(tool_name)
                         if not tool:
                             error_message = f"Unknown tool '{tool_name}'. Available tools: {', '.join(self._tools_by_name.keys())}"
-                            self._append_tool_result(error_message, tool_name, tool_call.id)
+                            self._append_tool_result(
+                                error_message,
+                                tool_name,
+                                tool_call.id,
+                                run_id=run_id,
+                            )
                             trace.add(
                                 TraceStep(
                                     type="error",
@@ -703,9 +953,14 @@ class Agent:
                             )
                             continue
 
-                        policy_error = self._check_policy(tool_name, parameters)
+                        policy_error = self._check_policy(tool_name, parameters, run_id)
                         if policy_error:
-                            self._append_tool_result(policy_error, tool_name, tool_call.id)
+                            self._append_tool_result(
+                                policy_error,
+                                tool_name,
+                                tool_call.id,
+                                run_id=run_id,
+                            )
                             trace.add(
                                 TraceStep(
                                     type="error",
@@ -719,18 +974,36 @@ class Agent:
                         try:
                             start_time = time.time()
                             self._call_hook("on_tool_start", tool_name, parameters)
+                            self._notify_observers(
+                                "on_tool_start", run_id, call_id, tool_name, parameters
+                            )
 
                             chunk_counter = {"count": 0}
 
                             def chunk_callback(chunk: str) -> None:
                                 chunk_counter["count"] += 1
                                 self._call_hook("on_tool_chunk", tool_name, chunk)
+                                self._notify_observers(
+                                    "on_tool_chunk",
+                                    run_id,
+                                    call_id,
+                                    tool_name,
+                                    chunk,
+                                )
 
                             result = self._execute_tool_with_timeout(
                                 tool, parameters, chunk_callback
                             )
                             duration = time.time() - start_time
                             self._call_hook("on_tool_end", tool_name, result, duration)
+                            self._notify_observers(
+                                "on_tool_end",
+                                run_id,
+                                call_id,
+                                tool_name,
+                                result,
+                                duration * 1000,
+                            )
 
                             trace.add(
                                 TraceStep(
@@ -738,7 +1011,7 @@ class Agent:
                                     duration_ms=duration * 1000,
                                     tool_name=tool_name,
                                     tool_args=parameters,
-                                    tool_result=result[:200] if result else None,
+                                    tool_result=self._truncate_tool_result(result),
                                     summary=f"{tool_name} → {len(result)} chars",
                                 )
                             )
@@ -762,12 +1035,25 @@ class Agent:
                                 )
 
                             self._append_tool_result(
-                                result, tool_name, tool_call.id, tool_result=result
+                                result,
+                                tool_name,
+                                tool_call.id,
+                                tool_result=result,
+                                run_id=run_id,
                             )
 
                         except Exception as exc:
                             duration = time.time() - start_time
                             self._call_hook("on_tool_error", tool_name, exc, parameters)
+                            self._notify_observers(
+                                "on_tool_error",
+                                run_id,
+                                call_id,
+                                tool_name,
+                                exc,
+                                parameters,
+                                duration * 1000,
+                            )
                             trace.add(
                                 TraceStep(
                                     type="error",
@@ -788,9 +1074,15 @@ class Agent:
                                 )
 
                             error_message = f"Error executing tool '{tool_name}': {exc}"
-                            self._append_tool_result(error_message, tool_name, tool_call.id)
+                            self._append_tool_result(
+                                error_message,
+                                tool_name,
+                                tool_call.id,
+                                run_id=run_id,
+                            )
 
                 self._call_hook("on_iteration_end", iteration, response_text)
+                self._notify_observers("on_iteration_end", run_id, iteration, response_text or "")
                 continue
 
             final_response = Message(
@@ -798,10 +1090,9 @@ class Agent:
                 content=f"Maximum iterations ({self.config.max_iterations}) reached without resolution.",
             )
             self._history.append(final_response)
-            if self.memory:
-                self.memory.add(final_response)
+            self._memory_add(final_response, run_id)
             self._call_hook("on_agent_end", final_response, self.usage)
-            return AgentResult(
+            _result = AgentResult(
                 message=final_response,
                 tool_name=last_tool_name,
                 tool_args=last_tool_args,
@@ -811,23 +1102,30 @@ class Agent:
                 reasoning_history=reasoning_history,
                 trace=trace,
                 provider_used=getattr(self.provider, "provider_used", None),
+                usage=copy.copy(self.usage),
             )
+            self._notify_observers("on_run_end", run_id, _result)
+            return _result
         except Exception as exc:
             if not self.memory:
                 self._history = self._history[:_history_checkpoint]
             self._call_hook("on_error", exc, {"messages": messages, "iteration": iteration})
+            self._notify_observers(
+                "on_error", run_id, exc, {"messages": messages, "iteration": iteration}
+            )
             raise
         finally:
+            self._unwire_fallback_observer()
             self._system_prompt = original_system_prompt
 
     def _call_provider(
         self,
         stream_handler: Optional[Callable[[str], None]] = None,
         trace: Optional[AgentTrace] = None,
+        run_id: Optional[str] = None,
     ) -> Message:
         call_start = time.time()
 
-        # --- Cache lookup (before any retries / API calls) ---
         cache_key: Optional[str] = None
         if self.config.cache and not (
             self.config.stream and getattr(self.provider, "supports_streaming", False)
@@ -844,7 +1142,29 @@ class Agent:
                 cached_msg = cast(Message, cached[0])
                 cached_usage = cached[1]
                 self.usage.add_usage(cached_usage, tool_name=None)
+                self._call_hook("on_llm_start", self._history, self.config.model)
                 self._call_hook("on_llm_end", cached_msg.content, cached_usage)
+                if run_id:
+                    self._notify_observers(
+                        "on_llm_start",
+                        run_id,
+                        self._history,
+                        self.config.model,
+                        self._system_prompt,
+                    )
+                    self._notify_observers(
+                        "on_llm_end",
+                        run_id,
+                        cached_msg.content,
+                        cached_usage,
+                    )
+                    self._notify_observers(
+                        "on_cache_hit",
+                        run_id,
+                        self.config.model,
+                        cached_msg.content or "",
+                    )
+                    self._notify_observers("on_usage", run_id, cached_usage)
                 if self.config.verbose:
                     print("[agent] cache hit -- skipping provider call")
                 if trace is not None:
@@ -865,13 +1185,20 @@ class Agent:
             attempts += 1
             try:
                 self._call_hook("on_llm_start", self._history, self.config.model)
+                if run_id:
+                    self._notify_observers(
+                        "on_llm_start",
+                        run_id,
+                        self._history,
+                        self.config.model,
+                        self._system_prompt,
+                    )
 
                 if self.config.stream and getattr(self.provider, "supports_streaming", False):
                     response_text = self._streaming_call(stream_handler=stream_handler)
-                    self._call_hook(
-                        "on_llm_end", response_text, None
-                    )  # No usage stats for streaming
-                    # For streaming, we currently construct a text-only Message
+                    self._call_hook("on_llm_end", response_text, None)
+                    if run_id:
+                        self._notify_observers("on_llm_end", run_id, response_text, None)
                     return Message(role=Role.ASSISTANT, content=response_text)
 
                 response_msg, usage_stats = self.provider.complete(
@@ -883,19 +1210,18 @@ class Agent:
                     max_tokens=self.config.max_tokens,
                     timeout=self.config.request_timeout,
                 )
-                response_text = response_msg.content
+                response_text = response_msg.content or ""
 
-                # Track usage (tool name will be added later after parsing)
                 self.usage.add_usage(usage_stats, tool_name=None)
 
-                # Store in cache on successful provider call
                 if cache_key is not None and self.config.cache:
                     self.config.cache.set(cache_key, (response_msg, usage_stats))
 
-                # Call on_llm_end hook
                 self._call_hook("on_llm_end", response_text, usage_stats)
+                if run_id:
+                    self._notify_observers("on_llm_end", run_id, response_text, usage_stats)
+                    self._notify_observers("on_usage", run_id, usage_stats)
 
-                # Check cost warning threshold
                 if (
                     self.config.cost_warning_threshold
                     and self.usage.total_cost_usd > self.config.cost_warning_threshold
@@ -932,13 +1258,25 @@ class Agent:
                     )
                 if attempts > self.config.max_retries:
                     break
+                backoff = 0.0
                 if (
                     self._is_rate_limit_error(last_error)
                     and self.config.rate_limit_cooldown_seconds
                 ):
-                    time.sleep(self.config.rate_limit_cooldown_seconds * attempts)
+                    backoff += self.config.rate_limit_cooldown_seconds * attempts
                 if self.config.retry_backoff_seconds:
-                    time.sleep(self.config.retry_backoff_seconds * attempts)
+                    backoff += self.config.retry_backoff_seconds * attempts
+                if run_id:
+                    self._notify_observers(
+                        "on_llm_retry",
+                        run_id,
+                        attempts,
+                        self.config.max_retries,
+                        exc,
+                        backoff,
+                    )
+                if backoff > 0:
+                    time.sleep(backoff)
 
         if trace is not None:
             trace.add(
@@ -981,6 +1319,7 @@ class Agent:
         tool_name: str,
         tool_call_id: Optional[str] = None,
         tool_result: Optional[str] = None,
+        run_id: Optional[str] = None,
     ) -> None:
         """Update history with tool output."""
         tool_msg = Message(
@@ -991,8 +1330,7 @@ class Agent:
             tool_call_id=tool_call_id,
         )
         self._history.append(tool_msg)
-        if self.memory:
-            self.memory.add(tool_msg)
+        self._memory_add(tool_msg, run_id or "")
 
     # ------------------------------------------------------------------
     # Parallel tool execution helpers
@@ -1005,6 +1343,7 @@ class Agent:
         iteration: int,
         response_text: str,
         trace: Optional[AgentTrace] = None,
+        run_id: Optional[str] = None,
     ) -> tuple:
         """Execute multiple tool calls concurrently using ThreadPoolExecutor.
 
@@ -1033,23 +1372,57 @@ class Agent:
                 )
                 return _Result(tc, error_msg, True, 0.0, None, 0)
 
+            policy_error = self._check_policy(tool_name, parameters, run_id or "")
+            if policy_error:
+                return _Result(tc, policy_error, True, 0.0, tool, 0)
+
+            call_id = tc.id or ""
             start = time.time()
             self._call_hook("on_tool_start", tool_name, parameters)
+            if run_id:
+                self._notify_observers("on_tool_start", run_id, call_id, tool_name, parameters)
 
             chunk_counter = {"count": 0}
 
             def chunk_cb(chunk: str) -> None:
                 chunk_counter["count"] += 1
                 self._call_hook("on_tool_chunk", tool_name, chunk)
+                if run_id:
+                    self._notify_observers(
+                        "on_tool_chunk",
+                        run_id,
+                        call_id,
+                        tool_name,
+                        chunk,
+                    )
 
             try:
                 result = self._execute_tool_with_timeout(tool, parameters, chunk_cb)
                 dur = time.time() - start
                 self._call_hook("on_tool_end", tool_name, result, dur)
+                if run_id:
+                    self._notify_observers(
+                        "on_tool_end",
+                        run_id,
+                        call_id,
+                        tool_name,
+                        result,
+                        dur * 1000,
+                    )
                 return _Result(tc, result, False, dur, tool, chunk_counter["count"])
             except Exception as exc:
                 dur = time.time() - start
                 self._call_hook("on_tool_error", tool_name, exc, parameters)
+                if run_id:
+                    self._notify_observers(
+                        "on_tool_error",
+                        run_id,
+                        call_id,
+                        tool_name,
+                        exc,
+                        parameters,
+                        dur * 1000,
+                    )
                 error_msg = f"Error executing tool '{tool_name}': {exc}"
                 return _Result(tc, error_msg, True, dur, tool, 0)
 
@@ -1100,17 +1473,28 @@ class Agent:
                         duration_ms=r.duration * 1000,
                         tool_name=r.tool_call.tool_name,
                         tool_args=r.tool_call.parameters,
-                        tool_result=r.result[:200] if not r.is_error and r.result else None,
+                        tool_result=(
+                            self._truncate_tool_result(r.result) if not r.is_error else None
+                        ),
                         error=r.result if r.is_error else None,
                         summary=f"{r.tool_call.tool_name} → {'error' if r.is_error else f'{len(r.result)} chars'}",
                     )
                 )
 
             if r.is_error:
-                self._append_tool_result(r.result, r.tool_call.tool_name, r.tool_call.id)
+                self._append_tool_result(
+                    r.result,
+                    r.tool_call.tool_name,
+                    r.tool_call.id,
+                    run_id=run_id,
+                )
             else:
                 self._append_tool_result(
-                    r.result, r.tool_call.tool_name, r.tool_call.id, tool_result=r.result
+                    r.result,
+                    r.tool_call.tool_name,
+                    r.tool_call.id,
+                    tool_result=r.result,
+                    run_id=run_id,
                 )
 
         return last_tool_name, last_tool_args
@@ -1122,6 +1506,7 @@ class Agent:
         iteration: int,
         response_text: str,
         trace: Optional[AgentTrace] = None,
+        run_id: Optional[str] = None,
     ) -> tuple:
         """Execute multiple tool calls concurrently using asyncio.gather.
 
@@ -1141,6 +1526,7 @@ class Agent:
         async def _run_one(tc: ToolCall) -> _Result:
             tool_name = tc.tool_name
             parameters = tc.parameters
+            call_id = tc.id or ""
             tool = self._tools_by_name.get(tool_name)
 
             if not tool:
@@ -1150,27 +1536,59 @@ class Agent:
                 )
                 return _Result(tc, error_msg, True, 0.0, None, 0)
 
+            policy_error = await self._acheck_policy(tool_name, parameters, run_id or "")
+            if policy_error:
+                return _Result(tc, policy_error, True, 0.0, tool, 0)
+
             start = time.time()
             self._call_hook("on_tool_start", tool_name, parameters)
+            if run_id:
+                self._notify_observers("on_tool_start", run_id, call_id, tool_name, parameters)
 
             chunk_counter = {"count": 0}
 
             def chunk_cb(chunk: str) -> None:
                 chunk_counter["count"] += 1
                 self._call_hook("on_tool_chunk", tool_name, chunk)
+                if run_id:
+                    self._notify_observers(
+                        "on_tool_chunk",
+                        run_id,
+                        call_id,
+                        tool_name,
+                        chunk,
+                    )
 
             try:
                 result = await self._aexecute_tool_with_timeout(tool, parameters, chunk_cb)
                 dur = time.time() - start
                 self._call_hook("on_tool_end", tool_name, result, dur)
+                if run_id:
+                    self._notify_observers(
+                        "on_tool_end",
+                        run_id,
+                        call_id,
+                        tool_name,
+                        result,
+                        dur * 1000,
+                    )
                 return _Result(tc, result, False, dur, tool, chunk_counter["count"])
             except Exception as exc:
                 dur = time.time() - start
                 self._call_hook("on_tool_error", tool_name, exc, parameters)
+                if run_id:
+                    self._notify_observers(
+                        "on_tool_error",
+                        run_id,
+                        call_id,
+                        tool_name,
+                        exc,
+                        parameters,
+                        dur * 1000,
+                    )
                 error_msg = f"Error executing tool '{tool_name}': {exc}"
                 return _Result(tc, error_msg, True, dur, tool, 0)
 
-        # Run all tool calls concurrently
         results = await asyncio.gather(*[_run_one(tc) for tc in tool_calls_to_execute])
 
         last_tool_name: Optional[str] = None
@@ -1207,18 +1625,28 @@ class Agent:
                         duration_ms=r.duration * 1000,
                         tool_name=r.tool_call.tool_name,
                         tool_args=r.tool_call.parameters,
-                        tool_result=r.result[:200] if not r.is_error and r.result else None,
+                        tool_result=(
+                            self._truncate_tool_result(r.result) if not r.is_error else None
+                        ),
                         error=r.result if r.is_error else None,
                         summary=f"{r.tool_call.tool_name} → {'error' if r.is_error else f'{len(r.result)} chars'}",
                     )
                 )
 
-            # Append result to history (in order)
             if r.is_error:
-                self._append_tool_result(r.result, r.tool_call.tool_name, r.tool_call.id)
+                self._append_tool_result(
+                    r.result,
+                    r.tool_call.tool_name,
+                    r.tool_call.id,
+                    run_id=run_id,
+                )
             else:
                 self._append_tool_result(
-                    r.result, r.tool_call.tool_name, r.tool_call.id, tool_result=r.result
+                    r.result,
+                    r.tool_call.tool_name,
+                    r.tool_call.id,
+                    tool_result=r.result,
+                    run_id=run_id,
                 )
 
         return last_tool_name, last_tool_args
@@ -1263,13 +1691,19 @@ class Agent:
         """
         messages = self._normalize_messages(messages)
         self._call_hook("on_agent_start", messages)
+
+        trace = self._new_trace()
+        run_id = trace.run_id
         _history_checkpoint = len(self._history)
         iteration = 0
+
+        self._wire_fallback_observer(run_id)
+        self._notify_observers("on_run_start", run_id, messages, self._system_prompt)
 
         try:
             if self.memory:
                 self._history = self.memory.get_history() + list(messages)
-                self.memory.add_many(messages)
+                self._memory_add_many(list(messages), run_id)
             else:
                 self._history.extend(messages)
 
@@ -1280,6 +1714,7 @@ class Agent:
             while iteration < self.config.max_iterations:
                 iteration += 1
                 self._call_hook("on_iteration_start", iteration, self._history)
+                self._notify_observers("on_iteration_start", run_id, iteration, self._history)
 
                 full_content = ""
                 current_tool_calls: List[ToolCall] = []
@@ -1290,8 +1725,17 @@ class Agent:
                     and self.provider.supports_streaming
                 )
 
+                self._call_hook("on_llm_start", self._history, self.config.model)
+                self._notify_observers(
+                    "on_llm_start",
+                    run_id,
+                    self._history,
+                    self.config.model,
+                    self._system_prompt,
+                )
+                llm_start = time.time()
+
                 if not has_astream:
-                    # Fallback: provider doesn't support astream, use acomplete
                     if hasattr(self.provider, "acomplete") and getattr(
                         self.provider, "supports_async", False
                     ):
@@ -1305,7 +1749,6 @@ class Agent:
                             timeout=self.config.request_timeout,
                         )
                     else:
-                        # Last resort: sync complete in executor
                         loop = asyncio.get_event_loop()
                         response_msg, _usage = await loop.run_in_executor(
                             None,
@@ -1319,10 +1762,15 @@ class Agent:
                                 timeout=self.config.request_timeout,
                             ),
                         )
+                    self._call_hook("on_llm_end", response_msg.content, _usage)
+                    self._notify_observers("on_llm_end", run_id, response_msg.content, _usage)
+                    if _usage:
+                        self._notify_observers("on_usage", run_id, _usage)
                     yield StreamChunk(content=response_msg.content)
                     full_content = response_msg.content
+                    if response_msg.tool_calls:
+                        current_tool_calls = response_msg.tool_calls
                 else:
-                    # Real async streaming
                     gen = self.provider.astream(
                         model=self.config.model,
                         system_prompt=self._system_prompt,
@@ -1341,15 +1789,26 @@ class Agent:
                             current_tool_calls.append(item)
                             yield StreamChunk(tool_calls=[item])
 
-                # Reconstruct the response message
+                    self._call_hook("on_llm_end", full_content, None)
+                    self._notify_observers("on_llm_end", run_id, full_content, None)
+
+                trace.add(
+                    TraceStep(
+                        type="llm_call",
+                        duration_ms=(time.time() - llm_start) * 1000,
+                        model=self.config.model,
+                        summary=f"{self.config.model} → {len(full_content)} chars (stream)",
+                    )
+                )
+
                 response_msg = Message(
-                    role=Role.ASSISTANT, content=full_content, tool_calls=current_tool_calls or None
+                    role=Role.ASSISTANT,
+                    content=full_content,
+                    tool_calls=current_tool_calls or None,
                 )
                 self._history.append(response_msg)
-                if self.memory:
-                    self.memory.add(response_msg)
+                self._memory_add(response_msg, run_id)
 
-                # Tool parsing logic
                 tool_calls_to_execute = []
                 if response_msg.tool_calls:
                     tool_calls_to_execute = response_msg.tool_calls
@@ -1361,34 +1820,53 @@ class Agent:
                 if not tool_calls_to_execute:
                     final_response = response_msg
                     self._call_hook("on_iteration_end", iteration, full_content)
-                    yield AgentResult(
+                    self._notify_observers(
+                        "on_iteration_end", run_id, iteration, full_content or ""
+                    )
+                    _result = AgentResult(
                         message=final_response,
                         tool_name=last_tool_name,
                         tool_args=last_tool_args,
                         iterations=iteration,
                         tool_calls=all_tool_calls,
+                        trace=trace,
+                        usage=copy.copy(self.usage),
                     )
+                    self._notify_observers("on_run_end", run_id, _result)
+                    yield _result
                     self._call_hook("on_agent_end", final_response, self.usage)
                     return
 
                 if self.config.routing_only:
-                    yield AgentResult(
+                    self._call_hook("on_iteration_end", iteration, full_content)
+                    self._notify_observers(
+                        "on_iteration_end", run_id, iteration, full_content or ""
+                    )
+                    _result = AgentResult(
                         message=response_msg,
                         tool_name=tool_calls_to_execute[-1].tool_name,
                         tool_args=tool_calls_to_execute[-1].parameters,
                         iterations=iteration,
                         tool_calls=tool_calls_to_execute,
+                        trace=trace,
+                        usage=copy.copy(self.usage),
                     )
+                    self._notify_observers("on_run_end", run_id, _result)
+                    yield _result
                     return
 
-                # Execute tools
                 use_parallel = (
                     self.config.parallel_tool_execution and len(tool_calls_to_execute) > 1
                 )
 
                 if use_parallel:
                     _last_name, _last_args = await self._aexecute_tools_parallel(
-                        tool_calls_to_execute, all_tool_calls, iteration, full_content, trace=None
+                        tool_calls_to_execute,
+                        all_tool_calls,
+                        iteration,
+                        full_content,
+                        trace=trace,
+                        run_id=run_id,
                     )
                     last_tool_name = _last_name
                     last_tool_args = _last_args
@@ -1396,6 +1874,7 @@ class Agent:
                     for tool_call in tool_calls_to_execute:
                         tool_name = tool_call.tool_name
                         parameters = tool_call.parameters
+                        call_id = tool_call.id or ""
                         all_tool_calls.append(tool_call)
                         last_tool_name = tool_name
                         last_tool_args = parameters
@@ -1403,47 +1882,119 @@ class Agent:
                         tool = self._tools_by_name.get(tool_name)
                         if not tool:
                             result = f"Error: Tool {tool_name} not found"
-                            self._append_tool_result(result, tool_name, tool_call.id)
+                            self._append_tool_result(
+                                result,
+                                tool_name,
+                                tool_call.id,
+                                run_id=run_id,
+                            )
                             continue
 
-                        policy_error = await self._acheck_policy(tool_name, parameters)
+                        policy_error = await self._acheck_policy(tool_name, parameters, run_id)
                         if policy_error:
-                            self._append_tool_result(policy_error, tool_name, tool_call.id)
+                            self._append_tool_result(
+                                policy_error,
+                                tool_name,
+                                tool_call.id,
+                                run_id=run_id,
+                            )
                             continue
 
                         try:
+                            start_time = time.time()
+                            self._call_hook("on_tool_start", tool_name, parameters)
+                            self._notify_observers(
+                                "on_tool_start", run_id, call_id, tool_name, parameters
+                            )
                             result = await self._aexecute_tool_with_timeout(tool, parameters, None)
+                            duration = time.time() - start_time
+                            self._call_hook("on_tool_end", tool_name, result, duration)
+                            self._notify_observers(
+                                "on_tool_end",
+                                run_id,
+                                call_id,
+                                tool_name,
+                                result,
+                                duration * 1000,
+                            )
+                            trace.add(
+                                TraceStep(
+                                    type="tool_execution",
+                                    duration_ms=duration * 1000,
+                                    tool_name=tool_name,
+                                    tool_args=parameters,
+                                    tool_result=self._truncate_tool_result(result),
+                                    summary=f"{tool_name} → {len(result)} chars",
+                                )
+                            )
                             self._append_tool_result(
-                                result, tool_name, tool_call.id, tool_result=result
+                                result,
+                                tool_name,
+                                tool_call.id,
+                                tool_result=result,
+                                run_id=run_id,
                             )
                         except Exception as exc:
+                            duration = time.time() - start_time
+                            self._call_hook("on_tool_error", tool_name, exc, parameters)
+                            self._notify_observers(
+                                "on_tool_error",
+                                run_id,
+                                call_id,
+                                tool_name,
+                                exc,
+                                parameters,
+                                duration * 1000,
+                            )
+                            trace.add(
+                                TraceStep(
+                                    type="error",
+                                    duration_ms=duration * 1000,
+                                    tool_name=tool_name,
+                                    error=str(exc),
+                                    summary=f"{tool_name} failed: {exc}",
+                                )
+                            )
                             error_message = f"Error executing tool '{tool.name}': {exc}"
-                            self._append_tool_result(error_message, tool_name, tool_call.id)
+                            self._append_tool_result(
+                                error_message,
+                                tool_name,
+                                tool_call.id,
+                                run_id=run_id,
+                            )
 
                 self._call_hook("on_iteration_end", iteration, full_content)
+                self._notify_observers("on_iteration_end", run_id, iteration, full_content or "")
 
-            # Max iterations reached
             final_msg = Message(
                 role=Role.ASSISTANT,
                 content=f"Maximum iterations ({self.config.max_iterations}) reached without resolution.",
             )
             self._history.append(final_msg)
-            yield AgentResult(
+            _result = AgentResult(
                 message=final_msg,
                 tool_name=last_tool_name,
                 tool_args=last_tool_args,
                 iterations=iteration,
                 tool_calls=all_tool_calls,
+                trace=trace,
+                usage=copy.copy(self.usage),
             )
-            if self.memory:
-                self.memory.add(final_msg)
+            self._notify_observers("on_run_end", run_id, _result)
+            yield _result
+            self._memory_add(final_msg, run_id)
             self._call_hook("on_agent_end", final_msg, self.usage)
             return
         except Exception as exc:
             if not self.memory:
                 self._history = self._history[:_history_checkpoint]
             self._call_hook("on_error", exc, {"messages": messages, "iteration": iteration})
+            self._notify_observers(
+                "on_error", run_id, exc, {"messages": messages, "iteration": iteration}
+            )
             raise
+        finally:
+            self._unwire_fallback_observer()
 
     async def arun(
         self,
@@ -1473,14 +2024,18 @@ class Agent:
             schema = schema_from_response_format(response_format)
             self._system_prompt = self._system_prompt + build_schema_instruction(schema)
 
-        trace = AgentTrace()
+        trace = self._new_trace()
+        run_id = trace.run_id
         _history_checkpoint = len(self._history)
         iteration = 0
+
+        self._wire_fallback_observer(run_id)
+        self._notify_observers("on_run_start", run_id, messages, self._system_prompt)
 
         try:
             if self.memory:
                 self._history = self.memory.get_history() + list(messages)
-                self.memory.add_many(messages)
+                self._memory_add_many(list(messages), run_id)
             else:
                 self._history.extend(messages)
 
@@ -1492,16 +2047,17 @@ class Agent:
             while iteration < self.config.max_iterations:
                 iteration += 1
                 self._call_hook("on_iteration_start", iteration, self._history)
+                self._notify_observers("on_iteration_start", run_id, iteration, self._history)
 
                 response_msg = await self._acall_provider(
-                    stream_handler=stream_handler, trace=trace
+                    stream_handler=stream_handler, trace=trace, run_id=run_id
                 )
-                response_text = response_msg.content
+                response_text = response_msg.content or ""
 
                 tool_calls_to_execute = []
                 if response_msg.tool_calls:
                     tool_calls_to_execute = response_msg.tool_calls
-                else:
+                elif response_format is None:
                     parse_result = self.parser.parse(response_text)
                     if parse_result.tool_call:
                         tool_calls_to_execute.append(parse_result.tool_call)
@@ -1527,7 +2083,20 @@ class Agent:
                     if response_format is not None:
                         try:
                             parsed = parse_and_validate(response_text, response_format)
+                            self._notify_observers(
+                                "on_structured_validate",
+                                run_id,
+                                True,
+                                iteration,
+                            )
                         except (ValueError, TypeError) as exc:
+                            self._notify_observers(
+                                "on_structured_validate",
+                                run_id,
+                                False,
+                                iteration,
+                                str(exc),
+                            )
                             if iteration < self.config.max_iterations:
                                 trace.add(
                                     TraceStep(
@@ -1545,15 +2114,20 @@ class Agent:
                                 )
                                 self._history.append(retry_msg)
                                 self._call_hook("on_iteration_end", iteration, response_text)
+                                self._notify_observers(
+                                    "on_iteration_end", run_id, iteration, response_text or ""
+                                )
                                 continue
 
                     final_response = Message(role=Role.ASSISTANT, content=response_text)
                     self._history.append(final_response)
                     self._call_hook("on_iteration_end", iteration, response_text)
-                    if self.memory:
-                        self.memory.add(final_response)
+                    self._notify_observers(
+                        "on_iteration_end", run_id, iteration, response_text or ""
+                    )
+                    self._memory_add(final_response, run_id)
                     self._call_hook("on_agent_end", final_response, self.usage)
-                    return AgentResult(
+                    _result = AgentResult(
                         message=final_response,
                         tool_name=last_tool_name,
                         tool_args=last_tool_args,
@@ -1564,10 +2138,17 @@ class Agent:
                         reasoning_history=reasoning_history,
                         trace=trace,
                         provider_used=getattr(self.provider, "provider_used", None),
+                        usage=copy.copy(self.usage),
                     )
+                    self._notify_observers("on_run_end", run_id, _result)
+                    return _result
 
                 if self.config.routing_only and tool_calls_to_execute:
-                    return AgentResult(
+                    self._call_hook("on_iteration_end", iteration, response_text)
+                    self._notify_observers(
+                        "on_iteration_end", run_id, iteration, response_text or ""
+                    )
+                    _result = AgentResult(
                         message=response_msg,
                         tool_name=tool_calls_to_execute[-1].tool_name,
                         tool_args=tool_calls_to_execute[-1].parameters,
@@ -1577,12 +2158,13 @@ class Agent:
                         reasoning_history=reasoning_history,
                         trace=trace,
                         provider_used=getattr(self.provider, "provider_used", None),
+                        usage=copy.copy(self.usage),
                     )
+                    self._notify_observers("on_run_end", run_id, _result)
+                    return _result
 
-                # Execute tool calls
                 self._history.append(response_msg)
-                if self.memory:
-                    self.memory.add(response_msg)
+                self._memory_add(response_msg, run_id)
 
                 use_parallel = (
                     self.config.parallel_tool_execution and len(tool_calls_to_execute) > 1
@@ -1590,15 +2172,20 @@ class Agent:
 
                 if use_parallel:
                     _last_name, _last_args = await self._aexecute_tools_parallel(
-                        tool_calls_to_execute, all_tool_calls, iteration, response_text, trace=trace
+                        tool_calls_to_execute,
+                        all_tool_calls,
+                        iteration,
+                        response_text,
+                        trace=trace,
+                        run_id=run_id,
                     )
                     last_tool_name = _last_name
                     last_tool_args = _last_args
                 else:
-                    # Sequential execution (single tool call or parallel disabled)
                     for tool_call in tool_calls_to_execute:
                         tool_name = tool_call.tool_name
                         parameters = tool_call.parameters
+                        call_id = tool_call.id or ""
                         all_tool_calls.append(tool_call)
                         last_tool_name = tool_name
                         last_tool_args = parameters
@@ -1611,7 +2198,12 @@ class Agent:
                         tool = self._tools_by_name.get(tool_name)
                         if not tool:
                             error_message = f"Unknown tool '{tool_name}'. Available tools: {', '.join(self._tools_by_name.keys())}"
-                            self._append_tool_result(error_message, tool_name, tool_call.id)
+                            self._append_tool_result(
+                                error_message,
+                                tool_name,
+                                tool_call.id,
+                                run_id=run_id,
+                            )
                             trace.add(
                                 TraceStep(
                                     type="error",
@@ -1622,9 +2214,14 @@ class Agent:
                             )
                             continue
 
-                        policy_error = await self._acheck_policy(tool_name, parameters)
+                        policy_error = await self._acheck_policy(tool_name, parameters, run_id)
                         if policy_error:
-                            self._append_tool_result(policy_error, tool_name, tool_call.id)
+                            self._append_tool_result(
+                                policy_error,
+                                tool_name,
+                                tool_call.id,
+                                run_id=run_id,
+                            )
                             trace.add(
                                 TraceStep(
                                     type="error",
@@ -1638,18 +2235,36 @@ class Agent:
                         try:
                             start_time = time.time()
                             self._call_hook("on_tool_start", tool_name, parameters)
+                            self._notify_observers(
+                                "on_tool_start", run_id, call_id, tool_name, parameters
+                            )
 
                             chunk_counter = {"count": 0}
 
                             def chunk_callback(chunk: str) -> None:
                                 chunk_counter["count"] += 1
                                 self._call_hook("on_tool_chunk", tool_name, chunk)
+                                self._notify_observers(
+                                    "on_tool_chunk",
+                                    run_id,
+                                    call_id,
+                                    tool_name,
+                                    chunk,
+                                )
 
                             result = await self._aexecute_tool_with_timeout(
                                 tool, parameters, chunk_callback
                             )
                             duration = time.time() - start_time
                             self._call_hook("on_tool_end", tool_name, result, duration)
+                            self._notify_observers(
+                                "on_tool_end",
+                                run_id,
+                                call_id,
+                                tool_name,
+                                result,
+                                duration * 1000,
+                            )
 
                             trace.add(
                                 TraceStep(
@@ -1657,7 +2272,7 @@ class Agent:
                                     duration_ms=duration * 1000,
                                     tool_name=tool_name,
                                     tool_args=parameters,
-                                    tool_result=result[:200] if result else None,
+                                    tool_result=self._truncate_tool_result(result),
                                     summary=f"{tool_name} → {len(result)} chars",
                                 )
                             )
@@ -1674,6 +2289,15 @@ class Agent:
                         except Exception as exc:
                             duration = time.time() - start_time
                             self._call_hook("on_tool_error", tool.name, exc, parameters)
+                            self._notify_observers(
+                                "on_tool_error",
+                                run_id,
+                                call_id,
+                                tool_name,
+                                exc,
+                                parameters,
+                                duration * 1000,
+                            )
                             trace.add(
                                 TraceStep(
                                     type="error",
@@ -1695,24 +2319,33 @@ class Agent:
                                 )
 
                             error_message = f"Error executing tool '{tool.name}': {exc}"
-                            self._append_tool_result(error_message, tool_name, tool_call.id)
+                            self._append_tool_result(
+                                error_message,
+                                tool_name,
+                                tool_call.id,
+                                run_id=run_id,
+                            )
                             continue
 
                         self._append_tool_result(
-                            result, tool_name, tool_call.id, tool_result=result
+                            result,
+                            tool_name,
+                            tool_call.id,
+                            tool_result=result,
+                            run_id=run_id,
                         )
 
                 self._call_hook("on_iteration_end", iteration, response_text)
+                self._notify_observers("on_iteration_end", run_id, iteration, response_text or "")
 
             final_response = Message(
                 role=Role.ASSISTANT,
                 content=f"Maximum iterations ({self.config.max_iterations}) reached without resolution.",
             )
             self._history.append(final_response)
-            if self.memory:
-                self.memory.add(final_response)
+            self._memory_add(final_response, run_id)
             self._call_hook("on_agent_end", final_response, self.usage)
-            return AgentResult(
+            _result = AgentResult(
                 message=final_response,
                 tool_name=last_tool_name,
                 tool_args=last_tool_args,
@@ -1722,24 +2355,31 @@ class Agent:
                 reasoning_history=reasoning_history,
                 trace=trace,
                 provider_used=getattr(self.provider, "provider_used", None),
+                usage=copy.copy(self.usage),
             )
+            self._notify_observers("on_run_end", run_id, _result)
+            return _result
         except Exception as exc:
             if not self.memory:
                 self._history = self._history[:_history_checkpoint]
             self._call_hook("on_error", exc, {"messages": messages, "iteration": iteration})
+            self._notify_observers(
+                "on_error", run_id, exc, {"messages": messages, "iteration": iteration}
+            )
             raise
         finally:
+            self._unwire_fallback_observer()
             self._system_prompt = original_system_prompt
 
     async def _acall_provider(
         self,
         stream_handler: Optional[Callable[[str], None]] = None,
         trace: Optional[AgentTrace] = None,
+        run_id: Optional[str] = None,
     ) -> Message:
         """Async version of _call_provider with retry logic."""
         call_start = time.time()
 
-        # --- Cache lookup (before any retries / API calls) ---
         cache_key: Optional[str] = None
         if self.config.cache and not (
             self.config.stream and getattr(self.provider, "supports_streaming", False)
@@ -1756,7 +2396,29 @@ class Agent:
                 cached_msg = cast(Message, cached[0])
                 cached_usage = cached[1]
                 self.usage.add_usage(cached_usage, tool_name=None)
+                self._call_hook("on_llm_start", self._history, self.config.model)
                 self._call_hook("on_llm_end", cached_msg.content, cached_usage)
+                if run_id:
+                    self._notify_observers(
+                        "on_llm_start",
+                        run_id,
+                        self._history,
+                        self.config.model,
+                        self._system_prompt,
+                    )
+                    self._notify_observers(
+                        "on_llm_end",
+                        run_id,
+                        cached_msg.content,
+                        cached_usage,
+                    )
+                    self._notify_observers(
+                        "on_cache_hit",
+                        run_id,
+                        self.config.model,
+                        cached_msg.content or "",
+                    )
+                    self._notify_observers("on_usage", run_id, cached_usage)
                 if self.config.verbose:
                     print("[agent] cache hit -- skipping provider call")
                 if trace is not None:
@@ -1777,10 +2439,20 @@ class Agent:
             attempts += 1
             try:
                 self._call_hook("on_llm_start", self._history, self.config.model)
+                if run_id:
+                    self._notify_observers(
+                        "on_llm_start",
+                        run_id,
+                        self._history,
+                        self.config.model,
+                        self._system_prompt,
+                    )
 
                 if self.config.stream and getattr(self.provider, "supports_streaming", False):
                     response_text = await self._astreaming_call(stream_handler=stream_handler)
                     self._call_hook("on_llm_end", response_text, None)
+                    if run_id:
+                        self._notify_observers("on_llm_end", run_id, response_text, None)
                     return Message(role=Role.ASSISTANT, content=response_text)
 
                 # Check if provider has async support
@@ -1796,7 +2468,7 @@ class Agent:
                         max_tokens=self.config.max_tokens,
                         timeout=self.config.request_timeout,
                     )
-                    response_text = response_msg.content
+                    response_text = response_msg.content or ""
                 else:
                     # Fallback to sync in executor
                     loop = asyncio.get_event_loop()
@@ -1813,20 +2485,18 @@ class Agent:
                                 timeout=self.config.request_timeout,
                             ),
                         )
-                    # Sync calls return tuple[Message, UsageStats]
-                    response_text = response_msg.content
+                    response_text = response_msg.content or ""
 
-                # Track usage
                 self.usage.add_usage(usage_stats, tool_name=None)
 
-                # Store in cache on successful provider call
                 if cache_key is not None and self.config.cache:
                     self.config.cache.set(cache_key, (response_msg, usage_stats))
 
-                # Call on_llm_end hook
                 self._call_hook("on_llm_end", response_text, usage_stats)
+                if run_id:
+                    self._notify_observers("on_llm_end", run_id, response_text, usage_stats)
+                    self._notify_observers("on_usage", run_id, usage_stats)
 
-                # Check cost warning threshold
                 if (
                     self.config.cost_warning_threshold
                     and self.usage.total_cost_usd > self.config.cost_warning_threshold
@@ -1863,13 +2533,25 @@ class Agent:
                     )
                 if attempts > self.config.max_retries:
                     break
+                backoff = 0.0
                 if (
                     self._is_rate_limit_error(last_error)
                     and self.config.rate_limit_cooldown_seconds
                 ):
-                    await asyncio.sleep(self.config.rate_limit_cooldown_seconds * attempts)
+                    backoff += self.config.rate_limit_cooldown_seconds * attempts
                 if self.config.retry_backoff_seconds:
-                    await asyncio.sleep(self.config.retry_backoff_seconds * attempts)
+                    backoff += self.config.retry_backoff_seconds * attempts
+                if run_id:
+                    self._notify_observers(
+                        "on_llm_retry",
+                        run_id,
+                        attempts,
+                        self.config.max_retries,
+                        exc,
+                        backoff,
+                    )
+                if backoff > 0:
+                    await asyncio.sleep(backoff)
 
         if trace is not None:
             trace.add(

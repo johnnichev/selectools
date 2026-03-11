@@ -1,6 +1,6 @@
 """Public exports for the selectools package."""
 
-__version__ = "0.13.0"
+__version__ = "0.14.0"
 
 # Import submodules (lazy loading for optional dependencies)
 from . import embeddings, models, rag, toolbox
@@ -16,6 +16,7 @@ from .exceptions import (
 )
 from .memory import ConversationMemory
 from .models import ALL_MODELS, MODELS_BY_ID, Anthropic, Cohere, Gemini, ModelInfo, Ollama, OpenAI
+from .observer import AgentObserver, LoggingObserver
 from .parser import ToolCallParser
 from .policy import PolicyDecision, PolicyResult, ToolPolicy
 from .pricing import PRICING, calculate_cost, calculate_embedding_cost, get_model_pricing
@@ -89,7 +90,9 @@ __all__ = [
     "PolicyResult",
     # Structured output
     "ResponseFormat",
-    # Tracing
+    # Observability
+    "AgentObserver",
+    "LoggingObserver",
     "AgentTrace",
     "TraceStep",
     # Submodules (for lazy loading)

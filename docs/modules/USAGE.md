@@ -105,7 +105,24 @@ response = agent.run([Message(role=Role.USER, content="Search for Python")])
 print(f"Total tokens: {agent.total_tokens:,}")
 print(f"Total cost: ${agent.total_cost:.6f}")
 print(agent.get_usage_summary())
+
+# Also available on the result itself
+print(response.usage)  # AgentUsage snapshot
 ```
+
+### Real-Time Usage via AgentObserver
+
+For real-time per-call token tracking (without waiting for the run to complete), use the `on_usage` observer event:
+
+```python
+from selectools import AgentObserver
+
+class UsageTracker(AgentObserver):
+    def on_usage(self, run_id, usage):
+        print(f"[{run_id}] {usage.total_tokens} tokens, ${usage.cost_usd:.6f}")
+```
+
+This fires for every LLM call, including cache hits and structured output retries.
 
 ### Output
 

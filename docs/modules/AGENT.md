@@ -12,17 +12,18 @@
 5. [Retry and Error Handling](#retry-and-error-handling)
 6. [Sync vs Async Execution](#sync-vs-async-execution)
 7. [Hook System](#hook-system)
-8. [Memory Integration](#memory-integration)
-9. [Streaming](#streaming)
-10. [Parallel Tool Execution](#parallel-tool-execution)
-11. [Response Caching](#response-caching)
-12. [Structured Output](#structured-output)
-13. [Execution Traces](#execution-traces)
-14. [Reasoning Visibility](#reasoning-visibility)
-15. [Provider Fallback](#provider-fallback)
-16. [Batch Processing](#batch-processing)
-17. [Tool Policy & Human-in-the-Loop](#tool-policy--human-in-the-loop)
-18. [Implementation Details](#implementation-details)
+8. [AgentObserver Protocol](#agentobserver-protocol)
+9. [Memory Integration](#memory-integration)
+10. [Streaming](#streaming)
+11. [Parallel Tool Execution](#parallel-tool-execution)
+12. [Response Caching](#response-caching)
+13. [Structured Output](#structured-output)
+14. [Execution Traces](#execution-traces)
+15. [Reasoning Visibility](#reasoning-visibility)
+16. [Provider Fallback](#provider-fallback)
+17. [Batch Processing](#batch-processing)
+18. [Tool Policy & Human-in-the-Loop](#tool-policy--human-in-the-loop)
+19. [Implementation Details](#implementation-details)
 
 ---
 
@@ -737,6 +738,110 @@ def debug_iteration(iteration, messages):
         print(f"{msg.role}: {msg.content[:100]}")
 
 config = AgentConfig(hooks={"on_iteration_start": debug_iteration})
+```
+
+---
+
+## AgentObserver Protocol
+
+**File:** `src/selectools/observer.py`
+**Classes:** `AgentObserver`, `LoggingObserver`
+
+The **AgentObserver** protocol is a class-based alternative to the hooks dict, designed for structured observability integrations (Langfuse, OpenTelemetry, Datadog). Every callback receives a **`run_id`** for cross-request correlation, and tool callbacks also receive a **`call_id`** for matching parallel tool start/end pairs.
+
+### Quick Start
+
+```python
+from selectools import Agent, AgentConfig, AgentObserver, LoggingObserver
+
+class MyObserver(AgentObserver):
+    def on_llm_start(self, run_id, messages, model, system_prompt):
+        print(f"[{run_id}] LLM call to {model}")
+
+    def on_tool_end(self, run_id, call_id, tool_name, result, duration_ms):
+        print(f"[{run_id}] {tool_name} finished in {duration_ms:.1f}ms")
+
+agent = Agent(
+    tools=[...], provider=provider,
+    config=AgentConfig(observers=[MyObserver(), LoggingObserver()]),
+)
+```
+
+### All 15 Lifecycle Events
+
+| Event | Scope | Parameters (after `run_id`) | When |
+|---|---|---|---|
+| `on_run_start` | Run | `messages`, `system_prompt` | Start of `run()`/`arun()`/`astream()` |
+| `on_run_end` | Run | `result` (AgentResult) | Agent produces final result |
+| `on_error` | Run | `error`, `context` | Unrecoverable error |
+| `on_llm_start` | LLM | `messages`, `model`, `system_prompt` | Before each provider call |
+| `on_llm_end` | LLM | `response`, `usage` | After each provider call |
+| `on_cache_hit` | LLM | `model`, `response` | Response served from cache |
+| `on_usage` | LLM | `usage` (UsageStats) | Per-call token/cost stats |
+| `on_llm_retry` | LLM | `attempt`, `max_retries`, `error`, `backoff_seconds` | LLM call about to be retried |
+| `on_tool_start` | Tool | `call_id`, `tool_name`, `tool_args` | Before tool execution |
+| `on_tool_end` | Tool | `call_id`, `tool_name`, `result`, `duration_ms` | After successful tool execution |
+| `on_tool_error` | Tool | `call_id`, `tool_name`, `error`, `tool_args`, `duration_ms` | Tool raised an exception |
+| `on_tool_chunk` | Tool | `call_id`, `tool_name`, `chunk` | Streaming tool emits a chunk |
+| `on_iteration_start` | Iteration | `iteration`, `messages` | Start of agent loop iteration |
+| `on_iteration_end` | Iteration | `iteration`, `response` | End of agent loop iteration |
+| `on_batch_start` | Batch | `batch_id`*, `prompts_count` | Before `batch()`/`abatch()` |
+| `on_batch_end` | Batch | `batch_id`*, `results_count`, `errors_count`, `total_duration_ms` | After all batch items complete |
+| `on_policy_decision` | Policy | `tool_name`, `decision`, `reason`, `tool_args` | After tool policy evaluation |
+| `on_structured_validate` | Structured | `success`, `attempt`, `error` | After structured output validation |
+| `on_provider_fallback` | Fallback | `failed_provider`, `next_provider`, `error` | FallbackProvider switches provider |
+| `on_memory_trim` | Memory | `messages_removed`, `messages_remaining`, `reason` | Memory enforces limits |
+
+*`on_batch_start`/`on_batch_end` use `batch_id` instead of `run_id`.
+
+### Built-in LoggingObserver
+
+Emits structured JSON events to Python's `logging` module:
+
+```python
+import logging
+logging.basicConfig(level=logging.INFO)
+
+agent = Agent(
+    tools=[...], provider=provider,
+    config=AgentConfig(observers=[LoggingObserver()]),
+)
+```
+
+Output:
+
+```json
+{"event": "run_start", "run_id": "a3f2...", "model": "gpt-4o-mini", "timestamp": 1708099200.0}
+{"event": "llm_end", "run_id": "a3f2...", "tokens": 150, "duration_ms": 312.5}
+{"event": "tool_end", "run_id": "a3f2...", "tool": "search", "duration_ms": 45.2}
+```
+
+### Observer vs Hooks
+
+| Aspect | Hooks (`dict`) | AgentObserver |
+|---|---|---|
+| **Correlation** | Manual (closures, thread-local) | Built-in `run_id` + `call_id` |
+| **Multiple consumers** | One callback per event | Multiple observers |
+| **Event coverage** | 8 events | 15 events (including batch, fallback, retry, memory) |
+| **Type safety** | Dict keys are strings | Protocol methods with signatures |
+| **Use case** | Quick debugging, simple logging | Production observability (Langfuse, OTel, Datadog) |
+
+Both systems work together — hooks and observers fire independently for the same events.
+
+### Trace Metadata & Nested Agents
+
+```python
+config = AgentConfig(
+    parent_run_id="outer-agent-run-id",
+    trace_metadata={"user_id": "u123", "environment": "production"},
+    observers=[MyObserver()],
+)
+result = agent.run("classify this")
+print(result.trace.parent_run_id)   # "outer-agent-run-id"
+print(result.trace.metadata)         # {"user_id": "u123", "environment": "production"}
+
+# Export as OpenTelemetry spans
+spans = result.trace.to_otel_spans()
 ```
 
 ---

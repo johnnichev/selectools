@@ -5,7 +5,58 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.14.0] - 2026-03-11
+
+### Added - AgentObserver Protocol & Observability
+
+#### AgentObserver Protocol
+
+- **`AgentObserver`** base class — class-based alternative to hooks dict for structured observability integrations (Langfuse, OpenTelemetry, Datadog)
+- Every callback receives a **`run_id`** for cross-request correlation; tool callbacks also receive a **`call_id`** for parallel tool matching
+- **15 lifecycle events** with no-op defaults — subclass and override only the events you need:
+  - **Run-level**: `on_run_start`, `on_run_end`, `on_error`
+  - **LLM-level**: `on_llm_start`, `on_llm_end`, `on_cache_hit`, `on_usage`, `on_llm_retry`
+  - **Tool-level**: `on_tool_start`, `on_tool_end`, `on_tool_error`, `on_tool_chunk`
+  - **Iteration-level**: `on_iteration_start`, `on_iteration_end`
+  - **Batch-level**: `on_batch_start`, `on_batch_end`
+  - **Policy-level**: `on_policy_decision`
+  - **Structured output**: `on_structured_validate`
+  - **Provider fallback**: `on_provider_fallback`
+  - **Memory**: `on_memory_trim`
+- **`LoggingObserver`** — built-in observer that emits structured JSON to Python's `logging` module
+- **`AgentConfig(observers=[...])`** — register one or more observers per agent
+- **`AgentResult.usage`** — aggregated `AgentUsage` available on every result
+- **`AgentTrace.parent_run_id`** and **`AgentTrace.metadata`** for nested agent correlation
+- **`AgentTrace.to_otel_spans()`** — export trace steps as OpenTelemetry-compatible span dicts
+
+### Fixed
+
+- **OpenAI `max_tokens` rejected by newer models (GPT-5.x, GPT-4.1, o-series, codex)**: OpenAI's newer model families require `max_completion_tokens` instead of the legacy `max_tokens` parameter. Passing `max_tokens` returns a `400 Unsupported parameter` error. The `OpenAIProvider` now auto-detects the model family and sends the correct parameter. Affects `complete()`, `acomplete()`, `stream()`, and `astream()`.
+- **Structured output broken by text parser**: When `response_format` is set, the text-based `ToolCallParser` would incorrectly match the LLM's JSON output (e.g. `{"name": "test"}`) as a tool call, preventing structured validation from running. The agent would loop until `max_iterations`. Parser is now skipped when `response_format` is active.
+- **Memory trim observer gap**: `memory.add_many()` at the start of `run()`/`arun()`/`astream()` could trigger trimming without notifying observers. Added `_memory_add_many()` helper that fires `on_memory_trim` events.
+- **routing_only iteration event mismatch**: `on_iteration_start` fired but `on_iteration_end` was skipped due to early return. Added missing notification in all three code paths.
+- **TypeError crash on None provider content**: Providers returning `content=None` crashed `_call_provider` with `TypeError: object of type 'NoneType' has no len()`. Fixed with `content or ""` normalization.
+- **Async policy timeout not enforced for sync callbacks**: `_acheck_policy` called sync `confirm_action` directly without timeout protection, potentially blocking the event loop. Now wraps sync callbacks in `loop.run_in_executor()` + `asyncio.wait_for()`.
+- **Tool policy bypassed in parallel execution**: `_check_policy` / `_acheck_policy` were missing from `_execute_tools_parallel` and `_aexecute_tools_parallel`. Policy checks now run before every parallel tool execution.
+- **`on_llm_retry` fired after backoff sleep**: Moved notification before the sleep to enable real-time logging of retry attempts.
+- **Infinite recursion crash with batch + FallbackProvider**: Thread-unsafe `on_fallback` wiring caused stack overflow in `_observer_fallback` during concurrent `batch()` calls. Fixed with `threading.Lock`, reference counting, and `threading.local` for run_id correlation.
+- **`on_tool_chunk` observer notification consistency**: Added `if run_id:` guard matching `on_tool_start`/`on_tool_end` pattern.
+
+### Added - Model Registry Update (March 2026)
+
+- **10 new models** across all three major providers (total: 145 models)
+- **OpenAI (6 new):** `gpt-5.4` (flagship, 1.05M context, $5/$22.50), `gpt-5.4-pro` ($30/$180), `gpt-5.3-chat-latest`, `gpt-5.3-codex`, `gpt-realtime-1.5`, `gpt-audio-1.5`
+- **Anthropic (1 new):** `claude-sonnet-4-6` ($3/$15)
+- **Gemini (3 new):** `gemini-3.1-pro-preview` ($2/$12), `gemini-3.1-flash-lite-preview` ($0.10/$0.40), `gemini-3-flash-preview` ($0.50/$3)
+- **Price corrections:** GPT-5.2 series updated from $1.25/$10 to $1.75/$14; GPT-5.2-pro from $15/$120 to $21/$168
+
+### Changed
+
+- `AgentResult` extended with `usage` field (aggregated `AgentUsage` copy)
+- `AgentConfig` extended with `observers`, `parent_run_id`, `trace_metadata`, `trace_tool_result_chars` fields
+- New public exports: `AgentObserver`, `LoggingObserver`
+- Model registry grown from 135 to **145 models** with updated March 2026 pricing
+- Test suite grown from 880+ to **938 tests** (45 new observer tests, 10 model tests)
 
 ---
 

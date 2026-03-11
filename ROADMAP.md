@@ -336,6 +336,9 @@ config = AgentConfig(
 | **Tool-Pair-Aware Trimming**   | ✅ v0.13.0 | High   | Small  |
 | **Tool Policy Engine**         | ✅ v0.13.0 | High   | Medium |
 | **Human-in-the-Loop Approval** | ✅ v0.13.0 | High   | Medium |
+| **AgentObserver Protocol**     | ✅ v0.13.x | High   | Medium |
+| **LoggingObserver**            | ✅ v0.13.x | Medium | Small  |
+| **OTel Span Export**           | ✅ v0.13.x | Medium | Small  |
 
 ---
 

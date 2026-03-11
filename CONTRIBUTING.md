@@ -3,7 +3,7 @@
 Thank you for your interest in contributing to Selectools! We welcome contributions from the community.
 
 **Current Version:** v0.13.0
-**Test Status:** ✅ 883 tests passing (100%)
+**Test Status:** ✅ 938 tests passing (100%)
 **Python:** 3.9+
 
 ## Getting Started
@@ -371,7 +371,7 @@ We especially welcome contributions in these areas:
 - Add comparison guides (vs LangChain, LlamaIndex)
 
 ### 🧪 **Testing**
-- Increase test coverage (currently 921 tests passing!)
+- Increase test coverage (currently 938 tests passing!)
 - Add performance benchmarks
 - Improve E2E test stability with retry/rate-limit handling
 

@@ -6,6 +6,32 @@
 
 **Production-ready AI agents with tool calling, RAG, and hybrid search.** Connect LLMs to your Python functions, embed and search your documents with vector + keyword fusion, stream responses in real time, and dynamically manage tools at runtime. Works with OpenAI, Anthropic, Gemini, and Ollama. Tracks costs automatically.
 
+## What's New in v0.14.0
+
+**AgentObserver Protocol** — Class-based observability for production monitoring (Langfuse, Datadog, OpenTelemetry):
+
+- **15 lifecycle events**: `on_run_start`, `on_llm_end`, `on_tool_start`, `on_tool_end`, `on_provider_fallback`, `on_memory_trim`, and more
+- Every callback receives a **`run_id`** for cross-request correlation; tool callbacks also get a **`call_id`** for parallel tool matching
+- Built-in **`LoggingObserver`** for structured JSON logs, plus **`AgentTrace.to_otel_spans()`** for OpenTelemetry export
+- `AgentResult.usage` — aggregated `AgentUsage` on every result
+
+**Model Registry Update (March 2026)** — 145 models with up-to-date pricing:
+
+- **OpenAI**: GPT-5.4 / GPT-5.4-pro (1.05M context), GPT-5.3 codex variants, realtime-1.5, audio-1.5
+- **Anthropic**: Claude Sonnet 4.6
+- **Gemini**: 3.1 Pro, 3 Flash, 3.1 Flash-Lite
+- **Price corrections**: GPT-5.2 series and GPT-5.2-pro updated to current rates
+
+**Critical Fixes:**
+
+- OpenAI `max_tokens` → `max_completion_tokens` auto-detection for GPT-5.x, GPT-4.1, o-series
+- Structured output no longer intercepted by text parser when `response_format` is set
+- Tool policy enforced in parallel execution mode (was bypassed)
+- Infinite recursion crash with `batch()` + `FallbackProvider` resolved
+- 7 additional bug fixes for memory trimming, async timeouts, None content handling, and more
+
+> Full changelog: [CHANGELOG.md](https://github.com/johnnichev/selectools/blob/main/CHANGELOG.md)
+
 ## Why Selectools
 
 | Capability | What You Get |
@@ -23,7 +49,8 @@
 | **Dynamic Tools** | Load tools from files/directories at runtime. Add, remove, replace tools without restarting. |
 | **Response Caching** | LRU + TTL in-memory cache and Redis backend. Avoid redundant LLM calls for identical requests. |
 | **Routing Mode** | Agent selects a tool without executing it. Use for intent classification and request routing. |
-| **Production Hardened** | Retries with backoff, per-tool timeouts, iteration caps, cost warnings, observability hooks. |
+| **AgentObserver Protocol** | 15-event lifecycle observer with `run_id`/`call_id` correlation. Built-in `LoggingObserver` for structured JSON logs. |
+| **Production Hardened** | Retries with backoff, per-tool timeouts, iteration caps, cost warnings, observability hooks + observers. |
 | **Library-First** | Not a framework. No magic globals, no hidden state. Use as much or as little as you need. |
 
 ## What's Included
@@ -40,10 +67,11 @@
 - **Advanced Chunking**: Semantic + contextual chunking for better retrieval
 - **Dynamic Tool Loading**: Plugin system with hot-reload support
 - **Response Caching**: InMemoryCache and RedisCache with stats tracking
-- **120 Model Registry**: Type-safe constants with pricing and metadata
+- **145 Model Registry**: Type-safe constants with pricing and metadata
 - **Pre-built Toolbox**: 22 tools for files, data, text, datetime, web
 - **27 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, and more
-- **880+ Tests**: Unit, integration, and E2E with real API calls
+- **AgentObserver Protocol**: 15 lifecycle events with `run_id` correlation, `LoggingObserver`, OTel export
+- **938+ Tests**: Unit, integration, and E2E with real API calls
 
 ## Install
 
@@ -345,6 +373,28 @@ async def confirm(tool_name, tool_args, reason):
 config = AgentConfig(tool_policy=policy, confirm_action=confirm)
 ```
 
+### AgentObserver Protocol
+
+Class-based observability with `run_id` correlation for Langfuse, OpenTelemetry, Datadog, or custom integrations:
+
+```python
+from selectools import Agent, AgentConfig, AgentObserver, LoggingObserver
+
+class MyObserver(AgentObserver):
+    def on_tool_end(self, run_id, call_id, tool_name, result, duration_ms):
+        print(f"[{run_id}] {tool_name} finished in {duration_ms:.1f}ms")
+
+    def on_provider_fallback(self, run_id, failed_provider, next_provider, error):
+        print(f"[{run_id}] {failed_provider} failed, falling back to {next_provider}")
+
+agent = Agent(
+    tools=[...], provider=provider,
+    config=AgentConfig(observers=[MyObserver(), LoggingObserver()]),
+)
+```
+
+15 lifecycle events: run, LLM, tool, iteration, batch, policy, structured output, fallback, retry, memory trim. See `observer.py` for full reference.
+
 ### E2E Streaming & Parallel Execution
 
 - `agent.astream()` yields `StreamChunk` (text deltas) then `AgentResult` (final)
@@ -368,7 +418,7 @@ See [docs/modules/STREAMING.md](docs/modules/STREAMING.md) for full documentatio
 ```python
 from selectools.models import OpenAI, Anthropic, Gemini, Ollama
 
-# IDE autocomplete for all 120 models with pricing metadata
+# IDE autocomplete for all 145 models with pricing metadata
 model = OpenAI.GPT_4O_MINI
 print(f"Cost: ${model.prompt_cost}/${model.completion_cost} per 1M tokens")
 print(f"Context: {model.context_window:,} tokens")

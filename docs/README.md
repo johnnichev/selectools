@@ -26,7 +26,7 @@ Welcome to the comprehensive technical documentation for selectools - a producti
 
 Detailed technical documentation for each module:
 
-1. **[AGENT.md](modules/AGENT.md)** - Agent loop, structured output, traces, reasoning, batch, policy, caching
+1. **[AGENT.md](modules/AGENT.md)** - Agent loop, structured output, traces, reasoning, batch, policy, observer, caching
 2. **[STREAMING.md](modules/STREAMING.md)** - E2E streaming, parallel execution, routing mode, AgentResult, context propagation
 3. **[TOOLS.md](modules/TOOLS.md)** - Tool definition, validation, registry, and streaming
 4. **[DYNAMIC_TOOLS.md](modules/DYNAMIC_TOOLS.md)** - ToolLoader, dynamic tool loading, hot-reload, plugin systems
@@ -66,7 +66,7 @@ Detailed technical documentation for each module:
 
 - Cost tracking: [USAGE.md](modules/USAGE.md)
 - Model selection: [MODELS.md](modules/MODELS.md)
-- Monitoring: [AGENT.md](modules/AGENT.md#hook-system)
+- Monitoring: [AGENT.md](modules/AGENT.md#hook-system) (hooks) and [AGENT.md](modules/AGENT.md#agentobserver-protocol) (observer protocol)
 
 ### By Feature
 

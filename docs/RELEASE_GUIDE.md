@@ -27,7 +27,7 @@ PyPI links to your GitHub repository, and you should create **GitHub Releases** 
 git add -A
 git commit -m "Release v0.7.0: Model Registry System
 
-- Add model registry with 120 models
+- Add model registry with 145 models
 - IDE autocomplete for all models
 - Rich metadata (pricing, context windows)
 - Backward compatible migration

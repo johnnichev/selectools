@@ -42,7 +42,7 @@ class TestModelRegistry:
 
     def test_all_models_count(self) -> None:
         """Test that we have all registered models."""
-        assert len(ALL_MODELS) == 135
+        assert len(ALL_MODELS) == 145
 
     def test_models_by_id_count(self) -> None:
         """Test that MODELS_BY_ID has same count as ALL_MODELS."""
@@ -74,7 +74,7 @@ class TestOpenAIModels:
     def test_openai_model_count(self) -> None:
         """Test OpenAI model count."""
         openai_models = [m for m in ALL_MODELS if m.provider == "openai"]
-        assert len(openai_models) == 71
+        assert len(openai_models) == 77
 
     def test_openai_gpt4o(self) -> None:
         """Test GPT-4o model definition."""
@@ -108,7 +108,7 @@ class TestAnthropicModels:
     def test_anthropic_model_count(self) -> None:
         """Test Anthropic model count."""
         anthropic_models = [m for m in ALL_MODELS if m.provider == "anthropic"]
-        assert len(anthropic_models) == 21
+        assert len(anthropic_models) == 22
 
     def test_anthropic_sonnet_4_5(self) -> None:
         """Test Claude Sonnet 4.5 model definition."""
@@ -142,7 +142,7 @@ class TestGeminiModels:
     def test_gemini_model_count(self) -> None:
         """Test Gemini has 27 models (25 chat + 2 embedding)."""
         gemini_models = [m for m in ALL_MODELS if m.provider == "gemini"]
-        assert len(gemini_models) == 27
+        assert len(gemini_models) == 30
 
     def test_gemini_flash_2_0(self) -> None:
         """Test Gemini 2.0 Flash model definition."""
@@ -295,3 +295,59 @@ class TestProviderDefaults:
     def test_ollama_default_exists(self) -> None:
         """Test that Ollama default model (Llama 3.2) exists."""
         assert Ollama.LLAMA_3_2.id in MODELS_BY_ID
+
+
+class TestMaxCompletionTokensDetection:
+    """Tests for the max_tokens → max_completion_tokens migration."""
+
+    def test_gpt5_models_use_max_completion_tokens(self) -> None:
+        from selectools.providers.openai_provider import _uses_max_completion_tokens
+
+        assert _uses_max_completion_tokens("gpt-5") is True
+        assert _uses_max_completion_tokens("gpt-5-mini") is True
+        assert _uses_max_completion_tokens("gpt-5-nano") is True
+        assert _uses_max_completion_tokens("gpt-5.1") is True
+        assert _uses_max_completion_tokens("gpt-5.2") is True
+        assert _uses_max_completion_tokens("gpt-5.2-pro") is True
+
+    def test_gpt41_models_use_max_completion_tokens(self) -> None:
+        from selectools.providers.openai_provider import _uses_max_completion_tokens
+
+        assert _uses_max_completion_tokens("gpt-4.1") is True
+        assert _uses_max_completion_tokens("gpt-4.1-mini") is True
+        assert _uses_max_completion_tokens("gpt-4.1-nano") is True
+
+    def test_o_series_uses_max_completion_tokens(self) -> None:
+        from selectools.providers.openai_provider import _uses_max_completion_tokens
+
+        assert _uses_max_completion_tokens("o1") is True
+        assert _uses_max_completion_tokens("o1-mini") is True
+        assert _uses_max_completion_tokens("o1-pro") is True
+        assert _uses_max_completion_tokens("o3") is True
+        assert _uses_max_completion_tokens("o3-mini") is True
+        assert _uses_max_completion_tokens("o3-pro") is True
+        assert _uses_max_completion_tokens("o4-mini") is True
+
+    def test_codex_uses_max_completion_tokens(self) -> None:
+        from selectools.providers.openai_provider import _uses_max_completion_tokens
+
+        assert _uses_max_completion_tokens("codex-mini-latest") is True
+
+    def test_legacy_models_use_max_tokens(self) -> None:
+        from selectools.providers.openai_provider import _uses_max_completion_tokens
+
+        assert _uses_max_completion_tokens("gpt-4o") is False
+        assert _uses_max_completion_tokens("gpt-4o-mini") is False
+        assert _uses_max_completion_tokens("gpt-4-turbo") is False
+        assert _uses_max_completion_tokens("gpt-4") is False
+        assert _uses_max_completion_tokens("gpt-3.5-turbo") is False
+        assert _uses_max_completion_tokens("davinci-002") is False
+
+    def test_all_registry_models_covered(self) -> None:
+        """Every OpenAI chat model in the registry should resolve without error."""
+        from selectools.providers.openai_provider import _uses_max_completion_tokens
+
+        for model in ALL_MODELS:
+            if model.provider == "openai" and model.type == "chat":
+                result = _uses_max_completion_tokens(model.id)
+                assert isinstance(result, bool), f"Failed for {model.id}"

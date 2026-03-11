@@ -62,7 +62,11 @@ class Provider(Protocol):
         max_tokens: int = 1000,
         timeout: float | None = None,
     ) -> tuple[Message, UsageStats]:
-        """Return assistant Message (with optional tool_calls) and usage stats."""
+        """Return assistant Message (with optional tool_calls) and usage stats.
+
+        Note: Message.content may be None when the LLM responds with only
+        tool_calls. The agent normalizes None content to "" internally.
+        """
         ...
 
     def stream(self, *, model, system_prompt, messages, **kwargs):
@@ -132,9 +136,12 @@ provider = OpenAIProvider(
 # - Vision support (image_path in messages)
 # - Full usage stats
 # - Native tool calling (function calling API)
+# - Auto max_tokens → max_completion_tokens for GPT-5/4.1/o-series
 ```
 
 **API:** OpenAI Chat Completions API
+
+**Token Parameter Handling:** Newer OpenAI models (GPT-5.x, GPT-4.1, o-series, codex) reject the legacy `max_tokens` parameter and require `max_completion_tokens`. The provider auto-detects the model family and sends the correct parameter — no user action needed.
 
 ### Anthropic Provider
 
@@ -450,31 +457,48 @@ class OpenAIProvider(Provider):
 
     def complete(self, *, model, system_prompt, messages, temperature, max_tokens, timeout):
         formatted = self._format_messages(system_prompt, messages)
+        model_name = model or self.default_model
 
-        response = self._client.chat.completions.create(
-            model=model or self.default_model,
-            messages=formatted,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            timeout=timeout,
+        # Auto-detect max_tokens vs max_completion_tokens per model family
+        token_key = (
+            "max_completion_tokens"
+            if _uses_max_completion_tokens(model_name)
+            else "max_tokens"
         )
+        args = {
+            "model": model_name,
+            "messages": formatted,
+            "temperature": temperature,
+            token_key: max_tokens,
+            "timeout": timeout,
+        }
+
+        response = self._client.chat.completions.create(**args)
 
         content = response.choices[0].message.content
-        usage_stats = self._extract_usage(response, model)
+        usage_stats = self._extract_usage(response, model_name)
 
         return content or "", usage_stats
 
     def stream(self, *, model, system_prompt, messages, temperature, max_tokens, timeout):
         formatted = self._format_messages(system_prompt, messages)
+        model_name = model or self.default_model
 
-        response = self._client.chat.completions.create(
-            model=model or self.default_model,
-            messages=formatted,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            stream=True,
-            timeout=timeout,
+        token_key = (
+            "max_completion_tokens"
+            if _uses_max_completion_tokens(model_name)
+            else "max_tokens"
         )
+        args = {
+            "model": model_name,
+            "messages": formatted,
+            "temperature": temperature,
+            token_key: max_tokens,
+            "stream": True,
+            "timeout": timeout,
+        }
+
+        response = self._client.chat.completions.create(**args)
 
         for chunk in response:
             delta = chunk.choices[0].delta
@@ -522,17 +546,25 @@ def complete(self, ...):
 ```python
 async def acomplete(self, *, model, system_prompt, messages, ...):
     formatted = self._format_messages(system_prompt, messages)
+    model_name = model or self.default_model
 
-    response = await self._async_client.chat.completions.create(
-        model=model or self.default_model,
-        messages=formatted,
-        temperature=temperature,
-        max_tokens=max_tokens,
-        timeout=timeout,
+    token_key = (
+        "max_completion_tokens"
+        if _uses_max_completion_tokens(model_name)
+        else "max_tokens"
     )
+    args = {
+        "model": model_name,
+        "messages": formatted,
+        "temperature": temperature,
+        token_key: max_tokens,
+        "timeout": timeout,
+    }
+
+    response = await self._async_client.chat.completions.create(**args)
 
     content = response.choices[0].message.content
-    usage_stats = self._extract_usage(response, model)
+    usage_stats = self._extract_usage(response, model_name)
 
     return content or "", usage_stats
 ```

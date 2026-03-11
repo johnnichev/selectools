@@ -2,7 +2,7 @@
 Pricing tables for major LLM providers.
 
 This module derives pricing from the canonical model registry (models.py).
-Prices in USD per 1M tokens (updated December 2025).
+Prices in USD per 1M tokens (updated March 2026).
 
 Prices are subject to change - check provider documentation for current rates:
 - OpenAI: https://openai.com/api/pricing/

@@ -45,20 +45,60 @@ class ModelInfo:
 
 
 # =============================================================================
-# OpenAI Models (65 total)
+# OpenAI Models
 # =============================================================================
 
 
 class OpenAI:
     """OpenAI GPT models with pricing and capabilities."""
 
-    # ===== GPT-5.2 Series (Latest) =====
+    # ===== GPT-5.4 Series (Latest Flagship) =====
+    GPT_5_4 = ModelInfo(
+        id="gpt-5.4",
+        provider="openai",
+        type="chat",
+        prompt_cost=5.00,
+        completion_cost=22.50,
+        max_tokens=16384,
+        context_window=1050000,
+    )
+    GPT_5_4_PRO = ModelInfo(
+        id="gpt-5.4-pro",
+        provider="openai",
+        type="chat",
+        prompt_cost=30.00,
+        completion_cost=180.00,
+        max_tokens=16384,
+        context_window=1050000,
+    )
+
+    # ===== GPT-5.3 Series =====
+    GPT_5_3_CHAT_LATEST = ModelInfo(
+        id="gpt-5.3-chat-latest",
+        provider="openai",
+        type="chat",
+        prompt_cost=1.75,
+        completion_cost=14.00,
+        max_tokens=16384,
+        context_window=128000,
+    )
+    GPT_5_3_CODEX = ModelInfo(
+        id="gpt-5.3-codex",
+        provider="openai",
+        type="chat",
+        prompt_cost=1.75,
+        completion_cost=14.00,
+        max_tokens=16384,
+        context_window=128000,
+    )
+
+    # ===== GPT-5.2 Series =====
     GPT_5_2 = ModelInfo(
         id="gpt-5.2",
         provider="openai",
         type="chat",
-        prompt_cost=1.25,
-        completion_cost=10.00,
+        prompt_cost=1.75,
+        completion_cost=14.00,
         max_tokens=16384,
         context_window=128000,
     )
@@ -66,8 +106,8 @@ class OpenAI:
         id="gpt-5.2-chat-latest",
         provider="openai",
         type="chat",
-        prompt_cost=1.25,
-        completion_cost=10.00,
+        prompt_cost=1.75,
+        completion_cost=14.00,
         max_tokens=16384,
         context_window=128000,
     )
@@ -75,8 +115,8 @@ class OpenAI:
         id="gpt-5.2-codex",
         provider="openai",
         type="chat",
-        prompt_cost=1.25,
-        completion_cost=10.00,
+        prompt_cost=1.75,
+        completion_cost=14.00,
         max_tokens=16384,
         context_window=128000,
     )
@@ -84,8 +124,8 @@ class OpenAI:
         id="gpt-5.2-pro",
         provider="openai",
         type="chat",
-        prompt_cost=15.00,
-        completion_cost=120.00,
+        prompt_cost=21.00,
+        completion_cost=168.00,
         max_tokens=16384,
         context_window=128000,
     )
@@ -312,9 +352,18 @@ class OpenAI:
         context_window=128000,
     )
 
-    # ===== GPT-4o Realtime/Audio =====
+    # ===== GPT Realtime/Audio =====
     GPT_REALTIME = ModelInfo(
         id="gpt-realtime",
+        provider="openai",
+        type="audio",
+        prompt_cost=4.00,
+        completion_cost=16.00,
+        max_tokens=4096,
+        context_window=128000,
+    )
+    GPT_REALTIME_1_5 = ModelInfo(
+        id="gpt-realtime-1.5",
         provider="openai",
         type="audio",
         prompt_cost=4.00,
@@ -351,6 +400,15 @@ class OpenAI:
     )
     GPT_AUDIO = ModelInfo(
         id="gpt-audio",
+        provider="openai",
+        type="audio",
+        prompt_cost=2.50,
+        completion_cost=10.00,
+        max_tokens=4096,
+        context_window=128000,
+    )
+    GPT_AUDIO_1_5 = ModelInfo(
+        id="gpt-audio-1.5",
         provider="openai",
         type="audio",
         prompt_cost=2.50,
@@ -720,7 +778,7 @@ class OpenAI:
 
 
 # =============================================================================
-# Anthropic Claude Models (18 total)
+# Anthropic Claude Models
 # =============================================================================
 
 
@@ -734,6 +792,17 @@ class Anthropic:
         type="chat",
         prompt_cost=5.00,
         completion_cost=25.00,
+        max_tokens=8192,
+        context_window=200000,
+    )
+
+    # ===== Claude 4.6 Series =====
+    SONNET_4_6 = ModelInfo(
+        id="claude-sonnet-4-6",
+        provider="anthropic",
+        type="chat",
+        prompt_cost=3.00,
+        completion_cost=15.00,
         max_tokens=8192,
         context_window=200000,
     )
@@ -937,14 +1006,34 @@ class Anthropic:
 
 
 # =============================================================================
-# Google Gemini Models (26 total)
+# Google Gemini Models
 # =============================================================================
 
 
 class Gemini:
     """Google Gemini models with pricing and capabilities."""
 
-    # ===== Gemini 3 Series (Latest) =====
+    # ===== Gemini 3.1 Series (Latest) =====
+    PRO_3_1 = ModelInfo(
+        id="gemini-3.1-pro-preview",
+        provider="gemini",
+        type="chat",
+        prompt_cost=2.00,
+        completion_cost=12.00,
+        max_tokens=8192,
+        context_window=1000000,
+    )
+    FLASH_LITE_3_1_PREVIEW = ModelInfo(
+        id="gemini-3.1-flash-lite-preview",
+        provider="gemini",
+        type="chat",
+        prompt_cost=0.10,
+        completion_cost=0.40,
+        max_tokens=8192,
+        context_window=1000000,
+    )
+
+    # ===== Gemini 3 Series =====
     PRO_3 = ModelInfo(
         id="gemini-3-pro-preview",
         provider="gemini",
@@ -962,6 +1051,15 @@ class Gemini:
         completion_cost=12.00,
         max_tokens=8192,
         context_window=2000000,
+    )
+    FLASH_3_PREVIEW = ModelInfo(
+        id="gemini-3-flash-preview",
+        provider="gemini",
+        type="chat",
+        prompt_cost=0.50,
+        completion_cost=3.00,
+        max_tokens=8192,
+        context_window=1000000,
     )
 
     # ===== Gemini 2.5 Series =====
@@ -1404,7 +1502,7 @@ def _collect_all_models() -> List[ModelInfo]:
 
 
 ALL_MODELS: List[ModelInfo] = _collect_all_models()
-"""Complete list of all 130 models across all providers (chat + embedding)."""
+"""Complete list of all models across all providers (chat + embedding)."""
 
 MODELS_BY_ID: Dict[str, ModelInfo] = {model.id: model for model in ALL_MODELS}
 """Quick lookup dictionary mapping model ID to ModelInfo."""

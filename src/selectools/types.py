@@ -185,6 +185,7 @@ class AgentResult:
     reasoning_history: List[str] = field(default_factory=list)
     trace: Optional[Any] = None
     provider_used: Optional[str] = None
+    usage: Optional[Any] = None
 
     @property
     def content(self) -> str:
