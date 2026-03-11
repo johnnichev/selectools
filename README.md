@@ -69,7 +69,7 @@
 - **Response Caching**: InMemoryCache and RedisCache with stats tracking
 - **145 Model Registry**: Type-safe constants with pricing and metadata
 - **Pre-built Toolbox**: 22 tools for files, data, text, datetime, web
-- **27 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, and more
+- **28 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, and more
 - **AgentObserver Protocol**: 15 lifecycle events with `run_id` correlation, `LoggingObserver`, OTel export
 - **938+ Tests**: Unit, integration, and E2E with real API calls
 

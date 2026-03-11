@@ -8,6 +8,7 @@ Demonstrates:
   3. result.reasoning and reasoning_history
   4. trace.timeline() human-readable output
   5. trace.to_dict() / to_json() for export
+  6. trace.to_otel_spans() for OpenTelemetry export
 
 No API key needed — uses a mock provider.
 
@@ -210,6 +211,23 @@ def main() -> None:
             print(f"  Exported {len(exported['steps'])} steps")
 
     print()
+
+    # --- Step 7: Export as OpenTelemetry spans ---
+    print("--- Step 7: Export trace as OpenTelemetry-compatible spans ---\n")
+
+    otel_spans = result.trace.to_otel_spans()
+    print(f"  Exported {len(otel_spans)} OTel spans:\n")
+    for span in otel_spans:
+        name = span.get("name", "N/A")
+        stype = span.get("type", "N/A")
+        dur = span.get("duration_ms", 0)
+        print(f"    {name:30s}  type={stype:18s}  duration={dur:.1f}ms")
+        if span.get("attributes"):
+            for k, v in list(span["attributes"].items())[:2]:
+                print(f"      {k} = {str(v)[:60]}")
+
+    print()
+    assert len(otel_spans) >= 5
 
     # --- Assertions ---
     assert len(result.trace) >= 5

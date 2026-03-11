@@ -183,6 +183,102 @@ print(result.trace.timeline())  # See what the agent did
 print(result.reasoning)    # Why it chose that classification
 ```
 
+## Step 7: Provider Fallback
+
+Wrap multiple providers in a priority chain. If the primary fails, the next one is tried automatically:
+
+```python
+from selectools import Agent, AgentConfig, FallbackProvider, OpenAIProvider, AnthropicProvider
+from selectools.providers.stubs import LocalProvider
+
+provider = FallbackProvider(
+    providers=[
+        OpenAIProvider(),        # Try OpenAI first
+        AnthropicProvider(),     # Fall back to Anthropic
+        LocalProvider(),         # Last resort (offline)
+    ],
+    max_failures=3,              # Skip after 3 consecutive failures
+    cooldown_seconds=60,         # Skip for 60 seconds
+    on_fallback=lambda name, err: print(f"Skipping {name}: {err}"),
+)
+
+agent = Agent(tools=[...], provider=provider, config=AgentConfig(max_iterations=5))
+result = agent.ask("Hello!")
+```
+
+The built-in circuit breaker avoids wasting time on providers that are consistently down.
+
+## Step 8: Tool Policy
+
+Control which tools can run with declarative rules and human-in-the-loop approval:
+
+```python
+from selectools import Agent, AgentConfig, tool
+from selectools.policy import ToolPolicy
+
+@tool(description="Read a file")
+def read_file(path: str) -> str:
+    return open(path).read()
+
+@tool(description="Delete a file")
+def delete_file(path: str) -> str:
+    os.remove(path)
+    return f"Deleted {path}"
+
+policy = ToolPolicy(
+    allow=["read_*"],          # Always allowed
+    review=["send_*"],         # Needs human approval
+    deny=["delete_*"],         # Always blocked
+)
+
+def approve(tool_name, tool_args, reason):
+    return input(f"Allow {tool_name}({tool_args})? [y/n] ") == "y"
+
+agent = Agent(
+    tools=[read_file, delete_file],
+    provider=provider,
+    config=AgentConfig(
+        tool_policy=policy,
+        confirm_action=approve,
+        approval_timeout=30,
+    ),
+)
+```
+
+## Step 9: Monitor with AgentObserver
+
+For production observability, use `AgentObserver` — a class-based protocol with 15 lifecycle events. Every callback gets a `run_id` for cross-request correlation:
+
+```python
+from selectools import Agent, AgentConfig
+from selectools.observer import AgentObserver, LoggingObserver
+
+class MyObserver(AgentObserver):
+    def on_run_start(self, run_id, messages, system_prompt):
+        print(f"[{run_id[:8]}] Starting with {len(messages)} messages")
+
+    def on_tool_end(self, run_id, call_id, tool_name, result, duration_ms):
+        print(f"[{run_id[:8]}] {tool_name} took {duration_ms:.0f}ms")
+
+    def on_run_end(self, run_id, result):
+        print(f"[{run_id[:8]}] Done — {result.usage.total_tokens} tokens")
+
+agent = Agent(
+    tools=[...],
+    provider=provider,
+    config=AgentConfig(
+        observers=[MyObserver(), LoggingObserver()],
+    ),
+)
+
+result = agent.ask("Hello!")
+
+# Export execution trace as OpenTelemetry spans
+otel_spans = result.trace.to_otel_spans()
+```
+
+`LoggingObserver` emits structured JSON to Python's `logging` module — plug it into Datadog, ELK, or any log aggregator.
+
 ## What's Next?
 
 You now know the core API. Here is where to go from here:
@@ -196,13 +292,16 @@ You now know the core API. Here is where to go from here:
 | Auto-failover between providers | [Providers Guide — Fallback](modules/PROVIDERS.md#fallbackprovider) |
 | Classify multiple requests at once | [Agent Guide — Batch Processing](modules/AGENT.md#batch-processing) |
 | Control which tools can run | [Agent Guide — Tool Policy](modules/AGENT.md#tool-policy--human-in-the-loop) |
+| Monitor with AgentObserver | [Agent Guide — Observer Protocol](modules/AGENT.md#agentobserver-protocol) |
+| Export traces to OpenTelemetry | [Agent Guide — OTel Export](modules/AGENT.md#agentobserver-protocol) |
 | Stream responses in real time | [Streaming Guide](modules/STREAMING.md) |
 | Use hybrid search (keyword + semantic) | [Hybrid Search Guide](modules/HYBRID_SEARCH.md) |
 | Load tools from plugin files | [Dynamic Tools Guide](modules/DYNAMIC_TOOLS.md) |
 | Cache LLM responses to save money | [Agent Guide — Caching](modules/AGENT.md#response-caching) |
+| Browse 145 models with pricing | [Models Guide](modules/MODELS.md) |
 | Track costs and token usage | [Usage Guide](modules/USAGE.md) |
 | Understand the full architecture | [Architecture](ARCHITECTURE.md) |
-| See working examples | [examples/](../examples/) (27 numbered scripts, 01–27) |
+| See working examples | [examples/](../examples/) (28 numbered scripts, 01–28) |
 
 ---
 
@@ -219,6 +318,9 @@ You now know the core API. Here is where to go from here:
 | Check cost | `agent.total_cost`, `agent.get_usage_summary()` |
 | See execution trace | `result.trace.timeline()` |
 | See reasoning | `result.reasoning` |
+| Export to OTel | `result.trace.to_otel_spans()` |
+| Add an observer | `AgentConfig(observers=[MyObserver()])` |
+| Set tool policy | `AgentConfig(tool_policy=ToolPolicy(allow=["read_*"]))` |
 | Reset state | `agent.reset()` |
 | Add a tool at runtime | `agent.add_tool(my_tool)` |
 | Remove a tool | `agent.remove_tool("tool_name")` |

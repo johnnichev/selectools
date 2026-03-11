@@ -1,6 +1,14 @@
 """
 Observability Hooks — lifecycle callbacks and tool validation at registration time.
 
+NOTE: For production observability (Langfuse, Datadog, OpenTelemetry), prefer
+the class-based AgentObserver protocol introduced in v0.14.0. It provides
+run_id/call_id correlation, 15 lifecycle events, and a built-in LoggingObserver.
+See examples/28_agent_observer.py for the recommended approach.
+
+This example demonstrates the original hooks dict API, which still works and
+is useful for quick one-off monitoring.
+
 Prerequisites: OPENAI_API_KEY (examples 01-05)
 Run: python examples/12_observability_hooks.py
 """

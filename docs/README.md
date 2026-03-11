@@ -1,7 +1,7 @@
 # Selectools Implementation Documentation
 
-**Version:** 0.13.0
-**Last Updated:** February 2026
+**Version:** 0.14.0
+**Last Updated:** March 2026
 
 Welcome to the comprehensive technical documentation for selectools - a production-ready Python framework for building AI agents with tool-calling capabilities and RAG support.
 
@@ -40,7 +40,7 @@ Detailed technical documentation for each module:
 12. **[ADVANCED_CHUNKING.md](modules/ADVANCED_CHUNKING.md)** - Semantic and contextual document chunking
 13. **[EMBEDDINGS.md](modules/EMBEDDINGS.md)** - Embedding providers and semantic search
 14. **[VECTOR_STORES.md](modules/VECTOR_STORES.md)** - Vector database implementations
-15. **[MODELS.md](modules/MODELS.md)** - Model registry and pricing system
+15. **[MODELS.md](modules/MODELS.md)** - 145 models across 5 providers with March 2026 pricing
 
 ---
 
@@ -66,7 +66,7 @@ Detailed technical documentation for each module:
 
 - Cost tracking: [USAGE.md](modules/USAGE.md)
 - Model selection: [MODELS.md](modules/MODELS.md)
-- Monitoring: [AGENT.md](modules/AGENT.md#hook-system) (hooks) and [AGENT.md](modules/AGENT.md#agentobserver-protocol) (observer protocol)
+- Monitoring: [AGENT.md](modules/AGENT.md#hook-system) (hooks), [AGENT.md](modules/AGENT.md#agentobserver-protocol) (observer protocol), and `result.trace.to_otel_spans()` for OpenTelemetry
 
 ### By Feature
 
@@ -205,7 +205,7 @@ Detailed technical documentation for each module:
 2. **Library-First** - Composable, no framework lock-in
 3. **Production Hardened** - Retries, timeouts, validation
 4. **Developer Friendly** - Type hints, decorators, clear errors
-5. **Observable** - Hooks, analytics, usage tracking
+5. **Observable** - AgentObserver protocol, hooks, OTel span export, usage tracking
 6. **Cost Aware** - Automatic tracking and warnings
 7. **Performance Optimized** - Parallel tool execution, response caching, async-first design
 
@@ -267,6 +267,14 @@ See: [AGENT.md — Batch Processing](modules/AGENT.md#batch-processing)
 ### Add Tool Policies
 
 See: [AGENT.md — Tool Policy](modules/AGENT.md#tool-policy--human-in-the-loop)
+
+### Monitor with AgentObserver
+
+See: [AGENT.md — AgentObserver Protocol](modules/AGENT.md#agentobserver-protocol)
+
+### Export Traces to OpenTelemetry
+
+See: [AGENT.md — AgentObserver Protocol](modules/AGENT.md#agentobserver-protocol) (`result.trace.to_otel_spans()`)
 
 ### Switch Providers
 
