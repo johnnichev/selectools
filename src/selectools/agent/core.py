@@ -1296,12 +1296,12 @@ class Agent:
         if not getattr(self.provider, "supports_streaming", False):
             raise ProviderError(f"Provider {self.provider.name} does not support streaming.")
 
-        # Note: Streaming does not return usage stats due to Python generator limitations
         aggregated: List[str] = []
         for chunk in self.provider.stream(
             model=self.config.model,
             system_prompt=self._system_prompt,
             messages=self._history,
+            tools=self.tools,
             temperature=self.config.temperature,
             max_tokens=self.config.max_tokens,
             timeout=self.config.request_timeout,
@@ -2574,27 +2574,27 @@ class Agent:
 
         aggregated: List[str] = []
 
-        # Check if provider has async streaming
         if hasattr(self.provider, "astream") and getattr(self.provider, "supports_async", False):
             stream = self.provider.astream(  # type: ignore[attr-defined]
                 model=self.config.model,
                 system_prompt=self._system_prompt,
                 messages=self._history,
+                tools=self.tools,
                 temperature=self.config.temperature,
                 max_tokens=self.config.max_tokens,
                 timeout=self.config.request_timeout,
             )
             async for chunk in stream:
-                if chunk:
-                    aggregated.append(str(chunk))
+                if isinstance(chunk, str) and chunk:
+                    aggregated.append(chunk)
                     if stream_handler:
-                        stream_handler(str(chunk))
+                        stream_handler(chunk)
         else:
-            # Fallback to sync streaming in executor
             for chunk in self.provider.stream(
                 model=self.config.model,
                 system_prompt=self._system_prompt,
                 messages=self._history,
+                tools=self.tools,
                 temperature=self.config.temperature,
                 max_tokens=self.config.max_tokens,
                 timeout=self.config.request_timeout,

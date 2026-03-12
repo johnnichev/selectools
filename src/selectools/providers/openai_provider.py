@@ -168,6 +168,9 @@ class OpenAIProvider(Provider):
             "stream": True,
             "timeout": timeout,
         }
+        if tools:
+            args["tools"] = [self._map_tool_to_openai(t) for t in tools]
+
         try:
             response = cast(Any, self._client.chat.completions.create(**args))
         except Exception as exc:  # noqa: BLE001

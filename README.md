@@ -6,31 +6,32 @@
 
 **Production-ready AI agents with tool calling, RAG, and hybrid search.** Connect LLMs to your Python functions, embed and search your documents with vector + keyword fusion, stream responses in real time, and dynamically manage tools at runtime. Works with OpenAI, Anthropic, Gemini, and Ollama. Tracks costs automatically.
 
-## What's New in v0.14.0
+## What's New in v0.14.1
 
-**AgentObserver Protocol** — Class-based observability for production monitoring (Langfuse, Datadog, OpenTelemetry):
+**Critical streaming fix** — All streaming methods across every provider were silently dropping tool definitions:
 
-- **15 lifecycle events**: `on_run_start`, `on_llm_end`, `on_tool_start`, `on_tool_end`, `on_provider_fallback`, `on_memory_trim`, and more
-- Every callback receives a **`run_id`** for cross-request correlation; tool callbacks also get a **`call_id`** for parallel tool matching
-- Built-in **`LoggingObserver`** for structured JSON logs, plus **`AgentTrace.to_otel_spans()`** for OpenTelemetry export
-- `AgentResult.usage` — aggregated `AgentUsage` on every result
+- **13 bugs fixed**: `stream()` and `astream()` in OpenAI, Anthropic, Gemini, Ollama, and FallbackProvider now correctly pass `tools` to the API and yield `ToolCall` objects
+- Agents using `run(stream=True)`, `arun(stream=True)`, or `astream()` can now use tools (previously broken across all providers)
+- Ollama `_format_messages()` now correctly handles tool role and assistant tool_calls in multi-turn conversations
+- `FallbackProvider.astream()` now has proper error handling, failover, and circuit breaker support
 
-**Model Registry Update (March 2026)** — 145 models with up-to-date pricing:
+**Test suite massively expanded** — 141 new tests (total: 1100):
 
-- **OpenAI**: GPT-5.4 / GPT-5.4-pro (1.05M context), GPT-5.3 codex variants, realtime-1.5, audio-1.5
-- **Anthropic**: Claude Sonnet 4.6
-- **Gemini**: 3.1 Pro, 3 Flash, 3.1 Flash-Lite
-- **Price corrections**: GPT-5.2 series and GPT-5.2-pro updated to current rates
-
-**Critical Fixes:**
-
-- OpenAI `max_tokens` → `max_completion_tokens` auto-detection for GPT-5.x, GPT-4.1, o-series
-- Structured output no longer intercepted by text parser when `response_format` is set
-- Tool policy enforced in parallel execution mode (was bypassed)
-- Infinite recursion crash with `batch()` + `FallbackProvider` resolved
-- 7 additional bug fixes for memory trimming, async timeouts, None content handling, and more
+- Regression tests for every prior bug fix to prevent reintroduction
+- Recording-provider tests that verify exact arguments passed to streaming methods
+- Unit tests for 6 modules that previously only had E2E coverage (policy, structured, trace, fallback, format_messages, batch)
 
 > Full changelog: [CHANGELOG.md](https://github.com/johnnichev/selectools/blob/main/CHANGELOG.md)
+
+<details>
+<summary><strong>v0.14.0 highlights</strong></summary>
+
+- **AgentObserver Protocol** — 15 lifecycle events with `run_id`/`call_id` correlation for Langfuse, Datadog, OpenTelemetry
+- **Model Registry Update** — 145 models with March 2026 pricing (GPT-5.4, Claude Sonnet 4.6, Gemini 3.1 Pro)
+- OpenAI `max_tokens` → `max_completion_tokens` auto-detection for GPT-5.x, o-series
+- 11 additional bug fixes for structured output, policy bypass, memory trimming, async timeouts, and more
+
+</details>
 
 ## Why Selectools
 

@@ -167,7 +167,7 @@ class GeminiProvider(Provider):
         """
         Stream responses from Gemini's generate_content_stream API.
 
-        Yields text chunks as they arrive from the API.
+        Yields text chunks and ToolCall objects as they arrive.
         """
         from google.genai import types
 
@@ -179,6 +179,9 @@ class GeminiProvider(Provider):
             max_output_tokens=max_tokens,
             system_instruction=system_prompt if system_prompt else None,
         )
+
+        if tools:
+            config.tools = [self._map_tool_to_gemini(t) for t in tools]
 
         try:
             stream = self._client.models.generate_content_stream(
@@ -385,9 +388,11 @@ class GeminiProvider(Provider):
         timeout: float | None = None,
     ) -> AsyncIterable[Union[str, ToolCall]]:
         """
-        Async version of stream() using client.aio.
+        Async streaming with native tool call support.
 
-        Yields text chunks as they arrive from the API.
+        Yields:
+            str: Text content deltas
+            ToolCall: Complete tool call objects when a function_call part arrives
         """
         from google.genai import types
 
@@ -399,6 +404,9 @@ class GeminiProvider(Provider):
             max_output_tokens=max_tokens,
             system_instruction=system_prompt if system_prompt else None,
         )
+
+        if tools:
+            config.tools = [self._map_tool_to_gemini(t) for t in tools]
 
         try:
             stream = await self._client.aio.models.generate_content_stream(
@@ -412,6 +420,21 @@ class GeminiProvider(Provider):
         async for chunk in stream:
             if chunk.text:
                 yield chunk.text
+
+            candidates = chunk.candidates if hasattr(chunk, "candidates") else None
+            if candidates:
+                for candidate in candidates:
+                    if candidate.content and candidate.content.parts:
+                        for part in candidate.content.parts:
+                            if part.function_call:
+                                tc_id = f"call_{uuid.uuid4().hex}"
+                                yield ToolCall(
+                                    tool_name=str(part.function_call.name or ""),
+                                    parameters=(
+                                        part.function_call.args if part.function_call.args else {}
+                                    ),
+                                    id=tc_id,
+                                )
 
 
 __all__ = ["GeminiProvider"]

@@ -263,6 +263,8 @@ class FallbackProvider:
         max_tokens: int = 1000,
         timeout: float | None = None,
     ) -> AsyncIterable[Union[str, ToolCall]]:
+        last_exc: Optional[Exception] = None
+
         for provider in self.providers:
             pname = getattr(provider, "name", type(provider).__name__)
             if self._is_circuit_open(pname):
@@ -270,19 +272,33 @@ class FallbackProvider:
             if not getattr(provider, "supports_streaming", False):
                 continue
 
-            self.provider_used = pname
-            stream: AsyncIterable[Union[str, ToolCall]] = provider.astream(
-                model=model,
-                system_prompt=system_prompt,
-                messages=messages,
-                tools=tools,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                timeout=timeout,
-            )
-            return stream
+            try:
+                stream: AsyncIterable[Union[str, ToolCall]] = provider.astream(
+                    model=model,
+                    system_prompt=system_prompt,
+                    messages=messages,
+                    tools=tools,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    timeout=timeout,
+                )
+                self._record_success(pname)
+                self.provider_used = pname
+                return stream
+            except Exception as exc:
+                last_exc = exc
+                if _is_retriable(exc):
+                    self._record_failure(pname)
+                    if self.on_fallback:
+                        next_name = self._next_available(pname) or "none"
+                        try:
+                            self.on_fallback(pname, next_name, exc)
+                        except Exception:  # nosec B110
+                            pass
+                    continue
+                raise
 
-        raise ProviderError("No async-streaming provider available.")
+        raise ProviderError(f"No async-streaming provider available. Last error: {last_exc}")
 
     def _next_available(self, after_name: str) -> Optional[str]:
         found = False

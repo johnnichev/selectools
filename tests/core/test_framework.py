@@ -104,6 +104,7 @@ class FakeStreamingProvider(FakeProvider):
         model: Optional[str] = None,
         system_prompt: Optional[str] = None,
         messages: List[Message],
+        tools: Optional[List[Any]] = None,
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: Optional[float] = None,

@@ -5,6 +5,88 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.1] - 2026-03-12
+
+### Fixed — Streaming & Provider Tool Passing (13 bugs)
+
+All streaming methods (`stream()`, `astream()`) across every provider were silently dropping tool definitions and/or failing to yield `ToolCall` objects. This meant agents using `run(stream=True)`, `arun(stream=True)`, or `astream()` could not use tools at all. These bugs were invisible because mock providers in tests accepted `**kwargs`, silently swallowing missing parameters.
+
+#### Agent Core (`core.py`)
+
+- **`_streaming_call()` did not pass `tools` to `provider.stream()`** — agents using `run(stream=True)` could never call tools
+- **`_astreaming_call()` did not pass `tools` to `provider.astream()`** — agents using `arun(stream=True)` could never call tools
+- **`_astreaming_call()` sync fallback did not pass `tools` to `provider.stream()`**
+- **`_astreaming_call()` stringified `ToolCall` objects** — `ToolCall` objects yielded by `astream()` were converted to `str`, corrupting them
+
+#### OpenAI Provider
+
+- **`stream()` did not pass `tools` to the API** — streaming tool calls were impossible
+
+#### Anthropic Provider
+
+- **`stream()` did not pass `tools` to the API**
+- **`astream()` did not pass `tools` to the API**
+- **`astream()` did not yield `ToolCall` objects** — only text chunks were yielded; `tool_use` blocks were discarded
+
+#### Gemini Provider
+
+- **`stream()` did not pass `tools` to the API** (config.tools was never set)
+- **`astream()` did not pass `tools` to the API**
+- **`astream()` did not yield `ToolCall` objects** — `function_call` parts in streaming chunks were ignored
+
+#### Ollama Provider
+
+- **`stream()` did not pass `tools` to the API**
+- **`astream()` did not pass `tools` and did not yield `ToolCall` objects**
+- **`_format_messages()` mapped `TOOL` role to `"assistant"` instead of `"tool"`** — breaking multi-turn tool conversations
+- **`_format_messages()` omitted `tool_calls` array on `ASSISTANT` messages** — the model never saw its own prior tool calls
+
+#### FallbackProvider
+
+- **`astream()` had no error handling** — first provider failure crashed instead of falling over; circuit breaker never recorded failures; `on_fallback` callback never fired
+
+### Improved — Test Suite (+141 tests, total: 1100)
+
+Root cause of all 13 bugs: mock providers used `**kwargs` which silently consumed missing parameters. Tests never asserted that `tools` was actually received by the provider, and never checked that `ToolCall` objects kept their type through the streaming pipeline.
+
+#### New regression tests (`tests/agent/test_regression.py` — 28 tests)
+
+- Structured output not intercepted by text parser when `response_format` is set
+- Provider returning `content=None` doesn't crash
+- Async policy timeout enforced on sync `confirm_action` callbacks (both sync and async paths)
+- `routing_only` mode fires `on_iteration_end` event
+- Empty `tool_calls=[]`, nonexistent tools, and wrong argument types handled gracefully
+- Concurrent `arun()` doesn't crash; `abatch()` provides history isolation
+- `FallbackProvider` + observers + `batch()` doesn't stack overflow
+- Policy deny enforced in both sync and async agent paths
+- Retry backoff succeeds and exhausts correctly
+- Crashing observer doesn't crash the agent
+- Every run produces a trace with steps
+- Usage always attached to result
+- `reset()` clears history and usage
+- Max iterations enforced even with infinite tool loops
+
+#### New provider streaming tests (`tests/providers/test_provider_streaming_tools.py` — 21 tests)
+
+- Recording providers verify exact arguments passed to `complete()`, `stream()`, `astream()`
+- Agent passes `tools` to streaming methods for `run(stream=True)`, `arun(stream=True)`, `astream()`
+- `ToolCall` objects not stringified in `_astreaming_call()`
+- Ollama `_format_messages()` correctly handles `TOOL` role and `ASSISTANT` `tool_calls`
+- Anthropic `astream()` yields `ToolCall` objects from `tool_use` blocks
+- `FallbackProvider.astream()` failover, circuit breaker, and error propagation
+- OpenAI `stream()` passes tools to API
+
+#### New unit tests for previously untested modules (92 tests)
+
+- **`test_policy.py` (24):** `ToolPolicy.evaluate()`, glob patterns, evaluation order, `deny_when` conditions, `from_dict()`, `from_yaml()`
+- **`test_structured.py` (20):** `extract_json()`, `parse_and_validate()`, `schema_from_response_format()`, `build_schema_instruction()`
+- **`test_trace.py` (30):** `AgentTrace` filter/timeline/to_dict/to_json/to_otel_spans, OTel span structure
+- **`test_fallback_unit.py` (20):** `_is_retriable()`, `complete()`/`acomplete()` failover, circuit breaker, `on_fallback` callback
+- **`test_format_messages.py` (13):** `_format_messages()` for OpenAI, Anthropic, Gemini — tool role, assistant tool_calls, images
+- **`test_batch.py` (6):** `batch()`/`abatch()` history isolation, progress callbacks, partial failure handling
+
+---
+
 ## [0.14.0] - 2026-03-11
 
 ### Added - AgentObserver Protocol & Observability
@@ -56,7 +138,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AgentConfig` extended with `observers`, `parent_run_id`, `trace_metadata`, `trace_tool_result_chars` fields
 - New public exports: `AgentObserver`, `LoggingObserver`
 - Model registry grown from 135 to **145 models** with updated March 2026 pricing
-- Test suite grown from 880+ to **938 tests** (45 new observer tests, 10 model tests)
+- Test suite grown from 880+ to **938 tests** (45 new observer tests, 10 model tests). Further expanded to **1100 tests** in v0.14.1.
 
 ---
 
