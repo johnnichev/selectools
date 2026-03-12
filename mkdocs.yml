@@ -10,31 +10,45 @@ theme:
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: indigo
-      accent: deep purple
+      primary: deep purple
+      accent: amber
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: indigo
-      accent: deep purple
+      primary: deep purple
+      accent: amber
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
   features:
     - navigation.instant
+    - navigation.instant.progress
     - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.sections
-    - navigation.expand
     - navigation.top
+    - navigation.footer
     - search.suggest
     - search.highlight
+    - search.share
     - content.code.copy
+    - content.code.annotate
     - content.tabs.link
     - toc.follow
   icon:
     repo: fontawesome/brands/github
+    admonition:
+      note: fontawesome/solid/note-sticky
+      tip: fontawesome/solid/lightbulb
+      warning: fontawesome/solid/triangle-exclamation
+      danger: fontawesome/solid/skull-crossbones
+      example: fontawesome/solid/flask
+  font:
+    text: Inter
+    code: JetBrains Mono
 
 plugins:
   - search
@@ -48,48 +62,60 @@ markdown_extensions:
   - pymdownx.superfences
   - pymdownx.highlight:
       anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
   - pymdownx.inlinehilite
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.snippets
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - tables
   - toc:
       permalink: true
   - attr_list
   - md_in_html
+  - def_list
+  - pymdownx.tasklist:
+      custom_checkbox: true
 
 nav:
   - Home: index.md
   - Getting Started:
     - Quickstart: QUICKSTART.md
     - API Keys: KEYS.md
-  - Architecture: ARCHITECTURE.md
-  - Modules:
+    - Architecture: ARCHITECTURE.md
+  - Core:
     - Agent: modules/AGENT.md
     - Tools: modules/TOOLS.md
     - Toolbox (24 Built-in): modules/TOOLBOX.md
     - Dynamic Tools: modules/DYNAMIC_TOOLS.md
-    - Providers: modules/PROVIDERS.md
-    - Models & Pricing: modules/MODELS.md
-    - Memory: modules/MEMORY.md
     - Streaming: modules/STREAMING.md
+    - Memory: modules/MEMORY.md
+  - Providers:
+    - Overview: modules/PROVIDERS.md
+    - Models & Pricing: modules/MODELS.md
     - Usage & Cost Tracking: modules/USAGE.md
-    - Parser: modules/PARSER.md
-    - Prompt: modules/PROMPT.md
   - RAG:
     - RAG Pipeline: modules/RAG.md
     - Hybrid Search: modules/HYBRID_SEARCH.md
     - Advanced Chunking: modules/ADVANCED_CHUNKING.md
     - Embeddings: modules/EMBEDDINGS.md
     - Vector Stores: modules/VECTOR_STORES.md
-  - Security & Compliance:
+  - Security:
     - Guardrails: modules/GUARDRAILS.md
     - Audit Logging: modules/AUDIT.md
     - Screening & Coherence: modules/SECURITY.md
     - Error Handling: modules/EXCEPTIONS.md
-  - Contributing:
+  - Reference:
+    - Parser: modules/PARSER.md
+    - Prompt: modules/PROMPT.md
     - Release Guide: RELEASE_GUIDE.md
-  - Changelog: CHANGELOG.md
+    - Changelog: CHANGELOG.md
+
+extra_css:
+  - stylesheets/extra.css
 
 extra:
   social:
@@ -98,3 +124,5 @@ extra:
     - icon: fontawesome/brands/python
       link: https://pypi.org/project/selectools/
   generator: false
+  version:
+    provider: mike

@@ -1,17 +1,85 @@
+---
+hide:
+  - navigation
+---
+
 # Selectools
 
 **Production-ready AI agents with tool calling, RAG, and hybrid search.**
 
-Connect LLMs to your Python functions, embed and search your documents with vector + keyword fusion, stream responses in real time, and dynamically manage tools at runtime. Works with OpenAI, Anthropic, Gemini, and Ollama. Tracks costs automatically.
+Connect LLMs to your Python functions, embed and search your documents with vector + keyword fusion, stream responses in real time, and dynamically manage tools at runtime.
+
+[:octicons-download-16: Install](#install){ .md-button .md-button--primary }
+[:octicons-book-16: Quickstart](QUICKSTART.md){ .md-button }
+[:octicons-mark-github-16: GitHub](https://github.com/johnnichev/selectools){ .md-button }
 
 ---
 
-## Quick Install
+## Why Selectools?
 
-```bash
-pip install selectools                    # Core + basic RAG
-pip install selectools[rag]               # + Chroma, Pinecone, Voyage, Cohere, PyPDF
-```
+<div class="grid cards" markdown>
+
+-   :material-swap-horizontal:{ .lg .middle } **Provider Agnostic**
+
+    ---
+
+    Switch between OpenAI, Anthropic, Gemini, and Ollama with one line. Your tools stay identical.
+
+-   :material-code-json:{ .lg .middle } **Structured Output**
+
+    ---
+
+    Pydantic or JSON Schema `response_format` with auto-retry on validation failure.
+
+-   :material-chart-timeline:{ .lg .middle } **Execution Traces**
+
+    ---
+
+    Every `run()` returns `result.trace` — a structured timeline of LLM calls, tool picks, and executions.
+
+-   :material-shield-check:{ .lg .middle } **Enterprise Security**
+
+    ---
+
+    Guardrails, PII redaction, prompt injection screening, coherence checking, and JSONL audit logging.
+
+-   :material-magnify:{ .lg .middle } **Hybrid RAG Search**
+
+    ---
+
+    BM25 keyword + vector semantic search with RRF/weighted fusion and cross-encoder reranking.
+
+-   :material-lightning-bolt:{ .lg .middle } **E2E Streaming**
+
+    ---
+
+    Token-level `astream()` with native tool call support. Parallel tool execution via `asyncio.gather`.
+
+</div>
+
+---
+
+## Install
+
+=== "Core"
+
+    ```bash
+    pip install selectools
+    ```
+
+=== "Core + RAG"
+
+    ```bash
+    pip install selectools[rag]
+    ```
+
+=== "Everything"
+
+    ```bash
+    pip install selectools[rag,cache]
+    ```
+
+---
 
 ## Minimal Agent
 
@@ -36,6 +104,10 @@ print(result.trace.timeline)  # Structured execution trace
 print(result.reasoning)       # Why the agent chose get_weather
 ```
 
+!!! tip "No API key? No problem"
+    Use the built-in `LocalProvider` stub to test tool calling and agent logic without any API key.
+    See the [Quickstart](QUICKSTART.md) for details.
+
 ---
 
 ## What's Included
@@ -43,7 +115,7 @@ print(result.reasoning)       # Why the agent chose get_weather
 | Category | Highlights |
 |---|---|
 | **5 LLM Providers** | OpenAI, Anthropic, Gemini, Ollama + FallbackProvider (auto-failover with circuit breaker) |
-| **145 Models** | Type-safe constants with March 2026 pricing for all providers |
+| **146 Models** | Type-safe constants with March 2026 pricing for all providers |
 | **Structured Output** | Pydantic / JSON Schema `response_format` with auto-retry on validation failure |
 | **Execution Traces** | `result.trace` — typed timeline of every LLM call, tool pick, and execution |
 | **Reasoning Visibility** | `result.reasoning` explains *why* the agent chose each tool |
@@ -66,35 +138,28 @@ print(result.reasoning)       # Why the agent chose get_weather
 
 ## Learning Path
 
-### Beginner
+!!! abstract "Beginner"
+    1. **[Quickstart](QUICKSTART.md)** — Build your first agent in 5 minutes
+    2. **[Architecture](ARCHITECTURE.md)** — Big-picture overview
+    3. **[Agent](modules/AGENT.md)** — Core agent loop
+    4. **[Tools](modules/TOOLS.md)** — Creating custom tools
 
-1. **[Quickstart](QUICKSTART.md)** — Build your first agent in 5 minutes, no API key needed
-2. **[Architecture](ARCHITECTURE.md)** — Big-picture overview
-3. **[Agent](modules/AGENT.md)** — Core agent loop
-4. **[Tools](modules/TOOLS.md)** — Creating custom tools
+!!! abstract "Intermediate"
+    5. **[Providers](modules/PROVIDERS.md)** — Switch between OpenAI, Anthropic, Gemini, Ollama
+    6. **[Memory](modules/MEMORY.md)** — Conversation persistence and sliding windows
+    7. **[Streaming](modules/STREAMING.md)** — Real-time token streaming
+    8. **[Models & Pricing](modules/MODELS.md)** — 146 models with cost data
 
-### Intermediate
+!!! abstract "Advanced"
+    9. **[RAG Pipeline](modules/RAG.md)** — Document search and retrieval
+    10. **[Hybrid Search](modules/HYBRID_SEARCH.md)** — BM25 + vector fusion
+    11. **[Dynamic Tools](modules/DYNAMIC_TOOLS.md)** — Plugin systems and hot-reload
 
-5. **[Providers](modules/PROVIDERS.md)** — Switch between OpenAI, Anthropic, Gemini, Ollama
-6. **[Memory](modules/MEMORY.md)** — Conversation persistence and sliding windows
-7. **[Streaming](modules/STREAMING.md)** — Real-time token streaming
-8. **[Models & Pricing](modules/MODELS.md)** — 145 models with cost data
-9. **[Usage Tracking](modules/USAGE.md)** — Token and cost analytics
-
-### Advanced
-
-10. **[RAG Pipeline](modules/RAG.md)** — Document search and retrieval
-11. **[Hybrid Search](modules/HYBRID_SEARCH.md)** — BM25 + vector fusion
-12. **[Advanced Chunking](modules/ADVANCED_CHUNKING.md)** — Semantic and contextual splitting
-13. **[Dynamic Tools](modules/DYNAMIC_TOOLS.md)** — Plugin systems and hot-reload
-
-### Production / Enterprise
-
-14. **[Guardrails](modules/GUARDRAILS.md)** — Input/output validation pipeline
-15. **[Audit Logging](modules/AUDIT.md)** — Compliance and privacy-aware logging
-16. **[Security](modules/SECURITY.md)** — Tool output screening and coherence checking
-17. **[Error Handling](modules/EXCEPTIONS.md)** — Custom exception hierarchy
-18. **[Toolbox](modules/TOOLBOX.md)** — 24 ready-to-use tools
+!!! abstract "Production / Enterprise"
+    12. **[Guardrails](modules/GUARDRAILS.md)** — Input/output validation pipeline
+    13. **[Audit Logging](modules/AUDIT.md)** — Compliance and privacy-aware logging
+    14. **[Security](modules/SECURITY.md)** — Tool output screening and coherence checking
+    15. **[Error Handling](modules/EXCEPTIONS.md)** — Custom exception hierarchy
 
 ---
 
@@ -128,23 +193,9 @@ Loop continues or returns AgentResult (.parsed, .trace, .reasoning)
 
 ---
 
-## Quick Navigation by Role
-
-**For Developers:**
-[Architecture](ARCHITECTURE.md) · [Agent](modules/AGENT.md) · [Tools](modules/TOOLS.md) · [Toolbox](modules/TOOLBOX.md) · [Dynamic Tools](modules/DYNAMIC_TOOLS.md) · [RAG](modules/RAG.md) · [Errors](modules/EXCEPTIONS.md)
-
-**For DevOps / Production:**
-[Usage Tracking](modules/USAGE.md) · [Models](modules/MODELS.md) · [Guardrails](modules/GUARDRAILS.md) · [Audit](modules/AUDIT.md) · [Security](modules/SECURITY.md)
-
-**For Contributors:**
-[Providers](modules/PROVIDERS.md) · [Vector Stores](modules/VECTOR_STORES.md) · [Parser](modules/PARSER.md) · [Release Guide](RELEASE_GUIDE.md)
-
----
-
 ## Links
 
-- [PyPI Package](https://pypi.org/project/selectools/)
-- [GitHub Repository](https://github.com/johnnichev/selectools)
-- [Changelog](CHANGELOG.md)
-- [Getting Started Notebook](https://github.com/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb)
-- [32 Example Scripts](https://github.com/johnnichev/selectools/tree/main/examples)
+[:fontawesome-brands-python: PyPI Package](https://pypi.org/project/selectools/){ .md-button }
+[:fontawesome-brands-github: GitHub Repository](https://github.com/johnnichev/selectools){ .md-button }
+[:material-notebook: Getting Started Notebook](https://github.com/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb){ .md-button }
+[:material-code-tags: 32 Example Scripts](https://github.com/johnnichev/selectools/tree/main/examples){ .md-button }

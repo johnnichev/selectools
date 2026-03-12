@@ -19,7 +19,7 @@
 
 The **Models** module provides a **single source of truth** for all supported LLM and embedding models. It includes:
 
-- 145 models across 5 providers
+- 146 models across 5 providers
 - Pricing per 1M tokens
 - Context windows
 - Max output tokens
@@ -77,7 +77,7 @@ Anthropic.SONNET_3_5       # ModelInfo instance
 Gemini.FLASH_2_0           # ModelInfo instance
 
 # Complete list
-ALL_MODELS                 # List[ModelInfo] - all 145 models
+ALL_MODELS                 # List[ModelInfo] - all 146 models
 
 # Quick lookup
 MODELS_BY_ID               # Dict[str, ModelInfo] - O(1) lookup
@@ -93,7 +93,7 @@ MODELS_BY_ID               # Dict[str, ModelInfo] - O(1) lookup
 from selectools.models import OpenAI
 
 # GPT-5.4 Series (Latest Flagship — 1.05M context)
-OpenAI.GPT_5_4              # $5.00 / $22.50 per 1M tokens
+OpenAI.GPT_5_4              # $2.50 / $15.00 per 1M tokens
 OpenAI.GPT_5_4_PRO          # $30.00 / $180.00 per 1M tokens
 
 # GPT-5.x Series
@@ -153,7 +153,7 @@ from selectools.models import Gemini
 
 # Gemini 3.1 Series (Latest)
 Gemini.PRO_3_1              # $2.00 / $12.00 per 1M tokens (1M context)
-Gemini.FLASH_LITE_3_1_PREVIEW  # $0.10 / $0.40 per 1M tokens
+Gemini.FLASH_LITE_3_1          # $0.25 / $1.50 per 1M tokens
 
 # Gemini 3 Series
 Gemini.PRO_3                # $2.00 / $12.00 per 1M tokens (2M context)
@@ -294,7 +294,7 @@ else:
 ```python
 from selectools.models import ALL_MODELS
 
-# All 145 models
+# All 146 models
 print(f"Total models: {len(ALL_MODELS)}")
 
 # Filter by provider
@@ -543,7 +543,7 @@ def test_model_registry():
     assert model.context_window > 0
 
     # Test registry
-    assert len(ALL_MODELS) >= 145
+    assert len(ALL_MODELS) >= 146
     assert "gpt-4o-mini" in MODELS_BY_ID
 
     # Test lookup
@@ -628,7 +628,7 @@ print(f"${cost:.6f}")  # $0.000200
 ```python
 from selectools import ALL_MODELS, MODELS_BY_ID
 
-# All 145 ModelInfo objects
+# All 146 ModelInfo objects
 for model in ALL_MODELS:
     print(f"{model.id:40s} ${model.prompt_cost:>8.2f} / ${model.completion_cost:>8.2f}")
 

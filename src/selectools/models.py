@@ -57,8 +57,8 @@ class OpenAI:
         id="gpt-5.4",
         provider="openai",
         type="chat",
-        prompt_cost=5.00,
-        completion_cost=22.50,
+        prompt_cost=2.50,
+        completion_cost=15.00,
         max_tokens=16384,
         context_window=1050000,
     )
@@ -1023,13 +1023,13 @@ class Gemini:
         max_tokens=8192,
         context_window=1000000,
     )
-    FLASH_LITE_3_1_PREVIEW = ModelInfo(
-        id="gemini-3.1-flash-lite-preview",
+    FLASH_LITE_3_1 = ModelInfo(
+        id="gemini-3-1-flash-lite",
         provider="gemini",
         type="chat",
-        prompt_cost=0.10,
-        completion_cost=0.40,
-        max_tokens=8192,
+        prompt_cost=0.25,
+        completion_cost=1.50,
+        max_tokens=65536,
         context_window=1000000,
     )
 
@@ -1302,6 +1302,15 @@ class Gemini:
             completion_cost=0.0,
             max_tokens=2048,
             context_window=2048,
+        )
+        EMBEDDING_2_PREVIEW = ModelInfo(
+            id="gemini-embedding-2-preview",
+            provider="gemini",
+            type="embedding",
+            prompt_cost=0.20,
+            completion_cost=0.0,
+            max_tokens=8192,
+            context_window=8192,
         )
 
 

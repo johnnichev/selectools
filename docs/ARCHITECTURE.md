@@ -150,7 +150,7 @@ Selectools is a production-ready Python framework for building AI agents with to
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌───────────┐  │
 │  │   Usage      │  │  Analytics   │  │   Pricing    │  │   Models  │  │
 │  │   Tracking   │  │  (analytics) │  │  (pricing)   │  │ (registry)│  │
-│  │   (usage.py) │  │  • Metrics   │  │  • Cost calc │  │  • 145    │  │
+│  │   (usage.py) │  │  • Metrics   │  │  • Cost calc │  │  • 146    │  │
 │  │   • Tokens   │  │  • Patterns  │  │  • Per model │  │   models  │  │
 │  │   • Cost     │  │  • Success   │  │              │  │           │  │
 │  └──────────────┘  └──────────────┘  └──────────────┘  └───────────┘  │
@@ -319,7 +319,7 @@ Class-based lifecycle observability:
 
 ### 15. Model Registry (`models.py`)
 
-Single source of truth for 145 models:
+Single source of truth for 146 models:
 
 - Pricing per 1M tokens
 - Context windows

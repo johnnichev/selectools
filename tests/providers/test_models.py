@@ -42,7 +42,7 @@ class TestModelRegistry:
 
     def test_all_models_count(self) -> None:
         """Test that we have all registered models."""
-        assert len(ALL_MODELS) == 145
+        assert len(ALL_MODELS) == 146
 
     def test_models_by_id_count(self) -> None:
         """Test that MODELS_BY_ID has same count as ALL_MODELS."""
@@ -140,9 +140,9 @@ class TestGeminiModels:
     """Tests for Google Gemini model definitions."""
 
     def test_gemini_model_count(self) -> None:
-        """Test Gemini has 27 models (25 chat + 2 embedding)."""
+        """Test Gemini has 31 models (28 chat + 3 embedding)."""
         gemini_models = [m for m in ALL_MODELS if m.provider == "gemini"]
-        assert len(gemini_models) == 30
+        assert len(gemini_models) == 31
 
     def test_gemini_flash_2_0(self) -> None:
         """Test Gemini 2.0 Flash model definition."""
