@@ -1,6 +1,6 @@
 # Selectools Implementation Documentation
 
-**Version:** 0.14.0
+**Version:** 0.15.0
 **Last Updated:** March 2026
 
 Welcome to the comprehensive technical documentation for selectools - a production-ready Python framework for building AI agents with tool-calling capabilities and RAG support.
@@ -41,6 +41,11 @@ Detailed technical documentation for each module:
 13. **[EMBEDDINGS.md](modules/EMBEDDINGS.md)** - Embedding providers and semantic search
 14. **[VECTOR_STORES.md](modules/VECTOR_STORES.md)** - Vector database implementations
 15. **[MODELS.md](modules/MODELS.md)** - 145 models across 5 providers with March 2026 pricing
+16. **[GUARDRAILS.md](modules/GUARDRAILS.md)** - Input/output validation pipeline, PII redaction, topic blocking
+17. **[AUDIT.md](modules/AUDIT.md)** - JSONL audit logging with privacy controls
+18. **[SECURITY.md](modules/SECURITY.md)** - Tool output screening and coherence checking
+19. **[TOOLBOX.md](modules/TOOLBOX.md)** - 24 pre-built tools across 5 categories (file, web, data, datetime, text)
+20. **[EXCEPTIONS.md](modules/EXCEPTIONS.md)** - Error hierarchy, exception attributes, catch patterns
 
 ---
 
@@ -53,8 +58,10 @@ Detailed technical documentation for each module:
 - Start: [ARCHITECTURE.md](ARCHITECTURE.md)
 - Building agents: [AGENT.md](modules/AGENT.md)
 - Creating tools: [TOOLS.md](modules/TOOLS.md)
+- Pre-built toolbox: [TOOLBOX.md](modules/TOOLBOX.md)
 - Dynamic tools & plugins: [DYNAMIC_TOOLS.md](modules/DYNAMIC_TOOLS.md)
 - Adding RAG: [RAG.md](modules/RAG.md)
+- Error handling: [EXCEPTIONS.md](modules/EXCEPTIONS.md)
 
 **For Contributors:**
 
@@ -67,6 +74,9 @@ Detailed technical documentation for each module:
 - Cost tracking: [USAGE.md](modules/USAGE.md)
 - Model selection: [MODELS.md](modules/MODELS.md)
 - Monitoring: [AGENT.md](modules/AGENT.md#hook-system) (hooks), [AGENT.md](modules/AGENT.md#agentobserver-protocol) (observer protocol), and `result.trace.to_otel_spans()` for OpenTelemetry
+- Guardrails & safety: [GUARDRAILS.md](modules/GUARDRAILS.md)
+- Audit logging: [AUDIT.md](modules/AUDIT.md)
+- Prompt injection defence: [SECURITY.md](modules/SECURITY.md)
 
 ### By Feature
 
@@ -86,6 +96,12 @@ Detailed technical documentation for each module:
 - [EMBEDDINGS.md](modules/EMBEDDINGS.md) - Vector generation
 - [VECTOR_STORES.md](modules/VECTOR_STORES.md) - Storage
 
+**Security & Compliance:**
+
+- [GUARDRAILS.md](modules/GUARDRAILS.md) - Input/output validation pipeline
+- [SECURITY.md](modules/SECURITY.md) - Tool output screening & coherence checking
+- [AUDIT.md](modules/AUDIT.md) - JSONL audit trail with privacy controls
+
 **Streaming & Performance:**
 
 - [STREAMING.md](modules/STREAMING.md) - E2E streaming, parallel execution, routing mode
@@ -100,7 +116,7 @@ Detailed technical documentation for each module:
 
 ## 📊 Documentation Stats
 
-- **Total files:** 16 (1 main + 15 modules)
+- **Total files:** 21 (1 main + 20 modules)
 - **ASCII diagrams:** 30+ diagrams
 - **Code examples:** 250+ examples
 
@@ -113,27 +129,33 @@ Detailed technical documentation for each module:
 ```
 1. User Query
    ↓
-2. AGENT loads history (MEMORY) and calls PROVIDER (or FALLBACK chain)
+2. INPUT GUARDRAILS validate/redact user message (PII, topic, toxicity)
    ↓
-3. CACHE checked (if configured) → hit? Return cached response
+3. AGENT loads history (MEMORY) and calls PROVIDER (or FALLBACK chain)
    ↓
-4. PROVIDER formats prompt (PROMPT + STRUCTURED schema) and calls LLM → CACHE stores result
+4. CACHE checked (if configured) → hit? Return cached response
    ↓
-5. PARSER extracts TOOL_CALL from response; REASONING extracted
+5. PROVIDER formats prompt (PROMPT + STRUCTURED schema) and calls LLM → CACHE stores result
    ↓
-6. POLICY ENGINE evaluates tool call → allow/review/deny
+6. OUTPUT GUARDRAILS validate LLM response (format, length, toxicity)
    ↓
-6b. If review: HUMAN-IN-THE-LOOP callback → approve/reject
+7. PARSER extracts TOOL_CALL from response; REASONING extracted
    ↓
-7. TOOLS validates and executes (parallel if multiple)
+8. POLICY ENGINE evaluates tool call → allow/review/deny
    ↓
-8. TRACE records each step (llm_call, tool_selection, tool_execution)
+8b. If review: HUMAN-IN-THE-LOOP callback → approve/reject
    ↓
-9. USAGE tracks tokens and costs
+9. COHERENCE CHECK verifies tool call matches user intent
    ↓
-10. If response_format: STRUCTURED validates → retry on failure
+10. TOOLS validates and executes (parallel if multiple)
    ↓
-11. Loop continues or returns AgentResult (with .parsed, .trace, .reasoning)
+11. OUTPUT SCREENING checks tool results for prompt injection
+   ↓
+12. TRACE records each step; AUDIT LOGGER writes JSONL; USAGE tracks costs
+   ↓
+13. If response_format: STRUCTURED validates → retry on failure
+   ↓
+14. Loop continues or returns AgentResult (with .parsed, .trace, .reasoning)
 ```
 
 **Read:**
@@ -193,7 +215,13 @@ Detailed technical documentation for each module:
 3. Read [ADVANCED_CHUNKING.md](modules/ADVANCED_CHUNKING.md) - Semantic & contextual chunking
 4. Read [STREAMING.md](modules/STREAMING.md) - Streaming, parallel execution, routing
 5. Read [DYNAMIC_TOOLS.md](modules/DYNAMIC_TOOLS.md) - Plugin systems & hot-reload
-6. Build production RAG and agent systems!
+
+### Production / Enterprise
+
+1. Read [GUARDRAILS.md](modules/GUARDRAILS.md) - Input/output validation pipeline
+2. Read [AUDIT.md](modules/AUDIT.md) - Compliance logging
+3. Read [SECURITY.md](modules/SECURITY.md) - Prompt injection defence
+4. Build production RAG and agent systems!
 
 ---
 
@@ -208,6 +236,7 @@ Detailed technical documentation for each module:
 5. **Observable** - AgentObserver protocol, hooks, OTel span export, usage tracking
 6. **Cost Aware** - Automatic tracking and warnings
 7. **Performance Optimized** - Parallel tool execution, response caching, async-first design
+8. **Enterprise Secure** - Guardrails, PII redaction, prompt injection screening, coherence checking, audit logging
 
 ### Core Patterns
 
@@ -231,6 +260,10 @@ Detailed technical documentation for each module:
 - **Contextual Chunking** - LLM-enriched chunks for better retrieval
 - **Dynamic Tool Loading** - Plugin discovery, hot-reload, runtime tool management
 - **Routing Mode** - Tool selection without execution for intent classification
+- **Guardrails Engine** - Input/output content validation with block/rewrite/warn actions
+- **Audit Logging** - JSONL audit trail with privacy controls and daily rotation
+- **Tool Output Screening** - Pattern-based prompt injection detection
+- **Coherence Checking** - LLM-based intent verification for tool calls
 
 ---
 
@@ -243,6 +276,18 @@ See: [AGENT.md](modules/AGENT.md)
 ### Define a Tool
 
 See: [TOOLS.md](modules/TOOLS.md)
+
+### Use Pre-Built Tools
+
+See: [TOOLBOX.md](modules/TOOLBOX.md)
+
+### Handle Errors
+
+See: [EXCEPTIONS.md](modules/EXCEPTIONS.md)
+
+### Look Up Model Pricing
+
+See: [MODELS.md — Programmatic Pricing API](modules/MODELS.md#programmatic-pricing-api)
 
 ### Add RAG
 
@@ -267,6 +312,22 @@ See: [AGENT.md — Batch Processing](modules/AGENT.md#batch-processing)
 ### Add Tool Policies
 
 See: [AGENT.md — Tool Policy](modules/AGENT.md#tool-policy--human-in-the-loop)
+
+### Add Guardrails
+
+See: [GUARDRAILS.md](modules/GUARDRAILS.md)
+
+### Add Audit Logging
+
+See: [AUDIT.md](modules/AUDIT.md)
+
+### Screen Tool Outputs for Injection
+
+See: [SECURITY.md — Tool Output Screening](modules/SECURITY.md#tool-output-screening)
+
+### Enable Coherence Checking
+
+See: [SECURITY.md — Coherence Checking](modules/SECURITY.md#coherence-checking)
 
 ### Monitor with AgentObserver
 

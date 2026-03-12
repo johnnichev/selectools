@@ -16,11 +16,14 @@ from typing import TYPE_CHECKING, Any, AsyncGenerator, Callable, Dict, List, Opt
 
 from ..analytics import AgentAnalytics
 from ..cache import CacheKeyBuilder
+from ..coherence import CoherenceResult, acheck_coherence, check_coherence
+from ..guardrails.base import GuardrailError
 from ..parser import ToolCallParser
 from ..policy import PolicyDecision, ToolPolicy
 from ..prompt import PromptBuilder
 from ..providers.base import Provider, ProviderError
 from ..providers.openai_provider import OpenAIProvider
+from ..security import screen_output as screen_tool_output
 from ..structured import (
     ResponseFormat,
     build_schema_instruction,
@@ -380,6 +383,102 @@ class Agent:
                 after,
                 "enforce_limits",
             )
+
+    def _run_input_guardrails(self, content: str, trace: Optional[AgentTrace] = None) -> str:
+        """Run input guardrails on user content.  Returns (possibly rewritten) content."""
+        if not self.config.guardrails or not self.config.guardrails.input:
+            return content
+        result = self.config.guardrails.check_input(content)
+        if trace and not result.passed:
+            trace.add(
+                TraceStep(
+                    type="guardrail",
+                    summary=f"Input guardrail: {result.reason}",
+                )
+            )
+        return result.content
+
+    def _run_output_guardrails(self, content: str, trace: Optional[AgentTrace] = None) -> str:
+        """Run output guardrails on LLM response.  Returns (possibly rewritten) content."""
+        if not self.config.guardrails or not self.config.guardrails.output:
+            return content
+        result = self.config.guardrails.check_output(content)
+        if trace and not result.passed:
+            trace.add(
+                TraceStep(
+                    type="guardrail",
+                    summary=f"Output guardrail: {result.reason}",
+                )
+            )
+        return result.content
+
+    def _screen_tool_result(self, tool_name: str, result: str) -> str:
+        """Screen a tool result for prompt injection if the tool or config requires it."""
+        tool = self._tools_by_name.get(tool_name)
+        should_screen = self.config.screen_tool_output or (
+            tool is not None and getattr(tool, "screen_output", False)
+        )
+        if not should_screen:
+            return result
+        screening = screen_tool_output(
+            result,
+            extra_patterns=self.config.output_screening_patterns,
+        )
+        return screening.content
+
+    def _check_coherence(
+        self,
+        user_message: str,
+        tool_name: str,
+        tool_args: Dict[str, Any],
+    ) -> Optional[str]:
+        """Sync coherence check.  Returns error string or None."""
+        if not self.config.coherence_check:
+            return None
+        provider = self.config.coherence_provider or self.provider
+        model = self.config.coherence_model or self.config.model
+        result = check_coherence(
+            provider=provider,
+            model=model,
+            user_message=user_message,
+            tool_name=tool_name,
+            tool_args=tool_args,
+            available_tools=list(self._tools_by_name.keys()),
+            timeout=self.config.request_timeout,
+        )
+        if not result.coherent:
+            return (
+                f"Coherence check failed for tool '{tool_name}': "
+                f"{result.explanation or 'Tool call does not match user intent'}"
+            )
+        return None
+
+    async def _acheck_coherence(
+        self,
+        user_message: str,
+        tool_name: str,
+        tool_args: Dict[str, Any],
+    ) -> Optional[str]:
+        """Async coherence check.  Returns error string or None."""
+        if not self.config.coherence_check:
+            return None
+        provider = self.config.coherence_provider or self.provider
+        model = self.config.coherence_model or self.config.model
+        result = await acheck_coherence(
+            provider=provider,
+            model=model,
+            user_message=user_message,
+            tool_name=tool_name,
+            tool_args=tool_args,
+            available_tools=list(self._tools_by_name.keys()),
+            timeout=self.config.request_timeout,
+        )
+        if not result.coherent:
+            return (
+                f"Coherence check failed for tool '{tool_name}': "
+                f"{result.explanation or 'Tool call does not match user intent'}"
+            )
+        return None
 
     def _new_trace(self) -> AgentTrace:
         """Create an ``AgentTrace`` pre-configured from ``AgentConfig``."""
@@ -772,11 +871,21 @@ class Agent:
         self._notify_observers("on_run_start", run_id, messages, self._system_prompt)
 
         try:
+            for msg in messages:
+                if msg.role == Role.USER and msg.content:
+                    msg.content = self._run_input_guardrails(msg.content, trace)
+
             if self.memory:
                 self._history = self.memory.get_history() + list(messages)
                 self._memory_add_many(list(messages), run_id)
             else:
                 self._history.extend(messages)
+
+            user_text_for_coherence = ""
+            for msg in reversed(messages):
+                if msg.role == Role.USER and msg.content:
+                    user_text_for_coherence = msg.content
+                    break
 
             all_tool_calls: List[ToolCall] = []
             last_tool_name: Optional[str] = None
@@ -792,6 +901,8 @@ class Agent:
                     stream_handler=stream_handler, trace=trace, run_id=run_id
                 )
                 response_text = response_msg.content or ""
+                response_text = self._run_output_guardrails(response_text, trace)
+                response_msg.content = response_text
 
                 tool_calls_to_execute = []
                 if response_msg.tool_calls:
@@ -971,6 +1082,26 @@ class Agent:
                             )
                             continue
 
+                        coherence_error = self._check_coherence(
+                            user_text_for_coherence, tool_name, parameters
+                        )
+                        if coherence_error:
+                            self._append_tool_result(
+                                coherence_error,
+                                tool_name,
+                                tool_call.id,
+                                run_id=run_id,
+                            )
+                            trace.add(
+                                TraceStep(
+                                    type="error",
+                                    tool_name=tool_name,
+                                    error=coherence_error,
+                                    summary=f"Coherence check failed for {tool_name}",
+                                )
+                            )
+                            continue
+
                         try:
                             start_time = time.time()
                             self._call_hook("on_tool_start", tool_name, parameters)
@@ -994,6 +1125,7 @@ class Agent:
                             result = self._execute_tool_with_timeout(
                                 tool, parameters, chunk_callback
                             )
+                            result = self._screen_tool_result(tool_name, result)
                             duration = time.time() - start_time
                             self._call_hook("on_tool_end", tool_name, result, duration)
                             self._notify_observers(
@@ -2033,11 +2165,21 @@ class Agent:
         self._notify_observers("on_run_start", run_id, messages, self._system_prompt)
 
         try:
+            for msg in messages:
+                if msg.role == Role.USER and msg.content:
+                    msg.content = self._run_input_guardrails(msg.content, trace)
+
             if self.memory:
                 self._history = self.memory.get_history() + list(messages)
                 self._memory_add_many(list(messages), run_id)
             else:
                 self._history.extend(messages)
+
+            user_text_for_coherence = ""
+            for msg in reversed(messages):
+                if msg.role == Role.USER and msg.content:
+                    user_text_for_coherence = msg.content
+                    break
 
             all_tool_calls: List[ToolCall] = []
             last_tool_name: Optional[str] = None
@@ -2053,6 +2195,8 @@ class Agent:
                     stream_handler=stream_handler, trace=trace, run_id=run_id
                 )
                 response_text = response_msg.content or ""
+                response_text = self._run_output_guardrails(response_text, trace)
+                response_msg.content = response_text
 
                 tool_calls_to_execute = []
                 if response_msg.tool_calls:
@@ -2232,6 +2376,26 @@ class Agent:
                             )
                             continue
 
+                        coherence_error = await self._acheck_coherence(
+                            user_text_for_coherence, tool_name, parameters
+                        )
+                        if coherence_error:
+                            self._append_tool_result(
+                                coherence_error,
+                                tool_name,
+                                tool_call.id,
+                                run_id=run_id,
+                            )
+                            trace.add(
+                                TraceStep(
+                                    type="error",
+                                    tool_name=tool_name,
+                                    error=coherence_error,
+                                    summary=f"Coherence check failed for {tool_name}",
+                                )
+                            )
+                            continue
+
                         try:
                             start_time = time.time()
                             self._call_hook("on_tool_start", tool_name, parameters)
@@ -2255,6 +2419,7 @@ class Agent:
                             result = await self._aexecute_tool_with_timeout(
                                 tool, parameters, chunk_callback
                             )
+                            result = self._screen_tool_result(tool_name, result)
                             duration = time.time() - start_time
                             self._call_hook("on_tool_end", tool_name, result, duration)
                             self._notify_observers(

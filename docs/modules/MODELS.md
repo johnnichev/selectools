@@ -565,6 +565,81 @@ def test_pricing_calculation():
 
 ---
 
+## Programmatic Pricing API
+
+Look up pricing at runtime — useful for cost estimation, budget alerts, and billing dashboards.
+
+### `PRICING` Dictionary
+
+The `PRICING` dict maps every model ID to its per-million-token costs:
+
+```python
+from selectools import PRICING
+
+# Look up GPT-4o pricing
+pricing = PRICING["gpt-4o"]
+print(pricing)
+# {"prompt": 2.50, "completion": 10.00}
+
+# Calculate cost for 1000 prompt + 500 completion tokens
+cost = (1000 * pricing["prompt"] + 500 * pricing["completion"]) / 1_000_000
+print(f"${cost:.6f}")
+```
+
+### `get_model_pricing(model_id)`
+
+Safe lookup that returns `None` if the model isn't in the registry:
+
+```python
+from selectools import get_model_pricing
+
+pricing = get_model_pricing("gpt-4o-mini")
+if pricing:
+    print(f"Prompt: ${pricing['prompt']}/M tokens")
+    print(f"Completion: ${pricing['completion']}/M tokens")
+else:
+    print("Unknown model")
+```
+
+### `calculate_cost(model, prompt_tokens, completion_tokens)`
+
+Direct cost calculation:
+
+```python
+from selectools import calculate_cost
+
+cost = calculate_cost("gpt-4o", prompt_tokens=1500, completion_tokens=300)
+print(f"${cost:.6f}")  # $0.006750
+```
+
+### `calculate_embedding_cost(model, tokens)`
+
+For embedding models:
+
+```python
+from selectools import calculate_embedding_cost
+
+cost = calculate_embedding_cost("text-embedding-3-small", tokens=10000)
+print(f"${cost:.6f}")  # $0.000200
+```
+
+### Listing All Models
+
+```python
+from selectools import ALL_MODELS, MODELS_BY_ID
+
+# All 145 ModelInfo objects
+for model in ALL_MODELS:
+    print(f"{model.id:40s} ${model.prompt_cost:>8.2f} / ${model.completion_cost:>8.2f}")
+
+# Look up by ID
+model = MODELS_BY_ID.get("claude-sonnet-4-20250514")
+if model:
+    print(f"Context: {model.context_window:,} tokens")
+```
+
+---
+
 ## Updating Models
 
 When new models are released:

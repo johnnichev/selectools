@@ -1,18 +1,32 @@
 """Public exports for the selectools package."""
 
-__version__ = "0.14.1"
+__version__ = "0.15.0"
 
 # Import submodules (lazy loading for optional dependencies)
-from . import embeddings, models, rag, toolbox
+from . import embeddings, guardrails, models, rag, toolbox
 from .agent import Agent, AgentConfig
 from .analytics import AgentAnalytics, ToolMetrics
+from .audit import AuditLogger, PrivacyLevel
 from .cache import Cache, CacheKeyBuilder, CacheStats, InMemoryCache
+from .coherence import CoherenceResult
 from .exceptions import (
     MemoryLimitExceededError,
     ProviderConfigurationError,
     SelectoolsError,
     ToolExecutionError,
     ToolValidationError,
+)
+from .guardrails import (
+    FormatGuardrail,
+    Guardrail,
+    GuardrailAction,
+    GuardrailError,
+    GuardrailResult,
+    GuardrailsPipeline,
+    LengthGuardrail,
+    PIIGuardrail,
+    TopicGuardrail,
+    ToxicityGuardrail,
 )
 from .memory import ConversationMemory
 from .models import ALL_MODELS, MODELS_BY_ID, Anthropic, Cohere, Gemini, ModelInfo, Ollama, OpenAI
@@ -95,6 +109,23 @@ __all__ = [
     "LoggingObserver",
     "AgentTrace",
     "TraceStep",
+    # Guardrails
+    "guardrails",
+    "Guardrail",
+    "GuardrailAction",
+    "GuardrailError",
+    "GuardrailResult",
+    "GuardrailsPipeline",
+    "FormatGuardrail",
+    "LengthGuardrail",
+    "PIIGuardrail",
+    "TopicGuardrail",
+    "ToxicityGuardrail",
+    # Audit
+    "AuditLogger",
+    "PrivacyLevel",
+    # Coherence
+    "CoherenceResult",
     # Submodules (for lazy loading)
     "embeddings",
     "rag",

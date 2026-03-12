@@ -119,6 +119,7 @@ class Tool:
         injected_kwargs: Optional[Dict[str, Any]] = None,
         config_injector: Optional[Callable[[], Dict[str, Any]]] = None,
         streaming: bool = False,
+        screen_output: bool = False,
     ):
         """
         Initialize a new Tool.
@@ -131,6 +132,8 @@ class Tool:
             injected_kwargs: Optional kwargs injected at execution (hidden from LLM).
             config_injector: Optional callable returning kwargs to inject at execution time.
             streaming: Whether this tool yields results progressively (returns Generator).
+            screen_output: Screen this tool's output for prompt injection before
+                feeding it back to the LLM.  Default: ``False``.
 
         Raises:
             ToolValidationError: If tool definition is invalid
@@ -141,11 +144,11 @@ class Tool:
         self.function = function
         self.injected_kwargs = injected_kwargs or {}
         self.config_injector = config_injector
-        # Detect both async functions and async generator functions
         self.is_async = inspect.iscoroutinefunction(function) or inspect.isasyncgenfunction(
             function
         )
         self.streaming = streaming
+        self.screen_output = screen_output
 
         # Validate tool definition at registration time
         self._validate_tool_definition()

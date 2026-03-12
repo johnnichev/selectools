@@ -1211,6 +1211,64 @@ print(result.content)  # Raw JSON string
 - **Pydantic v2 `BaseModel`**: Full schema generation with type coercion
 - **`dict` JSON Schema**: Raw JSON Schema for non-Pydantic users
 
+### ResponseFormat Type
+
+`ResponseFormat` is a type alias for what `response_format` accepts:
+
+```python
+from selectools import ResponseFormat  # Union[Type[Any], Dict[str, Any]]
+```
+
+It accepts either a Pydantic `BaseModel` subclass or a raw JSON Schema dict.
+
+### Standalone Helpers
+
+These utilities can be used independently for custom validation pipelines:
+
+```python
+from selectools.structured import (
+    extract_json,
+    schema_from_response_format,
+    parse_and_validate,
+    build_schema_instruction,
+    validation_retry_message,
+)
+```
+
+| Function | Description |
+|---|---|
+| `extract_json(text)` | Extract the first JSON object/array from text (handles code blocks, brace-balanced extraction). Returns `None` if no JSON found. |
+| `schema_from_response_format(fmt)` | Convert a Pydantic model or dict to a JSON Schema dict. |
+| `parse_and_validate(text, fmt)` | Extract JSON from text, validate against schema, return typed object. Raises `ValueError` on failure. |
+| `build_schema_instruction(schema)` | Generate the system prompt fragment that instructs the LLM to produce JSON matching the schema. |
+| `validation_retry_message(error)` | Generate the retry message sent to the LLM when validation fails. |
+
+**Example — custom extraction pipeline:**
+
+```python
+from selectools.structured import extract_json, parse_and_validate
+from pydantic import BaseModel
+
+class Sentiment(BaseModel):
+    label: str
+    score: float
+
+raw_text = 'Here is the analysis: ```json\n{"label": "positive", "score": 0.95}\n```'
+
+json_str = extract_json(raw_text)     # '{"label": "positive", "score": 0.95}'
+result = parse_and_validate(raw_text, Sentiment)  # Sentiment(label="positive", score=0.95)
+```
+
+### TraceStep Types for Structured Output
+
+When structured validation fails, a `structured_retry` step appears in the trace:
+
+```python
+for step in result.trace:
+    if step.type == "structured_retry":
+        print(f"Validation failed: {step.error}")
+```
+
 ---
 
 ## Execution Traces
@@ -1244,6 +1302,9 @@ total_llm_ms = sum(s.duration_ms for s in llm_steps)
 | `cache_hit` | Response served from cache |
 | `error` | Error during execution |
 | `structured_retry` | Structured output validation failed, retrying |
+| `guardrail` | Input/output guardrail triggered (v0.15.0) |
+| `coherence_check` | Coherence check blocked a tool call (v0.15.0) |
+| `output_screening` | Tool output screening detected injection (v0.15.0) |
 
 ### AgentTrace Methods
 

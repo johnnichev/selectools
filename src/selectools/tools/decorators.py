@@ -80,6 +80,7 @@ def tool(
     injected_kwargs: Optional[Dict[str, Any]] = None,
     config_injector: Optional[Callable[[], Dict[str, Any]]] = None,
     streaming: bool = False,
+    screen_output: bool = False,
 ) -> Callable[[Callable[..., Any]], Tool]:
     """
     Decorator to convert a function into a Tool.
@@ -94,6 +95,8 @@ def tool(
         injected_kwargs: Kwargs to inject nicely at runtime (hidden from LLM).
         config_injector: Callable returning kwargs to inject at runtime.
         streaming: Whether the tool streams results (returns Generator).
+        screen_output: Screen this tool's output for prompt injection.
+            Default: ``False``.
 
     Returns:
         Decorator function that returns a Tool instance.
@@ -109,16 +112,10 @@ def tool(
     """
 
     def decorator(func: Callable[..., Any]) -> Tool:
-        # Use provided name or function name
         tool_name = name or func.__name__
-
-        # Use provided description or docstring
         tool_description = description or inspect.getdoc(func) or f"Tool {tool_name}"
-
-        # Infer parameters
         parameters = _infer_parameters_from_callable(func, param_metadata)
 
-        # Create Tool instance
         tool_instance = Tool(
             name=tool_name,
             description=tool_description,
@@ -127,6 +124,7 @@ def tool(
             injected_kwargs=injected_kwargs,
             config_injector=config_injector,
             streaming=streaming,
+            screen_output=screen_output,
         )
         return tool_instance
 

@@ -279,6 +279,70 @@ otel_spans = result.trace.to_otel_spans()
 
 `LoggingObserver` emits structured JSON to Python's `logging` module — plug it into Datadog, ELK, or any log aggregator.
 
+## Step 10: Add Guardrails
+
+Validate inputs and outputs with a pluggable guardrail pipeline:
+
+```python
+from selectools import Agent, AgentConfig
+from selectools.guardrails import GuardrailsPipeline, TopicGuardrail, PIIGuardrail, GuardrailAction
+
+guardrails = GuardrailsPipeline(
+    input=[
+        TopicGuardrail(deny=["politics", "religion"]),
+        PIIGuardrail(action=GuardrailAction.REWRITE),  # redact PII
+    ],
+)
+
+agent = Agent(
+    tools=[...],
+    provider=provider,
+    config=AgentConfig(guardrails=guardrails),
+)
+
+# PII is automatically redacted before the LLM sees it
+result = agent.ask("Look up customer user@example.com")
+
+# Blocked topics raise GuardrailError
+from selectools.guardrails import GuardrailError
+try:
+    agent.ask("Tell me about politics")
+except GuardrailError as e:
+    print(f"Blocked: {e.reason}")
+```
+
+Five built-in guardrails: `TopicGuardrail`, `PIIGuardrail`, `ToxicityGuardrail`, `FormatGuardrail`, `LengthGuardrail`. Or subclass `Guardrail` to write your own.
+
+## Step 11: Audit Logging & Security
+
+Add a JSONL audit trail and prompt injection defence:
+
+```python
+from selectools import Agent, AgentConfig, tool
+from selectools.audit import AuditLogger, PrivacyLevel
+
+audit = AuditLogger(
+    log_dir="./audit",
+    privacy=PrivacyLevel.KEYS_ONLY,  # redact argument values
+)
+
+@tool(description="Fetch web page", screen_output=True)  # screen for injection
+def fetch_page(url: str) -> str:
+    import requests
+    return requests.get(url).text
+
+agent = Agent(
+    tools=[fetch_page],
+    provider=provider,
+    config=AgentConfig(
+        observers=[audit],            # JSONL audit log
+        screen_tool_output=True,      # prompt injection screening
+        coherence_check=True,         # verify tool calls match intent
+        coherence_model="gpt-4o-mini",
+    ),
+)
+```
+
 ## What's Next?
 
 You now know the core API. Here is where to go from here:
@@ -301,7 +365,15 @@ You now know the core API. Here is where to go from here:
 | Browse 145 models with pricing | [Models Guide](modules/MODELS.md) |
 | Track costs and token usage | [Usage Guide](modules/USAGE.md) |
 | Understand the full architecture | [Architecture](ARCHITECTURE.md) |
-| See working examples | [examples/](../examples/) (28 numbered scripts, 01–28) |
+| Add input/output guardrails | [Guardrails Guide](modules/GUARDRAILS.md) |
+| Add audit logging | [Audit Guide](modules/AUDIT.md) |
+| Screen tool outputs for injection | [Security Guide](modules/SECURITY.md) |
+| Enable coherence checking | [Security Guide — Coherence](modules/SECURITY.md#coherence-checking) |
+| Use 24 pre-built tools | [Toolbox Guide](modules/TOOLBOX.md) |
+| Handle errors gracefully | [Exceptions Guide](modules/EXCEPTIONS.md) |
+| Look up model pricing at runtime | [Models Guide — Pricing API](modules/MODELS.md#programmatic-pricing-api) |
+| Use structured output helpers | [Agent Guide — Structured Helpers](modules/AGENT.md#standalone-helpers) |
+| See working examples | [examples/](../examples/) (32 numbered scripts, 01–32) |
 
 ---
 
@@ -321,6 +393,10 @@ You now know the core API. Here is where to go from here:
 | Export to OTel | `result.trace.to_otel_spans()` |
 | Add an observer | `AgentConfig(observers=[MyObserver()])` |
 | Set tool policy | `AgentConfig(tool_policy=ToolPolicy(allow=["read_*"]))` |
+| Add guardrails | `AgentConfig(guardrails=GuardrailsPipeline(input=[...]))` |
+| Add audit logging | `AgentConfig(observers=[AuditLogger(log_dir="./audit")])` |
+| Screen tool output | `@tool(screen_output=True)` or `AgentConfig(screen_tool_output=True)` |
+| Check coherence | `AgentConfig(coherence_check=True, coherence_model="gpt-4o-mini")` |
 | Reset state | `agent.reset()` |
 | Add a tool at runtime | `agent.add_tool(my_tool)` |
 | Remove a tool | `agent.remove_tool("tool_name")` |

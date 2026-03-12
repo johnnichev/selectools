@@ -1,7 +1,7 @@
 # Selectools Architecture
 
-**Version:** 0.13.0
-**Last Updated:** February 2026
+**Version:** 0.15.0
+**Last Updated:** March 2026
 
 ## Table of Contents
 
@@ -37,6 +37,10 @@ Selectools is a production-ready Python framework for building AI agents with to
 - **Batch Processing**: `agent.batch()` / `agent.abatch()` for concurrent multi-prompt execution
 - **Tool Policy Engine**: Declarative allow/review/deny rules with human-in-the-loop approval
 - **Tool-Pair-Aware Trimming**: Memory sliding window preserves tool_use/tool_result pairs
+- **Guardrails Engine**: Input/output content validation with block/rewrite/warn actions
+- **Audit Logging**: JSONL audit trail with privacy controls (full/keys-only/hashed/none)
+- **Tool Output Screening**: Pattern-based prompt injection detection (15 built-in patterns)
+- **Coherence Checking**: LLM-based intent verification for tool calls
 
 ---
 
@@ -62,6 +66,10 @@ Selectools is a production-ready Python framework for building AI agents with to
 │  │  • Parallel tool execution                                       │  │
 │  │  • Batch processing (batch/abatch)                               │  │
 │  │  • Response caching (LRU+TTL)                                    │  │
+│  │  • Input/output guardrails (guardrails/)                         │  │
+│  │  • Tool output screening (security.py)                           │  │
+│  │  • Coherence checking (coherence.py)                             │  │
+│  │  • Audit logging (audit.py)                                      │  │
 │  └─────────┬────────────────────────┬──────────────────┬────────────┘  │
 │            │                        │                  │               │
 │            ▼                        ▼                  ▼               │

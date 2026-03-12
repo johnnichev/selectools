@@ -20,6 +20,9 @@ StepType = Literal[
     "cache_hit",
     "error",
     "structured_retry",
+    "guardrail",
+    "coherence_check",
+    "output_screening",
 ]
 
 

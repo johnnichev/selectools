@@ -5,6 +5,66 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] - 2026-03-12
+
+### Added — Enterprise Reliability
+
+#### Guardrails Engine (new `guardrails/` subpackage)
+
+- **`GuardrailsPipeline`**: Ordered pipeline of input and output guardrails that run before and after every LLM call. Supports chaining — if a guardrail rewrites content, downstream guardrails see the rewritten version.
+- **`Guardrail` base class**: Subclass and override `check(content) -> GuardrailResult` for custom validation. Three failure actions: `block` (raise `GuardrailError`), `rewrite` (return sanitised content), `warn` (log and continue).
+- **`TopicGuardrail`**: Keyword-based topic blocking with word-boundary matching. Case-insensitive by default.
+- **`PIIGuardrail`**: Regex-based PII detection for email, phone, SSN, credit card, and IPv4. Supports `redact` mode (replaces PII with `[TYPE:****]`), custom patterns, and selective detection.
+- **`ToxicityGuardrail`**: Keyword blocklist scoring with configurable threshold. Ships with a default blocklist of ~16 high-signal terms.
+- **`FormatGuardrail`**: Validates JSON structure, required keys, and content length bounds.
+- **`LengthGuardrail`**: Enforces min/max character and word counts. Supports `rewrite` mode for truncation.
+- **Agent integration**: `AgentConfig(guardrails=pipeline)` — input guardrails run on user messages before the LLM call; output guardrails run on LLM responses after they return. Both sync (`run()`) and async (`arun()`) paths.
+
+#### Audit Logging (new `audit.py` module)
+
+- **`AuditLogger`**: JSONL append-only audit logger implementing the `AgentObserver` protocol. Plugs into any agent via `AgentConfig(observers=[AuditLogger(...)])`.
+- **Privacy controls**: Four levels via `PrivacyLevel` — `full` (log everything), `keys_only` (redact values), `hashed` (SHA-256 truncated hashes), `none` (omit args).
+- **Daily file rotation**: `audit-YYYY-MM-DD.jsonl` files by default; disable for a single `audit.jsonl`.
+- **Thread-safe writes**: Safe for concurrent `batch()` usage.
+- Records: `run_start`, `run_end`, `tool_start`, `tool_end`, `tool_error`, `llm_end`, `policy_decision`, `error`.
+
+#### Tool Output Screening (new `security.py` module)
+
+- **Prompt injection detection**: 15 built-in regex patterns covering common injection techniques (e.g., "ignore previous instructions", `<system>` tags, `[INST]` markers, "forget everything").
+- **`@tool(screen_output=True)`**: Per-tool opt-in screening. Also available globally via `AgentConfig(screen_tool_output=True)`.
+- **Custom patterns**: `AgentConfig(output_screening_patterns=["ADMIN_OVERRIDE"])` adds extra regex patterns.
+- **Agent integration**: Blocked outputs are replaced with a safe placeholder message before being fed back to the LLM.
+
+#### Coherence Checking (new `coherence.py` module)
+
+- **LLM-based intent verification**: `AgentConfig(coherence_check=True)` adds a lightweight LLM call before each tool execution that verifies the proposed tool call matches the user's original request.
+- **Prompt injection defense**: Catches cases where injected content in tool outputs causes the agent to call unrelated tools (e.g., user asks "summarize emails" but injection causes `send_email`).
+- **Configurable provider/model**: `AgentConfig(coherence_provider=..., coherence_model=...)` — use a separate, fast model for checks. Defaults to the agent's own provider.
+- **Fail-open**: If the coherence check LLM call fails, the tool call is allowed (no silent blocking on infrastructure errors).
+- **Sync and async**: Both `run()` and `arun()` paths supported.
+
+### Changed
+
+- **`StepType` literal**: Added `"guardrail"`, `"coherence_check"`, and `"output_screening"` trace step types.
+- **`Tool` class**: New `screen_output: bool` parameter (default `False`).
+- **`@tool()` decorator**: New `screen_output` kwarg.
+- **`AgentConfig`**: New fields: `guardrails`, `screen_tool_output`, `output_screening_patterns`, `coherence_check`, `coherence_provider`, `coherence_model`.
+- **ROADMAP**: Enterprise Reliability moved from v1.0.0 to v0.15.0. Multi-Agent Orchestration and MCP moved to backlog. Memory & Persistence is now v0.16.0.
+
+### Documentation
+
+- **New module docs**: `GUARDRAILS.md`, `AUDIT.md`, `SECURITY.md`, `TOOLBOX.md`, `EXCEPTIONS.md` (5 new pages)
+- **Updated module docs**: `AGENT.md` (ResponseFormat helpers, new TraceStep types), `MODELS.md` (programmatic pricing API)
+- **Updated guides**: `QUICKSTART.md` (Steps 10-11 for guardrails, audit, security), `ARCHITECTURE.md` (v0.15.0 features), `docs/README.md` (21 module pages, new navigation sections)
+- **New examples**: `29_guardrails.py`, `30_audit_logging.py`, `31_tool_output_screening.py`, `32_coherence_checking.py`
+- **Updated notebook**: `getting_started.ipynb` — sections 11-13 for guardrails, audit, screening, coherence
+
+### Tests
+
+- **83 new tests** (total: 1183): Comprehensive coverage for all 5 built-in guardrails, pipeline chaining, audit logger privacy levels/rotation, all 15 injection patterns, coherence checking (sync + async + failure modes), and custom guardrail subclassing.
+
+---
+
 ## [0.14.1] - 2026-03-12
 
 ### Fixed — Streaming & Provider Tool Passing (13 bugs)
@@ -903,7 +963,7 @@ agent = RAGAgent.from_directory(
 
 ---
 
-## Migration Guide: v0.8.0 → v0.13.0
+## Migration Guide: v0.8.0 → v0.15.0
 
 This section covers all breaking changes for consumers upgrading from v0.8.0.
 
@@ -967,6 +1027,8 @@ print(message.tool_calls)   # List[ToolCall] — native tool calls
 
 ```python
 from selectools import Agent, AgentConfig, InMemoryCache
+from selectools.guardrails import GuardrailsPipeline, PIIGuardrail, TopicGuardrail
+from selectools.audit import AuditLogger, PrivacyLevel
 
 config = AgentConfig(
     # NEW in v0.9.0 — custom system prompt (replaces message-prepending hacks)
@@ -986,6 +1048,21 @@ config = AgentConfig(
 
     # NEW in v0.13.0 — human-in-the-loop approval
     confirm_action=lambda name, args, reason: True,
+
+    # NEW in v0.14.0 — structured observability
+    observers=[AuditLogger(log_dir="./audit", privacy=PrivacyLevel.KEYS_ONLY)],
+
+    # NEW in v0.15.0 — input/output guardrails
+    guardrails=GuardrailsPipeline(
+        input=[PIIGuardrail(action="rewrite"), TopicGuardrail(deny=["politics"])],
+    ),
+
+    # NEW in v0.15.0 — tool output screening
+    screen_tool_output=True,
+
+    # NEW in v0.15.0 — coherence checking
+    coherence_check=True,
+    coherence_model="gpt-4o-mini",
 )
 
 agent = Agent(tools=[...], provider=provider, config=config)
@@ -1036,6 +1113,9 @@ contextual = ContextualChunker(base_chunker=semantic, provider=provider)
 
 ## Release Links
 
+- [0.15.0 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.15.0)
+- [0.14.1 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.14.1)
+- [0.14.0 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.14.0)
 - [0.13.0 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.13.0)
 - [0.12.1 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.12.1)
 - [0.12.0 Release Notes](https://github.com/johnnichev/selectools/releases/tag/v0.12.0)

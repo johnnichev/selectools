@@ -6,30 +6,23 @@
 
 **Production-ready AI agents with tool calling, RAG, and hybrid search.** Connect LLMs to your Python functions, embed and search your documents with vector + keyword fusion, stream responses in real time, and dynamically manage tools at runtime. Works with OpenAI, Anthropic, Gemini, and Ollama. Tracks costs automatically.
 
-## What's New in v0.14.1
+## What's New in v0.15.0
 
-**Critical streaming fix** — All streaming methods across every provider were silently dropping tool definitions:
+**Enterprise Reliability** — Four new security and compliance features:
 
-- **13 bugs fixed**: `stream()` and `astream()` in OpenAI, Anthropic, Gemini, Ollama, and FallbackProvider now correctly pass `tools` to the API and yield `ToolCall` objects
-- Agents using `run(stream=True)`, `arun(stream=True)`, or `astream()` can now use tools (previously broken across all providers)
-- Ollama `_format_messages()` now correctly handles tool role and assistant tool_calls in multi-turn conversations
-- `FallbackProvider.astream()` now has proper error handling, failover, and circuit breaker support
-
-**Test suite massively expanded** — 141 new tests (total: 1100):
-
-- Regression tests for every prior bug fix to prevent reintroduction
-- Recording-provider tests that verify exact arguments passed to streaming methods
-- Unit tests for 6 modules that previously only had E2E coverage (policy, structured, trace, fallback, format_messages, batch)
+- **Guardrails Engine** — Pluggable input/output validation pipeline with 5 built-in guardrails (`TopicGuardrail`, `PIIGuardrail`, `ToxicityGuardrail`, `FormatGuardrail`, `LengthGuardrail`). Supports block, rewrite, and warn actions.
+- **Audit Logging** — JSONL append-only audit trail via `AuditLogger` with 4 privacy levels (full, keys-only, hashed, none) and daily file rotation. Implements `AgentObserver` for zero-config integration.
+- **Tool Output Screening** — Prompt injection detection with 15 built-in patterns. Per-tool opt-in via `@tool(screen_output=True)` or global via `AgentConfig(screen_tool_output=True)`.
+- **Coherence Checking** — LLM-based intent verification that catches tool calls diverging from the user's original request. Enable with `AgentConfig(coherence_check=True)`.
+- **83 new tests** (total: 1183)
 
 > Full changelog: [CHANGELOG.md](https://github.com/johnnichev/selectools/blob/main/CHANGELOG.md)
 
 <details>
-<summary><strong>v0.14.0 highlights</strong></summary>
+<summary><strong>v0.14.x highlights</strong></summary>
 
-- **AgentObserver Protocol** — 15 lifecycle events with `run_id`/`call_id` correlation for Langfuse, Datadog, OpenTelemetry
-- **Model Registry Update** — 145 models with March 2026 pricing (GPT-5.4, Claude Sonnet 4.6, Gemini 3.1 Pro)
-- OpenAI `max_tokens` → `max_completion_tokens` auto-detection for GPT-5.x, o-series
-- 11 additional bug fixes for structured output, policy bypass, memory trimming, async timeouts, and more
+- **v0.14.1**: Critical streaming fix — 13 bugs fixed across all providers; 141 new tests (total: 1100)
+- **v0.14.0**: AgentObserver Protocol (15 events), 145 models with March 2026 pricing, OpenAI `max_completion_tokens` auto-detection, 11 bug fixes
 
 </details>
 
@@ -50,6 +43,10 @@
 | **Dynamic Tools** | Load tools from files/directories at runtime. Add, remove, replace tools without restarting. |
 | **Response Caching** | LRU + TTL in-memory cache and Redis backend. Avoid redundant LLM calls for identical requests. |
 | **Routing Mode** | Agent selects a tool without executing it. Use for intent classification and request routing. |
+| **Guardrails Engine** | Input/output validation pipeline with PII redaction, topic blocking, toxicity detection, and format enforcement. |
+| **Audit Logging** | JSONL audit trail with privacy controls (redact, hash, omit) and daily rotation. |
+| **Tool Output Screening** | Prompt injection detection with 15 built-in patterns. Per-tool or global. |
+| **Coherence Checking** | LLM-based verification that tool calls match user intent — catches injection-driven tool misuse. |
 | **AgentObserver Protocol** | 15-event lifecycle observer with `run_id`/`call_id` correlation. Built-in `LoggingObserver` for structured JSON logs. |
 | **Production Hardened** | Retries with backoff, per-tool timeouts, iteration caps, cost warnings, observability hooks + observers. |
 | **Library-First** | Not a framework. No magic globals, no hidden state. Use as much or as little as you need. |
@@ -69,10 +66,10 @@
 - **Dynamic Tool Loading**: Plugin system with hot-reload support
 - **Response Caching**: InMemoryCache and RedisCache with stats tracking
 - **145 Model Registry**: Type-safe constants with pricing and metadata
-- **Pre-built Toolbox**: 22 tools for files, data, text, datetime, web
-- **28 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, and more
+- **Pre-built Toolbox**: 24 tools for files, data, text, datetime, web
+- **32 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, and more
 - **AgentObserver Protocol**: 15 lifecycle events with `run_id` correlation, `LoggingObserver`, OTel export
-- **938+ Tests**: Unit, integration, and E2E with real API calls
+- **1183 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 
@@ -638,4 +635,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). We welcome contributions for new tools, 
 
 ---
 
-[Roadmap](ROADMAP.md) | [Changelog](CHANGELOG.md) | [Documentation](docs/README.md) | [Feature Proposals](FEATURE_PROPOSALS.md)
+[Roadmap](ROADMAP.md) | [Changelog](CHANGELOG.md) | [Documentation](docs/README.md)

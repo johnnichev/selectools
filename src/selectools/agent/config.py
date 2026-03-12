@@ -9,8 +9,10 @@ from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, List, Optional
 
 if TYPE_CHECKING:
     from ..cache import Cache
+    from ..guardrails import GuardrailsPipeline
     from ..observer import AgentObserver
     from ..policy import ToolPolicy
+    from ..providers.base import Provider
 
 # Hook type definitions
 HookCallable = Callable[..., None]
@@ -88,6 +90,24 @@ class AgentConfig:
                ``AgentTrace`` created by this agent records a ``parent_run_id``
                so nested/chained agent calls can be linked in tracing systems.
                Default: None.
+        guardrails: Optional GuardrailsPipeline with input and output guardrails.
+               Input guardrails run on user messages before the LLM call.
+               Output guardrails run on LLM responses after they return.
+               Default: None (no guardrails).
+        screen_tool_output: Enable prompt-injection screening on ALL tool outputs.
+               Individual tools can also opt-in via ``@tool(screen_output=True)``.
+               Default: False.
+        output_screening_patterns: Extra regex patterns (strings) for tool output
+               screening in addition to the built-in injection detectors.
+               Default: None.
+        coherence_check: Enable LLM-based coherence checking that verifies each
+               proposed tool call matches the user's original intent.  Adds one
+               extra LLM call per tool-call iteration.  Default: False.
+        coherence_provider: Optional separate provider for coherence checks.
+               Uses the agent's own provider if not set.  Default: None.
+        coherence_model: Model to use for coherence checks.  Defaults to the
+               agent's configured model.  Using a fast/cheap model is recommended.
+               Default: None.
     """
 
     model: str = "gpt-4o"
@@ -115,3 +135,9 @@ class AgentConfig:
     trace_tool_result_chars: Optional[int] = 200
     trace_metadata: Dict[str, Any] = field(default_factory=dict)
     parent_run_id: Optional[str] = None
+    guardrails: Optional[GuardrailsPipeline] = None
+    screen_tool_output: bool = False
+    output_screening_patterns: Optional[List[str]] = None
+    coherence_check: bool = False
+    coherence_provider: Optional[Provider] = None
+    coherence_model: Optional[str] = None
