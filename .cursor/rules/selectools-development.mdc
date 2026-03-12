@@ -1,0 +1,53 @@
+---
+description: Selectools development conventions, testing requirements, and release process
+alwaysApply: true
+---
+
+# Selectools Development Rules
+
+## Code Conventions
+- Python 3.9+, line length 100, Black + isort formatting
+- Explicit types everywhere, no `any` — mypy enforced on `src/`
+- No narration comments — only explain non-obvious intent
+- Source layout: `src/selectools/`, tests in `tests/`
+- Pre-commit hooks: black, isort, flake8, mypy, bandit, yaml check (--unsafe for mkdocs)
+
+## Testing Requirements
+- Every new feature needs unit tests + integration tests
+- Every bug fix needs a regression test in `tests/agent/test_regression.py`
+- Use mock providers for unit tests, never real API calls
+- Use `RecordingProvider` pattern to verify exact args passed to providers
+- E2E tests use `@pytest.mark.e2e` (skipped in CI)
+- Run `pytest tests/ -x -q` and confirm ALL pass before any commit
+- Update model count assertions when adding/removing models
+
+## Feature Completeness Checklist
+Every feature MUST include ALL of:
+1. Source code in `src/selectools/`
+2. Public exports in `__init__.py`
+3. Unit tests in `tests/`
+4. Example script in `examples/NN_name.py`
+5. Module doc in `docs/modules/NAME.md`
+6. Section in `notebooks/getting_started.ipynb`
+7. Entry in `docs/index.md` feature table
+8. Navigation entry in `mkdocs.yml`
+9. Links from relevant existing docs
+
+## Release Process
+1. Create feature branch: `git checkout -b feat/<name>`
+2. Implement + test + document (all checklist items above)
+3. Bump version in `__init__.py` + `pyproject.toml`
+4. Update: CHANGELOG.md, README.md ("What's New"), ROADMAP.md
+5. Update hardcoded counts (models, tests, examples) across ALL docs
+6. `mkdocs build` to verify no broken links
+7. Commit, push, PR, merge to main
+8. Tag: `git tag -a vX.Y.Z`
+9. Push tags, build, publish to PyPI
+10. Verify GitHub Pages auto-deploys
+
+## Common Pitfalls
+- Provider `stream()`/`astream()` MUST pass `tools` param
+- `ToolCall` objects must not be stringified in streaming
+- OpenAI newer models need `max_completion_tokens` not `max_tokens`
+- `response_msg.content` can be `None` — always use `or ""`
+- MkDocs links outside `docs/` must use absolute GitHub URLs

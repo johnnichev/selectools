@@ -1,0 +1,47 @@
+---
+description: Rules for working with the agent core loop in selectools
+globs: src/selectools/agent/**/*.py
+alwaysApply: false
+---
+
+# Agent Core Rules
+
+## Execution Flow (in order)
+1. Input guardrails validate/redact user message
+2. Memory loads history, provider called (or fallback chain)
+3. Cache checked — hit returns cached response
+4. Provider formats prompt + calls LLM, cache stores result
+5. Output guardrails validate LLM response
+6. Parser extracts TOOL_CALL, reasoning extracted
+7. Policy engine evaluates tool call (allow/review/deny)
+8. Coherence check verifies tool matches user intent
+9. Tool executes (parallel if multiple), output screening applied
+10. Trace records step, audit logger writes, usage tracks costs
+11. Loop continues or returns AgentResult
+
+## AgentResult Always Contains
+- `.content` — final text response
+- `.trace` — AgentTrace with typed timeline
+- `.reasoning` — why agent chose tools
+- `.usage` — aggregated token/cost stats
+
+## Integration Points for New Features
+When adding a feature that touches the agent loop:
+- Add config fields to `agent/config.py`
+- Add new `StepType` to `trace.py` if recording trace steps
+- Add observer events to `observer.py` if emitting lifecycle events
+- Guard observer calls with `if run_id:` for consistency
+- Use `_notify_observers()` helper, never call observer methods directly
+- Wrap observer calls in try/except to prevent crashing agent
+
+## Thread Safety
+- `FallbackProvider` observer wiring uses `threading.Lock` + refcount
+- `batch()` uses `ThreadPoolExecutor` — each thread gets isolated history
+- `abatch()` uses `asyncio.gather` with copied agent instances
+- Direct concurrent `arun()` on same agent shares `_history` (known limitation)
+
+## Defensive Patterns
+- `response_msg.content or ""` — providers can return None content
+- `elif response_format is None:` — prevent parser intercepting structured output
+- `_memory_add_many()` — ensures on_memory_trim observers fire
+- `routing_only` path must still fire `on_iteration_end`
