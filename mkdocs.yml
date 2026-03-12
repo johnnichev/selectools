@@ -1,0 +1,100 @@
+site_name: Selectools
+site_description: Production-ready AI agents with tool calling, RAG, and hybrid search
+site_url: https://johnnichev.github.io/selectools
+repo_url: https://github.com/johnnichev/selectools
+repo_name: johnnichev/selectools
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+    - toc.follow
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+
+not_in_nav: |
+  README.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.snippets
+  - tables
+  - toc:
+      permalink: true
+  - attr_list
+  - md_in_html
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Quickstart: QUICKSTART.md
+    - API Keys: KEYS.md
+  - Architecture: ARCHITECTURE.md
+  - Modules:
+    - Agent: modules/AGENT.md
+    - Tools: modules/TOOLS.md
+    - Toolbox (24 Built-in): modules/TOOLBOX.md
+    - Dynamic Tools: modules/DYNAMIC_TOOLS.md
+    - Providers: modules/PROVIDERS.md
+    - Models & Pricing: modules/MODELS.md
+    - Memory: modules/MEMORY.md
+    - Streaming: modules/STREAMING.md
+    - Usage & Cost Tracking: modules/USAGE.md
+    - Parser: modules/PARSER.md
+    - Prompt: modules/PROMPT.md
+  - RAG:
+    - RAG Pipeline: modules/RAG.md
+    - Hybrid Search: modules/HYBRID_SEARCH.md
+    - Advanced Chunking: modules/ADVANCED_CHUNKING.md
+    - Embeddings: modules/EMBEDDINGS.md
+    - Vector Stores: modules/VECTOR_STORES.md
+  - Security & Compliance:
+    - Guardrails: modules/GUARDRAILS.md
+    - Audit Logging: modules/AUDIT.md
+    - Screening & Coherence: modules/SECURITY.md
+    - Error Handling: modules/EXCEPTIONS.md
+  - Contributing:
+    - Release Guide: RELEASE_GUIDE.md
+  - Changelog: CHANGELOG.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/johnnichev/selectools
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/selectools/
+  generator: false

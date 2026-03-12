@@ -16,6 +16,7 @@ build/
 dist/
 *.egg-info/
 .cache/
+site/
 
 # Testing / coverage
 .pytest_cache/
@@ -47,3 +48,6 @@ mypy_output.txt
 
 # Generated demo artifacts
 *_with_bbox.png
+
+# MkDocs build copies (generated at build time)
+docs/CHANGELOG.md

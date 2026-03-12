@@ -375,7 +375,7 @@ memory = ConversationMemory(max_messages=20)
 
 ## Future Enhancements
 
-Potential improvements (see [ROADMAP.md](../../ROADMAP.md)):
+Potential improvements (see [Roadmap](https://github.com/johnnichev/selectools/blob/main/ROADMAP.md)):
 
 1. **Summarize-on-Trim**: Auto-summarize old messages instead of dropping (v0.16.0)
 2. **Persistent Sessions**: Auto-save/load from disk or database (v0.16.0)

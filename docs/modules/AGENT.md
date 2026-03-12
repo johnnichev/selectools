@@ -22,7 +22,7 @@
 15. [Reasoning Visibility](#reasoning-visibility)
 16. [Provider Fallback](#provider-fallback)
 17. [Batch Processing](#batch-processing)
-18. [Tool Policy & Human-in-the-Loop](#tool-policy--human-in-the-loop)
+18. [Tool Policy & Human-in-the-Loop](#tool-policy-human-in-the-loop)
 19. [Implementation Details](#implementation-details)
 
 ---

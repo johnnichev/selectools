@@ -33,7 +33,7 @@ classifiers = [
 Homepage = "https://github.com/johnnichev/selectools"
 Repository = "https://github.com/johnnichev/selectools"
 Issues = "https://github.com/johnnichev/selectools/issues"
-Documentation = "https://github.com/johnnichev/selectools#readme"
+Documentation = "https://johnnichev.github.io/selectools"
 Changelog = "https://github.com/johnnichev/selectools/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
@@ -49,6 +49,7 @@ dev = [
     "flake8>=7.0.0",
     "mypy>=1.8.0",
     "bandit>=1.7.0",
+    "mkdocs-material>=9.5.0",
 ]
 rag = [
     "chromadb>=0.4.0",

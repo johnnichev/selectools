@@ -311,7 +311,7 @@ See: [AGENT.md — Batch Processing](modules/AGENT.md#batch-processing)
 
 ### Add Tool Policies
 
-See: [AGENT.md — Tool Policy](modules/AGENT.md#tool-policy--human-in-the-loop)
+See: [AGENT.md — Tool Policy](modules/AGENT.md#tool-policy-human-in-the-loop)
 
 ### Add Guardrails
 
@@ -371,8 +371,8 @@ See: [MODELS.md](modules/MODELS.md)
 
 1. **Read the [ARCHITECTURE.md](ARCHITECTURE.md)** for system overview
 2. **Explore module docs** based on your needs
-3. **Check the main [README.md](../README.md)** for quick start examples
-4. **Review the [ROADMAP.md](../ROADMAP.md)** for upcoming features
+3. **Check the main [README](https://github.com/johnnichev/selectools#readme)** for quick start examples
+4. **Review the [Roadmap](https://github.com/johnnichev/selectools/blob/main/ROADMAP.md)** for upcoming features
 
 ---
 

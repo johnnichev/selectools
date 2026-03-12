@@ -226,6 +226,6 @@ agent = Agent(
 
 ## See Also
 
-- [examples/03_toolbox.py](../../examples/03_toolbox.py) — Working demo of all categories
+- [examples/03_toolbox.py](https://github.com/johnnichev/selectools/blob/main/examples/03_toolbox.py) — Working demo of all categories
 - [TOOLS.md](TOOLS.md) — Creating your own tools with `@tool`
 - [DYNAMIC_TOOLS.md](DYNAMIC_TOOLS.md) — Loading tools from files/directories at runtime

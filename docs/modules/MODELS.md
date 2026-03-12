@@ -671,7 +671,7 @@ class OpenAI:
 
 - [Providers Module](PROVIDERS.md) - Using models with providers
 - [Usage Module](USAGE.md) - Cost tracking
-- [Pricing Module](../ARCHITECTURE.md#support-systems) - Cost calculation
+- [Pricing Module](../ARCHITECTURE.md#8-usage-tracking-usagepy-pricingpy) - Cost calculation
 
 ---
 

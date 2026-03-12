@@ -737,7 +737,7 @@ Includes:
   - Performance tuning
   - Cost management
   - Search relevance tuning
-- **Future Roadmap** — See [ROADMAP.md](./ROADMAP.md) for current plans
+- **Future Roadmap** — See [ROADMAP.md](https://github.com/johnnichev/selectools/blob/main/ROADMAP.md) for current plans
 
 ### Fixed
 

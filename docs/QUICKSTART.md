@@ -355,7 +355,7 @@ You now know the core API. Here is where to go from here:
 | Switch between providers | [Providers Guide](modules/PROVIDERS.md) |
 | Auto-failover between providers | [Providers Guide — Fallback](modules/PROVIDERS.md#fallbackprovider) |
 | Classify multiple requests at once | [Agent Guide — Batch Processing](modules/AGENT.md#batch-processing) |
-| Control which tools can run | [Agent Guide — Tool Policy](modules/AGENT.md#tool-policy--human-in-the-loop) |
+| Control which tools can run | [Agent Guide — Tool Policy](modules/AGENT.md#tool-policy-human-in-the-loop) |
 | Monitor with AgentObserver | [Agent Guide — Observer Protocol](modules/AGENT.md#agentobserver-protocol) |
 | Export traces to OpenTelemetry | [Agent Guide — OTel Export](modules/AGENT.md#agentobserver-protocol) |
 | Stream responses in real time | [Streaming Guide](modules/STREAMING.md) |
@@ -373,7 +373,7 @@ You now know the core API. Here is where to go from here:
 | Handle errors gracefully | [Exceptions Guide](modules/EXCEPTIONS.md) |
 | Look up model pricing at runtime | [Models Guide — Pricing API](modules/MODELS.md#programmatic-pricing-api) |
 | Use structured output helpers | [Agent Guide — Structured Helpers](modules/AGENT.md#standalone-helpers) |
-| See working examples | [examples/](../examples/) (32 numbered scripts, 01–32) |
+| See working examples | [examples/](https://github.com/johnnichev/selectools/tree/main/examples) (32 numbered scripts, 01–32) |
 
 ---
 

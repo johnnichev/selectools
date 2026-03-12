@@ -1,6 +1,7 @@
 # Selectools
 
 [![PyPI version](https://badge.fury.io/py/selectools.svg)](https://badge.fury.io/py/selectools)
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://johnnichev.github.io/selectools)
 [![License: LGPL v3](https://img.shields.io/badge/License-LGPL_v3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 
@@ -596,7 +597,9 @@ python examples/14_rag_basic.py     # Needs OPENAI_API_KEY
 
 ## Documentation
 
-Comprehensive technical documentation is available in [`docs/`](docs/README.md):
+**[Read the full documentation](https://johnnichev.github.io/selectools)** — hosted on GitHub Pages with search, dark mode, and easy navigation.
+
+Also available in [`docs/`](docs/README.md):
 
 | Module | Description |
 |---|---|
