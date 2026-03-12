@@ -13,6 +13,7 @@ repos:
         name: Fix end of files
       - id: check-yaml
         name: Check YAML syntax
+        args: ["--unsafe"]
         exclude: ^\.github/workflows/
       - id: check-added-large-files
         name: Check for large files

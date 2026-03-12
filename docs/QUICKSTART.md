@@ -362,7 +362,7 @@ You now know the core API. Here is where to go from here:
 | Use hybrid search (keyword + semantic) | [Hybrid Search Guide](modules/HYBRID_SEARCH.md) |
 | Load tools from plugin files | [Dynamic Tools Guide](modules/DYNAMIC_TOOLS.md) |
 | Cache LLM responses to save money | [Agent Guide — Caching](modules/AGENT.md#response-caching) |
-| Browse 145 models with pricing | [Models Guide](modules/MODELS.md) |
+| Browse 146 models with pricing | [Models Guide](modules/MODELS.md) |
 | Track costs and token usage | [Usage Guide](modules/USAGE.md) |
 | Understand the full architecture | [Architecture](ARCHITECTURE.md) |
 | Add input/output guardrails | [Guardrails Guide](modules/GUARDRAILS.md) |
