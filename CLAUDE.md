@@ -1,0 +1,252 @@
+# Selectools — Agent Instructions
+
+This file provides context for AI coding agents (Claude, Cursor, Copilot, etc.) working on the selectools codebase.
+
+## Project Overview
+
+**Selectools** is a production-ready Python library for building AI agents with tool calling, RAG, and hybrid search. It supports OpenAI, Anthropic, Gemini, and Ollama providers.
+
+- **Version**: Check `src/selectools/__init__.py` for current version
+- **Python**: 3.9+
+- **Package manager**: pip + setuptools
+- **Source layout**: `src/selectools/` (src-layout)
+- **Tests**: `tests/` (pytest)
+- **Docs**: `docs/` (MkDocs Material, deployed to GitHub Pages)
+- **PyPI**: https://pypi.org/project/selectools/
+- **Docs site**: https://johnnichev.github.io/selectools
+
+## Codebase Structure
+
+```
+src/selectools/
+├── __init__.py              # Public API exports + __version__
+├── agent/
+│   ├── core.py              # Main agent loop (run, arun, astream, batch)
+│   └── config.py            # AgentConfig dataclass
+├── providers/
+│   ├── base.py              # Provider protocol
+│   ├── openai_provider.py   # OpenAI adapter (max_completion_tokens handling)
+│   ├── anthropic_provider.py
+│   ├── gemini_provider.py
+│   ├── ollama_provider.py
+│   ├── fallback.py          # FallbackProvider with circuit breaker
+│   └── stubs.py             # LocalProvider for testing without API keys
+├── tools/
+│   ├── base.py              # Tool class
+│   ├── decorators.py        # @tool decorator
+│   ├── loader.py            # ToolLoader for dynamic loading
+│   └── registry.py          # Tool registry
+├── toolbox/                 # 24 pre-built tools (file, web, data, datetime, text)
+├── guardrails/              # Input/output validation pipeline
+│   ├── base.py              # Guardrail protocol, GuardrailAction, GuardrailResult
+│   ├── pipeline.py          # GuardrailsPipeline
+│   ├── pii.py, topic.py, toxicity.py, format.py, length.py
+├── rag/                     # RAG pipeline (loaders, chunking, hybrid search)
+│   ├── stores/              # Vector stores (memory, sqlite, chroma, pinecone)
+│   ├── hybrid.py, bm25.py, reranker.py, chunking.py
+├── embeddings/              # Embedding providers (openai, anthropic, gemini, cohere)
+├── memory.py                # ConversationMemory with sliding window + tool-pair trimming
+├── models.py                # 146 model registry with pricing (single source of truth)
+├── pricing.py               # Derives pricing from models.py
+├── usage.py                 # Token + cost tracking
+├── trace.py                 # AgentTrace, TraceStep
+├── observer.py              # AgentObserver protocol (15 events) + LoggingObserver
+├── policy.py                # ToolPolicy (allow/review/deny rules)
+├── parser.py                # ToolCallParser (JSON extraction from LLM responses)
+├── prompt.py                # PromptBuilder (system prompt generation)
+├── structured.py            # Structured output (Pydantic/JSON Schema validation)
+├── audit.py                 # AuditLogger (JSONL with privacy levels)
+├── security.py              # Tool output screening (prompt injection detection)
+├── coherence.py             # Coherence checking (LLM-based intent verification)
+├── cache.py                 # InMemoryCache (LRU + TTL)
+├── cache_redis.py           # RedisCache
+├── exceptions.py            # SelectoolsError hierarchy
+├── analytics.py             # AgentAnalytics
+├── types.py                 # Core types (Message, Role, ToolCall, AgentResult)
+└── env.py                   # Environment variable helpers
+
+tests/                       # 1183+ tests (unit, integration, regression, E2E)
+├── agent/                   # Agent core tests
+├── providers/               # Provider-specific tests
+├── rag/                     # RAG pipeline tests
+├── tools/                   # Tool system tests
+├── integration/             # Cross-module integration tests
+├── core/                    # Framework-level tests
+└── test_*.py                # Module-level unit tests
+
+examples/                    # 32 numbered example scripts (01-32)
+notebooks/getting_started.ipynb  # Interactive getting-started guide
+
+docs/                        # MkDocs Material documentation
+├── index.md                 # Landing page
+├── QUICKSTART.md            # 5-minute quickstart
+├── ARCHITECTURE.md          # System architecture
+├── modules/                 # 20 module-specific docs
+└── stylesheets/extra.css    # Custom theme CSS
+```
+
+## Development Commands
+
+```bash
+# Tests
+pytest tests/ -x -q                    # All tests
+pytest tests/ -k "not e2e" -x -q       # Skip E2E (no API keys needed)
+pytest tests/providers/test_models.py   # Specific test file
+
+# Formatting & linting
+black src/ tests/ --line-length=100
+isort src/ tests/ --profile=black --line-length=100
+flake8 src/
+mypy src/
+
+# Docs
+cp CHANGELOG.md docs/CHANGELOG.md && mkdocs serve   # Local preview
+mkdocs build                                          # Build static site
+
+# Build & publish
+python3 -m build
+python3 -m twine upload dist/*
+```
+
+## Key Conventions
+
+### Code Style
+- Line length: 100 characters
+- Formatter: Black + isort
+- Type hints: Required on all public APIs (mypy enforced)
+- No `any` types — always explicit types
+- No comments explaining what code does — only non-obvious intent
+
+### File Naming
+- Source modules: `snake_case.py`
+- Test files: `test_<module>.py`
+- Example files: `NN_descriptive_name.py` (zero-padded number)
+- Doc files: `UPPER_CASE.md` for modules, `lower_case.md` for guides
+
+### Provider Pattern
+Every provider implements the `Provider` protocol from `providers/base.py`:
+- `complete()` / `acomplete()` — synchronous/async completion
+- `stream()` / `astream()` — synchronous/async streaming (yields `str | ToolCall`)
+- `_format_messages()` — converts internal `Message` objects to provider-specific format
+- Must pass `tools` parameter to all methods (streaming included)
+- Must handle `ToolCall` objects properly (not stringify them)
+
+### Agent Core Pattern
+- `run()` / `arun()` — main sync/async execution
+- `astream()` — async streaming with tool calls
+- `batch()` / `abatch()` — concurrent multi-prompt execution
+- All methods produce `AgentResult` with `.content`, `.trace`, `.reasoning`, `.usage`
+
+### Testing Pattern
+- Unit tests mock providers — never call real APIs
+- Use `RecordingProvider` to verify exact arguments passed to provider methods
+- E2E tests use `@pytest.mark.e2e` and are skipped in CI
+- Regression tests go in `tests/agent/test_regression.py`
+- Every bug fix gets a dedicated regression test
+- Test model counts when adding/removing models
+
+## Feature Development Checklist
+
+When implementing a new feature, ALWAYS complete ALL of these steps:
+
+### 1. Cross-Feature Impact Analysis
+- [ ] How does this feature interact with existing features?
+- [ ] Does it need integration in `agent/core.py` (the main loop)?
+- [ ] Does `AgentConfig` need new fields?
+- [ ] Does `__init__.py` need new exports?
+- [ ] Does `AgentTrace` need new `StepType` values?
+- [ ] Does the `AgentObserver` protocol need new events?
+- [ ] Does `AgentResult` need new fields?
+
+### 2. Implementation
+- [ ] Create new module(s) in `src/selectools/`
+- [ ] Integrate with `agent/core.py` if it affects the agent loop
+- [ ] Update `agent/config.py` with new config options
+- [ ] Update `src/selectools/__init__.py` with new public exports
+- [ ] Run `black` and `isort` on all new/modified files
+- [ ] Run `mypy src/` to check types
+- [ ] Run `flake8 src/` to check linting
+
+### 3. Testing (CRITICAL — bugs found in production are unacceptable)
+- [ ] Unit tests for the new module (`tests/test_<module>.py`)
+- [ ] Integration tests if it touches the agent loop
+- [ ] Regression tests for any edge cases discovered
+- [ ] Update model count tests if models changed
+- [ ] Run full suite: `pytest tests/ -x -q` — ALL must pass
+- [ ] Verify no tests were broken by the change
+
+### 4. Documentation Updates (ALL of these, every time)
+- [ ] **Module doc**: Create or update `docs/modules/<MODULE>.md`
+- [ ] **Architecture doc**: Update `docs/ARCHITECTURE.md` if it adds a new component
+- [ ] **Quickstart**: Update `docs/QUICKSTART.md` if it's user-facing
+- [ ] **docs/README.md**: Update the documentation index
+- [ ] **docs/index.md**: Update the landing page feature table and model counts
+- [ ] **Notebook**: Add section to `notebooks/getting_started.ipynb`
+- [ ] **Example script**: Add `examples/NN_<feature>.py`
+- [ ] Verify all internal links work: `cp CHANGELOG.md docs/CHANGELOG.md && mkdocs build`
+
+### 5. Release Artifacts (for each release)
+- [ ] **Version bump**: `src/selectools/__init__.py` + `pyproject.toml`
+- [ ] **CHANGELOG.md**: Add detailed entry with features, fixes, and migration guide
+- [ ] **README.md**: Update "What's New" section, feature table, stats (model count, test count, example count)
+- [ ] **ROADMAP.md**: Mark features as completed, update future versions
+- [ ] **Git**: Create branch, commit, push, create PR, merge to main
+- [ ] **Tag**: `git tag -a vX.Y.Z -m "..."`
+- [ ] **PyPI**: `python3 -m build && python3 -m twine upload dist/*`
+- [ ] **Verify**: GitHub Pages docs auto-deploy after merge to main
+
+### 6. Cross-Reference Audit
+- [ ] Search for hardcoded counts (model count, test count, example count) across all docs
+- [ ] Verify pricing references match `models.py`
+- [ ] Ensure no broken links (relative paths, anchor references)
+- [ ] Verify the `mkdocs.yml` nav includes any new pages
+
+## Release History Pattern
+
+Each release follows this branch + PR workflow:
+
+```
+git checkout -b feat/<feature-name>
+# ... implement, test, document ...
+git add -A && git commit -m "feat: ..."
+git push -u origin HEAD
+gh pr create --title "..." --body "..."
+gh pr merge <number> --merge --delete-branch
+```
+
+For releases with version bumps:
+```
+git checkout -b release/vX.Y.Z
+# bump version, update changelog, etc.
+git tag -a vX.Y.Z -m "..."
+git push origin main --tags
+python3 -m build && python3 -m twine upload dist/*
+```
+
+## Common Pitfalls (from past bugs)
+
+1. **Provider streaming must pass `tools`**: All `stream()` and `astream()` methods MUST forward the `tools` parameter to the underlying API. This was a bug across ALL providers.
+
+2. **`ToolCall` objects must not be stringified**: In `_astreaming_call()`, check `isinstance(chunk, str)` before appending to text buffer. `ToolCall` objects are yielded alongside text chunks.
+
+3. **OpenAI `max_tokens` vs `max_completion_tokens`**: Newer models (GPT-5.x, o-series, GPT-4.1) require `max_completion_tokens`. The `_uses_max_completion_tokens()` helper in `openai_provider.py` handles this.
+
+4. **FallbackProvider.astream() needs error handling**: Must include try/except with `_is_retriable`, `_record_failure`, `on_fallback` callback, and `_record_success` — matching the pattern in `complete()` and `acomplete()`.
+
+5. **Thread safety for FallbackProvider + observers**: The `_wire_fallback_observer` uses a `threading.Lock` and reference count to prevent stack overflow during batch processing.
+
+6. **Structured output vs text parser**: When `response_format` is set, the `ToolCallParser` must NOT intercept valid JSON responses. Guard with `elif response_format is None:`.
+
+7. **`None` content from providers**: Always use `response_msg.content or ""` to prevent `TypeError` when providers return `None` content.
+
+8. **Memory `on_memory_trim` notification**: Use `_memory_add_many()` helper instead of direct `self.memory.add_many()` to ensure observer notifications fire.
+
+9. **Pre-commit YAML check**: mkdocs.yml uses Python tags for emoji extensions. The `check-yaml` hook needs `args: ["--unsafe"]`.
+
+10. **MkDocs links**: Files outside `docs/` (CHANGELOG.md, ROADMAP.md, examples/) must use absolute GitHub URLs, not relative paths.
+
+## Current Roadmap
+
+- **v0.15.0** ✅ Enterprise Reliability (guardrails, audit, screening, coherence)
+- **v0.16.0** 🟡 Memory & Persistence (sessions, summarize-on-trim, entity memory, knowledge graph)
+- **Backlog**: Multi-Agent Orchestration, MCP & Ecosystem

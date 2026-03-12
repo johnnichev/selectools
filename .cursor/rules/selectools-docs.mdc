@@ -1,0 +1,45 @@
+---
+description: Documentation standards for selectools docs and MkDocs site
+globs: docs/**/*.md
+alwaysApply: false
+---
+
+# Documentation Rules
+
+## MkDocs Site Structure
+- Config: `mkdocs.yml` (Material theme, tab nav, emoji, code copy)
+- Landing page: `docs/index.md`
+- Module docs: `docs/modules/<NAME>.md`
+- Guides: `docs/QUICKSTART.md`, `docs/ARCHITECTURE.md`
+- Custom CSS: `docs/stylesheets/extra.css`
+- CHANGELOG.md is copied from root at build time (not tracked in docs/)
+
+## Link Rules
+- Within docs/: use relative paths (`modules/AGENT.md`, `../ARCHITECTURE.md`)
+- To files outside docs/ (ROADMAP.md, examples/, notebooks/): use absolute GitHub URLs
+  Example: `https://github.com/johnnichev/selectools/blob/main/examples/01_hello_world.py`
+- Anchor format for MkDocs: `#heading-text` (lowercase, hyphens, no special chars)
+  `## Tool Policy & Human-in-the-Loop` → `#tool-policy-human-in-the-loop` (not double hyphen)
+
+## When Adding a New Feature
+1. Create `docs/modules/<FEATURE>.md` with full API reference and examples
+2. Add nav entry in `mkdocs.yml` under the appropriate tab
+3. Update `docs/index.md` feature table
+4. Update `docs/README.md` documentation index
+5. Update `docs/QUICKSTART.md` "next steps" table if user-facing
+6. Update `docs/ARCHITECTURE.md` if it adds a new system component
+7. Add section to `notebooks/getting_started.ipynb`
+8. Verify build: `cp CHANGELOG.md docs/CHANGELOG.md && mkdocs build`
+
+## Hardcoded Counts
+These appear in multiple files and MUST be updated together:
+- **Model count** (currently 146): index.md, README.md, MODELS.md, QUICKSTART.md, ARCHITECTURE.md
+- **Test count**: README.md, index.md, CHANGELOG.md
+- **Example count**: README.md, index.md
+- **Tool count** (24): index.md, README.md, TOOLBOX.md
+
+## Style
+- Use admonitions (`!!! tip`, `!!! warning`) for callouts
+- Use tabbed content (`=== "Tab Name"`) for install/usage variants
+- Use Material icons (`:material-icon-name:`) for feature cards
+- Code examples should be complete and runnable

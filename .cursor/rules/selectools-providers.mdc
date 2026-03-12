@@ -1,0 +1,48 @@
+---
+description: Rules for working with LLM provider adapters in selectools
+globs: src/selectools/providers/**/*.py
+alwaysApply: false
+---
+
+# Provider Implementation Rules
+
+## Protocol Compliance
+Every provider must implement all methods from `providers/base.py`:
+- `complete()`, `acomplete()` — sync/async completion
+- `stream()`, `astream()` — sync/async streaming
+- `_format_messages()` — convert `Message` to provider format
+
+## Critical: Tool Passing
+ALL methods (`complete`, `acomplete`, `stream`, `astream`) MUST:
+- Accept `tools: list[Tool] | None = None` parameter
+- Forward tools to the underlying API call
+- Map tools using `_map_tool_to_<provider>(t)` helper
+
+## Critical: Streaming Return Types
+- `stream()` returns `Iterable[str]`
+- `astream()` returns `AsyncIterable[Union[str, ToolCall]]`
+- `astream()` must parse tool call chunks and yield `ToolCall` objects
+- Never stringify `ToolCall` objects
+
+## OpenAI-Specific
+- Use `_uses_max_completion_tokens(model)` to decide parameter name
+- GPT-5.x, o-series, GPT-4.1 need `max_completion_tokens`
+- Older models use `max_tokens`
+
+## FallbackProvider
+- `astream()` must include try/except with `_is_retriable` + circuit breaker
+- Use `_record_failure()` / `_record_success()` consistently
+- Call `on_fallback` callback when falling back
+
+## Message Formatting
+- `Role.TOOL` messages need provider-specific formatting:
+  - OpenAI: `{"role": "tool", "content": ..., "tool_call_id": ...}`
+  - Anthropic: `{"role": "user", "content": [{"type": "tool_result", ...}]}`
+  - Gemini: `{"role": "user", "parts": [{"function_response": ...}]}`
+  - Ollama: `{"role": "tool", "content": ..., "tool_call_id": ...}`
+
+## Testing
+- Use `RecordingProvider` to capture and assert exact args
+- Test `_format_messages` for TOOL role, ASSISTANT with tool_calls, images
+- Test `astream()` yields `ToolCall` objects (not just strings)
+- Test FallbackProvider failover, circuit breaker, and callback behavior

@@ -1,0 +1,58 @@
+---
+description: Testing conventions and patterns for selectools
+globs: tests/**/*.py
+alwaysApply: false
+---
+
+# Testing Rules
+
+## Test Organization
+- `tests/test_<module>.py` — unit tests for each source module
+- `tests/agent/` — agent core, observer, batch, regression tests
+- `tests/providers/` — provider-specific, model registry, streaming, format tests
+- `tests/rag/` — RAG pipeline, chunking, hybrid search, vector store tests
+- `tests/integration/` — cross-module integration tests
+- `tests/tools/` — tool system tests
+
+## Mock Provider Pattern
+```python
+class FakeProvider:
+    name = "fake"
+    supports_streaming = True
+    supports_async = True
+
+    def complete(self, *, model, system_prompt, messages, tools=None, **kw):
+        return Message(role=Role.ASSISTANT, content="response")
+```
+Always include `tools=None` in signature — missing it silently hides bugs.
+
+## Recording Provider Pattern
+Use to verify exact args passed to provider methods:
+```python
+class RecordingProvider(FakeProvider):
+    def __init__(self):
+        self.calls = []
+    def complete(self, **kwargs):
+        self.calls.append(("complete", kwargs))
+        return Message(role=Role.ASSISTANT, content="ok")
+```
+
+## Regression Tests
+- Go in `tests/agent/test_regression.py`
+- Each test class documents the specific bug it prevents
+- Name pattern: `TestXxxHandling` describing the failure mode
+- Include a docstring explaining what broke and when
+
+## Assertions
+- Model counts: update when adding/removing models
+- Observer events: verify run_id is passed to all events
+- Streaming: verify `ToolCall` objects are yielded (not strings)
+- Policy: verify deny actually blocks execution
+- Guardrails: verify block raises, rewrite modifies content
+
+## Running Tests
+```bash
+pytest tests/ -x -q                 # All tests, stop on first failure
+pytest tests/ -k "not e2e" -x -q    # Skip E2E (CI mode)
+pytest tests/agent/ -x -q           # Just agent tests
+```
