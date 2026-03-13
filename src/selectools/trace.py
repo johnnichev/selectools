@@ -23,6 +23,11 @@ StepType = Literal[
     "guardrail",
     "coherence_check",
     "output_screening",
+    "session_load",
+    "session_save",
+    "memory_summarize",
+    "entity_extraction",
+    "kg_extraction",
 ]
 
 

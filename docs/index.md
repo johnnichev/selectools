@@ -131,8 +131,13 @@ print(result.reasoning)       # Why the agent chose get_weather
 | **Audit Logging** | JSONL audit trail with privacy controls and daily rotation |
 | **Tool Output Screening** | Prompt injection detection with 15 built-in patterns |
 | **Coherence Checking** | LLM-based verification that tool calls match user intent |
-| **AgentObserver Protocol** | 15-event lifecycle observer with run/call ID correlation and OTel export |
-| **1183 Tests** | Unit, integration, regression, and E2E |
+| **Persistent Sessions** | SessionStore protocol with JSON file, SQLite, and Redis backends with TTL |
+| **Summarize-on-Trim** | LLM-generated summaries of trimmed messages for context preservation |
+| **Entity Memory** | Auto-extract named entities with LRU-pruned registry and context injection |
+| **Knowledge Graph** | Relationship triple extraction with in-memory and SQLite storage |
+| **Cross-Session Knowledge** | Daily logs + persistent facts with auto-registered `remember` tool |
+| **AgentObserver Protocol** | 19-event lifecycle observer with run/call ID correlation and OTel export |
+| **1365 Tests** | Unit, integration, regression, and E2E |
 
 ---
 
@@ -160,6 +165,12 @@ print(result.reasoning)       # Why the agent chose get_weather
     13. **[Audit Logging](modules/AUDIT.md)** — Compliance and privacy-aware logging
     14. **[Security](modules/SECURITY.md)** — Tool output screening and coherence checking
     15. **[Error Handling](modules/EXCEPTIONS.md)** — Custom exception hierarchy
+
+!!! abstract "Memory & Persistence"
+    16. **[Sessions](modules/SESSIONS.md)** — Persistent session storage with 3 backends
+    17. **[Entity Memory](modules/ENTITY_MEMORY.md)** — Named entity extraction and tracking
+    18. **[Knowledge Graph](modules/KNOWLEDGE_GRAPH.md)** — Relationship triple extraction
+    19. **[Knowledge Memory](modules/KNOWLEDGE.md)** — Cross-session durable memory
 
 ---
 
@@ -198,4 +209,4 @@ Loop continues or returns AgentResult (.parsed, .trace, .reasoning)
 [:fontawesome-brands-python: PyPI Package](https://pypi.org/project/selectools/){ .md-button }
 [:fontawesome-brands-github: GitHub Repository](https://github.com/johnnichev/selectools){ .md-button }
 [:material-notebook: Getting Started Notebook](https://github.com/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb){ .md-button }
-[:material-code-tags: 32 Example Scripts](https://github.com/johnnichev/selectools/tree/main/examples){ .md-button }
+[:material-code-tags: 37 Example Scripts](https://github.com/johnnichev/selectools/tree/main/examples){ .md-button }

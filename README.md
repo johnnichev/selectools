@@ -7,17 +7,25 @@
 
 **Production-ready AI agents with tool calling, RAG, and hybrid search.** Connect LLMs to your Python functions, embed and search your documents with vector + keyword fusion, stream responses in real time, and dynamically manage tools at runtime. Works with OpenAI, Anthropic, Gemini, and Ollama. Tracks costs automatically.
 
-## What's New in v0.15.0
+## What's New in v0.16.0
 
-**Enterprise Reliability** — Four new security and compliance features:
+**Memory & Persistence** — Five new features for durable conversation state:
 
-- **Guardrails Engine** — Pluggable input/output validation pipeline with 5 built-in guardrails (`TopicGuardrail`, `PIIGuardrail`, `ToxicityGuardrail`, `FormatGuardrail`, `LengthGuardrail`). Supports block, rewrite, and warn actions.
-- **Audit Logging** — JSONL append-only audit trail via `AuditLogger` with 4 privacy levels (full, keys-only, hashed, none) and daily file rotation. Implements `AgentObserver` for zero-config integration.
-- **Tool Output Screening** — Prompt injection detection with 15 built-in patterns. Per-tool opt-in via `@tool(screen_output=True)` or global via `AgentConfig(screen_tool_output=True)`.
-- **Coherence Checking** — LLM-based intent verification that catches tool calls diverging from the user's original request. Enable with `AgentConfig(coherence_check=True)`.
-- **83 new tests** (total: 1183)
+- **Persistent Sessions** — `SessionStore` protocol with 3 backends (JSON file, SQLite, Redis). Auto-save/load via `AgentConfig(session_store=store, session_id="user-123")`.
+- **Summarize-on-Trim** — LLM-generated summaries of trimmed messages, injected as system context. No more silent context loss.
+- **Entity Memory** — Auto-extract named entities (person, org, project) across turns with LRU-pruned registry and system prompt injection.
+- **Knowledge Graph** — Relationship triple extraction with in-memory and SQLite storage. Query-relevant triples auto-injected into prompts.
+- **Cross-Session Knowledge** — Daily logs + persistent facts with auto-registered `remember` tool. Give your agent durable memory across conversations.
+- **182 new tests** (total: 1365)
 
 > Full changelog: [CHANGELOG.md](https://github.com/johnnichev/selectools/blob/main/CHANGELOG.md)
+
+<details>
+<summary><strong>v0.15.x highlights</strong></summary>
+
+- **v0.15.0**: Enterprise Reliability — Guardrails engine (5 built-in), audit logging (4 privacy levels), tool output screening (15 patterns), coherence checking
+
+</details>
 
 <details>
 <summary><strong>v0.14.x highlights</strong></summary>
@@ -48,7 +56,11 @@
 | **Audit Logging** | JSONL audit trail with privacy controls (redact, hash, omit) and daily rotation. |
 | **Tool Output Screening** | Prompt injection detection with 15 built-in patterns. Per-tool or global. |
 | **Coherence Checking** | LLM-based verification that tool calls match user intent — catches injection-driven tool misuse. |
-| **AgentObserver Protocol** | 15-event lifecycle observer with `run_id`/`call_id` correlation. Built-in `LoggingObserver` for structured JSON logs. |
+| **Persistent Sessions** | `SessionStore` with JSON file, SQLite, and Redis backends. Auto-save/load with TTL expiry. |
+| **Entity Memory** | LLM-based entity extraction with deduplication, LRU pruning, and system prompt injection. |
+| **Knowledge Graph** | Relationship triple extraction with in-memory and SQLite storage and keyword-based querying. |
+| **Cross-Session Knowledge** | Daily logs + persistent facts with auto-registered `remember` tool. |
+| **AgentObserver Protocol** | 19-event lifecycle observer with `run_id`/`call_id` correlation. Built-in `LoggingObserver` for structured JSON logs. |
 | **Production Hardened** | Retries with backoff, per-tool timeouts, iteration caps, cost warnings, observability hooks + observers. |
 | **Library-First** | Not a framework. No magic globals, no hidden state. Use as much or as little as you need. |
 
@@ -68,9 +80,13 @@
 - **Response Caching**: InMemoryCache and RedisCache with stats tracking
 - **146 Model Registry**: Type-safe constants with pricing and metadata
 - **Pre-built Toolbox**: 24 tools for files, data, text, datetime, web
-- **32 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, and more
-- **AgentObserver Protocol**: 15 lifecycle events with `run_id` correlation, `LoggingObserver`, OTel export
-- **1183 Tests**: Unit, integration, regression, and E2E with real API calls
+- **Persistent Sessions**: 3 backends (JSON file, SQLite, Redis) with TTL
+- **Entity Memory**: LLM-based named entity extraction and tracking
+- **Knowledge Graph**: Triple extraction with in-memory and SQLite storage
+- **Cross-Session Knowledge**: Daily logs + persistent memory with `remember` tool
+- **37 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, and more
+- **AgentObserver Protocol**: 19 lifecycle events with `run_id` correlation, `LoggingObserver`, OTel export
+- **1365 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 

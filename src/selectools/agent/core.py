@@ -138,6 +138,21 @@ class Agent:
         self._system_prompt = self.prompt_builder.build(self.tools)
         self._history: List[Message] = []
 
+        # Auto-load session from store if configured (only if no memory was provided)
+        if self.config.session_store and self.config.session_id and self.memory is None:
+            loaded = self.config.session_store.load(self.config.session_id)
+            if loaded is not None:
+                self.memory = loaded
+
+        # Auto-add remember tool if knowledge_memory is configured
+        if self.config.knowledge_memory and "remember" not in self._tools_by_name:
+            from ..toolbox.memory_tools import make_remember_tool
+
+            remember_tool = make_remember_tool(self.config.knowledge_memory)
+            self.tools.append(remember_tool)
+            self._tools_by_name[remember_tool.name] = remember_tool
+            self._system_prompt = self.prompt_builder.build(self.tools)
+
     # ------------------------------------------------------------------
     # Dynamic tool management
     # ------------------------------------------------------------------
@@ -366,6 +381,7 @@ class Agent:
                 after,
                 "enforce_limits",
             )
+            self._maybe_summarize_trim(run_id)
 
     def _memory_add_many(self, msgs: List[Message], run_id: str) -> None:
         """Add multiple messages to memory and notify observers if trimming occurred."""
@@ -383,6 +399,98 @@ class Agent:
                 after,
                 "enforce_limits",
             )
+            self._maybe_summarize_trim(run_id)
+
+    def _maybe_summarize_trim(self, run_id: str) -> None:
+        """Generate a summary of trimmed messages if summarize_on_trim is enabled."""
+        if not self.config.summarize_on_trim or not self.memory:
+            return
+        trimmed = self.memory._last_trimmed
+        if not trimmed:
+            return
+        try:
+            provider = self.config.summarize_provider or self.provider
+            model = self.config.summarize_model or self.config.model
+            text_parts = []
+            for m in trimmed:
+                prefix = m.role.value.upper()
+                text_parts.append(f"{prefix}: {m.content or ''}")
+            trimmed_text = "\n".join(text_parts)
+
+            prompt_msg = Message(
+                role=Role.USER,
+                content=(
+                    "Summarize the following conversation excerpt in 2-3 sentences. "
+                    "Focus on key facts, decisions, and context that would be useful "
+                    "for continuing the conversation:\n\n" + trimmed_text
+                ),
+            )
+            result = provider.complete(
+                model=model,
+                system_prompt="You are a concise summarizer.",
+                messages=[prompt_msg],
+                max_tokens=self.config.summarize_max_tokens,
+            )
+            # Provider returns (Message, UsageStats) tuple
+            summary_msg = result[0] if isinstance(result, tuple) else result
+            summary_text = summary_msg.content or ""
+            if summary_text:
+                existing = self.memory.summary
+                if existing:
+                    self.memory.summary = existing + " " + summary_text
+                else:
+                    self.memory.summary = summary_text
+                self._notify_observers("on_memory_summarize", run_id, self.memory.summary)
+        except Exception:  # nosec B110
+            pass  # never crash the agent for a summarization failure
+
+    def _session_save(self, run_id: str) -> None:
+        """Auto-save memory to session store if configured."""
+        store = self.config.session_store
+        sid = self.config.session_id
+        if not store or not sid or not self.memory:
+            return
+        try:
+            store.save(sid, self.memory)
+            self._notify_observers("on_session_save", run_id, sid, len(self.memory))
+        except Exception:  # nosec B110
+            pass  # never crash the agent for a persistence failure
+
+    def _extract_entities(self, run_id: str) -> None:
+        """Extract entities from recent messages if entity_memory is configured."""
+        em = self.config.entity_memory
+        if not em:
+            return
+        try:
+            recent = self._history[-em._relevance_window :]
+            entities = em.extract_entities(recent, model=self.config.model)
+            if entities:
+                em.update(entities)
+                self._notify_observers(
+                    "on_entity_extraction",
+                    run_id,
+                    len(entities),
+                )
+        except Exception:  # nosec B110
+            pass  # never crash the agent for entity extraction failure
+
+    def _extract_kg_triples(self, run_id: str) -> None:
+        """Extract relationship triples from recent messages if knowledge_graph is configured."""
+        kg = self.config.knowledge_graph
+        if not kg:
+            return
+        try:
+            recent = self._history[-kg._relevance_window :]
+            triples = kg.extract_triples(recent, model=self.config.model)
+            if triples:
+                kg.store.add_many(triples)
+                self._notify_observers(
+                    "on_kg_extraction",
+                    run_id,
+                    len(triples),
+                )
+        except Exception:  # nosec B110
+            pass  # never crash the agent for KG extraction failure
 
     def _run_input_guardrails(self, content: str, trace: Optional[AgentTrace] = None) -> str:
         """Run input guardrails on user content.  Returns (possibly rewritten) content."""
@@ -876,16 +984,52 @@ class Agent:
                     msg.content = self._run_input_guardrails(msg.content, trace)
 
             if self.memory:
+                if self.config.session_store and self.config.session_id:
+                    self._notify_observers(
+                        "on_session_load", run_id, self.config.session_id, len(self.memory)
+                    )
                 self._history = self.memory.get_history() + list(messages)
                 self._memory_add_many(list(messages), run_id)
+                if self.memory.summary:
+                    self._history.insert(
+                        0,
+                        Message(
+                            role=Role.SYSTEM,
+                            content=f"[Conversation Summary] {self.memory.summary}",
+                        ),
+                    )
             else:
                 self._history.extend(messages)
+
+            if self.config.knowledge_memory:
+                km_ctx = self.config.knowledge_memory.build_context()
+                if km_ctx:
+                    self._history.insert(
+                        0,
+                        Message(role=Role.SYSTEM, content=km_ctx),
+                    )
+
+            if self.config.entity_memory:
+                entity_ctx = self.config.entity_memory.build_context()
+                if entity_ctx:
+                    self._history.insert(
+                        0,
+                        Message(role=Role.SYSTEM, content=entity_ctx),
+                    )
 
             user_text_for_coherence = ""
             for msg in reversed(messages):
                 if msg.role == Role.USER and msg.content:
                     user_text_for_coherence = msg.content
                     break
+
+            if self.config.knowledge_graph:
+                kg_ctx = self.config.knowledge_graph.build_context(query=user_text_for_coherence)
+                if kg_ctx:
+                    self._history.insert(
+                        0,
+                        Message(role=Role.SYSTEM, content=kg_ctx),
+                    )
 
             all_tool_calls: List[ToolCall] = []
             last_tool_name: Optional[str] = None
@@ -976,6 +1120,9 @@ class Agent:
                         "on_iteration_end", run_id, iteration, response_text or ""
                     )
                     self._memory_add(final_response, run_id)
+                    self._extract_entities(run_id)
+                    self._extract_kg_triples(run_id)
+                    self._session_save(run_id)
                     self._call_hook("on_agent_end", final_response, self.usage)
                     _result = AgentResult(
                         message=final_response,
@@ -2170,16 +2317,52 @@ class Agent:
                     msg.content = self._run_input_guardrails(msg.content, trace)
 
             if self.memory:
+                if self.config.session_store and self.config.session_id:
+                    self._notify_observers(
+                        "on_session_load", run_id, self.config.session_id, len(self.memory)
+                    )
                 self._history = self.memory.get_history() + list(messages)
                 self._memory_add_many(list(messages), run_id)
+                if self.memory.summary:
+                    self._history.insert(
+                        0,
+                        Message(
+                            role=Role.SYSTEM,
+                            content=f"[Conversation Summary] {self.memory.summary}",
+                        ),
+                    )
             else:
                 self._history.extend(messages)
+
+            if self.config.knowledge_memory:
+                km_ctx = self.config.knowledge_memory.build_context()
+                if km_ctx:
+                    self._history.insert(
+                        0,
+                        Message(role=Role.SYSTEM, content=km_ctx),
+                    )
+
+            if self.config.entity_memory:
+                entity_ctx = self.config.entity_memory.build_context()
+                if entity_ctx:
+                    self._history.insert(
+                        0,
+                        Message(role=Role.SYSTEM, content=entity_ctx),
+                    )
 
             user_text_for_coherence = ""
             for msg in reversed(messages):
                 if msg.role == Role.USER and msg.content:
                     user_text_for_coherence = msg.content
                     break
+
+            if self.config.knowledge_graph:
+                kg_ctx = self.config.knowledge_graph.build_context(query=user_text_for_coherence)
+                if kg_ctx:
+                    self._history.insert(
+                        0,
+                        Message(role=Role.SYSTEM, content=kg_ctx),
+                    )
 
             all_tool_calls: List[ToolCall] = []
             last_tool_name: Optional[str] = None
@@ -2270,6 +2453,9 @@ class Agent:
                         "on_iteration_end", run_id, iteration, response_text or ""
                     )
                     self._memory_add(final_response, run_id)
+                    self._extract_entities(run_id)
+                    self._extract_kg_triples(run_id)
+                    self._session_save(run_id)
                     self._call_hook("on_agent_end", final_response, self.usage)
                     _result = AgentResult(
                         message=final_response,

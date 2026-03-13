@@ -103,6 +103,7 @@ class Message:
             "role": self.role.value,
             "content": self.content,
             "image_base64": self.image_base64,
+            "tool_name": self.tool_name,
             "tool_result": self.tool_result,
             "tool_calls": (
                 [
@@ -114,6 +115,36 @@ class Message:
             ),
             "tool_call_id": self.tool_call_id,
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Message":
+        """Reconstruct a Message from a dictionary produced by to_dict().
+
+        Uses ``object.__new__`` to skip ``__post_init__`` so stale
+        ``image_path`` values are never re-encoded.  The persisted
+        ``image_base64`` is restored directly instead.
+        """
+        msg = object.__new__(cls)
+        msg.role = Role(data["role"])
+        msg.content = data.get("content", "")
+        msg.image_path = None
+        msg.image_base64 = data.get("image_base64")
+        msg.tool_name = data.get("tool_name")
+        msg.tool_result = data.get("tool_result")
+        msg.tool_call_id = data.get("tool_call_id")
+        raw_calls = data.get("tool_calls")
+        if raw_calls:
+            msg.tool_calls = [
+                ToolCall(
+                    tool_name=tc["name"],
+                    parameters=tc.get("parameters", {}),
+                    id=tc.get("id"),
+                )
+                for tc in raw_calls
+            ]
+        else:
+            msg.tool_calls = None
+        return msg
 
 
 @dataclass
