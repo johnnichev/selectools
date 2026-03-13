@@ -1,6 +1,6 @@
 # Selectools Implementation Documentation
 
-**Version:** 0.15.0
+**Version:** 0.16.0
 **Last Updated:** March 2026
 
 Welcome to the comprehensive technical documentation for selectools - a production-ready Python framework for building AI agents with tool-calling capabilities and RAG support.
@@ -46,6 +46,10 @@ Detailed technical documentation for each module:
 18. **[SECURITY.md](modules/SECURITY.md)** - Tool output screening and coherence checking
 19. **[TOOLBOX.md](modules/TOOLBOX.md)** - 24 pre-built tools across 5 categories (file, web, data, datetime, text)
 20. **[EXCEPTIONS.md](modules/EXCEPTIONS.md)** - Error hierarchy, exception attributes, catch patterns
+21. **[SESSIONS.md](modules/SESSIONS.md)** - Persistent session storage with 3 backends
+22. **[ENTITY_MEMORY.md](modules/ENTITY_MEMORY.md)** - Named entity extraction and tracking
+23. **[KNOWLEDGE_GRAPH.md](modules/KNOWLEDGE_GRAPH.md)** - Relationship triple extraction and graph memory
+24. **[KNOWLEDGE.md](modules/KNOWLEDGE.md)** - Cross-session knowledge with daily logs and persistent facts
 
 ---
 
@@ -102,6 +106,13 @@ Detailed technical documentation for each module:
 - [SECURITY.md](modules/SECURITY.md) - Tool output screening & coherence checking
 - [AUDIT.md](modules/AUDIT.md) - JSONL audit trail with privacy controls
 
+**Memory & Persistence:**
+
+- [SESSIONS.md](modules/SESSIONS.md) - Persistent session storage
+- [ENTITY_MEMORY.md](modules/ENTITY_MEMORY.md) - Entity extraction and tracking
+- [KNOWLEDGE_GRAPH.md](modules/KNOWLEDGE_GRAPH.md) - Relationship triple graph
+- [KNOWLEDGE.md](modules/KNOWLEDGE.md) - Cross-session knowledge memory
+
 **Streaming & Performance:**
 
 - [STREAMING.md](modules/STREAMING.md) - E2E streaming, parallel execution, routing mode
@@ -116,7 +127,7 @@ Detailed technical documentation for each module:
 
 ## 📊 Documentation Stats
 
-- **Total files:** 21 (1 main + 20 modules)
+- **Total files:** 25 (1 main + 24 modules)
 - **ASCII diagrams:** 30+ diagrams
 - **Code examples:** 250+ examples
 
@@ -221,7 +232,14 @@ Detailed technical documentation for each module:
 1. Read [GUARDRAILS.md](modules/GUARDRAILS.md) - Input/output validation pipeline
 2. Read [AUDIT.md](modules/AUDIT.md) - Compliance logging
 3. Read [SECURITY.md](modules/SECURITY.md) - Prompt injection defence
-4. Build production RAG and agent systems!
+
+### Memory & Persistence
+
+1. Read [SESSIONS.md](modules/SESSIONS.md) - Persistent sessions
+2. Read [ENTITY_MEMORY.md](modules/ENTITY_MEMORY.md) - Entity tracking
+3. Read [KNOWLEDGE_GRAPH.md](modules/KNOWLEDGE_GRAPH.md) - Knowledge graphs
+4. Read [KNOWLEDGE.md](modules/KNOWLEDGE.md) - Cross-session knowledge
+5. Build production RAG and agent systems!
 
 ---
 

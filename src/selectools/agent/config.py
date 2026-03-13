@@ -9,10 +9,14 @@ from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, List, Optional
 
 if TYPE_CHECKING:
     from ..cache import Cache
+    from ..entity_memory import EntityMemory
     from ..guardrails import GuardrailsPipeline
+    from ..knowledge import KnowledgeMemory
+    from ..knowledge_graph import KnowledgeGraphMemory
     from ..observer import AgentObserver
     from ..policy import ToolPolicy
     from ..providers.base import Provider
+    from ..sessions import SessionStore
 
 # Hook type definitions
 HookCallable = Callable[..., None]
@@ -141,3 +145,12 @@ class AgentConfig:
     coherence_check: bool = False
     coherence_provider: Optional[Provider] = None
     coherence_model: Optional[str] = None
+    session_store: Optional[SessionStore] = None
+    session_id: Optional[str] = None
+    summarize_on_trim: bool = False
+    summarize_provider: Optional[Provider] = None
+    summarize_model: Optional[str] = None
+    summarize_max_tokens: int = 150
+    entity_memory: Optional[EntityMemory] = None
+    knowledge_graph: Optional[KnowledgeGraphMemory] = None
+    knowledge_memory: Optional[KnowledgeMemory] = None

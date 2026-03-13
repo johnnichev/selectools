@@ -55,6 +55,8 @@ class ConversationMemory:
         self.max_messages = max_messages
         self.max_tokens = max_tokens
         self._messages: List[Message] = []
+        self._summary: Optional[str] = None
+        self._last_trimmed: List[Message] = []
 
     def add(self, message: Message) -> None:
         """
@@ -113,6 +115,16 @@ class ConversationMemory:
         memory instance.
         """
         self._messages.clear()
+        self._last_trimmed = []
+
+    @property
+    def summary(self) -> Optional[str]:
+        """Current conversation summary produced by summarize-on-trim."""
+        return self._summary
+
+    @summary.setter
+    def summary(self, value: Optional[str]) -> None:
+        self._summary = value
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -128,7 +140,23 @@ class ConversationMemory:
             "max_tokens": self.max_tokens,
             "message_count": len(self._messages),
             "messages": [msg.to_dict() for msg in self._messages],
+            "summary": self._summary,
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ConversationMemory":
+        """Reconstruct a ConversationMemory from a dictionary produced by to_dict().
+
+        Restores config and messages without re-running ``_enforce_limits()``
+        so the persisted state is preserved exactly.
+        """
+        mem = cls.__new__(cls)
+        mem.max_messages = data["max_messages"]
+        mem.max_tokens = data.get("max_tokens")
+        mem._messages = [Message.from_dict(m) for m in data.get("messages", [])]
+        mem._summary = data.get("summary")
+        mem._last_trimmed = []
+        return mem
 
     def _enforce_limits(self) -> None:
         """
@@ -137,10 +165,16 @@ class ConversationMemory:
         Uses a tool-pair-aware sliding window: after trimming, the cut point
         is advanced past any orphaned tool results so the conversation always
         starts at a safe boundary (a user or system text message).
+
+        Trimmed messages are stored in ``_last_trimmed`` for the agent to
+        optionally summarize.
         """
+        trimmed: List[Message] = []
+
         # Enforce message count limit
         if len(self._messages) > self.max_messages:
             excess = len(self._messages) - self.max_messages
+            trimmed.extend(self._messages[:excess])
             self._messages = self._messages[excess:]
 
         # Enforce token count limit if configured
@@ -154,11 +188,13 @@ class ConversationMemory:
                 if total_tokens <= self.max_tokens:
                     break
 
-                self._messages.pop(0)
+                trimmed.append(self._messages.pop(0))
 
-        self._fix_tool_pair_boundary()
+        boundary_trimmed = self._fix_tool_pair_boundary()
+        trimmed.extend(boundary_trimmed)
+        self._last_trimmed = trimmed
 
-    def _fix_tool_pair_boundary(self) -> None:
+    def _fix_tool_pair_boundary(self) -> List[Message]:
         """Advance past orphaned tool results / assistant tool_use messages.
 
         After a naive trim the first message might be a TOOL result whose
@@ -167,16 +203,21 @@ class ConversationMemory:
         until we reach a safe starting point: a USER text message (without
         ``tool_call_id``) or a SYSTEM message.  Always keep at least one
         message.
+
+        Returns:
+            List of messages removed by boundary fixing.
         """
+        removed: List[Message] = []
         while len(self._messages) > 1:
             first = self._messages[0]
             if first.role == Role.TOOL:
-                self._messages.pop(0)
+                removed.append(self._messages.pop(0))
                 continue
             if first.role == Role.ASSISTANT and first.tool_calls:
-                self._messages.pop(0)
+                removed.append(self._messages.pop(0))
                 continue
             break
+        return removed
 
     def __len__(self) -> int:
         """Return the number of messages in history."""

@@ -5,6 +5,62 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - 2026-03-13
+
+### Added — Memory & Persistence
+
+#### Persistent Conversation Sessions (new `sessions.py` module)
+
+- **`SessionStore` protocol**: Pluggable backends for saving/loading `ConversationMemory` state. Three methods: `save()`, `load()`, `list()`, `delete()`.
+- **`JsonFileSessionStore`**: File-based backend, one JSON file per session.
+- **`SQLiteSessionStore`**: Single-database backend with JSON column.
+- **`RedisSessionStore`**: Distributed backend with server-side TTL.
+- **Agent integration**: `AgentConfig(session_store=store, session_id="user-123")` — auto-loads on init, auto-saves after each `run()` / `arun()`.
+- **TTL-based expiry**: All backends support configurable `default_ttl`.
+
+#### Summarize-on-Trim (enhanced `memory.py`)
+
+- **LLM-generated summaries**: When `ConversationMemory` trims messages, it generates a 2-3 sentence summary of dropped messages using a configurable provider/model.
+- **Context preservation**: Summary injected as system-level context message.
+- **Configuration**: `AgentConfig(summarize_on_trim=True, summarize_provider=provider)`.
+
+#### Entity Memory (new `entity_memory.py` module)
+
+- **`EntityMemory`**: LLM-based entity extraction after each turn.
+- **Entity types**: person, organization, project, location, date, custom.
+- **Deduplication**: Case-insensitive matching with attribute merging.
+- **LRU pruning**: Configurable `max_entities` limit.
+- **System prompt injection**: `[Known Entities]` context for subsequent turns.
+
+#### Knowledge Graph Memory (new `knowledge_graph.py` module)
+
+- **`KnowledgeGraphMemory`**: Extracts (subject, relation, object) triples from conversation.
+- **`TripleStore` protocol**: `InMemoryTripleStore` and `SQLiteTripleStore` backends.
+- **Keyword-based query**: `query_relevant(query)` for relevant triple retrieval.
+- **System prompt injection**: `[Known Relationships]` context.
+
+#### Cross-Session Knowledge Memory (new `knowledge.py` module)
+
+- **`KnowledgeMemory`**: Daily log files + persistent `MEMORY.md` for long-term facts.
+- **Auto-registered `remember` tool** for explicit knowledge storage.
+- **System prompt injection**: `[Long-term Memory]` + `[Recent Memory]` context.
+
+### Changed
+
+- **`AgentConfig`**: New fields: `session_store`, `session_id`, `summarize_on_trim`, `summarize_provider`, `summarize_model`, `entity_memory`, `knowledge_graph`, `knowledge_memory`.
+- **`AgentObserver`**: 4 new events (total: 19): `on_session_load`, `on_session_save`, `on_memory_summarize`, `on_entity_extraction`.
+- **`StepType`**: 5 new trace step types: `session_load`, `session_save`, `memory_summarize`, `entity_extraction`, `kg_extraction`.
+- **`ConversationMemory`**: New `summarize_on_trim` parameter and `summary` property.
+
+### Documentation
+
+- **4 new module docs**: `SESSIONS.md`, `ENTITY_MEMORY.md`, `KNOWLEDGE_GRAPH.md`, `KNOWLEDGE.md`
+- **Updated**: `ARCHITECTURE.md`, `QUICKSTART.md` (Steps 12-15), `docs/README.md`, `docs/index.md`
+- **5 new examples**: `33_persistent_sessions.py` through `37_knowledge_memory.py`
+- **Updated notebook**: sections 14-16 for sessions, entity memory, knowledge
+
+---
+
 ## [0.15.0] - 2026-03-12
 
 ### Added — Enterprise Reliability

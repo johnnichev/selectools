@@ -1,6 +1,6 @@
 """Public exports for the selectools package."""
 
-__version__ = "0.15.0"
+__version__ = "0.16.0"
 
 # Import submodules (lazy loading for optional dependencies)
 from . import embeddings, guardrails, models, rag, toolbox
@@ -9,6 +9,7 @@ from .analytics import AgentAnalytics, ToolMetrics
 from .audit import AuditLogger, PrivacyLevel
 from .cache import Cache, CacheKeyBuilder, CacheStats, InMemoryCache
 from .coherence import CoherenceResult
+from .entity_memory import Entity, EntityMemory
 from .exceptions import (
     MemoryLimitExceededError,
     ProviderConfigurationError,
@@ -28,6 +29,14 @@ from .guardrails import (
     TopicGuardrail,
     ToxicityGuardrail,
 )
+from .knowledge import KnowledgeMemory
+from .knowledge_graph import (
+    InMemoryTripleStore,
+    KnowledgeGraphMemory,
+    SQLiteTripleStore,
+    Triple,
+    TripleStore,
+)
 from .memory import ConversationMemory
 from .models import ALL_MODELS, MODELS_BY_ID, Anthropic, Cohere, Gemini, ModelInfo, Ollama, OpenAI
 from .observer import AgentObserver, LoggingObserver
@@ -41,6 +50,13 @@ from .providers.gemini_provider import GeminiProvider
 from .providers.ollama_provider import OllamaProvider
 from .providers.openai_provider import OpenAIProvider
 from .providers.stubs import LocalProvider
+from .sessions import (
+    JsonFileSessionStore,
+    RedisSessionStore,
+    SessionMetadata,
+    SessionStore,
+    SQLiteSessionStore,
+)
 from .structured import ResponseFormat
 from .tools import Tool, ToolParameter, ToolRegistry, tool
 from .trace import AgentTrace, TraceStep
@@ -126,6 +142,23 @@ __all__ = [
     "PrivacyLevel",
     # Coherence
     "CoherenceResult",
+    # Sessions
+    "SessionStore",
+    "SessionMetadata",
+    "JsonFileSessionStore",
+    "SQLiteSessionStore",
+    "RedisSessionStore",
+    # Entity Memory
+    "Entity",
+    "EntityMemory",
+    # Knowledge Memory
+    "KnowledgeMemory",
+    # Knowledge Graph
+    "Triple",
+    "TripleStore",
+    "InMemoryTripleStore",
+    "SQLiteTripleStore",
+    "KnowledgeGraphMemory",
     # Submodules (for lazy loading)
     "embeddings",
     "rag",

@@ -343,6 +343,107 @@ agent = Agent(
 )
 ```
 
+## Step 12: Persistent Sessions
+
+Save conversation state across agent restarts:
+
+```python
+from selectools import Agent, AgentConfig, ConversationMemory, tool
+from selectools.sessions import JsonFileSessionStore
+
+@tool(description="Save a note")
+def save_note(text: str) -> str:
+    return f"Saved: {text}"
+
+store = JsonFileSessionStore(directory="./sessions", default_ttl=3600)
+
+# First run — starts fresh, auto-saves on completion
+agent = Agent(
+    tools=[save_note],
+    provider=provider,
+    config=AgentConfig(session_store=store, session_id="user-123"),
+    memory=ConversationMemory(max_messages=50),
+)
+agent.ask("Remember that my favorite color is blue")
+
+# Second run — auto-loads previous session
+agent2 = Agent(
+    tools=[save_note],
+    provider=provider,
+    config=AgentConfig(session_store=store, session_id="user-123"),
+)
+result = agent2.ask("What is my favorite color?")
+# Agent remembers the previous conversation
+```
+
+Three backends available: `JsonFileSessionStore`, `SQLiteSessionStore`, `RedisSessionStore`. All support TTL-based expiry.
+
+## Step 13: Entity Memory
+
+Track named entities across conversation turns:
+
+```python
+from selectools import Agent, AgentConfig
+from selectools.entity_memory import EntityMemory
+
+entity_mem = EntityMemory(provider=provider, max_entities=50)
+
+agent = Agent(
+    tools=[...],
+    provider=provider,
+    config=AgentConfig(entity_memory=entity_mem),
+)
+
+agent.ask("I'm working with Alice from Acme Corp on Project Alpha")
+# Agent now tracks: Alice (person), Acme Corp (organization), Project Alpha (project)
+# Entities are injected as [Known Entities] context in subsequent turns
+```
+
+## Step 14: Knowledge Graph
+
+Extract and query relationship triples:
+
+```python
+from selectools import Agent, AgentConfig
+from selectools.knowledge_graph import KnowledgeGraphMemory
+
+kg = KnowledgeGraphMemory(provider=provider, storage="memory")
+
+agent = Agent(
+    tools=[...],
+    provider=provider,
+    config=AgentConfig(knowledge_graph=kg),
+)
+
+agent.ask("Alice manages Project Alpha and reports to Bob")
+# Graph stores: (Alice, manages, Project Alpha), (Alice, reports_to, Bob)
+# Query-relevant triples are injected as [Known Relationships] context
+```
+
+Use `SQLiteTripleStore` for persistent storage across sessions.
+
+## Step 15: Cross-Session Knowledge
+
+Give the agent durable memory across conversations:
+
+```python
+from selectools import Agent, AgentConfig
+from selectools.knowledge import KnowledgeMemory
+
+knowledge = KnowledgeMemory(directory="./memory", recent_days=2)
+
+agent = Agent(
+    tools=[...],
+    provider=provider,
+    config=AgentConfig(knowledge_memory=knowledge),
+)
+
+# The agent gets a `remember` tool automatically
+agent.ask("Remember that I prefer dark mode")
+# Stored in memory/MEMORY.md as a persistent fact
+# Future conversations inject [Long-term Memory] + [Recent Memory] context
+```
+
 ## What's Next?
 
 You now know the core API. Here is where to go from here:
@@ -373,7 +474,11 @@ You now know the core API. Here is where to go from here:
 | Handle errors gracefully | [Exceptions Guide](modules/EXCEPTIONS.md) |
 | Look up model pricing at runtime | [Models Guide — Pricing API](modules/MODELS.md#programmatic-pricing-api) |
 | Use structured output helpers | [Agent Guide — Structured Helpers](modules/AGENT.md#standalone-helpers) |
-| See working examples | [examples/](https://github.com/johnnichev/selectools/tree/main/examples) (32 numbered scripts, 01–32) |
+| Persist sessions across restarts | [Sessions Guide](modules/SESSIONS.md) |
+| Track entities across turns | [Entity Memory Guide](modules/ENTITY_MEMORY.md) |
+| Build a knowledge graph | [Knowledge Graph Guide](modules/KNOWLEDGE_GRAPH.md) |
+| Add cross-session memory | [Knowledge Memory Guide](modules/KNOWLEDGE.md) |
+| See working examples | [examples/](https://github.com/johnnichev/selectools/tree/main/examples) (37 numbered scripts, 01–37) |
 
 ---
 

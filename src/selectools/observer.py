@@ -315,6 +315,59 @@ class AgentObserver:
         """
 
     # ------------------------------------------------------------------
+    # Session events
+    # ------------------------------------------------------------------
+
+    def on_session_load(
+        self,
+        run_id: str,
+        session_id: str,
+        message_count: int,
+    ) -> None:
+        """Called when a session is loaded from a session store."""
+
+    def on_session_save(
+        self,
+        run_id: str,
+        session_id: str,
+        message_count: int,
+    ) -> None:
+        """Called when a session is saved to a session store."""
+
+    # ------------------------------------------------------------------
+    # Memory summarization events
+    # ------------------------------------------------------------------
+
+    def on_memory_summarize(
+        self,
+        run_id: str,
+        summary: str,
+    ) -> None:
+        """Called when a conversation summary is generated after trim."""
+
+    # ------------------------------------------------------------------
+    # Entity extraction events
+    # ------------------------------------------------------------------
+
+    def on_entity_extraction(
+        self,
+        run_id: str,
+        entities_extracted: int,
+    ) -> None:
+        """Called after entities are extracted from conversation messages."""
+
+    # ------------------------------------------------------------------
+    # Knowledge graph extraction events
+    # ------------------------------------------------------------------
+
+    def on_kg_extraction(
+        self,
+        run_id: str,
+        triples_extracted: int,
+    ) -> None:
+        """Called after relationship triples are extracted from conversation messages."""
+
+    # ------------------------------------------------------------------
     # Error events
     # ------------------------------------------------------------------
 
@@ -583,6 +636,21 @@ class LoggingObserver(AgentObserver):
             messages_remaining=messages_remaining,
             reason=reason,
         )
+
+    def on_session_load(self, run_id: str, session_id: str, message_count: int) -> None:
+        self._emit("session_load", run_id, session_id=session_id, message_count=message_count)
+
+    def on_session_save(self, run_id: str, session_id: str, message_count: int) -> None:
+        self._emit("session_save", run_id, session_id=session_id, message_count=message_count)
+
+    def on_memory_summarize(self, run_id: str, summary: str) -> None:
+        self._emit("memory_summarize", run_id, summary_length=len(summary))
+
+    def on_entity_extraction(self, run_id: str, entities_extracted: int) -> None:
+        self._emit("entity_extraction", run_id, entities_extracted=entities_extracted)
+
+    def on_kg_extraction(self, run_id: str, triples_extracted: int) -> None:
+        self._emit("kg_extraction", run_id, triples_extracted=triples_extracted)
 
     def on_error(self, run_id: str, error: Exception, context: Dict[str, Any]) -> None:
         self._emit("error", run_id, error=str(error), error_type=type(error).__name__)

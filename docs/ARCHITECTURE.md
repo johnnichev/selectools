@@ -1,6 +1,6 @@
 # Selectools Architecture
 
-**Version:** 0.15.0
+**Version:** 0.16.0
 **Last Updated:** March 2026
 
 ## Table of Contents
@@ -41,6 +41,11 @@ Selectools is a production-ready Python framework for building AI agents with to
 - **Audit Logging**: JSONL audit trail with privacy controls (full/keys-only/hashed/none)
 - **Tool Output Screening**: Pattern-based prompt injection detection (15 built-in patterns)
 - **Coherence Checking**: LLM-based intent verification for tool calls
+- **Persistent Sessions**: SessionStore protocol with JSON file, SQLite, and Redis backends
+- **Summarize-on-Trim**: LLM-generated summaries of trimmed messages
+- **Entity Memory**: Auto-extract named entities with LRU-pruned registry
+- **Knowledge Graph**: Relationship triple extraction and keyword-based querying
+- **Cross-Session Knowledge**: Daily logs + persistent facts with auto-registered `remember` tool
 
 ---
 
@@ -70,6 +75,8 @@ Selectools is a production-ready Python framework for building AI agents with to
 │  │  • Tool output screening (security.py)                           │  │
 │  │  • Coherence checking (coherence.py)                             │  │
 │  │  • Audit logging (audit.py)                                      │  │
+│  │  • Session persistence (sessions.py)                             │  │
+│  │  • Memory context injection (entity, KG, knowledge)              │  │
 │  └─────────┬────────────────────────┬──────────────────┬────────────┘  │
 │            │                        │                  │               │
 │            ▼                        ▼                  ▼               │
@@ -238,7 +245,44 @@ Each implements the `Provider` protocol with `complete()`, `stream()`, `acomplet
 - Sliding window with configurable limits (message count, token count)
 - Automatic pruning when limits exceeded
 - Tool-pair-aware trimming: never orphans a tool_use without its tool_result
+- Summarize-on-trim: LLM-generated summaries of trimmed messages
 - Integrates seamlessly with Agent
+
+### 6a. Persistent Sessions (`sessions.py`)
+
+**SessionStore** protocol with three backends for saving/loading `ConversationMemory`:
+
+- `JsonFileSessionStore` — file-based, one JSON file per session
+- `SQLiteSessionStore` — single database, JSON column
+- `RedisSessionStore` — distributed, server-side TTL
+- Auto-save after each run, auto-load on init via `AgentConfig`
+
+### 6b. Entity Memory (`entity_memory.py`)
+
+**EntityMemory** auto-extracts named entities from conversation using an LLM:
+
+- Tracks name, type, attributes, mention count, timestamps
+- Deduplication by name (case-insensitive) with attribute merging
+- LRU pruning when over `max_entities`
+- Injects `[Known Entities]` context into system prompt
+
+### 6c. Knowledge Graph Memory (`knowledge_graph.py`)
+
+**KnowledgeGraphMemory** extracts relationship triples from conversation:
+
+- `Triple` dataclass: subject, relation, object, confidence
+- `TripleStore` protocol with in-memory and SQLite backends
+- Keyword-based query for relevant triples
+- Injects `[Known Relationships]` context into system prompt
+
+### 6d. Cross-Session Knowledge (`knowledge.py`)
+
+**KnowledgeMemory** provides durable cross-session memory:
+
+- Daily log files (`YYYY-MM-DD.log`) for recent entries
+- Persistent `MEMORY.md` for long-term facts
+- Auto-registered `remember` tool for explicit knowledge storage
+- Injects `[Long-term Memory]` + `[Recent Memory]` into system prompt
 
 ### 7. RAG System (`rag/`)
 
@@ -284,7 +328,7 @@ Enforces typed responses from LLMs:
 
 Structured timeline of every agent execution:
 
-- `TraceStep` types: `llm_call`, `tool_selection`, `tool_execution`, `cache_hit`, `error`, `structured_retry`
+- `TraceStep` types: `llm_call`, `tool_selection`, `tool_execution`, `cache_hit`, `error`, `structured_retry`, `session_load`, `session_save`, `memory_summarize`, `entity_extraction`, `kg_extraction`
 - Captures timestamps, durations, input/output summaries, token usage
 - `AgentTrace` container with `.to_dict()`, `.to_json()`, `.timeline()`, `.filter()`
 - Always populated on `result.trace` — zero cost when not accessed
@@ -311,7 +355,7 @@ Resilient provider orchestration:
 
 Class-based lifecycle observability:
 
-- 15 event methods with `run_id` correlation for concurrent requests
+- 19 event methods with `run_id` correlation for concurrent requests
 - `call_id` for matching parallel tool start/end pairs
 - Built-in `LoggingObserver` for structured JSON log output
 - OpenTelemetry span export via `AgentTrace.to_otel_spans()`
@@ -453,7 +497,11 @@ Single source of truth for 146 models:
          │    ├─→ usage.py (AgentUsage, UsageStats)
          │    ├─→ analytics.py (AgentAnalytics)
          │    ├─→ observer.py (AgentObserver, LoggingObserver)
-         │    └─→ cache.py (Cache, InMemoryCache, CacheKeyBuilder)
+         │    ├─→ cache.py (Cache, InMemoryCache, CacheKeyBuilder)
+         │    ├─→ sessions.py (SessionStore, JsonFile/SQLite/Redis)
+         │    ├─→ entity_memory.py (EntityMemory)
+         │    ├─→ knowledge_graph.py (KnowledgeGraphMemory)
+         │    └─→ knowledge.py (KnowledgeMemory)
          │
          ├─→ cache.py (core caching)
          │    └─→ types.py, tools.py, usage.py

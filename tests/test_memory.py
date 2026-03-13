@@ -350,6 +350,144 @@ class TestDunderMethods:
         assert "current_messages=0" in r
 
 
+class TestSummaryProperty:
+    """Tests for the _summary field and summary property."""
+
+    def test_summary_defaults_to_none(self) -> None:
+        mem = ConversationMemory()
+        assert mem.summary is None
+
+    def test_summary_setter(self) -> None:
+        mem = ConversationMemory()
+        mem.summary = "User asked about weather."
+        assert mem.summary == "User asked about weather."
+
+    def test_summary_clear_to_none(self) -> None:
+        mem = ConversationMemory()
+        mem.summary = "something"
+        mem.summary = None
+        assert mem.summary is None
+
+    def test_summary_included_in_to_dict(self) -> None:
+        mem = ConversationMemory()
+        mem.summary = "A summary"
+        d = mem.to_dict()
+        assert d["summary"] == "A summary"
+
+    def test_summary_none_in_to_dict(self) -> None:
+        mem = ConversationMemory()
+        d = mem.to_dict()
+        assert d["summary"] is None
+
+
+class TestFromDict:
+    """Tests for ConversationMemory.from_dict() deserialization."""
+
+    def test_round_trip_empty(self) -> None:
+        mem = ConversationMemory(max_messages=10, max_tokens=500)
+        restored = ConversationMemory.from_dict(mem.to_dict())
+        assert restored.max_messages == 10
+        assert restored.max_tokens == 500
+        assert len(restored) == 0
+        assert restored.summary is None
+
+    def test_round_trip_with_messages(self) -> None:
+        mem = ConversationMemory(max_messages=5)
+        mem.add(_msg("Hello", Role.USER))
+        mem.add(_msg("Hi!", Role.ASSISTANT))
+
+        restored = ConversationMemory.from_dict(mem.to_dict())
+        assert len(restored) == 2
+        history = restored.get_history()
+        assert history[0].role == Role.USER
+        assert history[0].content == "Hello"
+        assert history[1].role == Role.ASSISTANT
+        assert history[1].content == "Hi!"
+
+    def test_round_trip_preserves_summary(self) -> None:
+        mem = ConversationMemory()
+        mem.summary = "User discussed weather"
+        mem.add(_msg("What's the weather?"))
+
+        restored = ConversationMemory.from_dict(mem.to_dict())
+        assert restored.summary == "User discussed weather"
+
+    def test_round_trip_with_tool_messages(self) -> None:
+        from selectools.types import ToolCall
+
+        mem = ConversationMemory()
+        mem.add(_msg("Find weather", Role.USER))
+        tc = ToolCall(tool_name="weather", parameters={"city": "SF"}, id="tc1")
+        mem.add(Message(role=Role.ASSISTANT, content="", tool_calls=[tc]))
+        mem.add(
+            Message(
+                role=Role.TOOL,
+                content="72F",
+                tool_name="weather",
+                tool_call_id="tc1",
+            )
+        )
+
+        restored = ConversationMemory.from_dict(mem.to_dict())
+        history = restored.get_history()
+        assert len(history) == 3
+        assert history[1].tool_calls is not None
+        assert history[1].tool_calls[0].tool_name == "weather"
+        assert history[2].role == Role.TOOL
+        assert history[2].tool_name == "weather"
+        assert history[2].tool_call_id == "tc1"
+
+    def test_does_not_re_enforce_limits(self) -> None:
+        """from_dict should NOT trim messages, even if count exceeds max."""
+        data = {
+            "max_messages": 2,
+            "max_tokens": None,
+            "message_count": 5,
+            "messages": [{"role": "user", "content": f"msg-{i}"} for i in range(5)],
+        }
+        restored = ConversationMemory.from_dict(data)
+        assert len(restored) == 5
+
+    def test_max_tokens_none(self) -> None:
+        data = {
+            "max_messages": 20,
+            "messages": [],
+        }
+        restored = ConversationMemory.from_dict(data)
+        assert restored.max_tokens is None
+
+    def test_missing_summary_defaults_to_none(self) -> None:
+        data = {
+            "max_messages": 20,
+            "max_tokens": None,
+            "messages": [{"role": "user", "content": "hi"}],
+        }
+        restored = ConversationMemory.from_dict(data)
+        assert restored.summary is None
+
+    def test_can_add_after_restore(self) -> None:
+        mem = ConversationMemory(max_messages=5)
+        mem.add(_msg("original"))
+
+        restored = ConversationMemory.from_dict(mem.to_dict())
+        restored.add(_msg("new message"))
+        assert len(restored) == 2
+        assert restored.get_history()[1].content == "new message"
+
+    def test_restored_memory_enforces_limits_on_new_adds(self) -> None:
+        mem = ConversationMemory(max_messages=3)
+        mem.add(_msg("A"))
+        mem.add(_msg("B"))
+
+        restored = ConversationMemory.from_dict(mem.to_dict())
+        restored.add(_msg("C"))
+        restored.add(_msg("D"))
+
+        assert len(restored) == 3
+        contents = [m.content for m in restored.get_history()]
+        assert contents == ["B", "C", "D"]
+
+
 class TestMixedRoles:
     """Tests with messages of different roles."""
 
