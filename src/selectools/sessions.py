@@ -92,7 +92,7 @@ class JsonFileSessionStore:
     def _is_expired(self, data: Dict[str, Any]) -> bool:
         if self._default_ttl is None:
             return False
-        updated_at = data.get("updated_at", data.get("created_at", 0))
+        updated_at: float = data.get("updated_at", data.get("created_at", 0))
         return (time.time() - updated_at) > self._default_ttl
 
     # -- public API --------------------------------------------------------
@@ -304,7 +304,7 @@ class SQLiteSessionStore:
         try:
             cursor = conn.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
             conn.commit()
-            return cursor.rowcount > 0
+            return int(cursor.rowcount) > 0
         finally:
             conn.close()
 
@@ -433,7 +433,7 @@ class RedisSessionStore:
         key = self._key(session_id)
         meta_key = self._meta_key(session_id)
         removed = self._client.delete(key, meta_key)
-        return removed > 0
+        return int(removed) > 0
 
     def exists(self, session_id: str) -> bool:
         return bool(self._client.exists(self._key(session_id)))

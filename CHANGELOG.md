@@ -5,6 +5,32 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.1] - 2026-03-13
+
+### Fixed
+
+- **mypy**: Resolved all 5 type errors across `sessions.py` and `knowledge_graph.py` (0 errors now)
+- **sessions.py**: Replaced `Any` return type on `SQLiteSessionStore._conn()` with proper `sqlite3.Connection` annotation; moved `import sqlite3` to module level
+- **sessions.py**: Fixed `_is_expired()` return type by annotating `updated_at` as `float`
+- **sessions.py**: Fixed `delete()` return types in SQLite and Redis backends with explicit `int()` cast
+- **knowledge_graph.py**: Fixed `count()` and `query_relevant()` return type annotations
+
+### Added
+
+- **56 new tests** (total: 1421) for v0.16.0 consolidation:
+  - `test_sessions_redis.py` — 21 tests for RedisSessionStore with mock Redis client (save/load, TTL, delete, list, exists, import error, edge cases)
+  - `test_sessions_edge_cases.py` — 13 tests for corrupt JSON handling, TTL cleanup, OS error recovery, metadata
+  - `test_memory_boundary.py` — 6 tests for tool-pair boundary trimming after sliding window
+  - `test_memory_integration.py` — 7 tests for all memory features running simultaneously (sessions + entity + KG + knowledge memory)
+  - `test_memory_async.py` — 9 tests for `arun()` with session auto-save, entity memory, knowledge graph, combined features
+
+### Documentation
+
+- **AGENT.md**: Added `session_store`, `session_id`, `summarize_on_trim`, `summarize_provider`, `summarize_model`, `summarize_max_tokens`, `entity_memory`, `knowledge_graph`, `knowledge_memory` to AgentConfig section; expanded Memory Integration section with subsections for session auto-load/save, entity memory, knowledge graph, knowledge memory, and context injection order; added cross-references to Sessions, Entity Memory, Knowledge Graph, and Knowledge Memory modules in Further Reading
+- **MEMORY.md**: Added `from_dict()` classmethod to Serialization section; added full Summarize-on-Trim section with configuration, flow diagram, key properties, and code examples; updated Future Enhancements (removed shipped v0.16.0 features); expanded Further Reading with links to all memory modules
+
+---
+
 ## [0.16.0] - 2026-03-13
 
 ### Added — Memory & Persistence

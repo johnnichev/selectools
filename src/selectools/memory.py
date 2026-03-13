@@ -156,6 +156,7 @@ class ConversationMemory:
         mem._messages = [Message.from_dict(m) for m in data.get("messages", [])]
         mem._summary = data.get("summary")
         mem._last_trimmed = []
+        mem._fix_tool_pair_boundary()
         return mem
 
     def _enforce_limits(self) -> None:

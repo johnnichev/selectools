@@ -2112,8 +2112,8 @@ class Agent:
                         usage=copy.copy(self.usage),
                     )
                     self._notify_observers("on_run_end", run_id, _result)
-                    yield _result
                     self._call_hook("on_agent_end", final_response, self.usage)
+                    yield _result
                     return
 
                 if self.config.routing_only:
@@ -2260,9 +2260,9 @@ class Agent:
                 usage=copy.copy(self.usage),
             )
             self._notify_observers("on_run_end", run_id, _result)
-            yield _result
             self._memory_add(final_msg, run_id)
             self._call_hook("on_agent_end", final_msg, self.usage)
+            yield _result
             return
         except Exception as exc:
             if not self.memory:
@@ -2636,6 +2636,14 @@ class Agent:
                                     params=parameters,
                                     cost=0.0,
                                     chunk_count=chunk_counter["count"],
+                                )
+                            if self.usage.iterations:
+                                self.usage.tool_usage[tool.name] = (
+                                    self.usage.tool_usage.get(tool.name, 0) + 1
+                                )
+                                self.usage.tool_tokens[tool.name] = (
+                                    self.usage.tool_tokens.get(tool.name, 0)
+                                    + self.usage.iterations[-1].total_tokens
                                 )
                         except Exception as exc:
                             duration = time.time() - start_time

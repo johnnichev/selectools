@@ -8,6 +8,7 @@ extraction, deduplication, and LRU pruning.
 from __future__ import annotations
 
 import json
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -92,15 +93,17 @@ class EntityMemory:
         self._max_entities = max_entities
         self._relevance_window = relevance_window
         self._entities: Dict[str, Entity] = {}
+        self._lock = threading.Lock()
 
     @property
     def entities(self) -> List[Entity]:
         """All tracked entities, sorted by most recently mentioned."""
-        return sorted(
-            self._entities.values(),
-            key=lambda e: e.last_mentioned,
-            reverse=True,
-        )
+        with self._lock:
+            return sorted(
+                self._entities.values(),
+                key=lambda e: e.last_mentioned,
+                reverse=True,
+            )
 
     def extract_entities(
         self,
@@ -174,28 +177,31 @@ class EntityMemory:
 
         Deduplicates by name (case-insensitive), updates mention counts
         and attributes, and prunes if over ``max_entities``.
+
+        Thread-safe: protected by an internal lock.
         """
         now = time.time()
-        for entity in entities:
-            key = entity.name.lower()
-            if key in self._entities:
-                existing = self._entities[key]
-                existing.mention_count += 1
-                existing.last_mentioned = now
-                existing.attributes.update(entity.attributes)
-            else:
-                entity.last_mentioned = now
-                self._entities[key] = entity
+        with self._lock:
+            for entity in entities:
+                key = entity.name.lower()
+                if key in self._entities:
+                    existing = self._entities[key]
+                    existing.mention_count += 1
+                    existing.last_mentioned = now
+                    existing.attributes.update(entity.attributes)
+                else:
+                    entity.last_mentioned = now
+                    self._entities[key] = entity
 
-        # LRU prune: remove least recently mentioned
-        if len(self._entities) > self._max_entities:
-            sorted_keys = sorted(
-                self._entities.keys(),
-                key=lambda k: self._entities[k].last_mentioned,
-            )
-            excess = len(self._entities) - self._max_entities
-            for k in sorted_keys[:excess]:
-                del self._entities[k]
+            # LRU prune: remove least recently mentioned
+            if len(self._entities) > self._max_entities:
+                sorted_keys = sorted(
+                    self._entities.keys(),
+                    key=lambda k: self._entities[k].last_mentioned,
+                )
+                excess = len(self._entities) - self._max_entities
+                for k in sorted_keys[:excess]:
+                    del self._entities[k]
 
     def build_context(self) -> str:
         """Build a context string for prompt injection.

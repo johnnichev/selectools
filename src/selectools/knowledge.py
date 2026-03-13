@@ -9,6 +9,7 @@ for long-term facts.
 from __future__ import annotations
 
 import os
+import threading
 import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -39,6 +40,7 @@ class KnowledgeMemory:
         self._directory = directory
         self._recent_days = recent_days
         self._max_context_chars = max_context_chars
+        self._lock = threading.Lock()
         os.makedirs(directory, exist_ok=True)
 
     @property
@@ -66,17 +68,18 @@ class KnowledgeMemory:
         timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
         entry = f"[{timestamp}] [{category}] {content}"
 
-        # Write to daily log
+        # Write to daily log (thread-safe)
         today = now.strftime("%Y-%m-%d")
         log_path = os.path.join(self._directory, f"{today}.log")
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(entry + "\n")
+        with self._lock:
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(entry + "\n")
 
-        # Optionally write to persistent memory
-        if persistent:
-            mem_path = os.path.join(self._directory, "MEMORY.md")
-            with open(mem_path, "a", encoding="utf-8") as f:
-                f.write(f"- [{category}] {content}\n")
+            # Optionally write to persistent memory
+            if persistent:
+                mem_path = os.path.join(self._directory, "MEMORY.md")
+                with open(mem_path, "a", encoding="utf-8") as f:
+                    f.write(f"- [{category}] {content}\n")
 
         return f"Remembered: {content}"
 

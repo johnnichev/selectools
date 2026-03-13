@@ -133,7 +133,9 @@ class SQLiteTripleStore:
         self._ensure_table()
 
     def _connect(self) -> sqlite3.Connection:
-        return sqlite3.connect(self._db_path)
+        conn = sqlite3.connect(self._db_path)
+        conn.execute("PRAGMA journal_mode=WAL")
+        return conn
 
     def _ensure_table(self) -> None:
         conn = self._connect()
@@ -249,7 +251,7 @@ class SQLiteTripleStore:
     def count(self) -> int:
         conn = self._connect()
         try:
-            return conn.execute("SELECT COUNT(*) FROM triples").fetchone()[0]
+            return int(conn.execute("SELECT COUNT(*) FROM triples").fetchone()[0])
         finally:
             conn.close()
 
@@ -416,7 +418,7 @@ class KnowledgeGraphMemory:
         keywords = [w for w in query.lower().split() if len(w) > 2]
         if not keywords:
             return []
-        results = self._store.query(keywords)
+        results: List[Triple] = self._store.query(keywords)
         return results[: self._max_context_triples]
 
     def build_context(self, query: str = "") -> str:
