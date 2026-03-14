@@ -1976,6 +1976,7 @@ class Agent:
         _history_checkpoint = len(self._history)
         iteration = 0
 
+        original_system_prompt = self._system_prompt
         self._wire_fallback_observer(run_id)
         self._notify_observers("on_run_start", run_id, messages, self._system_prompt)
 
@@ -2274,6 +2275,7 @@ class Agent:
             raise
         finally:
             self._unwire_fallback_observer()
+            self._system_prompt = original_system_prompt
 
     async def arun(
         self,

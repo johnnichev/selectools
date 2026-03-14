@@ -45,12 +45,16 @@ src/selectools/
 │   ├── stores/              # Vector stores (memory, sqlite, chroma, pinecone)
 │   ├── hybrid.py, bm25.py, reranker.py, chunking.py
 ├── embeddings/              # Embedding providers (openai, anthropic, gemini, cohere)
-├── memory.py                # ConversationMemory with sliding window + tool-pair trimming
+├── memory.py                # ConversationMemory with sliding window + tool-pair trimming + summarize-on-trim
+├── sessions.py              # SessionStore protocol + JSON/SQLite/Redis backends
+├── entity_memory.py         # EntityMemory (LLM-based entity extraction)
+├── knowledge_graph.py       # KnowledgeGraphMemory (triple extraction + storage)
+├── knowledge.py             # KnowledgeMemory (cross-session durable memory)
 ├── models.py                # 146 model registry with pricing (single source of truth)
 ├── pricing.py               # Derives pricing from models.py
 ├── usage.py                 # Token + cost tracking
-├── trace.py                 # AgentTrace, TraceStep
-├── observer.py              # AgentObserver protocol (15 events) + LoggingObserver
+├── trace.py                 # AgentTrace, TraceStep (14 step types — see list below)
+├── observer.py              # AgentObserver protocol (19 events) + LoggingObserver
 ├── policy.py                # ToolPolicy (allow/review/deny rules)
 ├── parser.py                # ToolCallParser (JSON extraction from LLM responses)
 ├── prompt.py                # PromptBuilder (system prompt generation)
@@ -65,7 +69,7 @@ src/selectools/
 ├── types.py                 # Core types (Message, Role, ToolCall, AgentResult)
 └── env.py                   # Environment variable helpers
 
-tests/                       # 1183+ tests (unit, integration, regression, E2E)
+tests/                       # 1487 tests (unit, integration, regression, E2E)
 ├── agent/                   # Agent core tests
 ├── providers/               # Provider-specific tests
 ├── rag/                     # RAG pipeline tests
@@ -74,14 +78,14 @@ tests/                       # 1183+ tests (unit, integration, regression, E2E)
 ├── core/                    # Framework-level tests
 └── test_*.py                # Module-level unit tests
 
-examples/                    # 32 numbered example scripts (01-32)
+examples/                    # 37 numbered example scripts (01-37)
 notebooks/getting_started.ipynb  # Interactive getting-started guide
 
 docs/                        # MkDocs Material documentation
 ├── index.md                 # Landing page
 ├── QUICKSTART.md            # 5-minute quickstart
 ├── ARCHITECTURE.md          # System architecture
-├── modules/                 # 20 module-specific docs
+├── modules/                 # 24 module-specific docs
 └── stylesheets/extra.css    # Custom theme CSS
 ```
 
@@ -223,6 +227,27 @@ git push origin main --tags
 python3 -m build && python3 -m twine upload dist/*
 ```
 
+## TraceStep Types
+
+Every `AgentTrace` contains `TraceStep` entries with one of these types:
+
+| StepType | Added | Description |
+|---|---|---|
+| `llm_call` | v0.13.0 | Provider API call (model, tokens, duration) |
+| `tool_selection` | v0.13.0 | LLM chose a tool (name, args, reasoning) |
+| `tool_execution` | v0.13.0 | Tool executed (name, result, duration) |
+| `cache_hit` | v0.13.0 | Response served from cache |
+| `error` | v0.13.0 | Error during execution |
+| `structured_retry` | v0.13.0 | Structured output validation failed, retrying |
+| `guardrail` | v0.15.0 | Input/output guardrail triggered |
+| `coherence_check` | v0.15.0 | Coherence check blocked a tool call |
+| `output_screening` | v0.15.0 | Tool output screening detected injection |
+| `session_load` | v0.16.0 | Session loaded from store |
+| `session_save` | v0.16.0 | Session saved to store |
+| `memory_summarize` | v0.16.0 | Trimmed messages summarized |
+| `entity_extraction` | v0.16.0 | Entities extracted from conversation |
+| `kg_extraction` | v0.16.0 | Knowledge graph triples extracted |
+
 ## Common Pitfalls (from past bugs)
 
 1. **Provider streaming must pass `tools`**: All `stream()` and `astream()` methods MUST forward the `tools` parameter to the underlying API. This was a bug across ALL providers.
@@ -245,8 +270,12 @@ python3 -m build && python3 -m twine upload dist/*
 
 10. **MkDocs links**: Files outside `docs/` (CHANGELOG.md, ROADMAP.md, examples/) must use absolute GitHub URLs, not relative paths.
 
+11. **`astream()` must restore `_system_prompt` in finally**: All three execution methods (`run`, `arun`, `astream`) save `original_system_prompt` before the try block and restore it in `finally`. This prevents modified prompts (e.g. from `response_format`) from leaking to future calls. Was missing from `astream()` until v0.16.1.
+
 ## Current Roadmap
 
 - **v0.15.0** ✅ Enterprise Reliability (guardrails, audit, screening, coherence)
-- **v0.16.0** 🟡 Memory & Persistence (sessions, summarize-on-trim, entity memory, knowledge graph)
-- **Backlog**: Multi-Agent Orchestration, MCP & Ecosystem
+- **v0.16.0** ✅ Memory & Persistence (sessions, summarize-on-trim, entity memory, knowledge graph)
+- **v0.16.1** ✅ Consolidation (6 bug fixes, thread safety, 68 new tests, mypy 0 errors)
+- **v0.17.0** 🟡 Multi-Agent Orchestration — see `MULTI_AGENT_PLAN.md`
+- **Backlog**: Connector Expansion, Ecosystem Parity, Polish & Community
