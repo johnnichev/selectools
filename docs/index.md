@@ -137,7 +137,7 @@ print(result.reasoning)       # Why the agent chose get_weather
 | **Knowledge Graph** | Relationship triple extraction with in-memory and SQLite storage |
 | **Cross-Session Knowledge** | Daily logs + persistent facts with auto-registered `remember` tool |
 | **AgentObserver Protocol** | 19-event lifecycle observer with run/call ID correlation and OTel export |
-| **1365 Tests** | Unit, integration, regression, and E2E |
+| **1487 Tests** | Unit, integration, regression, and E2E |
 
 ---
 

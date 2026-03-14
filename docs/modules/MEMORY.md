@@ -9,7 +9,9 @@
 2. [Memory Management](#memory-management)
 3. [Integration with Agent](#integration-with-agent)
 4. [Implementation](#implementation)
-5. [Best Practices](#best-practices)
+5. [Summarize-on-Trim](#summarize-on-trim)
+6. [Best Practices](#best-practices)
+7. [Related Memory Modules](#related-memory-modules-v0160)
 
 ---
 
@@ -236,7 +238,105 @@ def to_dict(self) -> Dict[str, Any]:
         "max_tokens": self.max_tokens,
         "message_count": len(self._messages),
         "messages": [msg.to_dict() for msg in self._messages],
+        "summary": self._summary,
     }
+```
+
+#### Deserialization with `from_dict()`
+
+Reconstruct a `ConversationMemory` from a dictionary produced by `to_dict()`. The restored instance preserves the exact persisted state — `_enforce_limits()` is **not** re-run, so no messages are silently dropped during reconstruction. The tool-pair boundary is fixed to ensure a valid starting message.
+
+```python
+@classmethod
+def from_dict(cls, data: Dict[str, Any]) -> "ConversationMemory":
+    """Reconstruct a ConversationMemory from a to_dict() output."""
+    ...
+```
+
+**Usage:**
+
+```python
+import json
+
+# Save
+with open("conversation.json", "w") as f:
+    json.dump(memory.to_dict(), f)
+
+# Restore
+with open("conversation.json", "r") as f:
+    data = json.load(f)
+    memory = ConversationMemory.from_dict(data)
+
+# Summary is preserved
+print(memory.summary)  # Restored if present
+```
+
+**Key behaviors:**
+
+- Config fields (`max_messages`, `max_tokens`) are restored from the dict
+- Messages are reconstructed via `Message.from_dict()`
+- The `summary` field (from summarize-on-trim) is preserved
+- `_fix_tool_pair_boundary()` runs to ensure valid conversation start
+- `_last_trimmed` is reset to empty (trim history is not persisted)
+
+---
+
+## Summarize-on-Trim
+
+When messages are trimmed by the sliding window, important early context is normally lost. **Summarize-on-trim** generates a summary of the dropped messages and preserves it as system context.
+
+### Configuration
+
+Summarize-on-trim is configured via `AgentConfig`, not on `ConversationMemory` directly:
+
+```python
+from selectools import Agent, AgentConfig, ConversationMemory
+
+memory = ConversationMemory(max_messages=30)
+agent = Agent(
+    tools=[...], provider=provider, memory=memory,
+    config=AgentConfig(
+        summarize_on_trim=True,
+        summarize_provider=provider,       # Provider for summarization
+        summarize_model="gpt-4o-mini",     # Use a cheap/fast model
+        summarize_max_tokens=150,          # Max tokens for the summary
+    ),
+)
+```
+
+### How It Works
+
+```
+Messages exceed max_messages
+    │
+    ├─→ _enforce_limits() trims oldest messages
+    ├─→ Trimmed messages stored in _last_trimmed
+    │
+    ├─→ Agent detects _last_trimmed is non-empty
+    ├─→ Sends trimmed messages to summarize_provider
+    ├─→ Provider returns 2-3 sentence summary
+    │
+    ├─→ Summary stored in memory.summary
+    ├─→ on_memory_summarize observer event fired
+    │
+    └─→ On next turn, summary injected as [Conversation Summary] in system prompt
+```
+
+### Key Properties
+
+- **`memory.summary`**: Read the current summary (or `None` if no trimming has occurred)
+- **`memory._last_trimmed`**: Messages removed during the most recent `_enforce_limits()` call
+
+### Summary Persistence
+
+When using `to_dict()` / `from_dict()`, the summary is included:
+
+```python
+data = memory.to_dict()
+# data["summary"] contains the current summary string (or None)
+
+restored = ConversationMemory.from_dict(data)
+print(restored.summary)  # Summary is preserved
 ```
 
 ---
@@ -282,18 +382,19 @@ for msg in recent:
     print(f"{msg.role}: {msg.content}")
 ```
 
-### 5. Serialize for Persistence
+### 5. Serialize and Restore
 
 ```python
-# Save conversation
 import json
+
+# Save conversation
 with open("conversation.json", "w") as f:
     json.dump(memory.to_dict(), f)
 
-# Load conversation
+# Restore conversation (preserves summary and all messages)
 with open("conversation.json", "r") as f:
     data = json.load(f)
-    # Reconstruct memory from data
+    memory = ConversationMemory.from_dict(data)
 ```
 
 ---
@@ -373,21 +474,30 @@ memory = ConversationMemory(max_messages=20)
 
 ---
 
+## Related Memory Modules (v0.16.0)
+
+The following memory features were shipped in v0.16.0 and integrate with `ConversationMemory` via `AgentConfig`:
+
+- **[Sessions](SESSIONS.md)** — Persistent session storage with JSON file, SQLite, and Redis backends
+- **[Entity Memory](ENTITY_MEMORY.md)** — LLM-based named entity extraction and context injection
+- **[Knowledge Graph](KNOWLEDGE_GRAPH.md)** — Relationship triple extraction with in-memory and SQLite storage
+- **[Knowledge Memory](KNOWLEDGE.md)** — Cross-session durable memory with daily logs and `remember` tool
+
 ## Future Enhancements
 
 Potential improvements (see [Roadmap](https://github.com/johnnichev/selectools/blob/main/ROADMAP.md)):
 
-1. **Summarize-on-Trim**: Auto-summarize old messages instead of dropping (v0.16.0)
-2. **Persistent Sessions**: Auto-save/load from disk or database (v0.16.0)
-3. **Entity Memory**: Track named entities across turns (v0.16.0)
-4. **Knowledge Graph Memory**: Build relationship graphs from conversations (v0.16.0)
-5. **Semantic Pruning**: Remove similar/redundant messages
+1. **Semantic Pruning**: Remove similar/redundant messages to maximize useful context
 
 ---
 
 ## Further Reading
 
-- [Agent Module](AGENT.md) - How agents use memory
+- [Agent Module](AGENT.md) - How agents use memory (including session, entity, KG, and knowledge integration)
+- [Sessions Module](SESSIONS.md) - Persistent session storage backends
+- [Entity Memory Module](ENTITY_MEMORY.md) - Named entity extraction and tracking
+- [Knowledge Graph Module](KNOWLEDGE_GRAPH.md) - Relationship triple extraction
+- [Knowledge Memory Module](KNOWLEDGE.md) - Cross-session durable memory
 - [Types Module](../ARCHITECTURE.md#core-components) - Message data structure
 
 ---

@@ -17,12 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **56 new tests** (total: 1421) for v0.16.0 consolidation:
+- **68 new tests** (total: 1487) for v0.16.0 consolidation:
   - `test_sessions_redis.py` — 21 tests for RedisSessionStore with mock Redis client (save/load, TTL, delete, list, exists, import error, edge cases)
   - `test_sessions_edge_cases.py` — 13 tests for corrupt JSON handling, TTL cleanup, OS error recovery, metadata
   - `test_memory_boundary.py` — 6 tests for tool-pair boundary trimming after sliding window
   - `test_memory_integration.py` — 7 tests for all memory features running simultaneously (sessions + entity + KG + knowledge memory)
   - `test_memory_async.py` — 9 tests for `arun()` with session auto-save, entity memory, knowledge graph, combined features
+  - `test_consolidation_regression.py` — 12 tests for regression coverage of all 6 bug fixes
 
 ### Documentation
 

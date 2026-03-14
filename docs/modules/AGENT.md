@@ -409,6 +409,21 @@ class AgentConfig:
     tool_policy: Optional[ToolPolicy] = None  # allow/review/deny rules
     confirm_action: Optional[ConfirmAction] = None  # Human-in-the-loop callback
     approval_timeout: float = 60.0  # Seconds before auto-deny
+
+    # Sessions & Persistence (v0.16.0)
+    session_store: Optional[SessionStore] = None  # Auto-save/load conversation state
+    session_id: Optional[str] = None  # Unique session identifier
+
+    # Summarize-on-Trim (v0.16.0)
+    summarize_on_trim: bool = False  # Summarize trimmed messages before dropping
+    summarize_provider: Optional[Provider] = None  # Provider for summarization (defaults to agent's)
+    summarize_model: Optional[str] = None  # Model for summarization (use a cheap model)
+    summarize_max_tokens: int = 150  # Max tokens for the summary response
+
+    # Advanced Memory (v0.16.0)
+    entity_memory: Optional[EntityMemory] = None  # LLM-based entity extraction
+    knowledge_graph: Optional[KnowledgeGraphMemory] = None  # Relationship triple extraction
+    knowledge_memory: Optional[KnowledgeMemory] = None  # Cross-session durable memory
 ```
 
 ### Configuration Patterns
@@ -767,7 +782,7 @@ agent = Agent(
 )
 ```
 
-### All 15 Lifecycle Events
+### All 19 Lifecycle Events
 
 | Event | Scope | Parameters (after `run_id`) | When |
 |---|---|---|---|
@@ -791,6 +806,10 @@ agent = Agent(
 | `on_structured_validate` | Structured | `success`, `attempt`, `error` | After structured output validation |
 | `on_provider_fallback` | Fallback | `failed_provider`, `next_provider`, `error` | FallbackProvider switches provider |
 | `on_memory_trim` | Memory | `messages_removed`, `messages_remaining`, `reason` | Memory enforces limits |
+| `on_session_load` | Session | `session_id`, `message_count` | Session loaded from store (v0.16.0) |
+| `on_session_save` | Session | `session_id`, `message_count` | Session saved to store (v0.16.0) |
+| `on_memory_summarize` | Memory | `summary`, `messages_summarized` | Trimmed messages summarized (v0.16.0) |
+| `on_entity_extraction` | Memory | `entities`, `turn_count` | Entities extracted from turn (v0.16.0) |
 
 *`on_batch_start`/`on_batch_end` use `batch_id` instead of `run_id`.
 
@@ -848,7 +867,7 @@ spans = result.trace.to_otel_spans()
 
 ## Memory Integration
 
-### With Memory
+### Basic Memory
 
 ```python
 memory = ConversationMemory(max_messages=20)
@@ -899,6 +918,124 @@ memory = ConversationMemory(
 ```
 
 When limits are exceeded, oldest messages are dropped (sliding window).
+
+### Persistent Sessions
+
+Auto-save and auto-load conversation state across process restarts using `session_store` and `session_id`:
+
+```python
+from selectools.sessions import JsonFileSessionStore
+
+store = JsonFileSessionStore(directory="./sessions")
+agent = Agent(
+    tools=[...], provider=provider,
+    config=AgentConfig(session_store=store, session_id="user-123"),
+)
+
+# First run — auto-loads existing session (if any), auto-saves after
+result = agent.run([Message(role=Role.USER, content="My name is Alice")])
+
+# Later (even after restart) — session is restored automatically
+result = agent.run([Message(role=Role.USER, content="What's my name?")])
+# Agent knows: "Alice"
+```
+
+Three backends are available: `JsonFileSessionStore`, `SQLiteSessionStore`, `RedisSessionStore`. All support TTL-based expiry.
+
+See [Sessions Module](SESSIONS.md) for backend details and TTL configuration.
+
+### Summarize-on-Trim
+
+When messages are trimmed by the sliding window, optionally generate a summary of the dropped messages and inject it as system context:
+
+```python
+agent = Agent(
+    tools=[...], provider=provider,
+    memory=ConversationMemory(max_messages=30),
+    config=AgentConfig(
+        summarize_on_trim=True,
+        summarize_provider=provider,       # Provider for summarization
+        summarize_model="gpt-4o-mini",     # Use a cheap/fast model
+        summarize_max_tokens=150,          # Max tokens for the summary
+    ),
+)
+```
+
+**Flow:** When `_enforce_limits()` trims messages → the trimmed messages are sent to the summarize provider → a 2-3 sentence summary is generated → stored in `memory.summary` → injected as a system-level context message on subsequent turns.
+
+See [Memory Module](MEMORY.md#summarize-on-trim) for implementation details.
+
+### Entity Memory
+
+Automatically extract named entities (people, organizations, projects, etc.) from each turn and inject them as context:
+
+```python
+from selectools import EntityMemory
+
+entity_memory = EntityMemory(provider=provider)
+agent = Agent(
+    tools=[...], provider=provider, memory=memory,
+    config=AgentConfig(entity_memory=entity_memory),
+)
+
+agent.run([Message(role=Role.USER, content="I'm working with Alice from Acme Corp")])
+# Extracts: Alice (person, Acme Corp), Acme Corp (organization)
+# Injected as [Known Entities] in system prompt on next turn
+```
+
+See [Entity Memory Module](ENTITY_MEMORY.md) for entity types, deduplication, and LRU pruning.
+
+### Knowledge Graph Memory
+
+Extract (subject, relation, object) triples from conversation and query them for context injection:
+
+```python
+from selectools import KnowledgeGraphMemory
+
+kg = KnowledgeGraphMemory(provider=provider, storage="sqlite")
+agent = Agent(
+    tools=[...], provider=provider, memory=memory,
+    config=AgentConfig(knowledge_graph=kg),
+)
+
+agent.run([Message(role=Role.USER, content="Alice manages Project Alpha")])
+# Extracts: (Alice, manages, Project Alpha)
+# Injected as [Known Relationships] in system prompt on next turn
+```
+
+See [Knowledge Graph Module](KNOWLEDGE_GRAPH.md) for storage backends and querying.
+
+### Cross-Session Knowledge Memory
+
+Persistent knowledge that survives across sessions — daily logs plus a long-term fact store:
+
+```python
+from selectools import KnowledgeMemory
+
+knowledge = KnowledgeMemory(directory="./workspace", recent_days=2)
+agent = Agent(
+    tools=[...], provider=provider,
+    config=AgentConfig(knowledge_memory=knowledge),
+)
+# Auto-registers a `remember` tool — the agent can save facts explicitly
+# [Long-term Memory] and [Recent Memory] injected into system prompt
+```
+
+See [Knowledge Memory Module](KNOWLEDGE.md) for daily logs, fact storage, and retention configuration.
+
+### Context Injection Order
+
+When multiple memory features are active, context is injected into the system prompt in this order:
+
+```
+1. [Conversation Summary]     ← summarize_on_trim
+2. [Known Entities]           ← entity_memory
+3. [Known Relationships]      ← knowledge_graph
+4. [Long-term Memory]         ← knowledge_memory (persistent facts)
+5. [Recent Memory]            ← knowledge_memory (daily logs)
+```
+
+Each section is only present when the corresponding feature is configured and has data.
 
 ---
 
@@ -1305,6 +1442,11 @@ total_llm_ms = sum(s.duration_ms for s in llm_steps)
 | `guardrail` | Input/output guardrail triggered (v0.15.0) |
 | `coherence_check` | Coherence check blocked a tool call (v0.15.0) |
 | `output_screening` | Tool output screening detected injection (v0.15.0) |
+| `session_load` | Session loaded from store (v0.16.0) |
+| `session_save` | Session saved to store (v0.16.0) |
+| `memory_summarize` | Trimmed messages summarized (v0.16.0) |
+| `entity_extraction` | Entities extracted from conversation (v0.16.0) |
+| `kg_extraction` | Knowledge graph triples extracted (v0.16.0) |
 
 ### AgentTrace Methods
 
@@ -1715,6 +1857,10 @@ def divide(a: float, b: float) -> str:
 - [Parser Module](PARSER.md) - Tool call parsing details
 - [Providers Module](PROVIDERS.md) - Provider implementations and FallbackProvider
 - [Memory Module](MEMORY.md) - Conversation memory and tool-pair-aware trimming
+- [Sessions Module](SESSIONS.md) - Persistent session storage with 3 backends
+- [Entity Memory Module](ENTITY_MEMORY.md) - Named entity extraction and tracking
+- [Knowledge Graph Module](KNOWLEDGE_GRAPH.md) - Relationship triple extraction
+- [Knowledge Memory Module](KNOWLEDGE.md) - Cross-session durable memory
 - [Usage Module](USAGE.md) - Cost tracking
 - [Architecture](../ARCHITECTURE.md) - System-level overview including new modules
 

@@ -763,6 +763,12 @@ Focus: Niche integrations, community sharing, and developer experience polish.
 
 ## Release History
 
+### v0.16.1 - Consolidation & Hardening
+
+- ✅ **6 bug fixes**: `arun()` tool_usage stats, `astream()` dead code after yield, `memory.from_dict()` boundary fix, `EntityMemory` thread safety, `KnowledgeMemory` thread safety, `SQLiteTripleStore` WAL mode
+- ✅ **mypy**: Resolved all 5 type errors across `sessions.py` and `knowledge_graph.py` (0 errors now)
+- ✅ **68 new tests** (total: 1487): Redis sessions, edge cases, memory boundary, memory integration, async memory, consolidation regression
+
 ### v0.16.0 - Memory & Persistence
 
 - ✅ **Persistent Sessions**: `SessionStore` protocol with 3 backends (JSON file, SQLite, Redis), TTL expiry, auto-save/load via `AgentConfig`
