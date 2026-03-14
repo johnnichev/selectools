@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "selectools"
-version = "0.16.1"
+version = "0.16.2"
 description = "Production-ready AI agents with tool calling, structured output, execution traces, and RAG. Provider-agnostic (OpenAI, Anthropic, Gemini, Ollama) with fallback chains, batch processing, tool policies, streaming, caching, and cost tracking."
 readme = "README.md"
 requires-python = ">=3.9"

@@ -5,6 +5,23 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.2] - 2026-03-14
+
+### Fixed
+
+- **agent/core.py**: `astream()` now saves and restores `_system_prompt` in its `finally` block, matching `run()` and `arun()`. Previously, if `_system_prompt` was modified during streaming execution, the change would leak to subsequent calls on the same agent instance.
+
+### Documentation
+
+- **CLAUDE.md**: Updated stale counts (tests 1183→1487, examples 32→37, observer events 15→19, module docs 20→24), added v0.16.0 modules to codebase structure, added TraceStep types reference table, added pitfall #11, updated roadmap
+- **AGENT.md**: Documented 9 new AgentConfig fields, expanded Memory Integration section with sessions/entity/KG/knowledge subsections, added 4 observer events and 5 trace step types
+- **MEMORY.md**: Documented `from_dict()` deserialization, added Summarize-on-Trim section, updated Future Enhancements
+- **index.md**: Updated test count to 1487
+- **ROADMAP.md**: Added v0.16.1 release history entry
+- **CHANGELOG.md**: Fixed v0.16.1 test total (56→68, added missing test file)
+
+---
+
 ## [0.16.1] - 2026-03-13
 
 ### Fixed
