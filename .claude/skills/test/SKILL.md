@@ -1,17 +1,16 @@
-# Selectools Testing
+---
+name: test
+description: Write tests following selectools patterns — mocks, recording, regression, integration
+argument-hint: <module-or-feature-to-test>
+---
 
-Skill for writing tests that follow selectools conventions and patterns.
+# Test Writing
 
-## Trigger
+Write tests for: $ARGUMENTS
 
-Use when writing tests for new features, bug fixes, or regressions in selectools.
+## Live Project State
 
-## Context
-
-- **Test framework**: pytest
-- **Test location**: `tests/` mirroring source structure
-- **Current count**: 1183+ tests
-- **Run command**: `pytest tests/ -x -q`
+- Current tests: !`pytest tests/ --collect-only -q 2>/dev/null | tail -1`
 
 ## Test Organization
 
@@ -107,8 +106,8 @@ class TestSpecificBugDescription:
 - **Model counts**: `assert len(MODELS) == 146` — update when models change
 - **Observer events**: Verify `run_id` is passed to all events
 - **Streaming**: Verify `ToolCall` objects are yielded (use `isinstance(chunk, ToolCall)`)
-- **Policy**: Verify `deny` actually blocks execution (raises `ToolPolicyError`)
-- **Guardrails**: Verify `block` raises `GuardrailError`, `rewrite` modifies content
+- **Policy**: Verify `deny` actually blocks execution
+- **Guardrails**: Verify `block` raises error, `rewrite` modifies content
 
 ## Integration Test Pattern
 

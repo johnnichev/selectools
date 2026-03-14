@@ -54,7 +54,7 @@ src/selectools/
 ├── pricing.py               # Derives pricing from models.py
 ├── usage.py                 # Token + cost tracking
 ├── trace.py                 # AgentTrace, TraceStep (14 step types — see list below)
-├── observer.py              # AgentObserver protocol (19 events) + LoggingObserver
+├── observer.py              # AgentObserver protocol (25 events) + LoggingObserver
 ├── policy.py                # ToolPolicy (allow/review/deny rules)
 ├── parser.py                # ToolCallParser (JSON extraction from LLM responses)
 ├── prompt.py                # PromptBuilder (system prompt generation)

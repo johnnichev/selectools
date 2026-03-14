@@ -1,34 +1,31 @@
-# Selectools Feature Implementation
+---
+name: feature
+description: End-to-end feature implementation — source, exports, tests, docs, examples, and notebook
+argument-hint: <feature-description>
+---
 
-End-to-end skill for implementing new features in the selectools codebase. Covers source code, agent integration, exports, tests, docs, examples, and notebook updates.
+# Feature Implementation
 
-## Trigger
+Implement the following feature: $ARGUMENTS
 
-Use when implementing a new module, feature, or capability in selectools (e.g., new RAG loader, vector store, toolbox module, orchestration component).
+## Live Project State
 
-## Context
+- Version: !`grep -m1 __version__ src/selectools/__init__.py`
+- Tests: !`pytest tests/ --collect-only -q 2>/dev/null | tail -1`
+- Last example: !`ls examples/*.py | tail -1`
+- Next example number: use the next zero-padded number after the last one above
 
-- **Source layout**: `src/selectools/` with public API in `__init__.py`
-- **Python**: 3.9+, line length 100, Black + isort, mypy enforced
-- **No `any` types** — always explicit types
-- **No narration comments** — only explain non-obvious intent
-- **Optional deps**: All external dependencies must be lazy-imported with try/except ImportError
-- **Latest example**: `examples/32_coherence_checking.py` (next is 33)
-- **Latest test count**: 1183
-
-## Implementation Steps
-
-### 1. Cross-Feature Impact Analysis
+## 1. Cross-Feature Impact Analysis
 
 Before writing code, determine:
 - Does this touch `agent/core.py`? If so, follow the execution flow: input guardrails -> memory -> provider -> cache -> output guardrails -> parser -> policy -> coherence -> tool execution -> trace -> audit
 - Does `AgentConfig` in `agent/config.py` need new fields?
 - Does `__init__.py` need new public exports?
 - Does `trace.py` need new `StepType` values?
-- Does `observer.py` need new events? If so, guard with `if run_id:` and use `_notify_observers()` helper
+- Does `observer.py` need new events? If so, add no-op default in `AgentObserver` class, implement in `LoggingObserver`, and use `_notify_observers()` helper in `agent/core.py`
 - Does `AgentResult` need new fields?
 
-### 2. Write Source Code
+## 2. Write Source Code
 
 **New module pattern**:
 ```python
@@ -52,35 +49,30 @@ except ImportError:
 
 **For toolbox** — new file in `src/selectools/toolbox/`. Functions decorated with `@tool(description=...)`. Return `str`. Register in `toolbox/__init__.py`'s `get_all_tools()` and `get_tools_by_category()`.
 
-### 3. Update Exports
+## 3. Update Exports
 
 Add to `src/selectools/__init__.py`:
 ```python
 from selectools.new_module import NewClass
 ```
 
-### 4. Format and Lint
+## 4. Format and Lint
 
-```bash
-black src/ tests/ --line-length=100
-isort src/ tests/ --profile=black --line-length=100
-flake8 src/
-mypy src/
-```
+Run `/lint` to format and check code quality.
 
-### 5. Write Tests
+## 5. Write Tests
 
-See the `selectools-test` skill for detailed testing patterns.
+See `/test` for detailed testing patterns.
 
-### 6. Write Example Script
+## 6. Write Example Script
 
-Create `examples/NN_feature_name.py` (next available number, zero-padded).
+Create `examples/NN_feature_name.py` (use next number from Live Project State above).
 
-### 7. Write Documentation
+## 7. Write Documentation
 
-See the `selectools-docs` skill for detailed documentation patterns.
+See `/docs` for detailed documentation patterns.
 
-### 8. Run Full Test Suite
+## 8. Run Full Test Suite
 
 ```bash
 pytest tests/ -x -q
@@ -96,3 +88,4 @@ ALL tests must pass. No exceptions.
 - Provider `stream()`/`astream()` MUST pass `tools` param
 - Never stringify `ToolCall` objects in streaming paths
 - FallbackProvider observer wiring needs `threading.Lock` + refcount
+- `astream()` must save/restore `_system_prompt` in finally block (matches run/arun)

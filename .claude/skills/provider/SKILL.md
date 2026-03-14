@@ -1,16 +1,22 @@
-# Selectools Provider Implementation
+---
+name: provider
+description: Add or modify an LLM provider adapter — protocol, tool mapping, model registry, streaming
+argument-hint: <provider-name>
+---
 
-Skill for adding or modifying LLM provider adapters in selectools.
+# Provider Implementation
 
-## Trigger
+Implement or modify the following provider: $ARGUMENTS
 
-Use when adding a new LLM provider, fixing provider bugs, or modifying provider behavior (e.g., adding Bedrock, fixing streaming, updating message formatting).
+## Live Project State
+
+- Models in registry: !`grep -c "ModelInfo(" src/selectools/models.py`
 
 ## Context
 
-- **Provider protocol**: `src/selectools/providers/base.py` defines the `Provider` protocol
+- **Provider protocol**: `src/selectools/providers/base.py`
 - **Existing providers**: `openai_provider.py`, `anthropic_provider.py`, `gemini_provider.py`, `ollama_provider.py`, `fallback.py`, `stubs.py`
-- **Model registry**: `src/selectools/models.py` — single source of truth for 146 models with pricing
+- **Model registry**: `src/selectools/models.py` — single source of truth for all models with pricing
 
 ## Protocol Requirements
 
