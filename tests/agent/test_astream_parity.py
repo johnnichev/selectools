@@ -1209,3 +1209,81 @@ class TestParallelOutputScreening:
         ]
         if tool_msgs:
             assert tool_msgs[0].content is not None
+
+
+# ---------------------------------------------------------------------------
+# Tests: Bug fixes (round 3)
+# ---------------------------------------------------------------------------
+
+
+class TestGuardrailsDoNotMutateCallerMessages:
+    def test_input_guardrails_dont_mutate_original(self) -> None:
+        """_prepare_run must not mutate the caller's Message objects."""
+
+        class RewriteGuardrail(Guardrail):
+            name = "rewrite"
+
+            def check(self, content: str) -> GuardrailResult:
+                return GuardrailResult(
+                    passed=True,
+                    content=content.replace("secret", "REDACTED"),
+                    guardrail_name="rewrite",
+                )
+
+        pipeline = GuardrailsPipeline(input=[RewriteGuardrail()])
+        provider = _SimpleProvider("Ok")
+        agent = Agent(
+            tools=[noop_tool],
+            provider=provider,
+            config=AgentConfig(max_iterations=1, guardrails=pipeline),
+        )
+
+        original_msg = Message(role=Role.USER, content="The secret code")
+        agent.run([original_msg])
+
+        # The caller's original message must NOT be mutated
+        assert original_msg.content == "The secret code"
+
+    @pytest.mark.asyncio
+    async def test_astream_input_guardrails_dont_mutate_original(self) -> None:
+        """astream _prepare_run must not mutate the caller's Message objects."""
+
+        class RewriteGuardrail(Guardrail):
+            name = "rewrite"
+
+            def check(self, content: str) -> GuardrailResult:
+                return GuardrailResult(
+                    passed=True,
+                    content=content.replace("secret", "REDACTED"),
+                    guardrail_name="rewrite",
+                )
+
+        pipeline = GuardrailsPipeline(input=[RewriteGuardrail()])
+        provider = _SimpleProvider("Ok")
+        agent = Agent(
+            tools=[noop_tool],
+            provider=provider,
+            config=AgentConfig(max_iterations=1, guardrails=pipeline),
+        )
+
+        original_msg = Message(role=Role.USER, content="The secret code")
+        await _collect_astream(agent, [original_msg])
+
+        assert original_msg.content == "The secret code"
+
+
+class TestAskParentRunId:
+    def test_ask_supports_parent_run_id(self) -> None:
+        """ask() must pass through parent_run_id to run()."""
+        provider = _SimpleProvider("Done")
+        agent = Agent(tools=[noop_tool], provider=provider, config=AgentConfig(max_iterations=1))
+        result = agent.ask("Hi", parent_run_id="parent-ask-123")
+        assert result.trace.parent_run_id == "parent-ask-123"
+
+    @pytest.mark.asyncio
+    async def test_aask_supports_parent_run_id(self) -> None:
+        """aask() must pass through parent_run_id to arun()."""
+        provider = _SimpleProvider("Done")
+        agent = Agent(tools=[noop_tool], provider=provider, config=AgentConfig(max_iterations=1))
+        result = await agent.aask("Hi", parent_run_id="parent-aask-456")
+        assert result.trace.parent_run_id == "parent-aask-456"

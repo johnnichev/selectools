@@ -548,10 +548,12 @@ class Agent:
         self._wire_fallback_observer(run_id)
         self._notify_observers("on_run_start", run_id, messages, self._system_prompt)
 
-        # Input guardrails
-        for msg in messages:
-            if msg.role == Role.USER and msg.content:
-                msg.content = self._run_input_guardrails(msg.content, trace)
+        # Input guardrails (operate on copies to avoid mutating caller's objects)
+        if self.config.guardrails and self.config.guardrails.input:
+            messages = [copy.copy(msg) for msg in messages]
+            for msg in messages:
+                if msg.role == Role.USER and msg.content:
+                    msg.content = self._run_input_guardrails(msg.content, trace)
 
         # Memory / session loading
         if self.memory:
@@ -962,6 +964,7 @@ class Agent:
         prompt: str,
         stream_handler: Optional[Callable[[str], None]] = None,
         response_format: Optional[ResponseFormat] = None,
+        parent_run_id: Optional[str] = None,
     ) -> AgentResult:
         """
         Send a single user prompt and return the agent's response.
@@ -975,6 +978,7 @@ class Agent:
             response_format: Optional Pydantic model class or JSON Schema dict.
                 When provided the LLM is instructed to return valid JSON and
                 the result is validated. Access via ``result.parsed``.
+            parent_run_id: Optional run-ID of a parent agent for trace linking.
 
         Returns:
             AgentResult with the response and metadata.
@@ -988,6 +992,7 @@ class Agent:
             [Message(role=Role.USER, content=prompt)],
             stream_handler=stream_handler,
             response_format=response_format,
+            parent_run_id=parent_run_id,
         )
 
     async def aask(
@@ -995,6 +1000,7 @@ class Agent:
         prompt: str,
         stream_handler: Optional[Callable[[str], None]] = None,
         response_format: Optional[ResponseFormat] = None,
+        parent_run_id: Optional[str] = None,
     ) -> AgentResult:
         """
         Async version of :meth:`ask`.
@@ -1003,6 +1009,7 @@ class Agent:
             prompt: Plain-text question or instruction.
             stream_handler: Optional callback for streaming responses.
             response_format: Optional Pydantic model class or JSON Schema dict.
+            parent_run_id: Optional run-ID of a parent agent for trace linking.
 
         Returns:
             AgentResult with the response and metadata.
@@ -1015,6 +1022,7 @@ class Agent:
             [Message(role=Role.USER, content=prompt)],
             stream_handler=stream_handler,
             response_format=response_format,
+            parent_run_id=parent_run_id,
         )
 
     def batch(
