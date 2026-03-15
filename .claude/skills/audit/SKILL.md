@@ -13,9 +13,9 @@ description: Cross-reference audit for stale counts, broken links, and doc drift
 - Models: !`grep -c "ModelInfo(" src/selectools/models.py`
 - Examples: !`ls examples/*.py | wc -l | tr -d ' '`
 - Module docs: !`ls docs/modules/*.md | wc -l | tr -d ' '`
-- Toolbox tools: !`grep -rc "@tool" src/selectools/toolbox/*.py | awk -F: '{s+=$2}END{print s}'`
-- Observer events: !`sed -n '/^class AgentObserver/,/^class /p' src/selectools/observer.py | grep -c "def on_"`
-- StepTypes: !`awk '/^StepType = Literal\[/,/\]/' src/selectools/trace.py | grep -c '"'`
+- Toolbox tools: !`grep -roh "@tool" src/selectools/toolbox/*.py | wc -l | tr -d ' '`
+- Observer events: !`python3 -c "import ast; t=ast.parse(open('src/selectools/observer.py').read()); print(len([n.name for c in ast.walk(t) if isinstance(c,ast.ClassDef) and c.name=='AgentObserver' for n in c.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and n.name.startswith('on_')]))" 2>/dev/null`
+- StepTypes: !`python3 -c "import re; c=open('src/selectools/trace.py').read(); m=re.search(r'StepType = Literal\[(.*?)\]',c,re.DOTALL); print(len(re.findall(r'\"(\w+)\"',m.group(1))))" 2>/dev/null`
 - Last example: !`ls examples/*.py | tail -1`
 
 ## Audit Procedure

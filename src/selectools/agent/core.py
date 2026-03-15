@@ -11,7 +11,7 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, AsyncGenerator, Callable, Dict, List, Optional, Union, cast
 
 from ..analytics import AgentAnalytics
@@ -39,6 +39,23 @@ from .config import AgentConfig
 
 if TYPE_CHECKING:
     from ..memory import ConversationMemory
+
+
+@dataclass
+class _RunContext:
+    """Private context object carrying state for a single run/arun/astream invocation."""
+
+    trace: AgentTrace
+    run_id: str
+    original_system_prompt: str
+    history_checkpoint: int
+    response_format: Optional[ResponseFormat]
+    user_text_for_coherence: str = ""
+    iteration: int = 0
+    all_tool_calls: List[ToolCall] = field(default_factory=list)
+    last_tool_name: Optional[str] = None
+    last_tool_args: Dict[str, Any] = field(default_factory=dict)
+    reasoning_history: List[str] = field(default_factory=list)
 
 
 class Agent:
@@ -152,6 +169,19 @@ class Agent:
             self.tools.append(remember_tool)
             self._tools_by_name[remember_tool.name] = remember_tool
             self._system_prompt = self.prompt_builder.build(self.tools)
+
+    @property
+    def name(self) -> str:
+        """Return the agent's name from config."""
+        return self.config.name
+
+    def __call__(
+        self,
+        messages: Union[str, List[Message]],
+        **kwargs: Any,
+    ) -> AgentResult:
+        """Allow calling the agent directly as a shorthand for run()."""
+        return self.run(messages, **kwargs)
 
     # ------------------------------------------------------------------
     # Dynamic tool management
@@ -491,6 +521,198 @@ class Agent:
                 )
         except Exception:  # nosec B110
             pass  # never crash the agent for KG extraction failure
+
+    def _prepare_run(
+        self,
+        messages: List[Message],
+        response_format: Optional[ResponseFormat] = None,
+        parent_run_id: Optional[str] = None,
+    ) -> _RunContext:
+        """Shared setup for run(), arun(), and astream().
+
+        Saves original system prompt, applies response_format, creates trace,
+        wires observers, runs input guardrails, loads memory/session, injects
+        knowledge context, and returns a _RunContext carrying all state.
+        """
+        original_system_prompt = self._system_prompt
+        if response_format is not None:
+            schema = schema_from_response_format(response_format)
+            self._system_prompt = self._system_prompt + build_schema_instruction(schema)
+
+        trace = self._new_trace()
+        if parent_run_id is not None:
+            trace.parent_run_id = parent_run_id
+        run_id = trace.run_id
+        history_checkpoint = len(self._history)
+
+        self._wire_fallback_observer(run_id)
+        self._notify_observers("on_run_start", run_id, messages, self._system_prompt)
+
+        # Input guardrails
+        for msg in messages:
+            if msg.role == Role.USER and msg.content:
+                msg.content = self._run_input_guardrails(msg.content, trace)
+
+        # Memory / session loading
+        if self.memory:
+            if self.config.session_store and self.config.session_id:
+                self._notify_observers(
+                    "on_session_load", run_id, self.config.session_id, len(self.memory)
+                )
+            self._history = self.memory.get_history() + list(messages)
+            self._memory_add_many(list(messages), run_id)
+            if self.memory.summary:
+                self._history.insert(
+                    0,
+                    Message(
+                        role=Role.SYSTEM,
+                        content=f"[Conversation Summary] {self.memory.summary}",
+                    ),
+                )
+        else:
+            self._history.extend(messages)
+
+        # Knowledge memory context
+        if self.config.knowledge_memory:
+            km_ctx = self.config.knowledge_memory.build_context()
+            if km_ctx:
+                self._history.insert(
+                    0,
+                    Message(role=Role.SYSTEM, content=km_ctx),
+                )
+
+        # Entity memory context
+        if self.config.entity_memory:
+            entity_ctx = self.config.entity_memory.build_context()
+            if entity_ctx:
+                self._history.insert(
+                    0,
+                    Message(role=Role.SYSTEM, content=entity_ctx),
+                )
+
+        # Extract user text for coherence checks
+        user_text_for_coherence = ""
+        for msg in reversed(messages):
+            if msg.role == Role.USER and msg.content:
+                user_text_for_coherence = msg.content
+                break
+
+        # Knowledge graph context
+        if self.config.knowledge_graph:
+            kg_ctx = self.config.knowledge_graph.build_context(query=user_text_for_coherence)
+            if kg_ctx:
+                self._history.insert(
+                    0,
+                    Message(role=Role.SYSTEM, content=kg_ctx),
+                )
+
+        return _RunContext(
+            trace=trace,
+            run_id=run_id,
+            original_system_prompt=original_system_prompt,
+            history_checkpoint=history_checkpoint,
+            response_format=response_format,
+            user_text_for_coherence=user_text_for_coherence,
+        )
+
+    def _finalize_run(
+        self,
+        ctx: _RunContext,
+        final_response: Message,
+        parsed: Any = None,
+    ) -> AgentResult:
+        """Shared teardown for run(), arun(), and astream().
+
+        Appends final response to history, saves session, extracts entities/KG,
+        and builds the AgentResult.
+        """
+        self._history.append(final_response)
+        self._memory_add(final_response, ctx.run_id)
+        self._extract_entities(ctx.run_id)
+        self._extract_kg_triples(ctx.run_id)
+        self._session_save(ctx.run_id)
+        self._call_hook("on_agent_end", final_response, self.usage)
+        result = AgentResult(
+            message=final_response,
+            tool_name=ctx.last_tool_name,
+            tool_args=ctx.last_tool_args,
+            iterations=ctx.iteration,
+            tool_calls=ctx.all_tool_calls,
+            parsed=parsed,
+            reasoning=ctx.reasoning_history[-1] if ctx.reasoning_history else None,
+            reasoning_history=ctx.reasoning_history,
+            trace=ctx.trace,
+            provider_used=getattr(self.provider, "provider_used", None),
+            usage=copy.copy(self.usage),
+        )
+        self._notify_observers("on_run_end", ctx.run_id, result)
+        return result
+
+    def _build_max_iterations_result(self, ctx: _RunContext) -> AgentResult:
+        """Build the AgentResult for when max iterations are reached."""
+        final_response = Message(
+            role=Role.ASSISTANT,
+            content=f"Maximum iterations ({self.config.max_iterations}) reached without resolution.",
+        )
+        self._history.append(final_response)
+        self._memory_add(final_response, ctx.run_id)
+        self._call_hook("on_agent_end", final_response, self.usage)
+        result = AgentResult(
+            message=final_response,
+            tool_name=ctx.last_tool_name,
+            tool_args=ctx.last_tool_args,
+            iterations=ctx.iteration,
+            tool_calls=ctx.all_tool_calls,
+            reasoning=ctx.reasoning_history[-1] if ctx.reasoning_history else None,
+            reasoning_history=ctx.reasoning_history,
+            trace=ctx.trace,
+            provider_used=getattr(self.provider, "provider_used", None),
+            usage=copy.copy(self.usage),
+        )
+        self._notify_observers("on_run_end", ctx.run_id, result)
+        return result
+
+    def _process_response(
+        self,
+        ctx: _RunContext,
+        response_msg: Message,
+    ) -> tuple:
+        """Shared post-provider response processing for run(), arun(), and astream().
+
+        Applies output guardrails, extracts tool calls (with response_format guard),
+        extracts reasoning, adds tool_selection trace steps.
+
+        Returns (response_text, tool_calls_to_execute, reasoning_text).
+        """
+        response_text = response_msg.content or ""
+        response_text = self._run_output_guardrails(response_text, ctx.trace)
+        response_msg.content = response_text
+
+        tool_calls_to_execute: List[ToolCall] = []
+        if response_msg.tool_calls:
+            tool_calls_to_execute = response_msg.tool_calls
+        elif ctx.response_format is None:
+            parse_result = self.parser.parse(response_text)
+            if parse_result.tool_call:
+                tool_calls_to_execute.append(parse_result.tool_call)
+
+        reasoning_text = self._extract_reasoning(response_msg, tool_calls_to_execute)
+        if reasoning_text:
+            ctx.reasoning_history.append(reasoning_text)
+
+        if tool_calls_to_execute:
+            for tc in tool_calls_to_execute:
+                ctx.trace.add(
+                    TraceStep(
+                        type="tool_selection",
+                        tool_name=tc.tool_name,
+                        tool_args=tc.parameters,
+                        reasoning=reasoning_text,
+                        summary=f"Selected {tc.tool_name}",
+                    )
+                )
+
+        return response_text, tool_calls_to_execute, reasoning_text
 
     def _run_input_guardrails(self, content: str, trace: Optional[AgentTrace] = None) -> str:
         """Run input guardrails on user content.  Returns (possibly rewritten) content."""
@@ -833,11 +1055,7 @@ class Agent:
 
         def _run_one(prompt: str) -> AgentResult:
             nonlocal completed
-            clone = copy.copy(self)
-            clone._history = []
-            clone.usage = AgentUsage()
-            clone.memory = None
-            clone.analytics = None
+            clone = self._clone_for_isolation()
             try:
                 result = clone.run(prompt, response_format=response_format)
             except Exception as exc:
@@ -902,11 +1120,7 @@ class Agent:
 
         async def _run_one(prompt: str) -> AgentResult:
             nonlocal completed
-            clone = copy.copy(self)
-            clone._history = []
-            clone.usage = AgentUsage()
-            clone.memory = None
-            clone.analytics = None
+            clone = self._clone_for_isolation()
             async with semaphore:
                 try:
                     result = await clone.arun(prompt, response_format=response_format)
@@ -939,6 +1153,7 @@ class Agent:
         messages: Union[str, List[Message]],
         stream_handler: Optional[Callable[[str], None]] = None,
         response_format: Optional[ResponseFormat] = None,
+        parent_run_id: Optional[str] = None,
     ) -> AgentResult:
         """
         Execute the agent loop with the provided conversation history.
@@ -964,135 +1179,46 @@ class Agent:
         """
         messages = self._normalize_messages(messages)
         self._call_hook("on_agent_start", messages)
-
-        original_system_prompt = self._system_prompt
-        if response_format is not None:
-            schema = schema_from_response_format(response_format)
-            self._system_prompt = self._system_prompt + build_schema_instruction(schema)
-
-        trace = self._new_trace()
-        run_id = trace.run_id
-        _history_checkpoint = len(self._history)
-        iteration = 0
-
-        self._wire_fallback_observer(run_id)
-        self._notify_observers("on_run_start", run_id, messages, self._system_prompt)
+        ctx = self._prepare_run(
+            messages, response_format=response_format, parent_run_id=parent_run_id
+        )
 
         try:
-            for msg in messages:
-                if msg.role == Role.USER and msg.content:
-                    msg.content = self._run_input_guardrails(msg.content, trace)
-
-            if self.memory:
-                if self.config.session_store and self.config.session_id:
-                    self._notify_observers(
-                        "on_session_load", run_id, self.config.session_id, len(self.memory)
-                    )
-                self._history = self.memory.get_history() + list(messages)
-                self._memory_add_many(list(messages), run_id)
-                if self.memory.summary:
-                    self._history.insert(
-                        0,
-                        Message(
-                            role=Role.SYSTEM,
-                            content=f"[Conversation Summary] {self.memory.summary}",
-                        ),
-                    )
-            else:
-                self._history.extend(messages)
-
-            if self.config.knowledge_memory:
-                km_ctx = self.config.knowledge_memory.build_context()
-                if km_ctx:
-                    self._history.insert(
-                        0,
-                        Message(role=Role.SYSTEM, content=km_ctx),
-                    )
-
-            if self.config.entity_memory:
-                entity_ctx = self.config.entity_memory.build_context()
-                if entity_ctx:
-                    self._history.insert(
-                        0,
-                        Message(role=Role.SYSTEM, content=entity_ctx),
-                    )
-
-            user_text_for_coherence = ""
-            for msg in reversed(messages):
-                if msg.role == Role.USER and msg.content:
-                    user_text_for_coherence = msg.content
-                    break
-
-            if self.config.knowledge_graph:
-                kg_ctx = self.config.knowledge_graph.build_context(query=user_text_for_coherence)
-                if kg_ctx:
-                    self._history.insert(
-                        0,
-                        Message(role=Role.SYSTEM, content=kg_ctx),
-                    )
-
-            all_tool_calls: List[ToolCall] = []
-            last_tool_name: Optional[str] = None
-            last_tool_args: Dict[str, Any] = {}
-            reasoning_history: List[str] = []
-
-            while iteration < self.config.max_iterations:
-                iteration += 1
-                self._call_hook("on_iteration_start", iteration, self._history)
-                self._notify_observers("on_iteration_start", run_id, iteration, self._history)
+            while ctx.iteration < self.config.max_iterations:
+                ctx.iteration += 1
+                self._call_hook("on_iteration_start", ctx.iteration, self._history)
+                self._notify_observers(
+                    "on_iteration_start", ctx.run_id, ctx.iteration, self._history
+                )
 
                 response_msg = self._call_provider(
-                    stream_handler=stream_handler, trace=trace, run_id=run_id
+                    stream_handler=stream_handler, trace=ctx.trace, run_id=ctx.run_id
                 )
-                response_text = response_msg.content or ""
-                response_text = self._run_output_guardrails(response_text, trace)
-                response_msg.content = response_text
-
-                tool_calls_to_execute = []
-                if response_msg.tool_calls:
-                    tool_calls_to_execute = response_msg.tool_calls
-                elif response_format is None:
-                    parse_result = self.parser.parse(response_text)
-                    if parse_result.tool_call:
-                        tool_calls_to_execute.append(parse_result.tool_call)
-
-                reasoning_text = self._extract_reasoning(response_msg, tool_calls_to_execute)
-                if reasoning_text:
-                    reasoning_history.append(reasoning_text)
-
-                if tool_calls_to_execute:
-                    for tc in tool_calls_to_execute:
-                        trace.add(
-                            TraceStep(
-                                type="tool_selection",
-                                tool_name=tc.tool_name,
-                                tool_args=tc.parameters,
-                                reasoning=reasoning_text,
-                                summary=f"Selected {tc.tool_name}",
-                            )
-                        )
+                response_text, tool_calls_to_execute, reasoning_text = self._process_response(
+                    ctx, response_msg
+                )
 
                 if not tool_calls_to_execute:
                     parsed = None
-                    if response_format is not None:
+                    if ctx.response_format is not None:
                         try:
-                            parsed = parse_and_validate(response_text, response_format)
+                            parsed = parse_and_validate(response_text, ctx.response_format)
                             self._notify_observers(
                                 "on_structured_validate",
-                                run_id,
+                                ctx.run_id,
                                 True,
-                                iteration,
+                                ctx.iteration,
                             )
                         except (ValueError, TypeError) as exc:
                             self._notify_observers(
                                 "on_structured_validate",
-                                run_id,
+                                ctx.run_id,
                                 False,
-                                iteration,
+                                ctx.iteration,
                                 str(exc),
                             )
-                            if iteration < self.config.max_iterations:
-                                trace.add(
+                            if ctx.iteration < self.config.max_iterations:
+                                ctx.trace.add(
                                     TraceStep(
                                         type="structured_retry",
                                         error=str(exc),
@@ -1107,61 +1233,44 @@ class Agent:
                                     Message(role=Role.ASSISTANT, content=response_text)
                                 )
                                 self._history.append(retry_msg)
-                                self._call_hook("on_iteration_end", iteration, response_text)
+                                self._call_hook("on_iteration_end", ctx.iteration, response_text)
                                 self._notify_observers(
-                                    "on_iteration_end", run_id, iteration, response_text or ""
+                                    "on_iteration_end",
+                                    ctx.run_id,
+                                    ctx.iteration,
+                                    response_text or "",
                                 )
                                 continue
 
                     final_response = Message(role=Role.ASSISTANT, content=response_text)
-                    self._history.append(final_response)
-                    self._call_hook("on_iteration_end", iteration, response_text)
+                    self._call_hook("on_iteration_end", ctx.iteration, response_text)
                     self._notify_observers(
-                        "on_iteration_end", run_id, iteration, response_text or ""
+                        "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
                     )
-                    self._memory_add(final_response, run_id)
-                    self._extract_entities(run_id)
-                    self._extract_kg_triples(run_id)
-                    self._session_save(run_id)
-                    self._call_hook("on_agent_end", final_response, self.usage)
-                    _result = AgentResult(
-                        message=final_response,
-                        tool_name=last_tool_name,
-                        tool_args=last_tool_args,
-                        iterations=iteration,
-                        tool_calls=all_tool_calls,
-                        parsed=parsed,
-                        reasoning=reasoning_history[-1] if reasoning_history else None,
-                        reasoning_history=reasoning_history,
-                        trace=trace,
-                        provider_used=getattr(self.provider, "provider_used", None),
-                        usage=copy.copy(self.usage),
-                    )
-                    self._notify_observers("on_run_end", run_id, _result)
-                    return _result
+                    return self._finalize_run(ctx, final_response, parsed=parsed)
 
                 if self.config.routing_only and tool_calls_to_execute:
-                    self._call_hook("on_iteration_end", iteration, response_text)
+                    self._call_hook("on_iteration_end", ctx.iteration, response_text)
                     self._notify_observers(
-                        "on_iteration_end", run_id, iteration, response_text or ""
+                        "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
                     )
                     _result = AgentResult(
                         message=response_msg,
                         tool_name=tool_calls_to_execute[-1].tool_name,
                         tool_args=tool_calls_to_execute[-1].parameters,
-                        iterations=iteration,
+                        iterations=ctx.iteration,
                         tool_calls=tool_calls_to_execute,
                         reasoning=reasoning_text,
-                        reasoning_history=reasoning_history,
-                        trace=trace,
+                        reasoning_history=ctx.reasoning_history,
+                        trace=ctx.trace,
                         provider_used=getattr(self.provider, "provider_used", None),
                         usage=copy.copy(self.usage),
                     )
-                    self._notify_observers("on_run_end", run_id, _result)
+                    self._notify_observers("on_run_end", ctx.run_id, _result)
                     return _result
 
                 self._history.append(response_msg)
-                self._memory_add(response_msg, run_id)
+                self._memory_add(response_msg, ctx.run_id)
 
                 use_parallel = (
                     self.config.parallel_tool_execution and len(tool_calls_to_execute) > 1
@@ -1170,26 +1279,26 @@ class Agent:
                 if use_parallel:
                     _last_name, _last_args = self._execute_tools_parallel(
                         tool_calls_to_execute,
-                        all_tool_calls,
-                        iteration,
+                        ctx.all_tool_calls,
+                        ctx.iteration,
                         response_text,
-                        trace=trace,
-                        run_id=run_id,
+                        trace=ctx.trace,
+                        run_id=ctx.run_id,
                     )
-                    last_tool_name = _last_name
-                    last_tool_args = _last_args
+                    ctx.last_tool_name = _last_name
+                    ctx.last_tool_args = _last_args
                 else:
                     for tool_call in tool_calls_to_execute:
                         tool_name = tool_call.tool_name
                         parameters = tool_call.parameters
                         call_id = tool_call.id or ""
-                        all_tool_calls.append(tool_call)
-                        last_tool_name = tool_name
-                        last_tool_args = parameters
+                        ctx.all_tool_calls.append(tool_call)
+                        ctx.last_tool_name = tool_name
+                        ctx.last_tool_args = parameters
 
                         if self.config.verbose:
                             print(
-                                f"[agent] Iteration {iteration}: tool={tool_name} params={parameters}"
+                                f"[agent] Iteration {ctx.iteration}: tool={tool_name} params={parameters}"
                             )
 
                         tool = self._tools_by_name.get(tool_name)
@@ -1199,9 +1308,9 @@ class Agent:
                                 error_message,
                                 tool_name,
                                 tool_call.id,
-                                run_id=run_id,
+                                run_id=ctx.run_id,
                             )
-                            trace.add(
+                            ctx.trace.add(
                                 TraceStep(
                                     type="error",
                                     tool_name=tool_name,
@@ -1211,15 +1320,15 @@ class Agent:
                             )
                             continue
 
-                        policy_error = self._check_policy(tool_name, parameters, run_id)
+                        policy_error = self._check_policy(tool_name, parameters, ctx.run_id)
                         if policy_error:
                             self._append_tool_result(
                                 policy_error,
                                 tool_name,
                                 tool_call.id,
-                                run_id=run_id,
+                                run_id=ctx.run_id,
                             )
-                            trace.add(
+                            ctx.trace.add(
                                 TraceStep(
                                     type="error",
                                     tool_name=tool_name,
@@ -1230,16 +1339,16 @@ class Agent:
                             continue
 
                         coherence_error = self._check_coherence(
-                            user_text_for_coherence, tool_name, parameters
+                            ctx.user_text_for_coherence, tool_name, parameters
                         )
                         if coherence_error:
                             self._append_tool_result(
                                 coherence_error,
                                 tool_name,
                                 tool_call.id,
-                                run_id=run_id,
+                                run_id=ctx.run_id,
                             )
-                            trace.add(
+                            ctx.trace.add(
                                 TraceStep(
                                     type="error",
                                     tool_name=tool_name,
@@ -1253,7 +1362,7 @@ class Agent:
                             start_time = time.time()
                             self._call_hook("on_tool_start", tool_name, parameters)
                             self._notify_observers(
-                                "on_tool_start", run_id, call_id, tool_name, parameters
+                                "on_tool_start", ctx.run_id, call_id, tool_name, parameters
                             )
 
                             chunk_counter = {"count": 0}
@@ -1263,7 +1372,7 @@ class Agent:
                                 self._call_hook("on_tool_chunk", tool_name, chunk)
                                 self._notify_observers(
                                     "on_tool_chunk",
-                                    run_id,
+                                    ctx.run_id,
                                     call_id,
                                     tool_name,
                                     chunk,
@@ -1277,14 +1386,14 @@ class Agent:
                             self._call_hook("on_tool_end", tool_name, result, duration)
                             self._notify_observers(
                                 "on_tool_end",
-                                run_id,
+                                ctx.run_id,
                                 call_id,
                                 tool_name,
                                 result,
                                 duration * 1000,
                             )
 
-                            trace.add(
+                            ctx.trace.add(
                                 TraceStep(
                                     type="tool_execution",
                                     duration_ms=duration * 1000,
@@ -1318,7 +1427,7 @@ class Agent:
                                 tool_name,
                                 tool_call.id,
                                 tool_result=result,
-                                run_id=run_id,
+                                run_id=ctx.run_id,
                             )
 
                         except Exception as exc:
@@ -1326,14 +1435,14 @@ class Agent:
                             self._call_hook("on_tool_error", tool_name, exc, parameters)
                             self._notify_observers(
                                 "on_tool_error",
-                                run_id,
+                                ctx.run_id,
                                 call_id,
                                 tool_name,
                                 exc,
                                 parameters,
                                 duration * 1000,
                             )
-                            trace.add(
+                            ctx.trace.add(
                                 TraceStep(
                                     type="error",
                                     duration_ms=duration * 1000,
@@ -1357,45 +1466,30 @@ class Agent:
                                 error_message,
                                 tool_name,
                                 tool_call.id,
-                                run_id=run_id,
+                                run_id=ctx.run_id,
                             )
 
-                self._call_hook("on_iteration_end", iteration, response_text)
-                self._notify_observers("on_iteration_end", run_id, iteration, response_text or "")
+                self._call_hook("on_iteration_end", ctx.iteration, response_text)
+                self._notify_observers(
+                    "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                )
                 continue
 
-            final_response = Message(
-                role=Role.ASSISTANT,
-                content=f"Maximum iterations ({self.config.max_iterations}) reached without resolution.",
-            )
-            self._history.append(final_response)
-            self._memory_add(final_response, run_id)
-            self._call_hook("on_agent_end", final_response, self.usage)
-            _result = AgentResult(
-                message=final_response,
-                tool_name=last_tool_name,
-                tool_args=last_tool_args,
-                iterations=iteration,
-                tool_calls=all_tool_calls,
-                reasoning=reasoning_history[-1] if reasoning_history else None,
-                reasoning_history=reasoning_history,
-                trace=trace,
-                provider_used=getattr(self.provider, "provider_used", None),
-                usage=copy.copy(self.usage),
-            )
-            self._notify_observers("on_run_end", run_id, _result)
-            return _result
+            return self._build_max_iterations_result(ctx)
         except Exception as exc:
             if not self.memory:
-                self._history = self._history[:_history_checkpoint]
-            self._call_hook("on_error", exc, {"messages": messages, "iteration": iteration})
+                self._history = self._history[: ctx.history_checkpoint]
+            self._call_hook("on_error", exc, {"messages": messages, "iteration": ctx.iteration})
             self._notify_observers(
-                "on_error", run_id, exc, {"messages": messages, "iteration": iteration}
+                "on_error",
+                ctx.run_id,
+                exc,
+                {"messages": messages, "iteration": ctx.iteration},
             )
             raise
         finally:
             self._unwire_fallback_observer()
-            self._system_prompt = original_system_prompt
+            self._system_prompt = ctx.original_system_prompt
 
     def _call_provider(
         self,
@@ -1950,19 +2044,33 @@ class Agent:
         finally:
             executor.shutdown(wait=False)
 
+    def _clone_for_isolation(self) -> "Agent":
+        """Create a lightweight clone for batch processing with isolated state."""
+        clone = copy.copy(self)
+        clone._history = []
+        clone.usage = AgentUsage()
+        clone.memory = None
+        clone.analytics = None
+        return clone
+
     def _is_rate_limit_error(self, message: str) -> bool:
         lowered = message.lower()
         return "rate limit" in lowered or "429" in lowered
 
     # Async methods
     async def astream(
-        self, messages: Union[str, List[Message]]
+        self,
+        messages: Union[str, List[Message]],
+        response_format: Optional[ResponseFormat] = None,
+        parent_run_id: Optional[str] = None,
     ) -> AsyncGenerator[Union[StreamChunk, AgentResult], None]:
         """
         Stream the agent's response token-by-token.
 
         Args:
             messages: A plain-text prompt (str) or list of Message objects.
+            response_format: Optional Pydantic model class or JSON Schema dict.
+            parent_run_id: Optional run-ID of a parent agent for trace linking.
 
         Yields:
             StreamChunk: Intermediate content chunks.
@@ -1970,31 +2078,17 @@ class Agent:
         """
         messages = self._normalize_messages(messages)
         self._call_hook("on_agent_start", messages)
-
-        trace = self._new_trace()
-        run_id = trace.run_id
-        _history_checkpoint = len(self._history)
-        iteration = 0
-
-        original_system_prompt = self._system_prompt
-        self._wire_fallback_observer(run_id)
-        self._notify_observers("on_run_start", run_id, messages, self._system_prompt)
+        ctx = self._prepare_run(
+            messages, response_format=response_format, parent_run_id=parent_run_id
+        )
 
         try:
-            if self.memory:
-                self._history = self.memory.get_history() + list(messages)
-                self._memory_add_many(list(messages), run_id)
-            else:
-                self._history.extend(messages)
-
-            all_tool_calls: List[ToolCall] = []
-            last_tool_name: Optional[str] = None
-            last_tool_args: Dict[str, Any] = {}
-
-            while iteration < self.config.max_iterations:
-                iteration += 1
-                self._call_hook("on_iteration_start", iteration, self._history)
-                self._notify_observers("on_iteration_start", run_id, iteration, self._history)
+            while ctx.iteration < self.config.max_iterations:
+                ctx.iteration += 1
+                self._call_hook("on_iteration_start", ctx.iteration, self._history)
+                self._notify_observers(
+                    "on_iteration_start", ctx.run_id, ctx.iteration, self._history
+                )
 
                 full_content = ""
                 current_tool_calls: List[ToolCall] = []
@@ -2008,7 +2102,7 @@ class Agent:
                 self._call_hook("on_llm_start", self._history, self.config.model)
                 self._notify_observers(
                     "on_llm_start",
-                    run_id,
+                    ctx.run_id,
                     self._history,
                     self.config.model,
                     self._system_prompt,
@@ -2043,9 +2137,9 @@ class Agent:
                             ),
                         )
                     self._call_hook("on_llm_end", response_msg.content, _usage)
-                    self._notify_observers("on_llm_end", run_id, response_msg.content, _usage)
+                    self._notify_observers("on_llm_end", ctx.run_id, response_msg.content, _usage)
                     if _usage:
-                        self._notify_observers("on_usage", run_id, _usage)
+                        self._notify_observers("on_usage", ctx.run_id, _usage)
                     yield StreamChunk(content=response_msg.content)
                     full_content = response_msg.content
                     if response_msg.tool_calls:
@@ -2070,9 +2164,9 @@ class Agent:
                             yield StreamChunk(tool_calls=[item])
 
                     self._call_hook("on_llm_end", full_content, None)
-                    self._notify_observers("on_llm_end", run_id, full_content, None)
+                    self._notify_observers("on_llm_end", ctx.run_id, full_content, None)
 
-                trace.add(
+                ctx.trace.add(
                     TraceStep(
                         type="llm_call",
                         duration_ms=(time.time() - llm_start) * 1000,
@@ -2086,348 +2180,33 @@ class Agent:
                     content=full_content,
                     tool_calls=current_tool_calls or None,
                 )
-                self._history.append(response_msg)
-                self._memory_add(response_msg, run_id)
 
-                tool_calls_to_execute = []
-                if response_msg.tool_calls:
-                    tool_calls_to_execute = response_msg.tool_calls
-                else:
-                    parse_result = self.parser.parse(full_content)
-                    if parse_result.tool_call:
-                        tool_calls_to_execute.append(parse_result.tool_call)
-
-                if not tool_calls_to_execute:
-                    final_response = response_msg
-                    self._call_hook("on_iteration_end", iteration, full_content)
-                    self._notify_observers(
-                        "on_iteration_end", run_id, iteration, full_content or ""
-                    )
-                    _result = AgentResult(
-                        message=final_response,
-                        tool_name=last_tool_name,
-                        tool_args=last_tool_args,
-                        iterations=iteration,
-                        tool_calls=all_tool_calls,
-                        trace=trace,
-                        usage=copy.copy(self.usage),
-                    )
-                    self._notify_observers("on_run_end", run_id, _result)
-                    self._call_hook("on_agent_end", final_response, self.usage)
-                    yield _result
-                    return
-
-                if self.config.routing_only:
-                    self._call_hook("on_iteration_end", iteration, full_content)
-                    self._notify_observers(
-                        "on_iteration_end", run_id, iteration, full_content or ""
-                    )
-                    _result = AgentResult(
-                        message=response_msg,
-                        tool_name=tool_calls_to_execute[-1].tool_name,
-                        tool_args=tool_calls_to_execute[-1].parameters,
-                        iterations=iteration,
-                        tool_calls=tool_calls_to_execute,
-                        trace=trace,
-                        usage=copy.copy(self.usage),
-                    )
-                    self._notify_observers("on_run_end", run_id, _result)
-                    yield _result
-                    return
-
-                use_parallel = (
-                    self.config.parallel_tool_execution and len(tool_calls_to_execute) > 1
+                # Use _process_response for output guardrails, parsing, reasoning
+                response_text, tool_calls_to_execute, reasoning_text = self._process_response(
+                    ctx, response_msg
                 )
-
-                if use_parallel:
-                    _last_name, _last_args = await self._aexecute_tools_parallel(
-                        tool_calls_to_execute,
-                        all_tool_calls,
-                        iteration,
-                        full_content,
-                        trace=trace,
-                        run_id=run_id,
-                    )
-                    last_tool_name = _last_name
-                    last_tool_args = _last_args
-                else:
-                    for tool_call in tool_calls_to_execute:
-                        tool_name = tool_call.tool_name
-                        parameters = tool_call.parameters
-                        call_id = tool_call.id or ""
-                        all_tool_calls.append(tool_call)
-                        last_tool_name = tool_name
-                        last_tool_args = parameters
-
-                        tool = self._tools_by_name.get(tool_name)
-                        if not tool:
-                            result = f"Error: Tool {tool_name} not found"
-                            self._append_tool_result(
-                                result,
-                                tool_name,
-                                tool_call.id,
-                                run_id=run_id,
-                            )
-                            continue
-
-                        policy_error = await self._acheck_policy(tool_name, parameters, run_id)
-                        if policy_error:
-                            self._append_tool_result(
-                                policy_error,
-                                tool_name,
-                                tool_call.id,
-                                run_id=run_id,
-                            )
-                            continue
-
-                        try:
-                            start_time = time.time()
-                            self._call_hook("on_tool_start", tool_name, parameters)
-                            self._notify_observers(
-                                "on_tool_start", run_id, call_id, tool_name, parameters
-                            )
-                            result = await self._aexecute_tool_with_timeout(tool, parameters, None)
-                            duration = time.time() - start_time
-                            self._call_hook("on_tool_end", tool_name, result, duration)
-                            self._notify_observers(
-                                "on_tool_end",
-                                run_id,
-                                call_id,
-                                tool_name,
-                                result,
-                                duration * 1000,
-                            )
-                            trace.add(
-                                TraceStep(
-                                    type="tool_execution",
-                                    duration_ms=duration * 1000,
-                                    tool_name=tool_name,
-                                    tool_args=parameters,
-                                    tool_result=self._truncate_tool_result(result),
-                                    summary=f"{tool_name} → {len(result)} chars",
-                                )
-                            )
-                            self._append_tool_result(
-                                result,
-                                tool_name,
-                                tool_call.id,
-                                tool_result=result,
-                                run_id=run_id,
-                            )
-                        except Exception as exc:
-                            duration = time.time() - start_time
-                            self._call_hook("on_tool_error", tool_name, exc, parameters)
-                            self._notify_observers(
-                                "on_tool_error",
-                                run_id,
-                                call_id,
-                                tool_name,
-                                exc,
-                                parameters,
-                                duration * 1000,
-                            )
-                            trace.add(
-                                TraceStep(
-                                    type="error",
-                                    duration_ms=duration * 1000,
-                                    tool_name=tool_name,
-                                    error=str(exc),
-                                    summary=f"{tool_name} failed: {exc}",
-                                )
-                            )
-                            error_message = f"Error executing tool '{tool.name}': {exc}"
-                            self._append_tool_result(
-                                error_message,
-                                tool_name,
-                                tool_call.id,
-                                run_id=run_id,
-                            )
-
-                self._call_hook("on_iteration_end", iteration, full_content)
-                self._notify_observers("on_iteration_end", run_id, iteration, full_content or "")
-
-            final_msg = Message(
-                role=Role.ASSISTANT,
-                content=f"Maximum iterations ({self.config.max_iterations}) reached without resolution.",
-            )
-            self._history.append(final_msg)
-            _result = AgentResult(
-                message=final_msg,
-                tool_name=last_tool_name,
-                tool_args=last_tool_args,
-                iterations=iteration,
-                tool_calls=all_tool_calls,
-                trace=trace,
-                usage=copy.copy(self.usage),
-            )
-            self._notify_observers("on_run_end", run_id, _result)
-            self._memory_add(final_msg, run_id)
-            self._call_hook("on_agent_end", final_msg, self.usage)
-            yield _result
-            return
-        except Exception as exc:
-            if not self.memory:
-                self._history = self._history[:_history_checkpoint]
-            self._call_hook("on_error", exc, {"messages": messages, "iteration": iteration})
-            self._notify_observers(
-                "on_error", run_id, exc, {"messages": messages, "iteration": iteration}
-            )
-            raise
-        finally:
-            self._unwire_fallback_observer()
-            self._system_prompt = original_system_prompt
-
-    async def arun(
-        self,
-        messages: Union[str, List[Message]],
-        stream_handler: Optional[Callable[[str], None]] = None,
-        response_format: Optional[ResponseFormat] = None,
-    ) -> AgentResult:
-        """
-        Async version of run().
-
-        Execute the agent loop asynchronously with the provided conversation history.
-        Uses provider async methods if available, falls back to sync in executor.
-
-        Args:
-            messages: A plain-text prompt (str) or list of Message objects.
-            stream_handler: Optional callback for streaming responses.
-            response_format: Optional Pydantic model class or JSON Schema dict.
-
-        Returns:
-            AgentResult with the final response and tool call metadata.
-        """
-        messages = self._normalize_messages(messages)
-        self._call_hook("on_agent_start", messages)
-
-        original_system_prompt = self._system_prompt
-        if response_format is not None:
-            schema = schema_from_response_format(response_format)
-            self._system_prompt = self._system_prompt + build_schema_instruction(schema)
-
-        trace = self._new_trace()
-        run_id = trace.run_id
-        _history_checkpoint = len(self._history)
-        iteration = 0
-
-        self._wire_fallback_observer(run_id)
-        self._notify_observers("on_run_start", run_id, messages, self._system_prompt)
-
-        try:
-            for msg in messages:
-                if msg.role == Role.USER and msg.content:
-                    msg.content = self._run_input_guardrails(msg.content, trace)
-
-            if self.memory:
-                if self.config.session_store and self.config.session_id:
-                    self._notify_observers(
-                        "on_session_load", run_id, self.config.session_id, len(self.memory)
-                    )
-                self._history = self.memory.get_history() + list(messages)
-                self._memory_add_many(list(messages), run_id)
-                if self.memory.summary:
-                    self._history.insert(
-                        0,
-                        Message(
-                            role=Role.SYSTEM,
-                            content=f"[Conversation Summary] {self.memory.summary}",
-                        ),
-                    )
-            else:
-                self._history.extend(messages)
-
-            if self.config.knowledge_memory:
-                km_ctx = self.config.knowledge_memory.build_context()
-                if km_ctx:
-                    self._history.insert(
-                        0,
-                        Message(role=Role.SYSTEM, content=km_ctx),
-                    )
-
-            if self.config.entity_memory:
-                entity_ctx = self.config.entity_memory.build_context()
-                if entity_ctx:
-                    self._history.insert(
-                        0,
-                        Message(role=Role.SYSTEM, content=entity_ctx),
-                    )
-
-            user_text_for_coherence = ""
-            for msg in reversed(messages):
-                if msg.role == Role.USER and msg.content:
-                    user_text_for_coherence = msg.content
-                    break
-
-            if self.config.knowledge_graph:
-                kg_ctx = self.config.knowledge_graph.build_context(query=user_text_for_coherence)
-                if kg_ctx:
-                    self._history.insert(
-                        0,
-                        Message(role=Role.SYSTEM, content=kg_ctx),
-                    )
-
-            all_tool_calls: List[ToolCall] = []
-            last_tool_name: Optional[str] = None
-            last_tool_args: Dict[str, Any] = {}
-            reasoning_history: List[str] = []
-
-            while iteration < self.config.max_iterations:
-                iteration += 1
-                self._call_hook("on_iteration_start", iteration, self._history)
-                self._notify_observers("on_iteration_start", run_id, iteration, self._history)
-
-                response_msg = await self._acall_provider(
-                    stream_handler=stream_handler, trace=trace, run_id=run_id
-                )
-                response_text = response_msg.content or ""
-                response_text = self._run_output_guardrails(response_text, trace)
-                response_msg.content = response_text
-
-                tool_calls_to_execute = []
-                if response_msg.tool_calls:
-                    tool_calls_to_execute = response_msg.tool_calls
-                elif response_format is None:
-                    parse_result = self.parser.parse(response_text)
-                    if parse_result.tool_call:
-                        tool_calls_to_execute.append(parse_result.tool_call)
-
-                reasoning_text = self._extract_reasoning(response_msg, tool_calls_to_execute)
-                if reasoning_text:
-                    reasoning_history.append(reasoning_text)
-
-                if tool_calls_to_execute:
-                    for tc in tool_calls_to_execute:
-                        trace.add(
-                            TraceStep(
-                                type="tool_selection",
-                                tool_name=tc.tool_name,
-                                tool_args=tc.parameters,
-                                reasoning=reasoning_text,
-                                summary=f"Selected {tc.tool_name}",
-                            )
-                        )
 
                 if not tool_calls_to_execute:
                     parsed = None
-                    if response_format is not None:
+                    if ctx.response_format is not None:
                         try:
-                            parsed = parse_and_validate(response_text, response_format)
+                            parsed = parse_and_validate(response_text, ctx.response_format)
                             self._notify_observers(
                                 "on_structured_validate",
-                                run_id,
+                                ctx.run_id,
                                 True,
-                                iteration,
+                                ctx.iteration,
                             )
                         except (ValueError, TypeError) as exc:
                             self._notify_observers(
                                 "on_structured_validate",
-                                run_id,
+                                ctx.run_id,
                                 False,
-                                iteration,
+                                ctx.iteration,
                                 str(exc),
                             )
-                            if iteration < self.config.max_iterations:
-                                trace.add(
+                            if ctx.iteration < self.config.max_iterations:
+                                ctx.trace.add(
                                     TraceStep(
                                         type="structured_retry",
                                         error=str(exc),
@@ -2442,61 +2221,48 @@ class Agent:
                                     Message(role=Role.ASSISTANT, content=response_text)
                                 )
                                 self._history.append(retry_msg)
-                                self._call_hook("on_iteration_end", iteration, response_text)
+                                self._call_hook("on_iteration_end", ctx.iteration, response_text)
                                 self._notify_observers(
-                                    "on_iteration_end", run_id, iteration, response_text or ""
+                                    "on_iteration_end",
+                                    ctx.run_id,
+                                    ctx.iteration,
+                                    response_text or "",
                                 )
                                 continue
 
                     final_response = Message(role=Role.ASSISTANT, content=response_text)
-                    self._history.append(final_response)
-                    self._call_hook("on_iteration_end", iteration, response_text)
+                    self._call_hook("on_iteration_end", ctx.iteration, response_text)
                     self._notify_observers(
-                        "on_iteration_end", run_id, iteration, response_text or ""
+                        "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
                     )
-                    self._memory_add(final_response, run_id)
-                    self._extract_entities(run_id)
-                    self._extract_kg_triples(run_id)
-                    self._session_save(run_id)
-                    self._call_hook("on_agent_end", final_response, self.usage)
-                    _result = AgentResult(
-                        message=final_response,
-                        tool_name=last_tool_name,
-                        tool_args=last_tool_args,
-                        iterations=iteration,
-                        tool_calls=all_tool_calls,
-                        parsed=parsed,
-                        reasoning=reasoning_history[-1] if reasoning_history else None,
-                        reasoning_history=reasoning_history,
-                        trace=trace,
-                        provider_used=getattr(self.provider, "provider_used", None),
-                        usage=copy.copy(self.usage),
-                    )
-                    self._notify_observers("on_run_end", run_id, _result)
-                    return _result
+                    _result = self._finalize_run(ctx, final_response, parsed=parsed)
+                    yield _result
+                    return
 
-                if self.config.routing_only and tool_calls_to_execute:
-                    self._call_hook("on_iteration_end", iteration, response_text)
+                if self.config.routing_only:
+                    self._call_hook("on_iteration_end", ctx.iteration, full_content)
                     self._notify_observers(
-                        "on_iteration_end", run_id, iteration, response_text or ""
+                        "on_iteration_end", ctx.run_id, ctx.iteration, full_content or ""
                     )
                     _result = AgentResult(
                         message=response_msg,
                         tool_name=tool_calls_to_execute[-1].tool_name,
                         tool_args=tool_calls_to_execute[-1].parameters,
-                        iterations=iteration,
+                        iterations=ctx.iteration,
                         tool_calls=tool_calls_to_execute,
                         reasoning=reasoning_text,
-                        reasoning_history=reasoning_history,
-                        trace=trace,
+                        reasoning_history=ctx.reasoning_history,
+                        trace=ctx.trace,
                         provider_used=getattr(self.provider, "provider_used", None),
                         usage=copy.copy(self.usage),
                     )
-                    self._notify_observers("on_run_end", run_id, _result)
-                    return _result
+                    self._notify_observers("on_run_end", ctx.run_id, _result)
+                    yield _result
+                    return
 
+                # Append response AFTER checking for tool calls (matches run/arun)
                 self._history.append(response_msg)
-                self._memory_add(response_msg, run_id)
+                self._memory_add(response_msg, ctx.run_id)
 
                 use_parallel = (
                     self.config.parallel_tool_execution and len(tool_calls_to_execute) > 1
@@ -2505,26 +2271,26 @@ class Agent:
                 if use_parallel:
                     _last_name, _last_args = await self._aexecute_tools_parallel(
                         tool_calls_to_execute,
-                        all_tool_calls,
-                        iteration,
-                        response_text,
-                        trace=trace,
-                        run_id=run_id,
+                        ctx.all_tool_calls,
+                        ctx.iteration,
+                        full_content,
+                        trace=ctx.trace,
+                        run_id=ctx.run_id,
                     )
-                    last_tool_name = _last_name
-                    last_tool_args = _last_args
+                    ctx.last_tool_name = _last_name
+                    ctx.last_tool_args = _last_args
                 else:
                     for tool_call in tool_calls_to_execute:
                         tool_name = tool_call.tool_name
                         parameters = tool_call.parameters
                         call_id = tool_call.id or ""
-                        all_tool_calls.append(tool_call)
-                        last_tool_name = tool_name
-                        last_tool_args = parameters
+                        ctx.all_tool_calls.append(tool_call)
+                        ctx.last_tool_name = tool_name
+                        ctx.last_tool_args = parameters
 
                         if self.config.verbose:
                             print(
-                                f"[agent] Iteration {iteration}: tool={tool_name} params={parameters}"
+                                f"[agent] Iteration {ctx.iteration}: tool={tool_name} params={parameters}"
                             )
 
                         tool = self._tools_by_name.get(tool_name)
@@ -2534,9 +2300,9 @@ class Agent:
                                 error_message,
                                 tool_name,
                                 tool_call.id,
-                                run_id=run_id,
+                                run_id=ctx.run_id,
                             )
-                            trace.add(
+                            ctx.trace.add(
                                 TraceStep(
                                     type="error",
                                     tool_name=tool_name,
@@ -2546,15 +2312,15 @@ class Agent:
                             )
                             continue
 
-                        policy_error = await self._acheck_policy(tool_name, parameters, run_id)
+                        policy_error = await self._acheck_policy(tool_name, parameters, ctx.run_id)
                         if policy_error:
                             self._append_tool_result(
                                 policy_error,
                                 tool_name,
                                 tool_call.id,
-                                run_id=run_id,
+                                run_id=ctx.run_id,
                             )
-                            trace.add(
+                            ctx.trace.add(
                                 TraceStep(
                                     type="error",
                                     tool_name=tool_name,
@@ -2565,16 +2331,16 @@ class Agent:
                             continue
 
                         coherence_error = await self._acheck_coherence(
-                            user_text_for_coherence, tool_name, parameters
+                            ctx.user_text_for_coherence, tool_name, parameters
                         )
                         if coherence_error:
                             self._append_tool_result(
                                 coherence_error,
                                 tool_name,
                                 tool_call.id,
-                                run_id=run_id,
+                                run_id=ctx.run_id,
                             )
-                            trace.add(
+                            ctx.trace.add(
                                 TraceStep(
                                     type="error",
                                     tool_name=tool_name,
@@ -2588,7 +2354,7 @@ class Agent:
                             start_time = time.time()
                             self._call_hook("on_tool_start", tool_name, parameters)
                             self._notify_observers(
-                                "on_tool_start", run_id, call_id, tool_name, parameters
+                                "on_tool_start", ctx.run_id, call_id, tool_name, parameters
                             )
 
                             chunk_counter = {"count": 0}
@@ -2598,7 +2364,7 @@ class Agent:
                                 self._call_hook("on_tool_chunk", tool_name, chunk)
                                 self._notify_observers(
                                     "on_tool_chunk",
-                                    run_id,
+                                    ctx.run_id,
                                     call_id,
                                     tool_name,
                                     chunk,
@@ -2612,14 +2378,14 @@ class Agent:
                             self._call_hook("on_tool_end", tool_name, result, duration)
                             self._notify_observers(
                                 "on_tool_end",
-                                run_id,
+                                ctx.run_id,
                                 call_id,
                                 tool_name,
                                 result,
                                 duration * 1000,
                             )
 
-                            trace.add(
+                            ctx.trace.add(
                                 TraceStep(
                                     type="tool_execution",
                                     duration_ms=duration * 1000,
@@ -2647,28 +2413,36 @@ class Agent:
                                     self.usage.tool_tokens.get(tool.name, 0)
                                     + self.usage.iterations[-1].total_tokens
                                 )
+
+                            self._append_tool_result(
+                                result,
+                                tool_name,
+                                tool_call.id,
+                                tool_result=result,
+                                run_id=ctx.run_id,
+                            )
+
                         except Exception as exc:
                             duration = time.time() - start_time
-                            self._call_hook("on_tool_error", tool.name, exc, parameters)
+                            self._call_hook("on_tool_error", tool_name, exc, parameters)
                             self._notify_observers(
                                 "on_tool_error",
-                                run_id,
+                                ctx.run_id,
                                 call_id,
                                 tool_name,
                                 exc,
                                 parameters,
                                 duration * 1000,
                             )
-                            trace.add(
+                            ctx.trace.add(
                                 TraceStep(
                                     type="error",
                                     duration_ms=duration * 1000,
-                                    tool_name=tool.name,
+                                    tool_name=tool_name,
                                     error=str(exc),
-                                    summary=f"{tool.name} failed: {exc}",
+                                    summary=f"{tool_name} failed: {exc}",
                                 )
                             )
-
                             if self.analytics:
                                 self.analytics.record_tool_call(
                                     tool_name=tool.name,
@@ -2676,61 +2450,374 @@ class Agent:
                                     duration=duration,
                                     params=parameters,
                                     cost=0.0,
-                                    chunk_count=chunk_counter.get("count", 0),
+                                    chunk_count=0,
                                 )
 
-                            error_message = f"Error executing tool '{tool.name}': {exc}"
+                            error_message = f"Error executing tool '{tool_name}': {exc}"
                             self._append_tool_result(
                                 error_message,
                                 tool_name,
                                 tool_call.id,
-                                run_id=run_id,
+                                run_id=ctx.run_id,
                             )
-                            continue
 
-                        self._append_tool_result(
-                            result,
-                            tool_name,
-                            tool_call.id,
-                            tool_result=result,
-                            run_id=run_id,
-                        )
+                self._call_hook("on_iteration_end", ctx.iteration, response_text)
+                self._notify_observers(
+                    "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                )
 
-                self._call_hook("on_iteration_end", iteration, response_text)
-                self._notify_observers("on_iteration_end", run_id, iteration, response_text or "")
-
-            final_response = Message(
-                role=Role.ASSISTANT,
-                content=f"Maximum iterations ({self.config.max_iterations}) reached without resolution.",
-            )
-            self._history.append(final_response)
-            self._memory_add(final_response, run_id)
-            self._call_hook("on_agent_end", final_response, self.usage)
-            _result = AgentResult(
-                message=final_response,
-                tool_name=last_tool_name,
-                tool_args=last_tool_args,
-                iterations=iteration,
-                tool_calls=all_tool_calls,
-                reasoning=reasoning_history[-1] if reasoning_history else None,
-                reasoning_history=reasoning_history,
-                trace=trace,
-                provider_used=getattr(self.provider, "provider_used", None),
-                usage=copy.copy(self.usage),
-            )
-            self._notify_observers("on_run_end", run_id, _result)
-            return _result
+            _result = self._build_max_iterations_result(ctx)
+            yield _result
+            return
         except Exception as exc:
             if not self.memory:
-                self._history = self._history[:_history_checkpoint]
-            self._call_hook("on_error", exc, {"messages": messages, "iteration": iteration})
+                self._history = self._history[: ctx.history_checkpoint]
+            self._call_hook("on_error", exc, {"messages": messages, "iteration": ctx.iteration})
             self._notify_observers(
-                "on_error", run_id, exc, {"messages": messages, "iteration": iteration}
+                "on_error",
+                ctx.run_id,
+                exc,
+                {"messages": messages, "iteration": ctx.iteration},
             )
             raise
         finally:
             self._unwire_fallback_observer()
-            self._system_prompt = original_system_prompt
+            self._system_prompt = ctx.original_system_prompt
+
+    async def arun(
+        self,
+        messages: Union[str, List[Message]],
+        stream_handler: Optional[Callable[[str], None]] = None,
+        response_format: Optional[ResponseFormat] = None,
+        parent_run_id: Optional[str] = None,
+    ) -> AgentResult:
+        """
+        Async version of run().
+
+        Execute the agent loop asynchronously with the provided conversation history.
+        Uses provider async methods if available, falls back to sync in executor.
+
+        Args:
+            messages: A plain-text prompt (str) or list of Message objects.
+            stream_handler: Optional callback for streaming responses.
+            response_format: Optional Pydantic model class or JSON Schema dict.
+            parent_run_id: Optional run-ID of a parent agent for trace linking.
+
+        Returns:
+            AgentResult with the final response and tool call metadata.
+        """
+        messages = self._normalize_messages(messages)
+        self._call_hook("on_agent_start", messages)
+        ctx = self._prepare_run(
+            messages, response_format=response_format, parent_run_id=parent_run_id
+        )
+
+        try:
+            while ctx.iteration < self.config.max_iterations:
+                ctx.iteration += 1
+                self._call_hook("on_iteration_start", ctx.iteration, self._history)
+                self._notify_observers(
+                    "on_iteration_start", ctx.run_id, ctx.iteration, self._history
+                )
+
+                response_msg = await self._acall_provider(
+                    stream_handler=stream_handler, trace=ctx.trace, run_id=ctx.run_id
+                )
+                response_text, tool_calls_to_execute, reasoning_text = self._process_response(
+                    ctx, response_msg
+                )
+
+                if not tool_calls_to_execute:
+                    parsed = None
+                    if ctx.response_format is not None:
+                        try:
+                            parsed = parse_and_validate(response_text, ctx.response_format)
+                            self._notify_observers(
+                                "on_structured_validate",
+                                ctx.run_id,
+                                True,
+                                ctx.iteration,
+                            )
+                        except (ValueError, TypeError) as exc:
+                            self._notify_observers(
+                                "on_structured_validate",
+                                ctx.run_id,
+                                False,
+                                ctx.iteration,
+                                str(exc),
+                            )
+                            if ctx.iteration < self.config.max_iterations:
+                                ctx.trace.add(
+                                    TraceStep(
+                                        type="structured_retry",
+                                        error=str(exc),
+                                        summary=f"Validation failed: {exc}",
+                                    )
+                                )
+                                retry_msg = Message(
+                                    role=Role.USER,
+                                    content=validation_retry_message(exc),
+                                )
+                                self._history.append(
+                                    Message(role=Role.ASSISTANT, content=response_text)
+                                )
+                                self._history.append(retry_msg)
+                                self._call_hook("on_iteration_end", ctx.iteration, response_text)
+                                self._notify_observers(
+                                    "on_iteration_end",
+                                    ctx.run_id,
+                                    ctx.iteration,
+                                    response_text or "",
+                                )
+                                continue
+
+                    final_response = Message(role=Role.ASSISTANT, content=response_text)
+                    self._call_hook("on_iteration_end", ctx.iteration, response_text)
+                    self._notify_observers(
+                        "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                    )
+                    return self._finalize_run(ctx, final_response, parsed=parsed)
+
+                if self.config.routing_only and tool_calls_to_execute:
+                    self._call_hook("on_iteration_end", ctx.iteration, response_text)
+                    self._notify_observers(
+                        "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                    )
+                    _result = AgentResult(
+                        message=response_msg,
+                        tool_name=tool_calls_to_execute[-1].tool_name,
+                        tool_args=tool_calls_to_execute[-1].parameters,
+                        iterations=ctx.iteration,
+                        tool_calls=tool_calls_to_execute,
+                        reasoning=reasoning_text,
+                        reasoning_history=ctx.reasoning_history,
+                        trace=ctx.trace,
+                        provider_used=getattr(self.provider, "provider_used", None),
+                        usage=copy.copy(self.usage),
+                    )
+                    self._notify_observers("on_run_end", ctx.run_id, _result)
+                    return _result
+
+                self._history.append(response_msg)
+                self._memory_add(response_msg, ctx.run_id)
+
+                use_parallel = (
+                    self.config.parallel_tool_execution and len(tool_calls_to_execute) > 1
+                )
+
+                if use_parallel:
+                    _last_name, _last_args = await self._aexecute_tools_parallel(
+                        tool_calls_to_execute,
+                        ctx.all_tool_calls,
+                        ctx.iteration,
+                        response_text,
+                        trace=ctx.trace,
+                        run_id=ctx.run_id,
+                    )
+                    ctx.last_tool_name = _last_name
+                    ctx.last_tool_args = _last_args
+                else:
+                    for tool_call in tool_calls_to_execute:
+                        tool_name = tool_call.tool_name
+                        parameters = tool_call.parameters
+                        call_id = tool_call.id or ""
+                        ctx.all_tool_calls.append(tool_call)
+                        ctx.last_tool_name = tool_name
+                        ctx.last_tool_args = parameters
+
+                        if self.config.verbose:
+                            print(
+                                f"[agent] Iteration {ctx.iteration}: tool={tool_name} params={parameters}"
+                            )
+
+                        tool = self._tools_by_name.get(tool_name)
+                        if not tool:
+                            error_message = f"Unknown tool '{tool_name}'. Available tools: {', '.join(self._tools_by_name.keys())}"
+                            self._append_tool_result(
+                                error_message,
+                                tool_name,
+                                tool_call.id,
+                                run_id=ctx.run_id,
+                            )
+                            ctx.trace.add(
+                                TraceStep(
+                                    type="error",
+                                    tool_name=tool_name,
+                                    error=error_message,
+                                    summary=f"Unknown tool {tool_name}",
+                                )
+                            )
+                            continue
+
+                        policy_error = await self._acheck_policy(tool_name, parameters, ctx.run_id)
+                        if policy_error:
+                            self._append_tool_result(
+                                policy_error,
+                                tool_name,
+                                tool_call.id,
+                                run_id=ctx.run_id,
+                            )
+                            ctx.trace.add(
+                                TraceStep(
+                                    type="error",
+                                    tool_name=tool_name,
+                                    error=policy_error,
+                                    summary=f"Policy denied {tool_name}",
+                                )
+                            )
+                            continue
+
+                        coherence_error = await self._acheck_coherence(
+                            ctx.user_text_for_coherence, tool_name, parameters
+                        )
+                        if coherence_error:
+                            self._append_tool_result(
+                                coherence_error,
+                                tool_name,
+                                tool_call.id,
+                                run_id=ctx.run_id,
+                            )
+                            ctx.trace.add(
+                                TraceStep(
+                                    type="error",
+                                    tool_name=tool_name,
+                                    error=coherence_error,
+                                    summary=f"Coherence check failed for {tool_name}",
+                                )
+                            )
+                            continue
+
+                        try:
+                            start_time = time.time()
+                            self._call_hook("on_tool_start", tool_name, parameters)
+                            self._notify_observers(
+                                "on_tool_start", ctx.run_id, call_id, tool_name, parameters
+                            )
+
+                            chunk_counter = {"count": 0}
+
+                            def chunk_callback(chunk: str) -> None:
+                                chunk_counter["count"] += 1
+                                self._call_hook("on_tool_chunk", tool_name, chunk)
+                                self._notify_observers(
+                                    "on_tool_chunk",
+                                    ctx.run_id,
+                                    call_id,
+                                    tool_name,
+                                    chunk,
+                                )
+
+                            result = await self._aexecute_tool_with_timeout(
+                                tool, parameters, chunk_callback
+                            )
+                            result = self._screen_tool_result(tool_name, result)
+                            duration = time.time() - start_time
+                            self._call_hook("on_tool_end", tool_name, result, duration)
+                            self._notify_observers(
+                                "on_tool_end",
+                                ctx.run_id,
+                                call_id,
+                                tool_name,
+                                result,
+                                duration * 1000,
+                            )
+
+                            ctx.trace.add(
+                                TraceStep(
+                                    type="tool_execution",
+                                    duration_ms=duration * 1000,
+                                    tool_name=tool_name,
+                                    tool_args=parameters,
+                                    tool_result=self._truncate_tool_result(result),
+                                    summary=f"{tool_name} → {len(result)} chars",
+                                )
+                            )
+
+                            if self.analytics:
+                                self.analytics.record_tool_call(
+                                    tool_name=tool.name,
+                                    success=True,
+                                    duration=duration,
+                                    params=parameters,
+                                    cost=0.0,
+                                    chunk_count=chunk_counter["count"],
+                                )
+                            if self.usage.iterations:
+                                self.usage.tool_usage[tool.name] = (
+                                    self.usage.tool_usage.get(tool.name, 0) + 1
+                                )
+                                self.usage.tool_tokens[tool.name] = (
+                                    self.usage.tool_tokens.get(tool.name, 0)
+                                    + self.usage.iterations[-1].total_tokens
+                                )
+
+                            self._append_tool_result(
+                                result,
+                                tool_name,
+                                tool_call.id,
+                                tool_result=result,
+                                run_id=ctx.run_id,
+                            )
+
+                        except Exception as exc:
+                            duration = time.time() - start_time
+                            self._call_hook("on_tool_error", tool_name, exc, parameters)
+                            self._notify_observers(
+                                "on_tool_error",
+                                ctx.run_id,
+                                call_id,
+                                tool_name,
+                                exc,
+                                parameters,
+                                duration * 1000,
+                            )
+                            ctx.trace.add(
+                                TraceStep(
+                                    type="error",
+                                    duration_ms=duration * 1000,
+                                    tool_name=tool_name,
+                                    error=str(exc),
+                                    summary=f"{tool_name} failed: {exc}",
+                                )
+                            )
+                            if self.analytics:
+                                self.analytics.record_tool_call(
+                                    tool_name=tool.name,
+                                    success=False,
+                                    duration=duration,
+                                    params=parameters,
+                                    cost=0.0,
+                                    chunk_count=0,
+                                )
+
+                            error_message = f"Error executing tool '{tool_name}': {exc}"
+                            self._append_tool_result(
+                                error_message,
+                                tool_name,
+                                tool_call.id,
+                                run_id=ctx.run_id,
+                            )
+
+                self._call_hook("on_iteration_end", ctx.iteration, response_text)
+                self._notify_observers(
+                    "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                )
+
+            return self._build_max_iterations_result(ctx)
+        except Exception as exc:
+            if not self.memory:
+                self._history = self._history[: ctx.history_checkpoint]
+            self._call_hook("on_error", exc, {"messages": messages, "iteration": ctx.iteration})
+            self._notify_observers(
+                "on_error",
+                ctx.run_id,
+                exc,
+                {"messages": messages, "iteration": ctx.iteration},
+            )
+            raise
+        finally:
+            self._unwire_fallback_observer()
+            self._system_prompt = ctx.original_system_prompt
 
     async def _acall_provider(
         self,

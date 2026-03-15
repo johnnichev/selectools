@@ -49,6 +49,24 @@ The **Agent** class is the central orchestrator of the selectools framework. It 
 14. **Response Caching**: Avoid redundant LLM calls via pluggable cache layer
 15. **Tool Policy & HITL**: Declarative allow/review/deny rules with human approval
 
+### Properties & Convenience Methods
+
+| Property / Method | Description |
+|---|---|
+| `agent.name` | Returns `config.name` (default: `"agent"`). Useful for multi-agent identification. |
+| `agent(messages, **kw)` | Shorthand for `agent.run(messages, **kw)` via `__call__`. |
+| `agent.ask(prompt)` | Shorthand for `run()` with a single string prompt. |
+| `agent.aask(prompt)` | Async version of `ask()`. |
+
+```python
+# Named agents for multi-agent systems
+researcher = Agent(tools=[search], config=AgentConfig(name="researcher"))
+print(researcher.name)  # "researcher"
+
+# Call the agent directly
+result = researcher("Find info about Python")  # same as researcher.run(...)
+```
+
 ### Core Dependencies
 
 ```python
@@ -603,6 +621,15 @@ except Exception as exc:
 
 ## Sync vs Async Execution
 
+All three execution methods share the same parameters and feature set (as of v0.16.3):
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `messages` | `str \| List[Message]` | required | User prompt or message list |
+| `stream_handler` | `Callable[[str], None]` | `None` | Callback for streaming chunks (run/arun only) |
+| `response_format` | `ResponseFormat` | `None` | Pydantic model or JSON Schema for structured output |
+| `parent_run_id` | `str` | `None` | Links trace to a parent agent's run for nested orchestration |
+
 ### Sync Execution (`run()`)
 
 ```python
@@ -782,7 +809,7 @@ agent = Agent(
 )
 ```
 
-### All 19 Lifecycle Events
+### All 25 Lifecycle Events
 
 | Event | Scope | Parameters (after `run_id`) | When |
 |---|---|---|---|
@@ -1043,7 +1070,7 @@ Each section is only present when the corresponding feature is configured and ha
 
 ### Agent.astream()
 
-The `astream()` method provides token-by-token streaming with native tool call support:
+The `astream()` method provides token-by-token streaming with **full feature parity** with `run()` and `arun()` (as of v0.16.3). It supports `response_format`, `parent_run_id`, input/output guardrails, coherence checks, knowledge context injection, entity/KG extraction, session save, structured output validation, analytics, and verbose output.
 
 ```python
 async for item in agent.astream([Message(role=Role.USER, content="Search for Python")]):
@@ -1053,13 +1080,25 @@ async for item in agent.astream([Message(role=Role.USER, content="Search for Pyt
         print(f"\nDone in {item.iterations} iterations")
 ```
 
+**Signature:**
+
+```python
+async def astream(
+    messages: Union[str, List[Message]],
+    response_format: Optional[ResponseFormat] = None,  # Structured output
+    parent_run_id: Optional[str] = None,               # Trace linking
+) -> AsyncGenerator[Union[StreamChunk, AgentResult], None]:
+```
+
 ### How It Works
 
-1. Provider streams text deltas and tool call deltas via `astream()`
-2. Text chunks are yielded as `StreamChunk` objects
-3. Tool calls are accumulated until complete, then executed
-4. Tool results are appended to history and the loop continues
-5. Final `AgentResult` is yielded when no more tool calls
+1. Shared `_prepare_run()` sets up trace, guardrails, memory, knowledge context (identical to run/arun)
+2. Provider streams text deltas and tool call deltas via `astream()`
+3. Text chunks are yielded as `StreamChunk` objects
+4. Shared `_process_response()` applies output guardrails, parses tool calls, extracts reasoning
+5. Tool calls are executed with coherence checks, output screening, analytics, and usage tracking
+6. Shared `_finalize_run()` saves session, extracts entities/KG, builds full `AgentResult`
+7. Final `AgentResult` is yielded (includes `parsed`, `reasoning`, `reasoning_history`, `provider_used`)
 
 ### Provider Protocol
 

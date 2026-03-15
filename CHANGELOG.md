@@ -5,6 +5,53 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.3] - 2026-03-14
+
+### Added
+
+- **`Agent.name`** property — reads from `AgentConfig.name` (default: `"agent"`). Pre-work for multi-agent orchestration (v0.17.0)
+- **`Agent.__call__()`** — allows calling the agent directly as a shorthand for `run()`
+- **`parent_run_id`** parameter on `run()`, `arun()`, and `astream()` — overrides `config.parent_run_id` for trace linking in nested agent calls
+- **`response_format`** parameter on `astream()` — brings structured output support to streaming (was missing)
+- **`GraphExecutionError`** exception — new error type for graph execution failures (pre-work for v0.17.0)
+- **`_clone_for_isolation()`** — shared helper used by `batch()` and `abatch()` for consistent agent cloning
+- **29 regression tests** (`tests/agent/test_astream_parity.py`) covering all astream() bug fixes
+
+### Fixed
+
+- **astream() input guardrails**: Now runs `_run_input_guardrails()` on user messages (was missing)
+- **astream() output guardrails**: Now runs `_run_output_guardrails()` on LLM responses (was missing)
+- **astream() knowledge_memory context**: Now injects `knowledge_memory.build_context()` into history (was missing)
+- **astream() entity_memory context**: Now injects `entity_memory.build_context()` into history (was missing)
+- **astream() knowledge_graph context**: Now injects `knowledge_graph.build_context()` into history (was missing)
+- **astream() session load notification**: Now notifies observers with `on_session_load` event (was missing)
+- **astream() memory summary injection**: Now injects `memory.summary` into history (was missing)
+- **astream() user_text_for_coherence**: Now extracts user text for coherence checks (was missing)
+- **astream() response_format parse guard**: Parser no longer intercepts valid JSON when `response_format` is set (was always parsing)
+- **astream() reasoning extraction**: Now extracts reasoning text from LLM responses (was missing)
+- **astream() tool_selection trace steps**: Now records `tool_selection` trace steps (was missing)
+- **astream() coherence check**: Now runs `_acheck_coherence()` on tool calls (was missing)
+- **astream() screen_tool_result**: Now screens tool output for prompt injection (was missing)
+- **astream() analytics recording**: Now records tool call analytics (was missing)
+- **astream() verbose output**: Now prints verbose logs for tool execution (was missing)
+- **astream() chunk callback**: Now passes chunk callback to tool execution (was passing `None`)
+- **astream() per-tool usage tracking**: Now tracks per-tool token usage (was missing)
+- **astream() tool-not-found**: Now uses consistent error message format and produces trace step (was different from run/arun)
+- **astream() policy denial trace**: Now produces trace step for policy denials (was missing)
+- **astream() entity extraction**: Now calls `_extract_entities()` in teardown (was missing)
+- **astream() KG extraction**: Now calls `_extract_kg_triples()` in teardown (was missing)
+- **astream() session save**: Now calls `_session_save()` in teardown (was missing)
+- **astream() AgentResult fields**: Now includes `parsed`, `reasoning`, `reasoning_history`, `provider_used` (were missing)
+- **astream() structured output validation**: Now validates and retries structured output (was missing)
+- **astream() history append order**: Response now appended to history only when tool calls exist (was appending before check)
+
+### Changed
+
+- **agent/core.py refactoring**: Extracted `_RunContext` dataclass, `_prepare_run()`, `_finalize_run()`, `_process_response()`, `_build_max_iterations_result()` shared helpers — eliminates ~800 lines of duplicated setup/teardown/iteration logic across `run()`, `arun()`, and `astream()`
+- **batch()/abatch()**: Now use `_clone_for_isolation()` instead of inline clone logic
+
+---
+
 ## [0.16.2] - 2026-03-14
 
 ### Fixed

@@ -136,8 +136,8 @@ print(result.reasoning)       # Why the agent chose get_weather
 | **Entity Memory** | Auto-extract named entities with LRU-pruned registry and context injection |
 | **Knowledge Graph** | Relationship triple extraction with in-memory and SQLite storage |
 | **Cross-Session Knowledge** | Daily logs + persistent facts with auto-registered `remember` tool |
-| **AgentObserver Protocol** | 19-event lifecycle observer with run/call ID correlation and OTel export |
-| **1487 Tests** | Unit, integration, regression, and E2E |
+| **AgentObserver Protocol** | 25-event lifecycle observer with run/call ID correlation and OTel export |
+| **1462 Tests** | Unit, integration, regression, and E2E |
 
 ---
 
