@@ -444,6 +444,26 @@ agent.ask("Remember that I prefer dark mode")
 # Future conversations inject [Long-term Memory] + [Recent Memory] context
 ```
 
+## Step 16: Terminal Tools
+
+Some tools should stop the agent loop after execution -- no further LLM call:
+
+```python
+from selectools import tool
+
+@tool(terminal=True)
+def present_question(question_id: int) -> str:
+    """Present a question and wait for the user's answer."""
+    return f"Question {question_id} presented"
+
+# Or use a dynamic condition:
+config = AgentConfig(
+    stop_condition=lambda tool_name, result: "present" in tool_name,
+)
+```
+
+When a terminal tool fires, `AgentResult.content` contains the tool's return value.
+
 ## What's Next?
 
 You now know the core API. Here is where to go from here:
@@ -478,7 +498,7 @@ You now know the core API. Here is where to go from here:
 | Track entities across turns | [Entity Memory Guide](modules/ENTITY_MEMORY.md) |
 | Build a knowledge graph | [Knowledge Graph Guide](modules/KNOWLEDGE_GRAPH.md) |
 | Add cross-session memory | [Knowledge Memory Guide](modules/KNOWLEDGE.md) |
-| See working examples | [examples/](https://github.com/johnnichev/selectools/tree/main/examples) (37 numbered scripts, 01–37) |
+| See working examples | [examples/](https://github.com/johnnichev/selectools/tree/main/examples) (38 numbered scripts, 01–38) |
 
 ---
 

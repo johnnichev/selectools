@@ -119,6 +119,12 @@ class Provider(Protocol):
 
 ## Provider Implementations
 
+All providers support namespace imports from the `selectools.providers` package:
+
+```python
+from selectools.providers import OpenAIProvider, AnthropicProvider, GeminiProvider, OllamaProvider
+```
+
 ### OpenAI Provider
 
 ```python
@@ -204,6 +210,11 @@ provider = OllamaProvider(
 ```
 
 **API:** Ollama REST API
+
+> **Implementation note**: `OpenAIProvider` and `OllamaProvider` both inherit from
+> `_OpenAICompatibleBase` (Template Method pattern), sharing message formatting,
+> response parsing, and streaming logic. Only pricing, error messages, and token
+> parameter naming differ between them.
 
 ### Local Provider (Testing)
 

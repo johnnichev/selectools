@@ -6,19 +6,15 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, Iterable, List, Union, cast
+from typing import Any, Dict
 
 from ..models import Ollama as OllamaModels
-
-if TYPE_CHECKING:
-    from ..tools.base import Tool
-
-from ..types import Message, Role, ToolCall
-from ..usage import UsageStats
-from .base import Provider, ProviderError
+from ..types import ToolCall
+from ._openai_compat import _OpenAICompatibleBase
+from .base import ProviderError
 
 
-class OllamaProvider(Provider):
+class OllamaProvider(_OpenAICompatibleBase):
     """
     Adapter for Ollama local models using OpenAI-compatible API.
 
@@ -85,372 +81,46 @@ class OllamaProvider(Provider):
         self.default_model = model
         self.base_url = base_url
 
-    def complete(
-        self,
-        *,
-        model: str,
-        system_prompt: str,
-        messages: List[Message],
-        tools: List[Tool] | None = None,
-        temperature: float = 0.0,
-        max_tokens: int = 1000,
-        timeout: float | None = None,
-    ) -> tuple[Message, UsageStats]:
-        formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
-        model_name = model or self.default_model
+    # -- template method overrides -------------------------------------------
 
-        args: Dict[str, Any] = {
-            "model": model_name,
-            "messages": cast(Any, formatted),
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "timeout": timeout,
-        }
+    def _get_token_key(self, model: str) -> str:
+        return "max_tokens"  # Ollama always uses max_tokens
 
-        if tools:
-            args["tools"] = [self._map_tool_to_ollama(t) for t in tools]
+    def _calculate_cost(self, model: str, prompt_tokens: int, completion_tokens: int) -> float:
+        return 0.0  # Local models are free
 
+    def _get_provider_name(self) -> str:
+        return "ollama"
+
+    def _wrap_error(self, exc: Exception, operation: str) -> ProviderError:
+        error_msg = str(exc)
+        if "Connection" in error_msg or "connect" in error_msg.lower():
+            return ProviderError(
+                f"Failed to connect to Ollama at {self.base_url}. "
+                f"Make sure Ollama is running (try: ollama serve). Error: {exc}"
+            )
+        return ProviderError(f"Ollama {operation} failed: {exc}")
+
+    def _parse_tool_call_id(self, tc: Any) -> str:
+        return tc.id if tc.id else f"call_{uuid.uuid4().hex}"
+
+    def _parse_tool_call_arguments(self, tc: Any) -> dict:
+        """Ollama may return arguments as a dict or a JSON string."""
         try:
-            response = cast(Any, self._client.chat.completions.create(**args))
-        except Exception as exc:  # noqa: BLE001
-            error_msg = str(exc)
-            if "Connection" in error_msg or "connect" in error_msg.lower():
-                raise ProviderError(
-                    f"Failed to connect to Ollama at {self.base_url}. "
-                    f"Make sure Ollama is running (try: ollama serve). Error: {exc}"
-                ) from exc
-            raise ProviderError(f"Ollama completion failed: {exc}") from exc
-
-        message = response.choices[0].message
-        content = message.content
-        tool_calls: List[ToolCall] = []
-
-        if message.tool_calls:
-            for tc in message.tool_calls:
-                # Ollama via OpenAI client
-                # generic OpenAI client returns objects with function.arguments as str
-                try:
-                    if isinstance(tc.function.arguments, str):
-                        params = json.loads(tc.function.arguments)
-                    else:
-                        params = tc.function.arguments
-                except (json.JSONDecodeError, TypeError):
-                    params = {}
-
-                # Check for ID, generate if missing
-                tc_id = tc.id if tc.id else f"call_{uuid.uuid4().hex}"
-
-                tool_calls.append(
-                    ToolCall(
-                        tool_name=tc.function.name,
-                        parameters=params,
-                        id=tc_id,
-                    )
-                )
-
-        # Extract usage stats (Ollama may or may not provide these)
-        usage = response.usage
-        usage_stats = UsageStats(
-            prompt_tokens=usage.prompt_tokens if usage else 0,
-            completion_tokens=usage.completion_tokens if usage else 0,
-            total_tokens=usage.total_tokens if usage else 0,
-            cost_usd=0.0,  # Local models are free
-            model=model_name,
-            provider="ollama",
-        )
-
-        return (
-            Message(
-                role=Role.ASSISTANT,
-                content=content or "",
-                tool_calls=tool_calls or None,
-            ),
-            usage_stats,
-        )
-
-    def stream(
-        self,
-        *,
-        model: str,
-        system_prompt: str,
-        messages: List[Message],
-        tools: List[Tool] | None = None,
-        temperature: float = 0.0,
-        max_tokens: int = 1000,
-        timeout: float | None = None,
-    ) -> Iterable[str]:
-        """Stream response chunks. Note: Does not return usage stats."""
-        formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
-        model_name = model or self.default_model
-
-        args: Dict[str, Any] = {
-            "model": model_name,
-            "messages": cast(Any, formatted),
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "stream": True,
-            "timeout": timeout,
-        }
-        if tools:
-            args["tools"] = [self._map_tool_to_ollama(t) for t in tools]
-
-        try:
-            response = cast(Any, self._client.chat.completions.create(**args))
-        except Exception as exc:  # noqa: BLE001
-            error_msg = str(exc)
-            if "Connection" in error_msg or "connect" in error_msg.lower():
-                raise ProviderError(
-                    f"Failed to connect to Ollama at {self.base_url}. "
-                    f"Make sure Ollama is running (try: ollama serve). Error: {exc}"
-                ) from exc
-            raise ProviderError(f"Ollama streaming failed: {exc}") from exc
-
-        for chunk in response:  # type: ignore
-            try:
-                delta = chunk.choices[0].delta if chunk.choices else None
-                if not delta or not delta.content:
-                    continue
-                content = delta.content
-                if isinstance(content, list):
-                    content = "".join(
-                        [part.text for part in content if getattr(part, "text", None)]
-                    )
-                yield content
-            except Exception as exc:  # noqa: BLE001
-                raise ProviderError(f"Ollama stream parsing failed: {exc}") from exc
-
-    def _format_messages(self, system_prompt: str, messages: List[Message]) -> List[dict]:
-        payload: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
-        for message in messages:
-            role = message.role.value
-
-            if role == Role.TOOL.value:
-                payload.append(
-                    {
-                        "role": "tool",
-                        "content": message.content,
-                        "tool_call_id": message.tool_call_id,
-                    }
-                )
-            elif role == Role.ASSISTANT.value:
-                msg_dict: Dict[str, Any] = {
-                    "role": "assistant",
-                    "content": self._format_content(message),
-                }
-                if message.tool_calls:
-                    msg_dict["tool_calls"] = [
-                        {
-                            "id": tc.id or f"call_{uuid.uuid4().hex}",
-                            "type": "function",
-                            "function": {
-                                "name": tc.tool_name,
-                                "arguments": json.dumps(tc.parameters),
-                            },
-                        }
-                        for tc in message.tool_calls
-                    ]
-                payload.append(msg_dict)
+            if isinstance(tc.function.arguments, str):
+                return json.loads(tc.function.arguments)
             else:
-                payload.append(
-                    {
-                        "role": role,
-                        "content": self._format_content(message),
-                    }
-                )
-        return payload
+                return tc.function.arguments
+        except (json.JSONDecodeError, TypeError):
+            return {}
 
-    def _format_content(self, message: Message) -> str | List[Any]:
-        if message.image_base64:
-            # Ollama supports vision in some models (e.g., llava)
-            return [
-                {"type": "text", "text": message.content},
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/jpeg;base64,{message.image_base64}"},
-                },
-            ]
-        return message.content
+    # -- tool-call ID helpers (Ollama may not provide IDs) --------------------
 
-    def _map_tool_to_ollama(self, tool: Tool) -> Dict[str, Any]:
-        """Convert a selectools.Tool to Ollama tool schema (same as OpenAI)."""
-        return {
-            "type": "function",
-            "function": tool.schema(),
-        }
+    def _format_tool_call_id(self, tc: ToolCall) -> str:
+        return tc.id or f"call_{uuid.uuid4().hex}"
 
-    # Async methods
-    async def acomplete(
-        self,
-        *,
-        model: str,
-        system_prompt: str,
-        messages: List[Message],
-        tools: List[Tool] | None = None,
-        temperature: float = 0.0,
-        max_tokens: int = 1000,
-        timeout: float | None = None,
-    ) -> tuple[Message, UsageStats]:
-        """Async version of complete() using AsyncOpenAI client."""
-        formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
-        model_name = model or self.default_model
-
-        args: Dict[str, Any] = {
-            "model": model_name,
-            "messages": cast(Any, formatted),
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "timeout": timeout,
-        }
-
-        if tools:
-            args["tools"] = [self._map_tool_to_ollama(t) for t in tools]
-
-        try:
-            response = cast(Any, await self._async_client.chat.completions.create(**args))
-        except Exception as exc:
-            error_msg = str(exc)
-            if "Connection" in error_msg or "connect" in error_msg.lower():
-                raise ProviderError(
-                    f"Failed to connect to Ollama at {self.base_url}. "
-                    f"Make sure Ollama is running (try: ollama serve). Error: {exc}"
-                ) from exc
-            raise ProviderError(f"Ollama async completion failed: {exc}") from exc
-
-        message = response.choices[0].message
-        content = message.content
-        tool_calls: List[ToolCall] = []
-
-        if message.tool_calls:
-            for tc in message.tool_calls:
-                try:
-                    if isinstance(tc.function.arguments, str):
-                        params = json.loads(tc.function.arguments)
-                    else:
-                        params = tc.function.arguments
-                except (json.JSONDecodeError, TypeError):
-                    params = {}
-
-                tc_id = tc.id if tc.id else f"call_{uuid.uuid4().hex}"
-
-                tool_calls.append(
-                    ToolCall(
-                        tool_name=tc.function.name,
-                        parameters=params,
-                        id=tc_id,
-                    )
-                )
-
-        # Extract usage stats
-        usage = response.usage
-        usage_stats = UsageStats(
-            prompt_tokens=usage.prompt_tokens if usage else 0,
-            completion_tokens=usage.completion_tokens if usage else 0,
-            total_tokens=usage.total_tokens if usage else 0,
-            cost_usd=0.0,  # Local models are free
-            model=model_name,
-            provider="ollama",
-        )
-
-        return (
-            Message(
-                role=Role.ASSISTANT,
-                content=content or "",
-                tool_calls=tool_calls or None,
-            ),
-            usage_stats,
-        )
-
-    async def astream(
-        self,
-        *,
-        model: str,
-        system_prompt: str,
-        messages: List[Message],
-        tools: List[Tool] | None = None,
-        temperature: float = 0.0,
-        max_tokens: int = 1000,
-        timeout: float | None = None,
-    ) -> AsyncIterable[Union[str, ToolCall]]:
-        """
-        Async streaming with native tool call support.
-
-        Yields:
-            str: Text content deltas
-            ToolCall: Complete tool call objects when finish_reason is "tool_calls"
-        """
-        formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
-        model_name = model or self.default_model
-
-        args: Dict[str, Any] = {
-            "model": model_name,
-            "messages": cast(Any, formatted),
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "stream": True,
-            "timeout": timeout,
-        }
-        if tools:
-            args["tools"] = [self._map_tool_to_ollama(t) for t in tools]
-
-        try:
-            response = cast(Any, await self._async_client.chat.completions.create(**args))
-        except Exception as exc:
-            error_msg = str(exc)
-            if "Connection" in error_msg or "connect" in error_msg.lower():
-                raise ProviderError(
-                    f"Failed to connect to Ollama at {self.base_url}. "
-                    f"Make sure Ollama is running (try: ollama serve). Error: {exc}"
-                ) from exc
-            raise ProviderError(f"Ollama async streaming failed: {exc}") from exc
-
-        tool_call_deltas: Dict[int, Dict[str, Any]] = {}
-
-        async for chunk in response:  # type: ignore
-            try:
-                if not chunk.choices:
-                    continue
-                delta = chunk.choices[0].delta
-
-                if delta.content:
-                    yield delta.content
-
-                if delta.tool_calls:
-                    for tc_delta in delta.tool_calls:
-                        index = tc_delta.index
-                        if index not in tool_call_deltas:
-                            tool_call_deltas[index] = {
-                                "id": tc_delta.id or f"call_{uuid.uuid4().hex}",
-                                "name": "",
-                                "arguments": "",
-                            }
-
-                        if tc_delta.id:
-                            tool_call_deltas[index]["id"] = tc_delta.id
-                        if tc_delta.function:
-                            if tc_delta.function.name:
-                                tool_call_deltas[index]["name"] += tc_delta.function.name
-                            if tc_delta.function.arguments:
-                                tool_call_deltas[index]["arguments"] += tc_delta.function.arguments
-
-                finish_reason = chunk.choices[0].finish_reason
-                if finish_reason == "tool_calls":
-                    for idx in sorted(tool_call_deltas.keys()):
-                        tc_info = tool_call_deltas[idx]
-                        try:
-                            params = (
-                                json.loads(tc_info["arguments"]) if tc_info["arguments"] else {}
-                            )
-                        except json.JSONDecodeError:
-                            params = {}
-                        yield ToolCall(
-                            tool_name=tc_info["name"],
-                            parameters=params,
-                            id=tc_info["id"],
-                        )
-                    tool_call_deltas = {}
-
-            except Exception as exc:
-                raise ProviderError(f"Ollama async stream parsing failed: {exc}") from exc
+    def _initial_tool_call_id(self, tc_delta: Any) -> str:
+        return tc_delta.id or f"call_{uuid.uuid4().hex}"
 
 
 __all__ = ["OllamaProvider"]

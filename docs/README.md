@@ -77,7 +77,7 @@ Detailed technical documentation for each module:
 
 - Cost tracking: [USAGE.md](modules/USAGE.md)
 - Model selection: [MODELS.md](modules/MODELS.md)
-- Monitoring: [AGENT.md](modules/AGENT.md#hook-system) (hooks), [AGENT.md](modules/AGENT.md#agentobserver-protocol) (observer protocol), and `result.trace.to_otel_spans()` for OpenTelemetry
+- Monitoring: [AGENT.md](modules/AGENT.md#agentobserver-protocol) (AgentObserver + AsyncAgentObserver, hooks deprecated), and `result.trace.to_otel_spans()` for OpenTelemetry
 - Guardrails & safety: [GUARDRAILS.md](modules/GUARDRAILS.md)
 - Audit logging: [AUDIT.md](modules/AUDIT.md)
 - Prompt injection defence: [SECURITY.md](modules/SECURITY.md)
@@ -251,7 +251,7 @@ Detailed technical documentation for each module:
 2. **Library-First** - Composable, no framework lock-in
 3. **Production Hardened** - Retries, timeouts, validation
 4. **Developer Friendly** - Type hints, decorators, clear errors
-5. **Observable** - AgentObserver protocol, hooks, OTel span export, usage tracking
+5. **Observable** - AgentObserver + AsyncAgentObserver protocol, OTel span export, usage tracking (hooks deprecated)
 6. **Cost Aware** - Automatic tracking and warnings
 7. **Performance Optimized** - Parallel tool execution, response caching, async-first design
 8. **Enterprise Secure** - Guardrails, PII redaction, prompt injection screening, coherence checking, audit logging

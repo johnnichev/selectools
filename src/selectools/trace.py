@@ -11,24 +11,31 @@ import json
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, Iterator, List, Literal, Optional
+from enum import Enum
+from typing import Any, Dict, Iterator, List, Optional
 
-StepType = Literal[
-    "llm_call",
-    "tool_selection",
-    "tool_execution",
-    "cache_hit",
-    "error",
-    "structured_retry",
-    "guardrail",
-    "coherence_check",
-    "output_screening",
-    "session_load",
-    "session_save",
-    "memory_summarize",
-    "entity_extraction",
-    "kg_extraction",
-]
+
+class StepType(str, Enum):
+    """Enumeration of trace step types.
+
+    Inherits from ``str`` so that ``StepType.LLM_CALL == "llm_call"`` is ``True``,
+    preserving backward compatibility with code that compares against string literals.
+    """
+
+    LLM_CALL = "llm_call"
+    TOOL_SELECTION = "tool_selection"
+    TOOL_EXECUTION = "tool_execution"
+    CACHE_HIT = "cache_hit"
+    ERROR = "error"
+    STRUCTURED_RETRY = "structured_retry"
+    GUARDRAIL = "guardrail"
+    COHERENCE_CHECK = "coherence_check"
+    OUTPUT_SCREENING = "output_screening"
+    SESSION_LOAD = "session_load"
+    SESSION_SAVE = "session_save"
+    MEMORY_SUMMARIZE = "memory_summarize"
+    ENTITY_EXTRACTION = "entity_extraction"
+    KG_EXTRACTION = "kg_extraction"
 
 
 @dataclass

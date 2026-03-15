@@ -22,7 +22,11 @@ src/selectools/
 ├── __init__.py              # Public API exports + __version__
 ├── agent/
 │   ├── core.py              # Main agent loop (run, arun, astream, batch)
-│   └── config.py            # AgentConfig dataclass
+│   ├── config.py            # AgentConfig dataclass
+│   ├── _tool_executor.py    # Tool execution pipeline (policy, coherence, timeouts)
+│   ├── _provider_caller.py  # LLM provider calls (cache, retry, streaming)
+│   ├── _lifecycle.py        # Observer notification, fallback wiring
+│   └── _memory_manager.py   # Memory operations, session save, entity/KG extraction
 ├── providers/
 │   ├── base.py              # Provider protocol
 │   ├── openai_provider.py   # OpenAI adapter (max_completion_tokens handling)
@@ -30,6 +34,7 @@ src/selectools/
 │   ├── gemini_provider.py
 │   ├── ollama_provider.py
 │   ├── fallback.py          # FallbackProvider with circuit breaker
+│   ├── _openai_compat.py    # Shared OpenAI/Ollama base (Template Method)
 │   └── stubs.py             # LocalProvider for testing without API keys
 ├── tools/
 │   ├── base.py              # Tool class
@@ -54,7 +59,7 @@ src/selectools/
 ├── pricing.py               # Derives pricing from models.py
 ├── usage.py                 # Token + cost tracking
 ├── trace.py                 # AgentTrace, TraceStep (14 step types — see list below)
-├── observer.py              # AgentObserver protocol (25 events) + LoggingObserver
+├── observer.py              # AgentObserver (25 sync events) + AsyncAgentObserver (25 async events) + LoggingObserver
 ├── policy.py                # ToolPolicy (allow/review/deny rules)
 ├── parser.py                # ToolCallParser (JSON extraction from LLM responses)
 ├── prompt.py                # PromptBuilder (system prompt generation)
@@ -69,7 +74,7 @@ src/selectools/
 ├── types.py                 # Core types (Message, Role, ToolCall, AgentResult)
 └── env.py                   # Environment variable helpers
 
-tests/                       # 1477 tests (unit, integration, regression, E2E)
+tests/                       # 1640 tests (unit, integration, regression, E2E)
 ├── agent/                   # Agent core tests
 ├── providers/               # Provider-specific tests
 ├── rag/                     # RAG pipeline tests
@@ -78,7 +83,7 @@ tests/                       # 1477 tests (unit, integration, regression, E2E)
 ├── core/                    # Framework-level tests
 └── test_*.py                # Module-level unit tests
 
-examples/                    # 37 numbered example scripts (01-37)
+examples/                    # 38 numbered example scripts (01-38)
 notebooks/getting_started.ipynb  # Interactive getting-started guide
 
 docs/                        # MkDocs Material documentation
@@ -86,6 +91,7 @@ docs/                        # MkDocs Material documentation
 ├── QUICKSTART.md            # 5-minute quickstart
 ├── ARCHITECTURE.md          # System architecture
 ├── modules/                 # 24 module-specific docs
+├── decisions/               # Architecture Decision Records (ADRs)
 └── stylesheets/extra.css    # Custom theme CSS
 ```
 
@@ -274,6 +280,8 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 
 12. **`astream()` must have full feature parity with `run()`/`arun()`**: As of v0.16.3, all three methods share `_prepare_run()`, `_finalize_run()`, `_process_response()`, and `_build_max_iterations_result()` helpers. When adding new features to the agent loop, add them to these shared helpers rather than to individual methods. The `_RunContext` dataclass carries all per-run state.
 
+13. **Hooks are deprecated — use observers**: `AgentConfig.hooks` (a plain dict of callbacks) is deprecated. Passing `hooks` emits a `DeprecationWarning` and internally wraps the dict via `_HooksAdapter(AgentObserver)`. New code should always use `AgentObserver` or `AsyncAgentObserver` instead.
+
 ## Current Roadmap
 
 - **v0.15.0** ✅ Enterprise Reliability (guardrails, audit, screening, coherence)
@@ -282,5 +290,6 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 - **v0.16.2** ✅ astream() prompt leak fix + documentation updates
 - **v0.16.3** ✅ Agent refactoring + astream() full parity (14+ bug fixes, 29 new tests, ~800 lines dedup)
 - **v0.16.4** ✅ Parallel execution safety + 5 bug fixes
-- **v0.17.0** 🟡 Multi-Agent Orchestration — see `MULTI_AGENT_PLAN.md`
-- **Backlog**: Connector Expansion, Ecosystem Parity, Polish & Community
+- **v0.16.5** ✅ Design Patterns & Code Quality (agent decomposition, provider Template Method, async observers, terminal actions, hooks deprecation, ADRs) — see `docs/decisions/`
+- **v0.17.0** 🔵 Multi-Agent Orchestration — see `MULTI_AGENT_PLAN.md`
+- **Backlog**: Connector Expansion, Ecosystem Parity, Structured AgentConfig, Polish & Community

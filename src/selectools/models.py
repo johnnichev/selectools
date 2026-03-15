@@ -15,9 +15,22 @@ Example:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Literal
+from enum import Enum
+from typing import Dict, List
 
-ModelType = Literal["chat", "embedding", "image", "audio", "multimodal"]
+
+class ModelType(str, Enum):
+    """Enumeration of model types.
+
+    Inherits from ``str`` so that ``ModelType.CHAT == "chat"`` is ``True``,
+    preserving backward compatibility with code that compares against string literals.
+    """
+
+    CHAT = "chat"
+    EMBEDDING = "embedding"
+    IMAGE = "image"
+    AUDIO = "audio"
+    MULTIMODAL = "multimodal"
 
 
 @dataclass(frozen=True)
@@ -56,7 +69,7 @@ class OpenAI:
     GPT_5_4 = ModelInfo(
         id="gpt-5.4",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=2.50,
         completion_cost=15.00,
         max_tokens=16384,
@@ -65,7 +78,7 @@ class OpenAI:
     GPT_5_4_PRO = ModelInfo(
         id="gpt-5.4-pro",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=30.00,
         completion_cost=180.00,
         max_tokens=16384,
@@ -76,7 +89,7 @@ class OpenAI:
     GPT_5_3_CHAT_LATEST = ModelInfo(
         id="gpt-5.3-chat-latest",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.75,
         completion_cost=14.00,
         max_tokens=16384,
@@ -85,7 +98,7 @@ class OpenAI:
     GPT_5_3_CODEX = ModelInfo(
         id="gpt-5.3-codex",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.75,
         completion_cost=14.00,
         max_tokens=16384,
@@ -96,7 +109,7 @@ class OpenAI:
     GPT_5_2 = ModelInfo(
         id="gpt-5.2",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.75,
         completion_cost=14.00,
         max_tokens=16384,
@@ -105,7 +118,7 @@ class OpenAI:
     GPT_5_2_CHAT_LATEST = ModelInfo(
         id="gpt-5.2-chat-latest",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.75,
         completion_cost=14.00,
         max_tokens=16384,
@@ -114,7 +127,7 @@ class OpenAI:
     GPT_5_2_CODEX = ModelInfo(
         id="gpt-5.2-codex",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.75,
         completion_cost=14.00,
         max_tokens=16384,
@@ -123,7 +136,7 @@ class OpenAI:
     GPT_5_2_PRO = ModelInfo(
         id="gpt-5.2-pro",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=21.00,
         completion_cost=168.00,
         max_tokens=16384,
@@ -134,7 +147,7 @@ class OpenAI:
     GPT_5_1 = ModelInfo(
         id="gpt-5.1",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.25,
         completion_cost=10.00,
         max_tokens=16384,
@@ -143,7 +156,7 @@ class OpenAI:
     GPT_5 = ModelInfo(
         id="gpt-5",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.25,
         completion_cost=10.00,
         max_tokens=16384,
@@ -152,7 +165,7 @@ class OpenAI:
     GPT_5_MINI = ModelInfo(
         id="gpt-5-mini",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.25,
         completion_cost=2.00,
         max_tokens=16384,
@@ -161,7 +174,7 @@ class OpenAI:
     GPT_5_NANO = ModelInfo(
         id="gpt-5-nano",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.05,
         completion_cost=0.40,
         max_tokens=8192,
@@ -170,7 +183,7 @@ class OpenAI:
     GPT_5_1_CHAT_LATEST = ModelInfo(
         id="gpt-5.1-chat-latest",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.25,
         completion_cost=10.00,
         max_tokens=16384,
@@ -179,7 +192,7 @@ class OpenAI:
     GPT_5_CHAT_LATEST = ModelInfo(
         id="gpt-5-chat-latest",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.25,
         completion_cost=10.00,
         max_tokens=16384,
@@ -188,7 +201,7 @@ class OpenAI:
     GPT_5_1_CODEX_MAX = ModelInfo(
         id="gpt-5.1-codex-max",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.25,
         completion_cost=10.00,
         max_tokens=16384,
@@ -197,7 +210,7 @@ class OpenAI:
     GPT_5_1_CODEX = ModelInfo(
         id="gpt-5.1-codex",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.25,
         completion_cost=10.00,
         max_tokens=16384,
@@ -206,7 +219,7 @@ class OpenAI:
     GPT_5_CODEX = ModelInfo(
         id="gpt-5-codex",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.25,
         completion_cost=10.00,
         max_tokens=16384,
@@ -215,7 +228,7 @@ class OpenAI:
     GPT_5_PRO = ModelInfo(
         id="gpt-5-pro",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=15.00,
         completion_cost=120.00,
         max_tokens=16384,
@@ -224,7 +237,7 @@ class OpenAI:
     GPT_5_1_CODEX_MINI = ModelInfo(
         id="gpt-5.1-codex-mini",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.25,
         completion_cost=2.00,
         max_tokens=16384,
@@ -233,7 +246,7 @@ class OpenAI:
     GPT_5_SEARCH_API = ModelInfo(
         id="gpt-5-search-api",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.25,
         completion_cost=10.00,
         max_tokens=16384,
@@ -242,7 +255,7 @@ class OpenAI:
     CODEX_MINI_LATEST = ModelInfo(
         id="codex-mini-latest",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.50,
         completion_cost=6.00,
         max_tokens=16384,
@@ -253,7 +266,7 @@ class OpenAI:
     GPT_4_1 = ModelInfo(
         id="gpt-4.1",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=2.00,
         completion_cost=8.00,
         max_tokens=16384,
@@ -262,7 +275,7 @@ class OpenAI:
     GPT_4_1_MINI = ModelInfo(
         id="gpt-4.1-mini",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.40,
         completion_cost=1.60,
         max_tokens=16384,
@@ -271,7 +284,7 @@ class OpenAI:
     GPT_4_1_NANO = ModelInfo(
         id="gpt-4.1-nano",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.10,
         completion_cost=0.40,
         max_tokens=8192,
@@ -282,7 +295,7 @@ class OpenAI:
     GPT_4O = ModelInfo(
         id="gpt-4o",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=2.50,
         completion_cost=10.00,
         max_tokens=16384,
@@ -291,7 +304,7 @@ class OpenAI:
     GPT_4O_2024_11_20 = ModelInfo(
         id="gpt-4o-2024-11-20",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=2.50,
         completion_cost=10.00,
         max_tokens=16384,
@@ -300,7 +313,7 @@ class OpenAI:
     GPT_4O_2024_08_06 = ModelInfo(
         id="gpt-4o-2024-08-06",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=2.50,
         completion_cost=10.00,
         max_tokens=16384,
@@ -309,7 +322,7 @@ class OpenAI:
     GPT_4O_2024_05_13 = ModelInfo(
         id="gpt-4o-2024-05-13",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=5.00,
         completion_cost=15.00,
         max_tokens=4096,
@@ -318,7 +331,7 @@ class OpenAI:
     GPT_4O_MINI = ModelInfo(
         id="gpt-4o-mini",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.15,
         completion_cost=0.60,
         max_tokens=16384,
@@ -327,7 +340,7 @@ class OpenAI:
     GPT_4O_MINI_2024_07_18 = ModelInfo(
         id="gpt-4o-mini-2024-07-18",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.15,
         completion_cost=0.60,
         max_tokens=16384,
@@ -336,7 +349,7 @@ class OpenAI:
     GPT_4O_MINI_SEARCH_PREVIEW = ModelInfo(
         id="gpt-4o-mini-search-preview",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.15,
         completion_cost=0.60,
         max_tokens=16384,
@@ -345,7 +358,7 @@ class OpenAI:
     GPT_4O_SEARCH_PREVIEW = ModelInfo(
         id="gpt-4o-search-preview",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=2.50,
         completion_cost=10.00,
         max_tokens=16384,
@@ -356,7 +369,7 @@ class OpenAI:
     GPT_REALTIME = ModelInfo(
         id="gpt-realtime",
         provider="openai",
-        type="audio",
+        type=ModelType.AUDIO,
         prompt_cost=4.00,
         completion_cost=16.00,
         max_tokens=4096,
@@ -365,7 +378,7 @@ class OpenAI:
     GPT_REALTIME_1_5 = ModelInfo(
         id="gpt-realtime-1.5",
         provider="openai",
-        type="audio",
+        type=ModelType.AUDIO,
         prompt_cost=4.00,
         completion_cost=16.00,
         max_tokens=4096,
@@ -374,7 +387,7 @@ class OpenAI:
     GPT_REALTIME_MINI = ModelInfo(
         id="gpt-realtime-mini",
         provider="openai",
-        type="audio",
+        type=ModelType.AUDIO,
         prompt_cost=0.60,
         completion_cost=2.40,
         max_tokens=4096,
@@ -383,7 +396,7 @@ class OpenAI:
     GPT_4O_REALTIME_PREVIEW = ModelInfo(
         id="gpt-4o-realtime-preview",
         provider="openai",
-        type="audio",
+        type=ModelType.AUDIO,
         prompt_cost=5.00,
         completion_cost=20.00,
         max_tokens=4096,
@@ -392,7 +405,7 @@ class OpenAI:
     GPT_4O_MINI_REALTIME_PREVIEW = ModelInfo(
         id="gpt-4o-mini-realtime-preview",
         provider="openai",
-        type="audio",
+        type=ModelType.AUDIO,
         prompt_cost=0.60,
         completion_cost=2.40,
         max_tokens=4096,
@@ -401,7 +414,7 @@ class OpenAI:
     GPT_AUDIO = ModelInfo(
         id="gpt-audio",
         provider="openai",
-        type="audio",
+        type=ModelType.AUDIO,
         prompt_cost=2.50,
         completion_cost=10.00,
         max_tokens=4096,
@@ -410,7 +423,7 @@ class OpenAI:
     GPT_AUDIO_1_5 = ModelInfo(
         id="gpt-audio-1.5",
         provider="openai",
-        type="audio",
+        type=ModelType.AUDIO,
         prompt_cost=2.50,
         completion_cost=10.00,
         max_tokens=4096,
@@ -419,7 +432,7 @@ class OpenAI:
     GPT_AUDIO_MINI = ModelInfo(
         id="gpt-audio-mini",
         provider="openai",
-        type="audio",
+        type=ModelType.AUDIO,
         prompt_cost=0.60,
         completion_cost=2.40,
         max_tokens=4096,
@@ -428,7 +441,7 @@ class OpenAI:
     GPT_4O_AUDIO_PREVIEW = ModelInfo(
         id="gpt-4o-audio-preview",
         provider="openai",
-        type="audio",
+        type=ModelType.AUDIO,
         prompt_cost=2.50,
         completion_cost=10.00,
         max_tokens=4096,
@@ -437,7 +450,7 @@ class OpenAI:
     GPT_4O_MINI_AUDIO_PREVIEW = ModelInfo(
         id="gpt-4o-mini-audio-preview",
         provider="openai",
-        type="audio",
+        type=ModelType.AUDIO,
         prompt_cost=0.15,
         completion_cost=0.60,
         max_tokens=16384,
@@ -448,7 +461,7 @@ class OpenAI:
     O1 = ModelInfo(
         id="o1",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=15.00,
         completion_cost=60.00,
         max_tokens=32768,
@@ -457,7 +470,7 @@ class OpenAI:
     O1_2024_12_17 = ModelInfo(
         id="o1-2024-12-17",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=15.00,
         completion_cost=60.00,
         max_tokens=32768,
@@ -466,7 +479,7 @@ class OpenAI:
     O1_PRO = ModelInfo(
         id="o1-pro",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=150.00,
         completion_cost=600.00,
         max_tokens=32768,
@@ -475,7 +488,7 @@ class OpenAI:
     O1_MINI = ModelInfo(
         id="o1-mini",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.10,
         completion_cost=4.40,
         max_tokens=16384,
@@ -484,7 +497,7 @@ class OpenAI:
     O3_PRO = ModelInfo(
         id="o3-pro",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=20.00,
         completion_cost=80.00,
         max_tokens=32768,
@@ -493,7 +506,7 @@ class OpenAI:
     O3 = ModelInfo(
         id="o3",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=2.00,
         completion_cost=8.00,
         max_tokens=32768,
@@ -502,7 +515,7 @@ class OpenAI:
     O3_DEEP_RESEARCH = ModelInfo(
         id="o3-deep-research",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=10.00,
         completion_cost=40.00,
         max_tokens=32768,
@@ -511,7 +524,7 @@ class OpenAI:
     O3_MINI = ModelInfo(
         id="o3-mini",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.10,
         completion_cost=4.40,
         max_tokens=16384,
@@ -520,7 +533,7 @@ class OpenAI:
     O4_MINI = ModelInfo(
         id="o4-mini",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.10,
         completion_cost=4.40,
         max_tokens=16384,
@@ -529,7 +542,7 @@ class OpenAI:
     O4_MINI_DEEP_RESEARCH = ModelInfo(
         id="o4-mini-deep-research",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=2.00,
         completion_cost=8.00,
         max_tokens=32768,
@@ -540,7 +553,7 @@ class OpenAI:
     GPT_4_TURBO = ModelInfo(
         id="gpt-4-turbo",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=10.00,
         completion_cost=30.00,
         max_tokens=4096,
@@ -549,7 +562,7 @@ class OpenAI:
     GPT_4_TURBO_2024_04_09 = ModelInfo(
         id="gpt-4-turbo-2024-04-09",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=10.00,
         completion_cost=30.00,
         max_tokens=4096,
@@ -558,7 +571,7 @@ class OpenAI:
     GPT_4_TURBO_PREVIEW = ModelInfo(
         id="gpt-4-turbo-preview",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=10.00,
         completion_cost=30.00,
         max_tokens=4096,
@@ -567,7 +580,7 @@ class OpenAI:
     GPT_4_0125_PREVIEW = ModelInfo(
         id="gpt-4-0125-preview",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=10.00,
         completion_cost=30.00,
         max_tokens=4096,
@@ -576,7 +589,7 @@ class OpenAI:
     GPT_4_1106_PREVIEW = ModelInfo(
         id="gpt-4-1106-preview",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=10.00,
         completion_cost=30.00,
         max_tokens=4096,
@@ -585,7 +598,7 @@ class OpenAI:
     GPT_4_1106_VISION_PREVIEW = ModelInfo(
         id="gpt-4-1106-vision-preview",
         provider="openai",
-        type="multimodal",
+        type=ModelType.MULTIMODAL,
         prompt_cost=10.00,
         completion_cost=30.00,
         max_tokens=4096,
@@ -596,7 +609,7 @@ class OpenAI:
     GPT_4 = ModelInfo(
         id="gpt-4",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=30.00,
         completion_cost=60.00,
         max_tokens=8192,
@@ -605,7 +618,7 @@ class OpenAI:
     GPT_4_0613 = ModelInfo(
         id="gpt-4-0613",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=30.00,
         completion_cost=60.00,
         max_tokens=8192,
@@ -614,7 +627,7 @@ class OpenAI:
     GPT_4_0314 = ModelInfo(
         id="gpt-4-0314",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=30.00,
         completion_cost=60.00,
         max_tokens=8192,
@@ -623,7 +636,7 @@ class OpenAI:
     GPT_4_32K = ModelInfo(
         id="gpt-4-32k",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=60.00,
         completion_cost=120.00,
         max_tokens=32768,
@@ -634,7 +647,7 @@ class OpenAI:
     GPT_3_5_TURBO = ModelInfo(
         id="gpt-3.5-turbo",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.50,
         completion_cost=1.50,
         max_tokens=4096,
@@ -643,7 +656,7 @@ class OpenAI:
     GPT_3_5_TURBO_0125 = ModelInfo(
         id="gpt-3.5-turbo-0125",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.50,
         completion_cost=1.50,
         max_tokens=4096,
@@ -652,7 +665,7 @@ class OpenAI:
     GPT_3_5_TURBO_1106 = ModelInfo(
         id="gpt-3.5-turbo-1106",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.00,
         completion_cost=2.00,
         max_tokens=4096,
@@ -661,7 +674,7 @@ class OpenAI:
     GPT_3_5_TURBO_0613 = ModelInfo(
         id="gpt-3.5-turbo-0613",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.50,
         completion_cost=2.00,
         max_tokens=4096,
@@ -670,7 +683,7 @@ class OpenAI:
     GPT_3_5_0301 = ModelInfo(
         id="gpt-3.5-0301",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.50,
         completion_cost=2.00,
         max_tokens=4096,
@@ -679,7 +692,7 @@ class OpenAI:
     GPT_3_5_TURBO_INSTRUCT = ModelInfo(
         id="gpt-3.5-turbo-instruct",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.50,
         completion_cost=2.00,
         max_tokens=4096,
@@ -688,7 +701,7 @@ class OpenAI:
     GPT_3_5_TURBO_16K = ModelInfo(
         id="gpt-3.5-turbo-16k",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=3.00,
         completion_cost=4.00,
         max_tokens=16384,
@@ -697,7 +710,7 @@ class OpenAI:
     GPT_3_5_TURBO_16K_0613 = ModelInfo(
         id="gpt-3.5-turbo-16k-0613",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=3.00,
         completion_cost=4.00,
         max_tokens=16384,
@@ -708,7 +721,7 @@ class OpenAI:
     DAVINCI_002 = ModelInfo(
         id="davinci-002",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=2.00,
         completion_cost=2.00,
         max_tokens=16384,
@@ -717,7 +730,7 @@ class OpenAI:
     BABBAGE_002 = ModelInfo(
         id="babbage-002",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.40,
         completion_cost=0.40,
         max_tokens=16384,
@@ -728,7 +741,7 @@ class OpenAI:
     CHATGPT_4O_LATEST = ModelInfo(
         id="chatgpt-4o-latest",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=5.00,
         completion_cost=15.00,
         max_tokens=16384,
@@ -737,7 +750,7 @@ class OpenAI:
     COMPUTER_USE_PREVIEW = ModelInfo(
         id="computer-use-preview",
         provider="openai",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=3.00,
         completion_cost=12.00,
         max_tokens=8192,
@@ -751,7 +764,7 @@ class OpenAI:
         TEXT_EMBEDDING_3_SMALL = ModelInfo(
             id="text-embedding-3-small",
             provider="openai",
-            type="embedding",
+            type=ModelType.EMBEDDING,
             prompt_cost=0.02,
             completion_cost=0.0,
             max_tokens=8191,
@@ -760,7 +773,7 @@ class OpenAI:
         TEXT_EMBEDDING_3_LARGE = ModelInfo(
             id="text-embedding-3-large",
             provider="openai",
-            type="embedding",
+            type=ModelType.EMBEDDING,
             prompt_cost=0.13,
             completion_cost=0.0,
             max_tokens=8191,
@@ -769,7 +782,7 @@ class OpenAI:
         ADA_002 = ModelInfo(
             id="text-embedding-ada-002",
             provider="openai",
-            type="embedding",
+            type=ModelType.EMBEDDING,
             prompt_cost=0.10,
             completion_cost=0.0,
             max_tokens=8191,
@@ -789,7 +802,7 @@ class Anthropic:
     OPUS_4_6 = ModelInfo(
         id="claude-opus-4-6",
         provider="anthropic",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=5.00,
         completion_cost=25.00,
         max_tokens=8192,
@@ -800,7 +813,7 @@ class Anthropic:
     SONNET_4_6 = ModelInfo(
         id="claude-sonnet-4-6",
         provider="anthropic",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=3.00,
         completion_cost=15.00,
         max_tokens=8192,
@@ -811,7 +824,7 @@ class Anthropic:
     OPUS_4_5 = ModelInfo(
         id="claude-opus-4-5",
         provider="anthropic",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=5.00,
         completion_cost=25.00,
         max_tokens=8192,
@@ -820,7 +833,7 @@ class Anthropic:
     SONNET_4_5 = ModelInfo(
         id="claude-sonnet-4-5",
         provider="anthropic",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=3.00,
         completion_cost=15.00,
         max_tokens=8192,
@@ -829,7 +842,7 @@ class Anthropic:
     HAIKU_4_5 = ModelInfo(
         id="claude-haiku-4-5",
         provider="anthropic",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.00,
         completion_cost=5.00,
         max_tokens=8192,
@@ -840,7 +853,7 @@ class Anthropic:
     OPUS_4_11 = ModelInfo(
         id="claude-opus-4-11",
         provider="anthropic",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=15.00,
         completion_cost=75.00,
         max_tokens=8192,
@@ -851,7 +864,7 @@ class Anthropic:
     OPUS_4_01 = ModelInfo(
         id="claude-opus-4-01",
         provider="anthropic",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=15.00,
         completion_cost=75.00,
         max_tokens=8192,
@@ -860,7 +873,7 @@ class Anthropic:
     SONNET_4_01 = ModelInfo(
         id="claude-sonnet-4-01",
         provider="anthropic",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=3.00,
         completion_cost=15.00,
         max_tokens=8192,
@@ -871,7 +884,7 @@ class Anthropic:
     SONNET_3_7_LATEST = ModelInfo(
         id="claude-3-7-sonnet-latest",
         provider="anthropic",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=3.00,
         completion_cost=15.00,
         max_tokens=8192,
@@ -882,7 +895,7 @@ class Anthropic:
     SONNET_3_5_20241022 = ModelInfo(
         id="claude-3-5-sonnet-20241022",
         provider="anthropic",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=3.00,
         completion_cost=15.00,
         max_tokens=8192,
@@ -891,7 +904,7 @@ class Anthropic:
     SONNET_3_5_20240620 = ModelInfo(
         id="claude-3-5-sonnet-20240620",
         provider="anthropic",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=3.00,
         completion_cost=15.00,
         max_tokens=8192,
@@ -900,7 +913,7 @@ class Anthropic:
     SONNET_3_5_LATEST = ModelInfo(
         id="claude-3-5-sonnet-latest",
         provider="anthropic",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=3.00,
         completion_cost=15.00,
         max_tokens=8192,
@@ -909,7 +922,7 @@ class Anthropic:
     HAIKU_3_5_20241022 = ModelInfo(
         id="claude-3-5-haiku-20241022",
         provider="anthropic",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.80,
         completion_cost=4.00,
         max_tokens=8192,
@@ -918,7 +931,7 @@ class Anthropic:
     HAIKU_3_5_LATEST = ModelInfo(
         id="claude-3-5-haiku-latest",
         provider="anthropic",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.80,
         completion_cost=4.00,
         max_tokens=8192,
@@ -929,7 +942,7 @@ class Anthropic:
     OPUS_3_20240229 = ModelInfo(
         id="claude-3-opus-20240229",
         provider="anthropic",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=15.00,
         completion_cost=75.00,
         max_tokens=4096,
@@ -938,7 +951,7 @@ class Anthropic:
     OPUS_3 = ModelInfo(
         id="claude-3-opus",
         provider="anthropic",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=15.00,
         completion_cost=75.00,
         max_tokens=4096,
@@ -947,7 +960,7 @@ class Anthropic:
     SONNET_3_20240229 = ModelInfo(
         id="claude-3-sonnet-20240229",
         provider="anthropic",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=3.00,
         completion_cost=15.00,
         max_tokens=4096,
@@ -956,7 +969,7 @@ class Anthropic:
     SONNET_3 = ModelInfo(
         id="claude-3-sonnet",
         provider="anthropic",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=3.00,
         completion_cost=15.00,
         max_tokens=4096,
@@ -965,7 +978,7 @@ class Anthropic:
     HAIKU_3_20240307 = ModelInfo(
         id="claude-3-haiku-20240307",
         provider="anthropic",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.25,
         completion_cost=1.25,
         max_tokens=4096,
@@ -974,7 +987,7 @@ class Anthropic:
     HAIKU_3 = ModelInfo(
         id="claude-3-haiku",
         provider="anthropic",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.25,
         completion_cost=1.25,
         max_tokens=4096,
@@ -988,7 +1001,7 @@ class Anthropic:
         VOYAGE_3 = ModelInfo(
             id="voyage-3",
             provider="anthropic",
-            type="embedding",
+            type=ModelType.EMBEDDING,
             prompt_cost=0.06,
             completion_cost=0.0,
             max_tokens=32000,
@@ -997,7 +1010,7 @@ class Anthropic:
         VOYAGE_3_LITE = ModelInfo(
             id="voyage-3-lite",
             provider="anthropic",
-            type="embedding",
+            type=ModelType.EMBEDDING,
             prompt_cost=0.02,
             completion_cost=0.0,
             max_tokens=32000,
@@ -1017,7 +1030,7 @@ class Gemini:
     PRO_3_1 = ModelInfo(
         id="gemini-3.1-pro-preview",
         provider="gemini",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=2.00,
         completion_cost=12.00,
         max_tokens=8192,
@@ -1026,7 +1039,7 @@ class Gemini:
     FLASH_LITE_3_1 = ModelInfo(
         id="gemini-3-1-flash-lite",
         provider="gemini",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.25,
         completion_cost=1.50,
         max_tokens=65536,
@@ -1037,7 +1050,7 @@ class Gemini:
     PRO_3 = ModelInfo(
         id="gemini-3-pro-preview",
         provider="gemini",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=2.00,
         completion_cost=12.00,
         max_tokens=8192,
@@ -1046,7 +1059,7 @@ class Gemini:
     PRO_3_IMAGE = ModelInfo(
         id="gemini-3-pro-image-preview",
         provider="gemini",
-        type="multimodal",
+        type=ModelType.MULTIMODAL,
         prompt_cost=2.00,
         completion_cost=12.00,
         max_tokens=8192,
@@ -1055,7 +1068,7 @@ class Gemini:
     FLASH_3_PREVIEW = ModelInfo(
         id="gemini-3-flash-preview",
         provider="gemini",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.50,
         completion_cost=3.00,
         max_tokens=8192,
@@ -1066,7 +1079,7 @@ class Gemini:
     PRO_2_5 = ModelInfo(
         id="gemini-2.5-pro",
         provider="gemini",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.25,
         completion_cost=10.00,
         max_tokens=8192,
@@ -1075,7 +1088,7 @@ class Gemini:
     FLASH_2_5 = ModelInfo(
         id="gemini-2.5-flash",
         provider="gemini",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.30,
         completion_cost=2.50,
         max_tokens=8192,
@@ -1084,7 +1097,7 @@ class Gemini:
     FLASH_2_5_PREVIEW_09_2025 = ModelInfo(
         id="gemini-2.5-flash-preview-09-2025",
         provider="gemini",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.30,
         completion_cost=2.50,
         max_tokens=8192,
@@ -1093,7 +1106,7 @@ class Gemini:
     FLASH_LITE_2_5 = ModelInfo(
         id="gemini-2.5-flash-lite",
         provider="gemini",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.10,
         completion_cost=0.40,
         max_tokens=8192,
@@ -1102,7 +1115,7 @@ class Gemini:
     FLASH_LITE_2_5_PREVIEW_09_2025 = ModelInfo(
         id="gemini-2.5-flash-lite-preview-09-2025",
         provider="gemini",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.10,
         completion_cost=0.40,
         max_tokens=8192,
@@ -1111,7 +1124,7 @@ class Gemini:
     FLASH_NATIVE_AUDIO_2_5_PREVIEW = ModelInfo(
         id="gemini-2.5-flash-native-audio-preview-09-2025",
         provider="gemini",
-        type="audio",
+        type=ModelType.AUDIO,
         prompt_cost=0.50,
         completion_cost=2.00,
         max_tokens=8192,
@@ -1120,7 +1133,7 @@ class Gemini:
     FLASH_IMAGE_2_5 = ModelInfo(
         id="gemini-2.5-flash-image",
         provider="gemini",
-        type="image",
+        type=ModelType.IMAGE,
         prompt_cost=0.30,
         completion_cost=2.50,
         max_tokens=8192,
@@ -1129,7 +1142,7 @@ class Gemini:
     FLASH_TTS_2_5_PREVIEW = ModelInfo(
         id="gemini-2.5-flash-preview-tts",
         provider="gemini",
-        type="audio",
+        type=ModelType.AUDIO,
         prompt_cost=0.50,
         completion_cost=10.00,
         max_tokens=8192,
@@ -1138,7 +1151,7 @@ class Gemini:
     PRO_TTS_2_5_PREVIEW = ModelInfo(
         id="gemini-2.5-pro-preview-tts",
         provider="gemini",
-        type="audio",
+        type=ModelType.AUDIO,
         prompt_cost=1.00,
         completion_cost=20.00,
         max_tokens=8192,
@@ -1147,7 +1160,7 @@ class Gemini:
     COMPUTER_USE_2_5_PREVIEW = ModelInfo(
         id="gemini-2.5-computer-use-preview-10-2025",
         provider="gemini",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.25,
         completion_cost=10.00,
         max_tokens=8192,
@@ -1156,7 +1169,7 @@ class Gemini:
     LIVE_2_5_FLASH_PREVIEW = ModelInfo(
         id="gemini-live-2.5-flash-preview",
         provider="gemini",
-        type="audio",
+        type=ModelType.AUDIO,
         prompt_cost=0.50,
         completion_cost=2.00,
         max_tokens=8192,
@@ -1167,7 +1180,7 @@ class Gemini:
     FLASH_2_0 = ModelInfo(
         id="gemini-2.0-flash",
         provider="gemini",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.10,
         completion_cost=0.40,
         max_tokens=8192,
@@ -1176,7 +1189,7 @@ class Gemini:
     FLASH_LITE_2_0 = ModelInfo(
         id="gemini-2.0-flash-lite",
         provider="gemini",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.075,
         completion_cost=0.30,
         max_tokens=8192,
@@ -1185,7 +1198,7 @@ class Gemini:
     FLASH_LIVE_2_0_001 = ModelInfo(
         id="gemini-2.0-flash-live-001",
         provider="gemini",
-        type="audio",
+        type=ModelType.AUDIO,
         prompt_cost=0.35,
         completion_cost=1.50,
         max_tokens=8192,
@@ -1196,7 +1209,7 @@ class Gemini:
     ROBOTICS_ER_1_5 = ModelInfo(
         id="gemini-robotics-er-1.5-preview",
         provider="gemini",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.30,
         completion_cost=2.50,
         max_tokens=8192,
@@ -1207,7 +1220,7 @@ class Gemini:
     PRO_1_5 = ModelInfo(
         id="gemini-1.5-pro",
         provider="gemini",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.25,
         completion_cost=5.00,
         max_tokens=8192,
@@ -1216,7 +1229,7 @@ class Gemini:
     PRO_1_5_LATEST = ModelInfo(
         id="gemini-1.5-pro-latest",
         provider="gemini",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=1.25,
         completion_cost=5.00,
         max_tokens=8192,
@@ -1225,7 +1238,7 @@ class Gemini:
     FLASH_1_5 = ModelInfo(
         id="gemini-1.5-flash",
         provider="gemini",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.075,
         completion_cost=0.30,
         max_tokens=8192,
@@ -1234,7 +1247,7 @@ class Gemini:
     FLASH_1_5_LATEST = ModelInfo(
         id="gemini-1.5-flash-latest",
         provider="gemini",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.075,
         completion_cost=0.30,
         max_tokens=8192,
@@ -1245,7 +1258,7 @@ class Gemini:
     PRO_1_0 = ModelInfo(
         id="gemini-1.0-pro",
         provider="gemini",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.50,
         completion_cost=1.50,
         max_tokens=8192,
@@ -1254,7 +1267,7 @@ class Gemini:
     PRO = ModelInfo(
         id="gemini-pro",
         provider="gemini",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.50,
         completion_cost=1.50,
         max_tokens=8192,
@@ -1265,7 +1278,7 @@ class Gemini:
     GEMMA_3 = ModelInfo(
         id="gemma-3",
         provider="gemini",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.00,
         completion_cost=0.00,
         max_tokens=8192,
@@ -1274,7 +1287,7 @@ class Gemini:
     GEMMA_3N = ModelInfo(
         id="gemma-3n",
         provider="gemini",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.00,
         completion_cost=0.00,
         max_tokens=8192,
@@ -1288,7 +1301,7 @@ class Gemini:
         EMBEDDING_001 = ModelInfo(
             id="text-embedding-001",
             provider="gemini",
-            type="embedding",
+            type=ModelType.EMBEDDING,
             prompt_cost=0.0,
             completion_cost=0.0,
             max_tokens=2048,
@@ -1297,7 +1310,7 @@ class Gemini:
         EMBEDDING_004 = ModelInfo(
             id="text-embedding-004",
             provider="gemini",
-            type="embedding",
+            type=ModelType.EMBEDDING,
             prompt_cost=0.0,
             completion_cost=0.0,
             max_tokens=2048,
@@ -1306,7 +1319,7 @@ class Gemini:
         EMBEDDING_2_PREVIEW = ModelInfo(
             id="gemini-embedding-2-preview",
             provider="gemini",
-            type="embedding",
+            type=ModelType.EMBEDDING,
             prompt_cost=0.20,
             completion_cost=0.0,
             max_tokens=8192,
@@ -1325,7 +1338,7 @@ class Ollama:
     LLAMA_3_2 = ModelInfo(
         id="llama3.2",
         provider="ollama",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.00,
         completion_cost=0.00,
         max_tokens=4096,
@@ -1334,7 +1347,7 @@ class Ollama:
     LLAMA_3_1 = ModelInfo(
         id="llama3.1",
         provider="ollama",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.00,
         completion_cost=0.00,
         max_tokens=4096,
@@ -1343,7 +1356,7 @@ class Ollama:
     LLAMA_3 = ModelInfo(
         id="llama3",
         provider="ollama",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.00,
         completion_cost=0.00,
         max_tokens=4096,
@@ -1352,7 +1365,7 @@ class Ollama:
     LLAMA_2 = ModelInfo(
         id="llama2",
         provider="ollama",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.00,
         completion_cost=0.00,
         max_tokens=4096,
@@ -1361,7 +1374,7 @@ class Ollama:
     MISTRAL = ModelInfo(
         id="mistral",
         provider="ollama",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.00,
         completion_cost=0.00,
         max_tokens=4096,
@@ -1370,7 +1383,7 @@ class Ollama:
     MIXTRAL = ModelInfo(
         id="mixtral",
         provider="ollama",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.00,
         completion_cost=0.00,
         max_tokens=4096,
@@ -1379,7 +1392,7 @@ class Ollama:
     CODELLAMA = ModelInfo(
         id="codellama",
         provider="ollama",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.00,
         completion_cost=0.00,
         max_tokens=4096,
@@ -1388,7 +1401,7 @@ class Ollama:
     PHI = ModelInfo(
         id="phi",
         provider="ollama",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.00,
         completion_cost=0.00,
         max_tokens=2048,
@@ -1397,7 +1410,7 @@ class Ollama:
     NEURAL_CHAT = ModelInfo(
         id="neural-chat",
         provider="ollama",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.00,
         completion_cost=0.00,
         max_tokens=4096,
@@ -1406,7 +1419,7 @@ class Ollama:
     STARLING_LM = ModelInfo(
         id="starling-lm",
         provider="ollama",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.00,
         completion_cost=0.00,
         max_tokens=4096,
@@ -1415,7 +1428,7 @@ class Ollama:
     QWEN = ModelInfo(
         id="qwen",
         provider="ollama",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.00,
         completion_cost=0.00,
         max_tokens=4096,
@@ -1424,7 +1437,7 @@ class Ollama:
     GEMMA = ModelInfo(
         id="gemma",
         provider="ollama",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.00,
         completion_cost=0.00,
         max_tokens=8192,
@@ -1433,7 +1446,7 @@ class Ollama:
     VICUNA = ModelInfo(
         id="vicuna",
         provider="ollama",
-        type="chat",
+        type=ModelType.CHAT,
         prompt_cost=0.00,
         completion_cost=0.00,
         max_tokens=4096,
@@ -1456,7 +1469,7 @@ class Cohere:
         EMBED_V3 = ModelInfo(
             id="embed-english-v3.0",
             provider="cohere",
-            type="embedding",
+            type=ModelType.EMBEDDING,
             prompt_cost=0.10,
             completion_cost=0.0,
             max_tokens=512,
@@ -1465,7 +1478,7 @@ class Cohere:
         EMBED_MULTILINGUAL_V3 = ModelInfo(
             id="embed-multilingual-v3.0",
             provider="cohere",
-            type="embedding",
+            type=ModelType.EMBEDDING,
             prompt_cost=0.10,
             completion_cost=0.0,
             max_tokens=512,
@@ -1474,7 +1487,7 @@ class Cohere:
         EMBED_V3_LIGHT = ModelInfo(
             id="embed-english-light-v3.0",
             provider="cohere",
-            type="embedding",
+            type=ModelType.EMBEDDING,
             prompt_cost=0.10,
             completion_cost=0.0,
             max_tokens=512,

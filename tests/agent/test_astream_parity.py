@@ -441,16 +441,16 @@ class TestAstreamCoherenceCheck:
                 yield "Blocked"
 
         # Mock coherence to always fail
-        import selectools.agent.core as core_mod
+        import selectools.agent._tool_executor as te_mod
 
-        original = core_mod.acheck_coherence
+        original = te_mod.acheck_coherence
 
         async def _fake_coherence(**kwargs: Any) -> Any:
             from selectools.coherence import CoherenceResult
 
             return CoherenceResult(coherent=False, explanation="Not coherent")
 
-        core_mod.acheck_coherence = _fake_coherence
+        te_mod.acheck_coherence = _fake_coherence
         try:
             provider = _CoherenceFailProvider()
             agent = Agent(
@@ -465,7 +465,7 @@ class TestAstreamCoherenceCheck:
             error_steps = [s for s in result.trace.steps if s.type == "error"]
             assert any("Coherence" in (s.error or "") for s in error_steps)
         finally:
-            core_mod.acheck_coherence = original
+            te_mod.acheck_coherence = original
 
 
 class TestAstreamScreenToolResult:
@@ -1106,9 +1106,9 @@ def tool_b() -> str:
 class TestParallelCoherenceCheck:
     def test_sync_parallel_coherence_blocks_tool(self) -> None:
         """Parallel sync execution must run coherence checks."""
-        import selectools.agent.core as core_mod
+        import selectools.agent._tool_executor as te_mod
 
-        original = core_mod.check_coherence
+        original = te_mod.check_coherence
 
         def _fake_coherence(**kwargs: Any) -> Any:
             from selectools.coherence import CoherenceResult
@@ -1117,7 +1117,7 @@ class TestParallelCoherenceCheck:
                 return CoherenceResult(coherent=False, explanation="Not coherent")
             return CoherenceResult(coherent=True)
 
-        core_mod.check_coherence = _fake_coherence
+        te_mod.check_coherence = _fake_coherence
         try:
             provider = _TwoToolProvider("tool_a", {}, "tool_b", {})
             agent = Agent(
@@ -1130,14 +1130,14 @@ class TestParallelCoherenceCheck:
             error_steps = [s for s in result.trace.steps if s.type == "error"]
             assert any("Coherence" in (s.error or "") for s in error_steps)
         finally:
-            core_mod.check_coherence = original
+            te_mod.check_coherence = original
 
     @pytest.mark.asyncio
     async def test_async_parallel_coherence_blocks_tool(self) -> None:
         """Parallel async execution must run coherence checks."""
-        import selectools.agent.core as core_mod
+        import selectools.agent._tool_executor as te_mod
 
-        original = core_mod.acheck_coherence
+        original = te_mod.acheck_coherence
 
         async def _fake_coherence(**kwargs: Any) -> Any:
             from selectools.coherence import CoherenceResult
@@ -1146,7 +1146,7 @@ class TestParallelCoherenceCheck:
                 return CoherenceResult(coherent=False, explanation="Not coherent")
             return CoherenceResult(coherent=True)
 
-        core_mod.acheck_coherence = _fake_coherence
+        te_mod.acheck_coherence = _fake_coherence
         try:
             provider = _TwoToolProvider("tool_a", {}, "tool_b", {})
             agent = Agent(
@@ -1158,7 +1158,7 @@ class TestParallelCoherenceCheck:
             error_steps = [s for s in result.trace.steps if s.type == "error"]
             assert any("Coherence" in (s.error or "") for s in error_steps)
         finally:
-            core_mod.acheck_coherence = original
+            te_mod.acheck_coherence = original
 
 
 class TestParallelOutputScreening:

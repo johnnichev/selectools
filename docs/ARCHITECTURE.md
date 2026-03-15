@@ -1,6 +1,6 @@
 # Selectools Architecture
 
-**Version:** 0.16.3
+**Version:** 0.16.4
 **Last Updated:** March 2026
 
 ## Table of Contents
@@ -25,7 +25,7 @@ Selectools is a production-ready Python framework for building AI agents with to
 - **Production-Ready**: Robust error handling, retry logic, timeouts, and validation
 - **RAG Support**: 4 embedding providers, 4 vector stores, document loaders
 - **Developer-Friendly**: Type hints, `@tool` decorator, automatic schema inference
-- **Observable**: Built-in hooks, `AgentObserver` protocol (25 events with `run_id`), `LoggingObserver`, analytics, usage tracking, and cost monitoring
+- **Observable**: `AgentObserver` + `AsyncAgentObserver` protocol (25 events with `run_id`), `LoggingObserver`, analytics, usage tracking, and cost monitoring (legacy hooks deprecated)
 - **Native Tool Calling**: OpenAI, Anthropic, and Gemini native function calling APIs
 - **Streaming**: E2E token-level streaming with native tool call support via `Agent.astream`
 - **Parallel Execution**: Concurrent tool execution via `asyncio.gather` / `ThreadPoolExecutor`
@@ -67,7 +67,7 @@ Selectools is a production-ready Python framework for building AI agents with to
 │  │  • Execution traces (AgentTrace)                                 │  │
 │  │  • Reasoning extraction                                          │  │
 │  │  • Error handling & retries                                      │  │
-│  │  • Hooks + AgentObserver (observability)                          │  │
+│  │  • AgentObserver + AsyncAgentObserver (hooks deprecated)          │  │
 │  │  • Parallel tool execution                                       │  │
 │  │  • Batch processing (batch/abatch)                               │  │
 │  │  • Response caching (LRU+TTL)                                    │  │
@@ -197,6 +197,11 @@ The **Agent** is the orchestrator that manages the iterative loop of:
 - Parallel tool execution for concurrent multi-tool calls
 - Streaming responses via `astream()`
 - Response caching to avoid redundant LLM calls
+
+**Internal structure**: The Agent class is composed from 4 mixins for maintainability:
+`_ToolExecutorMixin` (tool pipeline), `_ProviderCallerMixin` (LLM calls),
+`_LifecycleMixin` (observer notification), `_MemoryManagerMixin` (memory/session/entity).
+All public methods remain on `Agent`.
 
 ### 2. Tools (`tools.py`)
 
@@ -357,9 +362,11 @@ Class-based lifecycle observability:
 
 - 25 event methods with `run_id` correlation for concurrent requests
 - `call_id` for matching parallel tool start/end pairs
+- `AsyncAgentObserver` provides async equivalents of all observer events
 - Built-in `LoggingObserver` for structured JSON log output
 - OpenTelemetry span export via `AgentTrace.to_otel_spans()`
 - Designed for Langfuse, Datadog, custom integrations
+- Legacy hooks (`AgentConfig(hooks={...})`) are deprecated in favor of observers
 
 ### 15. Model Registry (`models.py`)
 
@@ -626,13 +633,15 @@ Single source of truth for 146 models:
 
 **Problem:** Black box behavior makes debugging hard.
 
-**Solution:** Hook system for lifecycle events:
+**Solution:** `AgentObserver` protocol (25 lifecycle events, `run_id` correlation):
 
-- `on_agent_start/end`
-- `on_iteration_start/end`
+- `on_run_start/end`, `on_iteration_start/end`
 - `on_tool_start/end/error/chunk`
 - `on_llm_start/end`
-- `on_error`
+- `on_error`, `on_guardrail_triggered`, `on_coherence_blocked`, ...
+- `AsyncAgentObserver` for async-native observers
+
+Legacy hooks (`AgentConfig(hooks={...})`) are deprecated. Use `AgentConfig(observers=[...])` instead.
 
 **Benefit:** Full visibility into agent behavior.
 
@@ -761,15 +770,20 @@ def my_tool(param1: str, param2: int = 10) -> str:
 
 Schema is auto-generated from type hints and defaults.
 
-### Custom Hooks
+### Custom Observers
 
 ```python
-def my_hook(tool_name, args):
-    print(f"Tool: {tool_name}, Args: {args}")
+from selectools.observer import AgentObserver
 
-config = AgentConfig(hooks={"on_tool_start": my_hook})
+class MyObserver(AgentObserver):
+    def on_tool_start(self, run_id, call_id, tool_name, args):
+        print(f"[{run_id[:8]}] Tool: {tool_name}, Args: {args}")
+
+config = AgentConfig(observers=[MyObserver()])
 agent = Agent(tools=[...], provider=provider, config=config)
 ```
+
+> **Note:** Legacy hooks (`AgentConfig(hooks={...})`) are deprecated. Use `observers` instead.
 
 ---
 

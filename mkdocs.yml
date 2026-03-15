@@ -112,6 +112,13 @@ nav:
     - Audit Logging: modules/AUDIT.md
     - Screening & Coherence: modules/SECURITY.md
     - Error Handling: modules/EXCEPTIONS.md
+  - Architecture Decisions:
+    - Protocol over ABC: decisions/001-protocol-over-abc.md
+    - Observer Replaces Hooks: decisions/002-observer-replaces-hooks.md
+    - Literal to Enum: decisions/003-literal-to-enum.md
+    - Provider Base Class: decisions/004-provider-base-class.md
+    - Agent Decomposition: decisions/005-agent-decomposition.md
+    - Agent Config Future: decisions/006-agent-config-future.md
   - Reference:
     - Parser: modules/PARSER.md
     - Prompt: modules/PROMPT.md

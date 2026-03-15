@@ -348,22 +348,36 @@ print(f"Total cost: ${total_cost:.6f}")  # $0.175000
 
 ### ModelType Enum
 
+`ModelType` is now a proper `str` enum (backward compatible with string comparisons):
+
 ```python
-from selectools.models import ModelType
+from selectools import ModelType
 
-ModelType = Literal["chat", "embedding", "image", "audio", "multimodal"]
+class ModelType(str, Enum):
+    CHAT = "chat"
+    EMBEDDING = "embedding"
+    IMAGE = "image"
+    AUDIO = "audio"
+    MULTIMODAL = "multimodal"
+```
 
+> **Backward compatible**: `ModelType.CHAT == "chat"` is `True`, so existing code that
+> compares against string literals continues to work without changes.
+
+```python
 # Chat models
-OpenAI.GPT_4O.type == "chat"
+OpenAI.GPT_4O.type == "chat"               # True
+OpenAI.GPT_4O.type == ModelType.CHAT        # True
 
 # Embedding models
-OpenAI.Embeddings.TEXT_EMBEDDING_3_SMALL.type == "embedding"
+OpenAI.Embeddings.TEXT_EMBEDDING_3_SMALL.type == "embedding"       # True
+OpenAI.Embeddings.TEXT_EMBEDDING_3_SMALL.type == ModelType.EMBEDDING  # True
 
 # Audio models
-OpenAI.GPT_REALTIME.type == "audio"
+OpenAI.GPT_REALTIME.type == ModelType.AUDIO           # True
 
 # Multimodal models
-OpenAI.GPT_4_1106_VISION_PREVIEW.type == "multimodal"
+OpenAI.GPT_4_1106_VISION_PREVIEW.type == ModelType.MULTIMODAL  # True
 ```
 
 ---
