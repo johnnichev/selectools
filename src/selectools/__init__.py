@@ -1,6 +1,6 @@
 """Public exports for the selectools package."""
 
-__version__ = "0.16.3"
+__version__ = "0.16.4"
 
 # Import submodules (lazy loading for optional dependencies)
 from . import embeddings, guardrails, models, rag, toolbox

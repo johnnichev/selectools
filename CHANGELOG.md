@@ -5,6 +5,22 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.4] - 2026-03-15
+
+### Fixed
+
+- **Parallel tool execution missing coherence checks**: Both `_execute_tools_parallel()` and `_aexecute_tools_parallel()` now run coherence checks before executing tools, matching sequential execution behavior.
+- **Parallel tool execution missing output screening**: Both parallel execution helpers now call `_screen_tool_result()` after tool execution, closing a security gap where parallel tool calls could bypass prompt injection detection.
+- **astream() usage tracking**: Fixed inline provider calls in astream() not feeding into `self.usage`, which caused `tool_usage` and `tool_tokens` dicts to remain empty during streaming.
+- **Input guardrails mutating caller's Message objects**: `_prepare_run()` now copies messages before applying input guardrails, preventing caller-side mutation when guardrails rewrite content.
+- **`ask()`/`aask()` missing `parent_run_id`**: Both convenience methods now accept and pass through `parent_run_id` for trace linking, matching `run()`/`arun()`/`astream()`.
+
+### Tests
+
+- **15 new tests** (total: 1477): Regression tests for all 5 fixes above, including parallel coherence/screening (sync + async), astream usage tracking, guardrail mutation prevention, and ask/aask parent_run_id.
+
+---
+
 ## [0.16.3] - 2026-03-14
 
 ### Added
