@@ -2136,6 +2136,8 @@ class Agent:
                                 timeout=self.config.request_timeout,
                             ),
                         )
+                    if _usage:
+                        self.usage.add_usage(_usage, tool_name=None)
                     self._call_hook("on_llm_end", response_msg.content, _usage)
                     self._notify_observers("on_llm_end", ctx.run_id, response_msg.content, _usage)
                     if _usage:
