@@ -112,8 +112,9 @@ class AgentTrace:
         """Human-readable timeline string."""
         lines = []
         for i, s in enumerate(self.steps, 1):
-            summary = s.summary or s.type
-            lines.append(f"  {i}. [{s.type:18s}] {s.duration_ms:7.1f}ms  {summary}")
+            type_val = s.type.value if hasattr(s.type, "value") else s.type
+            summary = s.summary or type_val
+            lines.append(f"  {i}. [{type_val:18s}] {s.duration_ms:7.1f}ms  {summary}")
         total = self.total_duration_ms
         lines.append(
             f"  Total: {total:.1f}ms (LLM: {self.llm_duration_ms:.1f}ms, Tools: {self.tool_duration_ms:.1f}ms)"
@@ -188,7 +189,8 @@ class AgentTrace:
         for step in self.steps:
             start_ns = int(step.timestamp * 1e9)
             end_ns = start_ns + int(step.duration_ms * 1e6)
-            attrs: Dict[str, Any] = {"selectools.step_type": step.type}
+            type_val = step.type.value if hasattr(step.type, "value") else step.type
+            attrs: Dict[str, Any] = {"selectools.step_type": type_val}
 
             if step.type == "llm_call":
                 name = f"llm.{step.model or 'unknown'}"
@@ -215,7 +217,7 @@ class AgentTrace:
                 if step.error:
                     attrs["error.message"] = step.error[:500]
             else:
-                name = step.type
+                name = step.type.value if hasattr(step.type, "value") else step.type
 
             if step.summary:
                 attrs["selectools.summary"] = step.summary[:200]

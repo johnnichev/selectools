@@ -126,11 +126,10 @@ class TestStepTypeEnum:
         assert Imported is StepType
 
     def test_steptype_in_string_formatting(self) -> None:
-        """StepType works in f-strings and format calls (str behavior)."""
-        formatted = f"{StepType.LLM_CALL}"
-        # In Python 3.11+ str enums format as their value; in 3.9-3.10 __format__
-        # also returns the value because StepType inherits from str.
-        assert "llm_call" in formatted
+        """StepType .value gives the string value across all Python versions."""
+        assert StepType.LLM_CALL.value == "llm_call"
+        # == comparison always works (str, Enum inherits __eq__ from str)
+        assert StepType.LLM_CALL == "llm_call"
         # Verify it works in the timeline method which uses :18s formatting
         step = TraceStep(type=StepType.LLM_CALL, duration_ms=100.0)
         trace = AgentTrace()
