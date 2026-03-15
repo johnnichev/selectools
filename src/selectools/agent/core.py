@@ -1284,6 +1284,7 @@ class Agent:
                         response_text,
                         trace=ctx.trace,
                         run_id=ctx.run_id,
+                        user_text_for_coherence=ctx.user_text_for_coherence,
                     )
                     ctx.last_tool_name = _last_name
                     ctx.last_tool_args = _last_args
@@ -1717,6 +1718,7 @@ class Agent:
         response_text: str,
         trace: Optional[AgentTrace] = None,
         run_id: Optional[str] = None,
+        user_text_for_coherence: str = "",
     ) -> tuple:
         """Execute multiple tool calls concurrently using ThreadPoolExecutor.
 
@@ -1749,6 +1751,10 @@ class Agent:
             if policy_error:
                 return _Result(tc, policy_error, True, 0.0, tool, 0)
 
+            coherence_error = self._check_coherence(user_text_for_coherence, tool_name, parameters)
+            if coherence_error:
+                return _Result(tc, coherence_error, True, 0.0, tool, 0)
+
             call_id = tc.id or ""
             start = time.time()
             self._call_hook("on_tool_start", tool_name, parameters)
@@ -1771,6 +1777,7 @@ class Agent:
 
             try:
                 result = self._execute_tool_with_timeout(tool, parameters, chunk_cb)
+                result = self._screen_tool_result(tool_name, result)
                 dur = time.time() - start
                 self._call_hook("on_tool_end", tool_name, result, dur)
                 if run_id:
@@ -1880,6 +1887,7 @@ class Agent:
         response_text: str,
         trace: Optional[AgentTrace] = None,
         run_id: Optional[str] = None,
+        user_text_for_coherence: str = "",
     ) -> tuple:
         """Execute multiple tool calls concurrently using asyncio.gather.
 
@@ -1913,6 +1921,12 @@ class Agent:
             if policy_error:
                 return _Result(tc, policy_error, True, 0.0, tool, 0)
 
+            coherence_error = await self._acheck_coherence(
+                user_text_for_coherence, tool_name, parameters
+            )
+            if coherence_error:
+                return _Result(tc, coherence_error, True, 0.0, tool, 0)
+
             start = time.time()
             self._call_hook("on_tool_start", tool_name, parameters)
             if run_id:
@@ -1934,6 +1948,7 @@ class Agent:
 
             try:
                 result = await self._aexecute_tool_with_timeout(tool, parameters, chunk_cb)
+                result = self._screen_tool_result(tool_name, result)
                 dur = time.time() - start
                 self._call_hook("on_tool_end", tool_name, result, dur)
                 if run_id:
@@ -2278,6 +2293,7 @@ class Agent:
                         full_content,
                         trace=ctx.trace,
                         run_id=ctx.run_id,
+                        user_text_for_coherence=ctx.user_text_for_coherence,
                     )
                     ctx.last_tool_name = _last_name
                     ctx.last_tool_args = _last_args
@@ -2615,6 +2631,7 @@ class Agent:
                         response_text,
                         trace=ctx.trace,
                         run_id=ctx.run_id,
+                        user_text_for_coherence=ctx.user_text_for_coherence,
                     )
                     ctx.last_tool_name = _last_name
                     ctx.last_tool_args = _last_args
