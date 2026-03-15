@@ -111,10 +111,40 @@ class MemoryLimitExceededError(SelectoolsError):
         super().__init__(message)
 
 
+class GraphExecutionError(SelectoolsError):
+    """Raised when a graph execution node fails."""
+
+    def __init__(
+        self,
+        graph_name: str,
+        node_name: str,
+        error: Exception,
+        step: int = 0,
+    ):
+        self.graph_name = graph_name
+        self.node_name = node_name
+        self.error = error
+        self.step = step
+
+        message = f"\n{'='*60}\n"
+        message += f"❌ Graph Execution Failed: '{graph_name}'\n"
+        message += f"{'='*60}\n\n"
+        message += f"Node: {node_name} (step {step})\n"
+        message += f"Error: {type(error).__name__}: {str(error)}\n"
+        message += f"\n💡 Check that:\n"
+        message += f"  - The node '{node_name}' is correctly configured\n"
+        message += f"  - All required inputs are available at step {step}\n"
+        message += f"  - The node's agent or function is working correctly\n"
+        message += f"\n{'='*60}\n"
+
+        super().__init__(message)
+
+
 __all__ = [
     "SelectoolsError",
     "ToolValidationError",
     "ToolExecutionError",
     "ProviderConfigurationError",
     "MemoryLimitExceededError",
+    "GraphExecutionError",
 ]

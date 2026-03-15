@@ -16,7 +16,7 @@
 - **Entity Memory** — Auto-extract named entities (person, org, project) across turns with LRU-pruned registry and system prompt injection.
 - **Knowledge Graph** — Relationship triple extraction with in-memory and SQLite storage. Query-relevant triples auto-injected into prompts.
 - **Cross-Session Knowledge** — Daily logs + persistent facts with auto-registered `remember` tool. Give your agent durable memory across conversations.
-- **182 new tests** (total: 1421 with v0.16.1 consolidation)
+- **182 new tests** (total: 1462 with v0.16.3 refactoring)
 
 > Full changelog: [CHANGELOG.md](https://github.com/johnnichev/selectools/blob/main/CHANGELOG.md)
 
@@ -85,8 +85,8 @@
 - **Knowledge Graph**: Triple extraction with in-memory and SQLite storage
 - **Cross-Session Knowledge**: Daily logs + persistent memory with `remember` tool
 - **37 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, and more
-- **AgentObserver Protocol**: 19 lifecycle events with `run_id` correlation, `LoggingObserver`, OTel export
-- **1421 Tests**: Unit, integration, regression, and E2E with real API calls
+- **AgentObserver Protocol**: 25 lifecycle events with `run_id` correlation, `LoggingObserver`, OTel export
+- **1462 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 

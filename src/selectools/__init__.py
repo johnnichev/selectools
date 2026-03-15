@@ -1,6 +1,6 @@
 """Public exports for the selectools package."""
 
-__version__ = "0.16.2"
+__version__ = "0.16.3"
 
 # Import submodules (lazy loading for optional dependencies)
 from . import embeddings, guardrails, models, rag, toolbox
@@ -11,6 +11,7 @@ from .cache import Cache, CacheKeyBuilder, CacheStats, InMemoryCache
 from .coherence import CoherenceResult
 from .entity_memory import Entity, EntityMemory
 from .exceptions import (
+    GraphExecutionError,
     MemoryLimitExceededError,
     ProviderConfigurationError,
     SelectoolsError,
@@ -91,6 +92,7 @@ __all__ = [
     "ToolExecutionError",
     "ProviderConfigurationError",
     "MemoryLimitExceededError",
+    "GraphExecutionError",
     # Usage tracking
     "UsageStats",
     "AgentUsage",

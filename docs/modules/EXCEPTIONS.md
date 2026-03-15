@@ -11,7 +11,8 @@ SelectoolsError                     # Base — catch-all for any selectools erro
 ├── ToolValidationError             # Bad tool parameters (type mismatch, missing required)
 ├── ToolExecutionError              # Tool function raised an exception
 ├── ProviderConfigurationError      # Missing API key or bad provider setup
-└── MemoryLimitExceededError        # Message count or token limit hit
+├── MemoryLimitExceededError        # Message count or token limit hit
+└── GraphExecutionError             # A graph execution node failed (v0.17.0 pre-work)
 ```
 
 All exceptions include **PyTorch-style error messages** with clear explanations and fix suggestions.
@@ -40,6 +41,7 @@ from selectools import (
     ToolExecutionError,
     ProviderConfigurationError,
     MemoryLimitExceededError,
+    GraphExecutionError,
 )
 
 try:
@@ -184,6 +186,39 @@ Limit: 20
 💡 Suggestions:
   - Increase max_messages: ConversationMemory(max_messages=40)
   - Clear older messages manually: memory.clear()
+
+============================================================
+```
+
+---
+
+## GraphExecutionError
+
+**When:** A node in a multi-agent graph fails during execution. Pre-work for v0.17.0 multi-agent orchestration.
+
+**Attributes:**
+
+| Attribute | Type | Description |
+|---|---|---|
+| `graph_name` | `str` | Name of the graph |
+| `node_name` | `str` | Node that failed |
+| `error` | `Exception` | The original exception |
+| `step` | `int` | Step number in the graph |
+
+**Example output:**
+
+```
+============================================================
+❌ Graph Execution Failed: 'research-pipeline'
+============================================================
+
+Node: summarize (step 3)
+Error: ProviderError: Rate limit exceeded
+
+💡 Check that:
+  - The node 'summarize' is correctly configured
+  - All required inputs are available at step 3
+  - The node's agent or function is working correctly
 
 ============================================================
 ```

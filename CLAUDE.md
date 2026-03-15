@@ -69,7 +69,7 @@ src/selectools/
 ├── types.py                 # Core types (Message, Role, ToolCall, AgentResult)
 └── env.py                   # Environment variable helpers
 
-tests/                       # 1487 tests (unit, integration, regression, E2E)
+tests/                       # 1462 tests (unit, integration, regression, E2E)
 ├── agent/                   # Agent core tests
 ├── providers/               # Provider-specific tests
 ├── rag/                     # RAG pipeline tests
@@ -272,10 +272,14 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 
 11. **`astream()` must restore `_system_prompt` in finally**: All three execution methods (`run`, `arun`, `astream`) save `original_system_prompt` before the try block and restore it in `finally`. This prevents modified prompts (e.g. from `response_format`) from leaking to future calls. Was missing from `astream()` until v0.16.1.
 
+12. **`astream()` must have full feature parity with `run()`/`arun()`**: As of v0.16.3, all three methods share `_prepare_run()`, `_finalize_run()`, `_process_response()`, and `_build_max_iterations_result()` helpers. When adding new features to the agent loop, add them to these shared helpers rather than to individual methods. The `_RunContext` dataclass carries all per-run state.
+
 ## Current Roadmap
 
 - **v0.15.0** ✅ Enterprise Reliability (guardrails, audit, screening, coherence)
 - **v0.16.0** ✅ Memory & Persistence (sessions, summarize-on-trim, entity memory, knowledge graph)
 - **v0.16.1** ✅ Consolidation (6 bug fixes, thread safety, 68 new tests, mypy 0 errors)
+- **v0.16.2** ✅ astream() prompt leak fix + documentation updates
+- **v0.16.3** ✅ Agent refactoring + astream() full parity (14+ bug fixes, 29 new tests, ~800 lines dedup)
 - **v0.17.0** 🟡 Multi-Agent Orchestration — see `MULTI_AGENT_PLAN.md`
 - **Backlog**: Connector Expansion, Ecosystem Parity, Polish & Community
