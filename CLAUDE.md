@@ -69,7 +69,7 @@ src/selectools/
 ├── types.py                 # Core types (Message, Role, ToolCall, AgentResult)
 └── env.py                   # Environment variable helpers
 
-tests/                       # 1462 tests (unit, integration, regression, E2E)
+tests/                       # 1477 tests (unit, integration, regression, E2E)
 ├── agent/                   # Agent core tests
 ├── providers/               # Provider-specific tests
 ├── rag/                     # RAG pipeline tests
@@ -281,5 +281,6 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 - **v0.16.1** ✅ Consolidation (6 bug fixes, thread safety, 68 new tests, mypy 0 errors)
 - **v0.16.2** ✅ astream() prompt leak fix + documentation updates
 - **v0.16.3** ✅ Agent refactoring + astream() full parity (14+ bug fixes, 29 new tests, ~800 lines dedup)
+- **v0.16.4** ✅ Parallel execution safety + 5 bug fixes
 - **v0.17.0** 🟡 Multi-Agent Orchestration — see `MULTI_AGENT_PLAN.md`
 - **Backlog**: Connector Expansion, Ecosystem Parity, Polish & Community
