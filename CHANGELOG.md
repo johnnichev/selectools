@@ -5,6 +5,18 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.6] - 2026-03-16
+
+### Fixed
+
+- **Gemini thought_signature UnicodeDecodeError**: Gemini 3.x returns `thought_signature` as opaque binary (protobuf/hash), not UTF-8 text. The previous `.decode("utf-8")` crashed with `UnicodeDecodeError` on non-UTF-8 bytes (e.g. `0xa4`, `0xd5`). Replaced with base64 encode/decode across all 5 affected locations in `complete()`, `acomplete()`, `astream()`, and `_format_contents()`. The signature now survives a lossless round-trip for arbitrary binary data.
+
+### Tests
+
+- **2 new regression tests** (total: 1642): Non-UTF-8 binary thought_signature round-trip in `test_phase1_design_patterns.py` and `tests/agent/test_regression.py`.
+
+---
+
 ## [0.16.5] - 2026-03-15
 
 ### Added

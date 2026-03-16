@@ -1,6 +1,6 @@
 # Selectools Implementation Documentation
 
-**Version:** 0.16.0
+**Version:** 0.16.6
 **Last Updated:** March 2026
 
 Welcome to the comprehensive technical documentation for selectools - a production-ready Python framework for building AI agents with tool-calling capabilities and RAG support.

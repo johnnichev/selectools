@@ -1,6 +1,6 @@
 # Selectools Architecture
 
-**Version:** 0.16.4
+**Version:** 0.16.6
 **Last Updated:** March 2026
 
 ## Table of Contents
