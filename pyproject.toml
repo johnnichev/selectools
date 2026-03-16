@@ -59,9 +59,6 @@ rag = [
     "pypdf>=4.0.0",
 ]
 
-[project.scripts]
-selectools = "selectools.cli:main"
-
 [tool.setuptools]
 package-dir = {"" = "src"}
 

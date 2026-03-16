@@ -241,7 +241,6 @@ selectools/
 │   ├── structured.py           # Structured output parsing & validation
 │   ├── trace.py                # AgentTrace & TraceStep
 │   ├── policy.py               # ToolPolicy (allow/review/deny)
-│   ├── cli.py                  # CLI interface
 │   ├── env.py                  # Environment variable loading
 │   ├── exceptions.py           # Custom exception classes
 │   ├── memory.py               # ConversationMemory (tool-pair-aware)

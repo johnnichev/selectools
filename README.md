@@ -11,7 +11,7 @@
 
 **Gemini 3.x thought_signature crash fix** — `thought_signature` from Gemini 3.x is opaque binary (protobuf/hash), not UTF-8 text. The previous code crashed with `UnicodeDecodeError` on non-UTF-8 bytes. Now uses base64 for lossless binary round-trip across all code paths.
 
-- **1642 tests** — 2 new regression tests for non-UTF-8 binary thought_signature round-trip
+- **1620 tests** — 2 new regression tests for non-UTF-8 binary thought_signature round-trip
 
 > Full changelog: [CHANGELOG.md](https://github.com/johnnichev/selectools/blob/main/CHANGELOG.md)
 
@@ -90,7 +90,7 @@
 - **Cross-Session Knowledge**: Daily logs + persistent memory with `remember` tool
 - **38 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, and more
 - **AgentObserver Protocol**: 25 lifecycle events with `run_id` correlation, `LoggingObserver`, OTel export
-- **1642 Tests**: Unit, integration, regression, and E2E with real API calls
+- **1620 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 
@@ -657,7 +657,7 @@ pytest tests/ -x -q          # All tests
 pytest tests/ -k "not e2e"   # Skip E2E (no API keys needed)
 ```
 
-1642 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, and E2E integration.
+1620 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, and E2E integration.
 
 ## License
 

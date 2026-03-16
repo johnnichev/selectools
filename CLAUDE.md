@@ -74,7 +74,7 @@ src/selectools/
 ├── types.py                 # Core types (Message, Role, ToolCall, AgentResult)
 └── env.py                   # Environment variable helpers
 
-tests/                       # 1642 tests (unit, integration, regression, E2E)
+tests/                       # 1620 tests (unit, integration, regression, E2E)
 ├── agent/                   # Agent core tests
 ├── providers/               # Provider-specific tests
 ├── rag/                     # RAG pipeline tests

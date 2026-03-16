@@ -10,8 +10,6 @@ import json
 import os
 import sys
 import types
-from contextlib import redirect_stdout
-from io import StringIO
 from pathlib import Path
 from typing import Any, Callable, Coroutine, Dict, Generator, List, Optional
 
@@ -19,7 +17,6 @@ import pytest
 
 import selectools
 from selectools import Agent, AgentConfig, Message, Role, Tool, ToolParameter
-from selectools.cli import _default_tools, build_parser, run_agent
 from selectools.memory import ConversationMemory
 from selectools.parser import ToolCallParser
 from selectools.providers.anthropic_provider import AnthropicProvider
@@ -625,32 +622,6 @@ def test_gemini_provider_with_mocked_client() -> None:
         os.environ.pop("GEMINI_API_KEY", None)
 
 
-def test_cli_streaming_with_local_provider() -> None:
-    parser = build_parser()
-    args = parser.parse_args(
-        [
-            "run",
-            "--provider",
-            "local",
-            "--model",
-            "local",
-            "--prompt",
-            "hello world",
-            "--stream",
-            "--max-iterations",
-            "1",
-            "--max-tokens",
-            "10",
-        ]
-    )
-    tools: Dict[str, Tool] = _default_tools()
-    buf = StringIO()
-    with redirect_stdout(buf):
-        run_agent(args, tools or {})  # run_agent fills tools default internally if empty
-    output = buf.getvalue()
-    assert "local provider" in output.lower()
-
-
 @pytest.mark.asyncio
 async def test_async_agent_basic() -> None:
     """Test basic async agent execution."""
@@ -806,7 +777,6 @@ if __name__ == "__main__":
         test_anthropic_and_gemini_require_api_keys,
         test_anthropic_provider_with_mocked_client,
         test_gemini_provider_with_mocked_client,
-        test_cli_streaming_with_local_provider,
     ]
 
     # Async tests run separately
