@@ -3,21 +3,31 @@
 [![PyPI version](https://badge.fury.io/py/selectools.svg)](https://badge.fury.io/py/selectools)
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://johnnichev.github.io/selectools)
 [![License: LGPL v3](https://img.shields.io/badge/License-LGPL_v3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 
 **Production-ready AI agents with tool calling, RAG, and hybrid search.** Connect LLMs to your Python functions, embed and search your documents with vector + keyword fusion, stream responses in real time, and dynamically manage tools at runtime. Works with OpenAI, Anthropic, Gemini, and Ollama. Tracks costs automatically.
 
-## What's New in v0.16.4
+## What's New in v0.16.5
 
-**Parallel Execution Safety** — Bug fixes for parallel tool execution, guardrail mutation, and streaming usage tracking:
+**Design Patterns & Code Quality** — Major structural refactoring + three community-requested features:
 
-- **Parallel coherence + screening** — Coherence checks and output screening now run correctly during parallel tool execution.
-- **Guardrail immutability** — Input guardrails no longer mutate the caller's message list.
-- **Streaming usage tracking** — `astream()` now correctly tracks token usage.
-- **ask/aask parent_run_id** — Convenience methods now propagate `parent_run_id` correctly.
-- **1640 tests** across unit, integration, regression, and E2E suites
+- **Terminal actions** — `@tool(terminal=True)` and `AgentConfig(stop_condition=...)` stop the agent loop after specific tools fire. For human-in-the-loop, payment flows, and escalation.
+- **Async observers** — `AsyncAgentObserver` with `blocking` flag for async DB writes and webhooks between tool executions.
+- **Gemini 3.x thought signatures** — `ToolCall.thought_signature` preserves function call signatures for Gemini 3.x models.
+- **Agent decomposed into 4 mixins** — `core.py` reduced from 3128 to 1448 lines (-54%).
+- **StepType + ModelType enums** — Type-safe `str, Enum` replacements (backward compatible).
+- **Hooks deprecated** — Use `AgentObserver` / `AsyncAgentObserver` instead. Existing hooks still work via adapter.
+- **1640 tests**, 6 Architecture Decision Records, Python 3.13 CI
 
 > Full changelog: [CHANGELOG.md](https://github.com/johnnichev/selectools/blob/main/CHANGELOG.md)
+
+<details>
+<summary><strong>v0.16.x highlights</strong></summary>
+
+- **v0.16.4**: Parallel execution safety — coherence + screening in parallel, guardrail immutability, streaming usage tracking
+- **v0.16.0**: Memory & Persistence — persistent sessions (3 backends), summarize-on-trim, entity memory, knowledge graph
+
+</details>
 
 <details>
 <summary><strong>v0.15.x highlights</strong></summary>
