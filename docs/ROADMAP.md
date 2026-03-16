@@ -237,6 +237,12 @@ Fixed `UnicodeDecodeError` when Gemini 3.x returns non-UTF-8 binary `thought_sig
 
 ---
 
+## v0.16.7: Cleanup ✅
+
+Removed unused CLI module (`cli.py` + console script entry point). Completed README example table (28-38). Fixed stale counts across CONTRIBUTING.md, ARCHITECTURE.md, QUICKSTART.md, AGENT.md. Total: 1620 tests.
+
+---
+
 ## v0.17.0: Multi-Agent Orchestration
 
 Focus: DAG-based multi-agent workflows that are simpler and more Pythonic than LangGraph.

@@ -5,6 +5,19 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.7] - 2026-03-16
+
+### Removed
+
+- **CLI module removed**: `src/selectools/cli.py` and the `selectools` console script entry point have been removed. The CLI was unused — the library API is the primary interface. Removes 22 tests (total: 1620).
+
+### Documentation
+
+- **README example table**: Added missing examples 28-38 (agent observer, guardrails, audit logging, screening, coherence, sessions, summarize-on-trim, entity memory, knowledge graph, knowledge memory, terminal tools).
+- **Cross-reference audit**: Fixed stale counts in CONTRIBUTING.md (was v0.13.0 era), docs/ARCHITECTURE.md, docs/README.md, docs/QUICKSTART.md, and docs/modules/AGENT.md.
+
+---
+
 ## [0.16.6] - 2026-03-16
 
 ### Fixed
