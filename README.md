@@ -607,6 +607,17 @@ Examples are numbered by difficulty. Start from 01 and work your way up.
 | 25 | `25_provider_fallback.py` | FallbackProvider, circuit breaker, failover chain | No |
 | 26 | `26_batch_processing.py` | batch(), abatch(), structured batch, error isolation | No |
 | 27 | `27_tool_policy.py` | ToolPolicy, deny_when, HITL approval, memory trimming | No |
+| 28 | `28_agent_observer.py` | AgentObserver, LoggingObserver, multiple observers, OTel export | No |
+| 29 | `29_guardrails.py` | Input/output guardrails, PII redaction, topic blocking | No |
+| 30 | `30_audit_logging.py` | JSONL audit logging, privacy controls, daily rotation | No |
+| 31 | `31_tool_output_screening.py` | Prompt injection detection in tool outputs | No |
+| 32 | `32_coherence_checking.py` | LLM-based intent verification for injection defense | Yes |
+| 33 | `33_persistent_sessions.py` | JsonFileSessionStore, cross-restart persistence | No |
+| 34 | `34_summarize_on_trim.py` | Summarize trimmed messages for context preservation | No |
+| 35 | `35_entity_memory.py` | Named entity extraction and tracking | No |
+| 36 | `36_knowledge_graph.py` | Triple extraction, in-memory and SQLite storage | No |
+| 37 | `37_knowledge_memory.py` | Cross-session facts, daily logs, `remember` tool | No |
+| 38 | `38_terminal_tools.py` | `@tool(terminal=True)`, `stop_condition` callback | No |
 
 Run any example:
 
@@ -646,7 +657,7 @@ pytest tests/ -x -q          # All tests
 pytest tests/ -k "not e2e"   # Skip E2E (no API keys needed)
 ```
 
-400+ tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, and E2E integration.
+1642 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, and E2E integration.
 
 ## License
 
