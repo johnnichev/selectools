@@ -7,7 +7,7 @@ This file provides context for AI coding agents (Claude, Cursor, Copilot, etc.) 
 **Selectools** is a production-ready Python library for building AI agents with tool calling, RAG, and hybrid search. It supports OpenAI, Anthropic, Gemini, and Ollama providers.
 
 - **Version**: Check `src/selectools/__init__.py` for current version
-- **Python**: 3.9+
+- **Python**: 3.13+ (CI runs 3.13)
 - **Package manager**: pip + setuptools
 - **Source layout**: `src/selectools/` (src-layout)
 - **Tests**: `tests/` (pytest)
