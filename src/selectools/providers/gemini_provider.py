@@ -123,11 +123,18 @@ class GeminiProvider(Provider):
             for part in candidate_content.parts:
                 if part.function_call:
                     tc_id = f"call_{uuid.uuid4().hex}"
+                    raw_sig = getattr(part, "thought_signature", None)
+                    sig_str = (
+                        (raw_sig.decode("utf-8") if isinstance(raw_sig, bytes) else str(raw_sig))
+                        if raw_sig
+                        else None
+                    )
                     tool_calls.append(
                         ToolCall(
                             tool_name=str(part.function_call.name or ""),
                             parameters=part.function_call.args if part.function_call.args else {},
                             id=tc_id,
+                            thought_signature=sig_str,
                         )
                     )
 
@@ -202,8 +209,17 @@ class GeminiProvider(Provider):
 
         Converts our Message format to Gemini's content format.
         System instructions are handled separately via config.
+
+        For Gemini 3.x thought signature support:
+        - ASSISTANT messages echo thought_signature on function_call parts
+        - TOOL messages include the original functionCall (with signature) before
+          the functionResponse, as required by the Gemini 3.x API
         """
         from google.genai import types
+
+        # Track the last ASSISTANT message's tool_calls so we can echo them
+        # alongside TOOL functionResponse messages (Gemini 3.x requirement)
+        last_assistant_tool_calls: dict[str, ToolCall] = {}
 
         contents = []
         for message in messages:
@@ -212,9 +228,21 @@ class GeminiProvider(Provider):
 
             if role == Role.TOOL.value:
                 role = "user"
-                # For tool results, we need a FunctionResponse part
-                # Note: We need the tool name here. Message has 'tool_name'.
                 if message.tool_name:
+                    # Echo the original functionCall part before the functionResponse
+                    # if we have a matching tool_call with thought_signature (Gemini 3.x)
+                    matching_tc = last_assistant_tool_calls.get(
+                        message.tool_call_id or ""
+                    ) or last_assistant_tool_calls.get(f"name:{message.tool_name}")
+                    if matching_tc and matching_tc.thought_signature:
+                        fc_part = types.Part(
+                            function_call=types.FunctionCall(
+                                name=matching_tc.tool_name, args=matching_tc.parameters
+                            )
+                        )
+                        fc_part.thought_signature = matching_tc.thought_signature.encode("utf-8")  # type: ignore[assignment]
+                        parts.append(fc_part)
+
                     parts.append(
                         types.Part(
                             function_response=types.FunctionResponse(
@@ -223,7 +251,6 @@ class GeminiProvider(Provider):
                         )
                     )
                 else:
-                    # Fallback if no tool name (legacy), treat as text
                     parts.append(types.Part(text=f"Tool output: {message.content}"))
 
             elif role == Role.ASSISTANT.value:
@@ -231,16 +258,21 @@ class GeminiProvider(Provider):
                 if message.content:
                     parts.append(types.Part(text=message.content))
 
-                # Handle outgoing tool calls
+                # Handle outgoing tool calls — echo thought_signature if present
                 if message.tool_calls:
+                    last_assistant_tool_calls = {}
                     for tc in message.tool_calls:
-                        parts.append(
-                            types.Part(
-                                function_call=types.FunctionCall(
-                                    name=tc.tool_name, args=tc.parameters
-                                )
-                            )
+                        # Index by both id and name for lookup from TOOL messages
+                        if tc.id:
+                            last_assistant_tool_calls[tc.id] = tc
+                        last_assistant_tool_calls[f"name:{tc.tool_name}"] = tc
+
+                        fc_part = types.Part(
+                            function_call=types.FunctionCall(name=tc.tool_name, args=tc.parameters)
                         )
+                        if tc.thought_signature:
+                            fc_part.thought_signature = tc.thought_signature.encode("utf-8")  # type: ignore[assignment]
+                        parts.append(fc_part)
 
             elif role == Role.USER.value:
                 role = "user"
@@ -346,11 +378,18 @@ class GeminiProvider(Provider):
             for part in candidate_content.parts:
                 if part.function_call:
                     tc_id = f"call_{uuid.uuid4().hex}"
+                    raw_sig = getattr(part, "thought_signature", None)
+                    sig_str = (
+                        (raw_sig.decode("utf-8") if isinstance(raw_sig, bytes) else str(raw_sig))
+                        if raw_sig
+                        else None
+                    )
                     tool_calls.append(
                         ToolCall(
                             tool_name=str(part.function_call.name or ""),
                             parameters=part.function_call.args if part.function_call.args else {},
                             id=tc_id,
+                            thought_signature=sig_str,
                         )
                     )
 
@@ -428,12 +467,23 @@ class GeminiProvider(Provider):
                         for part in candidate.content.parts:
                             if part.function_call:
                                 tc_id = f"call_{uuid.uuid4().hex}"
+                                raw_sig = getattr(part, "thought_signature", None)
+                                sig_str = (
+                                    (
+                                        raw_sig.decode("utf-8")
+                                        if isinstance(raw_sig, bytes)
+                                        else str(raw_sig)
+                                    )
+                                    if raw_sig
+                                    else None
+                                )
                                 yield ToolCall(
                                     tool_name=str(part.function_call.name or ""),
                                     parameters=(
                                         part.function_call.args if part.function_call.args else {}
                                     ),
                                     id=tc_id,
+                                    thought_signature=sig_str,
                                 )
 
 

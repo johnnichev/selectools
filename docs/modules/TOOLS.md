@@ -88,7 +88,16 @@ def get_weather(location: str, units: str = "celsius") -> str:
     return f"Weather in {location}: 72°{units[0].upper()}"
 ```
 
-The decorator:
+The decorator accepts these keyword arguments:
+
+- **`name`** (`str`, optional): Override the function name used as the tool name
+- **`description`** (`str`, optional): Tool description (falls back to docstring)
+- **`param_metadata`** (`dict`, optional): Per-parameter descriptions and enum constraints
+- **`streaming`** (`bool`, default `False`): Mark tool as a streaming generator
+- **`screen_output`** (`bool`, default `False`): Enable output screening for prompt injection
+- **`terminal`** (`bool`, default `False`): Stop the agent loop after this tool executes
+
+It also:
 
 - Infers parameter names and types from function signature
 - Detects required vs optional from default values
@@ -490,6 +499,17 @@ def calculate(a: int, b: int, operation: str = "add") -> str:
 ```
 
 If `description` is not provided, the decorator uses the docstring.
+
+### Terminal Tools
+
+- **`terminal`** (`bool`, default `False`): When `True`, the agent loop stops after this tool executes — no further LLM call is made. The tool result becomes `AgentResult.content`. Use for human-in-the-loop, form filling, escalation, or payment flows.
+
+```python
+@tool(terminal=True)
+def present_question(question_id: int) -> str:
+    """Present a question to the user and wait for their response."""
+    return json.dumps({"action": "present_question", "id": question_id})
+```
 
 ---
 

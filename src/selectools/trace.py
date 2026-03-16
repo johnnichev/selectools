@@ -11,24 +11,31 @@ import json
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, Iterator, List, Literal, Optional
+from enum import Enum
+from typing import Any, Dict, Iterator, List, Optional
 
-StepType = Literal[
-    "llm_call",
-    "tool_selection",
-    "tool_execution",
-    "cache_hit",
-    "error",
-    "structured_retry",
-    "guardrail",
-    "coherence_check",
-    "output_screening",
-    "session_load",
-    "session_save",
-    "memory_summarize",
-    "entity_extraction",
-    "kg_extraction",
-]
+
+class StepType(str, Enum):
+    """Enumeration of trace step types.
+
+    Inherits from ``str`` so that ``StepType.LLM_CALL == "llm_call"`` is ``True``,
+    preserving backward compatibility with code that compares against string literals.
+    """
+
+    LLM_CALL = "llm_call"
+    TOOL_SELECTION = "tool_selection"
+    TOOL_EXECUTION = "tool_execution"
+    CACHE_HIT = "cache_hit"
+    ERROR = "error"
+    STRUCTURED_RETRY = "structured_retry"
+    GUARDRAIL = "guardrail"
+    COHERENCE_CHECK = "coherence_check"
+    OUTPUT_SCREENING = "output_screening"
+    SESSION_LOAD = "session_load"
+    SESSION_SAVE = "session_save"
+    MEMORY_SUMMARIZE = "memory_summarize"
+    ENTITY_EXTRACTION = "entity_extraction"
+    KG_EXTRACTION = "kg_extraction"
 
 
 @dataclass
@@ -105,8 +112,9 @@ class AgentTrace:
         """Human-readable timeline string."""
         lines = []
         for i, s in enumerate(self.steps, 1):
-            summary = s.summary or s.type
-            lines.append(f"  {i}. [{s.type:18s}] {s.duration_ms:7.1f}ms  {summary}")
+            type_val = s.type.value if hasattr(s.type, "value") else s.type
+            summary = s.summary or type_val
+            lines.append(f"  {i}. [{type_val:18s}] {s.duration_ms:7.1f}ms  {summary}")
         total = self.total_duration_ms
         lines.append(
             f"  Total: {total:.1f}ms (LLM: {self.llm_duration_ms:.1f}ms, Tools: {self.tool_duration_ms:.1f}ms)"
@@ -181,7 +189,8 @@ class AgentTrace:
         for step in self.steps:
             start_ns = int(step.timestamp * 1e9)
             end_ns = start_ns + int(step.duration_ms * 1e6)
-            attrs: Dict[str, Any] = {"selectools.step_type": step.type}
+            type_val = step.type.value if hasattr(step.type, "value") else step.type
+            attrs: Dict[str, Any] = {"selectools.step_type": type_val}
 
             if step.type == "llm_call":
                 name = f"llm.{step.model or 'unknown'}"
@@ -208,7 +217,7 @@ class AgentTrace:
                 if step.error:
                     attrs["error.message"] = step.error[:500]
             else:
-                name = step.type
+                name = step.type.value if hasattr(step.type, "value") else step.type
 
             if step.summary:
                 attrs["selectools.summary"] = step.summary[:200]

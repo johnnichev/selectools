@@ -72,13 +72,28 @@ Create `examples/NN_feature_name.py` (use next number from Live Project State ab
 
 See `/docs` for detailed documentation patterns.
 
-## 8. Run Full Test Suite
+## 8. Update Notebook
+
+Add a section to `notebooks/getting_started.ipynb` demonstrating the feature.
+Follow the existing pattern: markdown cell with explanation, then code cell with
+a self-contained demo using `LocalProvider` (no API key needed).
+
+The notebook's "What you'll learn" list (cell 0) and "What's Next?" table (last cell)
+should be updated to include the new feature.
+
+## 9. Run Full Test Suite
 
 ```bash
 pytest tests/ -x -q
 ```
 
 ALL tests must pass. No exceptions.
+
+## 10. Run Audit
+
+Run `/audit` to verify all counts (tests, examples, models) are consistent
+across `CLAUDE.md`, `README.md`, `docs/index.md`, and other documentation files.
+Fix any mismatches before considering the feature complete.
 
 ## Defensive Patterns (from past bugs)
 

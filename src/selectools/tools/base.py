@@ -120,6 +120,7 @@ class Tool:
         config_injector: Optional[Callable[[], Dict[str, Any]]] = None,
         streaming: bool = False,
         screen_output: bool = False,
+        terminal: bool = False,
     ):
         """
         Initialize a new Tool.
@@ -134,6 +135,8 @@ class Tool:
             streaming: Whether this tool yields results progressively (returns Generator).
             screen_output: Screen this tool's output for prompt injection before
                 feeding it back to the LLM.  Default: ``False``.
+            terminal: If True, executing this tool stops the agent loop and
+                returns the tool result as the final response.  Default: ``False``.
 
         Raises:
             ToolValidationError: If tool definition is invalid
@@ -149,6 +152,7 @@ class Tool:
         )
         self.streaming = streaming
         self.screen_output = screen_output
+        self.terminal = terminal
 
         # Validate tool definition at registration time
         self._validate_tool_definition()

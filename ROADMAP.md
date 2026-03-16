@@ -190,6 +190,10 @@ v0.15.0  ✅ Enterprise Reliability (Complete)
 v0.16.0  ✅ Memory & Persistence (Complete)
          Sessions → Summarize-on-trim → Knowledge memory → Entity memory → KG memory
 
+v0.16.5  ✅ Design Patterns & Code Quality
+         StepType/ModelType enums → Agent mixin split → Provider base class → Terminal actions
+         → Async observers → Gemini 3.x thought signatures → Hooks deprecation → ADRs
+
 v0.17.0  🟡 Multi-Agent Orchestration
          AgentGraph → GraphState → Checkpointing → Parallel nodes → SupervisorAgent → MCP
 
@@ -204,6 +208,26 @@ v0.19.0  🟡 Ecosystem Parity
 v0.20.0  🟡 Polish & Community
          HTML trace viewer → Niche integrations → Tool marketplace
 ```
+
+---
+
+## v0.16.5: Design Patterns & Code Quality ✅
+
+Focus: Structural refactoring to prevent the class of bugs found in v0.16.0–v0.16.4 and prepare a clean foundation for v0.17.0 multi-agent orchestration.
+
+### Highlights
+
+- **Agent decomposed into 4 mixins** — `core.py` 3128→1448 lines (-54%)
+- **StepType + ModelType** converted to `str, Enum` for type safety
+- **Terminal actions** — `@tool(terminal=True)` and `stop_condition` callback
+- **AsyncAgentObserver** — async lifecycle hooks with `blocking` flag
+- **Gemini 3.x thought signatures** — `ToolCall.thought_signature` field
+- **Hooks deprecated** — wrapped via `_HooksAdapter`, single observer pipeline
+- **OpenAI/Ollama share base class** — Template Method pattern (-75% duplication)
+- **163 new tests** (total: 1640), 53 architecture fitness tests
+- **6 ADRs** in `docs/decisions/`
+
+See [CHANGELOG](CHANGELOG.md) for full details.
 
 ---
 
@@ -754,6 +778,7 @@ Focus: Niche integrations, community sharing, and developer experience polish.
 | Universal Vision Support   | Unified vision API across providers              |
 | AWS Bedrock Provider       | VPC-native model access (Claude, Llama, Mistral) |
 | Rate Limiting & Quotas     | Per-tool and per-user quotas                     |
+| Structured AgentConfig     | Group 41 fields into nested dataclasses (RetryConfig, CoherenceConfig, etc.) with backward compat |
 | Enhanced Testing Framework | Snapshot testing, load tests                     |
 | Documentation Generation   | Auto-generate docs from tool definitions         |
 | Prompt Optimization        | Automatic prompt compression                     |

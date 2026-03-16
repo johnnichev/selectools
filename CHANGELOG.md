@@ -5,6 +5,45 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.5] - 2026-03-15
+
+### Added
+
+- **Terminal action support** (FR-001): `@tool(terminal=True)` stops the agent loop after tool execution without another LLM call. Dynamic `AgentConfig.stop_condition` callback for result-dependent stops. Works in `run()`, `arun()`, `astream()`, and parallel execution.
+- **Async observer hooks** (FR-002): `AsyncAgentObserver` base class with 25 `a_on_*` async methods. `blocking=True` for inline await (DB writes), `blocking=False` (default) for fire-and-forget via `asyncio.ensure_future()`. Called in all async paths.
+- **Gemini 3.x thought signature support** (FR-003): `ToolCall.thought_signature` field captures and echoes `thoughtSignature` from Gemini 3.x function call responses. `_format_contents` includes original `functionCall` alongside `functionResponse` for TOOL messages.
+- **`StepType` enum**: Converted from `Literal[...]` to `class StepType(str, Enum)` with 14 members. Backward compatible — `StepType.LLM_CALL == "llm_call"` is `True`. Exported from `selectools`.
+- **`ModelType` enum**: Converted from `Literal[...]` to `class ModelType(str, Enum)` with 5 members. All 146 `ModelInfo` records updated to use enum members. Exported from `selectools`.
+- **Shared test fixtures**: `SharedFakeProvider`, `SharedRecordingProvider`, `SharedToolCallProvider`, `SharedErrorProvider` in `tests/conftest.py` with factory fixtures.
+- **Architecture fitness tests**: 53 tests in `tests/test_architecture.py` — circular imports, provider protocol compliance, enum coverage, export consistency, model registry validity.
+- **Architecture Decision Records**: 6 ADRs in `docs/decisions/` documenting Protocol over ABC, observer replaces hooks, Literal to Enum, provider base class, agent decomposition, and deferred config restructuring.
+- **Namespace exports**: `from selectools.providers import OpenAIProvider` now works (additive, flat imports unchanged).
+
+### Changed
+
+- **Agent decomposed into 4 mixins**: `core.py` reduced from 3128 to 1448 lines (-54%). Tool execution → `_tool_executor.py` (970 lines), provider calls → `_provider_caller.py` (469 lines), observer lifecycle → `_lifecycle.py` (141 lines), memory management → `_memory_manager.py` (146 lines). All public methods remain on `Agent`.
+- **Hooks deprecated**: `AgentConfig.hooks` emits `DeprecationWarning` and is transparently wrapped via `_HooksAdapter(AgentObserver)`. All 55 `_call_hook()` calls removed. Single observer notification pipeline.
+- **OpenAI/Ollama share base class**: `_OpenAICompatibleBase` (Template Method pattern) in `providers/_openai_compat.py`. OpenAI: 421→86 lines (-80%), Ollama: 456→126 lines (-72%).
+- **astream() provider call parity**: Non-streaming fallback path now delegates to `_acall_provider()` for full cache/retry/cost-warning parity with `arun()`.
+- **Tool execution extracted**: `_execute_single_tool()` and `_aexecute_single_tool()` replace 540 lines of copy-pasted tool execution loops across `run()`/`arun()`/`astream()`.
+
+### Tests
+
+- **163 new tests** (total: 1640): Phase 1 design patterns (32), architecture fitness (53), terminal actions (13), async observers (11), plus additional regression tests.
+
+### Documentation
+
+- Updated `docs/modules/AGENT.md` — hooks deprecation warning, AsyncAgentObserver section, terminal actions, mixin architecture
+- Updated `docs/modules/TOOLS.md` — `terminal` parameter documentation
+- Updated `docs/modules/MODELS.md` — ModelType as `str, Enum`
+- Updated `docs/modules/PROVIDERS.md` — `_OpenAICompatibleBase` note, namespace imports
+- Updated `docs/ARCHITECTURE.md` — mixin decomposition, AsyncAgentObserver, hooks deprecated
+- Updated `docs/QUICKSTART.md` — terminal tools step
+- Updated `notebooks/getting_started.ipynb` — terminal tools and async observers sections
+- New `examples/38_terminal_tools.py`
+
+---
+
 ## [0.16.4] - 2026-03-15
 
 ### Fixed

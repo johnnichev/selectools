@@ -23,7 +23,8 @@
 16. [Provider Fallback](#provider-fallback)
 17. [Batch Processing](#batch-processing)
 18. [Tool Policy & Human-in-the-Loop](#tool-policy-human-in-the-loop)
-19. [Implementation Details](#implementation-details)
+19. [Terminal Actions](#terminal-actions)
+20. [Implementation Details](#implementation-details)
 
 ---
 
@@ -706,6 +707,11 @@ The agent automatically detects and handles async tools via `tool.is_async` flag
 
 ## Hook System
 
+> **Deprecated in v0.16.5** — `AgentConfig.hooks` emits a `DeprecationWarning` and is
+> internally wrapped via `_HooksAdapter` into the observer pipeline. Use `AgentObserver`
+> or `AsyncAgentObserver` instead. Hooks continue to function but will be removed in a
+> future release.
+
 ### Available Hooks
 
 ```python
@@ -873,6 +879,39 @@ Output:
 | **Use case** | Quick debugging, simple logging | Production observability (Langfuse, OTel, Datadog) |
 
 Both systems work together — hooks and observers fire independently for the same events.
+
+### AsyncAgentObserver
+
+For async-native applications (FastAPI, aiohttp, async SQLAlchemy), `AsyncAgentObserver`
+provides 25 async `a_on_*` methods that mirror the sync observer:
+
+```python
+from selectools import AsyncAgentObserver
+
+class DBObserver(AsyncAgentObserver):
+    blocking = True  # await inline — must complete before next tool
+
+    async def a_on_tool_end(self, run_id, call_id, tool_name, result, duration_ms):
+        await db.execute("INSERT INTO events ...")
+
+class WebhookObserver(AsyncAgentObserver):
+    blocking = False  # fire-and-forget via asyncio.ensure_future
+
+    async def a_on_run_end(self, run_id, result):
+        await httpx.post("https://hooks.example.com/...", json={...})
+
+agent = Agent(
+    tools=[...],
+    provider=provider,
+    config=AgentConfig(observers=[DBObserver(), WebhookObserver()]),
+)
+```
+
+- **`blocking=True`**: Awaited inline — the agent loop waits for completion. Use for DB writes, rate limiting, result enrichment.
+- **`blocking=False`** (default): Dispatched via `asyncio.ensure_future()`. Use for webhooks, logging, audit trails.
+
+Async observers are called in `arun()` and `astream()` after each sync observer notification.
+In sync `run()`, only sync observers fire.
 
 ### Trace Metadata & Nested Agents
 
@@ -1639,7 +1678,49 @@ config = AgentConfig(
 
 ---
 
+## Terminal Actions
+
+Some tools are "terminal" — the agent loop should stop after they execute, without making another LLM call.
+
+**Static declaration** — tool author marks it at definition time:
+
+```python
+@tool(terminal=True)
+def present_question(question_id: int) -> str:
+    """Present a question card to the student."""
+    return json.dumps({"action": "present_question", "id": question_id})
+```
+
+**Dynamic condition** — stop decision depends on the result content:
+
+```python
+config = AgentConfig(
+    stop_condition=lambda tool_name, result: "present_question" in result,
+)
+```
+
+After tool execution, the agent checks:
+`tool.terminal or (config.stop_condition and config.stop_condition(tool_name, result))`
+
+If true, the tool result becomes `AgentResult.content` and the loop exits immediately.
+Works in `run()`, `arun()`, `astream()`, and parallel tool execution.
+
+---
+
 ## Implementation Details
+
+### Internal Architecture — Mixin Decomposition
+
+The Agent class is composed from 4 internal mixins for maintainability:
+
+| Mixin | File | Responsibility |
+|-------|------|---------------|
+| `_ToolExecutorMixin` | `agent/_tool_executor.py` | Tool execution pipeline, policy, coherence, parallel execution |
+| `_ProviderCallerMixin` | `agent/_provider_caller.py` | LLM provider calls, caching, retry, streaming |
+| `_LifecycleMixin` | `agent/_lifecycle.py` | Observer notification, fallback provider wiring |
+| `_MemoryManagerMixin` | `agent/_memory_manager.py` | Memory operations, session persistence, entity/KG extraction |
+
+All public methods remain on the `Agent` class — the mixins are internal implementation details.
 
 ### Key Attributes
 

@@ -1,8 +1,20 @@
 # v0.17.0 Multi-Agent Orchestration — Implementation Plan
 
-> **Status**: Draft — iterating before development begins
-> **Preceding release**: v0.16.1 (consolidation, shipped)
+> **Status**: Ready for development — foundation work complete (see below)
+> **Preceding release**: v0.16.4 (parallel execution safety, shipped)
 > **Target**: Biggest feature since the library started
+>
+> **Foundation work completed (2026-03-15)**:
+> The design patterns plan has been fully implemented (see `docs/decisions/` for ADRs),
+> providing the clean foundation this plan depends on:
+> - Agent decomposed into 4 mixins (`core.py` 3128 → 1448 lines)
+> - `StepType` is now `str, Enum` — ready for the 4 new graph step types below
+> - `_execute_single_tool` / `_aexecute_single_tool` extracted — graph nodes can reuse them
+> - `AsyncAgentObserver` shipped — graph observer events can be async
+> - Terminal action support (`tool.terminal`, `stop_condition`) — useful for HITL in graphs
+> - Provider base class — OpenAI/Ollama share `_OpenAICompatibleBase`
+> - Hooks deprecated via `_HooksAdapter` — single observer pipeline
+> - 1586 tests, 53 architecture fitness tests, shared test fixtures in conftest.py
 
 ## Design Philosophy
 
@@ -127,7 +139,13 @@ class GraphResult:
     total_usage: UsageStats                           # Aggregated across all nodes
 ```
 
-**`ErrorPolicy`** = `Literal["abort", "skip", "retry"]`
+**`ErrorPolicy`** — use `str, Enum` (consistent with `StepType`/`ModelType` pattern, see ADR-003):
+```python
+class ErrorPolicy(str, Enum):
+    ABORT = "abort"
+    SKIP = "skip"
+    RETRY = "retry"
+```
 
 **`AgentGraph`** class:
 
@@ -281,7 +299,7 @@ Serialization uses `GraphState.to_dict()`. Traces are excluded from checkpoints 
 
 ### Modify: `src/selectools/observer.py`
 
-Add 5 new methods to `AgentObserver` (total events: 28):
+Add 5 new methods to `AgentObserver` (total events: 30, including the 25 existing sync + 25 async from `AsyncAgentObserver`):
 
 ```python
 def on_graph_start(self, run_id: str, graph_name: str, entry_node: str, state: Dict[str, Any]) -> None: ...
@@ -295,10 +313,15 @@ Update `LoggingObserver` with structured JSON implementations for all 5.
 
 ### Modify: `src/selectools/trace.py`
 
-Add 4 new `StepType` literals:
+Add 4 new `StepType` enum members (StepType is now `str, Enum` — see ADR-003):
 
 ```python
-"graph_node_start", "graph_node_end", "graph_routing", "graph_checkpoint"
+class StepType(str, Enum):
+    ...
+    GRAPH_NODE_START = "graph_node_start"
+    GRAPH_NODE_END = "graph_node_end"
+    GRAPH_ROUTING = "graph_routing"
+    GRAPH_CHECKPOINT = "graph_checkpoint"
 ```
 
 The `AgentGraph` creates a root `AgentTrace` for the entire execution. Each node's `Agent` produces its own child `AgentTrace` linked via `parent_run_id`. The root trace captures node-level timeline (`graph_node_start`/`graph_node_end` steps), while child traces contain agent-internal steps (`llm_call`, `tool_execution`, etc.).
@@ -431,13 +454,18 @@ result = supervisor.run("Write a comprehensive blog post about AI safety")
 
 | File | Changes |
 |------|---------|
-| `src/selectools/exceptions.py` | Add `GraphExecutionError` |
-| `src/selectools/observer.py` | 5 new events + LoggingObserver |
-| `src/selectools/trace.py` | 4 new StepType values |
+| `src/selectools/exceptions.py` | Add `GraphExecutionError` (already has the class stub from v0.16.4) |
+| `src/selectools/observer.py` | 5 new sync events + 5 matching async events on `AsyncAgentObserver` + `LoggingObserver` |
+| `src/selectools/trace.py` | 4 new `StepType` enum members |
 | `src/selectools/__init__.py` | New exports + version bump |
 | `pyproject.toml` | Version bump |
 
-### ~305 new tests (total: ~1738)
+> **Note**: Agent code now lives across 5 files (`agent/core.py` + 4 mixins).
+> Graph node execution should call `agent.arun()` / `agent.run()` — no need to
+> interact with mixins directly. The `_execute_single_tool` in `_tool_executor.py`
+> is available if graph nodes need to execute tools without a full agent loop.
+
+### ~305 new tests (total: ~1891, up from 1586 after design patterns work)
 
 ---
 

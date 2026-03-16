@@ -1,28 +1,22 @@
 """
 OpenAI provider adapter for the tool-calling library.
 
-Handles the ``max_tokens`` → ``max_completion_tokens`` migration
+Handles the ``max_tokens`` -> ``max_completion_tokens`` migration
 automatically based on model family.  Newer models (GPT-5.x, GPT-4.1,
 o-series, codex) reject the legacy ``max_tokens`` parameter.
 """
 
 from __future__ import annotations
 
-import json
 import os
-from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, Iterable, List, Tuple, Union, cast
+from typing import Any, Dict, Tuple
 
 from ..env import load_default_env
 from ..exceptions import ProviderConfigurationError
 from ..models import OpenAI as OpenAIModels
 from ..pricing import calculate_cost
-from ..types import Message, Role, ToolCall
-from ..usage import UsageStats
-
-if TYPE_CHECKING:
-    from ..tools.base import Tool
-
-from .base import Provider, ProviderError
+from ._openai_compat import _OpenAICompatibleBase
+from .base import ProviderError
 
 _MAX_COMPLETION_TOKENS_PREFIXES: Tuple[str, ...] = (
     "gpt-5",
@@ -39,7 +33,7 @@ def _uses_max_completion_tokens(model: str) -> bool:
     return any(model.startswith(p) for p in _MAX_COMPLETION_TOKENS_PREFIXES)
 
 
-class OpenAIProvider(Provider):
+class OpenAIProvider(_OpenAICompatibleBase):
     """Adapter that speaks to OpenAI's Chat Completions API."""
 
     name = "openai"
@@ -67,355 +61,26 @@ class OpenAIProvider(Provider):
         self._async_client = AsyncOpenAI(api_key=self.api_key)
         self.default_model = default_model
 
-    def complete(
-        self,
-        *,
-        model: str,
-        system_prompt: str,
-        messages: List[Message],
-        tools: List[Tool] | None = None,
-        temperature: float = 0.0,
-        max_tokens: int = 1000,
-        timeout: float | None = None,
-    ) -> tuple[Message, UsageStats]:
-        formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
-        model_name = model or self.default_model
+    # -- template method overrides -------------------------------------------
 
-        token_key = (
-            "max_completion_tokens" if _uses_max_completion_tokens(model_name) else "max_tokens"
-        )
-        args: Dict[str, Any] = {
-            "model": model_name,
-            "messages": cast(Any, formatted),
-            "temperature": temperature,
-            token_key: max_tokens,
-            "timeout": timeout,
-        }
+    def _get_token_key(self, model: str) -> str:
+        return "max_completion_tokens" if _uses_max_completion_tokens(model) else "max_tokens"
 
-        if tools:
-            args["tools"] = [self._map_tool_to_openai(t) for t in tools]
+    def _calculate_cost(self, model: str, prompt_tokens: int, completion_tokens: int) -> float:
+        return calculate_cost(model, prompt_tokens, completion_tokens)
 
-        try:
-            response = cast(Any, self._client.chat.completions.create(**args))
-        except Exception as exc:  # noqa: BLE001
-            raise ProviderError(f"OpenAI completion failed: {exc}") from exc
+    def _get_provider_name(self) -> str:
+        return "openai"
 
-        message = response.choices[0].message
-        content = message.content
-        tool_calls: List[ToolCall] = []
+    def _wrap_error(self, exc: Exception, operation: str) -> ProviderError:
+        return ProviderError(f"OpenAI {operation} failed: {exc}")
 
-        if message.tool_calls:
-            for tc in message.tool_calls:
-                try:
-                    params = json.loads(tc.function.arguments)
-                except json.JSONDecodeError:
-                    params = {}
-                tool_calls.append(
-                    ToolCall(
-                        tool_name=tc.function.name,
-                        parameters=params,
-                        id=tc.id,
-                    )
-                )
+    def _parse_tool_call_id(self, tc: Any) -> str:
+        return tc.id
 
-        # Extract usage stats
-        usage = response.usage
-        usage_stats = UsageStats(
-            prompt_tokens=usage.prompt_tokens if usage else 0,
-            completion_tokens=usage.completion_tokens if usage else 0,
-            total_tokens=usage.total_tokens if usage else 0,
-            cost_usd=calculate_cost(
-                model_name,
-                usage.prompt_tokens if usage else 0,
-                usage.completion_tokens if usage else 0,
-            ),
-            model=model_name,
-            provider="openai",
-        )
-
-        return (
-            Message(
-                role=Role.ASSISTANT,
-                content=content or "",
-                tool_calls=tool_calls or None,
-            ),
-            usage_stats,
-        )
-
-    def stream(
-        self,
-        *,
-        model: str,
-        system_prompt: str,
-        messages: List[Message],
-        tools: List[Tool] | None = None,
-        temperature: float = 0.0,
-        max_tokens: int = 1000,
-        timeout: float | None = None,
-    ) -> Iterable[str]:
-        """Stream response chunks. Note: Does not return usage stats."""
-        formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
-        model_name = model or self.default_model
-
-        token_key = (
-            "max_completion_tokens" if _uses_max_completion_tokens(model_name) else "max_tokens"
-        )
-        args: Dict[str, Any] = {
-            "model": model_name,
-            "messages": cast(Any, formatted),
-            "temperature": temperature,
-            token_key: max_tokens,
-            "stream": True,
-            "timeout": timeout,
-        }
-        if tools:
-            args["tools"] = [self._map_tool_to_openai(t) for t in tools]
-
-        try:
-            response = cast(Any, self._client.chat.completions.create(**args))
-        except Exception as exc:  # noqa: BLE001
-            raise ProviderError(f"OpenAI streaming failed: {exc}") from exc
-
-        for chunk in response:
-            try:
-                delta = chunk.choices[0].delta if chunk.choices else None
-                if not delta or not delta.content:
-                    continue
-                content = delta.content
-                if isinstance(content, list):
-                    content = "".join(
-                        [part.text for part in content if getattr(part, "text", None)]
-                    )
-                yield content
-            except Exception as exc:  # noqa: BLE001
-                raise ProviderError(f"OpenAI stream parsing failed: {exc}") from exc
-
-    def _format_messages(self, system_prompt: str, messages: List[Message]) -> List[dict]:
-        payload: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
-        for message in messages:
-            role = message.role.value
-
-            if role == Role.TOOL.value:
-                payload.append(
-                    {
-                        "role": "tool",
-                        "content": message.content,
-                        "tool_call_id": message.tool_call_id,
-                    }
-                )
-            elif role == Role.ASSISTANT.value:
-                msg_dict: Dict[str, Any] = {
-                    "role": "assistant",
-                    "content": self._format_content(message),
-                }
-                if message.tool_calls:
-                    msg_dict["tool_calls"] = [
-                        {
-                            "id": tc.id,
-                            "type": "function",
-                            "function": {
-                                "name": tc.tool_name,
-                                "arguments": json.dumps(tc.parameters),
-                            },
-                        }
-                        for tc in message.tool_calls
-                    ]
-                payload.append(msg_dict)
-            else:
-                # User role
-                payload.append(
-                    {
-                        "role": role,
-                        "content": self._format_content(message),
-                    }
-                )
-        return payload
-
-    def _format_content(self, message: Message) -> str | List[Any]:
-        if message.image_base64:
-            return [
-                {"type": "text", "text": message.content},
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/jpeg;base64,{message.image_base64}"},
-                },
-            ]
-        return message.content
-
-    def _map_tool_to_openai(self, tool: Tool) -> Dict[str, Any]:
-        """Convert a selectools.Tool to OpenAI tool schema."""
-        return {
-            "type": "function",
-            "function": tool.schema(),
-        }
-
-    # Async methods
-    async def acomplete(
-        self,
-        *,
-        model: str,
-        system_prompt: str,
-        messages: List[Message],
-        tools: List[Tool] | None = None,
-        temperature: float = 0.0,
-        max_tokens: int = 1000,
-        timeout: float | None = None,
-    ) -> tuple[Message, UsageStats]:
-        """Async version of complete() using AsyncOpenAI client."""
-        formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
-        model_name = model or self.default_model
-
-        token_key = (
-            "max_completion_tokens" if _uses_max_completion_tokens(model_name) else "max_tokens"
-        )
-        args: Dict[str, Any] = {
-            "model": model_name,
-            "messages": cast(Any, formatted),
-            "temperature": temperature,
-            token_key: max_tokens,
-            "timeout": timeout,
-        }
-
-        if tools:
-            args["tools"] = [self._map_tool_to_openai(t) for t in tools]
-
-        try:
-            response = cast(Any, await self._async_client.chat.completions.create(**args))
-        except Exception as exc:
-            raise ProviderError(f"OpenAI async completion failed: {exc}") from exc
-
-        message = response.choices[0].message
-        content = message.content
-        tool_calls: List[ToolCall] = []
-
-        if message.tool_calls:
-            for tc in message.tool_calls:
-                try:
-                    params = json.loads(tc.function.arguments)
-                except json.JSONDecodeError:
-                    params = {}
-                tool_calls.append(
-                    ToolCall(
-                        tool_name=tc.function.name,
-                        parameters=params,
-                        id=tc.id,
-                    )
-                )
-
-        # Extract usage stats
-        usage = response.usage
-        usage_stats = UsageStats(
-            prompt_tokens=usage.prompt_tokens if usage else 0,
-            completion_tokens=usage.completion_tokens if usage else 0,
-            total_tokens=usage.total_tokens if usage else 0,
-            cost_usd=calculate_cost(
-                model_name,
-                usage.prompt_tokens if usage else 0,
-                usage.completion_tokens if usage else 0,
-            ),
-            model=model_name,
-            provider="openai",
-        )
-
-        return (
-            Message(
-                role=Role.ASSISTANT,
-                content=content or "",
-                tool_calls=tool_calls or None,
-            ),
-            usage_stats,
-        )
-
-    async def astream(
-        self,
-        *,
-        model: str,
-        system_prompt: str,
-        messages: List[Message],
-        tools: List[Tool] | None = None,
-        temperature: float = 0.0,
-        max_tokens: int = 1000,
-        timeout: float | None = None,
-    ) -> AsyncIterable[Union[str, ToolCall]]:
-        """
-        Async version of stream() using AsyncOpenAI client.
-        """
-        formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
-        model_name = model or self.default_model
-
-        token_key = (
-            "max_completion_tokens" if _uses_max_completion_tokens(model_name) else "max_tokens"
-        )
-        args: Dict[str, Any] = {
-            "model": model_name,
-            "messages": cast(Any, formatted),
-            "temperature": temperature,
-            token_key: max_tokens,
-            "stream": True,
-            "stream_options": {"include_usage": True},
-            "timeout": timeout,
-        }
-        if tools:
-            args["tools"] = [self._map_tool_to_openai(t) for t in tools]
-
-        try:
-            response = cast(Any, await self._async_client.chat.completions.create(**args))
-        except Exception as exc:
-            raise ProviderError(f"OpenAI async streaming failed: {exc}") from exc
-
-        # Track partial tool calls
-        tool_call_deltas: Dict[int, Dict[str, Any]] = {}
-
-        async for chunk in response:
-            try:
-                if not chunk.choices:
-                    continue
-                delta = chunk.choices[0].delta
-
-                # 1. Handle text content
-                if delta.content:
-                    yield delta.content
-
-                # 2. Handle tool calls
-                if delta.tool_calls:
-                    for tc_delta in delta.tool_calls:
-                        index = tc_delta.index
-                        if index not in tool_call_deltas:
-                            tool_call_deltas[index] = {
-                                "id": tc_delta.id,
-                                "name": "",
-                                "arguments": "",
-                            }
-
-                        if tc_delta.id:
-                            tool_call_deltas[index]["id"] = tc_delta.id
-                        if tc_delta.function:
-                            if tc_delta.function.name:
-                                tool_call_deltas[index]["name"] += tc_delta.function.name
-                            if tc_delta.function.arguments:
-                                tool_call_deltas[index]["arguments"] += tc_delta.function.arguments
-
-                # Check for finish reason to emit completed tool calls
-                finish_reason = chunk.choices[0].finish_reason
-                if finish_reason == "tool_calls":
-                    for index in sorted(tool_call_deltas.keys()):
-                        tc_info = tool_call_deltas[index]
-                        try:
-                            params = (
-                                json.loads(tc_info["arguments"]) if tc_info["arguments"] else {}
-                            )
-                        except json.JSONDecodeError:
-                            params = {}
-
-                        yield ToolCall(
-                            tool_name=tc_info["name"],
-                            parameters=params,
-                            id=tc_info["id"],
-                        )
-                    tool_call_deltas = {}  # Clear for next iteration if any
-
-            except Exception as exc:
-                raise ProviderError(f"OpenAI async stream parsing failed: {exc}") from exc
+    def _build_astream_args(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        args["stream_options"] = {"include_usage": True}
+        return args
 
 
 __all__ = ["OpenAIProvider"]

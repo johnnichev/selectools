@@ -81,6 +81,7 @@ def tool(
     config_injector: Optional[Callable[[], Dict[str, Any]]] = None,
     streaming: bool = False,
     screen_output: bool = False,
+    terminal: bool = False,
 ) -> Callable[[Callable[..., Any]], Tool]:
     """
     Decorator to convert a function into a Tool.
@@ -97,6 +98,8 @@ def tool(
         streaming: Whether the tool streams results (returns Generator).
         screen_output: Screen this tool's output for prompt injection.
             Default: ``False``.
+        terminal: If True, executing this tool stops the agent loop and
+            returns the tool result as the final response.  Default: ``False``.
 
     Returns:
         Decorator function that returns a Tool instance.
@@ -125,6 +128,7 @@ def tool(
             config_injector=config_injector,
             streaming=streaming,
             screen_output=screen_output,
+            terminal=terminal,
         )
         return tool_instance
 

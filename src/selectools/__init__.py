@@ -1,6 +1,6 @@
 """Public exports for the selectools package."""
 
-__version__ = "0.16.4"
+__version__ = "0.16.5"
 
 # Import submodules (lazy loading for optional dependencies)
 from . import embeddings, guardrails, models, rag, toolbox
@@ -39,8 +39,18 @@ from .knowledge_graph import (
     TripleStore,
 )
 from .memory import ConversationMemory
-from .models import ALL_MODELS, MODELS_BY_ID, Anthropic, Cohere, Gemini, ModelInfo, Ollama, OpenAI
-from .observer import AgentObserver, LoggingObserver
+from .models import (
+    ALL_MODELS,
+    MODELS_BY_ID,
+    Anthropic,
+    Cohere,
+    Gemini,
+    ModelInfo,
+    ModelType,
+    Ollama,
+    OpenAI,
+)
+from .observer import AgentObserver, AsyncAgentObserver, LoggingObserver
 from .parser import ToolCallParser
 from .policy import PolicyDecision, PolicyResult, ToolPolicy
 from .pricing import PRICING, calculate_cost, calculate_embedding_cost, get_model_pricing
@@ -60,7 +70,7 @@ from .sessions import (
 )
 from .structured import ResponseFormat
 from .tools import Tool, ToolParameter, ToolRegistry, tool
-from .trace import AgentTrace, TraceStep
+from .trace import AgentTrace, StepType, TraceStep
 from .types import AgentResult, Message, Role, ToolCall
 from .usage import AgentUsage, UsageStats
 
@@ -104,6 +114,7 @@ __all__ = [
     # Model Registry
     "models",
     "ModelInfo",
+    "ModelType",
     "ALL_MODELS",
     "MODELS_BY_ID",
     "OpenAI",
@@ -124,8 +135,10 @@ __all__ = [
     "ResponseFormat",
     # Observability
     "AgentObserver",
+    "AsyncAgentObserver",
     "LoggingObserver",
     "AgentTrace",
+    "StepType",
     "TraceStep",
     # Guardrails
     "guardrails",

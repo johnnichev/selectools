@@ -155,3 +155,4 @@ class AgentConfig:
     entity_memory: Optional[EntityMemory] = None
     knowledge_graph: Optional[KnowledgeGraphMemory] = None
     knowledge_memory: Optional[KnowledgeMemory] = None
+    stop_condition: Optional[Callable[[str, str], bool]] = None

@@ -7,16 +7,15 @@
 
 **Production-ready AI agents with tool calling, RAG, and hybrid search.** Connect LLMs to your Python functions, embed and search your documents with vector + keyword fusion, stream responses in real time, and dynamically manage tools at runtime. Works with OpenAI, Anthropic, Gemini, and Ollama. Tracks costs automatically.
 
-## What's New in v0.16.0
+## What's New in v0.16.4
 
-**Memory & Persistence** — Five new features for durable conversation state:
+**Parallel Execution Safety** — Bug fixes for parallel tool execution, guardrail mutation, and streaming usage tracking:
 
-- **Persistent Sessions** — `SessionStore` protocol with 3 backends (JSON file, SQLite, Redis). Auto-save/load via `AgentConfig(session_store=store, session_id="user-123")`.
-- **Summarize-on-Trim** — LLM-generated summaries of trimmed messages, injected as system context. No more silent context loss.
-- **Entity Memory** — Auto-extract named entities (person, org, project) across turns with LRU-pruned registry and system prompt injection.
-- **Knowledge Graph** — Relationship triple extraction with in-memory and SQLite storage. Query-relevant triples auto-injected into prompts.
-- **Cross-Session Knowledge** — Daily logs + persistent facts with auto-registered `remember` tool. Give your agent durable memory across conversations.
-- **182 new tests** (total: 1462 with v0.16.3 refactoring)
+- **Parallel coherence + screening** — Coherence checks and output screening now run correctly during parallel tool execution.
+- **Guardrail immutability** — Input guardrails no longer mutate the caller's message list.
+- **Streaming usage tracking** — `astream()` now correctly tracks token usage.
+- **ask/aask parent_run_id** — Convenience methods now propagate `parent_run_id` correctly.
+- **1640 tests** across unit, integration, regression, and E2E suites
 
 > Full changelog: [CHANGELOG.md](https://github.com/johnnichev/selectools/blob/main/CHANGELOG.md)
 
@@ -31,7 +30,7 @@
 <summary><strong>v0.14.x highlights</strong></summary>
 
 - **v0.14.1**: Critical streaming fix — 13 bugs fixed across all providers; 141 new tests (total: 1100)
-- **v0.14.0**: AgentObserver Protocol (15 events), 145 models with March 2026 pricing, OpenAI `max_completion_tokens` auto-detection, 11 bug fixes
+- **v0.14.0**: AgentObserver Protocol (25 events), 145 models with March 2026 pricing, OpenAI `max_completion_tokens` auto-detection, 11 bug fixes
 
 </details>
 
@@ -60,7 +59,7 @@
 | **Entity Memory** | LLM-based entity extraction with deduplication, LRU pruning, and system prompt injection. |
 | **Knowledge Graph** | Relationship triple extraction with in-memory and SQLite storage and keyword-based querying. |
 | **Cross-Session Knowledge** | Daily logs + persistent facts with auto-registered `remember` tool. |
-| **AgentObserver Protocol** | 19-event lifecycle observer with `run_id`/`call_id` correlation. Built-in `LoggingObserver` for structured JSON logs. |
+| **AgentObserver Protocol** | 25-event lifecycle observer with `run_id`/`call_id` correlation. Built-in `LoggingObserver` for structured JSON logs. |
 | **Production Hardened** | Retries with backoff, per-tool timeouts, iteration caps, cost warnings, observability hooks + observers. |
 | **Library-First** | Not a framework. No magic globals, no hidden state. Use as much or as little as you need. |
 
@@ -84,9 +83,9 @@
 - **Entity Memory**: LLM-based named entity extraction and tracking
 - **Knowledge Graph**: Triple extraction with in-memory and SQLite storage
 - **Cross-Session Knowledge**: Daily logs + persistent memory with `remember` tool
-- **37 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, and more
+- **38 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, and more
 - **AgentObserver Protocol**: 25 lifecycle events with `run_id` correlation, `LoggingObserver`, OTel export
-- **1462 Tests**: Unit, integration, regression, and E2E with real API calls
+- **1640 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 
@@ -408,7 +407,7 @@ agent = Agent(
 )
 ```
 
-15 lifecycle events: run, LLM, tool, iteration, batch, policy, structured output, fallback, retry, memory trim. See `observer.py` for full reference.
+25 lifecycle events: run, LLM, tool, iteration, batch, policy, structured output, fallback, retry, memory trim, guardrail, coherence, screening, session, entity, KG. See `observer.py` for full reference.
 
 ### E2E Streaming & Parallel Execution
 

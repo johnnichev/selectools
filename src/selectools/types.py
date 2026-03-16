@@ -107,7 +107,12 @@ class Message:
             "tool_result": self.tool_result,
             "tool_calls": (
                 [
-                    {"name": tc.tool_name, "parameters": tc.parameters, "id": tc.id}
+                    {
+                        "name": tc.tool_name,
+                        "parameters": tc.parameters,
+                        "id": tc.id,
+                        "thought_signature": tc.thought_signature,
+                    }
                     for tc in self.tool_calls
                 ]
                 if self.tool_calls
@@ -139,6 +144,7 @@ class Message:
                     tool_name=tc["name"],
                     parameters=tc.get("parameters", {}),
                     id=tc.get("id"),
+                    thought_signature=tc.get("thought_signature"),
                 )
                 for tc in raw_calls
             ]
@@ -170,6 +176,7 @@ class ToolCall:
     tool_name: str
     parameters: Dict[str, Any]
     id: Optional[str] = None
+    thought_signature: Optional[str] = None
 
 
 @dataclass

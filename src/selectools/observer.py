@@ -656,4 +656,383 @@ class LoggingObserver(AgentObserver):
         self._emit("error", run_id, error=str(error), error_type=type(error).__name__)
 
 
-__all__ = ["AgentObserver", "LoggingObserver"]
+class AsyncAgentObserver(AgentObserver):
+    """Base class for async agent lifecycle observers.
+
+    Override any subset of the ``a_on_*`` methods to receive notifications
+    asynchronously.  Each method mirrors the sync ``AgentObserver`` counterpart.
+
+    The ``blocking`` attribute controls execution behavior:
+
+    - ``blocking=False`` (default): ``asyncio.ensure_future()`` — runs concurrently,
+      never slows the agent loop.  Good for webhooks, logging, audit trails.
+    - ``blocking=True``: Inline ``await`` — must complete before the loop continues.
+      Good for DB writes, rate limiting, result enrichment.
+
+    In sync ``run()``, blocking async observers are called via ``asyncio.run()``.
+    Non-blocking async observers are skipped in sync context.
+    """
+
+    blocking: bool = False
+
+    # ------------------------------------------------------------------
+    # Run-level events
+    # ------------------------------------------------------------------
+
+    async def a_on_run_start(
+        self,
+        run_id: str,
+        messages: List[Message],
+        system_prompt: str,
+    ) -> None:
+        """Async counterpart of :meth:`on_run_start`."""
+
+    async def a_on_run_end(
+        self,
+        run_id: str,
+        result: "AgentResult",
+    ) -> None:
+        """Async counterpart of :meth:`on_run_end`."""
+
+    # ------------------------------------------------------------------
+    # LLM-level events
+    # ------------------------------------------------------------------
+
+    async def a_on_llm_start(
+        self,
+        run_id: str,
+        messages: List[Message],
+        model: str,
+        system_prompt: str,
+    ) -> None:
+        """Async counterpart of :meth:`on_llm_start`."""
+
+    async def a_on_llm_end(
+        self,
+        run_id: str,
+        response: str,
+        usage: Optional["UsageStats"],
+    ) -> None:
+        """Async counterpart of :meth:`on_llm_end`."""
+
+    async def a_on_cache_hit(
+        self,
+        run_id: str,
+        model: str,
+        response: str,
+    ) -> None:
+        """Async counterpart of :meth:`on_cache_hit`."""
+
+    async def a_on_usage(
+        self,
+        run_id: str,
+        usage: "UsageStats",
+    ) -> None:
+        """Async counterpart of :meth:`on_usage`."""
+
+    # ------------------------------------------------------------------
+    # Tool-level events
+    # ------------------------------------------------------------------
+
+    async def a_on_tool_start(
+        self,
+        run_id: str,
+        call_id: str,
+        tool_name: str,
+        tool_args: Dict[str, Any],
+    ) -> None:
+        """Async counterpart of :meth:`on_tool_start`."""
+
+    async def a_on_tool_end(
+        self,
+        run_id: str,
+        call_id: str,
+        tool_name: str,
+        result: str,
+        duration_ms: float,
+    ) -> None:
+        """Async counterpart of :meth:`on_tool_end`."""
+
+    async def a_on_tool_error(
+        self,
+        run_id: str,
+        call_id: str,
+        tool_name: str,
+        error: Exception,
+        tool_args: Dict[str, Any],
+        duration_ms: float,
+    ) -> None:
+        """Async counterpart of :meth:`on_tool_error`."""
+
+    async def a_on_tool_chunk(
+        self,
+        run_id: str,
+        call_id: str,
+        tool_name: str,
+        chunk: str,
+    ) -> None:
+        """Async counterpart of :meth:`on_tool_chunk`."""
+
+    # ------------------------------------------------------------------
+    # Policy events
+    # ------------------------------------------------------------------
+
+    async def a_on_policy_decision(
+        self,
+        run_id: str,
+        tool_name: str,
+        decision: str,
+        reason: str,
+        tool_args: Dict[str, Any],
+    ) -> None:
+        """Async counterpart of :meth:`on_policy_decision`."""
+
+    # ------------------------------------------------------------------
+    # Structured output events
+    # ------------------------------------------------------------------
+
+    async def a_on_structured_validate(
+        self,
+        run_id: str,
+        success: bool,
+        attempt: int,
+        error: Optional[str] = None,
+    ) -> None:
+        """Async counterpart of :meth:`on_structured_validate`."""
+
+    # ------------------------------------------------------------------
+    # Iteration events
+    # ------------------------------------------------------------------
+
+    async def a_on_iteration_start(
+        self,
+        run_id: str,
+        iteration: int,
+        messages: List[Message],
+    ) -> None:
+        """Async counterpart of :meth:`on_iteration_start`."""
+
+    async def a_on_iteration_end(
+        self,
+        run_id: str,
+        iteration: int,
+        response: str,
+    ) -> None:
+        """Async counterpart of :meth:`on_iteration_end`."""
+
+    # ------------------------------------------------------------------
+    # Batch events
+    # ------------------------------------------------------------------
+
+    async def a_on_batch_start(
+        self,
+        batch_id: str,
+        prompts_count: int,
+    ) -> None:
+        """Async counterpart of :meth:`on_batch_start`."""
+
+    async def a_on_batch_end(
+        self,
+        batch_id: str,
+        results_count: int,
+        errors_count: int,
+        total_duration_ms: float,
+    ) -> None:
+        """Async counterpart of :meth:`on_batch_end`."""
+
+    # ------------------------------------------------------------------
+    # Provider fallback events
+    # ------------------------------------------------------------------
+
+    async def a_on_provider_fallback(
+        self,
+        run_id: str,
+        failed_provider: str,
+        next_provider: str,
+        error: Exception,
+    ) -> None:
+        """Async counterpart of :meth:`on_provider_fallback`."""
+
+    # ------------------------------------------------------------------
+    # LLM retry events
+    # ------------------------------------------------------------------
+
+    async def a_on_llm_retry(
+        self,
+        run_id: str,
+        attempt: int,
+        max_retries: int,
+        error: Exception,
+        backoff_seconds: float,
+    ) -> None:
+        """Async counterpart of :meth:`on_llm_retry`."""
+
+    # ------------------------------------------------------------------
+    # Memory events
+    # ------------------------------------------------------------------
+
+    async def a_on_memory_trim(
+        self,
+        run_id: str,
+        messages_removed: int,
+        messages_remaining: int,
+        reason: str,
+    ) -> None:
+        """Async counterpart of :meth:`on_memory_trim`."""
+
+    # ------------------------------------------------------------------
+    # Session events
+    # ------------------------------------------------------------------
+
+    async def a_on_session_load(
+        self,
+        run_id: str,
+        session_id: str,
+        message_count: int,
+    ) -> None:
+        """Async counterpart of :meth:`on_session_load`."""
+
+    async def a_on_session_save(
+        self,
+        run_id: str,
+        session_id: str,
+        message_count: int,
+    ) -> None:
+        """Async counterpart of :meth:`on_session_save`."""
+
+    # ------------------------------------------------------------------
+    # Memory summarization events
+    # ------------------------------------------------------------------
+
+    async def a_on_memory_summarize(
+        self,
+        run_id: str,
+        summary: str,
+    ) -> None:
+        """Async counterpart of :meth:`on_memory_summarize`."""
+
+    # ------------------------------------------------------------------
+    # Entity extraction events
+    # ------------------------------------------------------------------
+
+    async def a_on_entity_extraction(
+        self,
+        run_id: str,
+        entities_extracted: int,
+    ) -> None:
+        """Async counterpart of :meth:`on_entity_extraction`."""
+
+    # ------------------------------------------------------------------
+    # Knowledge graph extraction events
+    # ------------------------------------------------------------------
+
+    async def a_on_kg_extraction(
+        self,
+        run_id: str,
+        triples_extracted: int,
+    ) -> None:
+        """Async counterpart of :meth:`on_kg_extraction`."""
+
+    # ------------------------------------------------------------------
+    # Error events
+    # ------------------------------------------------------------------
+
+    async def a_on_error(
+        self,
+        run_id: str,
+        error: Exception,
+        context: Dict[str, Any],
+    ) -> None:
+        """Async counterpart of :meth:`on_error`."""
+
+
+# ======================================================================
+# Hooks compatibility adapter (internal)
+# ======================================================================
+
+
+class _HooksAdapter(AgentObserver):
+    """Internal adapter that wraps a legacy ``hooks`` dict as an :class:`AgentObserver`.
+
+    This allows the hooks dict to be routed through the single observer
+    notification path, eliminating the need for parallel ``_call_hook()``
+    calls throughout the agent loop.
+
+    Not part of the public API — do **not** add to ``__all__``.
+    """
+
+    def __init__(self, hooks: Dict[str, Any]) -> None:
+        self._hooks = hooks
+
+    def _call(self, hook_name: str, *args: Any) -> None:
+        fn = self._hooks.get(hook_name)
+        if fn:
+            try:
+                fn(*args)
+            except Exception:  # noqa: BLE001 # nosec B110
+                pass
+
+    # -- Run-level events --------------------------------------------------
+
+    def on_run_start(self, run_id: str, messages: List[Message], system_prompt: str) -> None:
+        self._call("on_agent_start", messages)
+
+    def on_run_end(self, run_id: str, result: AgentResult) -> None:
+        self._call("on_agent_end", result.message, result.usage)
+
+    # -- LLM-level events --------------------------------------------------
+
+    def on_llm_start(
+        self, run_id: str, messages: List[Message], model: str, system_prompt: str
+    ) -> None:
+        self._call("on_llm_start", messages, model)
+
+    def on_llm_end(self, run_id: str, response: str, usage: Optional[UsageStats]) -> None:
+        self._call("on_llm_end", response, usage)
+
+    # -- Tool-level events -------------------------------------------------
+
+    def on_tool_start(
+        self, run_id: str, call_id: str, tool_name: str, tool_args: Dict[str, Any]
+    ) -> None:
+        self._call("on_tool_start", tool_name, tool_args)
+
+    def on_tool_end(
+        self,
+        run_id: str,
+        call_id: str,
+        tool_name: str,
+        result: str,
+        duration_ms: float,
+    ) -> None:
+        self._call("on_tool_end", tool_name, result, duration_ms / 1000)
+
+    def on_tool_error(
+        self,
+        run_id: str,
+        call_id: str,
+        tool_name: str,
+        error: Exception,
+        tool_args: Dict[str, Any],
+        duration_ms: float,
+    ) -> None:
+        self._call("on_tool_error", tool_name, error, tool_args)
+
+    def on_tool_chunk(self, run_id: str, call_id: str, tool_name: str, chunk: str) -> None:
+        self._call("on_tool_chunk", tool_name, chunk)
+
+    # -- Iteration-level events --------------------------------------------
+
+    def on_iteration_start(self, run_id: str, iteration: int, messages: List[Message]) -> None:
+        self._call("on_iteration_start", iteration, messages)
+
+    def on_iteration_end(self, run_id: str, iteration: int, response: str) -> None:
+        self._call("on_iteration_end", iteration, response)
+
+    # -- Error events ------------------------------------------------------
+
+    def on_error(self, run_id: str, error: Exception, context: Dict[str, Any]) -> None:
+        self._call("on_error", error, context)
+
+
+__all__ = ["AgentObserver", "AsyncAgentObserver", "LoggingObserver"]
