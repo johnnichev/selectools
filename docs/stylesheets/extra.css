@@ -1,17 +1,39 @@
-:root {
-  --md-primary-fg-color: #673ab7;
-  --md-primary-fg-color--light: #9575cd;
-  --md-primary-fg-color--dark: #4527a0;
-  --md-accent-fg-color: #ffc107;
+/* Selectools brand colors — Electric Blue + Cyan */
+
+:root,
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #1a56db;
+  --md-primary-fg-color--light: #3b82f6;
+  --md-primary-fg-color--dark: #1e40af;
+  --md-accent-fg-color: #06b6d4;
+  --md-accent-fg-color--transparent: rgba(6, 182, 212, 0.1);
+  --md-typeset-a-color: #1a56db;
 }
 
 [data-md-color-scheme="slate"] {
-  --md-primary-fg-color: #9575cd;
-  --md-primary-fg-color--light: #b39ddb;
-  --md-primary-fg-color--dark: #7e57c2;
-  --md-accent-fg-color: #ffd54f;
+  --md-primary-fg-color: #3b82f6;
+  --md-primary-fg-color--light: #60a5fa;
+  --md-primary-fg-color--dark: #2563eb;
+  --md-accent-fg-color: #22d3ee;
+  --md-accent-fg-color--transparent: rgba(34, 211, 238, 0.1);
+  --md-typeset-a-color: #60a5fa;
 }
 
+/* Header */
+.md-header {
+  background: var(--md-primary-fg-color);
+}
+
+.md-header__title {
+  font-weight: 700;
+}
+
+/* Tabs */
+.md-tabs {
+  background: var(--md-primary-fg-color--dark);
+}
+
+/* Cards */
 .md-typeset .grid.cards > ul > li {
   border: 1px solid var(--md-default-fg-color--lightest);
   border-radius: 0.5rem;
@@ -28,11 +50,23 @@
   margin-top: 0;
 }
 
+/* Admonitions */
 .md-typeset .admonition.abstract > .admonition-title::before,
 .md-typeset details.abstract > summary::before {
   content: "";
 }
 
-.md-header__title {
-  font-weight: 700;
+/* Code blocks */
+.md-typeset code {
+  border-radius: 0.25rem;
+}
+
+/* Nav sidebar active item */
+.md-nav__link--active {
+  font-weight: 600;
+}
+
+/* Footer */
+.md-footer {
+  background: var(--md-primary-fg-color--dark);
 }

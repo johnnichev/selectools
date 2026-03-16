@@ -48,6 +48,3 @@ mypy_output.txt
 
 # Generated demo artifacts
 *_with_bbox.png
-
-# MkDocs build copies (generated at build time)
-docs/CHANGELOG.md
