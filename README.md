@@ -7,17 +7,19 @@
 
 **Production-ready AI agents with tool calling, RAG, and hybrid search.** Connect LLMs to your Python functions, embed and search your documents with vector + keyword fusion, stream responses in real time, and dynamically manage tools at runtime. Works with OpenAI, Anthropic, Gemini, and Ollama. Tracks costs automatically.
 
-## What's New in v0.16.6
+## What's New in v0.16.7
 
-**Gemini 3.x thought_signature crash fix** — `thought_signature` from Gemini 3.x is opaque binary (protobuf/hash), not UTF-8 text. The previous code crashed with `UnicodeDecodeError` on non-UTF-8 bytes. Now uses base64 for lossless binary round-trip across all code paths.
+**Cleanup release** — Removed unused CLI module, completed README example table (28-38), fixed stale doc counts.
 
-- **1620 tests** — 2 new regression tests for non-UTF-8 binary thought_signature round-trip
+- **CLI removed** — `selectools` console script entry point removed (unused, flagged by package safety scanners)
+- **1620 tests** across unit, integration, regression, and E2E
 
 > Full changelog: [CHANGELOG.md](https://github.com/johnnichev/selectools/blob/main/CHANGELOG.md)
 
 <details>
 <summary><strong>v0.16.x highlights</strong></summary>
 
+- **v0.16.6**: Gemini 3.x thought_signature crash fix — base64 round-trip for non-UTF-8 binary signatures
 - **v0.16.5**: Design Patterns & Code Quality — terminal actions, async observers, Gemini 3.x thought signatures, agent decomposition, hooks deprecated
 - **v0.16.4**: Parallel execution safety — coherence + screening in parallel, guardrail immutability, streaming usage tracking
 - **v0.16.0**: Memory & Persistence — persistent sessions (3 backends), summarize-on-trim, entity memory, knowledge graph

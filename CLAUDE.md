@@ -292,5 +292,6 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 - **v0.16.4** ✅ Parallel execution safety + 5 bug fixes
 - **v0.16.5** ✅ Design Patterns & Code Quality (agent decomposition, provider Template Method, async observers, terminal actions, hooks deprecation, ADRs) — see `docs/decisions/`
 - **v0.16.6** ✅ Gemini thought_signature crash fix (base64 round-trip for non-UTF-8 binary signatures)
+- **v0.16.7** ✅ Cleanup (CLI removal, README example table, doc count audit)
 - **v0.17.0** 🔵 Multi-Agent Orchestration — see `MULTI_AGENT_PLAN.md`
 - **Backlog**: Connector Expansion, Ecosystem Parity, Structured AgentConfig, Polish & Community
