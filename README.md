@@ -582,7 +582,7 @@ Examples are numbered by difficulty. Start from 01 and work your way up.
 |---|---|---|---|
 | 01 | `01_hello_world.py` | First agent, `@tool`, `ask()` | No |
 | 02 | `02_search_weather.py` | ToolRegistry, multiple tools | No |
-| 03 | `03_toolbox.py` | 22 pre-built tools (file, data, text, datetime) | No |
+| 03 | `03_toolbox.py` | 24 pre-built tools (file, data, text, datetime, web) | No |
 | 04 | `04_conversation_memory.py` | Multi-turn memory | Yes |
 | 05 | `05_cost_tracking.py` | Token counting, cost warnings | Yes |
 | 06 | `06_async_agent.py` | `arun()`, concurrent agents, FastAPI | Yes |
