@@ -231,6 +231,12 @@ See [CHANGELOG](CHANGELOG.md) for full details.
 
 ---
 
+## v0.16.6: Gemini thought_signature crash fix ✅
+
+Fixed `UnicodeDecodeError` when Gemini 3.x returns non-UTF-8 binary `thought_signature`. Replaced UTF-8 encode/decode with base64 across all 5 affected locations. 2 new regression tests (total: 1642).
+
+---
+
 ## v0.17.0: Multi-Agent Orchestration
 
 Focus: DAG-based multi-agent workflows that are simpler and more Pythonic than LangGraph.

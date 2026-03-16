@@ -125,7 +125,11 @@ class GeminiProvider(Provider):
                     tc_id = f"call_{uuid.uuid4().hex}"
                     raw_sig = getattr(part, "thought_signature", None)
                     sig_str = (
-                        (raw_sig.decode("utf-8") if isinstance(raw_sig, bytes) else str(raw_sig))
+                        (
+                            base64.b64encode(raw_sig).decode("ascii")
+                            if isinstance(raw_sig, bytes)
+                            else str(raw_sig)
+                        )
                         if raw_sig
                         else None
                     )
@@ -240,7 +244,7 @@ class GeminiProvider(Provider):
                                 name=matching_tc.tool_name, args=matching_tc.parameters
                             )
                         )
-                        fc_part.thought_signature = matching_tc.thought_signature.encode("utf-8")  # type: ignore[assignment]
+                        fc_part.thought_signature = base64.b64decode(matching_tc.thought_signature)  # type: ignore[assignment]
                         parts.append(fc_part)
 
                     parts.append(
@@ -271,7 +275,7 @@ class GeminiProvider(Provider):
                             function_call=types.FunctionCall(name=tc.tool_name, args=tc.parameters)
                         )
                         if tc.thought_signature:
-                            fc_part.thought_signature = tc.thought_signature.encode("utf-8")  # type: ignore[assignment]
+                            fc_part.thought_signature = base64.b64decode(tc.thought_signature)  # type: ignore[assignment]
                         parts.append(fc_part)
 
             elif role == Role.USER.value:
@@ -380,7 +384,11 @@ class GeminiProvider(Provider):
                     tc_id = f"call_{uuid.uuid4().hex}"
                     raw_sig = getattr(part, "thought_signature", None)
                     sig_str = (
-                        (raw_sig.decode("utf-8") if isinstance(raw_sig, bytes) else str(raw_sig))
+                        (
+                            base64.b64encode(raw_sig).decode("ascii")
+                            if isinstance(raw_sig, bytes)
+                            else str(raw_sig)
+                        )
                         if raw_sig
                         else None
                     )
@@ -470,7 +478,7 @@ class GeminiProvider(Provider):
                                 raw_sig = getattr(part, "thought_signature", None)
                                 sig_str = (
                                     (
-                                        raw_sig.decode("utf-8")
+                                        base64.b64encode(raw_sig).decode("ascii")
                                         if isinstance(raw_sig, bytes)
                                         else str(raw_sig)
                                     )

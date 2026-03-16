@@ -2,9 +2,9 @@
 
 Thank you for your interest in contributing to Selectools! We welcome contributions from the community.
 
-**Current Version:** v0.13.0
-**Test Status:** ✅ 938 tests passing (100%)
-**Python:** 3.9+
+**Current Version:** v0.16.6
+**Test Status:** 1642 tests passing (100%)
+**Python:** 3.13+
 
 ## Getting Started
 
@@ -74,7 +74,7 @@ Similar to `npm run` scripts, here are the common commands for this project:
 ### Testing
 
 ```bash
-# Run all tests (921 tests)
+# Run all tests (1642 tests)
 pytest tests/ -v
 
 # Run tests quietly (summary only)
@@ -245,7 +245,7 @@ selectools/
 │   ├── env.py                  # Environment variable loading
 │   ├── exceptions.py           # Custom exception classes
 │   ├── memory.py               # ConversationMemory (tool-pair-aware)
-│   ├── models.py               # Model registry (120+ models)
+│   ├── models.py               # Model registry (146 models)
 │   ├── parser.py               # ToolCallParser
 │   ├── pricing.py              # LLM pricing data and cost calculation
 │   ├── prompt.py               # PromptBuilder
@@ -264,14 +264,14 @@ selectools/
 │   │   └── stubs.py            # LocalProvider / test stubs
 │   ├── embeddings/             # Embedding providers
 │   ├── rag/                    # RAG: vector stores, chunking, loaders
-│   └── toolbox/                # 22 pre-built tools
-├── tests/                      # Test suite (885+ tests)
+│   └── toolbox/                # 24 pre-built tools
+├── tests/                      # Test suite (1642 tests)
 │   ├── agent/                  # Agent tests
 │   ├── rag/                    # RAG tests
 │   ├── tools/                  # Tool tests
 │   ├── core/                   # Core framework tests
 │   └── integration/            # E2E tests (require API keys)
-├── examples/                   # 27 numbered examples (01–27)
+├── examples/                   # 38 numbered examples (01–38)
 ├── docs/                       # Detailed documentation
 │   ├── QUICKSTART.md           # 5-minute getting started
 │   ├── ARCHITECTURE.md         # Architecture overview
@@ -371,7 +371,7 @@ We especially welcome contributions in these areas:
 - Add comparison guides (vs LangChain, LlamaIndex)
 
 ### 🧪 **Testing**
-- Increase test coverage (currently 938 tests passing!)
+- Increase test coverage (currently 1642 tests passing!)
 - Add performance benchmarks
 - Improve E2E test stability with retry/rate-limit handling
 

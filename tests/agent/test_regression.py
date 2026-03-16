@@ -10,6 +10,7 @@ Naming convention: test_<bug_number_or_category>_<description>
 from __future__ import annotations
 
 import asyncio
+import base64
 import copy
 import json
 import threading
@@ -832,3 +833,66 @@ class TestAgentResultUsage:
         )
         result = agent.run("hi")
         assert result.usage is not None
+
+
+# ---------------------------------------------------------------------------
+# Regression: Gemini thought_signature non-UTF-8 binary crash
+# ---------------------------------------------------------------------------
+
+
+class TestGeminiThoughtSignatureNonUtf8:
+    """Gemini 3.x thought_signature is opaque binary (protobuf/hash), not UTF-8.
+
+    The old code did raw_sig.decode("utf-8") which crashed with UnicodeDecodeError
+    on bytes like 0xa4 or 0xd5. The fix uses base64 for the round-trip.
+    """
+
+    def _get_provider(self) -> Any:
+        try:
+            from google.genai import types  # noqa: F401
+        except ImportError:
+            pytest.skip("google-genai not installed")
+
+        from selectools.providers.gemini_provider import GeminiProvider
+
+        provider = GeminiProvider.__new__(GeminiProvider)
+        provider.default_model = "gemini-test"
+        return provider
+
+    def test_non_utf8_thought_signature_round_trip(self) -> None:
+        """Non-UTF-8 binary bytes survive encode→store→decode round-trip."""
+        provider = self._get_provider()
+
+        # Bytes that are NOT valid UTF-8 — exactly the pattern from the bug report
+        raw_binary = b"\xa4\xd5\x01\x02\xff\x80\x00\xfe"
+        b64_sig = base64.b64encode(raw_binary).decode("ascii")
+
+        messages = [
+            Message(
+                role=Role.ASSISTANT,
+                content="",
+                tool_calls=[
+                    ToolCall(
+                        tool_name="get_weather",
+                        parameters={"city": "Paris"},
+                        id="call_rt",
+                        thought_signature=b64_sig,
+                    )
+                ],
+            ),
+            Message(
+                role=Role.TOOL,
+                content='{"temp": 18}',
+                tool_name="get_weather",
+                tool_call_id="call_rt",
+            ),
+        ]
+        contents = provider._format_contents("system", messages)
+
+        # ASSISTANT function_call part: base64 decoded back to original bytes
+        fc_parts = [p for p in contents[0].parts if p.function_call is not None]
+        assert getattr(fc_parts[0], "thought_signature", None) == raw_binary
+
+        # TOOL echo part: also has original bytes
+        echo_part = contents[1].parts[0]
+        assert getattr(echo_part, "thought_signature", None) == raw_binary

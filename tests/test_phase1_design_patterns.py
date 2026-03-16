@@ -7,6 +7,7 @@ Tests for Phase 1 Design Pattern changes:
 
 from __future__ import annotations
 
+import base64
 from enum import Enum
 from typing import Any
 from unittest.mock import MagicMock
@@ -331,6 +332,8 @@ class TestGeminiFormatContentsThoughtSignature:
     def test_assistant_fc_part_gets_thought_signature(self) -> None:
         """ASSISTANT tool_calls with thought_signature set it on the fc_part."""
         provider = self._get_provider()
+        raw_bytes = b"sig_hello"
+        b64_sig = base64.b64encode(raw_bytes).decode("ascii")
         messages = [
             Message(
                 role=Role.ASSISTANT,
@@ -340,7 +343,7 @@ class TestGeminiFormatContentsThoughtSignature:
                         tool_name="search",
                         parameters={"q": "test"},
                         id="call_1",
-                        thought_signature="sig_hello",
+                        thought_signature=b64_sig,
                     )
                 ],
             )
@@ -356,8 +359,8 @@ class TestGeminiFormatContentsThoughtSignature:
 
         fc_part = fc_parts[0]
         assert fc_part.function_call.name == "search"
-        # thought_signature is stored as bytes on the SDK Part
-        assert getattr(fc_part, "thought_signature", None) == b"sig_hello"
+        # thought_signature is stored as bytes on the SDK Part (decoded from base64)
+        assert getattr(fc_part, "thought_signature", None) == raw_bytes
 
     def test_assistant_without_thought_signature_no_attr(self) -> None:
         """ASSISTANT tool_calls without thought_signature do not set the attr."""
@@ -390,6 +393,8 @@ class TestGeminiFormatContentsThoughtSignature:
     def test_assistant_multiple_tool_calls_mixed(self) -> None:
         """ASSISTANT with multiple tool_calls: only the one with signature gets it."""
         provider = self._get_provider()
+        raw_a = b"sig_a"
+        b64_a = base64.b64encode(raw_a).decode("ascii")
         messages = [
             Message(
                 role=Role.ASSISTANT,
@@ -399,7 +404,7 @@ class TestGeminiFormatContentsThoughtSignature:
                         tool_name="a",
                         parameters={},
                         id="call_a",
-                        thought_signature="sig_a",
+                        thought_signature=b64_a,
                     ),
                     ToolCall(
                         tool_name="b",
@@ -417,7 +422,7 @@ class TestGeminiFormatContentsThoughtSignature:
         part_a = [p for p in fc_parts if p.function_call.name == "a"][0]
         part_b = [p for p in fc_parts if p.function_call.name == "b"][0]
 
-        assert getattr(part_a, "thought_signature", None) == b"sig_a"
+        assert getattr(part_a, "thought_signature", None) == raw_a
         sig_b = getattr(part_b, "thought_signature", "NOT_SET")
         assert sig_b is None or sig_b == "NOT_SET"
 
@@ -426,6 +431,8 @@ class TestGeminiFormatContentsThoughtSignature:
     def test_tool_message_echoes_function_call_with_signature(self) -> None:
         """TOOL msg after ASSISTANT with thought_signature echoes functionCall."""
         provider = self._get_provider()
+        raw_echo = b"sig_echo"
+        b64_echo = base64.b64encode(raw_echo).decode("ascii")
         messages = [
             Message(
                 role=Role.ASSISTANT,
@@ -435,7 +442,7 @@ class TestGeminiFormatContentsThoughtSignature:
                         tool_name="search",
                         parameters={"q": "test"},
                         id="call_1",
-                        thought_signature="sig_echo",
+                        thought_signature=b64_echo,
                     )
                 ],
             ),
@@ -461,7 +468,7 @@ class TestGeminiFormatContentsThoughtSignature:
         echo_part = tool_content.parts[0]
         assert echo_part.function_call is not None
         assert echo_part.function_call.name == "search"
-        assert getattr(echo_part, "thought_signature", None) == b"sig_echo"
+        assert getattr(echo_part, "thought_signature", None) == raw_echo
 
         response_part = tool_content.parts[1]
         assert response_part.function_response is not None
@@ -503,6 +510,8 @@ class TestGeminiFormatContentsThoughtSignature:
     def test_tool_message_lookup_by_name_fallback(self) -> None:
         """TOOL msg matches ASSISTANT tool_call by name when tool_call_id differs."""
         provider = self._get_provider()
+        raw_weather = b"sig_weather"
+        b64_weather = base64.b64encode(raw_weather).decode("ascii")
         messages = [
             Message(
                 role=Role.ASSISTANT,
@@ -512,7 +521,7 @@ class TestGeminiFormatContentsThoughtSignature:
                         tool_name="weather",
                         parameters={"city": "NYC"},
                         id="call_w",
-                        thought_signature="sig_weather",
+                        thought_signature=b64_weather,
                     )
                 ],
             ),
@@ -529,7 +538,7 @@ class TestGeminiFormatContentsThoughtSignature:
         # Should still echo because name-based lookup found matching_tc
         assert len(tool_content.parts) == 2
         assert tool_content.parts[0].function_call is not None
-        assert getattr(tool_content.parts[0], "thought_signature", None) == b"sig_weather"
+        assert getattr(tool_content.parts[0], "thought_signature", None) == raw_weather
 
     def test_tool_message_no_assistant_context(self) -> None:
         """TOOL msg with no preceding ASSISTANT: just functionResponse, no echo."""
@@ -553,6 +562,8 @@ class TestGeminiFormatContentsThoughtSignature:
     def test_full_conversation_round_trip(self) -> None:
         """Full USER -> ASSISTANT(fc+sig) -> TOOL -> ASSISTANT conversation."""
         provider = self._get_provider()
+        raw_paris = b"sig_paris"
+        b64_paris = base64.b64encode(raw_paris).decode("ascii")
         messages = [
             Message(role=Role.USER, content="What's the weather in Paris?"),
             Message(
@@ -563,7 +574,7 @@ class TestGeminiFormatContentsThoughtSignature:
                         tool_name="get_weather",
                         parameters={"city": "Paris"},
                         id="call_gw",
-                        thought_signature="sig_paris",
+                        thought_signature=b64_paris,
                     )
                 ],
             ),
@@ -591,7 +602,7 @@ class TestGeminiFormatContentsThoughtSignature:
         assert contents[1].role == "model"
         fc_parts = [p for p in contents[1].parts if p.function_call is not None]
         assert len(fc_parts) == 1
-        assert getattr(fc_parts[0], "thought_signature", None) == b"sig_paris"
+        assert getattr(fc_parts[0], "thought_signature", None) == raw_paris
 
         # 3rd: user with echoed fc + function response
         assert contents[2].role == "user"
@@ -606,6 +617,8 @@ class TestGeminiFormatContentsThoughtSignature:
     def test_assistant_with_text_and_tool_calls_with_signature(self) -> None:
         """ASSISTANT with both text content and tool_calls preserves both."""
         provider = self._get_provider()
+        raw_sig = b"sig_text_and_tc"
+        b64_sig = base64.b64encode(raw_sig).decode("ascii")
         messages = [
             Message(
                 role=Role.ASSISTANT,
@@ -615,7 +628,7 @@ class TestGeminiFormatContentsThoughtSignature:
                         tool_name="search",
                         parameters={"q": "selectools"},
                         id="call_s",
-                        thought_signature="sig_text_and_tc",
+                        thought_signature=b64_sig,
                     )
                 ],
             )
@@ -630,4 +643,52 @@ class TestGeminiFormatContentsThoughtSignature:
         assert len(text_parts) == 1
         assert text_parts[0].text == "Let me look that up."
         assert len(fc_parts) == 1
-        assert getattr(fc_parts[0], "thought_signature", None) == b"sig_text_and_tc"
+        assert getattr(fc_parts[0], "thought_signature", None) == raw_sig
+
+    def test_non_utf8_binary_signature_round_trip(self) -> None:
+        """Regression: non-UTF-8 binary thought_signature survives the round-trip.
+
+        Gemini 3.x returns opaque binary (protobuf/hash) in thought_signature
+        that is NOT valid UTF-8. The base64 encode/decode path must handle this
+        without UnicodeDecodeError.
+
+        See: https://github.com/johnnichev/selectools/issues/XX
+        """
+        provider = self._get_provider()
+        # Bytes that are NOT valid UTF-8 — the exact pattern that crashed in production
+        raw_binary = b"\xa4\xd5\x01\x02\xff\x80\x00\xfe"
+        b64_sig = base64.b64encode(raw_binary).decode("ascii")
+
+        messages = [
+            Message(
+                role=Role.ASSISTANT,
+                content="",
+                tool_calls=[
+                    ToolCall(
+                        tool_name="search",
+                        parameters={"q": "test"},
+                        id="call_bin",
+                        thought_signature=b64_sig,
+                    )
+                ],
+            ),
+            Message(
+                role=Role.TOOL,
+                content="result",
+                tool_name="search",
+                tool_call_id="call_bin",
+            ),
+        ]
+        contents = provider._format_contents("system", messages)
+
+        # ASSISTANT fc_part should have the original binary bytes
+        fc_parts = [p for p in contents[0].parts if p.function_call is not None]
+        assert len(fc_parts) == 1
+        assert getattr(fc_parts[0], "thought_signature", None) == raw_binary
+
+        # TOOL echo should also have the original binary bytes
+        tool_content = contents[1]
+        assert len(tool_content.parts) == 2
+        echo_part = tool_content.parts[0]
+        assert echo_part.function_call is not None
+        assert getattr(echo_part, "thought_signature", None) == raw_binary

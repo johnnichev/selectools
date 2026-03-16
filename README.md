@@ -7,23 +7,18 @@
 
 **Production-ready AI agents with tool calling, RAG, and hybrid search.** Connect LLMs to your Python functions, embed and search your documents with vector + keyword fusion, stream responses in real time, and dynamically manage tools at runtime. Works with OpenAI, Anthropic, Gemini, and Ollama. Tracks costs automatically.
 
-## What's New in v0.16.5
+## What's New in v0.16.6
 
-**Design Patterns & Code Quality** — Major structural refactoring + three community-requested features:
+**Gemini 3.x thought_signature crash fix** — `thought_signature` from Gemini 3.x is opaque binary (protobuf/hash), not UTF-8 text. The previous code crashed with `UnicodeDecodeError` on non-UTF-8 bytes. Now uses base64 for lossless binary round-trip across all code paths.
 
-- **Terminal actions** — `@tool(terminal=True)` and `AgentConfig(stop_condition=...)` stop the agent loop after specific tools fire. For human-in-the-loop, payment flows, and escalation.
-- **Async observers** — `AsyncAgentObserver` with `blocking` flag for async DB writes and webhooks between tool executions.
-- **Gemini 3.x thought signatures** — `ToolCall.thought_signature` preserves function call signatures for Gemini 3.x models.
-- **Agent decomposed into 4 mixins** — `core.py` reduced from 3128 to 1448 lines (-54%).
-- **StepType + ModelType enums** — Type-safe `str, Enum` replacements (backward compatible).
-- **Hooks deprecated** — Use `AgentObserver` / `AsyncAgentObserver` instead. Existing hooks still work via adapter.
-- **1640 tests**, 6 Architecture Decision Records, Python 3.13 CI
+- **1642 tests** — 2 new regression tests for non-UTF-8 binary thought_signature round-trip
 
 > Full changelog: [CHANGELOG.md](https://github.com/johnnichev/selectools/blob/main/CHANGELOG.md)
 
 <details>
 <summary><strong>v0.16.x highlights</strong></summary>
 
+- **v0.16.5**: Design Patterns & Code Quality — terminal actions, async observers, Gemini 3.x thought signatures, agent decomposition, hooks deprecated
 - **v0.16.4**: Parallel execution safety — coherence + screening in parallel, guardrail immutability, streaming usage tracking
 - **v0.16.0**: Memory & Persistence — persistent sessions (3 backends), summarize-on-trim, entity memory, knowledge graph
 
@@ -95,7 +90,7 @@
 - **Cross-Session Knowledge**: Daily logs + persistent memory with `remember` tool
 - **38 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, and more
 - **AgentObserver Protocol**: 25 lifecycle events with `run_id` correlation, `LoggingObserver`, OTel export
-- **1640 Tests**: Unit, integration, regression, and E2E with real API calls
+- **1642 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 
@@ -587,7 +582,7 @@ Examples are numbered by difficulty. Start from 01 and work your way up.
 |---|---|---|---|
 | 01 | `01_hello_world.py` | First agent, `@tool`, `ask()` | No |
 | 02 | `02_search_weather.py` | ToolRegistry, multiple tools | No |
-| 03 | `03_toolbox.py` | 22 pre-built tools (file, data, text, datetime) | No |
+| 03 | `03_toolbox.py` | 24 pre-built tools (file, data, text, datetime, web) | No |
 | 04 | `04_conversation_memory.py` | Multi-turn memory | Yes |
 | 05 | `05_cost_tracking.py` | Token counting, cost warnings | Yes |
 | 06 | `06_async_agent.py` | `arun()`, concurrent agents, FastAPI | Yes |
