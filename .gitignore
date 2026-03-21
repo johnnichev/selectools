@@ -48,3 +48,6 @@ mypy_output.txt
 
 # Generated demo artifacts
 *_with_bbox.png
+
+# Private
+.private/
