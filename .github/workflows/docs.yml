@@ -36,6 +36,9 @@ jobs:
       - name: Build documentation
         run: mkdocs build
 
+      - name: Replace root with landing page
+        run: cp landing/index.html site/index.html
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

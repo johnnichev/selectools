@@ -210,3 +210,7 @@ Loop continues or returns AgentResult (.parsed, .trace, .reasoning)
 [:fontawesome-brands-github: GitHub Repository](https://github.com/johnnichev/selectools){ .md-button }
 [:material-notebook: Getting Started Notebook](https://github.com/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb){ .md-button }
 [:material-code-tags: 38 Example Scripts](https://github.com/johnnichev/selectools/tree/main/examples){ .md-button }
+
+---
+
+*An open-source project from [NichevLabs](https://nichevlabs.com).*

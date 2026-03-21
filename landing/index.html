@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Selectools — Production-Ready AI Agents by NichevLabs</title>
+  <meta name="description" content="Production-ready Python framework for AI agents with built-in guardrails, audit logging, cost tracking, and hybrid RAG. Open source from NichevLabs." />
+  <meta property="og:title" content="Selectools — Production-Ready AI Agents" />
+  <meta property="og:description" content="Built-in guardrails, audit logging, cost tracking, and hybrid RAG. Supports OpenAI, Anthropic, Gemini, Ollama." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://johnnichev.github.io/selectools/" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: { blue: '#3b82f6', cyan: '#06b6d4', dark: '#0f172a', card: '#1e293b' },
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    html { scroll-behavior: smooth; }
+    .fade-in { opacity: 0; transform: translateY(20px); transition: opacity 0.6s ease, transform 0.6s ease; }
+    .fade-in.visible { opacity: 1; transform: translateY(0); }
+    .code-block { background: #1e293b; }
+    .pill { background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); }
+    .copy-btn:active { transform: scale(0.95); }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+    .cursor-blink { animation: blink 1s step-end infinite; }
+    .comparison-row:nth-child(even) { background: rgba(30, 41, 59, 0.5); }
+  </style>
+</head>
+<body class="bg-brand-dark text-slate-50 font-sans antialiased">
+
+  <!-- Nav -->
+  <nav class="fixed top-0 w-full z-50 bg-brand-dark/80 backdrop-blur-md border-b border-slate-800">
+    <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+      <a href="#" class="text-xl font-bold text-white">selectools</a>
+      <div class="hidden md:flex items-center gap-8 text-sm text-slate-400">
+        <a href="#features" class="hover:text-white transition">Features</a>
+        <a href="#compare" class="hover:text-white transition">vs. LangChain</a>
+        <a href="#get-started" class="hover:text-white transition">Get Started</a>
+        <a href="QUICKSTART/" class="hover:text-white transition">Docs</a>
+        <a href="https://github.com/johnnichev/selectools" class="hover:text-white transition flex items-center gap-1">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="pt-32 pb-20 px-6">
+    <div class="max-w-6xl mx-auto">
+      <div class="max-w-3xl">
+        <p class="text-brand-cyan text-sm font-medium tracking-wider uppercase mb-4">Open source from NichevLabs</p>
+        <h1 class="text-5xl md:text-6xl font-extrabold leading-tight mb-6">
+          AI Agents That Ship With
+          <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-brand-cyan">Guardrails</span>,
+          Not Duct Tape
+        </h1>
+        <p class="text-xl text-slate-400 mb-10 leading-relaxed">
+          Production-ready Python framework for LLM agents. Built-in audit logging, cost tracking, prompt injection defense, and hybrid RAG. Drop-in support for OpenAI, Anthropic, Gemini, and Ollama.
+        </p>
+        <div class="flex flex-wrap gap-4 items-center mb-10">
+          <button onclick="copyPip()" class="copy-btn code-block text-brand-cyan font-mono text-sm px-5 py-3 rounded-lg border border-slate-700 hover:border-brand-cyan transition flex items-center gap-3">
+            <span>pip install selectools</span>
+            <svg id="copy-icon" class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            <svg id="check-icon" class="w-4 h-4 text-green-400 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <a href="QUICKSTART/" class="bg-brand-blue hover:bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg transition">Read the Docs</a>
+          <a href="https://github.com/johnnichev/selectools" class="border border-slate-700 hover:border-slate-500 text-slate-300 font-semibold px-6 py-3 rounded-lg transition">GitHub</a>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">OpenAI</span>
+          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">Anthropic</span>
+          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">Gemini</span>
+          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">Ollama</span>
+          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">146 Models</span>
+          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">1620 Tests</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pain → Solution -->
+  <section class="py-20 px-6 border-t border-slate-800" id="why">
+    <div class="max-w-6xl mx-auto">
+      <h2 class="text-3xl font-bold mb-4 text-center">Why Selectools?</h2>
+      <p class="text-slate-400 text-center mb-14 max-w-2xl mx-auto">Three problems every team building AI agents hits — and how Selectools solves them out of the box.</p>
+      <div class="grid md:grid-cols-3 gap-8">
+        <div class="fade-in code-block rounded-xl p-8 border border-slate-700">
+          <div class="text-3xl mb-4">&#128269;</div>
+          <h3 class="text-lg font-semibold mb-2 text-white">"I can't see what my agent is doing"</h3>
+          <p class="text-slate-400 text-sm leading-relaxed">Every <code class="text-brand-cyan">run()</code> returns <code class="text-brand-cyan">result.trace</code> + <code class="text-brand-cyan">result.reasoning</code> — a structured timeline of every LLM call, tool pick, and execution. No paid SaaS required.</p>
+        </div>
+        <div class="fade-in code-block rounded-xl p-8 border border-slate-700">
+          <div class="text-3xl mb-4">&#128737;</div>
+          <h3 class="text-lg font-semibold mb-2 text-white">"No guardrails until something breaks in prod"</h3>
+          <p class="text-slate-400 text-sm leading-relaxed">Built-in PII redaction, topic blocking, toxicity detection, and prompt injection screening with 15 patterns. Plus LLM-based coherence checking.</p>
+        </div>
+        <div class="fade-in code-block rounded-xl p-8 border border-slate-700">
+          <div class="text-3xl mb-4">&#128176;</div>
+          <h3 class="text-lg font-semibold mb-2 text-white">"I don't know what my agents cost"</h3>
+          <p class="text-slate-400 text-sm leading-relaxed"><code class="text-brand-cyan">result.usage.total_cost</code> — automatic per-call token counts and dollar costs across all providers. 146 models with built-in pricing data.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Code Showcase -->
+  <section class="py-20 px-6 border-t border-slate-800">
+    <div class="max-w-6xl mx-auto">
+      <h2 class="text-3xl font-bold mb-4 text-center">5 Lines to a Production Agent</h2>
+      <p class="text-slate-400 text-center mb-14 max-w-2xl mx-auto">Guardrails, audit logging, and injection defense — configured, not bolted on.</p>
+      <div class="grid lg:grid-cols-2 gap-8">
+        <div class="fade-in">
+          <div class="code-block rounded-xl border border-slate-700 overflow-hidden">
+            <div class="flex items-center gap-2 px-4 py-3 border-b border-slate-700">
+              <div class="w-3 h-3 rounded-full bg-red-500/80"></div>
+              <div class="w-3 h-3 rounded-full bg-yellow-500/80"></div>
+              <div class="w-3 h-3 rounded-full bg-green-500/80"></div>
+              <span class="ml-2 text-xs text-slate-500 font-mono">agent.py</span>
+            </div>
+            <pre class="p-6 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="text-purple-400">from</span> <span class="text-blue-300">selectools</span> <span class="text-purple-400">import</span> Agent, AgentConfig, tool
+<span class="text-purple-400">from</span> <span class="text-blue-300">selectools.providers</span> <span class="text-purple-400">import</span> OpenAIProvider
+<span class="text-purple-400">from</span> <span class="text-blue-300">selectools.guardrails</span> <span class="text-purple-400">import</span> GuardrailsPipeline, PIIGuardrail
+<span class="text-purple-400">from</span> <span class="text-blue-300">selectools.audit</span> <span class="text-purple-400">import</span> AuditLogger, PrivacyLevel
+
+<span class="text-green-400">@tool</span>
+<span class="text-purple-400">def</span> <span class="text-yellow-300">search_docs</span>(query: <span class="text-blue-300">str</span>) -> <span class="text-blue-300">str</span>:
+    <span class="text-green-400">"""Search the knowledge base."""</span>
+    <span class="text-purple-400">return</span> db.search(query)
+
+agent = Agent(
+    provider=<span class="text-yellow-300">OpenAIProvider</span>(),
+    tools=[search_docs],
+    config=<span class="text-yellow-300">AgentConfig</span>(
+        model=<span class="text-green-400">"gpt-4.1-mini"</span>,
+        guardrails=<span class="text-yellow-300">GuardrailsPipeline</span>(
+            input=[<span class="text-yellow-300">PIIGuardrail</span>(action=<span class="text-green-400">"redact"</span>)],
+        ),
+        screen_tool_output=<span class="text-orange-400">True</span>,
+        coherence_check=<span class="text-orange-400">True</span>,
+        audit=<span class="text-yellow-300">AuditLogger</span>(
+            path=<span class="text-green-400">"./audit"</span>,
+            privacy=PrivacyLevel.HASH,
+        ),
+    ),
+)
+
+result = agent.run(<span class="text-green-400">"Find our refund policy"</span>)</code></pre>
+          </div>
+        </div>
+        <div class="fade-in flex flex-col justify-center">
+          <div class="space-y-5">
+            <div class="code-block rounded-lg p-4 border border-slate-700">
+              <p class="text-xs text-slate-500 font-mono mb-1">result.content</p>
+              <p class="text-sm text-slate-300">"Our refund policy allows returns within 30 days..."</p>
+            </div>
+            <div class="code-block rounded-lg p-4 border border-slate-700">
+              <p class="text-xs text-slate-500 font-mono mb-1">result.reasoning</p>
+              <p class="text-sm text-slate-300">"User asked about refund policy &rarr; search_docs is the right tool"</p>
+            </div>
+            <div class="code-block rounded-lg p-4 border border-slate-700">
+              <p class="text-xs text-slate-500 font-mono mb-1">result.trace</p>
+              <div class="flex gap-2 text-xs font-mono mt-1">
+                <span class="bg-blue-500/20 text-blue-300 px-2 py-1 rounded">llm_call</span>
+                <span class="text-slate-600">&rarr;</span>
+                <span class="bg-purple-500/20 text-purple-300 px-2 py-1 rounded">tool_selection</span>
+                <span class="text-slate-600">&rarr;</span>
+                <span class="bg-green-500/20 text-green-300 px-2 py-1 rounded">tool_execution</span>
+                <span class="text-slate-600">&rarr;</span>
+                <span class="bg-blue-500/20 text-blue-300 px-2 py-1 rounded">llm_call</span>
+              </div>
+            </div>
+            <div class="code-block rounded-lg p-4 border border-slate-700">
+              <p class="text-xs text-slate-500 font-mono mb-1">result.usage</p>
+              <p class="text-sm text-slate-300">847 tokens &middot; <span class="text-green-400">$0.0012</span></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Grid -->
+  <section class="py-20 px-6 border-t border-slate-800" id="features">
+    <div class="max-w-6xl mx-auto">
+      <h2 class="text-3xl font-bold mb-4 text-center">What's Included</h2>
+      <p class="text-slate-400 text-center mb-14 max-w-2xl mx-auto">Everything you need for production AI agents — in one package.</p>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition">
+          <div class="text-2xl mb-3">&#9889;</div>
+          <h3 class="font-semibold mb-1">5 Providers</h3>
+          <p class="text-sm text-slate-400">OpenAI, Anthropic, Gemini, Ollama + auto-failover with circuit breaker</p>
+        </div>
+        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition">
+          <div class="text-2xl mb-3">&#127919;</div>
+          <h3 class="font-semibold mb-1">146 Models</h3>
+          <p class="text-sm text-slate-400">Type-safe constants with built-in pricing data for all providers</p>
+        </div>
+        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition">
+          <div class="text-2xl mb-3">&#128270;</div>
+          <h3 class="font-semibold mb-1">Hybrid RAG</h3>
+          <p class="text-sm text-slate-400">BM25 + vector search with RRF fusion and cross-encoder reranking</p>
+        </div>
+        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition">
+          <div class="text-2xl mb-3">&#128737;</div>
+          <h3 class="font-semibold mb-1">Guardrails</h3>
+          <p class="text-sm text-slate-400">PII redaction, toxicity, topic blocking, format and length validation</p>
+        </div>
+        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition">
+          <div class="text-2xl mb-3">&#128203;</div>
+          <h3 class="font-semibold mb-1">Audit Logging</h3>
+          <p class="text-sm text-slate-400">JSONL trail with 4 privacy levels and daily rotation</p>
+        </div>
+        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition">
+          <div class="text-2xl mb-3">&#128024;</div>
+          <h3 class="font-semibold mb-1">Entity Memory</h3>
+          <p class="text-sm text-slate-400">Auto-extract entities + knowledge graph with SQLite storage</p>
+        </div>
+        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition">
+          <div class="text-2xl mb-3">&#128295;</div>
+          <h3 class="font-semibold mb-1">24 Built-in Tools</h3>
+          <p class="text-sm text-slate-400">Files, web, data, datetime, text — ready to use out of the box</p>
+        </div>
+        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition">
+          <div class="text-2xl mb-3">&#9989;</div>
+          <h3 class="font-semibold mb-1">1620 Tests</h3>
+          <p class="text-sm text-slate-400">Unit, integration, regression, and E2E — production hardened</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Comparison Table -->
+  <section class="py-20 px-6 border-t border-slate-800" id="compare">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-3xl font-bold mb-4 text-center">Selectools vs. LangChain</h2>
+      <p class="text-slate-400 text-center mb-14 max-w-2xl mx-auto">An honest comparison. Choose LangChain for ecosystem breadth. Choose Selectools when compliance and observability aren't optional.</p>
+      <div class="code-block rounded-xl border border-slate-700 overflow-hidden">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-slate-700 text-left">
+              <th class="px-6 py-4 font-semibold text-slate-300">Capability</th>
+              <th class="px-6 py-4 font-semibold text-brand-cyan">Selectools</th>
+              <th class="px-6 py-4 font-semibold text-slate-400">LangChain</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-6 py-3 text-slate-300">Execution traces</td>
+              <td class="px-6 py-3 text-green-400">Built-in</td>
+              <td class="px-6 py-3 text-slate-500">LangSmith (paid)</td>
+            </tr>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-6 py-3 text-slate-300">Guardrails</td>
+              <td class="px-6 py-3 text-green-400">Built-in (5 types)</td>
+              <td class="px-6 py-3 text-slate-500">NeMo (separate project)</td>
+            </tr>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-6 py-3 text-slate-300">Audit logging</td>
+              <td class="px-6 py-3 text-green-400">Built-in (4 privacy levels)</td>
+              <td class="px-6 py-3 text-slate-500">Build it yourself</td>
+            </tr>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-6 py-3 text-slate-300">Cost tracking</td>
+              <td class="px-6 py-3 text-green-400">Automatic per-call</td>
+              <td class="px-6 py-3 text-slate-500">Manual / LangSmith</td>
+            </tr>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-6 py-3 text-slate-300">Injection defense</td>
+              <td class="px-6 py-3 text-green-400">15 patterns + coherence</td>
+              <td class="px-6 py-3 text-slate-500">Not included</td>
+            </tr>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-6 py-3 text-slate-300">Setup</td>
+              <td class="px-6 py-3 text-green-400">1 package</td>
+              <td class="px-6 py-3 text-slate-500">5+ packages</td>
+            </tr>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-6 py-3 text-slate-300">Reasoning visibility</td>
+              <td class="px-6 py-3 text-green-400">result.reasoning</td>
+              <td class="px-6 py-3 text-slate-500">Not available</td>
+            </tr>
+            <tr class="comparison-row">
+              <td class="px-6 py-3 text-slate-300">Community</td>
+              <td class="px-6 py-3 text-yellow-400">Growing</td>
+              <td class="px-6 py-3 text-green-400">Massive</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Who It's For -->
+  <section class="py-20 px-6 border-t border-slate-800">
+    <div class="max-w-6xl mx-auto">
+      <h2 class="text-3xl font-bold mb-14 text-center">Who It's For</h2>
+      <div class="grid md:grid-cols-3 gap-8">
+        <div class="fade-in code-block rounded-xl p-8 border border-slate-700">
+          <h3 class="text-lg font-semibold mb-3 text-brand-cyan">ML / AI Engineers</h3>
+          <p class="text-slate-400 text-sm leading-relaxed">You're building agents at work and need observability, cost control, and audit trails. Not another prototype framework.</p>
+        </div>
+        <div class="fade-in code-block rounded-xl p-8 border border-slate-700">
+          <h3 class="text-lg font-semibold mb-3 text-brand-cyan">Regulated Industries</h3>
+          <p class="text-slate-400 text-sm leading-relaxed">Fintech, healthtech, edtech. Your compliance team will ask about guardrails and audit logs. Have the answer ready.</p>
+        </div>
+        <div class="fade-in code-block rounded-xl p-8 border border-slate-700">
+          <h3 class="text-lg font-semibold mb-3 text-brand-cyan">Teams Outgrowing LangChain</h3>
+          <p class="text-slate-400 text-sm leading-relaxed">You've hit the ceiling on LangChain's observability and want traces, reasoning, and cost tracking without paying for LangSmith.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Get Started -->
+  <section class="py-20 px-6 border-t border-slate-800" id="get-started">
+    <div class="max-w-3xl mx-auto text-center">
+      <h2 class="text-3xl font-bold mb-6">Get Started in 60 Seconds</h2>
+      <div class="code-block rounded-xl p-8 border border-slate-700 text-left font-mono text-sm space-y-4 mb-10">
+        <div>
+          <span class="text-slate-500">1.</span>
+          <span class="text-slate-400"> Install:</span>
+          <span class="text-brand-cyan ml-4">pip install selectools</span>
+        </div>
+        <div>
+          <span class="text-slate-500">2.</span>
+          <span class="text-slate-400"> Set your key:</span>
+          <span class="text-brand-cyan ml-4">export OPENAI_API_KEY=sk-...</span>
+        </div>
+        <div>
+          <span class="text-slate-500">3.</span>
+          <span class="text-slate-400"> Run the example above — or start with the
+            <a href="QUICKSTART/" class="text-brand-blue hover:underline">Quickstart guide</a></span>
+        </div>
+      </div>
+      <div class="flex flex-wrap justify-center gap-4">
+        <a href="QUICKSTART/" class="bg-brand-blue hover:bg-blue-600 text-white font-semibold px-8 py-3 rounded-lg transition">Quickstart Guide</a>
+        <a href="https://github.com/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb" class="border border-slate-700 hover:border-slate-500 text-slate-300 font-semibold px-8 py-3 rounded-lg transition">Interactive Notebook</a>
+        <a href="https://github.com/johnnichev/selectools/tree/main/examples" class="border border-slate-700 hover:border-slate-500 text-slate-300 font-semibold px-8 py-3 rounded-lg transition">38 Examples</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="py-12 px-6 border-t border-slate-800">
+    <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+      <div class="text-center md:text-left">
+        <p class="text-slate-400 text-sm">An open-source project from <a href="https://nichevlabs.com" class="text-brand-cyan hover:underline">NichevLabs</a>.</p>
+        <p class="text-slate-500 text-xs mt-1">LGPL-3.0 &middot; Python 3.13+ &middot; v0.16.7</p>
+      </div>
+      <div class="flex items-center gap-6 text-sm text-slate-400">
+        <a href="https://github.com/johnnichev/selectools" class="hover:text-white transition">GitHub</a>
+        <a href="https://pypi.org/project/selectools/" class="hover:text-white transition">PyPI</a>
+        <a href="QUICKSTART/" class="hover:text-white transition">Docs</a>
+        <a href="https://github.com/johnnichev/selectools/blob/main/CHANGELOG.md" class="hover:text-white transition">Changelog</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Copy pip install
+    function copyPip() {
+      navigator.clipboard.writeText('pip install selectools');
+      document.getElementById('copy-icon').classList.add('hidden');
+      document.getElementById('check-icon').classList.remove('hidden');
+      setTimeout(() => {
+        document.getElementById('copy-icon').classList.remove('hidden');
+        document.getElementById('check-icon').classList.add('hidden');
+      }, 2000);
+    }
+
+    // Fade-in on scroll
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+  </script>
+
+</body>
+</html>
