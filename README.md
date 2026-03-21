@@ -105,10 +105,11 @@ pip install selectools[cache]             # + Redis cache
 pip install selectools[rag,cache]         # Everything
 ```
 
-Set your API key:
+Add your provider's API key to a `.env` file in your project root:
 
-```bash
-export OPENAI_API_KEY="sk-..."
+```
+OPENAI_API_KEY=sk-...
+# or ANTHROPIC_API_KEY, GEMINI_API_KEY — whichever provider you use
 ```
 
 ## Quick Start

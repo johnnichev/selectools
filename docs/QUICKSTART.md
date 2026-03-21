@@ -56,10 +56,11 @@ python my_agent.py
 
 ## Step 3: Connect to a Real LLM
 
-Set your API key and swap the provider:
+Add your provider's API key to a `.env` file in your project root and swap the provider:
 
-```bash
-export OPENAI_API_KEY="sk-..."
+```
+OPENAI_API_KEY=sk-...
+# or ANTHROPIC_API_KEY, GEMINI_API_KEY — whichever provider you use
 ```
 
 ```python
