@@ -1,5 +1,7 @@
 # Selectools Development Roadmap
 
+An open-source project from [NichevLabs](https://nichevlabs.com).
+
 > **Status Legend**
 >
 > - ✅ **Implemented** - Merged and available in latest release
@@ -195,15 +197,20 @@ v0.16.5  ✅ Design Patterns & Code Quality
          → Async observers → Gemini 3.x thought signatures → Hooks deprecation → ADRs
 
 v0.17.0  🟡 Multi-Agent Orchestration
-         AgentGraph → GraphState → Checkpointing → Parallel nodes → SupervisorAgent → MCP
+         AgentGraph → GraphState → Checkpointing → Parallel nodes → SupervisorAgent
 
-v0.18.0  🟡 Connector Expansion
+v0.17.1  🟡 Eval Framework
+         EvalSuite → TestCase → EvalRunner → built-in evaluators → HTML report
+
+v0.17.2  🟡 MCP Client/Server
+         MCPClient → mcp_tools() → MCPServer → tool interop
+
+v0.18.0  🟡 Serve & Deploy
+         FastAPI AgentRouter → Flask AgentBlueprint → Playground → Templates → YAML config
+
+v0.19.0  🟡 Connector Expansion
          CSV/JSON/HTML/URL/Markdown loaders → FAISS/Qdrant/pgvector stores
          → Code/search tools → SaaS loaders → GitHub/DB toolbox
-
-v0.19.0  🟡 Ecosystem Parity
-         Observe (trace store, evaluators, export) → Serve (FastAPI, Flask, playground)
-         → Templates → YAML config
 
 v0.20.0  🟡 Polish & Community
          HTML trace viewer → Niche integrations → Tool marketplace
@@ -465,173 +472,106 @@ server.serve(host="0.0.0.0", port=8080)
 | **Checkpointing**           | 🟡 High   | High   | Medium |
 | **Parallel Nodes**          | 🟡 Medium | High   | Medium |
 | **SupervisorAgent**         | 🟡 Medium | High   | Medium |
-| **MCP Client**              | 🟡 Medium | Medium | Medium |
-| **MCP Server**              | 🟡 Low    | Medium | Medium |
+| **MCP Client**              | ⏸️ Moved to v0.17.2 | Medium | Medium |
+| **MCP Server**              | ⏸️ Moved to v0.17.2 | Medium | Medium |
 
 ---
 
-## v0.18.0: Connector Expansion
+## v0.17.1: Eval Framework
 
-Focus: Close the integration gap with LangChain by adding high-demand document loaders, vector stores, and toolbox modules.
+Focus: Built-in evaluation and testing for AI agents — a capability no other framework ships as a library feature.
 
-### Current Inventory
-
-| Category            | Count    | Items                                    |
-| ------------------- | -------- | ---------------------------------------- |
-| Document Loaders    | 4        | text, file, directory, PDF               |
-| Vector Stores       | 4        | Memory, SQLite, Chroma, Pinecone         |
-| Embedding Providers | 4        | OpenAI, Anthropic/Voyage, Gemini, Cohere |
-| Toolbox             | 24 tools | file, web, data, datetime, text          |
-| Rerankers           | 2        | Cohere, Jina                             |
-
-### New Document Loaders
-
-Add to `src/selectools/rag/loaders.py` as new static methods on `DocumentLoader`. Refactor to `loaders/` subpackage with `__init__.py` re-exporting everything to support SaaS loaders as separate files.
-
-| Loader                      | Method                                              | Dependencies                  | Complexity | Why it matters                                        |
-| --------------------------- | --------------------------------------------------- | ----------------------------- | ---------- | ----------------------------------------------------- |
-| **CSV**                     | `from_csv(path, content_columns, metadata_columns)` | stdlib `csv`                  | Small      | Most common structured data format                    |
-| **JSON/JSONL**              | `from_json(path, text_field)` / `from_jsonl(...)`   | stdlib `json`                 | Small      | Standard for API responses, logs, datasets            |
-| **HTML**                    | `from_html(path_or_content, extract_text=True)`     | `beautifulsoup4` (optional)   | Small      | Web scraping output, saved pages                      |
-| **URL**                     | `from_url(url, timeout=30)`                         | `requests` + `beautifulsoup4` | Small      | Direct URL-to-document (2nd most requested after PDF) |
-| **Markdown w/ Frontmatter** | `from_markdown(path)`                               | `pyyaml` (optional)           | Small      | Static sites, docs, wikis                             |
-| **Google Drive**            | `from_google_drive(file_id, credentials)`           | `google-api-python-client`    | Medium     | Most-used enterprise doc platform                     |
-| **Notion**                  | `from_notion(page_id, api_key)`                     | `requests` (existing)         | Medium     | 2nd most-requested SaaS loader                        |
-| **GitHub**                  | `from_github(repo, path, branch, token)`            | `requests` (existing)         | Small      | Developer docs and code                               |
-| **SQL Database**            | `from_sql(connection_string, query)`                | `sqlalchemy` (optional)       | Medium     | Enterprise data in databases                          |
-
-### New Vector Stores
-
-New files in `src/selectools/rag/stores/`. Each follows the same pattern as `chroma.py`: inherit `VectorStore`, implement `add_documents`, `search`, `delete`, `clear`, lazy-import the dependency. Register in `VectorStore.create()` factory.
-
-| Store            | File          | Dependencies       | Complexity | Why it matters                                                            |
-| ---------------- | ------------- | ------------------ | ---------- | ------------------------------------------------------------------------- |
-| **FAISS**        | `faiss.py`    | `faiss-cpu`        | Medium     | De facto standard for local high-perf vector search (millions of vectors) |
-| **Qdrant**       | `qdrant.py`   | `qdrant-client`    | Medium     | Fastest-growing vector DB, excellent filtering, cloud + self-hosted       |
-| **pgvector**     | `pgvector.py` | `psycopg2-binary`  | Medium     | Use existing PostgreSQL — no new database needed                          |
-| **Weaviate**     | `weaviate.py` | `weaviate-client`  | Medium     | Popular cloud vector DB with GraphQL API                                  |
-| **Redis Vector** | `redis.py`    | `redis` (existing) | Medium     | Leverages existing Redis connection from `cache_redis.py`                 |
-
-### New Toolbox Modules
-
-New files in `src/selectools/toolbox/`. Follow `@tool` decorator pattern, register in `get_all_tools()` and `get_tools_by_category()`.
-
-| Module                | Tools                                                           | Dependencies                   | Complexity   | Why it matters                        |
-| --------------------- | --------------------------------------------------------------- | ------------------------------ | ------------ | ------------------------------------- |
-| **`code_tools.py`**   | `execute_python`, `execute_shell`                               | stdlib `subprocess`            | Medium       | #1 most-used tool in agent frameworks |
-| **`search_tools.py`** | `google_search`, `duckduckgo_search`                            | `duckduckgo_search` (optional) | Small-Medium | #2 most-used tool category            |
-| **`github_tools.py`** | `create_issue`, `list_issues`, `create_pr`, `get_file_contents` | `requests` (existing)          | Medium       | Developer workflow automation         |
-| **`db_tools.py`**     | `query_database`, `list_tables`, `describe_table`               | `sqlalchemy` (optional)        | Medium       | Enterprise data access                |
-
-### Dependency Management
-
-All new dependencies are optional and lazy-imported. Add to `pyproject.toml`:
-
-```toml
-[project.optional-dependencies]
-rag = [
-    # existing deps ...
-    "beautifulsoup4>=4.12.0",
-    "faiss-cpu>=1.7.0",
-    "qdrant-client>=1.7.0",
-    "psycopg2-binary>=2.9.0",
-    "weaviate-client>=4.0.0",
-]
-```
-
-Individual stores/loaders remain installable a la carte: `pip install selectools faiss-cpu` works without the full `[rag]` group.
-
-| Feature                    | Status    | Impact | Effort |
-| -------------------------- | --------- | ------ | ------ |
-| **CSV/JSON/JSONL Loaders** | 🟡 High   | High   | Small  |
-| **HTML/URL Loaders**       | 🟡 High   | High   | Small  |
-| **FAISS Vector Store**     | 🟡 High   | High   | Medium |
-| **Qdrant Vector Store**    | 🟡 Medium | Medium | Medium |
-| **pgvector Store**         | 🟡 Medium | High   | Medium |
-| **Code Execution Tools**   | 🟡 High   | High   | Medium |
-| **Search Tools**           | 🟡 High   | High   | Small  |
-| **SaaS Loaders**           | 🟡 Medium | Medium | Medium |
-| **GitHub/DB Toolbox**      | 🟡 Medium | Medium | Medium |
-
----
-
-## v0.19.0: Ecosystem Parity
-
-Focus: Observability, evaluation, REST API deployment, and templates — closing the gap with LangSmith, LangServe, and LangChain Hub.
-
-### Selectools Observe (Observability & Evaluation)
-
-**Existing head start**: `AgentObserver` (15 events), `AgentTrace` (OTel export), `AuditLogger` (JSONL), `AgentAnalytics`.
-
-**New `src/selectools/observe/` package**:
-
-```
-src/selectools/observe/
-    __init__.py          # Public exports
-    trace_store.py       # TraceStore protocol + InMemory, SQLite, JSONL backends
-    evaluators.py        # Evaluator protocol + built-in evaluators
-    eval_runner.py       # EvalRunner for dataset evaluation
-    export.py            # Export formatters (HTML, CSV, Datadog, Langfuse, OTel)
-    datasets.py          # EvalCase, EvalDataset for test datasets
-```
-
-#### Trace Store
+### EvalSuite
 
 ```python
-class TraceStore(Protocol):
-    def save(self, trace: AgentTrace) -> str: ...
-    def load(self, run_id: str) -> AgentTrace: ...
-    def query(self, filters: TraceFilter) -> List[AgentTrace]: ...
-    def list(self, limit: int, offset: int) -> List[AgentTraceSummary]: ...
+from selectools.evals import EvalSuite, TestCase
+
+suite = EvalSuite(agent=agent, cases=[
+    TestCase(input="Cancel my account", expect_tool="cancel_subscription"),
+    TestCase(input="Check my balance", expect_contains="balance"),
+    TestCase(input="What's 2+2?", expect_output="4"),
+])
+report = suite.run()
+print(report.accuracy)       # 0.95
+print(report.latency_p50)    # 1.2s
+print(report.total_cost)     # $0.003
 ```
 
-Built-in: `InMemoryTraceStore`, `SQLiteTraceStore`, `JSONLTraceStore`.
+### Built-in Evaluators
 
-Auto-collection via `TraceCollectorObserver` (implements `AgentObserver`, auto-saves traces on `on_run_end`).
-
-#### Evaluators
-
-```python
-class Evaluator(Protocol):
-    def evaluate(self, input: str, output: str, reference: Optional[str] = None) -> EvalResult: ...
-
-@dataclass
-class EvalResult:
-    score: float         # 0.0 to 1.0
-    passed: bool
-    reasoning: str
-    evaluator: str
-```
-
-Built-in evaluators:
-
+- `ToolUseEvaluator` — did the agent pick the right tool?
 - `CorrectnessEvaluator` — LLM-as-judge: is the output correct?
-- `RelevanceEvaluator` — LLM-as-judge: is the output relevant to the input?
+- `RelevanceEvaluator` — LLM-as-judge: is the output relevant?
 - `FaithfulnessEvaluator` — RAG-specific: is the output grounded in retrieved documents?
-- `ToolUseEvaluator` — did the agent use the right tools?
 - `LatencyEvaluator` — did the agent respond within the time budget?
 - `CostEvaluator` — did the agent stay within the cost budget?
 
-LLM-based evaluators use the existing `Provider` protocol — any configured provider works.
+### Module Structure
 
-#### Evaluation Runner
-
-```python
-class EvalRunner:
-    def run(self, agent: Agent, dataset: List[EvalCase], evaluators: List[Evaluator]) -> EvalReport: ...
+```
+src/selectools/evals/
+    __init__.py          # Public exports
+    suite.py             # EvalSuite, TestCase
+    evaluators.py        # Evaluator protocol + built-in evaluators
+    report.py            # EvalReport with accuracy, latency, cost, regressions
 ```
 
-Builds on `agent.batch()` for parallel evaluation.
+### Key Differentiator
 
-#### Export Formats
+Every team building agents needs evaluation. Today they either build it from scratch or pay for a SaaS product. Selectools ships it as a library — zero dependencies, runs in your test suite, produces structured reports.
 
-- `export_to_html(traces)` — self-contained HTML report with trace timeline (zero deps, open in browser)
-- `export_to_csv(traces)` — spreadsheet analysis
-- `export_to_datadog(traces)` — Datadog APM format
-- `export_to_langfuse(traces)` — open-source LangSmith alternative
-- `export_to_otel(traces)` — already exists via `AgentTrace.to_otel_spans()`
+| Feature | Status | Impact | Effort |
+|---|---|---|---|
+| **EvalSuite + TestCase** | 🟡 High | High | Medium |
+| **Built-in Evaluators (6)** | 🟡 High | High | Medium |
+| **EvalReport** | 🟡 High | Medium | Small |
+| **HTML Report Export** | 🟡 Medium | Medium | Small |
 
-**Key differentiator vs LangSmith**: Zero SaaS dependency. Self-contained HTML trace viewer. Full evaluation without leaving your codebase.
+---
+
+## v0.17.2: MCP Client/Server
+
+Focus: Model Context Protocol integration for tool interoperability.
+
+### MCP Client
+
+Discover and call tools from any MCP-compliant server:
+
+```python
+from selectools.mcp import MCPClient, mcp_tools
+
+client = MCPClient(server_url="http://localhost:8080")
+tools = mcp_tools(client)   # Returns List[Tool] that proxy to MCP server
+
+agent = Agent(tools=tools + local_tools, provider=provider)
+```
+
+### MCP Server
+
+Expose `@tool` functions as MCP-compliant endpoints:
+
+```python
+from selectools.mcp import MCPServer
+
+server = MCPServer(tools=[search_tool, calculator_tool])
+server.serve(host="0.0.0.0", port=8080)
+```
+
+### Key Differentiator
+
+First-class MCP support lets Selectools agents use any MCP-compatible tool server — massive integration surface area without building individual connectors.
+
+| Feature | Status | Impact | Effort |
+|---|---|---|---|
+| **MCPClient** | 🟡 High | High | Medium |
+| **mcp_tools() adapter** | 🟡 High | High | Small |
+| **MCPServer** | 🟡 Medium | Medium | Medium |
+
+---
+
+## v0.18.0: Serve & Deploy
+
+Focus: REST API deployment, agent templates, and developer experience — going from library to platform.
 
 ### Selectools Serve (REST API Deployment)
 
@@ -719,16 +659,123 @@ from selectools.templates import from_yaml
 agent = from_yaml("agent.yaml")
 ```
 
+### Observability (Trace Store + Export)
+
+**New `src/selectools/observe/` package**:
+
+```
+src/selectools/observe/
+    __init__.py          # Public exports
+    trace_store.py       # TraceStore protocol + InMemory, SQLite, JSONL backends
+    export.py            # Export formatters (HTML, CSV, Datadog, Langfuse, OTel)
+```
+
+```python
+class TraceStore(Protocol):
+    def save(self, trace: AgentTrace) -> str: ...
+    def load(self, run_id: str) -> AgentTrace: ...
+    def query(self, filters: TraceFilter) -> List[AgentTrace]: ...
+    def list(self, limit: int, offset: int) -> List[AgentTraceSummary]: ...
+```
+
+Built-in: `InMemoryTraceStore`, `SQLiteTraceStore`, `JSONLTraceStore`.
+
+Export formats: HTML (self-contained report), CSV, Datadog APM, Langfuse, OTel.
+
 | Feature                     | Status    | Impact | Effort |
 | --------------------------- | --------- | ------ | ------ |
-| **Trace Store**             | 🟡 High   | High   | Medium |
-| **Evaluators + EvalRunner** | 🟡 High   | High   | Medium |
-| **HTML Trace Export**       | 🟡 Medium | High   | Medium |
 | **FastAPI AgentRouter**     | 🟡 High   | High   | Medium |
 | **Flask AgentBlueprint**    | 🟡 Medium | Medium | Small  |
 | **Playground**              | 🟡 Medium | High   | Medium |
+| **Trace Store**             | 🟡 High   | High   | Medium |
+| **HTML Trace Export**       | 🟡 Medium | High   | Medium |
 | **Agent Templates**         | 🟡 Medium | Medium | Small  |
 | **YAML Config**             | 🟡 Low    | Medium | Small  |
+
+---
+
+## v0.19.0: Connector Expansion
+
+Focus: Close the integration gap with LangChain by adding high-demand document loaders, vector stores, and toolbox modules.
+
+### Current Inventory
+
+| Category            | Count    | Items                                    |
+| ------------------- | -------- | ---------------------------------------- |
+| Document Loaders    | 4        | text, file, directory, PDF               |
+| Vector Stores       | 4        | Memory, SQLite, Chroma, Pinecone         |
+| Embedding Providers | 4        | OpenAI, Anthropic/Voyage, Gemini, Cohere |
+| Toolbox             | 24 tools | file, web, data, datetime, text          |
+| Rerankers           | 2        | Cohere, Jina                             |
+
+### New Document Loaders
+
+Add to `src/selectools/rag/loaders.py` as new static methods on `DocumentLoader`. Refactor to `loaders/` subpackage with `__init__.py` re-exporting everything to support SaaS loaders as separate files.
+
+| Loader                      | Method                                              | Dependencies                  | Complexity | Why it matters                                        |
+| --------------------------- | --------------------------------------------------- | ----------------------------- | ---------- | ----------------------------------------------------- |
+| **CSV**                     | `from_csv(path, content_columns, metadata_columns)` | stdlib `csv`                  | Small      | Most common structured data format                    |
+| **JSON/JSONL**              | `from_json(path, text_field)` / `from_jsonl(...)`   | stdlib `json`                 | Small      | Standard for API responses, logs, datasets            |
+| **HTML**                    | `from_html(path_or_content, extract_text=True)`     | `beautifulsoup4` (optional)   | Small      | Web scraping output, saved pages                      |
+| **URL**                     | `from_url(url, timeout=30)`                         | `requests` + `beautifulsoup4` | Small      | Direct URL-to-document (2nd most requested after PDF) |
+| **Markdown w/ Frontmatter** | `from_markdown(path)`                               | `pyyaml` (optional)           | Small      | Static sites, docs, wikis                             |
+| **Google Drive**            | `from_google_drive(file_id, credentials)`           | `google-api-python-client`    | Medium     | Most-used enterprise doc platform                     |
+| **Notion**                  | `from_notion(page_id, api_key)`                     | `requests` (existing)         | Medium     | 2nd most-requested SaaS loader                        |
+| **GitHub**                  | `from_github(repo, path, branch, token)`            | `requests` (existing)         | Small      | Developer docs and code                               |
+| **SQL Database**            | `from_sql(connection_string, query)`                | `sqlalchemy` (optional)       | Medium     | Enterprise data in databases                          |
+
+### New Vector Stores
+
+New files in `src/selectools/rag/stores/`. Each follows the same pattern as `chroma.py`: inherit `VectorStore`, implement `add_documents`, `search`, `delete`, `clear`, lazy-import the dependency. Register in `VectorStore.create()` factory.
+
+| Store            | File          | Dependencies       | Complexity | Why it matters                                                            |
+| ---------------- | ------------- | ------------------ | ---------- | ------------------------------------------------------------------------- |
+| **FAISS**        | `faiss.py`    | `faiss-cpu`        | Medium     | De facto standard for local high-perf vector search (millions of vectors) |
+| **Qdrant**       | `qdrant.py`   | `qdrant-client`    | Medium     | Fastest-growing vector DB, excellent filtering, cloud + self-hosted       |
+| **pgvector**     | `pgvector.py` | `psycopg2-binary`  | Medium     | Use existing PostgreSQL — no new database needed                          |
+| **Weaviate**     | `weaviate.py` | `weaviate-client`  | Medium     | Popular cloud vector DB with GraphQL API                                  |
+| **Redis Vector** | `redis.py`    | `redis` (existing) | Medium     | Leverages existing Redis connection from `cache_redis.py`                 |
+
+### New Toolbox Modules
+
+New files in `src/selectools/toolbox/`. Follow `@tool` decorator pattern, register in `get_all_tools()` and `get_tools_by_category()`.
+
+| Module                | Tools                                                           | Dependencies                   | Complexity   | Why it matters                        |
+| --------------------- | --------------------------------------------------------------- | ------------------------------ | ------------ | ------------------------------------- |
+| **`code_tools.py`**   | `execute_python`, `execute_shell`                               | stdlib `subprocess`            | Medium       | #1 most-used tool in agent frameworks |
+| **`search_tools.py`** | `google_search`, `duckduckgo_search`                            | `duckduckgo_search` (optional) | Small-Medium | #2 most-used tool category            |
+| **`github_tools.py`** | `create_issue`, `list_issues`, `create_pr`, `get_file_contents` | `requests` (existing)          | Medium       | Developer workflow automation         |
+| **`db_tools.py`**     | `query_database`, `list_tables`, `describe_table`               | `sqlalchemy` (optional)        | Medium       | Enterprise data access                |
+
+### Dependency Management
+
+All new dependencies are optional and lazy-imported. Add to `pyproject.toml`:
+
+```toml
+[project.optional-dependencies]
+rag = [
+    # existing deps ...
+    "beautifulsoup4>=4.12.0",
+    "faiss-cpu>=1.7.0",
+    "qdrant-client>=1.7.0",
+    "psycopg2-binary>=2.9.0",
+    "weaviate-client>=4.0.0",
+]
+```
+
+Individual stores/loaders remain installable a la carte: `pip install selectools faiss-cpu` works without the full `[rag]` group.
+
+| Feature                    | Status    | Impact | Effort |
+| -------------------------- | --------- | ------ | ------ |
+| **CSV/JSON/JSONL Loaders** | 🟡 High   | High   | Small  |
+| **HTML/URL Loaders**       | 🟡 High   | High   | Small  |
+| **FAISS Vector Store**     | 🟡 High   | High   | Medium |
+| **Qdrant Vector Store**    | 🟡 Medium | Medium | Medium |
+| **pgvector Store**         | 🟡 Medium | High   | Medium |
+| **Code Execution Tools**   | 🟡 High   | High   | Medium |
+| **Search Tools**           | 🟡 High   | High   | Small  |
+| **SaaS Loaders**           | 🟡 Medium | Medium | Medium |
+| **GitHub/DB Toolbox**      | 🟡 Medium | Medium | Medium |
 
 ---
 
