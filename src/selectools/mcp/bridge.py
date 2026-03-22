@@ -93,9 +93,14 @@ def mcp_to_tool(
         if hasattr(ann, "idempotentHint"):
             annotations["idempotent"] = ann.idempotentHint
 
-    # Create wrapper function that the Tool will call
+    # Use async function as primary — this allows arun/aexecute to work
+    # natively. For sync agent.run(), Tool.execute() detects is_async=True
+    # and runs the coroutine in an executor via asyncio.run().
+    _original_name = mcp_tool.name
+    _call = call_fn
+
     async def _mcp_call(**kwargs: Any) -> str:
-        result = await call_fn(name=mcp_tool.name, arguments=kwargs)
+        result = await _call(name=_original_name, arguments=kwargs)
         return str(result)
 
     tool = Tool(
