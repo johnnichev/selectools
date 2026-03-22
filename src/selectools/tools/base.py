@@ -121,6 +121,7 @@ class Tool:
         streaming: bool = False,
         screen_output: bool = False,
         terminal: bool = False,
+        _skip_validation: bool = False,
     ):
         """
         Initialize a new Tool.
@@ -155,7 +156,8 @@ class Tool:
         self.terminal = terminal
 
         # Validate tool definition at registration time
-        self._validate_tool_definition()
+        if not _skip_validation:
+            self._validate_tool_definition()
 
     def _validate_tool_definition(self) -> None:
         """

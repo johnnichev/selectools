@@ -199,7 +199,7 @@ v0.16.5  ✅ Design Patterns & Code Quality
 v0.17.0  ✅ Eval Framework
          39 evaluators → A/B testing → snapshots → regression → HTML/JUnit → CI → templates
 
-v0.17.1  🟡 MCP Client/Server
+v0.17.1  ✅ MCP Client/Server
          MCPClient → mcp_tools() → MCPServer → MultiMCPClient → tool interop
 
 v0.17.2  🟡 Multi-Agent Orchestration
@@ -392,7 +392,7 @@ result = graph.run("Write a blog post about AI agents")
 
 ---
 
-## v0.17.1: MCP Client/Server
+## v0.17.1: MCP Client/Server ✅
 
 Focus: Model Context Protocol integration for tool interoperability.
 

@@ -10,9 +10,27 @@ An open-source project from **[NichevLabs](https://nichevlabs.com)**.
 
 **Production-ready AI agents with tool calling, RAG, and hybrid search.** Connect LLMs to your Python functions, embed and search your documents with vector + keyword fusion, stream responses in real time, and dynamically manage tools at runtime. Works with OpenAI, Anthropic, Gemini, and Ollama. Tracks costs automatically.
 
-## What's New in v0.17.0
+## What's New in v0.17.1
 
-**Built-in Eval Framework** — 39 evaluators, A/B testing, regression detection, and more. No separate install needed.
+**MCP Client/Server** — connect to any MCP-compatible tool server. `pip install selectools[mcp]`
+
+```python
+from selectools.mcp import mcp_tools, MCPServerConfig
+
+with mcp_tools(MCPServerConfig(command="python", args=["server.py"])) as tools:
+    agent = Agent(provider=provider, tools=tools, config=config)
+    result = agent.run("Search for Python tutorials")
+```
+
+- **MCPClient** — stdio + HTTP transport, circuit breaker, retry, tool caching
+- **MultiMCPClient** — multiple servers, graceful degradation, name prefixing
+- **MCPServer** — expose `@tool` functions as MCP server
+- All selectools features work on MCP tools: traces, guardrails, evals, policies
+
+<details>
+<summary><strong>v0.17.0: Built-in Eval Framework</strong></summary>
+
+**39 evaluators**, A/B testing, regression detection, and more. No separate install needed.
 
 ```python
 from selectools.evals import EvalSuite, TestCase
@@ -38,6 +56,8 @@ report.to_html("report.html")
 - **Cost Estimation** — `suite.estimate_cost()` before running
 - **History Tracking** — `HistoryStore` with trend analysis
 - **340 eval tests**, zero external dependencies
+
+</details>
 
 > Full changelog: [CHANGELOG.md](https://github.com/johnnichev/selectools/blob/main/CHANGELOG.md)
 
@@ -91,6 +111,7 @@ report.to_html("report.html")
 | **Entity Memory** | LLM-based entity extraction with deduplication, LRU pruning, and system prompt injection. |
 | **Knowledge Graph** | Relationship triple extraction with in-memory and SQLite storage and keyword-based querying. |
 | **Cross-Session Knowledge** | Daily logs + persistent facts with auto-registered `remember` tool. |
+| **MCP Integration** | Connect to any MCP tool server (stdio + HTTP). MCPClient, MultiMCPClient, MCPServer. Circuit breaker, retry, graceful degradation. |
 | **Eval Framework** | 39 built-in evaluators (21 deterministic + 18 LLM-as-judge). A/B testing, regression detection, snapshot testing, HTML reports, JUnit XML, CI integration. |
 | **AgentObserver Protocol** | 28-event lifecycle observer with `run_id`/`call_id` correlation. Built-in `LoggingObserver` for structured JSON logs. |
 | **Production Hardened** | Retries with backoff, per-tool timeouts, iteration caps, cost warnings, observability hooks + observers. |
@@ -116,10 +137,10 @@ report.to_html("report.html")
 - **Entity Memory**: LLM-based named entity extraction and tracking
 - **Knowledge Graph**: Triple extraction with in-memory and SQLite storage
 - **Cross-Session Knowledge**: Daily logs + persistent memory with `remember` tool
-- **40 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, eval framework, and more
+- **42 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, eval framework, and more
 - **Built-in Eval Framework**: 39 evaluators (21 deterministic + 18 LLM-as-judge), A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing
 - **AgentObserver Protocol**: 28 lifecycle events with `run_id` correlation, `LoggingObserver`, OTel export
-- **1960 Tests**: Unit, integration, regression, and E2E with real API calls
+- **1993 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 
@@ -127,7 +148,8 @@ report.to_html("report.html")
 pip install selectools                    # Core + basic RAG
 pip install selectools[rag]               # + Chroma, Pinecone, Voyage, Cohere, PyPDF
 pip install selectools[cache]             # + Redis cache
-pip install selectools[rag,cache]         # Everything
+pip install selectools[mcp]               # + MCP client/server
+pip install selectools[rag,cache,mcp]    # Everything
 ```
 
 Add your provider's API key to a `.env` file in your project root:
@@ -687,7 +709,7 @@ pytest tests/ -x -q          # All tests
 pytest tests/ -k "not e2e"   # Skip E2E (no API keys needed)
 ```
 
-1960 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, and E2E integration.
+1993 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, and E2E integration.
 
 ## License
 

@@ -140,6 +140,18 @@ class GraphExecutionError(SelectoolsError):
         super().__init__(message)
 
 
+class MCPError(SelectoolsError):
+    """Base class for MCP-related errors."""
+
+
+class MCPConnectionError(MCPError):
+    """Raised when an MCP server connection fails."""
+
+
+class MCPToolError(MCPError):
+    """Raised when an MCP tool call fails."""
+
+
 __all__ = [
     "SelectoolsError",
     "ToolValidationError",
@@ -147,4 +159,7 @@ __all__ = [
     "ProviderConfigurationError",
     "MemoryLimitExceededError",
     "GraphExecutionError",
+    "MCPError",
+    "MCPConnectionError",
+    "MCPToolError",
 ]
