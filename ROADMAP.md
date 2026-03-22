@@ -199,11 +199,11 @@ v0.16.5  ✅ Design Patterns & Code Quality
 v0.17.0  ✅ Eval Framework
          39 evaluators → A/B testing → snapshots → regression → HTML/JUnit → CI → templates
 
-v0.17.1  🟡 Multi-Agent Orchestration
-         AgentGraph → GraphState → Checkpointing → Parallel nodes → SupervisorAgent
+v0.17.1  🟡 MCP Client/Server
+         MCPClient → mcp_tools() → MCPServer → MultiMCPClient → tool interop
 
-v0.17.2  🟡 MCP Client/Server
-         MCPClient → mcp_tools() → MCPServer → tool interop
+v0.17.2  🟡 Multi-Agent Orchestration
+         AgentGraph → GraphState → Checkpointing → Parallel nodes → SupervisorAgent
 
 v0.18.0  🟡 Serve & Deploy
          FastAPI AgentRouter → Flask AgentBlueprint → Playground → Templates → YAML config
@@ -310,7 +310,7 @@ Every team building agents needs evaluation. Today they either build it from scr
 
 ---
 
-## v0.17.1: Multi-Agent Orchestration
+## v0.17.2: Multi-Agent Orchestration
 
 Focus: DAG-based multi-agent workflows that are simpler and more Pythonic than LangGraph.
 
@@ -392,7 +392,7 @@ result = graph.run("Write a blog post about AI agents")
 
 ---
 
-## v0.17.2: MCP Client/Server
+## v0.17.1: MCP Client/Server
 
 Focus: Model Context Protocol integration for tool interoperability.
 
