@@ -107,6 +107,8 @@ nav:
     - Advanced Chunking: modules/ADVANCED_CHUNKING.md
     - Embeddings: modules/EMBEDDINGS.md
     - Vector Stores: modules/VECTOR_STORES.md
+  - Evaluation:
+    - Eval Framework: modules/EVALS.md
   - Security:
     - Guardrails: modules/GUARDRAILS.md
     - Audit Logging: modules/AUDIT.md

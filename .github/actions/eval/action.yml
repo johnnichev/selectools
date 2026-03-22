@@ -1,0 +1,176 @@
+name: "Selectools Eval"
+description: "Run selectools eval suite and post results as a PR comment"
+branding:
+  icon: "check-circle"
+  color: "blue"
+
+inputs:
+  cases:
+    description: "Path to test cases file (JSON/YAML)"
+    required: true
+  provider:
+    description: "Provider: local, openai, anthropic, gemini, ollama"
+    default: "local"
+  model:
+    description: "Model name (optional, uses provider default)"
+    required: false
+  name:
+    description: "Suite name"
+    default: "eval"
+  concurrency:
+    description: "Max parallel cases"
+    default: "1"
+  baseline-dir:
+    description: "Baseline directory for regression detection"
+    default: ""
+  html-report:
+    description: "Path to write HTML report"
+    default: ""
+  junit-report:
+    description: "Path to write JUnit XML report"
+    default: ""
+  python-version:
+    description: "Python version"
+    default: "3.13"
+  post-comment:
+    description: "Post results as PR comment (true/false)"
+    default: "true"
+
+outputs:
+  accuracy:
+    description: "Eval accuracy (0.0 - 1.0)"
+    value: ${{ steps.run-eval.outputs.accuracy }}
+  pass-count:
+    description: "Number of passing cases"
+    value: ${{ steps.run-eval.outputs.pass_count }}
+  fail-count:
+    description: "Number of failing cases"
+    value: ${{ steps.run-eval.outputs.fail_count }}
+  regression:
+    description: "Whether regressions were detected"
+    value: ${{ steps.run-eval.outputs.regression }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install selectools
+      shell: bash
+      run: pip install selectools
+
+    - name: Run eval suite
+      id: run-eval
+      shell: bash
+      run: |
+        set +e
+
+        ARGS="run ${{ inputs.cases }} --name ${{ inputs.name }} --provider ${{ inputs.provider }} --concurrency ${{ inputs.concurrency }} --json /tmp/eval-results.json --verbose"
+
+        if [ -n "${{ inputs.model }}" ]; then
+          ARGS="$ARGS --model ${{ inputs.model }}"
+        fi
+        if [ -n "${{ inputs.html-report }}" ]; then
+          ARGS="$ARGS --html ${{ inputs.html-report }}"
+        fi
+        if [ -n "${{ inputs.junit-report }}" ]; then
+          ARGS="$ARGS --junit ${{ inputs.junit-report }}"
+        fi
+        if [ -n "${{ inputs.baseline-dir }}" ]; then
+          ARGS="$ARGS --baseline ${{ inputs.baseline-dir }}"
+        fi
+
+        python -m selectools.evals $ARGS
+        EXIT_CODE=$?
+
+        # Parse JSON results for outputs
+        if [ -f /tmp/eval-results.json ]; then
+          ACCURACY=$(python -c "import json; d=json.load(open('/tmp/eval-results.json')); print(d['summary']['accuracy'])")
+          PASS_COUNT=$(python -c "import json; d=json.load(open('/tmp/eval-results.json')); print(d['summary']['pass'])")
+          FAIL_COUNT=$(python -c "import json; d=json.load(open('/tmp/eval-results.json')); print(d['summary']['fail'])")
+          echo "accuracy=$ACCURACY" >> $GITHUB_OUTPUT
+          echo "pass_count=$PASS_COUNT" >> $GITHUB_OUTPUT
+          echo "fail_count=$FAIL_COUNT" >> $GITHUB_OUTPUT
+        fi
+
+        if [ $EXIT_CODE -ne 0 ]; then
+          echo "regression=true" >> $GITHUB_OUTPUT
+        else
+          echo "regression=false" >> $GITHUB_OUTPUT
+        fi
+
+        exit $EXIT_CODE
+
+    - name: Post PR comment
+      if: inputs.post-comment == 'true' && github.event_name == 'pull_request' && always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          let data;
+          try {
+            data = JSON.parse(fs.readFileSync('/tmp/eval-results.json', 'utf8'));
+          } catch (e) {
+            console.log('No eval results to post');
+            return;
+          }
+
+          const s = data.summary;
+          const accPct = (s.accuracy * 100).toFixed(1);
+          const accEmoji = s.accuracy >= 0.9 ? '🟢' : s.accuracy >= 0.7 ? '🟡' : '🔴';
+
+          let failDetails = '';
+          const failures = data.cases.filter(c => c.verdict === 'fail' || c.verdict === 'error');
+          if (failures.length > 0) {
+            const rows = failures.slice(0, 10).map(c => {
+              const issues = c.failures.map(f => f.message).join('; ') || c.error || '';
+              return `| ${c.name} | \`${c.verdict}\` | ${issues.substring(0, 100)} |`;
+            }).join('\n');
+            failDetails = `\n\n<details><summary>Failed cases (${failures.length})</summary>\n\n| Case | Verdict | Issue |\n|---|---|---|\n${rows}\n\n</details>`;
+          }
+
+          const body = `## ${accEmoji} Eval Report: \`${data.metadata.suite_name}\`
+
+          | Metric | Value |
+          |---|---|
+          | **Accuracy** | **${accPct}%** (${s.pass} pass, ${s.fail} fail, ${s.error} error) |
+          | **Latency** | p50: ${s.latency_p50.toFixed(0)}ms, p95: ${s.latency_p95.toFixed(0)}ms |
+          | **Cost** | $${s.total_cost.toFixed(6)} ($${s.cost_per_case.toFixed(6)}/case) |
+          | **Tokens** | ${s.total_tokens.toLocaleString()} |
+          | **Model** | ${data.metadata.model} |
+          ${failDetails}
+
+          <sub>Generated by <a href="https://github.com/johnnichev/selectools">Selectools Eval</a> — an open-source project from <a href="https://nichevlabs.com">NichevLabs</a></sub>`;
+
+          // Find and update existing comment or create new
+          const comments = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          const existing = comments.data.find(c => c.body.includes('Eval Report:'));
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body: body,
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body,
+            });
+          }
+
+    - name: Upload HTML report
+      if: inputs.html-report != '' && always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: eval-report
+        path: ${{ inputs.html-report }}
