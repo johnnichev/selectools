@@ -137,7 +137,8 @@ print(result.reasoning)       # Why the agent chose get_weather
 | **Knowledge Graph** | Relationship triple extraction with in-memory and SQLite storage |
 | **Cross-Session Knowledge** | Daily logs + persistent facts with auto-registered `remember` tool |
 | **AgentObserver Protocol** | 25-event lifecycle observer with run/call ID correlation and OTel export |
-| **1620 Tests** | Unit, integration, regression, and E2E |
+| **Eval Framework** | 22 built-in evaluators, A/B testing, regression detection, HTML reports, JUnit XML |
+| **1758 Tests** | Unit, integration, regression, and E2E |
 
 ---
 
@@ -166,11 +167,14 @@ print(result.reasoning)       # Why the agent chose get_weather
     14. **[Security](modules/SECURITY.md)** — Tool output screening and coherence checking
     15. **[Error Handling](modules/EXCEPTIONS.md)** — Custom exception hierarchy
 
+!!! abstract "Evaluation"
+    16. **[Eval Framework](modules/EVALS.md)** — 22 built-in evaluators, A/B testing, regression detection, snapshot testing
+
 !!! abstract "Memory & Persistence"
-    16. **[Sessions](modules/SESSIONS.md)** — Persistent session storage with 3 backends
-    17. **[Entity Memory](modules/ENTITY_MEMORY.md)** — Named entity extraction and tracking
-    18. **[Knowledge Graph](modules/KNOWLEDGE_GRAPH.md)** — Relationship triple extraction
-    19. **[Knowledge Memory](modules/KNOWLEDGE.md)** — Cross-session durable memory
+    17. **[Sessions](modules/SESSIONS.md)** — Persistent session storage with 3 backends
+    18. **[Entity Memory](modules/ENTITY_MEMORY.md)** — Named entity extraction and tracking
+    19. **[Knowledge Graph](modules/KNOWLEDGE_GRAPH.md)** — Relationship triple extraction
+    20. **[Knowledge Memory](modules/KNOWLEDGE.md)** — Cross-session durable memory
 
 ---
 
@@ -209,7 +213,7 @@ Loop continues or returns AgentResult (.parsed, .trace, .reasoning)
 [:fontawesome-brands-python: PyPI Package](https://pypi.org/project/selectools/){ .md-button }
 [:fontawesome-brands-github: GitHub Repository](https://github.com/johnnichev/selectools){ .md-button }
 [:material-notebook: Getting Started Notebook](https://github.com/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb){ .md-button }
-[:material-code-tags: 38 Example Scripts](https://github.com/johnnichev/selectools/tree/main/examples){ .md-button }
+[:material-code-tags: 39 Example Scripts](https://github.com/johnnichev/selectools/tree/main/examples){ .md-button }
 
 ---
 

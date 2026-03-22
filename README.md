@@ -14,7 +14,7 @@ An open-source project from **[NichevLabs](https://nichevlabs.com)**.
 **Cleanup release** — Removed unused CLI module, completed README example table (28-38), fixed stale doc counts.
 
 - **CLI removed** — `selectools` console script entry point removed (unused, flagged by package safety scanners)
-- **1620 tests** across unit, integration, regression, and E2E
+- **1758 tests** across unit, integration, regression, and E2E
 
 > Full changelog: [CHANGELOG.md](https://github.com/johnnichev/selectools/blob/main/CHANGELOG.md)
 
@@ -68,6 +68,7 @@ An open-source project from **[NichevLabs](https://nichevlabs.com)**.
 | **Entity Memory** | LLM-based entity extraction with deduplication, LRU pruning, and system prompt injection. |
 | **Knowledge Graph** | Relationship triple extraction with in-memory and SQLite storage and keyword-based querying. |
 | **Cross-Session Knowledge** | Daily logs + persistent facts with auto-registered `remember` tool. |
+| **Eval Framework** | 22 built-in evaluators (12 deterministic + 10 LLM-as-judge). A/B testing, regression detection, snapshot testing, HTML reports, JUnit XML, CI integration. |
 | **AgentObserver Protocol** | 25-event lifecycle observer with `run_id`/`call_id` correlation. Built-in `LoggingObserver` for structured JSON logs. |
 | **Production Hardened** | Retries with backoff, per-tool timeouts, iteration caps, cost warnings, observability hooks + observers. |
 | **Library-First** | Not a framework. No magic globals, no hidden state. Use as much or as little as you need. |
@@ -92,9 +93,10 @@ An open-source project from **[NichevLabs](https://nichevlabs.com)**.
 - **Entity Memory**: LLM-based named entity extraction and tracking
 - **Knowledge Graph**: Triple extraction with in-memory and SQLite storage
 - **Cross-Session Knowledge**: Daily logs + persistent memory with `remember` tool
-- **38 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, and more
+- **39 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, eval framework, and more
+- **Built-in Eval Framework**: 22 evaluators (12 deterministic + 10 LLM-as-judge), A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing
 - **AgentObserver Protocol**: 25 lifecycle events with `run_id` correlation, `LoggingObserver`, OTel export
-- **1620 Tests**: Unit, integration, regression, and E2E with real API calls
+- **1758 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 
@@ -662,7 +664,7 @@ pytest tests/ -x -q          # All tests
 pytest tests/ -k "not e2e"   # Skip E2E (no API keys needed)
 ```
 
-1620 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, and E2E integration.
+1758 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, and E2E integration.
 
 ## License
 

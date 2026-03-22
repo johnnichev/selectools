@@ -548,6 +548,22 @@ Single source of truth for 146 models:
          ├─→ pricing.py
          │    └─→ models.py
          │
+         ├─→ evals/
+         │    ├─→ suite.py (EvalSuite — orchestration)
+         │    │    └─→ agent/core.py (Agent._clone_for_isolation)
+         │    ├─→ evaluators.py (12 deterministic evaluators)
+         │    ├─→ llm_evaluators.py (10 LLM-as-judge evaluators)
+         │    │    └─→ providers/base.py (Provider.complete)
+         │    ├─→ report.py (EvalReport — stats, export)
+         │    ├─→ pairwise.py (PairwiseEval — A/B comparison)
+         │    ├─→ snapshot.py (SnapshotStore — Jest-style)
+         │    ├─→ regression.py (BaselineStore)
+         │    ├─→ generator.py (synthetic test case generation)
+         │    ├─→ badge.py (SVG badge generation)
+         │    ├─→ html.py (interactive HTML report)
+         │    ├─→ junit.py (JUnit XML for CI)
+         │    └─→ serve.py (live browser dashboard)
+         │
          └─→ models.py (Model registry)
 ```
 
@@ -556,6 +572,7 @@ Single source of truth for 146 models:
 - **Core modules** (`types`, `tools`, `agent`) have minimal dependencies
 - **Providers** depend only on core modules and their SDK
 - **RAG system** is self-contained, depends on `agent` only for `RAGAgent`
+- **Eval framework** depends on `agent` (for `_clone_for_isolation`) and `types` (for `Message`, `AgentResult`)
 - **Optional dependencies** (ChromaDB, Pinecone, etc.) are lazy-loaded
 
 ---
