@@ -2,7 +2,7 @@
 
 **Added in:** v0.17.0
 
-Built-in agent evaluation with 22 evaluators, regression detection, and CI integration. No separate install, no SaaS account, no external dependencies.
+Built-in agent evaluation with 39 evaluators, regression detection, and CI integration. No separate install, no SaaS account, no external dependencies.
 
 ---
 

@@ -874,7 +874,7 @@ Output:
 |---|---|---|
 | **Correlation** | Manual (closures, thread-local) | Built-in `run_id` + `call_id` |
 | **Multiple consumers** | One callback per event | Multiple observers |
-| **Event coverage** | 8 events | 25 events (including batch, fallback, retry, memory) |
+| **Event coverage** | 8 events | 28 events (including batch, fallback, retry, memory) |
 | **Type safety** | Dict keys are strings | Protocol methods with signatures |
 | **Use case** | Quick debugging, simple logging | Production observability (Langfuse, OTel, Datadog) |
 
