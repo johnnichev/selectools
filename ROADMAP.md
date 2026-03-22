@@ -202,7 +202,7 @@ v0.17.0  ✅ Eval Framework
 v0.17.1  ✅ MCP Client/Server
          MCPClient → mcp_tools() → MCPServer → MultiMCPClient → tool interop
 
-v0.17.3  🟡 Agent Runtime Controls
+v0.17.3  ✅ Agent Runtime Controls
          Token budget → Cancellation → Cost attribution → Structured results → Approval gate → SimpleStepObserver
 
 v0.17.4  🟡 Agent Intelligence
