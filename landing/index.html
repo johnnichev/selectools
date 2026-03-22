@@ -237,9 +237,96 @@ result = agent.run(<span class="text-green-400">"Find our refund policy"</span>)
           <p class="text-sm text-slate-400">Files, web, data, datetime, text — ready to use out of the box</p>
         </div>
         <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition">
-          <div class="text-2xl mb-3">&#9989;</div>
-          <h3 class="font-semibold mb-1">1620 Tests</h3>
-          <p class="text-sm text-slate-400">Unit, integration, regression, and E2E — production hardened</p>
+          <div class="text-2xl mb-3">&#128202;</div>
+          <h3 class="font-semibold mb-1">22 Eval Evaluators</h3>
+          <p class="text-sm text-slate-400">Built-in agent testing: tool use, correctness, safety, LLM-as-judge, regression detection</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Eval Framework -->
+  <section class="py-20 px-6 border-t border-slate-800" id="eval">
+    <div class="max-w-6xl mx-auto">
+      <h2 class="text-3xl font-bold mb-4 text-center">Built-in Agent Evaluation</h2>
+      <p class="text-slate-400 text-center mb-14 max-w-2xl mx-auto">The only agent framework with a built-in eval suite. No separate install, no SaaS account, no external dependencies. 22 evaluators out of the box.</p>
+      <div class="grid lg:grid-cols-2 gap-8">
+        <div class="fade-in">
+          <div class="code-block rounded-xl border border-slate-700 overflow-hidden">
+            <div class="flex items-center gap-2 px-4 py-3 border-b border-slate-700">
+              <div class="w-3 h-3 rounded-full bg-red-500/80"></div>
+              <div class="w-3 h-3 rounded-full bg-yellow-500/80"></div>
+              <div class="w-3 h-3 rounded-full bg-green-500/80"></div>
+              <span class="ml-2 text-xs text-slate-500 font-mono">test_agent.py</span>
+            </div>
+            <pre class="p-6 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="text-purple-400">from</span> <span class="text-blue-300">selectools.evals</span> <span class="text-purple-400">import</span> EvalSuite, TestCase
+
+suite = <span class="text-yellow-300">EvalSuite</span>(agent=agent, cases=[
+    <span class="text-yellow-300">TestCase</span>(
+        input=<span class="text-green-400">"Cancel my subscription"</span>,
+        expect_tool=<span class="text-green-400">"cancel_sub"</span>,
+        expect_contains=<span class="text-green-400">"cancelled"</span>,
+        expect_no_pii=<span class="text-orange-400">True</span>,
+    ),
+    <span class="text-yellow-300">TestCase</span>(
+        input=<span class="text-green-400">"What's my balance?"</span>,
+        expect_tool=<span class="text-green-400">"check_balance"</span>,
+        expect_latency_ms_lte=<span class="text-orange-400">500</span>,
+        expect_cost_usd_lte=<span class="text-orange-400">0.01</span>,
+    ),
+])
+
+report = suite.<span class="text-yellow-300">run</span>()
+<span class="text-purple-400">print</span>(report.accuracy)     <span class="text-slate-500"># 1.0</span>
+<span class="text-purple-400">print</span>(report.latency_p50)  <span class="text-slate-500"># 142ms</span>
+<span class="text-purple-400">print</span>(report.total_cost)   <span class="text-slate-500"># $0.002</span>
+
+report.<span class="text-yellow-300">to_html</span>(<span class="text-green-400">"report.html"</span>)</code></pre>
+          </div>
+        </div>
+        <div class="fade-in flex flex-col justify-center gap-4">
+          <div class="code-block rounded-lg p-5 border border-slate-700">
+            <h3 class="text-sm font-semibold text-brand-cyan mb-3">12 Deterministic Evaluators</h3>
+            <div class="flex flex-wrap gap-2 text-xs">
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">ToolUse</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Contains</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Output</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Structured</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Performance</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">JSON</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Length</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">StartsWith</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">EndsWith</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">PII Leak</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Injection</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Custom</span>
+            </div>
+          </div>
+          <div class="code-block rounded-lg p-5 border border-slate-700">
+            <h3 class="text-sm font-semibold text-brand-cyan mb-3">10 LLM-as-Judge Evaluators</h3>
+            <div class="flex flex-wrap gap-2 text-xs">
+              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Correctness</span>
+              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Relevance</span>
+              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Faithfulness</span>
+              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Hallucination</span>
+              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Toxicity</span>
+              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Coherence</span>
+              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Completeness</span>
+              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Bias</span>
+              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Summary</span>
+              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Custom Rubric</span>
+            </div>
+          </div>
+          <div class="code-block rounded-lg p-5 border border-slate-700">
+            <h3 class="text-sm font-semibold text-brand-cyan mb-3">Infrastructure</h3>
+            <div class="text-xs text-slate-400 space-y-1">
+              <div>Interactive HTML report with charts and filtering</div>
+              <div>JUnit XML for CI (GitHub Actions, Jenkins)</div>
+              <div>Regression detection with baseline comparison</div>
+              <div>Dataset loading from JSON/YAML files</div>
+              <div>GitHub Action with automatic PR comments</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -294,6 +381,11 @@ result = agent.run(<span class="text-green-400">"Find our refund policy"</span>)
               <td class="px-6 py-3 text-slate-300">Reasoning visibility</td>
               <td class="px-6 py-3 text-green-400">result.reasoning</td>
               <td class="px-6 py-3 text-slate-500">Not available</td>
+            </tr>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-6 py-3 text-slate-300">Agent evaluation</td>
+              <td class="px-6 py-3 text-green-400">Built-in (22 evaluators)</td>
+              <td class="px-6 py-3 text-slate-500">LangSmith (paid) or DeepEval (separate)</td>
             </tr>
             <tr class="comparison-row">
               <td class="px-6 py-3 text-slate-300">Community</td>
