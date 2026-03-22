@@ -113,7 +113,8 @@ report.to_html("report.html")
 | **Cross-Session Knowledge** | Daily logs + persistent facts with auto-registered `remember` tool. |
 | **MCP Integration** | Connect to any MCP tool server (stdio + HTTP). MCPClient, MultiMCPClient, MCPServer. Circuit breaker, retry, graceful degradation. |
 | **Eval Framework** | 39 built-in evaluators (21 deterministic + 18 LLM-as-judge). A/B testing, regression detection, snapshot testing, HTML reports, JUnit XML, CI integration. |
-| **AgentObserver Protocol** | 28-event lifecycle observer with `run_id`/`call_id` correlation. Built-in `LoggingObserver` for structured JSON logs. |
+| **AgentObserver Protocol** | 31-event lifecycle observer with `run_id`/`call_id` correlation. Built-in `LoggingObserver` + `SimpleStepObserver`. |
+| **Runtime Controls** | Token/cost budget limits, cooperative cancellation, per-tool approval gates, model switching per iteration. |
 | **Production Hardened** | Retries with backoff, per-tool timeouts, iteration caps, cost warnings, observability hooks + observers. |
 | **Library-First** | Not a framework. No magic globals, no hidden state. Use as much or as little as you need. |
 
@@ -136,11 +137,14 @@ report.to_html("report.html")
 - **Persistent Sessions**: 3 backends (JSON file, SQLite, Redis) with TTL
 - **Entity Memory**: LLM-based named entity extraction and tracking
 - **Knowledge Graph**: Triple extraction with in-memory and SQLite storage
-- **Cross-Session Knowledge**: Daily logs + persistent memory with `remember` tool
+- **Cross-Session Knowledge**: Daily logs + persistent memory with `remember` tool, pluggable stores (File, SQLite), importance scoring, TTL
+- **Token Budget & Cancellation**: `max_total_tokens`, `max_cost_usd` hard limits; `CancellationToken` for cooperative stopping
+- **Token Estimation**: `estimate_run_tokens()` for pre-execution budget checks
+- **Model Switching**: `model_selector` callback for per-iteration model selection
 - **42 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, eval framework, and more
 - **Built-in Eval Framework**: 39 evaluators (21 deterministic + 18 LLM-as-judge), A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing
-- **AgentObserver Protocol**: 28 lifecycle events with `run_id` correlation, `LoggingObserver`, OTel export
-- **1993 Tests**: Unit, integration, regression, and E2E with real API calls
+- **AgentObserver Protocol**: 31 lifecycle events with `run_id` correlation, `LoggingObserver`, `SimpleStepObserver`, OTel export
+- **2082 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 
@@ -709,7 +713,7 @@ pytest tests/ -x -q          # All tests
 pytest tests/ -k "not e2e"   # Skip E2E (no API keys needed)
 ```
 
-1993 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, and E2E integration.
+2082 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, and E2E integration.
 
 ## License
 

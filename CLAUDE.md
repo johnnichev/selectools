@@ -58,8 +58,8 @@ src/selectools/
 ├── models.py                # 146 model registry with pricing (single source of truth)
 ├── pricing.py               # Derives pricing from models.py
 ├── usage.py                 # Token + cost tracking
-├── trace.py                 # AgentTrace, TraceStep (14 step types — see list below)
-├── observer.py              # AgentObserver (28 sync events) + AsyncAgentObserver (25 async events) + LoggingObserver
+├── trace.py                 # AgentTrace, TraceStep (16 step types — see list below)
+├── observer.py              # AgentObserver (31 sync events) + AsyncAgentObserver (28 async events) + LoggingObserver + SimpleStepObserver
 ├── policy.py                # ToolPolicy (allow/review/deny rules)
 ├── parser.py                # ToolCallParser (JSON extraction from LLM responses)
 ├── prompt.py                # PromptBuilder (system prompt generation)
@@ -90,7 +90,7 @@ src/selectools/
     ├── junit.py             # JUnit XML for CI
     └── __main__.py          # CLI: python -m selectools.evals
 
-tests/                       # 1993 tests (unit, integration, regression, E2E)
+tests/                       # 2082 tests (unit, integration, regression, E2E)
 ├── agent/                   # Agent core tests
 ├── providers/               # Provider-specific tests
 ├── rag/                     # RAG pipeline tests
@@ -269,6 +269,8 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 | `memory_summarize` | v0.16.0 | Trimmed messages summarized |
 | `entity_extraction` | v0.16.0 | Entities extracted from conversation |
 | `kg_extraction` | v0.16.0 | Knowledge graph triples extracted |
+| `budget_exceeded` | v0.17.3 | Agent stopped due to token/cost budget limit |
+| `cancelled` | v0.17.3 | Agent run cancelled via CancellationToken |
 
 ## Common Pitfalls (from past bugs)
 

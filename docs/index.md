@@ -136,9 +136,10 @@ print(result.reasoning)       # Why the agent chose get_weather
 | **Entity Memory** | Auto-extract named entities with LRU-pruned registry and context injection |
 | **Knowledge Graph** | Relationship triple extraction with in-memory and SQLite storage |
 | **Cross-Session Knowledge** | Daily logs + persistent facts with auto-registered `remember` tool |
-| **AgentObserver Protocol** | 28-event lifecycle observer with run/call ID correlation and OTel export |
-| **Eval Framework** | 22 built-in evaluators, A/B testing, regression detection, HTML reports, JUnit XML |
-| **1993 Tests** | Unit, integration, regression, and E2E |
+| **AgentObserver Protocol** | 31-event lifecycle observer with run/call ID correlation, `SimpleStepObserver`, and OTel export |
+| **Runtime Controls** | Token/cost budget limits, cooperative cancellation, per-tool approval gates, model switching per iteration |
+| **Eval Framework** | 39 built-in evaluators, A/B testing, regression detection, HTML reports, JUnit XML |
+| **2082 Tests** | Unit, integration, regression, and E2E |
 
 ---
 

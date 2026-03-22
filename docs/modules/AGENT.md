@@ -815,7 +815,7 @@ agent = Agent(
 )
 ```
 
-### All 25 Lifecycle Events
+### All 31 Lifecycle Events
 
 | Event | Scope | Parameters (after `run_id`) | When |
 |---|---|---|---|
@@ -874,7 +874,7 @@ Output:
 |---|---|---|
 | **Correlation** | Manual (closures, thread-local) | Built-in `run_id` + `call_id` |
 | **Multiple consumers** | One callback per event | Multiple observers |
-| **Event coverage** | 8 events | 28 events (including batch, fallback, retry, memory) |
+| **Event coverage** | 8 events | 31 events (including batch, fallback, retry, memory, budget, cancellation, model switch) |
 | **Type safety** | Dict keys are strings | Protocol methods with signatures |
 | **Use case** | Quick debugging, simple logging | Production observability (Langfuse, OTel, Datadog) |
 
@@ -883,7 +883,7 @@ Both systems work together — hooks and observers fire independently for the sa
 ### AsyncAgentObserver
 
 For async-native applications (FastAPI, aiohttp, async SQLAlchemy), `AsyncAgentObserver`
-provides 25 async `a_on_*` methods that mirror the sync observer:
+provides 28 async `a_on_*` methods that mirror the sync observer:
 
 ```python
 from selectools import AsyncAgentObserver
