@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from ..coherence import CoherenceResult, acheck_coherence, check_coherence
-from ..policy import PolicyDecision, ToolPolicy
+from ..policy import PolicyDecision, PolicyResult, ToolPolicy
 from ..security import screen_output as screen_tool_output
 from ..trace import StepType, TraceStep
 from ..types import Message, Role
@@ -106,11 +106,29 @@ class _ToolExecutorMixin:
         run_id: str = "",
     ) -> Optional[str]:
         """Evaluate tool policy and confirm_action. Returns error string or None."""
-        if not self.config.tool_policy:
+        # Check per-tool requires_approval flag even without a ToolPolicy
+        tool_obj = self._tools_by_name.get(tool_name) if hasattr(self, "_tools_by_name") else None
+        tool_requires_approval = tool_obj and getattr(tool_obj, "requires_approval", False)
+
+        if not self.config.tool_policy and not tool_requires_approval:
             return None
 
-        result = self.config.tool_policy.evaluate(tool_name, tool_args)
+        if self.config.tool_policy:
+            result = self.config.tool_policy.evaluate(tool_name, tool_args)
+        else:
+            result = PolicyResult(
+                decision=PolicyDecision.ALLOW, reason="no policy", matched_rule=""
+            )
         decision_str = result.decision.value
+
+        # Override ALLOW to REVIEW if the tool itself requires approval
+        if result.decision == PolicyDecision.ALLOW and tool_requires_approval:
+            result = PolicyResult(
+                decision=PolicyDecision.REVIEW,
+                reason=f"Tool '{tool_name}' requires approval",
+                matched_rule="tool.requires_approval",
+            )
+            decision_str = result.decision.value
 
         if run_id:
             self._notify_observers(
@@ -161,11 +179,29 @@ class _ToolExecutorMixin:
         run_id: str = "",
     ) -> Optional[str]:
         """Async version of _check_policy."""
-        if not self.config.tool_policy:
+        # Check per-tool requires_approval flag even without a ToolPolicy
+        tool_obj = self._tools_by_name.get(tool_name) if hasattr(self, "_tools_by_name") else None
+        tool_requires_approval = tool_obj and getattr(tool_obj, "requires_approval", False)
+
+        if not self.config.tool_policy and not tool_requires_approval:
             return None
 
-        result = self.config.tool_policy.evaluate(tool_name, tool_args)
+        if self.config.tool_policy:
+            result = self.config.tool_policy.evaluate(tool_name, tool_args)
+        else:
+            result = PolicyResult(
+                decision=PolicyDecision.ALLOW, reason="no policy", matched_rule=""
+            )
         decision_str = result.decision.value
+
+        # Override ALLOW to REVIEW if the tool itself requires approval
+        if result.decision == PolicyDecision.ALLOW and tool_requires_approval:
+            result = PolicyResult(
+                decision=PolicyDecision.REVIEW,
+                reason=f"Tool '{tool_name}' requires approval",
+                matched_rule="tool.requires_approval",
+            )
+            decision_str = result.decision.value
 
         if run_id:
             self._notify_observers(

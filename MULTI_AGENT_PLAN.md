@@ -1,4 +1,4 @@
-# v0.17.0 Multi-Agent Orchestration — Implementation Plan
+# v0.18.0 Multi-Agent Orchestration — Implementation Plan
 
 > **Status**: Ready for development — foundation work complete (see below)
 > **Preceding release**: v0.16.4 (parallel execution safety, shipped)

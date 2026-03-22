@@ -40,19 +40,21 @@ class TestStepTypeEnum:
         "MEMORY_SUMMARIZE": "memory_summarize",
         "ENTITY_EXTRACTION": "entity_extraction",
         "KG_EXTRACTION": "kg_extraction",
+        "BUDGET_EXCEEDED": "budget_exceeded",
+        "CANCELLED": "cancelled",
     }
 
-    def test_all_14_members_exist(self) -> None:
-        """All 14 expected members are present on the StepType enum."""
+    def test_all_16_members_exist(self) -> None:
+        """All 16 expected members are present on the StepType enum."""
         for attr_name, str_value in self.EXPECTED_MEMBERS.items():
             member = getattr(StepType, attr_name, None)
             assert member is not None, f"StepType.{attr_name} missing"
             assert member.value == str_value
 
     def test_no_extra_members(self) -> None:
-        """StepType has exactly 14 members — no accidental extras."""
+        """StepType has exactly 16 members — no accidental extras."""
         members = [m for m in StepType]
-        assert len(members) == 14
+        assert len(members) == 16
 
     def test_backward_compat_string_equality(self) -> None:
         """Each StepType member compares equal to its plain string value."""

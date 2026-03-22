@@ -82,6 +82,7 @@ def tool(
     streaming: bool = False,
     screen_output: bool = False,
     terminal: bool = False,
+    requires_approval: bool = False,
 ) -> Callable[[Callable[..., Any]], Tool]:
     """
     Decorator to convert a function into a Tool.
@@ -100,6 +101,8 @@ def tool(
             Default: ``False``.
         terminal: If True, executing this tool stops the agent loop and
             returns the tool result as the final response.  Default: ``False``.
+        requires_approval: If True, the tool always requires human approval
+            before execution, regardless of ToolPolicy rules.  Default: ``False``.
 
     Returns:
         Decorator function that returns a Tool instance.
@@ -129,6 +132,7 @@ def tool(
             streaming=streaming,
             screen_output=screen_output,
             terminal=terminal,
+            requires_approval=requires_approval,
         )
         return tool_instance
 

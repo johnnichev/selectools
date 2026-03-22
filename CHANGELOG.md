@@ -5,6 +5,20 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.3] - 2026-03-22
+
+### Added
+
+- **Token Budget Per Run (R1)**: `max_total_tokens` and `max_cost_usd` on `AgentConfig`. Agent loop checks budget at each iteration start and returns partial result with `BUDGET_EXCEEDED` trace step when exceeded. New `on_budget_exceeded` observer event. New `BudgetExceededError` exception.
+- **Agent Cancellation (R2)**: `CancellationToken` (thread-safe) for cooperative cancellation. Checked at iteration boundaries and after tool execution. New `CANCELLED` trace step, `on_cancelled` observer event, `CancellationError` exception. Token is reusable via `reset()`.
+- **SimpleStepObserver (R4)**: Convenience observer that routes all 30 lifecycle events to a single `callback(event_name, run_id, **kwargs)` function. Simpler than subclassing `AgentObserver` with 30+ methods.
+- **Tool-Level Cost Attribution (R7)**: `cost_usd` field on `TraceStep`, populated on `LLM_CALL` steps from provider usage stats.
+- **Structured Tool Results (R8)**: `Tool._serialize_result()` auto-serializes dict, list, Pydantic model, and dataclass returns as JSON. Strings pass through unchanged; other types fall back to `str()`.
+- **Per-Tool Approval Gate (R9)**: `requires_approval` flag on `@tool()` decorator and `Tool` class. Tools with this flag always trigger `REVIEW` policy decision, regardless of `ToolPolicy` rules. Works with existing `confirm_action` callback.
+- New `StepType` values: `BUDGET_EXCEEDED`, `CANCELLED` (16 total, up from 14).
+- New exports: `CancellationToken`, `CancellationError`, `BudgetExceededError`, `SimpleStepObserver`.
+- 61 new tests (total: 1908).
+
 ## [0.17.1] - 2026-03-22
 
 ### Added

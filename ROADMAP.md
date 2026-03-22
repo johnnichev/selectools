@@ -202,17 +202,23 @@ v0.17.0  ✅ Eval Framework
 v0.17.1  ✅ MCP Client/Server
          MCPClient → mcp_tools() → MCPServer → MultiMCPClient → tool interop
 
-v0.17.2  🟡 Multi-Agent Orchestration
+v0.17.3  ✅ Agent Runtime Controls
+         Token budget → Cancellation → Cost attribution → Structured results → Approval gate → SimpleStepObserver
+
+v0.17.4  🟡 Agent Intelligence
+         Token estimation → Model switching → Knowledge memory enhancement (4 store backends)
+
+v0.18.0  🟡 Multi-Agent Orchestration
          AgentGraph → GraphState → Checkpointing → Parallel nodes → SupervisorAgent
 
-v0.18.0  🟡 Serve & Deploy
+v0.19.0  🟡 Serve & Deploy
          FastAPI AgentRouter → Flask AgentBlueprint → Playground → Templates → YAML config
 
-v0.19.0  🟡 Connector Expansion
+v0.20.0  🟡 Connector Expansion
          CSV/JSON/HTML/URL/Markdown loaders → FAISS/Qdrant/pgvector stores
          → Code/search tools → SaaS loaders → GitHub/DB toolbox
 
-v0.20.0  🟡 Polish & Community
+v0.21.0  🟡 Polish & Community
          HTML trace viewer → Niche integrations → Tool marketplace
 ```
 
@@ -310,7 +316,7 @@ Every team building agents needs evaluation. Today they either build it from scr
 
 ---
 
-## v0.17.2: Multi-Agent Orchestration
+## v0.18.0: Multi-Agent Orchestration
 
 Focus: DAG-based multi-agent workflows that are simpler and more Pythonic than LangGraph.
 

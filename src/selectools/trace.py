@@ -36,6 +36,8 @@ class StepType(str, Enum):
     MEMORY_SUMMARIZE = "memory_summarize"
     ENTITY_EXTRACTION = "entity_extraction"
     KG_EXTRACTION = "kg_extraction"
+    BUDGET_EXCEEDED = "budget_exceeded"
+    CANCELLED = "cancelled"
 
 
 @dataclass
@@ -53,6 +55,7 @@ class TraceStep:
     model: Optional[str] = None
     prompt_tokens: Optional[int] = None
     completion_tokens: Optional[int] = None
+    cost_usd: Optional[float] = None
 
     reasoning: Optional[str] = None
 

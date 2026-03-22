@@ -140,6 +140,24 @@ class GraphExecutionError(SelectoolsError):
         super().__init__(message)
 
 
+class BudgetExceededError(SelectoolsError):
+    """Raised when an agent run exceeds its token or cost budget."""
+
+    def __init__(self, reason: str, tokens_used: int = 0, cost_used: float = 0.0):
+        self.reason = reason
+        self.tokens_used = tokens_used
+        self.cost_used = cost_used
+        super().__init__(reason)
+
+
+class CancellationError(SelectoolsError):
+    """Raised when an agent run is cancelled via a CancellationToken."""
+
+    def __init__(self, reason: str = "Agent run was cancelled"):
+        self.reason = reason
+        super().__init__(reason)
+
+
 class MCPError(SelectoolsError):
     """Base class for MCP-related errors."""
 
@@ -159,6 +177,8 @@ __all__ = [
     "ProviderConfigurationError",
     "MemoryLimitExceededError",
     "GraphExecutionError",
+    "BudgetExceededError",
+    "CancellationError",
     "MCPError",
     "MCPConnectionError",
     "MCPToolError",
