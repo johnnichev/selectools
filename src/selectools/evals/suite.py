@@ -47,6 +47,58 @@ class EvalSuite:
         self.on_progress = on_progress
         self.tags = tags or {}
 
+    def estimate_cost(self) -> Dict[str, Any]:
+        """Estimate the cost of running this eval suite before executing.
+
+        Uses the model's pricing from the selectools model registry to estimate
+        input/output token costs. Returns a dict with estimated totals.
+        """
+        model_id = ""
+        if hasattr(self.agent, "config") and hasattr(self.agent.config, "model"):
+            model_id = self.agent.config.model or ""
+
+        prompt_cost_per_m = 0.0
+        completion_cost_per_m = 0.0
+
+        try:
+            from ..models import MODELS_BY_ID
+
+            model_info = MODELS_BY_ID.get(model_id)
+            if model_info:
+                prompt_cost_per_m = model_info.prompt_cost
+                completion_cost_per_m = model_info.completion_cost
+        except (ImportError, AttributeError):
+            pass
+
+        n_cases = len(self.cases)
+        # Rough estimate: ~200 input tokens, ~300 output tokens per case
+        est_input_tokens = n_cases * 200
+        est_output_tokens = n_cases * 300
+        est_input_cost = est_input_tokens * prompt_cost_per_m / 1_000_000
+        est_output_cost = est_output_tokens * completion_cost_per_m / 1_000_000
+        est_total = est_input_cost + est_output_cost
+
+        # Count LLM evaluators (each adds one LLM call per case)
+        llm_eval_count = 0
+        for ev in self.evaluators:
+            if hasattr(ev, "provider"):
+                llm_eval_count += 1
+        if llm_eval_count:
+            judge_calls = n_cases * llm_eval_count
+            # Judge calls are typically smaller (~100 input, ~100 output)
+            est_total += judge_calls * 100 * prompt_cost_per_m / 1_000_000
+            est_total += judge_calls * 100 * completion_cost_per_m / 1_000_000
+
+        return {
+            "model": model_id,
+            "cases": n_cases,
+            "llm_evaluators": llm_eval_count,
+            "estimated_input_tokens": est_input_tokens,
+            "estimated_output_tokens": est_output_tokens,
+            "estimated_cost_usd": round(est_total, 6),
+            "pricing_available": prompt_cost_per_m > 0,
+        }
+
     def run(self) -> EvalReport:
         """Run all cases synchronously and return an EvalReport."""
         start = time.perf_counter()

@@ -27,6 +27,7 @@ from .evaluators import (
     WordCountEvaluator,
 )
 from .generator import generate_cases
+from .history import HistoryEntry, HistoryStore, HistoryTrend
 from .llm_evaluators import (
     BiasEvaluator,
     CoherenceEvaluator,
@@ -52,6 +53,7 @@ from .report import EvalReport
 from .serve import serve_eval
 from .snapshot import SnapshotDiff, SnapshotResult, SnapshotStore
 from .suite import EvalSuite
+from .templates import code_quality_suite, customer_support_suite, rag_quality_suite, safety_suite
 from .types import CaseResult, CaseVerdict, EvalFailure, EvalMetadata, TestCase
 
 __all__ = [
@@ -123,4 +125,13 @@ __all__ = [
     "SnapshotDiff",
     # Live dashboard
     "serve_eval",
+    # History tracking
+    "HistoryStore",
+    "HistoryTrend",
+    "HistoryEntry",
+    # Pre-built templates
+    "customer_support_suite",
+    "rag_quality_suite",
+    "safety_suite",
+    "code_quality_suite",
 ]
