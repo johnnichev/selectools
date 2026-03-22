@@ -72,9 +72,25 @@ src/selectools/
 ├── exceptions.py            # SelectoolsError hierarchy
 ├── analytics.py             # AgentAnalytics
 ├── types.py                 # Core types (Message, Role, ToolCall, AgentResult)
-└── env.py                   # Environment variable helpers
+├── env.py                   # Environment variable helpers
+└── evals/                   # Built-in eval framework (22 evaluators)
+    ├── types.py             # TestCase, CaseResult, CaseVerdict, EvalFailure
+    ├── evaluators.py        # 12 deterministic evaluators
+    ├── llm_evaluators.py    # 10 LLM-as-judge evaluators
+    ├── suite.py             # EvalSuite orchestration
+    ├── report.py            # EvalReport with stats and export
+    ├── dataset.py           # DatasetLoader (JSON/YAML)
+    ├── regression.py        # BaselineStore, RegressionResult
+    ├── pairwise.py          # PairwiseEval A/B comparison
+    ├── generator.py         # Synthetic test case generator
+    ├── snapshot.py          # SnapshotStore (Jest-style)
+    ├── badge.py             # SVG badge generator
+    ├── serve.py             # Live eval dashboard
+    ├── html.py              # Interactive HTML report
+    ├── junit.py             # JUnit XML for CI
+    └── __main__.py          # CLI: python -m selectools.evals
 
-tests/                       # 1620 tests (unit, integration, regression, E2E)
+tests/                       # 1758 tests (unit, integration, regression, E2E)
 ├── agent/                   # Agent core tests
 ├── providers/               # Provider-specific tests
 ├── rag/                     # RAG pipeline tests
@@ -293,5 +309,7 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 - **v0.16.5** ✅ Design Patterns & Code Quality (agent decomposition, provider Template Method, async observers, terminal actions, hooks deprecation, ADRs) — see `docs/decisions/`
 - **v0.16.6** ✅ Gemini thought_signature crash fix (base64 round-trip for non-UTF-8 binary signatures)
 - **v0.16.7** ✅ Cleanup (CLI removal, README example table, doc count audit)
-- **v0.17.0** 🔵 Multi-Agent Orchestration — see `MULTI_AGENT_PLAN.md`
-- **Backlog**: Connector Expansion, Ecosystem Parity, Structured AgentConfig, Polish & Community
+- **v0.17.0** 🔵 Eval Framework (22 evaluators, A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing, live dashboard, badges, CLI)
+- **v0.17.1** 🟡 Multi-Agent Orchestration — see `MULTI_AGENT_PLAN.md`
+- **v0.17.2** 🟡 MCP Client/Server
+- **Backlog**: Serve & Deploy, Connector Expansion, Structured AgentConfig, Polish & Community
