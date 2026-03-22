@@ -10,22 +10,40 @@ An open-source project from **[NichevLabs](https://nichevlabs.com)**.
 
 **Production-ready AI agents with tool calling, RAG, and hybrid search.** Connect LLMs to your Python functions, embed and search your documents with vector + keyword fusion, stream responses in real time, and dynamically manage tools at runtime. Works with OpenAI, Anthropic, Gemini, and Ollama. Tracks costs automatically.
 
-## What's New in v0.17.1
+## What's New in v0.17.4
 
-**MCP Client/Server** — connect to any MCP-compatible tool server. `pip install selectools[mcp]`
+**Agent Intelligence** — token estimation, model switching per iteration, and enhanced knowledge memory.
 
 ```python
-from selectools.mcp import mcp_tools, MCPServerConfig
+from selectools import Agent, AgentConfig, CancellationToken, estimate_run_tokens
 
-with mcp_tools(MCPServerConfig(command="python", args=["server.py"])) as tools:
-    agent = Agent(provider=provider, tools=tools, config=config)
-    result = agent.run("Search for Python tutorials")
+# Token budget — stop before burning money
+config = AgentConfig(max_total_tokens=50000, max_cost_usd=0.20)
+
+# Cancellation — abort from any thread
+token = CancellationToken()
+result = await agent.arun("long task", cancel_token=token)
+
+# Model switching — cheap for tools, expensive for reasoning
+config = AgentConfig(
+    model="claude-haiku-4-5",
+    model_selector=lambda i, tc, u: "claude-sonnet-4-6" if i > 2 else "claude-haiku-4-5",
+)
 ```
+
+- **v0.17.4**: Token estimation, model switching per iteration, knowledge memory with pluggable stores (File, SQLite)
+- **v0.17.3**: Token/cost budget limits, `CancellationToken`, `SimpleStepObserver`, per-tool `requires_approval`, structured tool results, cost attribution
+
+<details>
+<summary><strong>v0.17.1: MCP Client/Server</strong></summary>
+
+Connect to any MCP-compatible tool server. `pip install selectools[mcp]`
 
 - **MCPClient** — stdio + HTTP transport, circuit breaker, retry, tool caching
 - **MultiMCPClient** — multiple servers, graceful degradation, name prefixing
 - **MCPServer** — expose `@tool` functions as MCP server
-- All selectools features work on MCP tools: traces, guardrails, evals, policies
+
+</details>
 
 <details>
 <summary><strong>v0.17.0: Built-in Eval Framework</strong></summary>
