@@ -42,6 +42,22 @@ class TestCase:
     # Structured output assertions
     expect_parsed: Optional[Dict[str, Any]] = None
 
+    # Content format assertions
+    expect_json: Optional[bool] = None
+    expect_starts_with: Optional[str] = None
+    expect_ends_with: Optional[str] = None
+    expect_min_length: Optional[int] = None
+    expect_max_length: Optional[int] = None
+
+    # Safety assertions
+    expect_no_pii: Optional[bool] = None
+    expect_no_injection: Optional[bool] = None
+
+    # LLM-as-judge fields
+    reference: Optional[str] = None
+    context: Optional[str] = None
+    rubric: Optional[str] = None
+
     # Performance assertions
     expect_iterations_lte: Optional[int] = None
     expect_latency_ms_lte: Optional[float] = None
