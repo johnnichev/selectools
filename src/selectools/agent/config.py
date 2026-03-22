@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from ..policy import ToolPolicy
     from ..providers.base import Provider
     from ..sessions import SessionStore
+    from ..usage import AgentUsage
 
 # Hook type definitions
 HookCallable = Callable[..., None]
@@ -157,6 +158,7 @@ class AgentConfig:
     knowledge_graph: Optional[KnowledgeGraphMemory] = None
     knowledge_memory: Optional[KnowledgeMemory] = None
     stop_condition: Optional[Callable[[str, str], bool]] = None
+    model_selector: Optional[Callable[[int, List, "AgentUsage"], str]] = None
     max_total_tokens: Optional[int] = None
     max_cost_usd: Optional[float] = None
     cancellation_token: Optional[CancellationToken] = None

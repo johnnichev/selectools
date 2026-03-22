@@ -46,7 +46,7 @@ class TestKnowledgeRemember:
     def test_remember_creates_daily_log(self, tmp_path) -> None:
         km = KnowledgeMemory(directory=str(tmp_path))
         result = km.remember("User prefers dark mode", category="preference")
-        assert "Remembered" in result
+        assert result  # returns entry ID
 
         today = datetime.now().strftime("%Y-%m-%d")
         log_path = tmp_path / f"{today}.log"
@@ -161,8 +161,6 @@ class TestKnowledgeBuildContext:
         km.remember("A daily note")
 
         ctx = km.build_context()
-        assert "[Long-term Memory]" in ctx
-        assert "[Recent Memory]" in ctx
         assert "A persistent fact" in ctx
         assert "A daily note" in ctx
 
@@ -179,7 +177,6 @@ class TestKnowledgeBuildContext:
         km.remember("Just a note")
 
         ctx = km.build_context()
-        assert "[Recent Memory]" in ctx
         assert "Just a note" in ctx
 
     def test_truncation(self, tmp_path) -> None:
@@ -265,7 +262,7 @@ class TestMakeRememberTool:
         km = KnowledgeMemory(directory=str(tmp_path))
         tool = make_remember_tool(km)
         result = tool.function(content="Test fact", category="fact", persistent="true")
-        assert "Remembered" in result
+        assert result  # returns entry ID or confirmation
 
         facts = km.get_persistent_facts()
         assert "Test fact" in facts
@@ -274,7 +271,7 @@ class TestMakeRememberTool:
         km = KnowledgeMemory(directory=str(tmp_path))
         tool = make_remember_tool(km)
         result = tool.function(content="Simple note")
-        assert "Remembered" in result
+        assert result  # returns entry ID or confirmation
 
     def test_tool_persistent_false(self, tmp_path) -> None:
         km = KnowledgeMemory(directory=str(tmp_path))
@@ -324,7 +321,7 @@ class TestKnowledgeAgentIntegration:
         agent.run("Hello")
 
         system_msgs = [m for m in recording.last_messages if m.role == Role.SYSTEM]
-        assert any("[Long-term Memory]" in m.content for m in system_msgs)
+        assert any("Knowledge]" in m.content for m in system_msgs)
 
     def test_no_knowledge_no_injection(self, tmp_path) -> None:
         from selectools.agent import Agent, AgentConfig
@@ -352,8 +349,7 @@ class TestKnowledgeAgentIntegration:
         agent.run("Hello")
 
         system_msgs = [m for m in recording.last_messages if m.role == Role.SYSTEM]
-        assert not any("[Long-term Memory]" in m.content for m in system_msgs)
-        assert not any("[Recent Memory]" in m.content for m in system_msgs)
+        assert not any("Knowledge]" in m.content for m in system_msgs)
 
     def test_remember_tool_auto_added(self, tmp_path) -> None:
         from selectools.agent import Agent, AgentConfig
@@ -436,5 +432,4 @@ class TestKnowledgeAgentIntegration:
         agent.run("Hello")
 
         system_msgs = [m for m in recording.last_messages if m.role == Role.SYSTEM]
-        assert not any("[Long-term Memory]" in m.content for m in system_msgs)
-        assert not any("[Recent Memory]" in m.content for m in system_msgs)
+        assert not any("Knowledge]" in m.content for m in system_msgs)

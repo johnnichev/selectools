@@ -189,6 +189,15 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         """Return the agent's name from config."""
         return self.config.name
 
+    @property
+    def _effective_model(self) -> str:
+        """The model to use for the current iteration.
+
+        Returns the model set by ``model_selector`` if active, otherwise
+        falls back to ``self.config.model``.
+        """
+        return getattr(self, "_current_model", None) or self.config.model
+
     def __call__(
         self,
         messages: Union[str, List[Message]],
@@ -313,6 +322,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         wires observers, runs input guardrails, loads memory/session, injects
         knowledge context, and returns a _RunContext carrying all state.
         """
+        self._current_model: Optional[str] = None
         original_system_prompt = self._system_prompt
         if response_format is not None:
             schema = schema_from_response_format(response_format)
@@ -867,6 +877,18 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 if budget_msg:
                     return self._build_budget_exceeded_result(ctx, budget_msg)
 
+                # Model selection (R10)
+                if self.config.model_selector:
+                    selected = self.config.model_selector(
+                        ctx.iteration, ctx.all_tool_calls, self.usage
+                    )
+                    if selected != self._effective_model:
+                        old_model = self._effective_model
+                        self._current_model = selected
+                        self._notify_observers(
+                            "on_model_switch", ctx.run_id, ctx.iteration, old_model, selected
+                        )
+
                 self._notify_observers(
                     "on_iteration_start", ctx.run_id, ctx.iteration, self._history
                 )
@@ -1052,6 +1074,21 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 if budget_msg:
                     yield StreamChunk(content=budget_msg)
                     return
+
+                # Model selection (R10)
+                if self.config.model_selector:
+                    selected = self.config.model_selector(
+                        ctx.iteration, ctx.all_tool_calls, self.usage
+                    )
+                    if selected != self._effective_model:
+                        old_model = self._effective_model
+                        self._current_model = selected
+                        self._notify_observers(
+                            "on_model_switch", ctx.run_id, ctx.iteration, old_model, selected
+                        )
+                        await self._anotify_observers(
+                            "on_model_switch", ctx.run_id, ctx.iteration, old_model, selected
+                        )
 
                 self._notify_observers(
                     "on_iteration_start", ctx.run_id, ctx.iteration, self._history
@@ -1368,6 +1405,21 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 budget_msg = self._check_budget(ctx)
                 if budget_msg:
                     return self._build_budget_exceeded_result(ctx, budget_msg)
+
+                # Model selection (R10)
+                if self.config.model_selector:
+                    selected = self.config.model_selector(
+                        ctx.iteration, ctx.all_tool_calls, self.usage
+                    )
+                    if selected != self._effective_model:
+                        old_model = self._effective_model
+                        self._current_model = selected
+                        self._notify_observers(
+                            "on_model_switch", ctx.run_id, ctx.iteration, old_model, selected
+                        )
+                        await self._anotify_observers(
+                            "on_model_switch", ctx.run_id, ctx.iteration, old_model, selected
+                        )
 
                 self._notify_observers(
                     "on_iteration_start", ctx.run_id, ctx.iteration, self._history
