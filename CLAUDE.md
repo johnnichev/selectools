@@ -310,6 +310,6 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 - **v0.16.6** ✅ Gemini thought_signature crash fix (base64 round-trip for non-UTF-8 binary signatures)
 - **v0.16.7** ✅ Cleanup (CLI removal, README example table, doc count audit)
 - **v0.17.0** ✅ Eval Framework (39 evaluators, A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing, live dashboard, badges, CLI, templates, history, observer events)
-- **v0.17.1** 🟡 Multi-Agent Orchestration — see `MULTI_AGENT_PLAN.md`
-- **v0.17.2** 🟡 MCP Client/Server
+- **v0.17.1** 🟡 MCP Client/Server — MCPClient, mcp_tools(), MCPServer, MultiMCPClient
+- **v0.17.2** 🟡 Multi-Agent Orchestration — see `MULTI_AGENT_PLAN.md`
 - **Backlog**: Serve & Deploy, Connector Expansion, Structured AgentConfig, Polish & Community
