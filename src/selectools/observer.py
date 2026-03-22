@@ -33,7 +33,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from .types import AgentResult, Message
 from .usage import UsageStats
@@ -380,6 +380,31 @@ class AgentObserver:
         """Called when the agent encounters an unrecoverable error."""
 
     # ------------------------------------------------------------------
+    # Budget events
+    # ------------------------------------------------------------------
+
+    def on_budget_exceeded(
+        self,
+        run_id: str,
+        reason: str,
+        tokens_used: int,
+        cost_used: float,
+    ) -> None:
+        """Called when the agent stops because a token or cost budget was exceeded."""
+
+    # ------------------------------------------------------------------
+    # Cancellation events
+    # ------------------------------------------------------------------
+
+    def on_cancelled(
+        self,
+        run_id: str,
+        iteration: int,
+        reason: str,
+    ) -> None:
+        """Called when the agent run is cancelled via a CancellationToken."""
+
+    # ------------------------------------------------------------------
     # Eval events
     # ------------------------------------------------------------------
 
@@ -688,6 +713,20 @@ class LoggingObserver(AgentObserver):
 
     def on_error(self, run_id: str, error: Exception, context: Dict[str, Any]) -> None:
         self._emit("error", run_id, error=str(error), error_type=type(error).__name__)
+
+    def on_budget_exceeded(
+        self, run_id: str, reason: str, tokens_used: int, cost_used: float
+    ) -> None:
+        self._emit(
+            "budget_exceeded",
+            run_id,
+            reason=reason,
+            tokens_used=tokens_used,
+            cost_used=round(cost_used, 6),
+        )
+
+    def on_cancelled(self, run_id: str, iteration: int, reason: str) -> None:
+        self._emit("cancelled", run_id, iteration=iteration, reason=reason)
 
     def on_eval_start(self, suite_name: str, total_cases: int, model: str) -> None:
         self._emit("eval_start", "", suite_name=suite_name, total_cases=total_cases, model=model)
@@ -1017,6 +1056,261 @@ class AsyncAgentObserver(AgentObserver):
     ) -> None:
         """Async counterpart of :meth:`on_error`."""
 
+    # ------------------------------------------------------------------
+    # Budget events
+    # ------------------------------------------------------------------
+
+    async def a_on_budget_exceeded(
+        self,
+        run_id: str,
+        reason: str,
+        tokens_used: int,
+        cost_used: float,
+    ) -> None:
+        """Async counterpart of :meth:`on_budget_exceeded`."""
+
+    # ------------------------------------------------------------------
+    # Cancellation events
+    # ------------------------------------------------------------------
+
+    async def a_on_cancelled(
+        self,
+        run_id: str,
+        iteration: int,
+        reason: str,
+    ) -> None:
+        """Async counterpart of :meth:`on_cancelled`."""
+
+
+# ======================================================================
+# Convenience observers
+# ======================================================================
+
+
+class SimpleStepObserver(AgentObserver):
+    """Observer that routes all lifecycle events to a single callback.
+
+    Instead of subclassing :class:`AgentObserver` and overriding many methods,
+    pass a single function that receives every event::
+
+        def on_event(event: str, run_id: str, **data):
+            print(f"[{event}] run={run_id} {data}")
+
+        config = AgentConfig(observers=[SimpleStepObserver(on_event)])
+
+    The callback signature is ``(event_name: str, run_id: str, **kwargs)``.
+    Event names match the method names without the ``on_`` prefix
+    (e.g. ``"run_start"``, ``"tool_end"``, ``"usage"``).
+    """
+
+    def __init__(self, callback: Callable[..., None]) -> None:
+        self._cb = callback
+
+    def on_run_start(self, run_id: str, messages: List[Message], system_prompt: str) -> None:
+        self._cb("run_start", run_id, message_count=len(messages), system_prompt=system_prompt)
+
+    def on_run_end(self, run_id: str, result: AgentResult) -> None:
+        self._cb("run_end", run_id, result=result)
+
+    def on_llm_start(
+        self, run_id: str, messages: List[Message], model: str, system_prompt: str
+    ) -> None:
+        self._cb("llm_start", run_id, model=model, message_count=len(messages))
+
+    def on_llm_end(self, run_id: str, response: str, usage: Optional[UsageStats]) -> None:
+        self._cb("llm_end", run_id, response=response, usage=usage)
+
+    def on_cache_hit(self, run_id: str, model: str, response: str) -> None:
+        self._cb("cache_hit", run_id, model=model, response=response)
+
+    def on_usage(self, run_id: str, usage: UsageStats) -> None:
+        self._cb("usage", run_id, usage=usage)
+
+    def on_tool_start(
+        self, run_id: str, call_id: str, tool_name: str, tool_args: Dict[str, Any]
+    ) -> None:
+        self._cb("tool_start", run_id, call_id=call_id, tool_name=tool_name, tool_args=tool_args)
+
+    def on_tool_end(
+        self, run_id: str, call_id: str, tool_name: str, result: str, duration_ms: float
+    ) -> None:
+        self._cb(
+            "tool_end",
+            run_id,
+            call_id=call_id,
+            tool_name=tool_name,
+            result=result,
+            duration_ms=duration_ms,
+        )
+
+    def on_tool_error(
+        self,
+        run_id: str,
+        call_id: str,
+        tool_name: str,
+        error: Exception,
+        tool_args: Dict[str, Any],
+        duration_ms: float,
+    ) -> None:
+        self._cb(
+            "tool_error",
+            run_id,
+            call_id=call_id,
+            tool_name=tool_name,
+            error=error,
+            tool_args=tool_args,
+            duration_ms=duration_ms,
+        )
+
+    def on_tool_chunk(self, run_id: str, call_id: str, tool_name: str, chunk: str) -> None:
+        self._cb("tool_chunk", run_id, call_id=call_id, tool_name=tool_name, chunk=chunk)
+
+    def on_policy_decision(
+        self, run_id: str, tool_name: str, decision: str, reason: str, tool_args: Dict[str, Any]
+    ) -> None:
+        self._cb(
+            "policy_decision",
+            run_id,
+            tool_name=tool_name,
+            decision=decision,
+            reason=reason,
+            tool_args=tool_args,
+        )
+
+    def on_structured_validate(
+        self, run_id: str, success: bool, attempt: int, error: Optional[str] = None
+    ) -> None:
+        self._cb("structured_validate", run_id, success=success, attempt=attempt, error=error)
+
+    def on_iteration_start(self, run_id: str, iteration: int, messages: List[Message]) -> None:
+        self._cb("iteration_start", run_id, iteration=iteration, message_count=len(messages))
+
+    def on_iteration_end(self, run_id: str, iteration: int, response: str) -> None:
+        self._cb("iteration_end", run_id, iteration=iteration, response=response)
+
+    def on_batch_start(self, batch_id: str, prompts_count: int) -> None:
+        self._cb("batch_start", batch_id, prompts_count=prompts_count)
+
+    def on_batch_end(
+        self, batch_id: str, results_count: int, errors_count: int, total_duration_ms: float
+    ) -> None:
+        self._cb(
+            "batch_end",
+            batch_id,
+            results_count=results_count,
+            errors_count=errors_count,
+            total_duration_ms=total_duration_ms,
+        )
+
+    def on_provider_fallback(
+        self, run_id: str, failed_provider: str, next_provider: str, error: Exception
+    ) -> None:
+        self._cb(
+            "provider_fallback",
+            run_id,
+            failed_provider=failed_provider,
+            next_provider=next_provider,
+            error=error,
+        )
+
+    def on_llm_retry(
+        self,
+        run_id: str,
+        attempt: int,
+        max_retries: int,
+        error: Exception,
+        backoff_seconds: float,
+    ) -> None:
+        self._cb(
+            "llm_retry",
+            run_id,
+            attempt=attempt,
+            max_retries=max_retries,
+            error=error,
+            backoff_seconds=backoff_seconds,
+        )
+
+    def on_memory_trim(
+        self, run_id: str, messages_removed: int, messages_remaining: int, reason: str
+    ) -> None:
+        self._cb(
+            "memory_trim",
+            run_id,
+            messages_removed=messages_removed,
+            messages_remaining=messages_remaining,
+            reason=reason,
+        )
+
+    def on_session_load(self, run_id: str, session_id: str, message_count: int) -> None:
+        self._cb("session_load", run_id, session_id=session_id, message_count=message_count)
+
+    def on_session_save(self, run_id: str, session_id: str, message_count: int) -> None:
+        self._cb("session_save", run_id, session_id=session_id, message_count=message_count)
+
+    def on_memory_summarize(self, run_id: str, summary: str) -> None:
+        self._cb("memory_summarize", run_id, summary=summary)
+
+    def on_entity_extraction(self, run_id: str, entities_extracted: int) -> None:
+        self._cb("entity_extraction", run_id, entities_extracted=entities_extracted)
+
+    def on_kg_extraction(self, run_id: str, triples_extracted: int) -> None:
+        self._cb("kg_extraction", run_id, triples_extracted=triples_extracted)
+
+    def on_error(self, run_id: str, error: Exception, context: Dict[str, Any]) -> None:
+        self._cb("error", run_id, error=error, context=context)
+
+    def on_budget_exceeded(
+        self, run_id: str, reason: str, tokens_used: int, cost_used: float
+    ) -> None:
+        self._cb(
+            "budget_exceeded",
+            run_id,
+            reason=reason,
+            tokens_used=tokens_used,
+            cost_used=cost_used,
+        )
+
+    def on_cancelled(self, run_id: str, iteration: int, reason: str) -> None:
+        self._cb("cancelled", run_id, iteration=iteration, reason=reason)
+
+    def on_eval_start(self, suite_name: str, total_cases: int, model: str) -> None:
+        self._cb("eval_start", "", suite_name=suite_name, total_cases=total_cases, model=model)
+
+    def on_eval_case_end(
+        self, suite_name: str, case_name: str, verdict: str, latency_ms: float, failures: int
+    ) -> None:
+        self._cb(
+            "eval_case_end",
+            "",
+            suite_name=suite_name,
+            case_name=case_name,
+            verdict=verdict,
+            latency_ms=latency_ms,
+            failures=failures,
+        )
+
+    def on_eval_end(
+        self,
+        suite_name: str,
+        accuracy: float,
+        total_cases: int,
+        pass_count: int,
+        fail_count: int,
+        total_cost: float,
+        duration_ms: float,
+    ) -> None:
+        self._cb(
+            "eval_end",
+            "",
+            suite_name=suite_name,
+            accuracy=accuracy,
+            total_cases=total_cases,
+            pass_count=pass_count,
+            fail_count=fail_count,
+            total_cost=total_cost,
+            duration_ms=duration_ms,
+        )
+
 
 # ======================================================================
 # Hooks compatibility adapter (internal)
@@ -1107,4 +1401,4 @@ class _HooksAdapter(AgentObserver):
         self._call("on_error", error, context)
 
 
-__all__ = ["AgentObserver", "AsyncAgentObserver", "LoggingObserver"]
+__all__ = ["AgentObserver", "AsyncAgentObserver", "LoggingObserver", "SimpleStepObserver"]

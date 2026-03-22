@@ -147,6 +147,7 @@ class _ProviderCallerMixin:
                             model=self.config.model,
                             prompt_tokens=usage_stats.prompt_tokens,
                             completion_tokens=usage_stats.completion_tokens,
+                            cost_usd=usage_stats.cost_usd,
                             summary=f"{self.config.model} → {len(response_text)} chars",
                         )
                     )
@@ -373,6 +374,7 @@ class _ProviderCallerMixin:
                             model=self.config.model,
                             prompt_tokens=usage_stats.prompt_tokens,
                             completion_tokens=usage_stats.completion_tokens,
+                            cost_usd=usage_stats.cost_usd,
                             summary=f"{self.config.model} → {len(response_text)} chars",
                         )
                     )

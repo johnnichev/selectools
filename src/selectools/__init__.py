@@ -8,10 +8,13 @@ from .agent import Agent, AgentConfig
 from .analytics import AgentAnalytics, ToolMetrics
 from .audit import AuditLogger, PrivacyLevel
 from .cache import Cache, CacheKeyBuilder, CacheStats, InMemoryCache
+from .cancellation import CancellationToken
 from .coherence import CoherenceResult
 from .entity_memory import Entity, EntityMemory
 from .evals import EvalReport, EvalSuite, TestCase
 from .exceptions import (
+    BudgetExceededError,
+    CancellationError,
     GraphExecutionError,
     MemoryLimitExceededError,
     ProviderConfigurationError,
@@ -51,7 +54,7 @@ from .models import (
     Ollama,
     OpenAI,
 )
-from .observer import AgentObserver, AsyncAgentObserver, LoggingObserver
+from .observer import AgentObserver, AsyncAgentObserver, LoggingObserver, SimpleStepObserver
 from .parser import ToolCallParser
 from .policy import PolicyDecision, PolicyResult, ToolPolicy
 from .pricing import PRICING, calculate_cost, calculate_embedding_cost, get_model_pricing
@@ -97,6 +100,8 @@ __all__ = [
     "FallbackProvider",
     "ToolRegistry",
     "tool",
+    # Cancellation
+    "CancellationToken",
     # Exceptions
     "SelectoolsError",
     "ToolValidationError",
@@ -104,6 +109,8 @@ __all__ = [
     "ProviderConfigurationError",
     "MemoryLimitExceededError",
     "GraphExecutionError",
+    "BudgetExceededError",
+    "CancellationError",
     # Usage tracking
     "UsageStats",
     "AgentUsage",
@@ -138,6 +145,7 @@ __all__ = [
     "AgentObserver",
     "AsyncAgentObserver",
     "LoggingObserver",
+    "SimpleStepObserver",
     "AgentTrace",
     "StepType",
     "TraceStep",

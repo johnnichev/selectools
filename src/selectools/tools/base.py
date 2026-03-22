@@ -9,6 +9,7 @@ import contextvars
 import difflib
 import functools
 import inspect
+import json
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Union
@@ -121,6 +122,7 @@ class Tool:
         streaming: bool = False,
         screen_output: bool = False,
         terminal: bool = False,
+        requires_approval: bool = False,
         _skip_validation: bool = False,
     ):
         """
@@ -138,6 +140,8 @@ class Tool:
                 feeding it back to the LLM.  Default: ``False``.
             terminal: If True, executing this tool stops the agent loop and
                 returns the tool result as the final response.  Default: ``False``.
+            requires_approval: If True, the tool always requires human approval
+                before execution, regardless of ToolPolicy rules.  Default: ``False``.
 
         Raises:
             ToolValidationError: If tool definition is invalid
@@ -154,6 +158,7 @@ class Tool:
         self.streaming = streaming
         self.screen_output = screen_output
         self.terminal = terminal
+        self.requires_approval = requires_approval
 
         # Validate tool definition at registration time
         if not _skip_validation:
@@ -367,6 +372,24 @@ class Tool:
                     ),
                 )
 
+    def _serialize_result(self, result: Any) -> str:
+        """Serialize a tool result to a string suitable for the LLM.
+
+        Dicts, lists, Pydantic models, and dataclasses are serialized as JSON.
+        Strings pass through unchanged.  All other types fall back to ``str()``.
+        """
+        if isinstance(result, str):
+            return result
+        if isinstance(result, (dict, list)):
+            return json.dumps(result, default=str)
+        if hasattr(result, "model_dump"):  # Pydantic v2
+            return json.dumps(result.model_dump(), default=str)
+        if hasattr(result, "__dataclass_fields__"):  # dataclass
+            from dataclasses import asdict
+
+            return json.dumps(asdict(result), default=str)
+        return str(result)
+
     def execute(
         self,
         params: Dict[str, ParameterValue],
@@ -402,7 +425,7 @@ class Tool:
                         chunk_callback(chunk_str)
                 return "".join(chunks)
 
-            return str(result)
+            return self._serialize_result(result)
         except Exception as exc:
             raise ToolExecutionError(tool_name=self.name, error=exc, params=params) from exc
 
@@ -448,7 +471,7 @@ class Tool:
 
                 # Otherwise it's a regular async function, await it
                 result = await result  # type: ignore[misc]
-                return str(result)
+                return self._serialize_result(result)
             else:
                 # Run sync function in executor to avoid blocking
                 loop = asyncio.get_event_loop()
@@ -468,6 +491,6 @@ class Tool:
                             chunk_callback(chunk_str)
                     return "".join(chunks)
 
-                return str(result)
+                return self._serialize_result(result)
         except Exception as exc:
             raise ToolExecutionError(tool_name=self.name, error=exc, params=params) from exc

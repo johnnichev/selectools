@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, List, Optional
 
 if TYPE_CHECKING:
     from ..cache import Cache
+    from ..cancellation import CancellationToken
     from ..entity_memory import EntityMemory
     from ..guardrails import GuardrailsPipeline
     from ..knowledge import KnowledgeMemory
@@ -156,3 +157,6 @@ class AgentConfig:
     knowledge_graph: Optional[KnowledgeGraphMemory] = None
     knowledge_memory: Optional[KnowledgeMemory] = None
     stop_condition: Optional[Callable[[str, str], bool]] = None
+    max_total_tokens: Optional[int] = None
+    max_cost_usd: Optional[float] = None
+    cancellation_token: Optional[CancellationToken] = None

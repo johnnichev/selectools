@@ -451,6 +451,80 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         self._notify_observers("on_run_end", ctx.run_id, result)
         return result
 
+    def _check_budget(self, ctx: _RunContext) -> Optional[str]:
+        """Check whether the token or cost budget has been exceeded.
+
+        Returns a reason string if the budget is exceeded, or ``None`` if OK.
+        """
+        if (
+            self.config.max_total_tokens is not None
+            and self.usage.total_tokens >= self.config.max_total_tokens
+        ):
+            return (
+                f"Token budget exceeded: {self.usage.total_tokens}"
+                f"/{self.config.max_total_tokens} tokens"
+            )
+        if (
+            self.config.max_cost_usd is not None
+            and self.usage.total_cost_usd >= self.config.max_cost_usd
+        ):
+            return (
+                f"Cost budget exceeded: ${self.usage.total_cost_usd:.6f}"
+                f"/${self.config.max_cost_usd:.6f}"
+            )
+        return None
+
+    def _build_budget_exceeded_result(self, ctx: _RunContext, reason: str) -> AgentResult:
+        """Build the AgentResult when a budget limit is hit."""
+        ctx.trace.add(TraceStep(type=StepType.BUDGET_EXCEEDED, summary=reason))
+        self._notify_observers(
+            "on_budget_exceeded",
+            ctx.run_id,
+            reason,
+            self.usage.total_tokens,
+            self.usage.total_cost_usd,
+        )
+        final_response = Message(role=Role.ASSISTANT, content=reason)
+        self._history.append(final_response)
+        self._memory_add(final_response, ctx.run_id)
+        result = AgentResult(
+            message=final_response,
+            tool_name=ctx.last_tool_name,
+            tool_args=ctx.last_tool_args,
+            iterations=ctx.iteration,
+            tool_calls=ctx.all_tool_calls,
+            reasoning=ctx.reasoning_history[-1] if ctx.reasoning_history else None,
+            reasoning_history=ctx.reasoning_history,
+            trace=ctx.trace,
+            provider_used=getattr(self.provider, "provider_used", None),
+            usage=copy.copy(self.usage),
+        )
+        self._notify_observers("on_run_end", ctx.run_id, result)
+        return result
+
+    def _build_cancelled_result(self, ctx: _RunContext) -> AgentResult:
+        """Build the AgentResult when a cancellation token fires."""
+        reason = "Agent run was cancelled"
+        ctx.trace.add(TraceStep(type=StepType.CANCELLED, summary=reason))
+        self._notify_observers("on_cancelled", ctx.run_id, ctx.iteration, reason)
+        final_response = Message(role=Role.ASSISTANT, content=reason)
+        self._history.append(final_response)
+        self._memory_add(final_response, ctx.run_id)
+        result = AgentResult(
+            message=final_response,
+            tool_name=ctx.last_tool_name,
+            tool_args=ctx.last_tool_args,
+            iterations=ctx.iteration,
+            tool_calls=ctx.all_tool_calls,
+            reasoning=ctx.reasoning_history[-1] if ctx.reasoning_history else None,
+            reasoning_history=ctx.reasoning_history,
+            trace=ctx.trace,
+            provider_used=getattr(self.provider, "provider_used", None),
+            usage=copy.copy(self.usage),
+        )
+        self._notify_observers("on_run_end", ctx.run_id, result)
+        return result
+
     def _process_response(
         self,
         ctx: _RunContext,
@@ -783,6 +857,16 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         try:
             while ctx.iteration < self.config.max_iterations:
                 ctx.iteration += 1
+
+                # Cancellation check (R2)
+                if self.config.cancellation_token and self.config.cancellation_token.is_cancelled:
+                    return self._build_cancelled_result(ctx)
+
+                # Budget check (R1)
+                budget_msg = self._check_budget(ctx)
+                if budget_msg:
+                    return self._build_budget_exceeded_result(ctx, budget_msg)
+
                 self._notify_observers(
                     "on_iteration_start", ctx.run_id, ctx.iteration, self._history
                 )
@@ -896,6 +980,10 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     )
                     return self._finalize_run(ctx, final_response)
 
+                # Post-tool cancellation check (R2)
+                if self.config.cancellation_token and self.config.cancellation_token.is_cancelled:
+                    return self._build_cancelled_result(ctx)
+
                 self._notify_observers(
                     "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
                 )
@@ -953,6 +1041,18 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         try:
             while ctx.iteration < self.config.max_iterations:
                 ctx.iteration += 1
+
+                # Cancellation check (R2)
+                if self.config.cancellation_token and self.config.cancellation_token.is_cancelled:
+                    yield StreamChunk(content="Agent run was cancelled")
+                    return
+
+                # Budget check (R1)
+                budget_msg = self._check_budget(ctx)
+                if budget_msg:
+                    yield StreamChunk(content=budget_msg)
+                    return
+
                 self._notify_observers(
                     "on_iteration_start", ctx.run_id, ctx.iteration, self._history
                 )
@@ -1193,6 +1293,11 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     yield _result
                     return
 
+                # Post-tool cancellation check (R2)
+                if self.config.cancellation_token and self.config.cancellation_token.is_cancelled:
+                    yield StreamChunk(content="Agent run was cancelled")
+                    return
+
                 self._notify_observers(
                     "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
                 )
@@ -1254,6 +1359,16 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         try:
             while ctx.iteration < self.config.max_iterations:
                 ctx.iteration += 1
+
+                # Cancellation check (R2)
+                if self.config.cancellation_token and self.config.cancellation_token.is_cancelled:
+                    return self._build_cancelled_result(ctx)
+
+                # Budget check (R1)
+                budget_msg = self._check_budget(ctx)
+                if budget_msg:
+                    return self._build_budget_exceeded_result(ctx, budget_msg)
+
                 self._notify_observers(
                     "on_iteration_start", ctx.run_id, ctx.iteration, self._history
                 )
@@ -1389,6 +1504,10 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     _result = self._finalize_run(ctx, final_response)
                     await self._anotify_observers("on_run_end", ctx.run_id, _result)
                     return _result
+
+                # Post-tool cancellation check (R2)
+                if self.config.cancellation_token and self.config.cancellation_token.is_cancelled:
+                    return self._build_cancelled_result(ctx)
 
                 self._notify_observers(
                     "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
