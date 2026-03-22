@@ -4,17 +4,40 @@
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://johnnichev.github.io/selectools)
 [![License: LGPL v3](https://img.shields.io/badge/License-LGPL_v3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
+[![Evaluators](https://img.shields.io/badge/evaluators-39-06b6d4.svg)](https://johnnichev.github.io/selectools/modules/EVALS/)
 
 An open-source project from **[NichevLabs](https://nichevlabs.com)**.
 
 **Production-ready AI agents with tool calling, RAG, and hybrid search.** Connect LLMs to your Python functions, embed and search your documents with vector + keyword fusion, stream responses in real time, and dynamically manage tools at runtime. Works with OpenAI, Anthropic, Gemini, and Ollama. Tracks costs automatically.
 
-## What's New in v0.16.7
+## What's New in v0.17.0
 
-**Cleanup release** — Removed unused CLI module, completed README example table (28-38), fixed stale doc counts.
+**Built-in Eval Framework** — 39 evaluators, A/B testing, regression detection, and more. No separate install needed.
 
-- **CLI removed** — `selectools` console script entry point removed (unused, flagged by package safety scanners)
-- **1758 tests** across unit, integration, regression, and E2E
+```python
+from selectools.evals import EvalSuite, TestCase
+
+suite = EvalSuite(agent=agent, cases=[
+    TestCase(input="Cancel account", expect_tool="cancel_sub", expect_no_pii=True),
+    TestCase(input="Balance?", expect_contains="balance", expect_latency_ms_lte=500),
+])
+report = suite.run()
+print(report.accuracy)      # 0.95
+print(report.latency_p50)   # 142ms
+report.to_html("report.html")
+```
+
+- **39 Evaluators** — 21 deterministic + 18 LLM-as-judge (tool use, correctness, safety, RAG, code, format)
+- **A/B Testing** — `PairwiseEval` compares two agents head-to-head
+- **Regression Detection** — `BaselineStore` tracks accuracy across runs
+- **Snapshot Testing** — Jest-style output snapshots for AI agents
+- **Pre-built Templates** — `customer_support_suite()`, `safety_suite()`, `rag_quality_suite()`, `code_quality_suite()`
+- **Interactive HTML Report** — donut chart, histogram, trend line, expandable rows, filtering
+- **GitHub Action** — automatic PR comments with eval results
+- **CLI** — `python -m selectools.evals run cases.json --html report.html`
+- **Cost Estimation** — `suite.estimate_cost()` before running
+- **History Tracking** — `HistoryStore` with trend analysis
+- **309 eval tests**, zero external dependencies
 
 > Full changelog: [CHANGELOG.md](https://github.com/johnnichev/selectools/blob/main/CHANGELOG.md)
 

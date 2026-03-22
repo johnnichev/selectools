@@ -379,6 +379,40 @@ class AgentObserver:
     ) -> None:
         """Called when the agent encounters an unrecoverable error."""
 
+    # ------------------------------------------------------------------
+    # Eval events
+    # ------------------------------------------------------------------
+
+    def on_eval_start(
+        self,
+        suite_name: str,
+        total_cases: int,
+        model: str,
+    ) -> None:
+        """Called when an eval suite starts running."""
+
+    def on_eval_case_end(
+        self,
+        suite_name: str,
+        case_name: str,
+        verdict: str,
+        latency_ms: float,
+        failures: int,
+    ) -> None:
+        """Called after each eval case completes."""
+
+    def on_eval_end(
+        self,
+        suite_name: str,
+        accuracy: float,
+        total_cases: int,
+        pass_count: int,
+        fail_count: int,
+        total_cost: float,
+        duration_ms: float,
+    ) -> None:
+        """Called when an eval suite finishes."""
+
 
 # ======================================================================
 # Built-in observers
@@ -654,6 +688,44 @@ class LoggingObserver(AgentObserver):
 
     def on_error(self, run_id: str, error: Exception, context: Dict[str, Any]) -> None:
         self._emit("error", run_id, error=str(error), error_type=type(error).__name__)
+
+    def on_eval_start(self, suite_name: str, total_cases: int, model: str) -> None:
+        self._emit("eval_start", "", suite_name=suite_name, total_cases=total_cases, model=model)
+
+    def on_eval_case_end(
+        self, suite_name: str, case_name: str, verdict: str, latency_ms: float, failures: int
+    ) -> None:
+        self._emit(
+            "eval_case_end",
+            "",
+            suite_name=suite_name,
+            case_name=case_name,
+            verdict=verdict,
+            latency_ms=round(latency_ms, 1),
+            failures=failures,
+        )
+
+    def on_eval_end(
+        self,
+        suite_name: str,
+        accuracy: float,
+        total_cases: int,
+        pass_count: int,
+        fail_count: int,
+        total_cost: float,
+        duration_ms: float,
+    ) -> None:
+        self._emit(
+            "eval_end",
+            "",
+            suite_name=suite_name,
+            accuracy=round(accuracy, 4),
+            total_cases=total_cases,
+            pass_count=pass_count,
+            fail_count=fail_count,
+            total_cost=round(total_cost, 6),
+            duration_ms=round(duration_ms, 1),
+        )
 
 
 class AsyncAgentObserver(AgentObserver):

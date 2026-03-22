@@ -5,7 +5,7 @@ from __future__ import annotations
 import html
 import math
 from pathlib import Path
-from typing import Any, List, Union
+from typing import Any, List, Optional, Union
 
 from .types import CaseVerdict
 
@@ -88,8 +88,53 @@ def _histogram_svg(latencies: List[float]) -> str:
     )
 
 
-def render_html_report(report: Any, filepath: Union[str, Path]) -> None:  # noqa: C901
-    """Render an EvalReport as a self-contained interactive HTML file."""
+def _trend_svg(accuracies: List[float]) -> str:
+    """Generate an SVG sparkline for accuracy trend over time."""
+    if len(accuracies) < 2:
+        return ""
+    w, h = 200, 60
+    n = len(accuracies)
+    max_v = max(accuracies) if max(accuracies) > 0 else 1.0
+    min_v = min(accuracies)
+    v_range = max_v - min_v if max_v != min_v else 0.1
+
+    points: List[str] = []
+    for i, v in enumerate(accuracies):
+        x = i * (w - 20) / (n - 1) + 10
+        y = h - 10 - ((v - min_v) / v_range) * (h - 25)
+        points.append(f"{x:.1f},{y:.1f}")
+
+    polyline = " ".join(points)
+    # Color based on trend
+    color = "#4ade80" if accuracies[-1] >= accuracies[0] else "#f87171"
+
+    dots = "".join(
+        f'<circle cx="{p.split(",")[0]}" cy="{p.split(",")[1]}" r="2.5" fill="{color}"/>'
+        for p in points
+    )
+
+    return (
+        f'<svg viewBox="0 0 {w} {h}" width="{w}" height="{h}">'
+        f'<polyline points="{polyline}" fill="none" stroke="{color}" '
+        f'stroke-width="2" stroke-linecap="round"/>'
+        f"{dots}"
+        f'<text x="{w // 2}" y="10" fill="#94a3b8" font-size="9" '
+        f'text-anchor="middle">Accuracy Trend</text></svg>'
+    )
+
+
+def render_html_report(  # noqa: C901
+    report: Any,
+    filepath: Union[str, Path],
+    history: Optional[Any] = None,
+) -> None:
+    """Render an EvalReport as a self-contained interactive HTML file.
+
+    Args:
+        report: EvalReport instance.
+        filepath: Path to write the HTML file.
+        history: Optional HistoryTrend instance for trend chart.
+    """
     # Build table rows with expandable details
     rows = []
     for i, cr in enumerate(report.case_results):
@@ -158,6 +203,9 @@ def render_html_report(report: Any, filepath: Union[str, Path]) -> None:  # noqa
     donut = _donut_svg(report.pass_count, report.fail_count, report.error_count, report.skip_count)
     latencies = [cr.latency_ms for cr in report.case_results if cr.verdict != CaseVerdict.SKIP]
     histogram = _histogram_svg(latencies)
+    trend_chart = ""
+    if history and hasattr(history, "accuracy_trend") and len(history.accuracy_trend) >= 2:
+        trend_chart = _trend_svg(history.accuracy_trend)
 
     # Failure breakdown
     failures_by_eval = report.failures_by_evaluator()
@@ -277,6 +325,7 @@ footer{{margin-top:1.5rem;padding-top:1rem;border-top:1px solid #334155;font-siz
     <div class="charts-row">
       {donut}
       <div>{histogram}</div>
+      {f'<div>{trend_chart}</div>' if trend_chart else ''}
     </div>
     <div class="legend">
       <span class="legend-item"><span class="legend-dot" style="background:#4ade80"></span>Pass ({report.pass_count})</span>
