@@ -5,6 +5,89 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] - 2026-03-22
+
+### Added
+
+**Built-in Eval Framework** — the only AI agent framework with a comprehensive evaluation suite built in. No separate install, no SaaS account, no external dependencies.
+
+#### Evaluators (39 total)
+
+**21 deterministic evaluators** (no API calls):
+- `ToolUseEvaluator` — tool name, tool list, argument value assertions
+- `ContainsEvaluator` — substring present/absent (case-insensitive)
+- `OutputEvaluator` — exact match and regex matching
+- `StructuredOutputEvaluator` — parsed field assertions (deep subset match)
+- `PerformanceEvaluator` — iteration count, latency, and cost thresholds
+- `JsonValidityEvaluator` — valid JSON output
+- `LengthEvaluator` — min/max character count
+- `WordCountEvaluator` — min/max word count
+- `StartsWithEvaluator` / `EndsWithEvaluator` — prefix/suffix assertions
+- `ToolOrderEvaluator` — tools called in expected sequence
+- `UniqueToolsEvaluator` — no duplicate tool calls
+- `PIILeakEvaluator` — SSN, email, phone, credit card, ZIP detection
+- `InjectionResistanceEvaluator` — 10 prompt injection patterns
+- `RefusalEvaluator` — detect appropriate refusal of harmful requests
+- `SentimentEvaluator` — keyword-based positive/negative/neutral detection
+- `PythonValidityEvaluator` — valid Python syntax (with code fence stripping)
+- `SQLValidityEvaluator` — SQL statement validation
+- `URLValidityEvaluator` — well-formed URL detection
+- `MarkdownFormatEvaluator` — markdown formatting detection
+- `CustomEvaluator` — any user-defined callable
+
+**18 LLM-as-judge evaluators** (use any Provider):
+- `LLMJudgeEvaluator` — generic rubric scoring (0-10)
+- `CorrectnessEvaluator` — correct vs reference answer
+- `RelevanceEvaluator` — response relevant to query
+- `FaithfulnessEvaluator` — grounded in provided context (RAG)
+- `HallucinationEvaluator` — fabricated information detection
+- `ToxicityEvaluator` — harmful/inappropriate content
+- `CoherenceEvaluator` — well-structured and logical
+- `CompletenessEvaluator` — fully addresses the query
+- `BiasEvaluator` — gender, racial, political bias
+- `SummaryEvaluator` — summary accuracy and coverage
+- `ConcisenessEvaluator` — not overly verbose
+- `InstructionFollowingEvaluator` — followed specific instructions
+- `ToneEvaluator` — matches expected tone
+- `ContextRecallEvaluator` — RAG: used all relevant context
+- `ContextPrecisionEvaluator` — RAG: retrieved context was relevant
+- `GrammarEvaluator` — grammatically correct and fluent
+- `SafetyEvaluator` — comprehensive safety check
+
+#### Infrastructure
+
+- `EvalSuite` — orchestrates eval runs with sync/async/concurrent execution
+- `EvalReport` — accuracy, latency p50/p95/p99, cost, weighted scoring, tag filtering, failure breakdown
+- `DatasetLoader` — load test cases from JSON/YAML files
+- `BaselineStore` + `RegressionResult` — save baselines, detect regressions across runs
+- `PairwiseEval` — compare two agents head-to-head with automatic winner determination
+- `SnapshotStore` — Jest-style snapshot testing for AI agent outputs
+- `generate_cases()` — LLM-powered synthetic test case generator from tool definitions
+- `generate_badge()` — shields.io-style SVG badges for README
+- `serve_eval()` — live browser dashboard with real-time eval progress
+- `HistoryStore` — track accuracy/cost/latency across runs with trend analysis
+- Interactive HTML report with donut chart, latency histogram, trend sparkline, expandable rows, filtering
+- JUnit XML for CI (GitHub Actions, Jenkins, GitLab CI)
+- `report.to_markdown()` — markdown summary for GitHub issues and PRs
+- CLI: `python -m selectools.evals run/compare`
+- GitHub Action at `.github/actions/eval/` with automatic PR comments
+- Cost estimation: `suite.estimate_cost()` before running
+- 4 pre-built templates: `customer_support_suite()`, `rag_quality_suite()`, `safety_suite()`, `code_quality_suite()`
+- `pip install selectools[evals]` for optional PyYAML dependency
+
+#### Observer Integration
+
+- 3 new observer events: `on_eval_start`, `on_eval_case_end`, `on_eval_end`
+- Compatible with `LoggingObserver` for structured JSON eval logs
+
+#### Testing
+
+- **309 new eval tests** across 6 test files (unit, integration, E2E)
+- 40 example scripts (2 eval-specific: `39_eval_framework.py`, `40_eval_advanced.py`)
+- Full module documentation: `docs/modules/EVALS.md`
+
+---
+
 ## [0.16.7] - 2026-03-16
 
 ### Removed

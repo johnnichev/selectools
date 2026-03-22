@@ -88,7 +88,7 @@
           <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">Gemini</span>
           <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">Ollama</span>
           <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">146 Models</span>
-          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">22 Evaluators</span>
+          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">39 Evaluators</span>
           <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">1758 Tests</span>
         </div>
       </div>
@@ -250,7 +250,7 @@ result = agent.run(<span class="text-green-400">"Find our refund policy"</span>)
   <section class="py-20 px-6 border-t border-slate-800" id="eval">
     <div class="max-w-6xl mx-auto">
       <h2 class="text-3xl font-bold mb-4 text-center">Built-in Agent Evaluation</h2>
-      <p class="text-slate-400 text-center mb-14 max-w-2xl mx-auto">The only agent framework with a built-in eval suite. No separate install, no SaaS account, no external dependencies. 22 evaluators out of the box.</p>
+      <p class="text-slate-400 text-center mb-14 max-w-2xl mx-auto">The only agent framework with a built-in eval suite. No separate install, no SaaS account, no external dependencies. 39 evaluators out of the box.</p>
       <div class="grid lg:grid-cols-2 gap-8">
         <div class="fade-in">
           <div class="code-block rounded-xl border border-slate-700 overflow-hidden">
@@ -287,32 +287,44 @@ report.<span class="text-yellow-300">to_html</span>(<span class="text-green-400"
         </div>
         <div class="fade-in flex flex-col justify-center gap-4">
           <div class="code-block rounded-lg p-5 border border-slate-700">
-            <h3 class="text-sm font-semibold text-brand-cyan mb-3">12 Deterministic Evaluators</h3>
+            <h3 class="text-sm font-semibold text-brand-cyan mb-3">21 Deterministic Evaluators</h3>
             <div class="flex flex-wrap gap-2 text-xs">
               <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">ToolUse</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">ToolOrder</span>
               <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Contains</span>
               <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Output</span>
               <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Structured</span>
               <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Performance</span>
               <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">JSON</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Python</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">SQL</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">URLs</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Markdown</span>
               <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Length</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">StartsWith</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">EndsWith</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">PII Leak</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Words</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">PII</span>
               <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Injection</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Refusal</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Sentiment</span>
               <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Custom</span>
             </div>
           </div>
           <div class="code-block rounded-lg p-5 border border-slate-700">
-            <h3 class="text-sm font-semibold text-brand-cyan mb-3">10 LLM-as-Judge Evaluators</h3>
+            <h3 class="text-sm font-semibold text-brand-cyan mb-3">18 LLM-as-Judge Evaluators</h3>
             <div class="flex flex-wrap gap-2 text-xs">
               <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Correctness</span>
               <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Relevance</span>
               <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Faithfulness</span>
               <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Hallucination</span>
               <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Toxicity</span>
+              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Safety</span>
               <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Coherence</span>
               <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Completeness</span>
+              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Conciseness</span>
+              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Grammar</span>
+              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Tone</span>
+              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">ContextRecall</span>
+              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">ContextPrecision</span>
               <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Bias</span>
               <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Summary</span>
               <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Custom Rubric</span>
@@ -333,65 +345,150 @@ report.<span class="text-yellow-300">to_html</span>(<span class="text-green-400"
     </div>
   </section>
 
-  <!-- Comparison Table -->
+  <!-- Comparison Tables -->
   <section class="py-20 px-6 border-t border-slate-800" id="compare">
-    <div class="max-w-4xl mx-auto">
-      <h2 class="text-3xl font-bold mb-4 text-center">Selectools vs. LangChain</h2>
-      <p class="text-slate-400 text-center mb-14 max-w-2xl mx-auto">An honest comparison. Choose LangChain for ecosystem breadth. Choose Selectools when compliance and observability aren't optional.</p>
-      <div class="code-block rounded-xl border border-slate-700 overflow-hidden">
-        <table class="w-full text-sm">
+    <div class="max-w-5xl mx-auto">
+      <h2 class="text-3xl font-bold mb-4 text-center">How We Compare</h2>
+      <p class="text-slate-400 text-center mb-14 max-w-2xl mx-auto">Choose LangChain for ecosystem breadth. Choose Selectools when compliance, observability, and evaluation aren't optional.</p>
+
+      <h3 class="text-xl font-semibold mb-4 text-center">Agent Framework Comparison</h3>
+      <div class="code-block rounded-xl border border-slate-700 overflow-hidden overflow-x-auto mb-12">
+        <table class="w-full text-sm" style="min-width:700px">
           <thead>
             <tr class="border-b border-slate-700 text-left">
-              <th class="px-6 py-4 font-semibold text-slate-300">Capability</th>
-              <th class="px-6 py-4 font-semibold text-brand-cyan">Selectools</th>
-              <th class="px-6 py-4 font-semibold text-slate-400">LangChain</th>
+              <th class="px-4 py-3 font-semibold text-slate-300">Capability</th>
+              <th class="px-4 py-3 font-semibold text-brand-cyan">Selectools</th>
+              <th class="px-4 py-3 font-semibold text-slate-400">LangChain</th>
+              <th class="px-4 py-3 font-semibold text-slate-400">CrewAI</th>
             </tr>
           </thead>
           <tbody>
             <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-6 py-3 text-slate-300">Execution traces</td>
-              <td class="px-6 py-3 text-green-400">Built-in</td>
-              <td class="px-6 py-3 text-slate-500">LangSmith (paid)</td>
+              <td class="px-4 py-3 text-slate-300">Execution traces</td>
+              <td class="px-4 py-3 text-green-400">Built-in</td>
+              <td class="px-4 py-3 text-slate-500">LangSmith (paid)</td>
+              <td class="px-4 py-3 text-slate-500">Limited logging</td>
             </tr>
             <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-6 py-3 text-slate-300">Guardrails</td>
-              <td class="px-6 py-3 text-green-400">Built-in (5 types)</td>
-              <td class="px-6 py-3 text-slate-500">NeMo (separate project)</td>
+              <td class="px-4 py-3 text-slate-300">Guardrails</td>
+              <td class="px-4 py-3 text-green-400">Built-in (5 types)</td>
+              <td class="px-4 py-3 text-slate-500">NeMo (separate)</td>
+              <td class="px-4 py-3 text-slate-500">Not built-in</td>
             </tr>
             <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-6 py-3 text-slate-300">Audit logging</td>
-              <td class="px-6 py-3 text-green-400">Built-in (4 privacy levels)</td>
-              <td class="px-6 py-3 text-slate-500">Build it yourself</td>
+              <td class="px-4 py-3 text-slate-300">Audit logging</td>
+              <td class="px-4 py-3 text-green-400">Built-in (4 privacy levels)</td>
+              <td class="px-4 py-3 text-slate-500">DIY</td>
+              <td class="px-4 py-3 text-slate-500">Not built-in</td>
             </tr>
             <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-6 py-3 text-slate-300">Cost tracking</td>
-              <td class="px-6 py-3 text-green-400">Automatic per-call</td>
-              <td class="px-6 py-3 text-slate-500">Manual / LangSmith</td>
+              <td class="px-4 py-3 text-slate-300">Agent evaluation</td>
+              <td class="px-4 py-3 text-green-400">Built-in (39 evaluators)</td>
+              <td class="px-4 py-3 text-slate-500">LangSmith (paid)</td>
+              <td class="px-4 py-3 text-slate-500">Not built-in</td>
             </tr>
             <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-6 py-3 text-slate-300">Injection defense</td>
-              <td class="px-6 py-3 text-green-400">15 patterns + coherence</td>
-              <td class="px-6 py-3 text-slate-500">Not included</td>
+              <td class="px-4 py-3 text-slate-300">Cost tracking</td>
+              <td class="px-4 py-3 text-green-400">Automatic per-call</td>
+              <td class="px-4 py-3 text-slate-500">Manual</td>
+              <td class="px-4 py-3 text-slate-500">Not built-in</td>
             </tr>
             <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-6 py-3 text-slate-300">Setup</td>
-              <td class="px-6 py-3 text-green-400">1 package</td>
-              <td class="px-6 py-3 text-slate-500">5+ packages</td>
+              <td class="px-4 py-3 text-slate-300">Injection defense</td>
+              <td class="px-4 py-3 text-green-400">15 patterns + coherence</td>
+              <td class="px-4 py-3 text-slate-500">Not included</td>
+              <td class="px-4 py-3 text-slate-500">Not included</td>
             </tr>
             <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-6 py-3 text-slate-300">Reasoning visibility</td>
-              <td class="px-6 py-3 text-green-400">result.reasoning</td>
-              <td class="px-6 py-3 text-slate-500">Not available</td>
+              <td class="px-4 py-3 text-slate-300">Setup</td>
+              <td class="px-4 py-3 text-green-400">1 package</td>
+              <td class="px-4 py-3 text-slate-500">5+ packages</td>
+              <td class="px-4 py-3 text-green-400">1 package</td>
             </tr>
             <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-6 py-3 text-slate-300">Agent evaluation</td>
-              <td class="px-6 py-3 text-green-400">Built-in (22 evaluators)</td>
-              <td class="px-6 py-3 text-slate-500">LangSmith (paid) or DeepEval (separate)</td>
+              <td class="px-4 py-3 text-slate-300">Multi-agent</td>
+              <td class="px-4 py-3 text-yellow-400">Coming v0.17.1</td>
+              <td class="px-4 py-3 text-green-400">LangGraph</td>
+              <td class="px-4 py-3 text-green-400">Core feature</td>
             </tr>
             <tr class="comparison-row">
-              <td class="px-6 py-3 text-slate-300">Community</td>
-              <td class="px-6 py-3 text-yellow-400">Growing</td>
-              <td class="px-6 py-3 text-green-400">Massive</td>
+              <td class="px-4 py-3 text-slate-300">Community</td>
+              <td class="px-4 py-3 text-yellow-400">Growing</td>
+              <td class="px-4 py-3 text-green-400">Massive</td>
+              <td class="px-4 py-3 text-green-400">Large</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="text-xl font-semibold mb-4 mt-12 text-center">Eval Framework Comparison</h3>
+      <div class="code-block rounded-xl border border-slate-700 overflow-hidden overflow-x-auto">
+        <table class="w-full text-sm" style="min-width:700px">
+          <thead>
+            <tr class="border-b border-slate-700 text-left">
+              <th class="px-4 py-3 font-semibold text-slate-300">Capability</th>
+              <th class="px-4 py-3 font-semibold text-brand-cyan">Selectools</th>
+              <th class="px-4 py-3 font-semibold text-slate-400">DeepEval</th>
+              <th class="px-4 py-3 font-semibold text-slate-400">Promptfoo</th>
+              <th class="px-4 py-3 font-semibold text-slate-400">LangSmith</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-4 py-3 text-slate-300">Install</td>
+              <td class="px-4 py-3 text-green-400">Built-in</td>
+              <td class="px-4 py-3 text-slate-500">Separate pip</td>
+              <td class="px-4 py-3 text-slate-500">Node.js CLI</td>
+              <td class="px-4 py-3 text-slate-500">pip + account</td>
+            </tr>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-4 py-3 text-slate-300">Evaluators</td>
+              <td class="px-4 py-3 text-green-400">39</td>
+              <td class="px-4 py-3 text-green-400">50+</td>
+              <td class="px-4 py-3 text-slate-500">~20</td>
+              <td class="px-4 py-3 text-slate-500">~8</td>
+            </tr>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-4 py-3 text-slate-300">A/B testing</td>
+              <td class="px-4 py-3 text-green-400">PairwiseEval</td>
+              <td class="px-4 py-3 text-slate-500">No</td>
+              <td class="px-4 py-3 text-slate-500">Side-by-side</td>
+              <td class="px-4 py-3 text-slate-500">Experiments</td>
+            </tr>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-4 py-3 text-slate-300">Snapshot testing</td>
+              <td class="px-4 py-3 text-green-400">SnapshotStore</td>
+              <td class="px-4 py-3 text-slate-500">No</td>
+              <td class="px-4 py-3 text-slate-500">No</td>
+              <td class="px-4 py-3 text-slate-500">No</td>
+            </tr>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-4 py-3 text-slate-300">Regression detection</td>
+              <td class="px-4 py-3 text-green-400">Local (JSON)</td>
+              <td class="px-4 py-3 text-slate-500">Cloud only</td>
+              <td class="px-4 py-3 text-green-400">CLI + GitHub</td>
+              <td class="px-4 py-3 text-slate-500">SaaS only</td>
+            </tr>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-4 py-3 text-slate-300">HTML report</td>
+              <td class="px-4 py-3 text-green-400">Interactive (charts)</td>
+              <td class="px-4 py-3 text-slate-500">Cloud only</td>
+              <td class="px-4 py-3 text-green-400">Self-contained</td>
+              <td class="px-4 py-3 text-slate-500">SaaS UI</td>
+            </tr>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-4 py-3 text-slate-300">Works offline</td>
+              <td class="px-4 py-3 text-green-400">Yes</td>
+              <td class="px-4 py-3 text-slate-500">Partial</td>
+              <td class="px-4 py-3 text-green-400">Yes</td>
+              <td class="px-4 py-3 text-slate-500">No</td>
+            </tr>
+            <tr class="comparison-row">
+              <td class="px-4 py-3 text-slate-300">Price</td>
+              <td class="px-4 py-3 text-green-400">Free</td>
+              <td class="px-4 py-3 text-green-400">Free + SaaS</td>
+              <td class="px-4 py-3 text-green-400">Free</td>
+              <td class="px-4 py-3 text-slate-500">$39/seat/mo</td>
             </tr>
           </tbody>
         </table>

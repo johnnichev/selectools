@@ -99,15 +99,45 @@ class EvalSuite:
             "pricing_available": prompt_cost_per_m > 0,
         }
 
+    def _notify_observers(self, event: str, **kwargs: Any) -> None:
+        """Fire observer events if the agent has observers configured."""
+        if not hasattr(self.agent, "config") or not hasattr(self.agent.config, "observers"):
+            return
+        observers = self.agent.config.observers or []
+        handler = f"on_{event}"
+        for obs in observers:
+            fn = getattr(obs, handler, None)
+            if fn:
+                try:
+                    fn(**kwargs)
+                except Exception:  # nosec B110
+                    pass  # Observer errors must not break the eval
+
     def run(self) -> EvalReport:
         """Run all cases synchronously and return an EvalReport."""
         start = time.perf_counter()
         run_id = uuid.uuid4().hex[:12]
 
+        model = ""
+        if hasattr(self.agent, "config") and hasattr(self.agent.config, "model"):
+            model = self.agent.config.model or ""
+        self._notify_observers(
+            "eval_start", suite_name=self.name, total_cases=len(self.cases), model=model
+        )
+
         if self.max_concurrency <= 1:
             results = []
             for i, case in enumerate(self.cases):
-                results.append(self._run_case(case))
+                cr = self._run_case(case)
+                results.append(cr)
+                self._notify_observers(
+                    "eval_case_end",
+                    suite_name=self.name,
+                    case_name=cr.case.name or cr.case.input[:50],
+                    verdict=cr.verdict.value,
+                    latency_ms=cr.latency_ms,
+                    failures=len(cr.failures),
+                )
                 if self.on_progress:
                     self.on_progress(i + 1, len(self.cases))
         else:
@@ -241,4 +271,17 @@ class EvalSuite:
             tags=self.tags,
         )
 
-        return EvalReport(metadata=metadata, case_results=case_results)
+        report = EvalReport(metadata=metadata, case_results=case_results)
+
+        self._notify_observers(
+            "eval_end",
+            suite_name=self.name,
+            accuracy=report.accuracy,
+            total_cases=len(case_results),
+            pass_count=report.pass_count,
+            fail_count=report.fail_count,
+            total_cost=report.total_cost,
+            duration_ms=duration_ms,
+        )
+
+        return report
