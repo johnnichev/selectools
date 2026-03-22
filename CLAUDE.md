@@ -90,7 +90,7 @@ src/selectools/
     ├── junit.py             # JUnit XML for CI
     └── __main__.py          # CLI: python -m selectools.evals
 
-tests/                       # 1960 tests (unit, integration, regression, E2E)
+tests/                       # 1993 tests (unit, integration, regression, E2E)
 ├── agent/                   # Agent core tests
 ├── providers/               # Provider-specific tests
 ├── rag/                     # RAG pipeline tests
@@ -310,6 +310,6 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 - **v0.16.6** ✅ Gemini thought_signature crash fix (base64 round-trip for non-UTF-8 binary signatures)
 - **v0.16.7** ✅ Cleanup (CLI removal, README example table, doc count audit)
 - **v0.17.0** ✅ Eval Framework (39 evaluators, A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing, live dashboard, badges, CLI, templates, history, observer events)
-- **v0.17.1** 🟡 MCP Client/Server — MCPClient, mcp_tools(), MCPServer, MultiMCPClient
+- **v0.17.1** ✅ MCP Client/Server — MCPClient, mcp_tools(), MCPServer, MultiMCPClient, circuit breaker
 - **v0.17.2** 🟡 Multi-Agent Orchestration — see `MULTI_AGENT_PLAN.md`
 - **Backlog**: Serve & Deploy, Connector Expansion, Structured AgentConfig, Polish & Community

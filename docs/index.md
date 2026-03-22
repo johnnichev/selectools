@@ -138,7 +138,7 @@ print(result.reasoning)       # Why the agent chose get_weather
 | **Cross-Session Knowledge** | Daily logs + persistent facts with auto-registered `remember` tool |
 | **AgentObserver Protocol** | 28-event lifecycle observer with run/call ID correlation and OTel export |
 | **Eval Framework** | 22 built-in evaluators, A/B testing, regression detection, HTML reports, JUnit XML |
-| **1960 Tests** | Unit, integration, regression, and E2E |
+| **1993 Tests** | Unit, integration, regression, and E2E |
 
 ---
 
@@ -213,7 +213,7 @@ Loop continues or returns AgentResult (.parsed, .trace, .reasoning)
 [:fontawesome-brands-python: PyPI Package](https://pypi.org/project/selectools/){ .md-button }
 [:fontawesome-brands-github: GitHub Repository](https://github.com/johnnichev/selectools){ .md-button }
 [:material-notebook: Getting Started Notebook](https://github.com/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb){ .md-button }
-[:material-code-tags: 40 Example Scripts](https://github.com/johnnichev/selectools/tree/main/examples){ .md-button }
+[:material-code-tags: 42 Example Scripts](https://github.com/johnnichev/selectools/tree/main/examples){ .md-button }
 
 ---
 

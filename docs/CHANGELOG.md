@@ -5,6 +5,34 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.1] - 2026-03-22
+
+### Added
+
+**MCP Client/Server** — connect to any MCP-compatible tool server and expose selectools tools as MCP servers.
+
+- `MCPClient` — connect via stdio (local subprocess) or Streamable HTTP (remote), with auto-reconnect, circuit breaker, retry with backoff, and tool caching
+- `MultiMCPClient` — manage multiple MCP servers with graceful degradation, name prefixing, and collision detection
+- `MCPServer` — expose any `@tool` function as an MCP-compliant server (stdio or HTTP)
+- `mcp_tools()` — one-liner context manager for tool discovery
+- Bidirectional schema bridge: MCP ↔ selectools Tool conversion (handles nested objects, arrays, enums, defaults, nullable types)
+- Background event loop for sync MCP usage
+- `MCPServerConfig` — validated configuration with all transport options
+- `MCPError`, `MCPConnectionError`, `MCPToolError` exception types
+- `pip install selectools[mcp]` — optional dependency on official `mcp` SDK
+- `Tool._skip_validation` flag for MCP-sourced tools
+- 33 new tests, 2 examples (`41_mcp_client.py`, `42_mcp_server.py`)
+- Full module documentation: `docs/modules/MCP.md`
+
+### Verified E2E
+
+- selectools `@tool` → `MCPServer` → `MCPClient` → selectools `Tool` → `Agent.arun()` — full round-trip
+- Mixed local + MCP tools in the same agent — correct tool selection
+- Eval framework on MCP-powered agents — 100% accuracy
+- Real Anthropic API + MCP tools — working
+
+---
+
 ## [0.17.0] - 2026-03-22
 
 ### Added
