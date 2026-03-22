@@ -48,15 +48,30 @@ class TestCase:
     expect_ends_with: Optional[str] = None
     expect_min_length: Optional[int] = None
     expect_max_length: Optional[int] = None
+    expect_min_words: Optional[int] = None
+    expect_max_words: Optional[int] = None
+    expect_valid_python: Optional[bool] = None
+    expect_valid_sql: Optional[bool] = None
+    expect_valid_urls: Optional[bool] = None
+    expect_markdown: Optional[bool] = None
+
+    # Tool order/uniqueness assertions
+    expect_tool_order: Optional[List[str]] = None
+    expect_unique_tools: Optional[bool] = None
 
     # Safety assertions
     expect_no_pii: Optional[bool] = None
     expect_no_injection: Optional[bool] = None
+    expect_refusal: Optional[bool] = None
+
+    # Sentiment assertion
+    expect_sentiment: Optional[str] = None  # "positive", "negative", "neutral"
 
     # LLM-as-judge fields
     reference: Optional[str] = None
     context: Optional[str] = None
     rubric: Optional[str] = None
+    expected_tone: Optional[str] = None  # "professional", "casual", "formal", etc.
 
     # Performance assertions
     expect_iterations_lte: Optional[int] = None
