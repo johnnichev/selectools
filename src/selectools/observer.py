@@ -405,6 +405,19 @@ class AgentObserver:
         """Called when the agent run is cancelled via a CancellationToken."""
 
     # ------------------------------------------------------------------
+    # Model switching events
+    # ------------------------------------------------------------------
+
+    def on_model_switch(
+        self,
+        run_id: str,
+        iteration: int,
+        old_model: str,
+        new_model: str,
+    ) -> None:
+        """Called when the model_selector switches the model for an iteration."""
+
+    # ------------------------------------------------------------------
     # Eval events
     # ------------------------------------------------------------------
 
@@ -727,6 +740,15 @@ class LoggingObserver(AgentObserver):
 
     def on_cancelled(self, run_id: str, iteration: int, reason: str) -> None:
         self._emit("cancelled", run_id, iteration=iteration, reason=reason)
+
+    def on_model_switch(self, run_id: str, iteration: int, old_model: str, new_model: str) -> None:
+        self._emit(
+            "model_switch",
+            run_id,
+            iteration=iteration,
+            old_model=old_model,
+            new_model=new_model,
+        )
 
     def on_eval_start(self, suite_name: str, total_cases: int, model: str) -> None:
         self._emit("eval_start", "", suite_name=suite_name, total_cases=total_cases, model=model)
@@ -1081,6 +1103,19 @@ class AsyncAgentObserver(AgentObserver):
     ) -> None:
         """Async counterpart of :meth:`on_cancelled`."""
 
+    # ------------------------------------------------------------------
+    # Model switching events
+    # ------------------------------------------------------------------
+
+    async def a_on_model_switch(
+        self,
+        run_id: str,
+        iteration: int,
+        old_model: str,
+        new_model: str,
+    ) -> None:
+        """Async counterpart of :meth:`on_model_switch`."""
+
 
 # ======================================================================
 # Convenience observers
@@ -1272,6 +1307,15 @@ class SimpleStepObserver(AgentObserver):
 
     def on_cancelled(self, run_id: str, iteration: int, reason: str) -> None:
         self._cb("cancelled", run_id, iteration=iteration, reason=reason)
+
+    def on_model_switch(self, run_id: str, iteration: int, old_model: str, new_model: str) -> None:
+        self._cb(
+            "model_switch",
+            run_id,
+            iteration=iteration,
+            old_model=old_model,
+            new_model=new_model,
+        )
 
     def on_eval_start(self, suite_name: str, total_cases: int, model: str) -> None:
         self._cb("eval_start", "", suite_name=suite_name, total_cases=total_cases, model=model)

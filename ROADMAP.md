@@ -205,7 +205,7 @@ v0.17.1  ✅ MCP Client/Server
 v0.17.3  ✅ Agent Runtime Controls
          Token budget → Cancellation → Cost attribution → Structured results → Approval gate → SimpleStepObserver
 
-v0.17.4  🟡 Agent Intelligence
+v0.17.4  ✅ Agent Intelligence
          Token estimation → Model switching → Knowledge memory enhancement (4 store backends)
 
 v0.18.0  🟡 Multi-Agent Orchestration

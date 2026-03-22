@@ -1,6 +1,6 @@
 """Public exports for the selectools package."""
 
-__version__ = "0.17.3"
+__version__ = "0.17.4"
 
 # Import submodules (lazy loading for optional dependencies)
 from . import embeddings, evals, guardrails, models, rag, toolbox
@@ -34,7 +34,13 @@ from .guardrails import (
     TopicGuardrail,
     ToxicityGuardrail,
 )
-from .knowledge import KnowledgeMemory
+from .knowledge import (
+    FileKnowledgeStore,
+    KnowledgeEntry,
+    KnowledgeMemory,
+    KnowledgeStore,
+    SQLiteKnowledgeStore,
+)
 from .knowledge_graph import (
     InMemoryTripleStore,
     KnowledgeGraphMemory,
@@ -73,6 +79,7 @@ from .sessions import (
     SQLiteSessionStore,
 )
 from .structured import ResponseFormat
+from .token_estimation import TokenEstimate, estimate_run_tokens, estimate_tokens
 from .tools import Tool, ToolParameter, ToolRegistry, tool
 from .trace import AgentTrace, StepType, TraceStep
 from .types import AgentResult, Message, Role, ToolCall
@@ -177,6 +184,14 @@ __all__ = [
     "EntityMemory",
     # Knowledge Memory
     "KnowledgeMemory",
+    "KnowledgeEntry",
+    "KnowledgeStore",
+    "FileKnowledgeStore",
+    "SQLiteKnowledgeStore",
+    # Token estimation
+    "TokenEstimate",
+    "estimate_tokens",
+    "estimate_run_tokens",
     # Knowledge Graph
     "Triple",
     "TripleStore",

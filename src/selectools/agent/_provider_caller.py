@@ -37,7 +37,7 @@ class _ProviderCallerMixin:
             self.config.stream and getattr(self.provider, "supports_streaming", False)
         ):
             cache_key = CacheKeyBuilder.build(
-                model=self.config.model,
+                model=self._effective_model,
                 system_prompt=self._system_prompt,
                 messages=self._history,
                 tools=self.tools,
@@ -53,7 +53,7 @@ class _ProviderCallerMixin:
                         "on_llm_start",
                         run_id,
                         self._history,
-                        self.config.model,
+                        self._effective_model,
                         self._system_prompt,
                     )
                     self._notify_observers(
@@ -65,7 +65,7 @@ class _ProviderCallerMixin:
                     self._notify_observers(
                         "on_cache_hit",
                         run_id,
-                        self.config.model,
+                        self._effective_model,
                         cached_msg.content or "",
                     )
                     self._notify_observers("on_usage", run_id, cached_usage)
@@ -76,8 +76,8 @@ class _ProviderCallerMixin:
                         TraceStep(
                             type=StepType.CACHE_HIT,
                             duration_ms=(time.time() - call_start) * 1000,
-                            model=self.config.model,
-                            summary=f"Cache hit: {self.config.model}",
+                            model=self._effective_model,
+                            summary=f"Cache hit: {self._effective_model}",
                         )
                     )
                 return cached_msg
@@ -93,7 +93,7 @@ class _ProviderCallerMixin:
                         "on_llm_start",
                         run_id,
                         self._history,
-                        self.config.model,
+                        self._effective_model,
                         self._system_prompt,
                     )
 
@@ -104,7 +104,7 @@ class _ProviderCallerMixin:
                     return Message(role=Role.ASSISTANT, content=response_text)
 
                 response_msg, usage_stats = self.provider.complete(
-                    model=self.config.model,
+                    model=self._effective_model,
                     system_prompt=self._system_prompt,
                     messages=self._history,
                     tools=self.tools,
@@ -144,11 +144,11 @@ class _ProviderCallerMixin:
                         TraceStep(
                             type=StepType.LLM_CALL,
                             duration_ms=(time.time() - call_start) * 1000,
-                            model=self.config.model,
+                            model=self._effective_model,
                             prompt_tokens=usage_stats.prompt_tokens,
                             completion_tokens=usage_stats.completion_tokens,
                             cost_usd=usage_stats.cost_usd,
-                            summary=f"{self.config.model} → {len(response_text)} chars",
+                            summary=f"{self._effective_model} → {len(response_text)} chars",
                         )
                     )
                 return response_msg
@@ -185,7 +185,7 @@ class _ProviderCallerMixin:
                 TraceStep(
                     type=StepType.LLM_CALL,
                     duration_ms=(time.time() - call_start) * 1000,
-                    model=self.config.model,
+                    model=self._effective_model,
                     error=last_error,
                     summary=f"Provider error: {last_error}",
                 )
@@ -200,7 +200,7 @@ class _ProviderCallerMixin:
 
         aggregated: List[str] = []
         for chunk in self.provider.stream(
-            model=self.config.model,
+            model=self._effective_model,
             system_prompt=self._system_prompt,
             messages=self._history,
             tools=self.tools,
@@ -233,7 +233,7 @@ class _ProviderCallerMixin:
             self.config.stream and getattr(self.provider, "supports_streaming", False)
         ):
             cache_key = CacheKeyBuilder.build(
-                model=self.config.model,
+                model=self._effective_model,
                 system_prompt=self._system_prompt,
                 messages=self._history,
                 tools=self.tools,
@@ -249,7 +249,7 @@ class _ProviderCallerMixin:
                         "on_llm_start",
                         run_id,
                         self._history,
-                        self.config.model,
+                        self._effective_model,
                         self._system_prompt,
                     )
                     self._notify_observers(
@@ -261,7 +261,7 @@ class _ProviderCallerMixin:
                     self._notify_observers(
                         "on_cache_hit",
                         run_id,
-                        self.config.model,
+                        self._effective_model,
                         cached_msg.content or "",
                     )
                     self._notify_observers("on_usage", run_id, cached_usage)
@@ -272,8 +272,8 @@ class _ProviderCallerMixin:
                         TraceStep(
                             type=StepType.CACHE_HIT,
                             duration_ms=(time.time() - call_start) * 1000,
-                            model=self.config.model,
-                            summary=f"Cache hit: {self.config.model}",
+                            model=self._effective_model,
+                            summary=f"Cache hit: {self._effective_model}",
                         )
                     )
                 return cached_msg
@@ -289,14 +289,14 @@ class _ProviderCallerMixin:
                         "on_llm_start",
                         run_id,
                         self._history,
-                        self.config.model,
+                        self._effective_model,
                         self._system_prompt,
                     )
                     await self._anotify_observers(
                         "on_llm_start",
                         run_id,
                         self._history,
-                        self.config.model,
+                        self._effective_model,
                         self._system_prompt,
                     )
 
@@ -312,7 +312,7 @@ class _ProviderCallerMixin:
                     self.provider, "supports_async", False
                 ):
                     response_msg, usage_stats = await self.provider.acomplete(
-                        model=self.config.model,
+                        model=self._effective_model,
                         system_prompt=self._system_prompt,
                         messages=self._history,
                         tools=self.tools,
@@ -328,7 +328,7 @@ class _ProviderCallerMixin:
                         response_msg, usage_stats = await loop.run_in_executor(
                             executor,
                             lambda: self.provider.complete(
-                                model=self.config.model,
+                                model=self._effective_model,
                                 system_prompt=self._system_prompt,
                                 messages=self._history,
                                 tools=self.tools,
@@ -371,11 +371,11 @@ class _ProviderCallerMixin:
                         TraceStep(
                             type=StepType.LLM_CALL,
                             duration_ms=(time.time() - call_start) * 1000,
-                            model=self.config.model,
+                            model=self._effective_model,
                             prompt_tokens=usage_stats.prompt_tokens,
                             completion_tokens=usage_stats.completion_tokens,
                             cost_usd=usage_stats.cost_usd,
-                            summary=f"{self.config.model} → {len(response_text)} chars",
+                            summary=f"{self._effective_model} → {len(response_text)} chars",
                         )
                     )
                 return response_msg
@@ -412,7 +412,7 @@ class _ProviderCallerMixin:
                 TraceStep(
                     type=StepType.LLM_CALL,
                     duration_ms=(time.time() - call_start) * 1000,
-                    model=self.config.model,
+                    model=self._effective_model,
                     error=last_error,
                     summary=f"Provider error: {last_error}",
                 )
@@ -430,7 +430,7 @@ class _ProviderCallerMixin:
 
         if hasattr(self.provider, "astream") and getattr(self.provider, "supports_async", False):
             stream = self.provider.astream(  # type: ignore[attr-defined]
-                model=self.config.model,
+                model=self._effective_model,
                 system_prompt=self._system_prompt,
                 messages=self._history,
                 tools=self.tools,
@@ -445,7 +445,7 @@ class _ProviderCallerMixin:
                         stream_handler(chunk)
         else:
             for chunk in self.provider.stream(
-                model=self.config.model,
+                model=self._effective_model,
                 system_prompt=self._system_prompt,
                 messages=self._history,
                 tools=self.tools,
