@@ -312,6 +312,6 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 - **v0.17.0** ✅ Eval Framework (39 evaluators, A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing, live dashboard, badges, CLI, templates, history, observer events)
 - **v0.17.1** ✅ MCP Client/Server — MCPClient, mcp_tools(), MCPServer, MultiMCPClient, circuit breaker
 - **v0.17.3** ✅ Agent Runtime Controls — token budget, cancellation, cost attribution, structured results, approval gate, SimpleStepObserver
-- **v0.17.4** 🟡 Agent Intelligence — token estimation, model switching, knowledge memory enhancement (4 store backends)
+- **v0.17.4** ✅ Agent Intelligence — token estimation, model switching, knowledge memory enhancement (4 store backends)
 - **v0.18.0** 🟡 Multi-Agent Orchestration — see `MULTI_AGENT_PLAN.md`
 - **Backlog**: Serve & Deploy, Connector Expansion, Structured AgentConfig, Polish & Community

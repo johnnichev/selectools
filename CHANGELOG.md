@@ -5,6 +5,16 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.4] - 2026-03-22
+
+### Added
+
+- **Pre-Execution Token Estimation (R6)**: `estimate_tokens()` and `estimate_run_tokens()` for budget pre-checks. Uses tiktoken for OpenAI models when installed, falls back to `chars/4` heuristic. `TokenEstimate` dataclass with breakdown.
+- **Model Switching Per Iteration (R10)**: `model_selector` callback on `AgentConfig`. `_effective_model` property used throughout provider caller. `on_model_switch` observer event.
+- **Knowledge Memory Enhancement (R3)**: `KnowledgeEntry` with importance, TTL, categories. `KnowledgeStore` protocol with `FileKnowledgeStore` and `SQLiteKnowledgeStore`. Importance-based eviction. Backward-compatible.
+- New exports: `TokenEstimate`, `estimate_tokens`, `estimate_run_tokens`, `KnowledgeEntry`, `KnowledgeStore`, `FileKnowledgeStore`, `SQLiteKnowledgeStore`.
+- 58 new tests (total: 1966).
+
 ## [0.17.3] - 2026-03-22
 
 ### Added
