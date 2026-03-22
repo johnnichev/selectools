@@ -196,11 +196,11 @@ v0.16.5  ✅ Design Patterns & Code Quality
          StepType/ModelType enums → Agent mixin split → Provider base class → Terminal actions
          → Async observers → Gemini 3.x thought signatures → Hooks deprecation → ADRs
 
-v0.17.0  🟡 Multi-Agent Orchestration
-         AgentGraph → GraphState → Checkpointing → Parallel nodes → SupervisorAgent
+v0.17.0  🟡 Eval Framework
+         EvalSuite → TestCase → built-in evaluators → HTML report → regression detection
 
-v0.17.1  🟡 Eval Framework
-         EvalSuite → TestCase → EvalRunner → built-in evaluators → HTML report
+v0.17.1  🟡 Multi-Agent Orchestration
+         AgentGraph → GraphState → Checkpointing → Parallel nodes → SupervisorAgent
 
 v0.17.2  🟡 MCP Client/Server
          MCPClient → mcp_tools() → MCPServer → tool interop
@@ -250,234 +250,7 @@ Removed unused CLI module (`cli.py` + console script entry point). Completed REA
 
 ---
 
-## v0.17.0: Multi-Agent Orchestration
-
-Focus: DAG-based multi-agent workflows that are simpler and more Pythonic than LangGraph.
-
-### Design Philosophy
-
-LangGraph requires learning StateGraph, MessageAnnotation, Pregel channels, and a custom checkpointing API before building anything. Selectools takes the opposite approach: **agents are the primitive, composition is plain Python**. An `AgentGraph` should feel like writing normal Python with `async/await`, not configuring a data pipeline.
-
-**Core principles**:
-
-1. **Agents are nodes, not functions** — each node is a full `Agent` instance with its own tools, provider, and config, reusing all existing infrastructure (traces, observers, guardrails, policies)
-2. **Edges are just Python functions** — no special `ConditionalEdge` class; a routing function takes the result and returns the next node name via plain `if/elif/else`
-3. **State is a typed dataclass** — no Pydantic models for state; just a `@dataclass` that gets passed between nodes
-4. **Checkpointing is serialization** — the state is JSON-serializable; checkpoint stores implement a 3-method protocol
-5. **HITL reuses existing patterns** — the existing `ToolPolicy` + `confirm_action` pattern already handles human-in-the-loop
-
-### Module Structure
-
-```
-src/selectools/orchestration/
-    __init__.py           # Public exports: AgentGraph, GraphNode, GraphState, GraphResult
-    graph.py              # AgentGraph: the DAG-based orchestration engine
-    node.py               # GraphNode: wraps Agent with input/output transforms
-    state.py              # GraphState: typed state container with merge semantics
-    checkpoint.py         # CheckpointStore protocol + InMemory, File, SQLite backends
-    supervisor.py         # SupervisorAgent: meta-agent for task decomposition
-    mcp.py                # MCP client/server integration
-```
-
-### Core Abstractions
-
-#### GraphState
-
-```python
-@dataclass
-class GraphState:
-    messages: List[Message]                    # Accumulated messages across nodes
-    data: Dict[str, Any]                       # Arbitrary key-value store for inter-node communication
-    current_node: str                          # Name of the currently executing node
-    history: List[Tuple[str, AgentResult]]     # Ordered list of (node_name, result) pairs
-    metadata: Dict[str, Any]                   # User-attached metadata (carried through checkpoints)
-```
-
-Intentionally flat and JSON-serializable. No Pydantic, no custom descriptors, no annotation magic.
-
-#### GraphNode
-
-```python
-@dataclass
-class GraphNode:
-    name: str
-    agent: Union[Agent, Callable[[GraphState], GraphState]]
-    input_transform: Optional[Callable[[GraphState], List[Message]]] = None   # state → messages for Agent.run()
-    output_transform: Optional[Callable[[AgentResult, GraphState], GraphState]] = None  # merge result into state
-    max_iterations: int = 1   # How many times this node can run in a cycle
-```
-
-If `input_transform`/`output_transform` are not provided, sensible defaults are used (last message becomes user message; result appends to state messages).
-
-#### AgentGraph
-
-```python
-class AgentGraph:
-    """DAG-based multi-agent orchestration engine."""
-
-    # Constants
-    END: ClassVar[str] = "__end__"
-
-    # Node management
-    def add_node(self, name: str, agent: Union[Agent, Callable], **kwargs) -> None: ...
-    def add_edge(self, from_node: str, to_node: str) -> None: ...
-    def add_conditional_edge(self, from_node: str, router_fn: Callable[[GraphState], str]) -> None: ...
-    def add_parallel_nodes(self, name: str, node_names: List[str], merge_fn: Optional[Callable] = None) -> None: ...
-    def set_entry(self, node_name: str) -> None: ...
-
-    # Execution
-    def run(self, prompt_or_state: Union[str, GraphState], checkpoint_store: Optional[CheckpointStore] = None) -> GraphResult: ...
-    def arun(self, prompt_or_state: ..., checkpoint_store: ...) -> GraphResult: ...
-    async def astream(self, prompt_or_state: ...) -> AsyncGenerator[GraphEvent, None]: ...
-
-    # Validation
-    def validate(self) -> List[str]: ...  # Returns list of warnings/errors
-```
-
-**Usage example**:
-
-```python
-from selectools.orchestration import AgentGraph
-
-graph = AgentGraph()
-graph.add_node("planner", planner_agent)
-graph.add_node("researcher", researcher_agent)
-graph.add_node("writer", writer_agent)
-
-graph.add_edge("planner", "researcher")
-graph.add_conditional_edge("researcher", lambda state: "writer" if state.data.get("ready") else "researcher")
-graph.add_edge("writer", AgentGraph.END)
-
-graph.set_entry("planner")
-result = graph.run("Write a blog post about AI agents")
-```
-
-#### GraphResult
-
-```python
-@dataclass
-class GraphResult:
-    content: str                                       # Final output text
-    state: GraphState                                  # Final state
-    node_results: Dict[str, List[AgentResult]]         # Per-node results
-    trace: AgentTrace                                  # Composite trace (linked via parent_run_id)
-    total_usage: UsageStats                            # Aggregated cost/tokens across all nodes
-```
-
-### How It Beats LangGraph
-
-| LangGraph                                                | Selectools AgentGraph                            | Why better                                                       |
-| -------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------- |
-| Custom `StateGraph` with `Annotated[list, add_messages]` | Plain `GraphState` dataclass                     | No custom type system to learn                                   |
-| `conditionalEdges` with special return constants         | Plain Python function returning a string         | Debuggable, testable, IDE-friendly                               |
-| Pregel channels for state management                     | `Dict[str, Any]` with merge functions            | Standard Python data structures                                  |
-| Separate `compile()` step before execution               | Validate + run in one step                       | No compilation phase, faster iteration                           |
-| `MemorySaver` / `SqliteSaver` / `PostgresSaver`          | `CheckpointStore` protocol (3 methods)           | Trivial to implement custom stores                               |
-| Node functions receive raw state                         | Nodes are full `Agent` instances                 | Inherit all Agent features: tools, traces, observers, guardrails |
-| Complex interrupt/resume for human-in-the-loop           | Reuse existing `confirm_action` on `AgentConfig` | Zero new concepts for HITL                                       |
-| Sub-graphs require `CompiledGraph` nesting               | AgentGraph can be a node in another AgentGraph   | Natural composition via duck typing                              |
-
-### Checkpointing
-
-```python
-class CheckpointStore(Protocol):
-    def save(self, graph_id: str, state: GraphState, step: int) -> str: ...    # Returns checkpoint_id
-    def load(self, checkpoint_id: str) -> Tuple[GraphState, int]: ...          # Returns (state, step)
-    def list(self, graph_id: str) -> List[str]: ...                            # List checkpoint_ids
-```
-
-Built-in implementations:
-
-- `InMemoryCheckpointStore` — dict-based, for development
-- `FileCheckpointStore` — JSON files, for single-process production
-- `SQLiteCheckpointStore` — for multi-process production
-
-Enables: resume after crash, HITL pause/resume, time travel debugging.
-
-### Parallel Execution
-
-```python
-graph.add_parallel_nodes("research_step", ["researcher_a", "researcher_b", "researcher_c"])
-graph.add_edge("research_step", "synthesizer")
-```
-
-Uses `asyncio.gather()` (async) or `ThreadPoolExecutor` (sync) — same pattern already in `agent/core.py` for parallel tool execution. Configurable `merge_fn(List[GraphState]) -> GraphState` (default: concatenate messages, shallow-merge data dicts).
-
-### Sub-Graphs and Composition
-
-An `AgentGraph` satisfies the `Agent`-like interface, so it can be a node in another graph:
-
-```python
-research_subgraph = AgentGraph()
-# ... define nodes ...
-
-main_graph = AgentGraph()
-main_graph.add_node("research", research_subgraph)   # Sub-graph as a node
-main_graph.add_node("writer", writer_agent)
-main_graph.add_edge("research", "writer")
-```
-
-Sub-graph traces are linked via `parent_run_id` (already supported in `trace.py`).
-
-### SupervisorAgent
-
-Higher-level abstraction for common multi-agent patterns:
-
-```python
-from selectools.orchestration import SupervisorAgent
-
-supervisor = SupervisorAgent(
-    agents={"researcher": researcher, "writer": writer, "reviewer": reviewer},
-    provider=OpenAIProvider(),
-    strategy="plan_and_execute",   # or "round_robin", "dynamic"
-)
-result = supervisor.run("Write a comprehensive blog post about AI safety")
-```
-
-The supervisor uses the provider LLM to decompose tasks and route to specialist agents. Internally builds and executes an `AgentGraph`.
-
-### MCP Integration
-
-**MCP Client** — discover and call tools from MCP-compliant servers:
-
-```python
-from selectools.orchestration.mcp import MCPClient, mcp_tools
-
-client = MCPClient(server_url="http://localhost:8080")
-tools = mcp_tools(client)   # Returns List[Tool] that proxy to MCP server
-
-agent = Agent(tools=tools + local_tools, provider=provider)
-```
-
-**MCP Server** — expose `@tool` functions as MCP-compliant endpoints:
-
-```python
-from selectools.orchestration.mcp import MCPServer
-
-server = MCPServer(tools=[search_tool, calculator_tool])
-server.serve(host="0.0.0.0", port=8080)
-```
-
-### Integration with Existing Systems
-
-- **Observers**: Graph `run_id` becomes each node's `parent_run_id`, creating a hierarchical trace tree
-- **Guardrails**: Per-node (each Agent's own guardrails) + graph-level (before first node, after last node)
-- **Caching**: Per-node via `AgentConfig(cache=...)`
-- **Cost tracking**: Aggregated across all nodes in `GraphResult.total_usage`
-- **New StepType values**: `graph_node_start`, `graph_node_end`, `graph_routing`, `graph_checkpoint`
-
-| Feature                     | Status    | Impact | Effort |
-| --------------------------- | --------- | ------ | ------ |
-| **AgentGraph + GraphState** | 🟡 High   | High   | Large  |
-| **Checkpointing**           | 🟡 High   | High   | Medium |
-| **Parallel Nodes**          | 🟡 Medium | High   | Medium |
-| **SupervisorAgent**         | 🟡 Medium | High   | Medium |
-| **MCP Client**              | ⏸️ Moved to v0.17.2 | Medium | Medium |
-| **MCP Server**              | ⏸️ Moved to v0.17.2 | Medium | Medium |
-
----
-
-## v0.17.1: Eval Framework
+## v0.17.0: Eval Framework
 
 Focus: Built-in evaluation and testing for AI agents — a capability no other framework ships as a library feature.
 
@@ -511,9 +284,14 @@ print(report.total_cost)     # $0.003
 ```
 src/selectools/evals/
     __init__.py          # Public exports
-    suite.py             # EvalSuite, TestCase
+    types.py             # TestCase, CaseResult, CaseVerdict, EvalFailure
+    suite.py             # EvalSuite orchestration (run/arun, batch dispatch)
     evaluators.py        # Evaluator protocol + built-in evaluators
     report.py            # EvalReport with accuracy, latency, cost, regressions
+    dataset.py           # DatasetLoader (JSON/YAML/dict -> List[TestCase])
+    regression.py        # BaselineStore, RegressionDetector
+    html.py              # Self-contained HTML report renderer
+    junit.py             # JUnit XML output for CI
 ```
 
 ### Key Differentiator
@@ -525,7 +303,92 @@ Every team building agents needs evaluation. Today they either build it from scr
 | **EvalSuite + TestCase** | 🟡 High | High | Medium |
 | **Built-in Evaluators (6)** | 🟡 High | High | Medium |
 | **EvalReport** | 🟡 High | Medium | Small |
+| **Dataset Loader (JSON/YAML)** | 🟡 Medium | Medium | Small |
+| **Regression Detection** | 🟡 Medium | High | Medium |
 | **HTML Report Export** | 🟡 Medium | Medium | Small |
+| **JUnit XML for CI** | 🟡 Medium | Medium | Small |
+
+---
+
+## v0.17.1: Multi-Agent Orchestration
+
+Focus: DAG-based multi-agent workflows that are simpler and more Pythonic than LangGraph.
+
+### Design Philosophy
+
+LangGraph requires learning StateGraph, MessageAnnotation, Pregel channels, and a custom checkpointing API before building anything. Selectools takes the opposite approach: **agents are the primitive, composition is plain Python**. An `AgentGraph` should feel like writing normal Python with `async/await`, not configuring a data pipeline.
+
+**Core principles**:
+
+1. **Agents are nodes, not functions** — each node is a full `Agent` instance with its own tools, provider, and config, reusing all existing infrastructure (traces, observers, guardrails, policies)
+2. **Edges are just Python functions** — no special `ConditionalEdge` class; a routing function takes the result and returns the next node name via plain `if/elif/else`
+3. **State is a typed dataclass** — no Pydantic models for state; just a `@dataclass` that gets passed between nodes
+4. **Checkpointing is serialization** — the state is JSON-serializable; checkpoint stores implement a 3-method protocol
+5. **HITL reuses existing patterns** — the existing `ToolPolicy` + `confirm_action` pattern already handles human-in-the-loop
+
+### Module Structure
+
+```
+src/selectools/orchestration/
+    __init__.py           # Public exports: AgentGraph, GraphNode, GraphState, GraphResult
+    graph.py              # AgentGraph: the DAG-based orchestration engine
+    node.py               # GraphNode: wraps Agent with input/output transforms
+    state.py              # GraphState: typed state container with merge semantics
+    checkpoint.py         # CheckpointStore protocol + InMemory, File, SQLite backends
+    supervisor.py         # SupervisorAgent: meta-agent for task decomposition
+```
+
+### Core Abstractions
+
+#### GraphState
+
+```python
+@dataclass
+class GraphState:
+    messages: List[Message]                    # Accumulated messages across nodes
+    data: Dict[str, Any]                       # Arbitrary key-value store for inter-node communication
+    current_node: str                          # Name of the currently executing node
+    history: List[Tuple[str, AgentResult]]     # Ordered list of (node_name, result) pairs
+    metadata: Dict[str, Any]                   # User-attached metadata (carried through checkpoints)
+```
+
+Intentionally flat and JSON-serializable. No Pydantic, no custom descriptors, no annotation magic.
+
+#### AgentGraph
+
+```python
+from selectools.orchestration import AgentGraph
+
+graph = AgentGraph()
+graph.add_node("planner", planner_agent)
+graph.add_node("researcher", researcher_agent)
+graph.add_node("writer", writer_agent)
+
+graph.add_edge("planner", "researcher")
+graph.add_conditional_edge("researcher", lambda state: "writer" if state.data.get("ready") else "researcher")
+graph.add_edge("writer", AgentGraph.END)
+
+graph.set_entry("planner")
+result = graph.run("Write a blog post about AI agents")
+```
+
+### How It Beats LangGraph
+
+| LangGraph                                                | Selectools AgentGraph                            | Why better                                                       |
+| -------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------- |
+| Custom `StateGraph` with `Annotated[list, add_messages]` | Plain `GraphState` dataclass                     | No custom type system to learn                                   |
+| `conditionalEdges` with special return constants         | Plain Python function returning a string         | Debuggable, testable, IDE-friendly                               |
+| Pregel channels for state management                     | `Dict[str, Any]` with merge functions            | Standard Python data structures                                  |
+| Separate `compile()` step before execution               | Validate + run in one step                       | No compilation phase, faster iteration                           |
+| Node functions receive raw state                         | Nodes are full `Agent` instances                 | Inherit all Agent features: tools, traces, observers, guardrails |
+| Complex interrupt/resume for human-in-the-loop           | Reuse existing `confirm_action` on `AgentConfig` | Zero new concepts for HITL                                       |
+
+| Feature                     | Status    | Impact | Effort |
+| --------------------------- | --------- | ------ | ------ |
+| **AgentGraph + GraphState** | 🟡 High   | High   | Large  |
+| **Checkpointing**           | 🟡 High   | High   | Medium |
+| **Parallel Nodes**          | 🟡 Medium | High   | Medium |
+| **SupervisorAgent**         | 🟡 Medium | High   | Medium |
 
 ---
 
