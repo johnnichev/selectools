@@ -170,7 +170,9 @@ class EvalSuite:
         duration_ms: float,
     ) -> EvalReport:
         """Aggregate case results into an EvalReport."""
-        model = getattr(self.agent, "_model", "") or ""
+        model = ""
+        if hasattr(self.agent, "config") and hasattr(self.agent.config, "model"):
+            model = self.agent.config.model or ""
         provider = ""
         if hasattr(self.agent, "provider") and self.agent.provider:
             provider = type(self.agent.provider).__name__
