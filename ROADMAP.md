@@ -196,8 +196,8 @@ v0.16.5  ✅ Design Patterns & Code Quality
          StepType/ModelType enums → Agent mixin split → Provider base class → Terminal actions
          → Async observers → Gemini 3.x thought signatures → Hooks deprecation → ADRs
 
-v0.17.0  🟡 Eval Framework
-         EvalSuite → TestCase → built-in evaluators → HTML report → regression detection
+v0.17.0  ✅ Eval Framework
+         39 evaluators → A/B testing → snapshots → regression → HTML/JUnit → CI → templates
 
 v0.17.1  🟡 Multi-Agent Orchestration
          AgentGraph → GraphState → Checkpointing → Parallel nodes → SupervisorAgent
@@ -250,7 +250,7 @@ Removed unused CLI module (`cli.py` + console script entry point). Completed REA
 
 ---
 
-## v0.17.0: Eval Framework
+## v0.17.0: Eval Framework ✅
 
 Focus: Built-in evaluation and testing for AI agents — a capability no other framework ships as a library feature.
 

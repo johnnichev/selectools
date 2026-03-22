@@ -82,7 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Testing
 
-- **309 new eval tests** across 6 test files (unit, integration, E2E)
+- **340 new eval tests** across 7 test files (unit, integration, E2E, hardening)
 - 40 example scripts (2 eval-specific: `39_eval_framework.py`, `40_eval_advanced.py`)
 - Full module documentation: `docs/modules/EVALS.md`
 
