@@ -10,45 +10,66 @@ An open-source project from **[NichevLabs](https://nichevlabs.com)**.
 
 **Production-ready AI agents with tool calling, RAG, and hybrid search.** Connect LLMs to your Python functions, embed and search your documents with vector + keyword fusion, stream responses in real time, and dynamically manage tools at runtime. Works with OpenAI, Anthropic, Gemini, and Ollama. Tracks costs automatically.
 
-## What's New in v0.17.4
+## What's New in v0.17
 
-**Agent Intelligence** — token estimation, model switching per iteration, and enhanced knowledge memory.
+### v0.17.4 — Agent Intelligence
 
 ```python
-from selectools import Agent, AgentConfig, CancellationToken, estimate_run_tokens
+from selectools import AgentConfig, estimate_run_tokens, KnowledgeMemory, SQLiteKnowledgeStore
 
-# Token budget — stop before burning money
-config = AgentConfig(max_total_tokens=50000, max_cost_usd=0.20)
-
-# Cancellation — abort from any thread
-token = CancellationToken()
-result = await agent.arun("long task", cancel_token=token)
+# Pre-execution token estimation
+estimate = estimate_run_tokens(messages, tools, system_prompt, model="gpt-4o")
+print(f"{estimate.total_tokens} tokens, {estimate.remaining_tokens} remaining")
 
 # Model switching — cheap for tools, expensive for reasoning
 config = AgentConfig(
     model="claude-haiku-4-5",
     model_selector=lambda i, tc, u: "claude-sonnet-4-6" if i > 2 else "claude-haiku-4-5",
 )
+
+# Knowledge memory with pluggable stores and importance scoring
+memory = KnowledgeMemory(store=SQLiteKnowledgeStore("knowledge.db"), max_entries=50)
+memory.remember("User prefers dark mode", category="preference", importance=0.9, ttl_days=30)
 ```
 
-- **v0.17.4**: Token estimation, model switching per iteration, knowledge memory with pluggable stores (File, SQLite)
-- **v0.17.3**: Token/cost budget limits, `CancellationToken`, `SimpleStepObserver`, per-tool `requires_approval`, structured tool results, cost attribution
+### v0.17.3 — Agent Runtime Controls
 
-<details>
-<summary><strong>v0.17.1: MCP Client/Server</strong></summary>
+```python
+from selectools import AgentConfig, CancellationToken, SimpleStepObserver
+from selectools.tools import tool
 
-Connect to any MCP-compatible tool server. `pip install selectools[mcp]`
+# Token/cost budget — stop before burning money
+config = AgentConfig(max_total_tokens=50000, max_cost_usd=0.20)
+
+# Cooperative cancellation from any thread
+token = CancellationToken()
+result = await agent.arun("long task", cancel_token=token)
+# token.cancel()  ← from UI handler, supervisor, timeout manager
+
+# Per-tool approval gate
+@tool(requires_approval=True, description="Send email to customer")
+def send_email(to: str, subject: str, body: str) -> str: ...
+
+# Single-callback observer for SSE streaming
+config = AgentConfig(observers=[SimpleStepObserver(
+    lambda event, run_id, **data: sse_send({"type": event, **data})
+)])
+```
+
+### v0.17.1 — MCP Client/Server
+
+```python
+from selectools.mcp import mcp_tools, MCPServerConfig
+
+with mcp_tools(MCPServerConfig(command="python", args=["server.py"])) as tools:
+    agent = Agent(provider=provider, tools=tools, config=config)
+```
 
 - **MCPClient** — stdio + HTTP transport, circuit breaker, retry, tool caching
 - **MultiMCPClient** — multiple servers, graceful degradation, name prefixing
 - **MCPServer** — expose `@tool` functions as MCP server
 
-</details>
-
-<details>
-<summary><strong>v0.17.0: Built-in Eval Framework</strong></summary>
-
-**39 evaluators**, A/B testing, regression detection, and more. No separate install needed.
+### v0.17.0 — Built-in Eval Framework
 
 ```python
 from selectools.evals import EvalSuite, TestCase
@@ -58,24 +79,12 @@ suite = EvalSuite(agent=agent, cases=[
     TestCase(input="Balance?", expect_contains="balance", expect_latency_ms_lte=500),
 ])
 report = suite.run()
-print(report.accuracy)      # 0.95
-print(report.latency_p50)   # 142ms
 report.to_html("report.html")
 ```
 
-- **39 Evaluators** — 21 deterministic + 18 LLM-as-judge (tool use, correctness, safety, RAG, code, format)
-- **A/B Testing** — `PairwiseEval` compares two agents head-to-head
-- **Regression Detection** — `BaselineStore` tracks accuracy across runs
-- **Snapshot Testing** — Jest-style output snapshots for AI agents
-- **Pre-built Templates** — `customer_support_suite()`, `safety_suite()`, `rag_quality_suite()`, `code_quality_suite()`
-- **Interactive HTML Report** — donut chart, histogram, trend line, expandable rows, filtering
-- **GitHub Action** — automatic PR comments with eval results
-- **CLI** — `python -m selectools.evals run cases.json --html report.html`
-- **Cost Estimation** — `suite.estimate_cost()` before running
-- **History Tracking** — `HistoryStore` with trend analysis
-- **340 eval tests**, zero external dependencies
-
-</details>
+- **39 Evaluators** — 21 deterministic + 18 LLM-as-judge
+- **A/B Testing**, regression detection, snapshot testing
+- **HTML reports**, JUnit XML, CLI, GitHub Action integration
 
 > Full changelog: [CHANGELOG.md](https://github.com/johnnichev/selectools/blob/main/CHANGELOG.md)
 
