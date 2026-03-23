@@ -315,5 +315,12 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 - **v0.17.1** ✅ MCP Client/Server — MCPClient, mcp_tools(), MCPServer, MultiMCPClient, circuit breaker
 - **v0.17.3** ✅ Agent Runtime Controls — token budget, cancellation, cost attribution, structured results, approval gate, SimpleStepObserver
 - **v0.17.4** ✅ Agent Intelligence — token estimation, model switching, knowledge memory enhancement (4 store backends)
+- **v0.17.5** 🟡 Tech Debt & Quick Wins — bug fixes, ReAct/CoT strategies, tool result caching, Python 3.9–3.13 CI
+- **v0.17.6** 🟡 Caching & Context — semantic caching, prompt compression, conversation branching
 - **v0.18.0** 🟡 Multi-Agent Orchestration — see `MULTI_AGENT_PLAN.md`
-- **Backlog**: Serve & Deploy, Connector Expansion, Structured AgentConfig, Polish & Community
+- **v0.18.x** 🟡 Composability Layer — Pipeline with `@step` + `|` operator (LCEL alternative)
+- **v0.19.0** 🟡 Serve & Deploy — `selectools serve`, FastAPI/Flask, Docker/Helm, `selectools doctor`
+- **v0.19.x** 🟡 Enterprise Hardening — Apache-2.0, security audit, compliance, stability markers
+- **v0.20.0** 🟡 Advanced Agent Patterns — PlanAndExecute, ReflectiveAgent, Debate, TeamLead, 50+ evaluators
+- **v0.20.x** 🟡 Connector Expansion + Performance — Qdrant, pgvector, FAISS, Bedrock, Azure, benchmarks
+- **v0.21.0** 🟡 Polish & Community — playground, migration guide, cookbook, tool marketplace

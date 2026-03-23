@@ -208,18 +208,40 @@ v0.17.3  ✅ Agent Runtime Controls
 v0.17.4  ✅ Agent Intelligence
          Token estimation → Model switching → Knowledge memory enhancement (4 store backends)
 
+v0.17.5  🟡 Tech Debt & Quick Wins
+         Stream fallback fix → abatch thread safety → async guardrails → ReAct/CoT strategies
+         → Tool result caching → Python 3.9–3.13 CI matrix
+
+v0.17.6  🟡 Caching & Context
+         Semantic caching → Prompt compression → Conversation branching
+
 v0.18.0  🟡 Multi-Agent Orchestration
-         AgentGraph → GraphState → Checkpointing → Parallel nodes → SupervisorAgent
+         AgentGraph → GraphState → Typed reducers → Resume-from-yield interrupts
+         → Scatter fan-out → Checkpointing → SupervisorAgent → Graph visualization
+
+v0.18.x  🟡 Composability Layer
+         Pipeline primitives → @step decorator → | operator chaining → parallel/branch/retry
+         → Type-safe composition (LCEL alternative)
 
 v0.19.0  🟡 Serve & Deploy
-         FastAPI AgentRouter → Flask AgentBlueprint → Playground → Templates → YAML config
+         selectools serve CLI → FastAPI AgentRouter → Flask AgentBlueprint
+         → Playground UI → Docker/Helm templates → selectools doctor CLI
 
-v0.20.0  🟡 Connector Expansion
-         CSV/JSON/HTML/URL/Markdown loaders → FAISS/Qdrant/pgvector stores
-         → Code/search tools → SaaS loaders → GitHub/DB toolbox
+v0.19.x  🟡 Enterprise Hardening
+         Apache-2.0 license → Security audit → Stability markers (Production/Stable)
+         → Compliance features → Deprecation policy → Compatibility matrix
+
+v0.20.0  🟡 Advanced Agent Patterns
+         PlanAndExecute → ReflectiveAgent → Debate → TeamLead
+         → 50+ evaluators (semantic similarity, rubric, multi-turn coherence)
+
+v0.20.x  🟡 Connector Expansion + Performance
+         Qdrant → pgvector → FAISS → Bedrock → Azure OpenAI
+         → Confluence/GitHub/Notion/Slack loaders → Published benchmarks
 
 v0.21.0  🟡 Polish & Community
-         HTML trace viewer → Niche integrations → Tool marketplace
+         HTML trace viewer → Interactive playground → Tool marketplace
+         → LangChain migration guide → Cookbook
 ```
 
 ---
