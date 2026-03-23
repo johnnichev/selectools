@@ -1,20 +1,25 @@
 # v0.18.0 Multi-Agent Orchestration — Implementation Plan
 
-> **Status**: Ready for development — foundation work complete (see below)
-> **Preceding release**: v0.16.4 (parallel execution safety, shipped)
+> **Status**: Ready for development — foundation work complete
+> **Preceding release**: v0.17.4 (Agent Intelligence, shipped 2026-03-22)
 > **Target**: Biggest feature since the library started
 >
-> **Foundation work completed (2026-03-15)**:
-> The design patterns plan has been fully implemented (see `docs/decisions/` for ADRs),
-> providing the clean foundation this plan depends on:
+> **Foundation work completed across v0.16.5–v0.17.4**:
 > - Agent decomposed into 4 mixins (`core.py` 3128 → 1448 lines)
-> - `StepType` is now `str, Enum` — ready for the 4 new graph step types below
-> - `_execute_single_tool` / `_aexecute_single_tool` extracted — graph nodes can reuse them
-> - `AsyncAgentObserver` shipped — graph observer events can be async
+> - `StepType` is `str, Enum` with 16 members — ready for graph step types
+> - `_execute_single_tool` / `_aexecute_single_tool` extracted — graph nodes can reuse
+> - `AgentObserver` (31 sync) + `AsyncAgentObserver` (28 async) + `SimpleStepObserver` shipped
 > - Terminal action support (`tool.terminal`, `stop_condition`) — useful for HITL in graphs
-> - Provider base class — OpenAI/Ollama share `_OpenAICompatibleBase`
-> - Hooks deprecated via `_HooksAdapter` — single observer pipeline
-> - 1586 tests, 53 architecture fitness tests, shared test fixtures in conftest.py
+> - `CancellationToken` — propagatable to child agent nodes for cooperative cancellation
+> - `max_total_tokens` / `max_cost_usd` — budget limits propagatable to nodes
+> - `model_selector` — per-iteration model switching within nodes
+> - `requires_approval` on `@tool()` — per-tool HITL within nodes
+> - `KnowledgeMemory` with pluggable stores — shareable across graph nodes
+> - `estimate_run_tokens()` — pre-node token budget estimation
+> - `GraphExecutionError` already in `exceptions.py` (stub from v0.16.4)
+> - MCP client/server shipped (v0.17.1) — MCP tools work in graph nodes
+> - Eval framework shipped (v0.17.0) — can evaluate graph outputs
+> - 2113 tests, 49 examples, shared test fixtures in conftest.py
 
 ## Design Philosophy
 
@@ -34,7 +39,8 @@ LangGraph requires learning StateGraph, MessageAnnotation, Pregel channels, and 
 2. **Error handling**: Three policies — `abort` (default), `skip`, `retry` — configurable per graph.
 3. **Streaming**: `astream()` yields `GraphEvent` tagged unions (`node_start`, `node_end`, `node_chunk`, `routing`, `graph_end`).
 4. **Backward compatibility**: `Agent` class is unchanged. Graph is purely additive — no changes to existing APIs.
-5. **MCP deferred**: MCP client/server ships in v0.17.1 — it's independent of the graph engine and can be built separately.
+5. **Cancellation propagation**: Graph checks `CancellationToken` before each node; individual node agents inherit the token via their `AgentConfig`.
+6. **Budget propagation**: Graph tracks cumulative usage across all nodes; can enforce graph-level `max_total_tokens` / `max_cost_usd` in addition to per-node limits.
 
 ## Module Structure
 
@@ -153,7 +159,10 @@ class ErrorPolicy(str, Enum):
 class AgentGraph:
     END: ClassVar[str] = "__end__"
 
-    def __init__(self, name="graph", observers=None, error_policy="abort", max_steps=50): ...
+    def __init__(
+        self, name="graph", observers=None, error_policy="abort", max_steps=50,
+        cancellation_token=None, max_total_tokens=None, max_cost_usd=None,
+    ): ...
 
     # Node management
     def add_node(self, name, agent_or_callable, input_transform=None, output_transform=None, max_iterations=1): ...
@@ -208,6 +217,7 @@ if checkpoint_id:
     state, step = checkpoint_store.load(checkpoint_id)
 trace = AgentTrace(metadata={"graph_name": self.name})
 run_id = trace.run_id
+usage = AgentUsage()
 
 current = self._entry_node
 step = 0
@@ -217,6 +227,16 @@ while current != END and step < max_steps:
     step += 1
     state.current_node = current
 
+    # Graph-level cancellation check
+    if self._cancellation_token and self._cancellation_token.is_cancelled:
+        break
+
+    # Graph-level budget check
+    if self._max_total_tokens and usage.total_tokens >= self._max_total_tokens:
+        break
+    if self._max_cost_usd and usage.total_cost_usd >= self._max_cost_usd:
+        break
+
     if current in self._parallel_groups:
         results, state = await self._aexecute_parallel(...)
         node_results.update(results)
@@ -224,13 +244,14 @@ while current != END and step < max_steps:
         node = self._nodes[current]
         result, state = await self._aexecute_node(node, state, trace, run_id)
         node_results.setdefault(current, []).append(result)
+        usage.merge(result.usage)
 
     if checkpoint_store:
         checkpoint_store.save(run_id, state, step)
 
     current = self._resolve_next_node(current, state)
 
-return GraphResult(content=..., state=state, node_results=node_results, trace=trace, total_usage=aggregate(node_results))
+return GraphResult(content=..., state=state, node_results=node_results, trace=trace, total_usage=usage)
 ```
 
 **Agent integration:** Each node's agent is called via `agent.run(messages)` / `agent.arun(messages)`. The agent's `parent_run_id` is set to the graph's `run_id`, creating trace hierarchy. `input_transform(state)` produces the messages, `output_transform(result, state)` merges results back.
@@ -254,6 +275,8 @@ Add `GraphExecutionError(SelectoolsError)` with `graph_name`, `node_name`, `erro
 - Parent trace linking (`parent_run_id` propagation)
 - State isolation (deep copy verification)
 - `validate()` warnings
+- Graph-level cancellation (token checked between nodes)
+- Graph-level budget limits (stops when cumulative usage exceeds limit)
 
 **Mocking:** Use `LocalProvider` from `providers/stubs.py` for deterministic agent responses.
 
@@ -299,7 +322,7 @@ Serialization uses `GraphState.to_dict()`. Traces are excluded from checkpoints 
 
 ### Modify: `src/selectools/observer.py`
 
-Add 5 new methods to `AgentObserver` (total events: 30, including the 25 existing sync + 25 async from `AsyncAgentObserver`):
+Add 5 new methods to `AgentObserver` (total: 36 sync events, up from 31):
 
 ```python
 def on_graph_start(self, run_id: str, graph_name: str, entry_node: str, state: Dict[str, Any]) -> None: ...
@@ -309,11 +332,13 @@ def on_node_end(self, run_id: str, node_name: str, step: int, duration_ms: float
 def on_graph_routing(self, run_id: str, from_node: str, to_node: str, reason: str) -> None: ...
 ```
 
-Update `LoggingObserver` with structured JSON implementations for all 5.
+Add 5 matching async methods to `AsyncAgentObserver` (total: 33 async events, up from 28).
+
+Update `LoggingObserver` and `SimpleStepObserver` with implementations for all 5 new events.
 
 ### Modify: `src/selectools/trace.py`
 
-Add 4 new `StepType` enum members (StepType is now `str, Enum` — see ADR-003):
+Add 4 new `StepType` enum members (total: 20, up from 16):
 
 ```python
 class StepType(str, Enum):
@@ -342,6 +367,7 @@ from .orchestration import (
 ### Tests: `tests/test_orchestration_integration.py` (~40 tests)
 - Observer events fire correctly during graph execution
 - `LoggingObserver` emits JSON for all 5 new events
+- `SimpleStepObserver` routes all 5 new events to callback
 - New StepTypes appear in traces
 - Root trace has graph steps, child traces have agent steps
 - Public exports importable from `selectools` and `selectools.orchestration`
@@ -356,9 +382,13 @@ from .orchestration import (
 SupervisorStrategy = Literal["plan_and_execute", "round_robin", "dynamic"]
 
 class SupervisorAgent:
-    def __init__(self, agents: Dict[str, Agent], provider: Provider, strategy="plan_and_execute", max_rounds=10): ...
+    def __init__(
+        self, agents: Dict[str, Agent], provider: Provider, strategy="plan_and_execute",
+        max_rounds=10, cancellation_token=None, max_total_tokens=None, max_cost_usd=None,
+    ): ...
     def run(self, prompt: str) -> GraphResult: ...
     async def arun(self, prompt: str) -> GraphResult: ...
+    async def astream(self, prompt: str) -> AsyncGenerator[GraphEvent, None]: ...
 ```
 
 All three strategies internally build and execute an `AgentGraph` — the supervisor is a convenience wrapper, not a separate execution engine:
@@ -389,6 +419,9 @@ result = supervisor.run("Write a comprehensive blog post about AI safety")
 - Error propagation from underlying graph
 - Usage aggregation across supervisor runs
 - Trace hierarchy: supervisor -> graph -> nodes
+- `astream()` yields correct event sequence
+- Cancellation propagation to graph and node agents
+- Budget enforcement at supervisor level
 
 ---
 
@@ -401,18 +434,20 @@ result = supervisor.run("Write a comprehensive blog post about AI safety")
 - **Update**: `docs/index.md` — feature table, test/example counts
 - **Update**: `notebooks/getting_started.ipynb` — orchestration section
 
-### Examples
-- `examples/38_agent_graph.py` — basic linear graph
-- `examples/39_parallel_agents.py` — parallel node execution
-- `examples/40_conditional_routing.py` — conditional edges
-- `examples/41_supervisor_agent.py` — supervisor patterns
-- `examples/42_graph_checkpointing.py` — checkpoint save/resume
+### Examples (next available: 50)
+- `examples/50_agent_graph.py` — basic linear graph
+- `examples/51_parallel_agents.py` — parallel node execution
+- `examples/52_conditional_routing.py` — conditional edges
+- `examples/53_supervisor_agent.py` — supervisor patterns
+- `examples/54_graph_checkpointing.py` — checkpoint save/resume
 
 ### Release Artifacts
-- Version bump: `__init__.py` + `pyproject.toml` -> `0.17.0`
+- Version bump: `__init__.py` + `pyproject.toml` -> `0.18.0`
 - `CHANGELOG.md` entry
 - `README.md` — "What's New", test count, example count
-- `ROADMAP.md` — mark v0.17.0 features as completed
+- `ROADMAP.md` — mark v0.18.0 as completed
+- Git tag: `v0.18.0`
+- PyPI: `python3 -m build && python3 -m twine upload dist/*`
 
 ---
 
@@ -425,9 +460,11 @@ result = supervisor.run("Write a comprehensive blog post about AI safety")
 | Pregel channels for state management | `Dict[str, Any]` with merge functions | Standard Python data structures |
 | Separate `compile()` step before execution | Validate + run in one step | No compilation phase, faster iteration |
 | `MemorySaver` / `SqliteSaver` / `PostgresSaver` | `CheckpointStore` protocol (4 methods) | Trivial to implement custom stores |
-| Node functions receive raw state | Nodes are full `Agent` instances | Inherit all Agent features: tools, traces, observers, guardrails |
-| Complex interrupt/resume for HITL | Reuse existing `confirm_action` on `AgentConfig` | Zero new concepts for HITL |
+| Node functions receive raw state | Nodes are full `Agent` instances | Inherit all Agent features: tools, traces, observers, guardrails, budget, cancellation |
+| Complex interrupt/resume for HITL | Reuse existing `confirm_action` + `requires_approval` | Zero new concepts for HITL |
 | Sub-graphs require `CompiledGraph` nesting | `AgentGraph.__call__` makes any graph a node | Natural composition via duck typing |
+| No built-in budget enforcement | Graph-level `max_total_tokens` / `max_cost_usd` | Cost control across entire workflow |
+| No cooperative cancellation | `CancellationToken` propagates to all nodes | Cancel entire workflow from any thread |
 
 ---
 
@@ -448,24 +485,23 @@ result = supervisor.run("Write a comprehensive blog post about AI safety")
 | `tests/test_orchestration_checkpoint.py` | ~50 tests |
 | `tests/test_orchestration_integration.py` | ~40 tests |
 | `tests/test_orchestration_supervisor.py` | ~50 tests |
-| `examples/38-42_*.py` | 5 examples |
+| `examples/50-54_*.py` | 5 examples |
 
-### Modified (5)
+### Modified (4)
 
 | File | Changes |
 |------|---------|
-| `src/selectools/exceptions.py` | Add `GraphExecutionError` (already has the class stub from v0.16.4) |
-| `src/selectools/observer.py` | 5 new sync events + 5 matching async events on `AsyncAgentObserver` + `LoggingObserver` |
-| `src/selectools/trace.py` | 4 new `StepType` enum members |
+| `src/selectools/observer.py` | 5 new sync + 5 async events, `LoggingObserver` + `SimpleStepObserver` |
+| `src/selectools/trace.py` | 4 new `StepType` members (16 → 20) |
 | `src/selectools/__init__.py` | New exports + version bump |
 | `pyproject.toml` | Version bump |
 
-> **Note**: Agent code now lives across 5 files (`agent/core.py` + 4 mixins).
-> Graph node execution should call `agent.arun()` / `agent.run()` — no need to
-> interact with mixins directly. The `_execute_single_tool` in `_tool_executor.py`
-> is available if graph nodes need to execute tools without a full agent loop.
+> **Note**: `GraphExecutionError` already exists in `exceptions.py` — no changes needed.
+>
+> Agent code lives across 5 files (`agent/core.py` + 4 mixins).
+> Graph node execution calls `agent.arun()` / `agent.run()` — no need to interact with mixins directly.
 
-### ~305 new tests (total: ~1891, up from 1586 after design patterns work)
+### ~305 new tests (total: ~2418, up from 2113)
 
 ---
 
@@ -484,12 +520,13 @@ After all phases:
 
 ---
 
-## Open Questions
+## Resolved Design Questions
 
-> Add questions/decisions here as we iterate before development.
-
-- [ ] Should `GraphState.data` use `copy.deepcopy` or allow opt-in shallow copy for performance?
-- [ ] Should parallel node streaming yield interleaved chunks or buffer per-branch?
-- [ ] Do we need graph-level guardrails (before first node, after last node) in addition to per-node?
-- [ ] Should `SupervisorAgent` support `astream()` or just `run()`/`arun()`?
-- [ ] Is `max_steps=50` the right default? Too high for simple graphs, too low for complex ones?
+| Question | Decision | Rationale |
+|----------|----------|-----------|
+| `GraphState.data` deep copy vs shallow? | Deep copy (default) | Safety for parallel execution; opt-in shallow not worth the API complexity |
+| Parallel streaming: interleaved or buffered? | Buffer per-branch | Matches existing parallel tool execution pattern; simpler consumer code |
+| Graph-level guardrails? | Yes, optional | `input_guardrails` before first node, `output_guardrails` after last node |
+| `SupervisorAgent.astream()`? | Yes | Consistency with `Agent` and `AgentGraph` APIs |
+| `max_steps=50` default? | Keep 50 | Configurable per-graph; 50 handles most use cases without infinite loop risk |
+| Cancellation propagation? | Automatic | Graph token propagates to node agents; single cancel stops everything |
