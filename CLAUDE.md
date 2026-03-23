@@ -90,7 +90,7 @@ src/selectools/
     ├── junit.py             # JUnit XML for CI
     └── __main__.py          # CLI: python -m selectools.evals
 
-tests/                       # 2082 tests (unit, integration, regression, E2E)
+tests/                       # 2113 tests (unit, integration, regression, E2E)
 ├── agent/                   # Agent core tests
 ├── providers/               # Provider-specific tests
 ├── rag/                     # RAG pipeline tests

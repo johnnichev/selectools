@@ -97,6 +97,11 @@ nav:
     - Entity Memory: modules/ENTITY_MEMORY.md
     - Knowledge Graph: modules/KNOWLEDGE_GRAPH.md
     - Knowledge Memory: modules/KNOWLEDGE.md
+  - Runtime Controls:
+    - Token Budget: modules/BUDGET.md
+    - Cancellation: modules/CANCELLATION.md
+    - Token Estimation: modules/TOKEN_ESTIMATION.md
+    - Model Switching: modules/MODEL_SWITCHING.md
   - Providers:
     - Overview: modules/PROVIDERS.md
     - Models & Pricing: modules/MODELS.md

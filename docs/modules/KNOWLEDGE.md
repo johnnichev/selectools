@@ -1,8 +1,13 @@
 # Knowledge Module
 
-**Added in:** v0.16.0
-**File:** `src/selectools/knowledge.py`
-**Classes:** `KnowledgeMemory`
+**Added in:** v0.16.0 (enhanced in v0.17.4)
+**File:** `src/selectools/knowledge.py`, `knowledge_store_redis.py`, `knowledge_store_supabase.py`
+**Classes:** `KnowledgeMemory`, `KnowledgeEntry`, `KnowledgeStore`, `FileKnowledgeStore`, `SQLiteKnowledgeStore`, `RedisKnowledgeStore`, `SupabaseKnowledgeStore`
+
+!!! tip "v0.17.4 Enhancements"
+    Knowledge Memory now supports pluggable store backends (File, SQLite, Redis, Supabase),
+    importance scoring (0.0–1.0), TTL per entry, category filtering, and importance-based eviction.
+    The original file-based API is fully backward compatible.
 
 ## Table of Contents
 

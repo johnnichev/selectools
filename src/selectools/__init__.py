@@ -188,6 +188,9 @@ __all__ = [
     "KnowledgeStore",
     "FileKnowledgeStore",
     "SQLiteKnowledgeStore",
+    # Knowledge stores (optional deps: redis, supabase)
+    # from selectools.knowledge_store_redis import RedisKnowledgeStore
+    # from selectools.knowledge_store_supabase import SupabaseKnowledgeStore
     # Token estimation
     "TokenEstimate",
     "estimate_tokens",
