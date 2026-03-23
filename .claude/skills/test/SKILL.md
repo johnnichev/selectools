@@ -16,38 +16,48 @@ Write tests for: $ARGUMENTS
 
 ```
 tests/
-    test_<module>.py          # Unit tests per source module
-    agent/                    # Agent core, observer, batch, regression
-        test_regression.py    # ALL regression tests go here
-    providers/                # Provider-specific tests
-    rag/                      # RAG pipeline, chunking, stores
-    integration/              # Cross-module integration tests
-    tools/                    # Tool system tests
+    conftest.py               # SharedFakeProvider, fixtures, helpers
+    test_<module>.py           # Unit tests per source module
+    agent/                     # Agent core, observer, batch, regression
+        test_regression.py     # ALL regression tests go here
+    providers/                 # Provider-specific tests
+    rag/                       # RAG pipeline, chunking, stores
+    integration/               # Cross-module integration tests
+    tools/                     # Tool system tests
 ```
 
-## Mock Provider Pattern
+## SharedFakeProvider (from conftest.py)
 
-Always include `tools=None` in the signature — missing it silently hides bugs:
+Use the `fake_provider` fixture — it returns a factory. Responses can be:
+- `str` — auto-wrapped as `Message(role=ASSISTANT, content=...)`
+- `Message` — used as-is (for tool_calls, etc.)
+- `(Message, UsageStats)` tuple — controls token/cost tracking
 
 ```python
-from selectools.types import Message, Role
+def test_example(self, fake_provider):
+    # Simple text response
+    provider = fake_provider(responses=["Hello"])
 
-class FakeProvider:
-    name = "fake"
-    supports_streaming = True
-    supports_async = True
+    # Tool call response
+    provider = fake_provider(responses=[
+        Message(role=Role.ASSISTANT, content="", tool_calls=[
+            ToolCall(tool_name="search", parameters={"q": "test"})
+        ]),
+        "Final answer",
+    ])
 
-    def complete(self, *, model, system_prompt, messages, tools=None, **kw):
-        return Message(role=Role.ASSISTANT, content="response")
+    # Response with specific usage stats (for budget/cost tests)
+    provider = fake_provider(responses=[
+        (Message(role=Role.ASSISTANT, content="answer"),
+         UsageStats(prompt_tokens=100, completion_tokens=50,
+                    total_tokens=150, cost_usd=0.01,
+                    model="test", provider="test")),
+    ])
+```
 
-    async def acomplete(self, *, model, system_prompt, messages, tools=None, **kw):
-        return Message(role=Role.ASSISTANT, content="response")
-
-    def stream(self, *, model, system_prompt, messages, tools=None, **kw):
-        yield "response"
-
-    async def astream(self, *, model, system_prompt, messages, tools=None, **kw):
-        yield "response"
+**Important:** Agent requires at least one tool. Use a dummy:
+```python
+_DUMMY = Tool(name="noop", description="noop", parameters=[], function=lambda: "ok")
 ```
 
 ## Recording Provider Pattern
@@ -55,34 +65,24 @@ class FakeProvider:
 Use to verify exact args passed to provider methods:
 
 ```python
-class RecordingProvider(FakeProvider):
+class RecordingProvider:
+    name = "recording"
+    supports_streaming = False
+    supports_async = False
+
     def __init__(self):
-        self.calls = []
-
-    def complete(self, **kwargs):
-        self.calls.append(("complete", kwargs))
-        return Message(role=Role.ASSISTANT, content="ok")
-```
-
-Then assert: `assert provider.calls[0][1]["tools"] is not None`
-
-## Tool-Returning Provider
-
-For testing tool call flows:
-
-```python
-class ToolCallingProvider:
-    call_count = 0
+        self.last_messages = []
+        self.last_system_prompt = ""
+        self.last_tools = None
 
     def complete(self, *, model, system_prompt, messages, tools=None, **kw):
-        self.call_count += 1
-        if self.call_count == 1:
-            return Message(
-                role=Role.ASSISTANT,
-                content="",
-                tool_calls=[ToolCall(id="tc1", name="my_tool", arguments={"arg": "val"})],
-            )
-        return Message(role=Role.ASSISTANT, content="Final answer")
+        self.last_messages = list(messages)
+        self.last_system_prompt = system_prompt
+        self.last_tools = tools
+        return Message(role=Role.ASSISTANT, content="ok"), UsageStats(
+            prompt_tokens=10, completion_tokens=5, total_tokens=15,
+            cost_usd=0.0001, model=model, provider="recording",
+        )
 ```
 
 ## Regression Tests
@@ -101,30 +101,62 @@ class TestSpecificBugDescription:
         ...
 ```
 
+## Testing v0.17.3+ Features
+
+### Budget tests
+```python
+def test_budget_stops_agent(self, fake_provider):
+    provider = fake_provider(responses=[
+        _tool_resp("noop", total_tokens=500),
+        _resp("done"),
+    ])
+    agent = Agent(tools=[_DUMMY], provider=provider,
+        config=AgentConfig(max_iterations=10, max_total_tokens=400))
+    result = agent.run("test")
+    assert "budget exceeded" in result.content.lower()
+    assert any(s.type == StepType.BUDGET_EXCEEDED for s in result.trace.steps)
+```
+
+### Cancellation tests
+```python
+from selectools.cancellation import CancellationToken
+
+token = CancellationToken()
+token.cancel()  # Pre-cancel
+agent = Agent(tools=[_DUMMY], provider=provider,
+    config=AgentConfig(cancellation_token=token))
+result = agent.run("test")
+assert "cancelled" in result.content.lower()
+```
+
+### Observer tests
+```python
+events = []
+class MyObserver(AgentObserver):
+    def on_budget_exceeded(self, run_id, reason, tokens_used, cost_used):
+        events.append({"event": "budget_exceeded", "reason": reason})
+
+config = AgentConfig(observers=[MyObserver()])
+```
+
+### Approval gate tests
+```python
+danger = Tool(name="danger", description="dangerous", parameters=[],
+    function=lambda: "boom", requires_approval=True)
+config = AgentConfig(confirm_action=lambda name, args, reason: False)
+# Tool should be denied
+```
+
 ## Key Assertions
 
 - **Model counts**: `assert len(MODELS) == 146` — update when models change
+- **StepType counts**: `assert len(StepType) == 16` — update when types added
 - **Observer events**: Verify `run_id` is passed to all events
 - **Streaming**: Verify `ToolCall` objects are yielded (use `isinstance(chunk, ToolCall)`)
 - **Policy**: Verify `deny` actually blocks execution
 - **Guardrails**: Verify `block` raises error, `rewrite` modifies content
-
-## Integration Test Pattern
-
-Test features working together through the agent:
-
-```python
-def test_feature_through_agent():
-    provider = FakeProvider()
-    agent = Agent(
-        tools=[my_tool],
-        provider=provider,
-        config=AgentConfig(feature_option=True),
-    )
-    result = agent.run("test prompt")
-    assert result.content == "expected"
-    assert result.trace.steps  # Verify trace recorded
-```
+- **Budget**: Verify `BUDGET_EXCEEDED` trace step on budget hit
+- **Cancellation**: Verify `CANCELLED` trace step on cancel
 
 ## Running Tests
 

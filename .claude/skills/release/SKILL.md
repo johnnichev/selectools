@@ -2,7 +2,6 @@
 name: release
 description: Prepare and execute a selectools release — version bump, changelog, docs, git, PyPI
 argument-hint: <version-number>
-disable-model-invocation: true
 ---
 
 # Release Process
@@ -16,6 +15,14 @@ Preparing release version: $ARGUMENTS
 - Tests: !`pytest tests/ --collect-only -q 2>/dev/null | tail -1`
 - Examples: !`ls examples/*.py | wc -l | tr -d ' '`
 - Models: !`grep -c "ModelInfo(" src/selectools/models.py`
+- StepTypes: !`python3 -c "from selectools.trace import StepType; print(len(StepType))" 2>/dev/null`
+
+## CRITICAL: Git Workflow Rules
+
+- **Never push without explicit user approval** — commit locally, then ask
+- **Always use PRs** — never push directly to main
+- **Keep feature work on one branch** — don't merge WIP to main
+- **No co-author lines** in commits
 
 ## 1. Pre-Release Checks
 
@@ -36,65 +43,55 @@ Update version in TWO files (must match):
 
 ## 3. CHANGELOG.md
 
-Add entry at the top:
-
-```markdown
-## [X.Y.Z] - YYYY-MM-DD
-
-### Added — Feature Theme Name
-
-#### Feature Name (new `module/` subpackage)
-
-- **`ClassName`**: Description of what it does and key capabilities.
-- **Agent integration**: How it plugs into the agent via `AgentConfig(option=...)`.
-
-### Changed
-
-- **`StepType` literal**: Added new trace step types if any.
-- **`AgentConfig`**: New fields added.
-
-### Documentation
-
-- **New module docs**: List new docs pages
-- **New examples**: List new example scripts
-
-### Tests
-
-- **NN new tests** (total: NNNN): Summary of test coverage.
+Add entry at the top following existing format. Then sync:
+```bash
+cp CHANGELOG.md docs/CHANGELOG.md
 ```
 
 ## 4. README.md Updates
 
 - Update "What's New" section
 - Update feature table if new capabilities
-- Update stats: model count, test count, example count
+- Update stats: test count, example count
 
-## 5. ROADMAP.md Updates
+## 5. ROADMAP.md + CLAUDE.md Updates
 
-- Mark completed features with checkmark
-- Add entry to "Release History" section
-- Update status from "In Progress" to "Complete"
+- Mark completed version with ✅
+- Update any stale counts in CLAUDE.md
 
 ## 6. Count Audit
 
 Run `/audit` to verify all hardcoded counts match live values.
 
-## 7. Git Workflow
+## 7. Commit (DO NOT push yet)
 
 ```bash
-git checkout -b release/vX.Y.Z
+git checkout -b release/vX.Y.Z   # or feat/<name> for feature releases
 git add <specific-files>
 git commit -m "release: vX.Y.Z — Feature Theme Name"
+```
+
+**Stop here and tell the user the commit is ready. Wait for explicit push approval.**
+
+## 8. After User Approves Push
+
+```bash
 git push -u origin HEAD
 gh pr create --title "release: vX.Y.Z" --body "..."
-# After PR merged:
+```
+
+Wait for user to approve merge.
+
+## 9. After PR Merged
+
+```bash
 gh pr merge <number> --merge --delete-branch
 git checkout main && git pull
 git tag -a vX.Y.Z -m "vX.Y.Z — Feature Theme Name"
 git push origin main --tags
 ```
 
-## 8. PyPI Publish
+## 10. PyPI Publish (after user confirms)
 
 ```bash
 rm -rf dist/
@@ -102,14 +99,14 @@ python3 -m build
 python3 -m twine upload dist/*
 ```
 
-## 9. Post-Release Verification
+## 11. Post-Release Verification
 
 - Verify GitHub Pages auto-deploys docs
 - Verify PyPI page shows new version
-- Test install: `pip install selectools==X.Y.Z`
+- `pip install selectools==X.Y.Z` in a clean env
 
 ## Version Numbering
 
-- **Patch** (0.X.1): Bug fixes, no new features
+- **Patch** (0.X.Y): Bug fixes, small features
 - **Minor** (0.X.0): New features, backward compatible
 - **Major** (X.0.0): Breaking changes (not yet — still pre-1.0)

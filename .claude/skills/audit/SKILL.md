@@ -14,87 +14,86 @@ description: Cross-reference audit for stale counts, broken links, and doc drift
 - Examples: !`ls examples/*.py | wc -l | tr -d ' '`
 - Module docs: !`ls docs/modules/*.md | wc -l | tr -d ' '`
 - Toolbox tools: !`grep -roh "@tool" src/selectools/toolbox/*.py | wc -l | tr -d ' '`
-- Observer events (sync): !`python3 -c "import ast; t=ast.parse(open('src/selectools/observer.py').read()); print(len([n.name for c in ast.walk(t) if isinstance(c,ast.ClassDef) and c.name=='AgentObserver' for n in c.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and n.name.startswith('on_')]))" 2>/dev/null`
-- Observer events (async): !`python3 -c "import ast; t=ast.parse(open('src/selectools/observer.py').read()); print(len([n.name for c in ast.walk(t) if isinstance(c,ast.ClassDef) and c.name=='AsyncAgentObserver' for n in c.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and n.name.startswith('a_on_')]))" 2>/dev/null`
+- Observer events (sync): !`python3 -c "from selectools.observer import AgentObserver; print(len([m for m in dir(AgentObserver) if m.startswith('on_')]))" 2>/dev/null`
+- Observer events (async): !`python3 -c "from selectools.observer import AsyncAgentObserver; print(len([m for m in dir(AsyncAgentObserver) if m.startswith('a_on_')]))" 2>/dev/null`
 - StepTypes: !`python3 -c "from selectools.trace import StepType; print(len(StepType))" 2>/dev/null`
-- ModelTypes: !`python3 -c "from selectools.models import ModelType; print(len(ModelType))" 2>/dev/null`
-- Agent mixin files: !`ls src/selectools/agent/_*.py 2>/dev/null | wc -l | tr -d ' '`
+- Knowledge store backends: !`echo "4 (File, SQLite, Redis, Supabase)"`
 - Last example: !`ls examples/*.py | tail -1`
 
 ## Audit Procedure
 
 ### 1. Version Consistency
-Verify `__init__.py` version matches `pyproject.toml` version. Report if they differ.
+Verify `__init__.py` version matches `pyproject.toml` version.
 
 ### 2. Count Audit
 
-Search each file below for the relevant count. Report any mismatch against the live values above.
-
-**Model count** — check:
-- `README.md`, `docs/index.md`, `docs/QUICKSTART.md`, `docs/ARCHITECTURE.md`, `docs/modules/MODELS.md`, `CLAUDE.md`
+Search each file for hardcoded counts. Report any mismatch against live values.
 
 **Test count** — check:
-- `README.md`, `docs/index.md`, `CLAUDE.md`
+- `README.md`, `docs/index.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `docs/CONTRIBUTING.md`, `landing/index.html`
 
 **Example count** — check:
-- `README.md`, `docs/index.md`, `CLAUDE.md`
+- `README.md`, `CLAUDE.md`
+
+**Model count** — check:
+- `README.md`, `docs/index.md`, `CLAUDE.md`, `docs/modules/MODELS.md`
 
 **Observer event count** — check:
-- `CLAUDE.md`, `docs/modules/AGENT.md`
+- `CLAUDE.md`, `docs/modules/AGENT.md`, `docs/ARCHITECTURE.md`, `docs/QUICKSTART.md`
 
 **StepType count** — check:
-- `CLAUDE.md`
-
-**Module doc count** — check:
-- `CLAUDE.md`
+- `CLAUDE.md`, `tests/test_phase1_design_patterns.py`
 
 ### 3. Content Drift Audit
 
-Check these files for content accuracy against the actual codebase:
-
-**CLAUDE.md** (root project instructions):
-- Codebase Structure tree matches actual directory layout (`ls src/selectools/agent/`, `ls src/selectools/providers/`)
-- Common Pitfalls section is current (hooks deprecated, mixin architecture, etc.)
-- Current Roadmap reflects shipped releases
-- TraceStep Types table matches `StepType` enum members
+**CLAUDE.md**:
+- Codebase Structure tree matches actual files (check for missing new files)
+- TraceStep Types table has all StepType members
+- Current Roadmap matches ROADMAP.md
+- Observer counts match
 
 **docs/ARCHITECTURE.md**:
-- Agent description mentions mixin decomposition
-- Observer section mentions `AsyncAgentObserver`
-- Hooks referenced as deprecated, not current
+- Version header is current
+- Observer event counts current
 
 **docs/modules/AGENT.md**:
-- Hook System section has deprecation warning
-- `AsyncAgentObserver` is documented
-- Terminal actions (`@tool(terminal=True)`, `stop_condition`) documented
-- Mixin architecture mentioned in Implementation Details
+- Lifecycle events table title matches actual count
+- AsyncAgentObserver event count correct
+- Hooks referenced as deprecated
+
+**docs/modules/KNOWLEDGE.md**:
+- Mentions all 4 store backends
+- References KnowledgeEntry, KnowledgeStore protocol
 
 **docs/modules/TOOLS.md**:
-- `@tool()` decorator docs include `terminal` parameter
-- `Tool` class docs mention `terminal` attribute
+- Mentions `requires_approval` parameter
+- Mentions `_serialize_result()` behavior
 
-**docs/modules/MODELS.md**:
-- `ModelType` shown as `str, Enum` (not `Literal`)
+### 4. New Feature Doc Coverage
 
-**docs/modules/PROVIDERS.md**:
-- Mentions `_OpenAICompatibleBase` shared by OpenAI/Ollama
-- Namespace imports documented (`from selectools.providers import ...`)
+Verify each v0.17.3+ feature has:
+- [ ] Module doc in `docs/modules/`
+- [ ] Example script in `examples/`
+- [ ] Entry in `mkdocs.yml` nav
 
-**docs/QUICKSTART.md**:
-- Terminal tools step present
-- Observer examples use `AgentObserver` (not hooks as primary)
-
-**docs/README.md**:
-- Hooks listed as deprecated
-- `AsyncAgentObserver` mentioned
-
-### 4. Skills Audit
-Check `.claude/skills/*/SKILL.md` for any hardcoded counts that don't match live values.
+Features to check: Budget, Cancellation, Token Estimation, Model Switching, SimpleStepObserver, Structured Results, Approval Gate
 
 ### 5. Link Check
-Run `cp CHANGELOG.md docs/CHANGELOG.md && mkdocs build` and report any warnings.
+```bash
+cp CHANGELOG.md docs/CHANGELOG.md && mkdocs build
+```
+Report any warnings.
 
-### 6. Output
+### 6. CHANGELOG Sync
+Verify `docs/CHANGELOG.md` matches `CHANGELOG.md`:
+```bash
+diff CHANGELOG.md docs/CHANGELOG.md
+```
+
+### 7. Private Docs (if accessible)
+Check `.private/comparison-table.md` and `.private/competitive-gaps.md` for stale eval counts, test counts, version references.
+
+### 8. Output
 
 Present results in two tables:
 

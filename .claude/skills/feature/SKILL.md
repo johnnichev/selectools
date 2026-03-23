@@ -14,16 +14,24 @@ Implement the following feature: $ARGUMENTS
 - Tests: !`pytest tests/ --collect-only -q 2>/dev/null | tail -1`
 - Last example: !`ls examples/*.py | tail -1`
 - Next example number: use the next zero-padded number after the last one above
+- StepTypes: !`python3 -c "from selectools.trace import StepType; print(len(StepType))" 2>/dev/null`
+- Observer events: !`python3 -c "from selectools.observer import AgentObserver; import inspect; print(len([m for m in dir(AgentObserver) if m.startswith('on_')]))" 2>/dev/null`
 
 ## 1. Cross-Feature Impact Analysis
 
 Before writing code, determine:
-- Does this touch `agent/core.py`? If so, follow the execution flow: input guardrails -> memory -> provider -> cache -> output guardrails -> parser -> policy -> coherence -> tool execution -> trace -> audit
+- Does this touch `agent/core.py`? If so, follow the execution flow:
+  `_prepare_run → cancellation check → budget check → model selection → on_iteration_start → provider call → _process_response → guardrails → parser → policy → coherence → tool execution → post-tool cancellation check → on_iteration_end`
 - Does `AgentConfig` in `agent/config.py` need new fields?
 - Does `__init__.py` need new public exports?
-- Does `trace.py` need new `StepType` values?
-- Does `observer.py` need new events? If so, add no-op default in `AgentObserver` class, implement in `LoggingObserver`, and use `_notify_observers()` helper in `agent/core.py`
+- Does `trace.py` need new `StepType` values? (currently 16)
+- Does `observer.py` need new events? If so, add to ALL FOUR classes:
+  - `AgentObserver` (no-op default)
+  - `AsyncAgentObserver` (async no-op)
+  - `LoggingObserver` (JSON emission via `_emit()`)
+  - `SimpleStepObserver` (delegate to `self._cb()`)
 - Does `AgentResult` need new fields?
+- Update `tests/test_phase1_design_patterns.py` StepType count if adding new types
 
 ## 2. Write Source Code
 
@@ -43,18 +51,15 @@ except ImportError:
     some_lib = None  # type: ignore[assignment]
 ```
 
-**For RAG loaders** — add static methods to `DocumentLoader` in `src/selectools/rag/loaders.py` returning `List[Document]`. Include `metadata` param. Auto-populate `source` in metadata.
+**For agent loop changes** — add to the shared helpers (`_check_budget`, `_build_cancelled_result`, etc.) rather than duplicating in `run()`/`arun()`/`astream()`. Use `_RunContext` to carry per-run state.
 
-**For vector stores** — new file in `src/selectools/rag/stores/`. Inherit `VectorStore`. Implement `add_documents`, `search`, `delete`, `clear`. Register in `VectorStore.create()` factory and `stores/__init__.py`.
+**For provider caller changes** — use `self._effective_model` (not `self.config.model`) throughout `_provider_caller.py`.
 
-**For toolbox** — new file in `src/selectools/toolbox/`. Functions decorated with `@tool(description=...)`. Return `str`. Register in `toolbox/__init__.py`'s `get_all_tools()` and `get_tools_by_category()`.
+**For tool changes** — add flags to both `Tool.__init__()` in `tools/base.py` AND `@tool()` decorator in `tools/decorators.py`.
 
 ## 3. Update Exports
 
-Add to `src/selectools/__init__.py`:
-```python
-from selectools.new_module import NewClass
-```
+Add to `src/selectools/__init__.py` in the appropriate section.
 
 ## 4. Format and Lint
 
@@ -62,7 +67,12 @@ Run `/lint` to format and check code quality.
 
 ## 5. Write Tests
 
-See `/test` for detailed testing patterns.
+See `/test` for detailed testing patterns. Key reminders:
+- Agent requires at least one tool (use `_DUMMY`)
+- Use `(Message, UsageStats)` tuples for controlled usage stats
+- Test observer events fire correctly
+- Test trace steps are recorded
+- Test backward compatibility (None/default values work)
 
 ## 6. Write Example Script
 
@@ -72,16 +82,7 @@ Create `examples/NN_feature_name.py` (use next number from Live Project State ab
 
 See `/docs` for detailed documentation patterns.
 
-## 8. Update Notebook
-
-Add a section to `notebooks/getting_started.ipynb` demonstrating the feature.
-Follow the existing pattern: markdown cell with explanation, then code cell with
-a self-contained demo using `LocalProvider` (no API key needed).
-
-The notebook's "What you'll learn" list (cell 0) and "What's Next?" table (last cell)
-should be updated to include the new feature.
-
-## 9. Run Full Test Suite
+## 8. Run Full Test Suite
 
 ```bash
 pytest tests/ -x -q
@@ -89,11 +90,13 @@ pytest tests/ -x -q
 
 ALL tests must pass. No exceptions.
 
-## 10. Run Audit
+## 9. Run Audit
 
-Run `/audit` to verify all counts (tests, examples, models) are consistent
-across `CLAUDE.md`, `README.md`, `docs/index.md`, and other documentation files.
-Fix any mismatches before considering the feature complete.
+Run `/audit` to verify all counts are consistent across docs. Fix any mismatches.
+
+## 10. Commit (but DO NOT push)
+
+Stage specific files and commit. Wait for user to approve before pushing.
 
 ## Defensive Patterns (from past bugs)
 
@@ -103,4 +106,9 @@ Fix any mismatches before considering the feature complete.
 - Provider `stream()`/`astream()` MUST pass `tools` param
 - Never stringify `ToolCall` objects in streaming paths
 - FallbackProvider observer wiring needs `threading.Lock` + refcount
-- `astream()` must save/restore `_system_prompt` in finally block (matches run/arun)
+- `astream()` must save/restore `_system_prompt` in finally block
+- Budget check at TOP of iteration (before LLM call, not after)
+- Cancellation check at TWO points: top of iteration AND after tool execution
+- Model selection via `_effective_model` property (not `self.config.model`)
+- `StreamChunk` has no `finished` field — don't pass `finished=True`
+- `bandit`: mark safe SQL with `# nosec B608`, mark safe pass with `# nosec B110`

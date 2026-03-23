@@ -54,7 +54,11 @@ src/selectools/
 ├── sessions.py              # SessionStore protocol + JSON/SQLite/Redis backends
 ├── entity_memory.py         # EntityMemory (LLM-based entity extraction)
 ├── knowledge_graph.py       # KnowledgeGraphMemory (triple extraction + storage)
-├── knowledge.py             # KnowledgeMemory (cross-session durable memory)
+├── knowledge.py             # KnowledgeMemory + KnowledgeEntry + KnowledgeStore + File/SQLite backends
+├── knowledge_store_redis.py # RedisKnowledgeStore (optional dep: redis)
+├── knowledge_store_supabase.py # SupabaseKnowledgeStore (optional dep: supabase)
+├── cancellation.py          # CancellationToken (thread-safe cooperative cancellation)
+├── token_estimation.py      # estimate_tokens(), estimate_run_tokens(), TokenEstimate
 ├── models.py                # 146 model registry with pricing (single source of truth)
 ├── pricing.py               # Derives pricing from models.py
 ├── usage.py                 # Token + cost tracking
