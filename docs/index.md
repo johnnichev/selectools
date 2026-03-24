@@ -138,8 +138,10 @@ print(result.reasoning)       # Why the agent chose get_weather
 | **Cross-Session Knowledge** | Daily logs + persistent facts with auto-registered `remember` tool |
 | **AgentObserver Protocol** | 31-event lifecycle observer with run/call ID correlation, `SimpleStepObserver`, and OTel export |
 | **Runtime Controls** | Token/cost budget limits, cooperative cancellation, per-tool approval gates, model switching per iteration |
+| **Reasoning Strategies** | Built-in ReAct, Chain-of-Thought, and Plan-Then-Act via `reasoning_strategy` config |
+| **Tool Result Caching** | `@tool(cacheable=True, cache_ttl=60)` — skip re-execution for identical tool calls |
 | **Eval Framework** | 39 built-in evaluators, A/B testing, regression detection, HTML reports, JUnit XML |
-| **2183 Tests** | Unit, integration, regression, and E2E |
+| **2220 Tests** | Unit, integration, regression, and E2E |
 
 ---
 
@@ -214,7 +216,7 @@ Loop continues or returns AgentResult (.parsed, .trace, .reasoning)
 [:fontawesome-brands-python: PyPI Package](https://pypi.org/project/selectools/){ .md-button }
 [:fontawesome-brands-github: GitHub Repository](https://github.com/johnnichev/selectools){ .md-button }
 [:material-notebook: Getting Started Notebook](https://github.com/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb){ .md-button }
-[:material-code-tags: 42 Example Scripts](https://github.com/johnnichev/selectools/tree/main/examples){ .md-button }
+[:material-code-tags: 51 Example Scripts](https://github.com/johnnichev/selectools/tree/main/examples){ .md-button }
 
 ---
 

@@ -83,6 +83,8 @@ def tool(
     screen_output: bool = False,
     terminal: bool = False,
     requires_approval: bool = False,
+    cacheable: bool = False,
+    cache_ttl: int = 300,
 ) -> Callable[[Callable[..., Any]], Tool]:
     """
     Decorator to convert a function into a Tool.
@@ -103,6 +105,10 @@ def tool(
             returns the tool result as the final response.  Default: ``False``.
         requires_approval: If True, the tool always requires human approval
             before execution, regardless of ToolPolicy rules.  Default: ``False``.
+        cacheable: If True, tool results are cached by name + args when the
+            agent has a cache configured.  Default: ``False``.
+        cache_ttl: Time-to-live in seconds for cached results.
+            Default: ``300`` (5 minutes).
 
     Returns:
         Decorator function that returns a Tool instance.
@@ -133,6 +139,8 @@ def tool(
             screen_output=screen_output,
             terminal=terminal,
             requires_approval=requires_approval,
+            cacheable=cacheable,
+            cache_ttl=cache_ttl,
         )
         return tool_instance
 

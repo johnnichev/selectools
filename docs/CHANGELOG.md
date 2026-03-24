@@ -5,6 +5,45 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.6] - 2026-03-24
+
+### Added
+
+#### Reasoning Strategies
+- New `reasoning_strategy` field on `AgentConfig`: `"react"`, `"cot"`, `"plan_then_act"`
+- Injects structured reasoning instructions into the system prompt via `PromptBuilder`
+- Works with existing `result.reasoning` extraction for full visibility into agent thought process
+- New export: `REASONING_STRATEGIES` dict for discovering available strategies
+
+```python
+config = AgentConfig(reasoning_strategy="react")  # Thought → Action → Observation
+config = AgentConfig(reasoning_strategy="cot")     # Chain-of-Thought step-by-step
+config = AgentConfig(reasoning_strategy="plan_then_act")  # Plan first, then execute
+```
+
+#### Tool Result Caching
+- New `cacheable` and `cache_ttl` parameters on `Tool` and `@tool()` decorator
+- Cacheable tools skip re-execution when called with the same arguments within TTL
+- Cache key: `tool_result:{tool_name}:{sha256(sorted_params)}`
+- Wired into all 4 execution paths (single sync/async, parallel sync/async)
+- Records `StepType.CACHE_HIT` trace step on cache hits
+- Reuses the agent's existing `config.cache` (InMemoryCache, RedisCache)
+
+```python
+@tool(description="Search the web", cacheable=True, cache_ttl=60)
+def web_search(query: str) -> str:
+    return expensive_api_call(query)
+```
+
+#### Python 3.9–3.13 CI Matrix
+- GitHub Actions now tests against Python 3.9, 3.10, 3.11, 3.12, and 3.13
+- Full codebase audit confirmed zero 3.10+ only syntax (all `X | Y` unions guarded by `from __future__ import annotations`)
+- Added `Programming Language :: Python :: 3.13` classifier to pyproject.toml
+
+### Stats
+- **37 new tests** (total: 2220)
+- **2 new examples** (50: reasoning strategies, 51: tool result caching; total: 51)
+
 ## [0.17.5] - 2026-03-23
 
 ### Fixed — Bug Hunt (91 validated fixes across 7 subsystems)

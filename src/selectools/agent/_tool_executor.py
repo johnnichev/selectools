@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import inspect
+import json
 import time
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
@@ -44,6 +46,31 @@ class _ToolExecutorMixin:
             extra_patterns=self.config.output_screening_patterns,
         )
         return screening.content
+
+    @staticmethod
+    def _build_tool_cache_key(tool_name: str, params: Dict[str, Any]) -> str:
+        """Build a deterministic cache key for a tool call."""
+        params_str = json.dumps(params, sort_keys=True, default=str)
+        params_hash = hashlib.sha256(params_str.encode()).hexdigest()[:16]
+        return f"tool_result:{tool_name}:{params_hash}"
+
+    def _check_tool_cache(self, tool: "Tool", params: Dict[str, Any]) -> Optional[str]:
+        """Return cached tool result or None on miss."""
+        if not self.config.cache or not getattr(tool, "cacheable", False):
+            return None
+        key = self._build_tool_cache_key(tool.name, params)
+        cached = self.config.cache.get(key)
+        if cached is not None:
+            return str(cached[0])  # (result_str, None)
+        return None
+
+    def _store_tool_cache(self, tool: "Tool", params: Dict[str, Any], result: str) -> None:
+        """Store a tool result in the cache."""
+        if not self.config.cache or not getattr(tool, "cacheable", False):
+            return
+        key = self._build_tool_cache_key(tool.name, params)
+        ttl = getattr(tool, "cache_ttl", 300)
+        self.config.cache.set(key, (result, None), ttl=ttl)
 
     def _check_coherence(
         self,
@@ -338,6 +365,11 @@ class _ToolExecutorMixin:
             if coherence_error:
                 return _Result(tc, coherence_error, True, 0.0, tool, 0)
 
+            # Tool result cache check
+            cached_result = self._check_tool_cache(tool, parameters)
+            if cached_result is not None:
+                return _Result(tc, cached_result, False, 0.0, tool, 0)
+
             call_id = tc.id or ""
             start = time.time()
             if run_id:
@@ -359,6 +391,7 @@ class _ToolExecutorMixin:
             try:
                 result = self._execute_tool_with_timeout(tool, parameters, chunk_cb)
                 result = self._screen_tool_result(tool_name, result)
+                self._store_tool_cache(tool, parameters, result)
                 dur = time.time() - start
                 if run_id:
                     self._notify_observers(
@@ -515,6 +548,11 @@ class _ToolExecutorMixin:
             if coherence_error:
                 return _Result(tc, coherence_error, True, 0.0, tool, 0)
 
+            # Tool result cache check
+            cached_result = self._check_tool_cache(tool, parameters)
+            if cached_result is not None:
+                return _Result(tc, cached_result, False, 0.0, tool, 0)
+
             start = time.time()
             if run_id:
                 self._notify_observers("on_tool_start", run_id, call_id, tool_name, parameters)
@@ -538,6 +576,7 @@ class _ToolExecutorMixin:
             try:
                 result = await self._aexecute_tool_with_timeout(tool, parameters, chunk_cb)
                 result = self._screen_tool_result(tool_name, result)
+                self._store_tool_cache(tool, parameters, result)
                 dur = time.time() - start
                 if run_id:
                     self._notify_observers(
@@ -766,6 +805,28 @@ class _ToolExecutorMixin:
             )
             return False
 
+        # --- Tool result cache check ---
+        cached_result = self._check_tool_cache(tool, parameters)
+        if cached_result is not None:
+            ctx.trace.add(
+                TraceStep(
+                    type=StepType.CACHE_HIT,
+                    tool_name=tool_name,
+                    tool_args=parameters,
+                    tool_result=self._truncate_tool_result(cached_result),
+                    summary=f"{tool_name} → cached",
+                )
+            )
+            self._append_tool_result(
+                cached_result, tool_name, tool_call.id, tool_result=cached_result, run_id=ctx.run_id
+            )
+            if getattr(tool, "terminal", False) or (
+                self.config.stop_condition and self.config.stop_condition(tool_name, cached_result)
+            ):
+                ctx.terminal_tool_result = cached_result
+                return True
+            return False
+
         # --- Execute ---
         try:
             start_time = time.time()
@@ -784,6 +845,9 @@ class _ToolExecutorMixin:
             self._notify_observers(
                 "on_tool_end", ctx.run_id, call_id, tool_name, result, duration * 1000
             )
+
+            # Store in tool result cache
+            self._store_tool_cache(tool, parameters, result)
 
             ctx.trace.add(
                 TraceStep(
@@ -927,6 +991,28 @@ class _ToolExecutorMixin:
             )
             return False
 
+        # --- Tool result cache check ---
+        cached_result = self._check_tool_cache(tool, parameters)
+        if cached_result is not None:
+            ctx.trace.add(
+                TraceStep(
+                    type=StepType.CACHE_HIT,
+                    tool_name=tool_name,
+                    tool_args=parameters,
+                    tool_result=self._truncate_tool_result(cached_result),
+                    summary=f"{tool_name} → cached",
+                )
+            )
+            self._append_tool_result(
+                cached_result, tool_name, tool_call.id, tool_result=cached_result, run_id=ctx.run_id
+            )
+            if getattr(tool, "terminal", False) or (
+                self.config.stop_condition and self.config.stop_condition(tool_name, cached_result)
+            ):
+                ctx.terminal_tool_result = cached_result
+                return True
+            return False
+
         # --- Execute (async) ---
         try:
             start_time = time.time()
@@ -951,6 +1037,9 @@ class _ToolExecutorMixin:
             await self._anotify_observers(
                 "on_tool_end", ctx.run_id, call_id, tool_name, result, duration * 1000
             )
+
+            # Store in tool result cache
+            self._store_tool_cache(tool, parameters, result)
 
             ctx.trace.add(
                 TraceStep(

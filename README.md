@@ -12,6 +12,24 @@ An open-source project from **[NichevLabs](https://nichevlabs.com)**.
 
 ## What's New in v0.17
 
+### v0.17.6 — Quick Wins
+
+```python
+from selectools import AgentConfig, REASONING_STRATEGIES, tool
+
+# Reasoning strategies — guide the LLM's thought process
+config = AgentConfig(reasoning_strategy="react")   # Thought → Action → Observation
+config = AgentConfig(reasoning_strategy="cot")      # Chain-of-Thought step-by-step
+config = AgentConfig(reasoning_strategy="plan_then_act")  # Plan first, then execute
+
+# Tool result caching — skip re-execution for identical calls
+@tool(description="Search the web", cacheable=True, cache_ttl=60)
+def web_search(query: str) -> str:
+    return expensive_api_call(query)
+```
+
+Also: Python 3.9–3.13 CI matrix (verified zero compatibility issues).
+
 ### v0.17.4 — Agent Intelligence
 
 ```python
@@ -168,10 +186,10 @@ report.to_html("report.html")
 - **Token Budget & Cancellation**: `max_total_tokens`, `max_cost_usd` hard limits; `CancellationToken` for cooperative stopping
 - **Token Estimation**: `estimate_run_tokens()` for pre-execution budget checks
 - **Model Switching**: `model_selector` callback for per-iteration model selection
-- **49 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, eval framework, and more
+- **51 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, eval framework, and more
 - **Built-in Eval Framework**: 39 evaluators (21 deterministic + 18 LLM-as-judge), A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing
 - **AgentObserver Protocol**: 31 lifecycle events with `run_id` correlation, `LoggingObserver`, `SimpleStepObserver`, OTel export
-- **2183 Tests**: Unit, integration, regression, and E2E with real API calls
+- **2220 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 
@@ -740,7 +758,7 @@ pytest tests/ -x -q          # All tests
 pytest tests/ -k "not e2e"   # Skip E2E (no API keys needed)
 ```
 
-2183 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, and E2E integration.
+2220 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, and E2E integration.
 
 ## License
 

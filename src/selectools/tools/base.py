@@ -123,6 +123,8 @@ class Tool:
         screen_output: bool = False,
         terminal: bool = False,
         requires_approval: bool = False,
+        cacheable: bool = False,
+        cache_ttl: int = 300,
         _skip_validation: bool = False,
     ):
         """
@@ -142,6 +144,10 @@ class Tool:
                 returns the tool result as the final response.  Default: ``False``.
             requires_approval: If True, the tool always requires human approval
                 before execution, regardless of ToolPolicy rules.  Default: ``False``.
+            cacheable: If True, tool results are cached by name + args when
+                the agent has a cache configured.  Default: ``False``.
+            cache_ttl: Time-to-live in seconds for cached results.
+                Default: ``300`` (5 minutes).
 
         Raises:
             ToolValidationError: If tool definition is invalid
@@ -159,6 +165,8 @@ class Tool:
         self.screen_output = screen_output
         self.terminal = terminal
         self.requires_approval = requires_approval
+        self.cacheable = cacheable
+        self.cache_ttl = cache_ttl
 
         # Validate tool definition at registration time
         if not _skip_validation:
