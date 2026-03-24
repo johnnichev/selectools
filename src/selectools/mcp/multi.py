@@ -90,8 +90,10 @@ class MultiMCPClient:
                 server_tools = await client.list_tools()
                 for tool in server_tools:
                     if self.prefix_tools:
-                        prefixed_name = f"{name}_{tool.name}"
-                        tool.name = prefixed_name
+                        import copy
+
+                        tool = copy.copy(tool)
+                        tool.name = f"{name}_{tool.name}"
                     else:
                         if tool.name in seen_names:
                             raise ValueError(

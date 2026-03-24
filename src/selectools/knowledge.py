@@ -493,7 +493,7 @@ class KnowledgeMemory:
         entry_id = self._store.save(entry)
 
         # Also write to legacy daily log for backward compat
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
         log_entry = f"[{timestamp}] [{category}] {content}"
         today = now.strftime("%Y-%m-%d")
@@ -542,7 +542,7 @@ class KnowledgeMemory:
         lines: List[str] = []
 
         for i in range(days):
-            date = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
+            date = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
             log_path = os.path.join(self._directory, f"{date}.log")
             if os.path.exists(log_path):
                 with open(log_path, "r", encoding="utf-8") as f:
@@ -626,7 +626,7 @@ class KnowledgeMemory:
             Number of log files removed.
         """
         keep_days = keep_days or self._recent_days
-        cutoff = datetime.now() - timedelta(days=keep_days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=keep_days)
         removed = 0
 
         for filename in os.listdir(self._directory):
@@ -634,7 +634,7 @@ class KnowledgeMemory:
                 continue
             date_str = filename[:-4]
             try:
-                file_date = datetime.strptime(date_str, "%Y-%m-%d")
+                file_date = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
                 if file_date < cutoff:
                     os.remove(os.path.join(self._directory, filename))
                     removed += 1

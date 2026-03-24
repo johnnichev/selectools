@@ -42,14 +42,18 @@ class InMemoryVectorStore(VectorStore):
 
     embedder: "EmbeddingProvider"
 
-    def __init__(self, embedder: "EmbeddingProvider"):  # noqa: F821
+    def __init__(
+        self, embedder: "EmbeddingProvider", max_documents: Optional[int] = None  # noqa: F821
+    ):
         """
         Initialize in-memory vector store.
 
         Args:
             embedder: Embedding provider to use for computing embeddings
+            max_documents: Optional capacity limit. Emits a warning when exceeded.
         """
         self.embedder = embedder
+        self.max_documents = max_documents
         self.documents: List[Document] = []
         self.embeddings: Optional[np.ndarray] = None
         self.ids: List[str] = []
@@ -70,6 +74,15 @@ class InMemoryVectorStore(VectorStore):
         """
         if not documents:
             return []
+
+        if self.max_documents and len(self.documents) + len(documents) > self.max_documents:
+            import warnings
+
+            warnings.warn(
+                f"InMemoryVectorStore exceeding max_documents ({self.max_documents}). "
+                f"Consider using SQLiteVectorStore for large collections.",
+                stacklevel=2,
+            )
 
         # Compute embeddings if not provided
         if embeddings is None:
@@ -125,11 +138,12 @@ class InMemoryVectorStore(VectorStore):
         # Cosine similarity = dot product / (norm1 * norm2)
         similarities = np.dot(self.embeddings, query_vec) / (doc_norms * query_norm + 1e-8)
 
-        # Get top-k indices
-        if len(similarities) <= top_k:
+        # Get top-k indices (overfetch when filter present to compensate for filtering)
+        fetch_k = min(top_k * 4, len(similarities)) if filter else top_k
+        if len(similarities) <= fetch_k:
             top_indices = np.argsort(similarities)[::-1]
         else:
-            top_indices = np.argpartition(similarities, -top_k)[-top_k:]
+            top_indices = np.argpartition(similarities, -fetch_k)[-fetch_k:]
             top_indices = top_indices[np.argsort(similarities[top_indices])][::-1]
 
         # Build results with optional filtering

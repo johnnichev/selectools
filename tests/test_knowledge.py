@@ -15,7 +15,7 @@ Tests cover:
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import pytest
@@ -48,7 +48,7 @@ class TestKnowledgeRemember:
         result = km.remember("User prefers dark mode", category="preference")
         assert result  # returns entry ID
 
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         log_path = tmp_path / f"{today}.log"
         assert log_path.exists()
         content = log_path.read_text()
@@ -77,7 +77,7 @@ class TestKnowledgeRemember:
         km.remember("First note")
         km.remember("Second note")
 
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         log_path = tmp_path / f"{today}.log"
         content = log_path.read_text()
         assert "First note" in content
@@ -87,7 +87,7 @@ class TestKnowledgeRemember:
         km = KnowledgeMemory(directory=str(tmp_path))
         km.remember("A note")
 
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         content = (tmp_path / f"{today}.log").read_text()
         assert "[general]" in content
 

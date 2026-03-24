@@ -287,7 +287,7 @@ class TestKnowledgeMemoryEnhanced:
     def test_legacy_logs_still_written(self, memory):
         """Legacy .log files are still written for backward compat."""
         memory.remember("test entry")
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         log_path = os.path.join(memory.directory, f"{today}.log")
         assert os.path.exists(log_path)
         with open(log_path) as f:
