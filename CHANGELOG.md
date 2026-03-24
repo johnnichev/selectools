@@ -5,6 +5,54 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.5] - 2026-03-23
+
+### Fixed — Bug Hunt (91 validated fixes across 7 subsystems)
+
+#### Critical (13)
+- **Path traversal in `JsonFileSessionStore`** — session IDs now validated against directory escape
+- **Unicode homoglyph bypass** in prompt injection screening — NFKD normalization + zero-width stripping
+- **`FallbackProvider` stream** records success after consumption, not before — circuit breaker works for streaming
+- **Gemini `response.text` ValueError** on tool-call-only responses — caught and handled
+- **`astream()` model_selector** was using `self.config.model` — now uses `self._effective_model`
+- **Sync `_check_policy`** silently approved async `confirm_action` — now rejects with clear error
+- **`aexecute()` ThreadPoolExecutor per call** — replaced with shared executor via `run_in_executor(None)`
+- **`execute()` on async tools** returned coroutine string repr — now awaits via `asyncio.run`
+- **Hybrid search O(n²)** `_find_matching_key` — replaced with O(1) `text_to_key` dict lookup
+- **`SQLiteVectorStore`** no thread safety — added `threading.Lock` + WAL mode
+- **`FileKnowledgeStore._save_all()`** not crash-safe — atomic write via tmp + `os.replace`
+- **`OutputEvaluator`** crashed on invalid regex — wrapped in `try/except re.error`
+- **`JsonValidityEvaluator`** ignored `expect_json=False` — guard now checks falsy, not just None
+
+#### High (26)
+- **`astream()` cancellation/budget paths** now build proper trace steps + fire async observer events
+- **`arun()` early exits** now fire `_anotify_observers("on_run_end")` for cancel/budget/max-iter
+- **`_aexecute_tools_parallel`** fires async observer events + tracks `tool_usage`/`tool_tokens`
+- **Sync `_streaming_call`** no longer stringifies `ToolCall` objects (pitfall #2)
+- **16 LLM evaluators** silently passed on unparseable scores — now return `EvalFailure`
+- **XSS in eval dashboard** — `innerHTML` replaced with `createElement`/`textContent`
+- **Donut SVG 360° arc** renders nothing — now draws two semicircles for full annulus
+- **SSN regex** matched ZIP+4 codes — now requires consistent separators
+- **Coherence LLM costs** tracked in `CoherenceResult.usage` + merged into agent usage
+- **Coherence `fail_closed`** option added (default: fail-open for backward compat)
+- Plus 16 more HIGH fixes across tools, RAG, memory, and security subsystems
+
+#### Medium (30) and Low (22)
+- `datetime.utcnow()` → `datetime.now(timezone.utc)` throughout knowledge stores
+- `ConversationMemory.clear()` now resets `_summary`
+- SQLite WAL mode + indexes for knowledge and session stores
+- Non-deterministic `hash()` → `hashlib.sha256` for document IDs in 3 vector stores
+- OpenAI `embed_texts()` batching at 2048 per request
+- Tool result caching: `_serialize_result` returns `""` for None, not `"None"`
+- Bool values rejected for int/float tool parameters
+- `ToolRegistry.tool()` now forwards `screen_output`, `terminal`, `requires_approval`
+- Plus 40+ more fixes (see `.private/BUG_HUNT_VALIDATED.md` for complete list)
+
+### Added
+- **Async guardrails** — `Guardrail.acheck()` with `asyncio.to_thread` default, `GuardrailsPipeline.acheck_input()`/`acheck_output()`, `Agent._arun_input_guardrails()`. `arun()`/`astream()` no longer block the event loop during guardrail checks.
+- 40 new regression tests covering all critical and high-severity fixes
+- 5 new entries in CLAUDE.md Common Pitfalls (#14-#18)
+
 ## [0.17.4] - 2026-03-22
 
 ### Added

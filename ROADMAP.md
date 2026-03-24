@@ -208,9 +208,9 @@ v0.17.3  ✅ Agent Runtime Controls
 v0.17.4  ✅ Agent Intelligence
          Token estimation → Model switching → Knowledge memory enhancement (4 store backends)
 
-v0.17.5  🟡 Tech Debt & Quick Wins
-         Stream fallback fix → abatch thread safety → async guardrails → ReAct/CoT strategies
-         → Tool result caching → Python 3.9–3.13 CI matrix
+v0.17.5  ✅ Bug Hunt & Async Guardrails
+         91 validated fixes (13 critical, 26 high, 52 medium+low) → Async guardrails
+         → 40 regression tests → 5 new Common Pitfalls
 
 v0.17.6  🟡 Caching & Context
          Semantic caching → Prompt compression → Conversation branching
