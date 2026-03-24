@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
@@ -57,11 +58,13 @@ class SQLiteVectorStore(VectorStore):
         """
         self.embedder = embedder
         self.db_path = db_path
+        self._lock = threading.Lock()
         self._init_db()
 
     def _init_db(self) -> None:
         """Initialize the database schema."""
         conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA journal_mode=WAL")
         cursor = conn.cursor()
 
         # Create documents table
@@ -108,31 +111,32 @@ class SQLiteVectorStore(VectorStore):
             texts = [doc.text for doc in documents]
             embeddings = self.embedder.embed_texts(texts)
 
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+        with self._lock:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
 
-        # Generate IDs and insert documents
-        ids = []
-        for i, (doc, embedding) in enumerate(zip(documents, embeddings)):
-            # Generate unique ID
-            doc_id = f"doc_{hash(doc.text)}_{i}"
-            ids.append(doc_id)
+            # Generate IDs and insert documents
+            ids = []
+            for i, (doc, embedding) in enumerate(zip(documents, embeddings)):
+                # Generate unique ID
+                doc_id = f"doc_{hash(doc.text)}_{i}"
+                ids.append(doc_id)
 
-            # Serialize data
-            metadata_json = json.dumps(doc.metadata)
-            embedding_json = json.dumps(embedding)
+                # Serialize data
+                metadata_json = json.dumps(doc.metadata)
+                embedding_json = json.dumps(embedding)
 
-            # Insert into database
-            cursor.execute(
-                """
-                INSERT OR REPLACE INTO documents (id, text, metadata, embedding)
-                VALUES (?, ?, ?, ?)
-            """,
-                (doc_id, doc.text, metadata_json, embedding_json),
-            )
+                # Insert into database
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO documents (id, text, metadata, embedding)
+                    VALUES (?, ?, ?, ?)
+                """,
+                    (doc_id, doc.text, metadata_json, embedding_json),
+                )
 
-        conn.commit()
-        conn.close()
+            conn.commit()
+            conn.close()
 
         return ids
 
@@ -153,26 +157,27 @@ class SQLiteVectorStore(VectorStore):
         Returns:
             List of SearchResult objects, sorted by similarity
         """
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+        with self._lock:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
 
-        # Fetch all documents (with optional metadata filtering)
-        if filter:
-            # Simple metadata filtering (exact match on JSON string)
-            cursor.execute("SELECT id, text, metadata, embedding FROM documents")
-            rows = cursor.fetchall()
-            # Filter in Python for more flexible matching
-            filtered_rows = []
-            for row in rows:
-                metadata = json.loads(row[2])
-                if all(metadata.get(k) == v for k, v in filter.items()):
-                    filtered_rows.append(row)
-            rows = filtered_rows
-        else:
-            cursor.execute("SELECT id, text, metadata, embedding FROM documents")
-            rows = cursor.fetchall()
+            # Fetch all documents (with optional metadata filtering)
+            if filter:
+                # Simple metadata filtering (exact match on JSON string)
+                cursor.execute("SELECT id, text, metadata, embedding FROM documents")
+                rows = cursor.fetchall()
+                # Filter in Python for more flexible matching
+                filtered_rows = []
+                for row in rows:
+                    metadata = json.loads(row[2])
+                    if all(metadata.get(k) == v for k, v in filter.items()):
+                        filtered_rows.append(row)
+                rows = filtered_rows
+            else:
+                cursor.execute("SELECT id, text, metadata, embedding FROM documents")
+                rows = cursor.fetchall()
 
-        conn.close()
+            conn.close()
 
         if not rows:
             return []
@@ -214,25 +219,27 @@ class SQLiteVectorStore(VectorStore):
         if not ids:
             return
 
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+        with self._lock:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
 
-        # Delete documents
-        placeholders = ",".join("?" for _ in ids)
-        cursor.execute(f"DELETE FROM documents WHERE id IN ({placeholders})", ids)  # nosec
+            # Delete documents
+            placeholders = ",".join("?" for _ in ids)
+            cursor.execute(f"DELETE FROM documents WHERE id IN ({placeholders})", ids)  # nosec
 
-        conn.commit()
-        conn.close()
+            conn.commit()
+            conn.close()
 
     def clear(self) -> None:
         """Clear all documents from the store."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+        with self._lock:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
 
-        cursor.execute("DELETE FROM documents")
+            cursor.execute("DELETE FROM documents")
 
-        conn.commit()
-        conn.close()
+            conn.commit()
+            conn.close()
 
 
 __all__ = ["SQLiteVectorStore"]

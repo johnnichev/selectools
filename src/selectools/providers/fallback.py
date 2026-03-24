@@ -234,9 +234,12 @@ class FallbackProvider:
                     max_tokens=max_tokens,
                     timeout=timeout,
                 )
+                # Wrap to record success/failure on consumption
+                for chunk in gen:
+                    yield chunk
                 self._record_success(pname)
                 self.provider_used = pname
-                return gen
+                return
             except Exception as exc:
                 last_exc = exc
                 if _is_retriable(exc):
@@ -252,7 +255,7 @@ class FallbackProvider:
 
         raise ProviderError(f"No streaming provider available. Last error: {last_exc}")
 
-    def astream(
+    async def astream(
         self,
         *,
         model: str,
@@ -273,7 +276,7 @@ class FallbackProvider:
                 continue
 
             try:
-                stream: AsyncIterable[Union[str, ToolCall]] = provider.astream(
+                gen = provider.astream(
                     model=model,
                     system_prompt=system_prompt,
                     messages=messages,
@@ -282,9 +285,12 @@ class FallbackProvider:
                     max_tokens=max_tokens,
                     timeout=timeout,
                 )
+                # Wrap to record success/failure on consumption
+                async for chunk in gen:
+                    yield chunk
                 self._record_success(pname)
                 self.provider_used = pname
-                return stream
+                return
             except Exception as exc:
                 last_exc = exc
                 if _is_retriable(exc):

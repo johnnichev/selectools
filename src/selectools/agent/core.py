@@ -1110,14 +1110,14 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     "on_llm_start",
                     ctx.run_id,
                     self._history,
-                    self.config.model,
+                    self._effective_model,
                     self._system_prompt,
                 )
                 await self._anotify_observers(
                     "on_llm_start",
                     ctx.run_id,
                     self._history,
-                    self.config.model,
+                    self._effective_model,
                     self._system_prompt,
                 )
                 llm_start = time.time()
@@ -1127,7 +1127,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         self.provider, "supports_async", False
                     ):
                         response_msg, _usage = await self.provider.acomplete(
-                            model=self.config.model,
+                            model=self._effective_model,
                             system_prompt=self._system_prompt,
                             messages=self._history,
                             tools=self.tools,
@@ -1140,7 +1140,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         response_msg, _usage = await loop.run_in_executor(
                             None,
                             lambda: self.provider.complete(
-                                model=self.config.model,
+                                model=self._effective_model,
                                 system_prompt=self._system_prompt,
                                 messages=self._history,
                                 tools=self.tools,
@@ -1164,7 +1164,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         current_tool_calls = response_msg.tool_calls
                 else:
                     gen = self.provider.astream(
-                        model=self.config.model,
+                        model=self._effective_model,
                         system_prompt=self._system_prompt,
                         messages=self._history,
                         tools=self.tools,
@@ -1188,8 +1188,8 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     TraceStep(
                         type=StepType.LLM_CALL,
                         duration_ms=(time.time() - llm_start) * 1000,
-                        model=self.config.model,
-                        summary=f"{self.config.model} → {len(full_content)} chars (stream)",
+                        model=self._effective_model,
+                        summary=f"{self._effective_model} → {len(full_content)} chars (stream)",
                     )
                 )
 

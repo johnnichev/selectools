@@ -208,10 +208,10 @@ class _ProviderCallerMixin:
             max_tokens=self.config.max_tokens,
             timeout=self.config.request_timeout,
         ):
-            if chunk:
-                aggregated.append(str(chunk))
+            if isinstance(chunk, str) and chunk:
+                aggregated.append(chunk)
                 if stream_handler:
-                    stream_handler(str(chunk))
+                    stream_handler(chunk)
 
         return "".join(aggregated)
 

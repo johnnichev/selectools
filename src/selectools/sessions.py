@@ -87,7 +87,10 @@ class JsonFileSessionStore:
         os.makedirs(directory, exist_ok=True)
 
     def _path(self, session_id: str) -> str:
-        return os.path.join(self._directory, f"{session_id}.json")
+        safe_id = os.path.basename(session_id)
+        if safe_id != session_id or ".." in session_id or "\x00" in session_id:
+            raise ValueError(f"Invalid session_id: {session_id!r}")
+        return os.path.join(self._directory, f"{safe_id}.json")
 
     def _is_expired(self, data: Dict[str, Any]) -> bool:
         if self._default_ttl is None:
@@ -115,8 +118,12 @@ class JsonFileSessionStore:
                 "updated_at": now,
                 "memory": memory.to_dict(),
             }
-            with open(path, "w", encoding="utf-8") as f:
+            tmp_path = path + ".tmp"
+            with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(payload, f, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, path)
 
     def load(self, session_id: str) -> Optional[ConversationMemory]:
         path = self._path(session_id)

@@ -149,6 +149,12 @@ class _ToolExecutorMixin:
         if result.decision == PolicyDecision.REVIEW:
             if self.config.confirm_action is None:
                 return f"Tool '{tool_name}' requires approval but no confirm_action configured: {result.reason}"
+            # Guard against async confirm_action in sync context
+            if inspect.iscoroutinefunction(self.config.confirm_action):
+                return (
+                    f"Tool '{tool_name}' requires approval but confirm_action is async. "
+                    f"Use arun() or astream() instead of run() for async confirm_action callbacks."
+                )
             try:
                 with ThreadPoolExecutor(max_workers=1) as executor:
                     future = executor.submit(

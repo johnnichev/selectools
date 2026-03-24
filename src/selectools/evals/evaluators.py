@@ -148,13 +148,23 @@ class OutputEvaluator:
                 )
 
         if case.expect_output_regex is not None:
-            if not re.search(case.expect_output_regex, content):
+            try:
+                if not re.search(case.expect_output_regex, content):
+                    failures.append(
+                        EvalFailure(
+                            evaluator_name=self.name,
+                            expected=case.expect_output_regex,
+                            actual=content[:200],
+                            message=f"Output does not match regex: {case.expect_output_regex}",
+                        )
+                    )
+            except re.error as exc:
                 failures.append(
                     EvalFailure(
                         evaluator_name=self.name,
                         expected=case.expect_output_regex,
                         actual=content[:200],
-                        message=f"Response does not match regex " f"'{case.expect_output_regex}'",
+                        message=f"Invalid regex pattern '{case.expect_output_regex}': {exc}",
                     )
                 )
 
@@ -291,7 +301,7 @@ class JsonValidityEvaluator:
     name: str = "json_validity"
 
     def check(self, case: TestCase, case_result: CaseResult) -> List[EvalFailure]:
-        if case.expect_json is None or case_result.agent_result is None:
+        if not case.expect_json or case_result.agent_result is None:
             return []
         import json as _json
 

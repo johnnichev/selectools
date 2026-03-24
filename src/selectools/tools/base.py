@@ -5,12 +5,12 @@ Tool metadata, schemas, and runtime validation.
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import contextvars
 import difflib
 import functools
 import inspect
 import json
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Union
 
@@ -415,6 +415,19 @@ class Tool:
         try:
             result = self.function(**call_args)
 
+            # Handle async functions called from sync context
+            if inspect.iscoroutine(result):
+                try:
+                    _loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    _loop = None
+                if _loop and _loop.is_running():
+                    # Already in an event loop — run in a new thread
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                        result = pool.submit(asyncio.run, result).result()
+                else:
+                    result = asyncio.run(result)
+
             # Handle streaming tools (generators)
             if inspect.isgenerator(result):
                 chunks = []
@@ -474,12 +487,11 @@ class Tool:
                 return self._serialize_result(result)
             else:
                 # Run sync function in executor to avoid blocking
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 context = contextvars.copy_context()
                 func_with_args = functools.partial(self.function, **call_args)
 
-                with ThreadPoolExecutor() as executor:
-                    result = await loop.run_in_executor(executor, context.run, func_with_args)
+                result = await loop.run_in_executor(None, context.run, func_with_args)
 
                 # Handle sync streaming in async context
                 if inspect.isgenerator(result):
