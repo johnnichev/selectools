@@ -158,7 +158,8 @@ class FileKnowledgeStore:
         return entries
 
     def _save_all(self, entries: List[KnowledgeEntry]) -> None:
-        with open(self._entries_path, "w", encoding="utf-8") as f:
+        tmp_path = self._entries_path + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
             for e in entries:
                 d = {
                     "id": e.id,
@@ -172,6 +173,9 @@ class FileKnowledgeStore:
                     "metadata": e.metadata,
                 }
                 f.write(json.dumps(d) + "\n")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, self._entries_path)
 
     def save(self, entry: KnowledgeEntry) -> str:
         with self._lock:

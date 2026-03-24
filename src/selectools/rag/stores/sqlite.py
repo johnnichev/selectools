@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+import threading
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
@@ -58,11 +59,13 @@ class SQLiteVectorStore(VectorStore):
         """
         self.embedder = embedder
         self.db_path = db_path
+        self._lock = threading.Lock()
         self._init_db()
 
     def _init_db(self) -> None:
         """Initialize the database schema."""
         conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA journal_mode=WAL")
         cursor = conn.cursor()
 
         # Create documents table
@@ -88,6 +91,10 @@ class SQLiteVectorStore(VectorStore):
         conn.commit()
         conn.close()
 
+    def _connect(self) -> sqlite3.Connection:
+        """Create a connection. Caller must use with self._lock."""
+        return sqlite3.connect(self.db_path)
+
     def add_documents(
         self, documents: List[Document], embeddings: Optional[List[List[float]]] = None
     ) -> List[str]:
@@ -109,7 +116,8 @@ class SQLiteVectorStore(VectorStore):
             texts = [doc.text for doc in documents]
             embeddings = self.embedder.embed_texts(texts)
 
-        conn = sqlite3.connect(self.db_path)
+        with self._lock:
+            conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
         # Generate IDs and insert documents
