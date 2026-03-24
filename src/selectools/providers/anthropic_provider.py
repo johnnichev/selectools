@@ -236,6 +236,10 @@ class AnthropicProvider(Provider):
                             }
                         )
 
+                # Anthropic API rejects empty content lists for assistant messages
+                if not content:
+                    content = [{"type": "text", "text": ""}]
+
             formatted.append({"role": role, "content": content})
         return formatted
 

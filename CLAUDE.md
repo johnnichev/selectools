@@ -94,7 +94,7 @@ src/selectools/
     ├── junit.py             # JUnit XML for CI
     └── __main__.py          # CLI: python -m selectools.evals
 
-tests/                       # 2113 tests (unit, integration, regression, E2E)
+tests/                       # 2183 tests (unit, integration, regression, E2E)
 ├── agent/                   # Agent core tests
 ├── providers/               # Provider-specific tests
 ├── rag/                     # RAG pipeline tests
@@ -304,6 +304,16 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 
 13. **Hooks are deprecated — use observers**: `AgentConfig.hooks` (a plain dict of callbacks) is deprecated. Passing `hooks` emits a `DeprecationWarning` and internally wraps the dict via `_HooksAdapter(AgentObserver)`. New code should always use `AgentObserver` or `AsyncAgentObserver` instead.
 
+14. **FallbackProvider `stream()` / `astream()` must record success AFTER consumption**: The generator must be fully consumed before calling `_record_success()`. Recording before consumption means the circuit breaker never trips on streaming errors. Fixed in v0.17.5.
+
+15. **`astream()` direct provider calls must use `self._effective_model`**: Unlike `run()`/`arun()` which go through `_call_provider`/`_acall_provider`, `astream()` calls providers directly. All model references in `astream()` must use `self._effective_model`, not `self.config.model`.
+
+16. **Async observer events must fire in all exit paths**: The shared `_build_cancelled_result`, `_build_budget_exceeded_result`, and `_build_max_iterations_result` only fire sync observers. In `arun()`/`astream()`, always add `await self._anotify_observers(...)` after calling these helpers.
+
+17. **`datetime.utcnow()` is deprecated — use `datetime.now(timezone.utc)`**: All datetime defaults in dataclasses must use `field(default_factory=lambda: datetime.now(timezone.utc))`, not `default_factory=datetime.utcnow`. The `is_expired` property and pruning code must also use aware datetimes.
+
+18. **Guardrails have async support**: `Guardrail.acheck()` runs sync `check()` via `asyncio.to_thread` by default. `GuardrailsPipeline` has `acheck_input()`/`acheck_output()`. `arun()`/`astream()` use `_arun_input_guardrails()` with `skip_guardrails=True` in `_prepare_run()` to avoid blocking the event loop.
+
 ## Current Roadmap
 
 - **v0.15.0** ✅ Enterprise Reliability (guardrails, audit, screening, coherence)
@@ -319,7 +329,7 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 - **v0.17.1** ✅ MCP Client/Server — MCPClient, mcp_tools(), MCPServer, MultiMCPClient, circuit breaker
 - **v0.17.3** ✅ Agent Runtime Controls — token budget, cancellation, cost attribution, structured results, approval gate, SimpleStepObserver
 - **v0.17.4** ✅ Agent Intelligence — token estimation, model switching, knowledge memory enhancement (4 store backends)
-- **v0.17.5** 🟡 Tech Debt & Quick Wins — bug fixes, ReAct/CoT strategies, tool result caching, Python 3.9–3.13 CI
+- **v0.17.5** ✅ Bug Hunt & Async Guardrails — 91 validated fixes, async guardrails, 40 regression tests
 - **v0.17.6** 🟡 Caching & Context — semantic caching, prompt compression, conversation branching
 - **v0.18.0** 🟡 Multi-Agent Orchestration — see `MULTI_AGENT_PLAN.md`
 - **v0.18.x** 🟡 Composability Layer — Pipeline with `@step` + `|` operator (LCEL alternative)

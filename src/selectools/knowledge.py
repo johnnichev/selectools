@@ -16,7 +16,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 
 # ======================================================================
@@ -46,8 +46,8 @@ class KnowledgeEntry:
     importance: float = 0.5
     persistent: bool = False
     ttl_days: Optional[int] = None
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -55,7 +55,7 @@ class KnowledgeEntry:
         """Whether this entry has passed its TTL."""
         if self.ttl_days is None:
             return False
-        return datetime.utcnow() > self.created_at + timedelta(days=self.ttl_days)
+        return datetime.now(timezone.utc) > self.created_at + timedelta(days=self.ttl_days)
 
 
 # ======================================================================
@@ -158,7 +158,8 @@ class FileKnowledgeStore:
         return entries
 
     def _save_all(self, entries: List[KnowledgeEntry]) -> None:
-        with open(self._entries_path, "w", encoding="utf-8") as f:
+        tmp_path = self._entries_path + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
             for e in entries:
                 d = {
                     "id": e.id,
@@ -172,6 +173,9 @@ class FileKnowledgeStore:
                     "metadata": e.metadata,
                 }
                 f.write(json.dumps(d) + "\n")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, self._entries_path)
 
     def save(self, entry: KnowledgeEntry) -> str:
         with self._lock:
@@ -187,9 +191,10 @@ class FileKnowledgeStore:
         return entry.id
 
     def get(self, entry_id: str) -> Optional[KnowledgeEntry]:
-        for e in self._load_all():
-            if e.id == entry_id:
-                return e
+        with self._lock:
+            for e in self._load_all():
+                if e.id == entry_id:
+                    return e
         return None
 
     def query(
@@ -199,7 +204,8 @@ class FileKnowledgeStore:
         since: Optional[datetime] = None,
         limit: int = 50,
     ) -> List[KnowledgeEntry]:
-        entries = self._load_all()
+        with self._lock:
+            entries = self._load_all()
         result = []
         for e in entries:
             if e.is_expired:
@@ -225,7 +231,8 @@ class FileKnowledgeStore:
         return False
 
     def count(self) -> int:
-        return len(self._load_all())
+        with self._lock:
+            return len(self._load_all())
 
     def prune(
         self,
@@ -235,7 +242,9 @@ class FileKnowledgeStore:
         with self._lock:
             entries = self._load_all()
             before = len(entries)
-            cutoff = datetime.utcnow() - timedelta(days=max_age_days) if max_age_days else None
+            cutoff = (
+                datetime.now(timezone.utc) - timedelta(days=max_age_days) if max_age_days else None
+            )
             kept = []
             for e in entries:
                 if e.persistent:
@@ -284,6 +293,13 @@ class SQLiteKnowledgeStore:
                     updated_at TEXT NOT NULL,
                     metadata TEXT DEFAULT '{}'
                 )"""
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_category ON knowledge(category)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_knowledge_importance ON knowledge(importance)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_knowledge_created ON knowledge(created_at)"
             )
 
     def _row_to_entry(self, row: tuple) -> KnowledgeEntry:
@@ -341,14 +357,13 @@ class SQLiteKnowledgeStore:
             clauses.append("created_at >= ?")
             params.append(since.isoformat())
         where = " AND ".join(clauses)
-        sql = (
-            f"SELECT * FROM knowledge WHERE {where} ORDER BY importance DESC LIMIT ?"  # nosec B608
-        )
-        params.append(limit)
+        # LIMIT is applied in Python after TTL filtering to avoid returning
+        # fewer results than requested when expired entries are present.
+        sql = f"SELECT * FROM knowledge WHERE {where} ORDER BY importance DESC"  # nosec B608
         with sqlite3.connect(self._db_path) as conn:
             rows = conn.execute(sql, params).fetchall()
         entries = [self._row_to_entry(r) for r in rows]
-        return [e for e in entries if not e.is_expired]
+        return [e for e in entries if not e.is_expired][:limit]
 
     def delete(self, entry_id: str) -> bool:
         with self._lock, sqlite3.connect(self._db_path) as conn:
@@ -371,7 +386,7 @@ class SQLiteKnowledgeStore:
             rows = conn.execute(
                 "SELECT id, ttl_days, created_at, persistent FROM knowledge"
             ).fetchall()
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             for row_id, ttl, created, persistent in rows:
                 if persistent:
                     continue
@@ -478,7 +493,7 @@ class KnowledgeMemory:
         entry_id = self._store.save(entry)
 
         # Also write to legacy daily log for backward compat
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
         log_entry = f"[{timestamp}] [{category}] {content}"
         today = now.strftime("%Y-%m-%d")
@@ -527,7 +542,7 @@ class KnowledgeMemory:
         lines: List[str] = []
 
         for i in range(days):
-            date = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
+            date = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
             log_path = os.path.join(self._directory, f"{date}.log")
             if os.path.exists(log_path):
                 with open(log_path, "r", encoding="utf-8") as f:
@@ -611,7 +626,7 @@ class KnowledgeMemory:
             Number of log files removed.
         """
         keep_days = keep_days or self._recent_days
-        cutoff = datetime.now() - timedelta(days=keep_days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=keep_days)
         removed = 0
 
         for filename in os.listdir(self._directory):
@@ -619,7 +634,7 @@ class KnowledgeMemory:
                 continue
             date_str = filename[:-4]
             try:
-                file_date = datetime.strptime(date_str, "%Y-%m-%d")
+                file_date = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
                 if file_date < cutoff:
                     os.remove(os.path.join(self._directory, filename))
                     removed += 1

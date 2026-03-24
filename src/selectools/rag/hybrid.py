@@ -214,8 +214,10 @@ class HybridSearcher:
             doc_scores[key] = doc_scores.get(key, 0.0) + rrf_score
             doc_map[key] = result
 
+        text_to_key = {doc_map[key].document.text: key for key in doc_map}
+
         for rank, result in enumerate(keyword_results):
-            matched_key = self._find_matching_key(result.document, doc_map)
+            matched_key = text_to_key.get(result.document.text)
             if matched_key is not None:
                 key = matched_key
             else:
@@ -252,8 +254,10 @@ class HybridSearcher:
             doc_scores[key] = self.vector_weight * norm_score
             doc_map[key] = result
 
+        text_to_key = {doc_map[key].document.text: key for key in doc_map}
+
         for result, norm_score in zip(keyword_results, k_normalised):
-            matched_key = self._find_matching_key(result.document, doc_map)
+            matched_key = text_to_key.get(result.document.text)
             if matched_key is not None:
                 key = matched_key
             else:

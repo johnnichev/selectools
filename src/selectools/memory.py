@@ -116,6 +116,7 @@ class ConversationMemory:
         """
         self._messages.clear()
         self._last_trimmed = []
+        self._summary = None
 
     @property
     def summary(self) -> Optional[str]:

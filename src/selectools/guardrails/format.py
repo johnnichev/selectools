@@ -78,6 +78,13 @@ class FormatGuardrail(Guardrail):
                         reason=f"Missing required JSON keys: {', '.join(missing)}",
                         guardrail_name=self.name,
                     )
+            elif self._required_keys:
+                return GuardrailResult(
+                    passed=False,
+                    content=content,
+                    guardrail_name=self.name,
+                    reason="JSON value is not an object; cannot check required keys",
+                )
 
         return GuardrailResult(passed=True, content=content, guardrail_name=self.name)
 

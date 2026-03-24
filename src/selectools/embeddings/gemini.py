@@ -110,7 +110,8 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
 
         config = types.EmbedContentConfig(task_type=self.task_type)
         embeddings = []
-        # Gemini API handles batching internally
+        # TODO: Use batch embed_content API for better performance with large text lists.
+        # Currently makes one API call per text due to Gemini SDK limitations.
         for text in texts:
             response = self.client.models.embed_content(
                 model=self.model,

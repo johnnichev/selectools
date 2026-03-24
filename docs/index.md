@@ -139,7 +139,7 @@ print(result.reasoning)       # Why the agent chose get_weather
 | **AgentObserver Protocol** | 31-event lifecycle observer with run/call ID correlation, `SimpleStepObserver`, and OTel export |
 | **Runtime Controls** | Token/cost budget limits, cooperative cancellation, per-tool approval gates, model switching per iteration |
 | **Eval Framework** | 39 built-in evaluators, A/B testing, regression detection, HTML reports, JUnit XML |
-| **2113 Tests** | Unit, integration, regression, and E2E |
+| **2183 Tests** | Unit, integration, regression, and E2E |
 
 ---
 

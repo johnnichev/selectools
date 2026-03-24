@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -142,13 +143,15 @@ class EvalSuite:
                     self.on_progress(i + 1, len(self.cases))
         else:
             completed = 0
+            _lock = threading.Lock()
 
             def _run_and_report(case: TestCase) -> CaseResult:
                 nonlocal completed
                 result = self._run_case(case)
-                completed += 1
-                if self.on_progress:
-                    self.on_progress(completed, len(self.cases))
+                with _lock:
+                    completed += 1
+                    if self.on_progress:
+                        self.on_progress(completed, len(self.cases))
                 return result
 
             with ThreadPoolExecutor(max_workers=self.max_concurrency) as pool:

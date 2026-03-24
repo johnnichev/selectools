@@ -60,7 +60,7 @@ class ToolPolicy:
         4. ``allow`` glob patterns
         5. Default → review
         """
-        if tool_args:
+        if tool_args is not None:
             for rule in self.deny_when:
                 if fnmatch.fnmatch(tool_name, rule.get("tool", "*")):
                     arg_name = rule.get("arg", "")

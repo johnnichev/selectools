@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Set
 
 import pytest
@@ -264,7 +264,7 @@ class TestPrune:
         expired = _make_entry(
             id="expired",
             ttl_days=1,
-            created_at=datetime.utcnow() - timedelta(days=10),
+            created_at=datetime.now(timezone.utc) - timedelta(days=10),
         )
         fresh = _make_entry(id="fresh", ttl_days=30)
         store.save(expired)
@@ -278,7 +278,7 @@ class TestPrune:
     def test_prune_by_max_age(self, store: RedisKnowledgeStore) -> None:
         old = _make_entry(
             id="old",
-            created_at=datetime.utcnow() - timedelta(days=100),
+            created_at=datetime.now(timezone.utc) - timedelta(days=100),
         )
         recent = _make_entry(id="recent")
         store.save(old)
@@ -317,13 +317,13 @@ class TestQuerySince:
     def test_query_since_filter(self, store: RedisKnowledgeStore) -> None:
         old = _make_entry(
             id="old",
-            created_at=datetime.utcnow() - timedelta(days=30),
+            created_at=datetime.now(timezone.utc) - timedelta(days=30),
         )
         recent = _make_entry(id="recent")
         store.save(old)
         store.save(recent)
 
-        cutoff = datetime.utcnow() - timedelta(days=7)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=7)
         results = store.query(since=cutoff)
         assert len(results) == 1
         assert results[0].id == "recent"

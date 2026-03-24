@@ -86,15 +86,18 @@ class MCPClient:
             else:
                 raise ValueError(f"Unknown transport: {self.config.transport}")
 
-            self._read, self._write = await self._cm.__aenter__()
-            # streamablehttp_client returns (read, write, get_session_id)
-            if isinstance(self._read, tuple):
-                self._read, self._write, _ = self._read
-                # Actually streamablehttp returns 3 values from __aenter__
-                # Let's handle both patterns
-            if hasattr(self._write, "__aenter__"):
-                # Some transports return the write stream needing another enter
-                pass
+            result = await self._cm.__aenter__()
+            if isinstance(result, tuple):
+                if len(result) == 3:
+                    self._read, self._write, _ = result
+                elif len(result) == 2:
+                    self._read, self._write = result
+                else:
+                    self._read = result[0]
+                    self._write = result[1] if len(result) > 1 else None
+            else:
+                self._read = result
+                self._write = None
 
             from mcp import ClientSession  # type: ignore[import-untyped]
 

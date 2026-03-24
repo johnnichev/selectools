@@ -9,7 +9,7 @@ Requires the ``supabase`` package::
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from .knowledge import KnowledgeEntry
@@ -131,7 +131,7 @@ class SupabaseKnowledgeStore:
         response = self._client.table(self._table).select("*").eq("persistent", False).execute()
         rows = response.data or []
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         cutoff = now - timedelta(days=max_age_days) if max_age_days else None
         removed = 0
 

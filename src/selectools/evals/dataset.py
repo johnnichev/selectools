@@ -46,7 +46,7 @@ class DatasetLoader:
             known = {k: v for k, v in item.items() if k in _TESTCASE_FIELDS}
             unknown = {k: v for k, v in item.items() if k not in _TESTCASE_FIELDS}
             if unknown:
-                meta = known.get("metadata", {})
+                meta = dict(known.get("metadata", {}))
                 meta.update(unknown)
                 known["metadata"] = meta
             cases.append(TestCase(**known))

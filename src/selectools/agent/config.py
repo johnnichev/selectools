@@ -148,6 +148,7 @@ class AgentConfig:
     coherence_check: bool = False
     coherence_provider: Optional[Provider] = None
     coherence_model: Optional[str] = None
+    coherence_fail_closed: bool = False
     session_store: Optional[SessionStore] = None
     session_id: Optional[str] = None
     summarize_on_trim: bool = False

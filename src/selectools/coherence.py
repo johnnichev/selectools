@@ -12,6 +12,7 @@ dedicated fast provider via ``AgentConfig(coherence_provider=...)``.
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
@@ -31,6 +32,7 @@ class CoherenceResult:
 
     coherent: bool
     explanation: Optional[str] = None
+    usage: Optional[Any] = None  # UsageStats from the coherence LLM call
 
 
 _COHERENCE_PROMPT = """You are a security auditor. Your task is to determine whether a proposed tool call is consistent with the user's ORIGINAL request.
@@ -58,6 +60,7 @@ def check_coherence(
     tool_args: Dict[str, Any],
     available_tools: List[str],
     timeout: Optional[float] = 10.0,
+    fail_closed: bool = False,
 ) -> CoherenceResult:
     """Check if a proposed tool call is coherent with the user's intent.
 
@@ -81,7 +84,7 @@ def check_coherence(
     )
 
     try:
-        response_msg, _ = provider.complete(
+        response_msg, usage = provider.complete(
             model=model,
             system_prompt="You are a concise security auditor.",
             messages=[Message(role=Role.USER, content=prompt)],
@@ -91,8 +94,9 @@ def check_coherence(
         )
         response_text = (response_msg.content or "").strip()
 
-        if response_text.upper().startswith("COHERENT"):
-            return CoherenceResult(coherent=True)
+        first_word = response_text.strip().upper().split()[0] if response_text.strip() else ""
+        if first_word == "COHERENT":
+            return CoherenceResult(coherent=True, usage=usage)
 
         explanation = None
         lines = response_text.split("\n", 1)
@@ -101,11 +105,11 @@ def check_coherence(
         else:
             explanation = response_text
 
-        return CoherenceResult(coherent=False, explanation=explanation)
+        return CoherenceResult(coherent=False, explanation=explanation, usage=usage)
     except Exception as exc:
         return CoherenceResult(
-            coherent=True,
-            explanation=f"Coherence check failed (allowing by default): {exc}",
+            coherent=not fail_closed,
+            explanation=f"Coherence check failed ({'denying' if fail_closed else 'allowing'} by default): {exc}",
         )
 
 
@@ -117,6 +121,7 @@ async def acheck_coherence(
     tool_args: Dict[str, Any],
     available_tools: List[str],
     timeout: Optional[float] = 10.0,
+    fail_closed: bool = False,
 ) -> CoherenceResult:
     """Async version of :func:`check_coherence`."""
     prompt = _COHERENCE_PROMPT.format(
@@ -128,7 +133,7 @@ async def acheck_coherence(
 
     try:
         if hasattr(provider, "acomplete"):
-            response_msg, _ = await provider.acomplete(  # type: ignore[attr-defined]
+            response_msg, usage = await provider.acomplete(  # type: ignore[attr-defined]
                 model=model,
                 system_prompt="You are a concise security auditor.",
                 messages=[Message(role=Role.USER, content=prompt)],
@@ -137,7 +142,8 @@ async def acheck_coherence(
                 timeout=timeout,
             )
         else:
-            response_msg, _ = provider.complete(
+            response_msg, usage = await asyncio.to_thread(
+                provider.complete,
                 model=model,
                 system_prompt="You are a concise security auditor.",
                 messages=[Message(role=Role.USER, content=prompt)],
@@ -147,8 +153,9 @@ async def acheck_coherence(
             )
         response_text = (response_msg.content or "").strip()
 
-        if response_text.upper().startswith("COHERENT"):
-            return CoherenceResult(coherent=True)
+        first_word = response_text.strip().upper().split()[0] if response_text.strip() else ""
+        if first_word == "COHERENT":
+            return CoherenceResult(coherent=True, usage=usage)
 
         explanation = None
         lines = response_text.split("\n", 1)
@@ -157,11 +164,11 @@ async def acheck_coherence(
         else:
             explanation = response_text
 
-        return CoherenceResult(coherent=False, explanation=explanation)
+        return CoherenceResult(coherent=False, explanation=explanation, usage=usage)
     except Exception as exc:
         return CoherenceResult(
-            coherent=True,
-            explanation=f"Coherence check failed (allowing by default): {exc}",
+            coherent=not fail_closed,
+            explanation=f"Coherence check failed ({'denying' if fail_closed else 'allowing'} by default): {exc}",
         )
 
 

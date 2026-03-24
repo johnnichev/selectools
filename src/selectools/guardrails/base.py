@@ -61,6 +61,17 @@ class Guardrail:
         """
         return GuardrailResult(passed=True, content=content, guardrail_name=self.name)
 
+    async def acheck(self, content: str) -> GuardrailResult:
+        """Async version of :meth:`check`.
+
+        The default runs the sync ``check()`` in a thread executor to avoid
+        blocking the event loop.  Override for native async implementations
+        (e.g. LLM-based guardrails with async provider calls).
+        """
+        import asyncio
+
+        return await asyncio.to_thread(self.check, content)
+
 
 class GuardrailError(Exception):
     """Raised when a guardrail with ``action=block`` rejects content."""

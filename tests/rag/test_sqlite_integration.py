@@ -225,9 +225,9 @@ class TestSQLiteDatabaseOperations:
 
             assert os.path.exists(custom_path)
         finally:
-            if os.path.exists(custom_path):
-                os.remove(custom_path)
-            os.rmdir(custom_dir)
+            import shutil
+
+            shutil.rmtree(custom_dir, ignore_errors=True)
 
     def test_clear_database(
         self, mock_embedder: Mock, temp_db_path: str, sample_documents: list[Document]

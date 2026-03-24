@@ -111,7 +111,10 @@ class GeminiProvider(Provider):
         except Exception as exc:
             raise ProviderError(f"Gemini completion failed: {exc}") from exc
 
-        content_text = response.text or ""
+        try:
+            content_text = response.text or ""
+        except ValueError:
+            content_text = ""
         tool_calls: List[ToolCall] = []
 
         candidate_content = (
@@ -370,7 +373,10 @@ class GeminiProvider(Provider):
         except Exception as exc:
             raise ProviderError(f"Gemini async completion failed: {exc}") from exc
 
-        content_text = response.text or ""
+        try:
+            content_text = response.text or ""
+        except ValueError:
+            content_text = ""
 
         tool_calls: List[ToolCall] = []
         candidate_content = (

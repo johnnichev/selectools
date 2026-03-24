@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import pytest
@@ -210,7 +210,7 @@ class TestPrune:
         expired = _make_entry(
             id="expired",
             ttl_days=1,
-            created_at=datetime.utcnow() - timedelta(days=10),
+            created_at=datetime.now(timezone.utc) - timedelta(days=10),
         )
         fresh = _make_entry(id="fresh", ttl_days=30)
         store.save(expired)

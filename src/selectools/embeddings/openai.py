@@ -9,6 +9,8 @@ from .provider import EmbeddingProvider
 
 logger = logging.getLogger(__name__)
 
+_MAX_BATCH = 2048
+
 
 class OpenAIEmbeddingProvider(EmbeddingProvider):
     """
@@ -94,6 +96,9 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         """
         Embed multiple texts in batch (more efficient than individual calls).
 
+        The OpenAI embeddings API has a per-request limit of 2048 inputs.
+        This method transparently batches larger lists.
+
         Args:
             texts: List of texts to embed
 
@@ -103,15 +108,20 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         if not texts:
             return []
 
-        kwargs: Dict[str, Any] = {"input": texts, "model": self.model}
-        if self.dimensions is not None:
-            kwargs["dimensions"] = self.dimensions
+        all_embeddings: List[List[float]] = []
+        for i in range(0, len(texts), _MAX_BATCH):
+            batch = texts[i : i + _MAX_BATCH]
+            kwargs: Dict[str, Any] = {"input": batch, "model": self.model}
+            if self.dimensions is not None:
+                kwargs["dimensions"] = self.dimensions
 
-        response = self.client.embeddings.create(**kwargs)
+            response = self.client.embeddings.create(**kwargs)
 
-        # Sort by index to ensure order matches input
-        sorted_data = sorted(response.data, key=lambda x: x.index)
-        return [item.embedding for item in sorted_data]
+            # Sort by index to ensure order matches input
+            sorted_data = sorted(response.data, key=lambda x: x.index)
+            all_embeddings.extend([item.embedding for item in sorted_data])
+
+        return all_embeddings
 
     def embed_query(self, query: str) -> List[float]:
         """

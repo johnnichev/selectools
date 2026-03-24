@@ -29,6 +29,20 @@ def _donut_svg(pass_n: int, fail_n: int, error_n: int, skip_n: int) -> str:
         if count == 0:
             continue
         sweep = (count / total) * 360
+        if sweep >= 359.99:
+            # Full circle: a single arc cannot render 360 degrees, so draw
+            # two semicircular arcs to form a complete annulus.
+            d = (
+                f"M {cx} {cy - r} "
+                f"A {r} {r} 0 1 1 {cx} {cy + r} "
+                f"A {r} {r} 0 1 1 {cx} {cy - r} Z "
+                f"M {cx} {cy - inner_r} "
+                f"A {inner_r} {inner_r} 0 1 0 {cx} {cy + inner_r} "
+                f"A {inner_r} {inner_r} 0 1 0 {cx} {cy - inner_r} Z"
+            )
+            paths.append(f'<path d="{d}" fill="{color}" opacity="0.9" fill-rule="evenodd"/>')
+            start_angle += sweep
+            continue
         end_angle = start_angle + sweep
         large = 1 if sweep > 180 else 0
         sa = math.radians(start_angle)

@@ -8,6 +8,7 @@ extraction, deduplication, and LRU pruning.
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 from dataclasses import dataclass, field
@@ -144,9 +145,8 @@ class EntityMemory:
             response_msg = result[0] if isinstance(result, tuple) else result
             raw_text = (response_msg.content or "").strip()
             # Strip markdown code fences if present
-            if raw_text.startswith("```"):
-                lines = raw_text.split("\n")
-                raw_text = "\n".join(line for line in lines if not line.strip().startswith("```"))
+            raw_text = re.sub(r"^```\w*\n?", "", raw_text, count=1)
+            raw_text = re.sub(r"\n?```\s*$", "", raw_text, count=1)
             entities_data = json.loads(raw_text)
             if not isinstance(entities_data, list):
                 return []
@@ -209,7 +209,7 @@ class EntityMemory:
         Returns:
             A formatted ``[Known Entities]`` block listing all tracked entities.
         """
-        if not self._entities:
+        if not self.entities:  # Uses the locked property
             return ""
 
         lines = ["[Known Entities]"]

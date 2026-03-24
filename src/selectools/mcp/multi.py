@@ -90,11 +90,10 @@ class MultiMCPClient:
                 server_tools = await client.list_tools()
                 for tool in server_tools:
                     if self.prefix_tools:
-                        # Re-create with prefix
-                        from .bridge import mcp_to_tool
+                        import copy
 
-                        prefixed_name = f"{name}_{tool.name}"
-                        tool.name = prefixed_name
+                        tool = copy.copy(tool)
+                        tool.name = f"{name}_{tool.name}"
                     else:
                         if tool.name in seen_names:
                             raise ValueError(

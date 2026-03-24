@@ -3,7 +3,7 @@
 Thank you for your interest in contributing to Selectools! We welcome contributions from the community.
 
 **Current Version:** v0.17.4
-**Test Status:** 2113 tests passing (100%)
+**Test Status:** 2183 tests passing (100%)
 **Python:** 3.13+
 
 ## Getting Started
@@ -74,7 +74,7 @@ Similar to `npm run` scripts, here are the common commands for this project:
 ### Testing
 
 ```bash
-# Run all tests (2113 tests)
+# Run all tests (2183 tests)
 pytest tests/ -v
 
 # Run tests quietly (summary only)
@@ -264,7 +264,7 @@ selectools/
 │   ├── embeddings/             # Embedding providers
 │   ├── rag/                    # RAG: vector stores, chunking, loaders
 │   └── toolbox/                # 24 pre-built tools
-├── tests/                      # Test suite (2113 tests)
+├── tests/                      # Test suite (2183 tests)
 │   ├── agent/                  # Agent tests
 │   ├── rag/                    # RAG tests
 │   ├── tools/                  # Tool tests
@@ -370,7 +370,7 @@ We especially welcome contributions in these areas:
 - Add comparison guides (vs LangChain, LlamaIndex)
 
 ### 🧪 **Testing**
-- Increase test coverage (currently 2113 tests passing!)
+- Increase test coverage (currently 2183 tests passing!)
 - Add performance benchmarks
 - Improve E2E test stability with retry/rate-limit handling
 

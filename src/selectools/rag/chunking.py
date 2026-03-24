@@ -45,6 +45,9 @@ class TextSplitter:
             chunk_overlap: Number of characters to overlap between chunks
             length_function: Function to measure text length (default: len)
             separator: Separator to try to split on (default: double newline)
+
+        Note: ``length_function`` must return character counts (not token counts),
+        as chunk boundaries are calculated using character-based string slicing.
         """
         if chunk_size <= 0:
             raise ValueError("chunk_size must be positive")
@@ -502,7 +505,7 @@ class ContextualChunker:
                 temperature=0.0,
             )
 
-            context_line = response_msg.content.strip()
+            context_line = (response_msg.content or "").strip()
             enriched_text = f"{self.context_prefix}{context_line}\n\n{chunk_doc.text}"
 
             metadata = chunk_doc.metadata.copy()

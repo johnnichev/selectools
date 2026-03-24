@@ -131,7 +131,16 @@ class CorrectnessEvaluator:
         judge_output = _call_judge(self.provider, self.model, prompt)
         score = _extract_score(judge_output)
 
-        if score is not None and score < self.threshold:
+        if score is None:
+            return [
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected=f"correctness >= {self.threshold}",
+                    actual="unparseable",
+                    message=f"LLM judge did not return a parseable score. Raw output: {judge_output[:200]}",
+                )
+            ]
+        if score < self.threshold:
             return [
                 EvalFailure(
                     evaluator_name=self.name,
@@ -167,7 +176,16 @@ class RelevanceEvaluator:
         judge_output = _call_judge(self.provider, self.model, prompt)
         score = _extract_score(judge_output)
 
-        if score is not None and score < self.threshold:
+        if score is None:
+            return [
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected=f"relevance >= {self.threshold}",
+                    actual="unparseable",
+                    message=f"LLM judge did not return a parseable score. Raw output: {judge_output[:200]}",
+                )
+            ]
+        if score < self.threshold:
             return [
                 EvalFailure(
                     evaluator_name=self.name,
@@ -208,7 +226,16 @@ class FaithfulnessEvaluator:
         judge_output = _call_judge(self.provider, self.model, prompt)
         score = _extract_score(judge_output)
 
-        if score is not None and score < self.threshold:
+        if score is None:
+            return [
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected=f"faithfulness >= {self.threshold}",
+                    actual="unparseable",
+                    message=f"LLM judge did not return a parseable score. Raw output: {judge_output[:200]}",
+                )
+            ]
+        if score < self.threshold:
             return [
                 EvalFailure(
                     evaluator_name=self.name,
@@ -249,7 +276,16 @@ class HallucinationEvaluator:
         judge_output = _call_judge(self.provider, self.model, prompt)
         score = _extract_score(judge_output)
 
-        if score is not None and score < self.threshold:
+        if score is None:
+            return [
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected=f"no hallucination (>= {self.threshold})",
+                    actual="unparseable",
+                    message=f"LLM judge did not return a parseable score. Raw output: {judge_output[:200]}",
+                )
+            ]
+        if score < self.threshold:
             return [
                 EvalFailure(
                     evaluator_name=self.name,
@@ -286,7 +322,16 @@ class ToxicityEvaluator:
         judge_output = _call_judge(self.provider, self.model, prompt)
         score = _extract_score(judge_output)
 
-        if score is not None and score < self.threshold:
+        if score is None:
+            return [
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected=f"safety >= {self.threshold}",
+                    actual="unparseable",
+                    message=f"LLM judge did not return a parseable score. Raw output: {judge_output[:200]}",
+                )
+            ]
+        if score < self.threshold:
             return [
                 EvalFailure(
                     evaluator_name=self.name,
@@ -323,7 +368,16 @@ class CoherenceEvaluator:
         judge_output = _call_judge(self.provider, self.model, prompt)
         score = _extract_score(judge_output)
 
-        if score is not None and score < self.threshold:
+        if score is None:
+            return [
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected=f"coherence >= {self.threshold}",
+                    actual="unparseable",
+                    message=f"LLM judge did not return a parseable score. Raw output: {judge_output[:200]}",
+                )
+            ]
+        if score < self.threshold:
             return [
                 EvalFailure(
                     evaluator_name=self.name,
@@ -359,7 +413,16 @@ class CompletenessEvaluator:
         judge_output = _call_judge(self.provider, self.model, prompt)
         score = _extract_score(judge_output)
 
-        if score is not None and score < self.threshold:
+        if score is None:
+            return [
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected=f"completeness >= {self.threshold}",
+                    actual="unparseable",
+                    message=f"LLM judge did not return a parseable score. Raw output: {judge_output[:200]}",
+                )
+            ]
+        if score < self.threshold:
             return [
                 EvalFailure(
                     evaluator_name=self.name,
@@ -397,7 +460,16 @@ class BiasEvaluator:
         judge_output = _call_judge(self.provider, self.model, prompt)
         score = _extract_score(judge_output)
 
-        if score is not None and score < self.threshold:
+        if score is None:
+            return [
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected=f"unbiased >= {self.threshold}",
+                    actual="unparseable",
+                    message=f"LLM judge did not return a parseable score. Raw output: {judge_output[:200]}",
+                )
+            ]
+        if score < self.threshold:
             return [
                 EvalFailure(
                     evaluator_name=self.name,
@@ -437,7 +509,16 @@ class SummaryEvaluator:
         judge_output = _call_judge(self.provider, self.model, prompt)
         score = _extract_score(judge_output)
 
-        if score is not None and score < self.threshold:
+        if score is None:
+            return [
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected=f"summary quality >= {self.threshold}",
+                    actual="unparseable",
+                    message=f"LLM judge did not return a parseable score. Raw output: {judge_output[:200]}",
+                )
+            ]
+        if score < self.threshold:
             return [
                 EvalFailure(
                     evaluator_name=self.name,
@@ -475,7 +556,16 @@ class ConcisenessEvaluator:
         judge_output = _call_judge(self.provider, self.model, prompt)
         score = _extract_score(judge_output)
 
-        if score is not None and score < self.threshold:
+        if score is None:
+            return [
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected=f"conciseness >= {self.threshold}",
+                    actual="unparseable",
+                    message=f"LLM judge did not return a parseable score. Raw output: {judge_output[:200]}",
+                )
+            ]
+        if score < self.threshold:
             return [
                 EvalFailure(
                     evaluator_name=self.name,
@@ -515,7 +605,16 @@ class InstructionFollowingEvaluator:
         judge_output = _call_judge(self.provider, self.model, prompt)
         score = _extract_score(judge_output)
 
-        if score is not None and score < self.threshold:
+        if score is None:
+            return [
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected=f"instruction following >= {self.threshold}",
+                    actual="unparseable",
+                    message=f"LLM judge did not return a parseable score. Raw output: {judge_output[:200]}",
+                )
+            ]
+        if score < self.threshold:
             return [
                 EvalFailure(
                     evaluator_name=self.name,
@@ -554,7 +653,16 @@ class ToneEvaluator:
         judge_output = _call_judge(self.provider, self.model, prompt)
         score = _extract_score(judge_output)
 
-        if score is not None and score < self.threshold:
+        if score is None:
+            return [
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected=f"tone '{case.expected_tone}' >= {self.threshold}",
+                    actual="unparseable",
+                    message=f"LLM judge did not return a parseable score. Raw output: {judge_output[:200]}",
+                )
+            ]
+        if score < self.threshold:
             return [
                 EvalFailure(
                     evaluator_name=self.name,
@@ -595,7 +703,16 @@ class ContextRecallEvaluator:
         judge_output = _call_judge(self.provider, self.model, prompt)
         score = _extract_score(judge_output)
 
-        if score is not None and score < self.threshold:
+        if score is None:
+            return [
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected=f"context recall >= {self.threshold}",
+                    actual="unparseable",
+                    message=f"LLM judge did not return a parseable score. Raw output: {judge_output[:200]}",
+                )
+            ]
+        if score < self.threshold:
             return [
                 EvalFailure(
                     evaluator_name=self.name,
@@ -636,7 +753,16 @@ class ContextPrecisionEvaluator:
         judge_output = _call_judge(self.provider, self.model, prompt)
         score = _extract_score(judge_output)
 
-        if score is not None and score < self.threshold:
+        if score is None:
+            return [
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected=f"context precision >= {self.threshold}",
+                    actual="unparseable",
+                    message=f"LLM judge did not return a parseable score. Raw output: {judge_output[:200]}",
+                )
+            ]
+        if score < self.threshold:
             return [
                 EvalFailure(
                     evaluator_name=self.name,
@@ -673,7 +799,16 @@ class GrammarEvaluator:
         judge_output = _call_judge(self.provider, self.model, prompt)
         score = _extract_score(judge_output)
 
-        if score is not None and score < self.threshold:
+        if score is None:
+            return [
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected=f"grammar >= {self.threshold}",
+                    actual="unparseable",
+                    message=f"LLM judge did not return a parseable score. Raw output: {judge_output[:200]}",
+                )
+            ]
+        if score < self.threshold:
             return [
                 EvalFailure(
                     evaluator_name=self.name,
@@ -720,7 +855,16 @@ class SafetyEvaluator:
         judge_output = _call_judge(self.provider, self.model, prompt)
         score = _extract_score(judge_output)
 
-        if score is not None and score < self.threshold:
+        if score is None:
+            return [
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected=f"safety >= {self.threshold}",
+                    actual="unparseable",
+                    message=f"LLM judge did not return a parseable score. Raw output: {judge_output[:200]}",
+                )
+            ]
+        if score < self.threshold:
             return [
                 EvalFailure(
                     evaluator_name=self.name,

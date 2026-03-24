@@ -115,8 +115,9 @@ class _OpenAICompatibleBase(ABC):
             "messages": cast(Any, formatted),
             "temperature": temperature,
             token_key: max_tokens,
-            "timeout": timeout,
         }
+        if timeout is not None:
+            args["timeout"] = timeout
 
         if tools:
             args["tools"] = [self._map_tool_to_openai(t) for t in tools]
@@ -148,8 +149,9 @@ class _OpenAICompatibleBase(ABC):
             "messages": cast(Any, formatted),
             "temperature": temperature,
             token_key: max_tokens,
-            "timeout": timeout,
         }
+        if timeout is not None:
+            args["timeout"] = timeout
 
         if tools:
             args["tools"] = [self._map_tool_to_openai(t) for t in tools]
@@ -183,8 +185,9 @@ class _OpenAICompatibleBase(ABC):
             "temperature": temperature,
             token_key: max_tokens,
             "stream": True,
-            "timeout": timeout,
         }
+        if timeout is not None:
+            args["timeout"] = timeout
         if tools:
             args["tools"] = [self._map_tool_to_openai(t) for t in tools]
 
@@ -229,8 +232,9 @@ class _OpenAICompatibleBase(ABC):
             "temperature": temperature,
             token_key: max_tokens,
             "stream": True,
-            "timeout": timeout,
         }
+        if timeout is not None:
+            args["timeout"] = timeout
         if tools:
             args["tools"] = [self._map_tool_to_openai(t) for t in tools]
 
@@ -307,7 +311,7 @@ class _OpenAICompatibleBase(ABC):
                     {
                         "role": "tool",
                         "content": message.content,
-                        "tool_call_id": message.tool_call_id,
+                        "tool_call_id": message.tool_call_id or "unknown",
                     }
                 )
             elif role == Role.ASSISTANT.value:
@@ -405,7 +409,7 @@ class _OpenAICompatibleBase(ABC):
 
         OpenAI always has an ID.  Ollama may not, so the subclass overrides.
         """
-        return tc.id
+        return tc.id or f"call_{id(tc)}"
 
     def _initial_tool_call_id(self, tc_delta: Any) -> str:
         """Provide the initial tool-call ID for a streaming delta.

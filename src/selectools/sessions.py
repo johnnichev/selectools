@@ -87,7 +87,10 @@ class JsonFileSessionStore:
         os.makedirs(directory, exist_ok=True)
 
     def _path(self, session_id: str) -> str:
-        return os.path.join(self._directory, f"{session_id}.json")
+        safe_id = os.path.basename(session_id)
+        if safe_id != session_id or ".." in session_id or "\x00" in session_id:
+            raise ValueError(f"Invalid session_id: {session_id!r}")
+        return os.path.join(self._directory, f"{safe_id}.json")
 
     def _is_expired(self, data: Dict[str, Any]) -> bool:
         if self._default_ttl is None:
@@ -115,8 +118,12 @@ class JsonFileSessionStore:
                 "updated_at": now,
                 "memory": memory.to_dict(),
             }
-            with open(path, "w", encoding="utf-8") as f:
+            tmp_path = path + ".tmp"
+            with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(payload, f, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, path)
 
     def load(self, session_id: str) -> Optional[ConversationMemory]:
         path = self._path(session_id)
@@ -125,9 +132,12 @@ class JsonFileSessionStore:
                 return None
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-        if self._is_expired(data):
-            self.delete(session_id)
-            return None
+            if self._is_expired(data):
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+                return None
         return ConversationMemory.from_dict(data["memory"])
 
     def list(self) -> List[SessionMetadata]:
@@ -209,6 +219,7 @@ class SQLiteSessionStore:
 
         conn = sqlite3.connect(self._db_path)
         try:
+            conn.execute("PRAGMA journal_mode=WAL")
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS sessions (
@@ -389,7 +400,7 @@ class RedisSessionStore:
         )
 
         pipe = self._client.pipeline()
-        if self._default_ttl:
+        if self._default_ttl is not None:
             pipe.setex(key, self._default_ttl, memory_json)
             pipe.setex(meta_key, self._default_ttl, meta_json)
         else:

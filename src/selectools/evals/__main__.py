@@ -189,8 +189,8 @@ def main() -> None:  # noqa: C901
                 store.save(report)
                 print(f"Baseline updated at {args.baseline}/")
 
-    # Exit with non-zero if accuracy is 0
-    if report.accuracy == 0.0 and report.metadata.total_cases > 0:
+    # Exit with non-zero if accuracy is 0 (only for run command)
+    if args.command == "run" and report.accuracy == 0.0 and report.metadata.total_cases > 0:
         sys.exit(1)
 
 

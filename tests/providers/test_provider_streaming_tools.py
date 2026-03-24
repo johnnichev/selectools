@@ -540,7 +540,8 @@ class TestAnthropicStreamPassesTools:
 class TestFallbackProviderAstream:
     """Verify FallbackProvider.astream has error handling and failover."""
 
-    def test_astream_failover_on_retriable_error(self) -> None:
+    @pytest.mark.asyncio
+    async def test_astream_failover_on_retriable_error(self) -> None:
         """If the first provider's astream() raises a retriable error,
         the fallback should try the next provider."""
         from selectools.providers.fallback import FallbackProvider
@@ -565,14 +566,18 @@ class TestFallbackProviderAstream:
 
         working = WorkingStreamProvider()
         fb = FallbackProvider(providers=[FailingStreamProvider(), working])
-        stream = fb.astream(
+        chunks = []
+        async for chunk in fb.astream(
             model="test",
             system_prompt="test",
             messages=[Message(role=Role.USER, content="hi")],
-        )
+        ):
+            chunks.append(chunk)
         assert fb.provider_used == "working"
+        assert chunks == ["hello from fallback"]
 
-    def test_astream_records_failure_for_circuit_breaker(self) -> None:
+    @pytest.mark.asyncio
+    async def test_astream_records_failure_for_circuit_breaker(self) -> None:
         """Failed astream() calls must be recorded for the circuit breaker."""
         from selectools.providers.fallback import FallbackProvider
 
@@ -589,25 +594,24 @@ class TestFallbackProviderAstream:
             supports_streaming = True
             supports_async = True
 
-            def astream(self, **kwargs: Any) -> AsyncIterable[str]:
-                async def gen() -> AsyncGenerator[str, None]:
-                    yield "ok"
-
-                return gen()
+            async def astream(self, **kwargs: Any) -> AsyncIterable[str]:
+                yield "ok"  # type: ignore[misc]
 
         fb = FallbackProvider(
             providers=[FailProvider(), OkProvider()],
             circuit_breaker_threshold=2,
         )
 
-        fb.astream(
+        async for _ in fb.astream(
             model="test",
             system_prompt="test",
             messages=[Message(role=Role.USER, content="hi")],
-        )
+        ):
+            pass
         assert fb._failures.get("fail", 0) == 1
 
-    def test_astream_raises_if_all_exhausted(self) -> None:
+    @pytest.mark.asyncio
+    async def test_astream_raises_if_all_exhausted(self) -> None:
         """If all providers fail in astream(), ProviderError must be raised."""
         from selectools.providers.fallback import FallbackProvider
 
@@ -621,11 +625,12 @@ class TestFallbackProviderAstream:
 
         fb = FallbackProvider(providers=[FailProvider()])
         with pytest.raises(ProviderError, match="Last error"):
-            fb.astream(
+            async for _ in fb.astream(
                 model="test",
                 system_prompt="test",
                 messages=[Message(role=Role.USER, content="hi")],
-            )
+            ):
+                pass
 
 
 # ============================================================================
@@ -670,7 +675,8 @@ class TestFallbackStreamPassesTools:
         assert received_tools[0] is not None
         assert len(received_tools[0]) == 1
 
-    def test_astream_passes_tools_to_child(self) -> None:
+    @pytest.mark.asyncio
+    async def test_astream_passes_tools_to_child(self) -> None:
         """FallbackProvider.astream() must forward tools to child.astream()."""
         from selectools.providers.fallback import FallbackProvider
 
@@ -679,28 +685,26 @@ class TestFallbackStreamPassesTools:
         class CapturingAsyncProvider:
             name = "capturing-async"
             supports_streaming = True
+            supports_async = True
 
-            def astream(
+            async def astream(
                 self,
                 *,
                 tools: Any = None,
                 **kwargs: Any,
             ) -> AsyncIterable[str]:
                 received_tools.append(tools)
-
-                async def gen() -> AsyncGenerator[str, None]:
-                    yield "ok"
-
-                return gen()
+                yield "ok"  # type: ignore[misc]
 
         mock_tool_obj = MagicMock()
         fb = FallbackProvider(providers=[CapturingAsyncProvider()])
-        fb.astream(
+        async for _ in fb.astream(
             model="test",
             system_prompt="test",
             messages=[Message(role=Role.USER, content="hi")],
             tools=[mock_tool_obj],
-        )
+        ):
+            pass
 
         assert len(received_tools) == 1
         assert received_tools[0] is not None

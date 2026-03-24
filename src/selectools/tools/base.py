@@ -293,6 +293,12 @@ class Tool:
         if value is None:
             return f"Parameter '{param.name}' is None"
 
+        if isinstance(value, bool) and param.param_type in (int, float):
+            return (
+                f"Expected {param.param_type.__name__} for '{param.name}', got bool. "
+                f"Pass an integer or float value instead."
+            )
+
         if param.param_type is float:
             if not isinstance(value, (float, int)):
                 return f"Parameter '{param.name}' must be a number"
@@ -378,6 +384,8 @@ class Tool:
         Dicts, lists, Pydantic models, and dataclasses are serialized as JSON.
         Strings pass through unchanged.  All other types fall back to ``str()``.
         """
+        if result is None:
+            return ""
         if isinstance(result, str):
             return result
         if isinstance(result, (dict, list)):
@@ -414,6 +422,20 @@ class Tool:
 
         try:
             result = self.function(**call_args)
+
+            # Handle async functions called from sync context
+            if inspect.iscoroutine(result):
+                try:
+                    _loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    _loop = None
+                if _loop and _loop.is_running():
+                    import concurrent.futures
+
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                        result = pool.submit(asyncio.run, result).result()
+                else:
+                    result = asyncio.run(result)
 
             # Handle streaming tools (generators)
             if inspect.isgenerator(result):
@@ -474,12 +496,11 @@ class Tool:
                 return self._serialize_result(result)
             else:
                 # Run sync function in executor to avoid blocking
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 context = contextvars.copy_context()
                 func_with_args = functools.partial(self.function, **call_args)
 
-                with ThreadPoolExecutor() as executor:
-                    result = await loop.run_in_executor(executor, context.run, func_with_args)
+                result = await loop.run_in_executor(None, context.run, func_with_args)
 
                 # Handle sync streaming in async context
                 if inspect.isgenerator(result):

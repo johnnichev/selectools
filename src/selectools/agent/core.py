@@ -315,6 +315,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         messages: List[Message],
         response_format: Optional[ResponseFormat] = None,
         parent_run_id: Optional[str] = None,
+        skip_guardrails: bool = False,
     ) -> _RunContext:
         """Shared setup for run(), arun(), and astream().
 
@@ -337,8 +338,16 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         self._wire_fallback_observer(run_id)
         self._notify_observers("on_run_start", run_id, messages, self._system_prompt)
 
+        # Extract user text for coherence checks BEFORE guardrails may redact it
+        user_text_for_coherence = ""
+        for msg in reversed(messages):
+            if msg.role == Role.USER and msg.content:
+                user_text_for_coherence = msg.content
+                break
+
         # Input guardrails (operate on copies to avoid mutating caller's objects)
-        if self.config.guardrails and self.config.guardrails.input:
+        # In async mode, guardrails are applied separately via _arun_input_guardrails
+        if self.config.guardrails and self.config.guardrails.input and not skip_guardrails:
             messages = [copy.copy(msg) for msg in messages]
             for msg in messages:
                 if msg.role == Role.USER and msg.content:
@@ -362,6 +371,14 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 )
         else:
             self._history.extend(messages)
+            if len(self._history) > 200:
+                import warnings
+
+                warnings.warn(
+                    f"Agent history has {len(self._history)} messages without memory configured. "
+                    f"Consider using ConversationMemory to prevent unbounded growth.",
+                    stacklevel=3,
+                )
 
         # Knowledge memory context
         if self.config.knowledge_memory:
@@ -380,13 +397,6 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     0,
                     Message(role=Role.SYSTEM, content=entity_ctx),
                 )
-
-        # Extract user text for coherence checks
-        user_text_for_coherence = ""
-        for msg in reversed(messages):
-            if msg.role == Role.USER and msg.content:
-                user_text_for_coherence = msg.content
-                break
 
         # Knowledge graph context
         if self.config.knowledge_graph:
@@ -601,6 +611,36 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 TraceStep(
                     type=StepType.GUARDRAIL,
                     summary=f"Output guardrail: {result.reason}",
+                )
+            )
+        return result.content
+
+    async def _arun_input_guardrails(self, content: str, trace: Optional[AgentTrace] = None) -> str:
+        """Async input guardrails — calls ``acheck()`` to avoid blocking the event loop."""
+        if not self.config.guardrails or not self.config.guardrails.input:
+            return content
+        result = await self.config.guardrails.acheck_input(content)
+        if trace and (not result.passed or result.guardrail_name):
+            trace.add(
+                TraceStep(
+                    type=StepType.GUARDRAIL,
+                    summary=f"Input guardrail: {result.guardrail_name or result.reason}",
+                )
+            )
+        return result.content
+
+    async def _arun_output_guardrails(
+        self, content: str, trace: Optional[AgentTrace] = None
+    ) -> str:
+        """Async output guardrails — calls ``acheck()`` to avoid blocking the event loop."""
+        if not self.config.guardrails or not self.config.guardrails.output:
+            return content
+        result = await self.config.guardrails.acheck_output(content)
+        if trace and (not result.passed or result.guardrail_name):
+            trace.add(
+                TraceStep(
+                    type=StepType.GUARDRAIL,
+                    summary=f"Output guardrail: {result.guardrail_name or result.reason}",
                 )
             )
         return result.content
@@ -1056,8 +1096,21 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         """
         messages = self._normalize_messages(messages)
         ctx = self._prepare_run(
-            messages, response_format=response_format, parent_run_id=parent_run_id
+            messages,
+            response_format=response_format,
+            parent_run_id=parent_run_id,
+            skip_guardrails=True,
         )
+
+        # Async input guardrails (non-blocking)
+        if self.config.guardrails and self.config.guardrails.input:
+            for i, msg in enumerate(self._history):
+                if msg.role == Role.USER and msg.content:
+                    self._history[i] = copy.copy(msg)
+                    self._history[i].content = await self._arun_input_guardrails(
+                        msg.content, ctx.trace
+                    )
+
         await self._anotify_observers("on_run_start", ctx.run_id, messages, self._system_prompt)
 
         try:
@@ -1066,13 +1119,27 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
 
                 # Cancellation check (R2)
                 if self.config.cancellation_token and self.config.cancellation_token.is_cancelled:
-                    yield StreamChunk(content="Agent run was cancelled")
+                    _result = self._build_cancelled_result(ctx)
+                    await self._anotify_observers(
+                        "on_cancelled", ctx.run_id, ctx.iteration, "Agent run was cancelled"
+                    )
+                    await self._anotify_observers("on_run_end", ctx.run_id, _result)
+                    yield _result
                     return
 
                 # Budget check (R1)
                 budget_msg = self._check_budget(ctx)
                 if budget_msg:
-                    yield StreamChunk(content=budget_msg)
+                    _result = self._build_budget_exceeded_result(ctx, budget_msg)
+                    await self._anotify_observers(
+                        "on_budget_exceeded",
+                        ctx.run_id,
+                        budget_msg,
+                        self.usage.total_tokens,
+                        self.usage.total_cost_usd,
+                    )
+                    await self._anotify_observers("on_run_end", ctx.run_id, _result)
+                    yield _result
                     return
 
                 # Model selection (R10)
@@ -1110,14 +1177,14 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     "on_llm_start",
                     ctx.run_id,
                     self._history,
-                    self.config.model,
+                    self._effective_model,
                     self._system_prompt,
                 )
                 await self._anotify_observers(
                     "on_llm_start",
                     ctx.run_id,
                     self._history,
-                    self.config.model,
+                    self._effective_model,
                     self._system_prompt,
                 )
                 llm_start = time.time()
@@ -1127,7 +1194,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         self.provider, "supports_async", False
                     ):
                         response_msg, _usage = await self.provider.acomplete(
-                            model=self.config.model,
+                            model=self._effective_model,
                             system_prompt=self._system_prompt,
                             messages=self._history,
                             tools=self.tools,
@@ -1140,7 +1207,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         response_msg, _usage = await loop.run_in_executor(
                             None,
                             lambda: self.provider.complete(
-                                model=self.config.model,
+                                model=self._effective_model,
                                 system_prompt=self._system_prompt,
                                 messages=self._history,
                                 tools=self.tools,
@@ -1164,7 +1231,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         current_tool_calls = response_msg.tool_calls
                 else:
                     gen = self.provider.astream(
-                        model=self.config.model,
+                        model=self._effective_model,
                         system_prompt=self._system_prompt,
                         messages=self._history,
                         tools=self.tools,
@@ -1188,8 +1255,8 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     TraceStep(
                         type=StepType.LLM_CALL,
                         duration_ms=(time.time() - llm_start) * 1000,
-                        model=self.config.model,
-                        summary=f"{self.config.model} → {len(full_content)} chars (stream)",
+                        model=self._effective_model,
+                        summary=f"{self._effective_model} → {len(full_content)} chars (stream)",
                     )
                 )
 
@@ -1332,7 +1399,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
 
                 # Post-tool cancellation check (R2)
                 if self.config.cancellation_token and self.config.cancellation_token.is_cancelled:
-                    yield StreamChunk(content="Agent run was cancelled")
+                    _result = self._build_cancelled_result(ctx)
+                    await self._anotify_observers(
+                        "on_cancelled", ctx.run_id, ctx.iteration, "Agent run was cancelled"
+                    )
+                    await self._anotify_observers("on_run_end", ctx.run_id, _result)
+                    yield _result
                     return
 
                 self._notify_observers(
@@ -1343,6 +1415,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 )
 
             _result = self._build_max_iterations_result(ctx)
+            await self._anotify_observers("on_run_end", ctx.run_id, _result)
             yield _result
             return
         except Exception as exc:
@@ -1389,8 +1462,21 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         """
         messages = self._normalize_messages(messages)
         ctx = self._prepare_run(
-            messages, response_format=response_format, parent_run_id=parent_run_id
+            messages,
+            response_format=response_format,
+            parent_run_id=parent_run_id,
+            skip_guardrails=True,
         )
+
+        # Async input guardrails (non-blocking)
+        if self.config.guardrails and self.config.guardrails.input:
+            for i, msg in enumerate(self._history):
+                if msg.role == Role.USER and msg.content:
+                    self._history[i] = copy.copy(msg)
+                    self._history[i].content = await self._arun_input_guardrails(
+                        msg.content, ctx.trace
+                    )
+
         await self._anotify_observers("on_run_start", ctx.run_id, messages, self._system_prompt)
 
         try:
@@ -1399,12 +1485,26 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
 
                 # Cancellation check (R2)
                 if self.config.cancellation_token and self.config.cancellation_token.is_cancelled:
-                    return self._build_cancelled_result(ctx)
+                    result = self._build_cancelled_result(ctx)
+                    await self._anotify_observers(
+                        "on_cancelled", ctx.run_id, ctx.iteration, "cancelled"
+                    )
+                    await self._anotify_observers("on_run_end", ctx.run_id, result)
+                    return result
 
                 # Budget check (R1)
                 budget_msg = self._check_budget(ctx)
                 if budget_msg:
-                    return self._build_budget_exceeded_result(ctx, budget_msg)
+                    result = self._build_budget_exceeded_result(ctx, budget_msg)
+                    await self._anotify_observers(
+                        "on_budget_exceeded",
+                        ctx.run_id,
+                        budget_msg,
+                        self.usage.total_tokens,
+                        self.usage.total_cost_usd,
+                    )
+                    await self._anotify_observers("on_run_end", ctx.run_id, result)
+                    return result
 
                 # Model selection (R10)
                 if self.config.model_selector:
@@ -1559,7 +1659,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
 
                 # Post-tool cancellation check (R2)
                 if self.config.cancellation_token and self.config.cancellation_token.is_cancelled:
-                    return self._build_cancelled_result(ctx)
+                    result = self._build_cancelled_result(ctx)
+                    await self._anotify_observers(
+                        "on_cancelled", ctx.run_id, ctx.iteration, "cancelled"
+                    )
+                    await self._anotify_observers("on_run_end", ctx.run_id, result)
+                    return result
 
                 self._notify_observers(
                     "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
@@ -1568,7 +1673,9 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
                 )
 
-            return self._build_max_iterations_result(ctx)
+            result = self._build_max_iterations_result(ctx)
+            await self._anotify_observers("on_run_end", ctx.run_id, result)
+            return result
         except Exception as exc:
             if not self.memory:
                 self._history = self._history[: ctx.history_checkpoint]
