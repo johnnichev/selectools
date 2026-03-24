@@ -94,7 +94,7 @@ src/selectools/
     ├── junit.py             # JUnit XML for CI
     └── __main__.py          # CLI: python -m selectools.evals
 
-tests/                       # 2113 tests (unit, integration, regression, E2E)
+tests/                       # 2183 tests (unit, integration, regression, E2E)
 ├── agent/                   # Agent core tests
 ├── providers/               # Provider-specific tests
 ├── rag/                     # RAG pipeline tests
@@ -303,6 +303,16 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 12. **`astream()` must have full feature parity with `run()`/`arun()`**: As of v0.16.3, all three methods share `_prepare_run()`, `_finalize_run()`, `_process_response()`, and `_build_max_iterations_result()` helpers. When adding new features to the agent loop, add them to these shared helpers rather than to individual methods. The `_RunContext` dataclass carries all per-run state.
 
 13. **Hooks are deprecated — use observers**: `AgentConfig.hooks` (a plain dict of callbacks) is deprecated. Passing `hooks` emits a `DeprecationWarning` and internally wraps the dict via `_HooksAdapter(AgentObserver)`. New code should always use `AgentObserver` or `AsyncAgentObserver` instead.
+
+14. **FallbackProvider `stream()` / `astream()` must record success AFTER consumption**: The generator must be fully consumed before calling `_record_success()`. Recording before consumption means the circuit breaker never trips on streaming errors. Fixed in v0.17.5.
+
+15. **`astream()` direct provider calls must use `self._effective_model`**: Unlike `run()`/`arun()` which go through `_call_provider`/`_acall_provider`, `astream()` calls providers directly. All model references in `astream()` must use `self._effective_model`, not `self.config.model`.
+
+16. **Async observer events must fire in all exit paths**: The shared `_build_cancelled_result`, `_build_budget_exceeded_result`, and `_build_max_iterations_result` only fire sync observers. In `arun()`/`astream()`, always add `await self._anotify_observers(...)` after calling these helpers.
+
+17. **`datetime.utcnow()` is deprecated — use `datetime.now(timezone.utc)`**: All datetime defaults in dataclasses must use `field(default_factory=lambda: datetime.now(timezone.utc))`, not `default_factory=datetime.utcnow`. The `is_expired` property and pruning code must also use aware datetimes.
+
+18. **Guardrails have async support**: `Guardrail.acheck()` runs sync `check()` via `asyncio.to_thread` by default. `GuardrailsPipeline` has `acheck_input()`/`acheck_output()`. `arun()`/`astream()` use `_arun_input_guardrails()` with `skip_guardrails=True` in `_prepare_run()` to avoid blocking the event loop.
 
 ## Current Roadmap
 

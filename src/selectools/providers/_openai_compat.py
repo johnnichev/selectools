@@ -409,7 +409,7 @@ class _OpenAICompatibleBase(ABC):
 
         OpenAI always has an ID.  Ollama may not, so the subclass overrides.
         """
-        return tc.id
+        return tc.id or f"call_{id(tc)}"
 
     def _initial_tool_call_id(self, tc_delta: Any) -> str:
         """Provide the initial tool-call ID for a streaming delta.

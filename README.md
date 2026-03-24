@@ -171,7 +171,7 @@ report.to_html("report.html")
 - **49 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, eval framework, and more
 - **Built-in Eval Framework**: 39 evaluators (21 deterministic + 18 LLM-as-judge), A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing
 - **AgentObserver Protocol**: 31 lifecycle events with `run_id` correlation, `LoggingObserver`, `SimpleStepObserver`, OTel export
-- **2113 Tests**: Unit, integration, regression, and E2E with real API calls
+- **2183 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 
@@ -740,7 +740,7 @@ pytest tests/ -x -q          # All tests
 pytest tests/ -k "not e2e"   # Skip E2E (no API keys needed)
 ```
 
-2082 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, and E2E integration.
+2183 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, and E2E integration.
 
 ## License
 
