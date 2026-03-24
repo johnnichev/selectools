@@ -217,6 +217,7 @@ v0.17.6  ✅ Quick Wins
 
 v0.17.7  🟡 Caching & Context
          Semantic caching → Prompt compression → Conversation branching
+         (~50 tests, 3 examples)
 
 v0.18.0  🟡 Multi-Agent Orchestration
          AgentGraph → GraphState → Typed reducers → Resume-from-yield interrupts
@@ -331,17 +332,118 @@ Every team building agents needs evaluation. Today they either build it from scr
 
 | Feature | Status | Impact | Effort |
 |---|---|---|---|
-| **EvalSuite + TestCase** | 🟡 High | High | Medium |
-| **Built-in Evaluators (6)** | 🟡 High | High | Medium |
-| **EvalReport** | 🟡 High | Medium | Small |
-| **Dataset Loader (JSON/YAML)** | 🟡 Medium | Medium | Small |
-| **Regression Detection** | 🟡 Medium | High | Medium |
-| **HTML Report Export** | 🟡 Medium | Medium | Small |
-| **JUnit XML for CI** | 🟡 Medium | Medium | Small |
+| **EvalSuite + TestCase** | ✅ Done | High | Medium |
+| **Built-in Evaluators (39)** | ✅ Done | High | Medium |
+| **EvalReport** | ✅ Done | Medium | Small |
+| **Dataset Loader (JSON/YAML)** | ✅ Done | Medium | Small |
+| **Regression Detection** | ✅ Done | High | Medium |
+| **HTML Report Export** | ✅ Done | Medium | Small |
+| **JUnit XML for CI** | ✅ Done | Medium | Small |
+| **Pairwise A/B eval** | ✅ Done | Medium | Small |
+| **Snapshot testing** | ✅ Done | Medium | Small |
+| **Live eval dashboard** | ✅ Done | Medium | Medium |
+| **SVG badge generator** | ✅ Done | Low | Small |
 
 ---
 
-## v0.18.0: Multi-Agent Orchestration
+## v0.17.1: MCP Client/Server ✅
+
+Focus: Model Context Protocol integration for tool interoperability.
+
+### MCP Client
+
+Discover and call tools from any MCP-compliant server:
+
+```python
+from selectools.mcp import MCPClient, mcp_tools
+
+client = MCPClient(server_url="http://localhost:8080")
+tools = mcp_tools(client)   # Returns List[Tool] that proxy to MCP server
+
+agent = Agent(tools=tools + local_tools, provider=provider)
+```
+
+### MCP Server
+
+Expose `@tool` functions as MCP-compliant endpoints:
+
+```python
+from selectools.mcp import MCPServer
+
+server = MCPServer(tools=[search_tool, calculator_tool])
+server.serve(host="0.0.0.0", port=8080)
+```
+
+### Key Differentiator
+
+First-class MCP support lets Selectools agents use any MCP-compatible tool server — massive integration surface area without building individual connectors.
+
+| Feature | Status | Impact | Effort |
+|---|---|---|---|
+| **MCPClient** | ✅ Done | High | Medium |
+| **mcp_tools() adapter** | ✅ Done | High | Small |
+| **MCPServer** | ✅ Done | Medium | Medium |
+| **MultiMCPClient** | ✅ Done | Medium | Small |
+
+---
+
+## v0.17.7: Caching & Context 🟡
+
+Focus: Smarter token management and memory exploration.
+
+### Semantic Caching
+
+Drop-in replacement for `InMemoryCache` that embeds cache keys and uses cosine similarity to serve semantically equivalent queries from cache — even if the exact prompt wording differs.
+
+```python
+from selectools.cache_semantic import SemanticCache
+from selectools.providers.openai_provider import OpenAIProvider
+
+cache = SemanticCache(
+    embedding_provider=OpenAIProvider(),
+    similarity_threshold=0.92,
+    max_size=1000,
+    ttl=3600,
+)
+agent = Agent(tools=[...], provider=provider, config=AgentConfig(cache=cache))
+# "What's the weather in NYC?" hits cache for "Weather in New York City?"
+```
+
+Same `Cache` protocol as `InMemoryCache` — zero migration cost.
+
+### Prompt Compression
+
+Before each LLM call, if the estimated token count exceeds a configurable threshold of the context window, proactively summarize old messages rather than letting the window overflow. Connects `estimate_run_tokens()` + `summarize_on_trim` into a proactive system.
+
+```python
+config = AgentConfig(
+    compress_context=True,
+    compress_threshold=0.75,   # start compressing at 75% of context window
+    compress_keep_recent=4,    # always keep the last N turns verbatim
+)
+```
+
+### Conversation Branching
+
+Deep-copy conversation state for exploration, what-if analysis, or agent evaluation.
+
+```python
+branch = agent.memory.branch()             # snapshot current state
+branch_result = branch_agent.run("...")    # explore without affecting main
+
+# Also works with session stores:
+session_store.branch(source_id="conv-123", new_id="conv-123-alt")
+```
+
+| Feature | Status | Impact | Effort |
+|---|---|---|---|
+| **SemanticCache** | 🟡 High | High | Medium |
+| **Prompt compression** | 🟡 High | Medium | Medium |
+| **Conversation branching** | 🟡 Medium | Medium | Small |
+
+---
+
+## v0.18.0: Multi-Agent Orchestration 🟡
 
 Focus: DAG-based multi-agent workflows that are simpler and more Pythonic than LangGraph.
 
@@ -423,47 +525,7 @@ result = graph.run("Write a blog post about AI agents")
 
 ---
 
-## v0.17.1: MCP Client/Server ✅
-
-Focus: Model Context Protocol integration for tool interoperability.
-
-### MCP Client
-
-Discover and call tools from any MCP-compliant server:
-
-```python
-from selectools.mcp import MCPClient, mcp_tools
-
-client = MCPClient(server_url="http://localhost:8080")
-tools = mcp_tools(client)   # Returns List[Tool] that proxy to MCP server
-
-agent = Agent(tools=tools + local_tools, provider=provider)
-```
-
-### MCP Server
-
-Expose `@tool` functions as MCP-compliant endpoints:
-
-```python
-from selectools.mcp import MCPServer
-
-server = MCPServer(tools=[search_tool, calculator_tool])
-server.serve(host="0.0.0.0", port=8080)
-```
-
-### Key Differentiator
-
-First-class MCP support lets Selectools agents use any MCP-compatible tool server — massive integration surface area without building individual connectors.
-
-| Feature | Status | Impact | Effort |
-|---|---|---|---|
-| **MCPClient** | 🟡 High | High | Medium |
-| **mcp_tools() adapter** | 🟡 High | High | Small |
-| **MCPServer** | 🟡 Medium | Medium | Medium |
-
----
-
-## v0.18.0: Serve & Deploy
+## v0.19.0: Serve & Deploy 🟡
 
 Focus: REST API deployment, agent templates, and developer experience — going from library to platform.
 
@@ -588,7 +650,7 @@ Export formats: HTML (self-contained report), CSV, Datadog APM, Langfuse, OTel.
 
 ---
 
-## v0.19.0: Connector Expansion
+## v0.20.x: Connector Expansion + Performance 🟡
 
 Focus: Close the integration gap with LangChain by adding high-demand document loaders, vector stores, and toolbox modules.
 
@@ -673,7 +735,7 @@ Individual stores/loaders remain installable a la carte: `pip install selectools
 
 ---
 
-## v0.20.0: Polish & Community
+## v0.21.0: Polish & Community 🟡
 
 Focus: Niche integrations, community sharing, and developer experience polish.
 
@@ -740,6 +802,45 @@ Focus: Niche integrations, community sharing, and developer experience polish.
 ---
 
 ## Release History
+
+### v0.17.6 - Quick Wins
+
+- ✅ **Reasoning Strategies**: `AgentConfig(reasoning_strategy="react"/"cot"/"plan_then_act")` injects structured reasoning instructions into system prompt; `REASONING_STRATEGIES` dict exported
+- ✅ **Tool Result Caching**: `@tool(cacheable=True, cache_ttl=300)` caches tool results by name + args in existing `config.cache`; wired into all 4 execution paths; `StepType.CACHE_HIT` recorded on hit
+- ✅ **Python 3.9–3.13 CI Matrix**: GitHub Actions strategy matrix; zero compat issues
+- ✅ **Provider defaults updated**: Anthropic → `claude-sonnet-4-6`, Gemini → `gemini-3-flash-preview`, OpenAI → `gpt-5-mini`; `AgentConfig.model` default → `gpt-5-mini`
+- ✅ **Model registry: 152 models** (added `gpt-5.4-mini`, `gpt-5.4-nano`, `claude-opus-4`, `claude-sonnet-4`, `claude-opus-4-1`, `gemini-3.1-flash-image-preview`)
+- ✅ **37 new tests** (total: 2220)
+
+### v0.17.5 - Bug Hunt & Async Guardrails
+
+- ✅ **91 validated bug fixes** (13 critical, 26 high, 52 medium+low): FallbackProvider stream success recording, async guardrail blocking, `astream()` prompt leak, model reference consistency, datetime deprecation, and more
+- ✅ **Async guardrails**: `Guardrail.acheck()` with executor fallback; `GuardrailsPipeline.acheck_input()/acheck_output()`; `arun()`/`astream()` use async paths
+- ✅ **5 new Common Pitfalls** (#14–#18) documented in CLAUDE.md
+- ✅ **40 regression tests** (total: 2183)
+
+### v0.17.4 - Agent Intelligence
+
+- ✅ **Token Estimation**: `estimate_tokens()`, `estimate_run_tokens()`, `TokenEstimate` — pre-flight cost/token prediction without calling the LLM
+- ✅ **Model Switching**: `AgentConfig(model_selector=fn)` — per-iteration model selection callback; `on_model_switch` observer event
+- ✅ **Knowledge Memory Enhancement**: `KnowledgeMemory` now supports 4 store backends (File, SQLite, Redis, Supabase); `SQLiteKnowledgeStore`, `RedisKnowledgeStore`, `SupabaseKnowledgeStore` added
+- ✅ **58 new tests** (total: 2143)
+
+### v0.17.3 - Agent Runtime Controls
+
+- ✅ **Token/Cost Budgets**: `AgentConfig(max_total_tokens=..., max_cost_usd=...)` with `BudgetExceededError`; `budget_exceeded` trace step
+- ✅ **Cooperative Cancellation**: `CancellationToken` with thread-safe `cancel()`; checked at top of each iteration and after tool execution; `cancelled` trace step
+- ✅ **SimpleStepObserver**: Lightweight single-callback observer for quick integrations
+- ✅ **Structured Results**: `AgentResult` enriched with budget/cancellation context
+- ✅ **Per-tool Approval Gate**: `@tool(requires_approval=True)` + `AgentConfig(confirm_action=fn)`
+- ✅ **61 new tests** (total: 2085)
+
+### v0.17.1 - MCP Client/Server
+
+- ✅ **MCPClient**: Discover and call tools from any MCP-compliant server with circuit breaker
+- ✅ **mcp_tools()**: Adapter that converts MCP tool definitions to `List[Tool]` for drop-in agent use
+- ✅ **MCPServer**: Expose `@tool` functions as MCP-compliant endpoints
+- ✅ **MultiMCPClient**: Fan-out across multiple MCP servers with deduplication
 
 ### v0.16.1 - Consolidation & Hardening
 
