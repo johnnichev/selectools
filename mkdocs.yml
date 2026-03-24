@@ -102,6 +102,8 @@ nav:
     - Cancellation: modules/CANCELLATION.md
     - Token Estimation: modules/TOKEN_ESTIMATION.md
     - Model Switching: modules/MODEL_SWITCHING.md
+    - Reasoning Strategies: modules/REASONING_STRATEGIES.md
+    - Tool Result Caching: modules/TOOL_CACHING.md
   - Providers:
     - Overview: modules/PROVIDERS.md
     - Models & Pricing: modules/MODELS.md

@@ -114,6 +114,10 @@ class AgentConfig:
         coherence_model: Model to use for coherence checks.  Defaults to the
                agent's configured model.  Using a fast/cheap model is recommended.
                Default: None.
+        reasoning_strategy: Optional reasoning pattern to inject into the system
+               prompt.  Valid values: ``"react"`` (Thought → Action → Observation),
+               ``"cot"`` (Chain-of-Thought step-by-step), ``"plan_then_act"``
+               (plan first, then execute).  Default: None (no strategy).
     """
 
     name: str = "agent"
@@ -159,6 +163,7 @@ class AgentConfig:
     knowledge_graph: Optional[KnowledgeGraphMemory] = None
     knowledge_memory: Optional[KnowledgeMemory] = None
     stop_condition: Optional[Callable[[str, str], bool]] = None
+    reasoning_strategy: Optional[str] = None
     model_selector: Optional[Callable[[int, List, "AgentUsage"], str]] = None
     max_total_tokens: Optional[int] = None
     max_cost_usd: Optional[float] = None

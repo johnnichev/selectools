@@ -139,12 +139,16 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         self.tools = tools
         self._tools_by_name = {tool.name: tool for tool in tools}
         self.provider = provider or OpenAIProvider()
+        strategy = config.reasoning_strategy if config else None
         if prompt_builder:
             self.prompt_builder = prompt_builder
         elif config and config.system_prompt:
-            self.prompt_builder = PromptBuilder(base_instructions=config.system_prompt)
+            self.prompt_builder = PromptBuilder(
+                base_instructions=config.system_prompt,
+                reasoning_strategy=strategy,
+            )
         else:
-            self.prompt_builder = PromptBuilder()
+            self.prompt_builder = PromptBuilder(reasoning_strategy=strategy)
         self.parser = parser or ToolCallParser()
         self.config = config or AgentConfig()
         self.memory = memory

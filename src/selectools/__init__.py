@@ -1,6 +1,6 @@
 """Public exports for the selectools package."""
 
-__version__ = "0.17.5"
+__version__ = "0.17.6"
 
 # Import submodules (lazy loading for optional dependencies)
 from . import embeddings, evals, guardrails, models, rag, toolbox
@@ -64,7 +64,7 @@ from .observer import AgentObserver, AsyncAgentObserver, LoggingObserver, Simple
 from .parser import ToolCallParser
 from .policy import PolicyDecision, PolicyResult, ToolPolicy
 from .pricing import PRICING, calculate_cost, calculate_embedding_cost, get_model_pricing
-from .prompt import PromptBuilder
+from .prompt import REASONING_STRATEGIES, PromptBuilder
 from .providers.anthropic_provider import AnthropicProvider
 from .providers.fallback import FallbackProvider
 from .providers.gemini_provider import GeminiProvider
@@ -99,6 +99,7 @@ __all__ = [
     "ToolCall",
     "ToolCallParser",
     "PromptBuilder",
+    "REASONING_STRATEGIES",
     "OpenAIProvider",
     "AnthropicProvider",
     "GeminiProvider",

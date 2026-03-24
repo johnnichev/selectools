@@ -76,7 +76,7 @@ Verify each v0.17.3+ feature has:
 - [ ] Example script in `examples/`
 - [ ] Entry in `mkdocs.yml` nav
 
-Features to check: Budget, Cancellation, Token Estimation, Model Switching, SimpleStepObserver, Structured Results, Approval Gate
+Features to check: Budget, Cancellation, Token Estimation, Model Switching, SimpleStepObserver, Structured Results, Approval Gate, Reasoning Strategies, Tool Result Caching
 
 ### 5. Link Check
 ```bash
@@ -91,7 +91,7 @@ diff CHANGELOG.md docs/CHANGELOG.md
 ```
 
 ### 7. Private Docs (if accessible)
-Check `.private/comparison-table.md` and `.private/competitive-gaps.md` for stale eval counts, test counts, version references.
+Check `.private/master-competitive-plan.md`, `.private/competitive-analysis.md`, and `.private/growth-plan.md` for stale test counts, example counts, version references, and competitive scorecard accuracy.
 
 ### 8. Output
 

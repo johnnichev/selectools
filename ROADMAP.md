@@ -212,7 +212,7 @@ v0.17.5  ✅ Bug Hunt & Async Guardrails
          91 validated fixes (13 critical, 26 high, 52 medium+low) → Async guardrails
          → 40 regression tests → 5 new Common Pitfalls
 
-v0.17.6  🟡 Quick Wins
+v0.17.6  ✅ Quick Wins
          ReAct/CoT reasoning strategies → Tool result caching → Python 3.9–3.13 CI matrix
 
 v0.17.7  🟡 Caching & Context
