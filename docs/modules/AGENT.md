@@ -392,7 +392,7 @@ This creates a **self-correcting loop**.
 @dataclass
 class AgentConfig:
     # Model selection
-    model: str = "gpt-4o"
+    model: str = "gpt-5-mini"
     temperature: float = 0.0
     max_tokens: int = 1000
 
