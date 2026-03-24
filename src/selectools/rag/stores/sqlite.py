@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
@@ -115,7 +116,7 @@ class SQLiteVectorStore(VectorStore):
         ids = []
         for i, (doc, embedding) in enumerate(zip(documents, embeddings)):
             # Generate unique ID
-            doc_id = f"doc_{hash(doc.text)}_{i}"
+            doc_id = f"doc_{hashlib.sha256(doc.text.encode()).hexdigest()[:16]}_{i}"
             ids.append(doc_id)
 
             # Serialize data
@@ -145,14 +146,6 @@ class SQLiteVectorStore(VectorStore):
         """
         Search for similar documents using cosine similarity.
 
-        .. note::
-            **Performance limitation**: This method loads all rows from the
-            database into memory to compute cosine similarity in Python.  For
-            large collections (>10 000 documents) consider using the
-            ``sqlite-vss`` extension for server-side approximate nearest
-            neighbour search, or switch to ``ChromaVectorStore`` /
-            ``PineconeVectorStore``.
-
         Args:
             query_embedding: Query embedding vector
             top_k: Number of results to return
@@ -164,9 +157,6 @@ class SQLiteVectorStore(VectorStore):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        # NOTE: fetchall() loads every row into memory.  A proper fix would
-        # use sqlite-vss for indexed vector search, but that requires a native
-        # extension and is out of scope for this backend.
         # Fetch all documents (with optional metadata filtering)
         if filter:
             # Simple metadata filtering (exact match on JSON string)

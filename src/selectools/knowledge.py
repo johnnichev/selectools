@@ -16,7 +16,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 
 # ======================================================================
@@ -46,8 +46,8 @@ class KnowledgeEntry:
     importance: float = 0.5
     persistent: bool = False
     ttl_days: Optional[int] = None
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -55,7 +55,7 @@ class KnowledgeEntry:
         """Whether this entry has passed its TTL."""
         if self.ttl_days is None:
             return False
-        return datetime.utcnow() > self.created_at + timedelta(days=self.ttl_days)
+        return datetime.now(timezone.utc) > self.created_at + timedelta(days=self.ttl_days)
 
 
 # ======================================================================
@@ -238,7 +238,9 @@ class FileKnowledgeStore:
         with self._lock:
             entries = self._load_all()
             before = len(entries)
-            cutoff = datetime.utcnow() - timedelta(days=max_age_days) if max_age_days else None
+            cutoff = (
+                datetime.now(timezone.utc) - timedelta(days=max_age_days) if max_age_days else None
+            )
             kept = []
             for e in entries:
                 if e.persistent:
@@ -380,7 +382,7 @@ class SQLiteKnowledgeStore:
             rows = conn.execute(
                 "SELECT id, ttl_days, created_at, persistent FROM knowledge"
             ).fetchall()
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             for row_id, ttl, created, persistent in rows:
                 if persistent:
                     continue

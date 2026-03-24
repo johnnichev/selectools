@@ -53,10 +53,16 @@ class ToxicityGuardrail(Guardrail):
     def __init__(
         self,
         *,
-        threshold: float = 0.0,
+        threshold: float = 0.1,
         blocklist: Optional[Set[str]] = None,
         action: GuardrailAction = GuardrailAction.BLOCK,
     ) -> None:
+        """Initialize ToxicityGuardrail.
+
+        Note: The default threshold is 0.1 rather than 0.0 to avoid
+        false positives when common words (e.g. "kill" in "kill the
+        process") appear in benign content.
+        """
         self.threshold = threshold
         self._blocklist = blocklist or _DEFAULT_BLOCKLIST
         self.action = action

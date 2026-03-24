@@ -80,7 +80,8 @@ class ToolLoader:
         if not path.suffix == ".py":
             raise ValueError(f"Expected a .py file, got: {path}")
 
-        module_name = f"_selectools_dynamic_.{path.stem}"
+        safe_stem = path.stem.replace("-", "_").replace(" ", "_")
+        module_name = f"_selectools_dynamic_.{safe_stem}"
         spec = importlib.util.spec_from_file_location(module_name, str(path))
         if spec is None or spec.loader is None:
             raise ImportError(f"Cannot create module spec for {path}")
@@ -129,7 +130,12 @@ class ToolLoader:
                 continue
             try:
                 tools.extend(ToolLoader.from_file(str(py_file)))
-            except Exception:  # nosec B112
+            except (ImportError, SyntaxError, AttributeError) as exc:
+                import logging
+
+                logging.getLogger(__name__).warning(
+                    "Failed to load tools from %s: %s", py_file, exc
+                )
                 continue
 
         return tools
@@ -170,7 +176,8 @@ class ToolLoader:
             List of Tool instances from the reloaded file.
         """
         path = Path(file_path).resolve()
-        module_name = f"_selectools_dynamic_.{path.stem}"
+        safe_stem = path.stem.replace("-", "_").replace(" ", "_")
+        module_name = f"_selectools_dynamic_.{safe_stem}"
 
         if module_name in sys.modules:
             del sys.modules[module_name]

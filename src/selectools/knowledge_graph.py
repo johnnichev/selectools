@@ -153,6 +153,8 @@ class SQLiteTripleStore:
                 )
                 """
             )
+            # Note: LIKE '%keyword%' queries cannot use B-tree indexes efficiently.
+            # Consider FTS5 for full-text search if query performance becomes an issue.
             conn.commit()
         finally:
             conn.close()
@@ -200,11 +202,16 @@ class SQLiteTripleStore:
         try:
             conditions = []
             params: List[str] = []
+
+            def _escape_like(kw: str) -> str:
+                return kw.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
             for kw in keywords:
-                like = f"%{kw}%"
+                like = f"%{_escape_like(kw)}%"
                 conditions.append(
-                    "(LOWER(subject) LIKE LOWER(?) OR LOWER(relation) LIKE LOWER(?)"
-                    " OR LOWER(object) LIKE LOWER(?))"
+                    "(LOWER(subject) LIKE LOWER(?) ESCAPE '\\'"
+                    " OR LOWER(relation) LIKE LOWER(?) ESCAPE '\\'"
+                    " OR LOWER(object) LIKE LOWER(?) ESCAPE '\\')"
                 )
                 params.extend([like, like, like])
             where = " OR ".join(conditions)

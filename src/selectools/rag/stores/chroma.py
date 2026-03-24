@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
@@ -103,7 +104,10 @@ class ChromaVectorStore(VectorStore):
             embeddings = self.embedder.embed_texts(texts)
 
         # Generate IDs
-        ids = [f"doc_{hash(doc.text)}_{i}" for i, doc in enumerate(documents)]
+        ids = [
+            f"doc_{hashlib.sha256(doc.text.encode()).hexdigest()[:16]}_{i}"
+            for i, doc in enumerate(documents)
+        ]
 
         # Extract texts and metadata
         texts = [doc.text for doc in documents]

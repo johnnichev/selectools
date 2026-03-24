@@ -2,7 +2,7 @@
 
 import os
 import tempfile
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -30,7 +30,7 @@ class TestKnowledgeEntry:
         e = KnowledgeEntry(
             content="old",
             ttl_days=1,
-            created_at=datetime.utcnow() - timedelta(days=2),
+            created_at=datetime.now(timezone.utc) - timedelta(days=2),
         )
         assert e.is_expired
 
@@ -42,7 +42,7 @@ class TestKnowledgeEntry:
         e = KnowledgeEntry(
             content="eternal",
             ttl_days=None,
-            created_at=datetime.utcnow() - timedelta(days=365),
+            created_at=datetime.now(timezone.utc) - timedelta(days=365),
         )
         assert not e.is_expired
 
@@ -100,7 +100,7 @@ class TestFileKnowledgeStore:
             KnowledgeEntry(
                 content="expired",
                 ttl_days=1,
-                created_at=datetime.utcnow() - timedelta(days=2),
+                created_at=datetime.now(timezone.utc) - timedelta(days=2),
             )
         )
         store.save(KnowledgeEntry(content="fresh"))
@@ -121,7 +121,7 @@ class TestFileKnowledgeStore:
             KnowledgeEntry(
                 content="old",
                 ttl_days=1,
-                created_at=datetime.utcnow() - timedelta(days=2),
+                created_at=datetime.now(timezone.utc) - timedelta(days=2),
             )
         )
         store.save(KnowledgeEntry(content="fresh"))
@@ -135,7 +135,7 @@ class TestFileKnowledgeStore:
                 content="persistent",
                 persistent=True,
                 ttl_days=1,
-                created_at=datetime.utcnow() - timedelta(days=2),
+                created_at=datetime.now(timezone.utc) - timedelta(days=2),
             )
         )
         removed = store.prune()
@@ -197,7 +197,7 @@ class TestSQLiteKnowledgeStore:
             KnowledgeEntry(
                 content="expired",
                 ttl_days=1,
-                created_at=datetime.utcnow() - timedelta(days=2),
+                created_at=datetime.now(timezone.utc) - timedelta(days=2),
             )
         )
         store.save(KnowledgeEntry(content="fresh"))
@@ -209,7 +209,7 @@ class TestSQLiteKnowledgeStore:
             KnowledgeEntry(
                 content="old",
                 ttl_days=1,
-                created_at=datetime.utcnow() - timedelta(days=2),
+                created_at=datetime.now(timezone.utc) - timedelta(days=2),
             )
         )
         store.save(KnowledgeEntry(content="fresh"))

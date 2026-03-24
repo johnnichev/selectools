@@ -337,6 +337,13 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         self._wire_fallback_observer(run_id)
         self._notify_observers("on_run_start", run_id, messages, self._system_prompt)
 
+        # Extract user text for coherence checks BEFORE guardrails may redact it
+        user_text_for_coherence = ""
+        for msg in reversed(messages):
+            if msg.role == Role.USER and msg.content:
+                user_text_for_coherence = msg.content
+                break
+
         # Input guardrails (operate on copies to avoid mutating caller's objects)
         if self.config.guardrails and self.config.guardrails.input:
             messages = [copy.copy(msg) for msg in messages]
@@ -362,6 +369,14 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 )
         else:
             self._history.extend(messages)
+            if len(self._history) > 200:
+                import warnings
+
+                warnings.warn(
+                    f"Agent history has {len(self._history)} messages without memory configured. "
+                    f"Consider using ConversationMemory to prevent unbounded growth.",
+                    stacklevel=3,
+                )
 
         # Knowledge memory context
         if self.config.knowledge_memory:
@@ -380,13 +395,6 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     0,
                     Message(role=Role.SYSTEM, content=entity_ctx),
                 )
-
-        # Extract user text for coherence checks
-        user_text_for_coherence = ""
-        for msg in reversed(messages):
-            if msg.role == Role.USER and msg.content:
-                user_text_for_coherence = msg.content
-                break
 
         # Knowledge graph context
         if self.config.knowledge_graph:

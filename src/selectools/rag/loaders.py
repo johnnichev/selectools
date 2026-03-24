@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 from .vector_store import Document
 
@@ -119,9 +122,8 @@ class DocumentLoader:
             raise ValueError(f"Not a directory: {directory}")
 
         # Find matching files
-        if recursive and not glob_pattern.startswith("**/"):
-            # Ensure recursive glob pattern
-            pattern = f"**/{glob_pattern}" if not glob_pattern.startswith("**") else glob_pattern
+        if recursive and "**" not in glob_pattern:
+            pattern = f"**/{glob_pattern}"
         else:
             pattern = glob_pattern
 
@@ -138,8 +140,7 @@ class DocumentLoader:
                     docs = DocumentLoader.from_file(str(file_path), metadata=metadata)
                     documents.extend(docs)
                 except Exception as e:
-                    # Skip files that can't be loaded
-                    print(f"Warning: Could not load {file_path}: {e}")
+                    logger.warning("Could not load %s: %s", file_path, e)
                     continue
 
         return documents

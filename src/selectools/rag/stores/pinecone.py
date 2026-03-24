@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
@@ -110,7 +111,7 @@ class PineconeVectorStore(VectorStore):
         vectors = []
         ids = []
         for i, (doc, embedding) in enumerate(zip(documents, embeddings)):
-            doc_id = f"doc_{hash(doc.text)}_{i}"
+            doc_id = f"doc_{hashlib.sha256(doc.text.encode()).hexdigest()[:16]}_{i}"
             ids.append(doc_id)
 
             # Pinecone format: (id, values, metadata)
@@ -154,12 +155,11 @@ class PineconeVectorStore(VectorStore):
         # Convert to SearchResult objects
         search_results = []
         for match in query_response.matches:
-            # Extract text from metadata without mutating the response object
+            # Extract text from metadata
             metadata = match.metadata or {}
-            text = metadata.get("text", "")
-            meta = {k: v for k, v in metadata.items() if k != "text"}
+            text = metadata.pop("text", "")
 
-            doc = Document(text=text, metadata=meta)
+            doc = Document(text=text, metadata=metadata)
             search_results.append(SearchResult(document=doc, score=match.score))
 
         return search_results

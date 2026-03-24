@@ -89,8 +89,9 @@ class SnapshotStore:
         path = self._dir / f"{suite_name}.snapshot.json"
 
         snapshot: Dict[str, Any] = {}
-        for cr in report.case_results:
-            key = cr.case.name or cr.case.input[:60]
+        for idx, cr in enumerate(report.case_results):
+            base_key = cr.case.name or cr.case.input[:60]
+            key = f"{base_key}_{idx}" if not cr.case.name else base_key
             entry: Dict[str, Any] = {
                 "input": cr.case.input,
                 "verdict": cr.verdict.value,
@@ -124,12 +125,16 @@ class SnapshotStore:
         stored = self.load(suite_name)
         if stored is None:
             # No snapshot exists — everything is new
-            names = [cr.case.name or cr.case.input[:60] for cr in report.case_results]
+            names = [
+                cr.case.name or f"{cr.case.input[:60]}_{idx}"
+                for idx, cr in enumerate(report.case_results)
+            ]
             return SnapshotResult(new_cases=names)
 
         current_keys: Dict[str, Any] = {}
-        for cr in report.case_results:
-            key = cr.case.name or cr.case.input[:60]
+        for idx, cr in enumerate(report.case_results):
+            base_key = cr.case.name or cr.case.input[:60]
+            key = f"{base_key}_{idx}" if not cr.case.name else base_key
             entry: Dict[str, Any] = {
                 "verdict": cr.verdict.value,
                 "tool_calls": cr.tool_calls,

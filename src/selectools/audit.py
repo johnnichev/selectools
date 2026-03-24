@@ -206,6 +206,7 @@ class AuditLogger(AgentObserver):
                 "tool_name": tool_name,
                 "decision": decision,
                 "reason": reason,
+                "tool_args": self._sanitize_args(tool_args),
             }
         )
 

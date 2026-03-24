@@ -42,21 +42,14 @@ class InMemoryVectorStore(VectorStore):
 
     embedder: "EmbeddingProvider"
 
-    def __init__(
-        self,
-        embedder: "EmbeddingProvider",
-        max_documents: Optional[int] = None,
-    ):  # noqa: F821
+    def __init__(self, embedder: "EmbeddingProvider"):  # noqa: F821
         """
         Initialize in-memory vector store.
 
         Args:
             embedder: Embedding provider to use for computing embeddings
-            max_documents: Optional upper bound on stored documents.  When
-                exceeded a warning is emitted suggesting a persistent store.
         """
         self.embedder = embedder
-        self.max_documents = max_documents
         self.documents: List[Document] = []
         self.embeddings: Optional[np.ndarray] = None
         self.ids: List[str] = []
@@ -77,15 +70,6 @@ class InMemoryVectorStore(VectorStore):
         """
         if not documents:
             return []
-
-        if self.max_documents and len(self.documents) + len(documents) > self.max_documents:
-            import warnings
-
-            warnings.warn(
-                f"InMemoryVectorStore exceeding max_documents ({self.max_documents}). "
-                f"Consider using SQLiteVectorStore for large collections.",
-                stacklevel=2,
-            )
 
         # Compute embeddings if not provided
         if embeddings is None:
@@ -141,17 +125,11 @@ class InMemoryVectorStore(VectorStore):
         # Cosine similarity = dot product / (norm1 * norm2)
         similarities = np.dot(self.embeddings, query_vec) / (doc_norms * query_norm + 1e-8)
 
-        # Overfetch when filtering to compensate for post-filter reduction
-        if filter:
-            fetch_k = min(top_k * 4, len(self.documents))
-        else:
-            fetch_k = top_k
-
         # Get top-k indices
-        if len(similarities) <= fetch_k:
+        if len(similarities) <= top_k:
             top_indices = np.argsort(similarities)[::-1]
         else:
-            top_indices = np.argpartition(similarities, -fetch_k)[-fetch_k:]
+            top_indices = np.argpartition(similarities, -top_k)[-top_k:]
             top_indices = top_indices[np.argsort(similarities[top_indices])][::-1]
 
         # Build results with optional filtering
@@ -178,18 +156,18 @@ class InMemoryVectorStore(VectorStore):
         Args:
             ids: List of document IDs to delete
         """
-        # Find indices to remove
         indices_to_remove = []
         for doc_id in ids:
             if doc_id in self.ids:
                 indices_to_remove.append(self.ids.index(doc_id))
 
-        # Remove in reverse order to avoid index shifting
-        for idx in sorted(indices_to_remove, reverse=True):
-            del self.documents[idx]
-            del self.ids[idx]
-            if self.embeddings is not None:
-                self.embeddings = np.delete(self.embeddings, idx, axis=0)
+        if indices_to_remove:
+            # Delete in batch (reverse order for list, single call for numpy)
+            for idx in sorted(indices_to_remove, reverse=True):
+                del self.documents[idx]
+                del self.ids[idx]
+            if self.embeddings is not None and indices_to_remove:
+                self.embeddings = np.delete(self.embeddings, sorted(indices_to_remove), axis=0)
 
     def clear(self) -> None:
         """Clear all documents from the store."""

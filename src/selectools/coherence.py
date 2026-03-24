@@ -12,12 +12,12 @@ dedicated fast provider via ``AgentConfig(coherence_provider=...)``.
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from .providers.base import Provider
 from .types import Message, Role
-from .usage import UsageStats
 
 
 @dataclass
@@ -28,12 +28,11 @@ class CoherenceResult:
         coherent: Whether the proposed tool call is consistent with the
             user's original intent.
         explanation: LLM-generated explanation (when ``coherent`` is ``False``).
-        usage: Token usage from the coherence LLM call (if available).
     """
 
     coherent: bool
     explanation: Optional[str] = None
-    usage: Optional[UsageStats] = None
+    usage: Optional[Any] = None  # UsageStats from the coherence LLM call
 
 
 _COHERENCE_PROMPT = """You are a security auditor. Your task is to determine whether a proposed tool call is consistent with the user's ORIGINAL request.
@@ -73,8 +72,6 @@ def check_coherence(
         tool_args: Arguments of the proposed tool call.
         available_tools: List of available tool names (for context).
         timeout: Request timeout for the check.
-        fail_closed: If ``True``, treat errors as incoherent (deny the call).
-            Default ``False`` preserves the original fail-open behaviour.
 
     Returns:
         :class:`CoherenceResult` indicating coherence.
@@ -97,7 +94,8 @@ def check_coherence(
         )
         response_text = (response_msg.content or "").strip()
 
-        if response_text.upper().startswith("COHERENT"):
+        first_word = response_text.strip().upper().split()[0] if response_text.strip() else ""
+        if first_word == "COHERENT":
             return CoherenceResult(coherent=True, usage=usage)
 
         explanation = None
@@ -111,7 +109,7 @@ def check_coherence(
     except Exception as exc:
         return CoherenceResult(
             coherent=not fail_closed,
-            explanation=f"Coherence check failed: {exc}",
+            explanation=f"Coherence check failed ({'denying' if fail_closed else 'allowing'} by default): {exc}",
         )
 
 
@@ -144,7 +142,8 @@ async def acheck_coherence(
                 timeout=timeout,
             )
         else:
-            response_msg, usage = provider.complete(
+            response_msg, usage = await asyncio.to_thread(
+                provider.complete,
                 model=model,
                 system_prompt="You are a concise security auditor.",
                 messages=[Message(role=Role.USER, content=prompt)],
@@ -154,7 +153,8 @@ async def acheck_coherence(
             )
         response_text = (response_msg.content or "").strip()
 
-        if response_text.upper().startswith("COHERENT"):
+        first_word = response_text.strip().upper().split()[0] if response_text.strip() else ""
+        if first_word == "COHERENT":
             return CoherenceResult(coherent=True, usage=usage)
 
         explanation = None
@@ -168,7 +168,7 @@ async def acheck_coherence(
     except Exception as exc:
         return CoherenceResult(
             coherent=not fail_closed,
-            explanation=f"Coherence check failed: {exc}",
+            explanation=f"Coherence check failed ({'denying' if fail_closed else 'allowing'} by default): {exc}",
         )
 
 

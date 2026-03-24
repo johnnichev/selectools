@@ -9,7 +9,7 @@ Requires the ``redis`` package::
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from .knowledge import KnowledgeEntry
@@ -82,14 +82,12 @@ class RedisKnowledgeStore:
         """Save or update an entry.  Returns the entry ID."""
         key = self._entry_key(entry.id)
 
-        # Read old category outside the pipeline (hget is not pipelineable
-        # when we need its value to decide which key to srem), but keep
-        # the window as small as possible by doing all writes in one pipeline.
-        old_cat: Optional[str] = self._client.hget(key, "category")
+        # If updating, remove old category index entry
+        existing_raw: Optional[str] = self._client.hget(key, "category")
+        if existing_raw is not None and existing_raw != entry.category:
+            self._client.srem(self._category_key(existing_raw), entry.id)
 
         pipe = self._client.pipeline()
-        if old_cat and old_cat != entry.category:
-            pipe.srem(self._category_key(old_cat), entry.id)
         pipe.hset(key, mapping=self._entry_to_dict(entry))
         pipe.zadd(self._importance_key(), {entry.id: entry.importance})
         pipe.sadd(self._category_key(entry.category), entry.id)
@@ -154,7 +152,11 @@ class RedisKnowledgeStore:
         return True
 
     def count(self) -> int:
-        """Total number of stored entries."""
+        """Total entries.
+
+        May include stale entries not yet pruned.
+        Call ``prune()`` for an accurate count.
+        """
         result: int = self._client.scard(self._all_ids_key())
         return result
 
@@ -165,7 +167,7 @@ class RedisKnowledgeStore:
     ) -> int:
         """Remove expired and low-importance non-persistent entries.  Returns count removed."""
         all_ids: List[str] = list(self._client.smembers(self._all_ids_key()))
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         cutoff = now - timedelta(days=max_age_days) if max_age_days else None
         removed = 0
 

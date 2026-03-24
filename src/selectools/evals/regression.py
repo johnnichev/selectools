@@ -58,8 +58,9 @@ class BaselineStore:
             return RegressionResult()
 
         baseline_verdicts: Dict[str, str] = {}
-        for case_data in baseline.get("cases", []):
-            key = case_data.get("name") or case_data.get("input", "")[:60]
+        for idx, case_data in enumerate(baseline.get("cases", [])):
+            base_key = case_data.get("name") or case_data.get("input", "")[:60]
+            key = f"{base_key}_{idx}" if not case_data.get("name") else base_key
             baseline_verdicts[key] = case_data.get("verdict", "")
 
         baseline_summary = baseline.get("summary", {})
@@ -70,8 +71,9 @@ class BaselineStore:
         regressions: List[str] = []
         improvements: List[str] = []
 
-        for cr in current.case_results:
-            key = cr.case.name or cr.case.input[:60]
+        for idx, cr in enumerate(current.case_results):
+            base_key = cr.case.name or cr.case.input[:60]
+            key = f"{base_key}_{idx}" if not cr.case.name else base_key
             old_verdict = baseline_verdicts.get(key)
             if old_verdict is None:
                 continue

@@ -658,7 +658,7 @@ class _ToolExecutorMixin:
         self, tool: Tool, parameters: dict, chunk_callback: Optional[Callable[[str], None]] = None
     ) -> str:
         """Run tool.execute with optional timeout and chunk callback."""
-        if not self.config.tool_timeout_seconds:
+        if self.config.tool_timeout_seconds is None:
             return tool.execute(parameters, chunk_callback=chunk_callback)
 
         executor = ThreadPoolExecutor(max_workers=1)
@@ -678,7 +678,7 @@ class _ToolExecutorMixin:
         self, tool: Tool, parameters: dict, chunk_callback: Optional[Callable[[str], None]] = None
     ) -> str:
         """Async version of _execute_tool_with_timeout."""
-        if not self.config.tool_timeout_seconds:
+        if self.config.tool_timeout_seconds is None:
             return await tool.aexecute(parameters, chunk_callback=chunk_callback)
 
         try:

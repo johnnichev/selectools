@@ -132,9 +132,12 @@ class JsonFileSessionStore:
                 return None
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-        if self._is_expired(data):
-            self.delete(session_id)
-            return None
+            if self._is_expired(data):
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+                return None
         return ConversationMemory.from_dict(data["memory"])
 
     def list(self) -> List[SessionMetadata]:
@@ -397,7 +400,7 @@ class RedisSessionStore:
         )
 
         pipe = self._client.pipeline()
-        if self._default_ttl:
+        if self._default_ttl is not None:
             pipe.setex(key, self._default_ttl, memory_json)
             pipe.setex(meta_key, self._default_ttl, meta_json)
         else:
