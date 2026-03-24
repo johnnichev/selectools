@@ -315,6 +315,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         messages: List[Message],
         response_format: Optional[ResponseFormat] = None,
         parent_run_id: Optional[str] = None,
+        skip_guardrails: bool = False,
     ) -> _RunContext:
         """Shared setup for run(), arun(), and astream().
 
@@ -345,7 +346,8 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 break
 
         # Input guardrails (operate on copies to avoid mutating caller's objects)
-        if self.config.guardrails and self.config.guardrails.input:
+        # In async mode, guardrails are applied separately via _arun_input_guardrails
+        if self.config.guardrails and self.config.guardrails.input and not skip_guardrails:
             messages = [copy.copy(msg) for msg in messages]
             for msg in messages:
                 if msg.role == Role.USER and msg.content:
@@ -609,6 +611,36 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 TraceStep(
                     type=StepType.GUARDRAIL,
                     summary=f"Output guardrail: {result.reason}",
+                )
+            )
+        return result.content
+
+    async def _arun_input_guardrails(self, content: str, trace: Optional[AgentTrace] = None) -> str:
+        """Async input guardrails — calls ``acheck()`` to avoid blocking the event loop."""
+        if not self.config.guardrails or not self.config.guardrails.input:
+            return content
+        result = await self.config.guardrails.acheck_input(content)
+        if trace and (not result.passed or result.guardrail_name):
+            trace.add(
+                TraceStep(
+                    type=StepType.GUARDRAIL,
+                    summary=f"Input guardrail: {result.guardrail_name or result.reason}",
+                )
+            )
+        return result.content
+
+    async def _arun_output_guardrails(
+        self, content: str, trace: Optional[AgentTrace] = None
+    ) -> str:
+        """Async output guardrails — calls ``acheck()`` to avoid blocking the event loop."""
+        if not self.config.guardrails or not self.config.guardrails.output:
+            return content
+        result = await self.config.guardrails.acheck_output(content)
+        if trace and (not result.passed or result.guardrail_name):
+            trace.add(
+                TraceStep(
+                    type=StepType.GUARDRAIL,
+                    summary=f"Output guardrail: {result.guardrail_name or result.reason}",
                 )
             )
         return result.content
@@ -1064,8 +1096,21 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         """
         messages = self._normalize_messages(messages)
         ctx = self._prepare_run(
-            messages, response_format=response_format, parent_run_id=parent_run_id
+            messages,
+            response_format=response_format,
+            parent_run_id=parent_run_id,
+            skip_guardrails=True,
         )
+
+        # Async input guardrails (non-blocking)
+        if self.config.guardrails and self.config.guardrails.input:
+            for i, msg in enumerate(self._history):
+                if msg.role == Role.USER and msg.content:
+                    self._history[i] = copy.copy(msg)
+                    self._history[i].content = await self._arun_input_guardrails(
+                        msg.content, ctx.trace
+                    )
+
         await self._anotify_observers("on_run_start", ctx.run_id, messages, self._system_prompt)
 
         try:
@@ -1417,8 +1462,21 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         """
         messages = self._normalize_messages(messages)
         ctx = self._prepare_run(
-            messages, response_format=response_format, parent_run_id=parent_run_id
+            messages,
+            response_format=response_format,
+            parent_run_id=parent_run_id,
+            skip_guardrails=True,
         )
+
+        # Async input guardrails (non-blocking)
+        if self.config.guardrails and self.config.guardrails.input:
+            for i, msg in enumerate(self._history):
+                if msg.role == Role.USER and msg.content:
+                    self._history[i] = copy.copy(msg)
+                    self._history[i].content = await self._arun_input_guardrails(
+                        msg.content, ctx.trace
+                    )
+
         await self._anotify_observers("on_run_start", ctx.run_id, messages, self._system_prompt)
 
         try:
