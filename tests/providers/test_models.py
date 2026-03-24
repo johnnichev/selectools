@@ -42,7 +42,7 @@ class TestModelRegistry:
 
     def test_all_models_count(self) -> None:
         """Test that we have all registered models."""
-        assert len(ALL_MODELS) == 146
+        assert len(ALL_MODELS) == 152
 
     def test_models_by_id_count(self) -> None:
         """Test that MODELS_BY_ID has same count as ALL_MODELS."""
@@ -74,7 +74,7 @@ class TestOpenAIModels:
     def test_openai_model_count(self) -> None:
         """Test OpenAI model count."""
         openai_models = [m for m in ALL_MODELS if m.provider == "openai"]
-        assert len(openai_models) == 77
+        assert len(openai_models) == 79
 
     def test_openai_gpt4o(self) -> None:
         """Test GPT-4o model definition."""
@@ -108,7 +108,7 @@ class TestAnthropicModels:
     def test_anthropic_model_count(self) -> None:
         """Test Anthropic model count."""
         anthropic_models = [m for m in ALL_MODELS if m.provider == "anthropic"]
-        assert len(anthropic_models) == 22
+        assert len(anthropic_models) == 25
 
     def test_anthropic_sonnet_4_5(self) -> None:
         """Test Claude Sonnet 4.5 model definition."""
@@ -142,7 +142,7 @@ class TestGeminiModels:
     def test_gemini_model_count(self) -> None:
         """Test Gemini has 31 models (28 chat + 3 embedding)."""
         gemini_models = [m for m in ALL_MODELS if m.provider == "gemini"]
-        assert len(gemini_models) == 31
+        assert len(gemini_models) == 32
 
     def test_gemini_flash_2_0(self) -> None:
         """Test Gemini 2.0 Flash model definition."""

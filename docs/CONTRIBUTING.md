@@ -244,7 +244,7 @@ selectools/
 │   ├── env.py                  # Environment variable loading
 │   ├── exceptions.py           # Custom exception classes
 │   ├── memory.py               # ConversationMemory (tool-pair-aware)
-│   ├── models.py               # Model registry (146 models)
+│   ├── models.py               # Model registry (152 models)
 │   ├── parser.py               # ToolCallParser
 │   ├── pricing.py              # LLM pricing data and cost calculation
 │   ├── prompt.py               # PromptBuilder

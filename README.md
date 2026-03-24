@@ -177,7 +177,7 @@ report.to_html("report.html")
 - **Advanced Chunking**: Semantic + contextual chunking for better retrieval
 - **Dynamic Tool Loading**: Plugin system with hot-reload support
 - **Response Caching**: InMemoryCache and RedisCache with stats tracking
-- **146 Model Registry**: Type-safe constants with pricing and metadata
+- **152 Model Registry**: Type-safe constants with pricing and metadata
 - **Pre-built Toolbox**: 24 tools for files, data, text, datetime, web
 - **Persistent Sessions**: 3 backends (JSON file, SQLite, Redis) with TTL
 - **Entity Memory**: LLM-based named entity extraction and tracking
@@ -538,7 +538,7 @@ See [docs/modules/STREAMING.md](docs/modules/STREAMING.md) for full documentatio
 ```python
 from selectools.models import OpenAI, Anthropic, Gemini, Ollama
 
-# IDE autocomplete for all 146 models with pricing metadata
+# IDE autocomplete for all 152 models with pricing metadata
 model = OpenAI.GPT_4O_MINI
 print(f"Cost: ${model.prompt_cost}/${model.completion_cost} per 1M tokens")
 print(f"Context: {model.context_window:,} tokens")

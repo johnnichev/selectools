@@ -84,6 +84,24 @@ class OpenAI:
         max_tokens=16384,
         context_window=1050000,
     )
+    GPT_5_4_MINI = ModelInfo(
+        id="gpt-5.4-mini",
+        provider="openai",
+        type=ModelType.CHAT,
+        prompt_cost=0.40,
+        completion_cost=1.60,
+        max_tokens=16384,
+        context_window=1050000,
+    )
+    GPT_5_4_NANO = ModelInfo(
+        id="gpt-5.4-nano",
+        provider="openai",
+        type=ModelType.CHAT,
+        prompt_cost=0.10,
+        completion_cost=0.40,
+        max_tokens=8192,
+        context_window=1050000,
+    )
 
     # ===== GPT-5.3 Series =====
     GPT_5_3_CHAT_LATEST = ModelInfo(
@@ -849,7 +867,36 @@ class Anthropic:
         context_window=200000,
     )
 
+    # ===== Claude 4 Base Aliases =====
+    OPUS_4 = ModelInfo(
+        id="claude-opus-4",
+        provider="anthropic",
+        type=ModelType.CHAT,
+        prompt_cost=5.00,
+        completion_cost=25.00,
+        max_tokens=8192,
+        context_window=200000,
+    )
+    SONNET_4 = ModelInfo(
+        id="claude-sonnet-4",
+        provider="anthropic",
+        type=ModelType.CHAT,
+        prompt_cost=3.00,
+        completion_cost=15.00,
+        max_tokens=8192,
+        context_window=200000,
+    )
+
     # ===== Claude 4.1 Series =====
+    OPUS_4_1 = ModelInfo(
+        id="claude-opus-4-1",
+        provider="anthropic",
+        type=ModelType.CHAT,
+        prompt_cost=5.00,
+        completion_cost=25.00,
+        max_tokens=8192,
+        context_window=200000,
+    )
     OPUS_4_11 = ModelInfo(
         id="claude-opus-4-11",
         provider="anthropic",
@@ -1037,11 +1084,20 @@ class Gemini:
         context_window=1000000,
     )
     FLASH_LITE_3_1 = ModelInfo(
-        id="gemini-3-1-flash-lite",
+        id="gemini-3.1-flash-lite-preview",
         provider="gemini",
         type=ModelType.CHAT,
         prompt_cost=0.25,
         completion_cost=1.50,
+        max_tokens=65536,
+        context_window=1000000,
+    )
+    FLASH_IMAGE_3_1 = ModelInfo(
+        id="gemini-3.1-flash-image-preview",
+        provider="gemini",
+        type=ModelType.MULTIMODAL,
+        prompt_cost=0.40,
+        completion_cost=1.60,
         max_tokens=65536,
         context_window=1000000,
     )

@@ -32,7 +32,7 @@ class AnthropicProvider(Provider):
     def __init__(
         self,
         api_key: str | None = None,
-        default_model: str = AnthropicModels.SONNET_4_5.id,
+        default_model: str = AnthropicModels.SONNET_4_6.id,
         base_url: str | None = None,
     ):
         load_default_env()

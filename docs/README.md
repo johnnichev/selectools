@@ -40,7 +40,7 @@ Detailed technical documentation for each module:
 12. **[ADVANCED_CHUNKING.md](modules/ADVANCED_CHUNKING.md)** - Semantic and contextual document chunking
 13. **[EMBEDDINGS.md](modules/EMBEDDINGS.md)** - Embedding providers and semantic search
 14. **[VECTOR_STORES.md](modules/VECTOR_STORES.md)** - Vector database implementations
-15. **[MODELS.md](modules/MODELS.md)** - 146 models across 5 providers with March 2026 pricing
+15. **[MODELS.md](modules/MODELS.md)** - 152 models across 5 providers with March 2026 pricing
 16. **[GUARDRAILS.md](modules/GUARDRAILS.md)** - Input/output validation pipeline, PII redaction, topic blocking
 17. **[AUDIT.md](modules/AUDIT.md)** - JSONL audit logging with privacy controls
 18. **[SECURITY.md](modules/SECURITY.md)** - Tool output screening and coherence checking

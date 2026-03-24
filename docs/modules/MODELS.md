@@ -19,7 +19,7 @@
 
 The **Models** module provides a **single source of truth** for all supported LLM and embedding models. It includes:
 
-- 146 models across 5 providers
+- 152 models across 5 providers
 - Pricing per 1M tokens
 - Context windows
 - Max output tokens
@@ -77,7 +77,7 @@ Anthropic.SONNET_3_5       # ModelInfo instance
 Gemini.FLASH_2_0           # ModelInfo instance
 
 # Complete list
-ALL_MODELS                 # List[ModelInfo] - all 146 models
+ALL_MODELS                 # List[ModelInfo] - all 152 models
 
 # Quick lookup
 MODELS_BY_ID               # Dict[str, ModelInfo] - O(1) lookup
@@ -294,7 +294,7 @@ else:
 ```python
 from selectools.models import ALL_MODELS
 
-# All 146 models
+# All 152 models
 print(f"Total models: {len(ALL_MODELS)}")
 
 # Filter by provider
@@ -557,7 +557,7 @@ def test_model_registry():
     assert model.context_window > 0
 
     # Test registry
-    assert len(ALL_MODELS) >= 146
+    assert len(ALL_MODELS) >= 152
     assert "gpt-4o-mini" in MODELS_BY_ID
 
     # Test lookup
@@ -642,7 +642,7 @@ print(f"${cost:.6f}")  # $0.000200
 ```python
 from selectools import ALL_MODELS, MODELS_BY_ID
 
-# All 146 ModelInfo objects
+# All 152 ModelInfo objects
 for model in ALL_MODELS:
     print(f"{model.id:40s} ${model.prompt_cost:>8.2f} / ${model.completion_cost:>8.2f}")
 

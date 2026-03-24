@@ -115,7 +115,7 @@ print(result.reasoning)       # Why the agent chose get_weather
 | Category | Highlights |
 |---|---|
 | **5 LLM Providers** | OpenAI, Anthropic, Gemini, Ollama + FallbackProvider (auto-failover with circuit breaker) |
-| **146 Models** | Type-safe constants with March 2026 pricing for all providers |
+| **152 Models** | Type-safe constants with March 2026 pricing for all providers |
 | **Structured Output** | Pydantic / JSON Schema `response_format` with auto-retry on validation failure |
 | **Execution Traces** | `result.trace` — typed timeline of every LLM call, tool pick, and execution |
 | **Reasoning Visibility** | `result.reasoning` explains *why* the agent chose each tool |
@@ -157,7 +157,7 @@ print(result.reasoning)       # Why the agent chose get_weather
     5. **[Providers](modules/PROVIDERS.md)** — Switch between OpenAI, Anthropic, Gemini, Ollama
     6. **[Memory](modules/MEMORY.md)** — Conversation persistence and sliding windows
     7. **[Streaming](modules/STREAMING.md)** — Real-time token streaming
-    8. **[Models & Pricing](modules/MODELS.md)** — 146 models with cost data
+    8. **[Models & Pricing](modules/MODELS.md)** — 152 models with cost data
 
 !!! abstract "Advanced"
     9. **[RAG Pipeline](modules/RAG.md)** — Document search and retrieval

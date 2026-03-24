@@ -40,7 +40,7 @@ class OpenAIProvider(_OpenAICompatibleBase):
     supports_streaming = True
     supports_async = True
 
-    def __init__(self, api_key: str | None = None, default_model: str = OpenAIModels.GPT_4O.id):
+    def __init__(self, api_key: str | None = None, default_model: str = OpenAIModels.GPT_5_MINI.id):
         load_default_env()
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not self.api_key:

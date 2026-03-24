@@ -39,7 +39,7 @@ class AgentConfig:
     Sensible defaults are provided for all options.
 
     Attributes:
-        model: Model identifier to use (e.g., "gpt-4o", "claude-3-5-sonnet-20240620").
+        model: Model identifier to use (e.g., "gpt-5-mini", "claude-sonnet-4-6").
         temperature: LLM temperature (0.0 = deterministic, higher = more creative). Default: 0.0.
         max_tokens: Maximum tokens in LLM response. Default: 1000.
         max_iterations: Maximum tool-calling iterations before stopping. Default: 6.
@@ -121,7 +121,7 @@ class AgentConfig:
     """
 
     name: str = "agent"
-    model: str = "gpt-4o"
+    model: str = "gpt-5-mini"
     temperature: float = 0.0
     max_tokens: int = 1000
     max_iterations: int = 6

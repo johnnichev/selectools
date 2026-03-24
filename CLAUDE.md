@@ -59,7 +59,7 @@ src/selectools/
 ├── knowledge_store_supabase.py # SupabaseKnowledgeStore (optional dep: supabase)
 ├── cancellation.py          # CancellationToken (thread-safe cooperative cancellation)
 ├── token_estimation.py      # estimate_tokens(), estimate_run_tokens(), TokenEstimate
-├── models.py                # 146 model registry with pricing (single source of truth)
+├── models.py                # 152 model registry with pricing (single source of truth)
 ├── pricing.py               # Derives pricing from models.py
 ├── usage.py                 # Token + cost tracking
 ├── trace.py                 # AgentTrace, TraceStep (16 step types — see list below)
