@@ -77,16 +77,19 @@ def test_anthropic_native_tool_call() -> None:
 
 @pytest.mark.e2e
 @pytest.mark.gemini
-@pytest.mark.skipif(not os.getenv("GEMINI_API_KEY"), reason="GEMINI_API_KEY not set")
+@pytest.mark.skipif(
+    not (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")),
+    reason="GEMINI_API_KEY or GOOGLE_API_KEY not set",
+)
 def test_gemini_native_tool_call() -> None:
     print("\nTesting Gemini native tool call...")
     try:
-        provider = GeminiProvider()
+        provider = GeminiProvider(default_model="gemini-2.5-flash")
     except Exception as e:
         pytest.skip(f"Gemini init failed: {e}")
 
     agent = Agent(
-        config=AgentConfig(model=provider.default_model),
+        config=AgentConfig(model="gemini-2.5-flash"),
         provider=provider,
         tools=[get_random_number],
     )

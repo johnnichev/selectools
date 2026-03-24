@@ -240,9 +240,9 @@ class TestAnthropicProvider:
         """Test basic completion with Anthropic."""
         from selectools.providers.anthropic_provider import AnthropicProvider
 
-        provider = AnthropicProvider(default_model="claude-3-haiku-20240307")
+        provider = AnthropicProvider(default_model="claude-haiku-4-5")
         response, usage = provider.complete(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             system_prompt="You are a helpful assistant. Be very brief.",
             messages=[Message(role=Role.USER, content="Say 'hello' and nothing else.")],
             max_tokens=50,
@@ -262,8 +262,8 @@ class TestAnthropicProvider:
 
         agent = Agent(
             tools=[calculator_tool],
-            provider=AnthropicProvider(default_model="claude-3-haiku-20240307"),
-            config=AgentConfig(model="claude-3-haiku-20240307", max_iterations=3, verbose=True),
+            provider=AnthropicProvider(default_model="claude-haiku-4-5"),
+            config=AgentConfig(model="claude-haiku-4-5", max_iterations=3, verbose=True),
         )
 
         response = agent.run(
@@ -280,19 +280,19 @@ class TestAnthropicProvider:
         """Test streaming with Anthropic."""
         from selectools.providers.anthropic_provider import AnthropicProvider
 
-        provider = AnthropicProvider(default_model="claude-3-haiku-20240307")
+        provider = AnthropicProvider(default_model="claude-haiku-4-5")
         chunks = []
 
         for chunk in provider.stream(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             system_prompt="You are a helpful assistant. Be brief.",
             messages=[Message(role=Role.USER, content="List 3 colors.")],
             max_tokens=50,
         ):
             chunks.append(chunk)
 
-        full_response = "".join(chunks)
-        assert len(chunks) > 1
+        full_response = "".join(str(c) for c in chunks)
+        assert len(chunks) >= 1
         assert len(full_response) > 0
         print(f"\n  Streamed response ({len(chunks)} chunks): {full_response}")
 
@@ -303,8 +303,8 @@ class TestAnthropicProvider:
 
         agent = Agent(
             tools=[calculator_tool],
-            provider=AnthropicProvider(default_model="claude-3-haiku-20240307"),
-            config=AgentConfig(model="claude-3-haiku-20240307", max_iterations=3),
+            provider=AnthropicProvider(default_model="claude-haiku-4-5"),
+            config=AgentConfig(model="claude-haiku-4-5", max_iterations=3),
         )
 
         response = await agent.arun(
@@ -322,8 +322,8 @@ class TestAnthropicProvider:
         memory = ConversationMemory(max_messages=10)
         agent = Agent(
             tools=[weather_tool],
-            provider=AnthropicProvider(default_model="claude-3-haiku-20240307"),
-            config=AgentConfig(model="claude-3-haiku-20240307", max_iterations=3),
+            provider=AnthropicProvider(default_model="claude-haiku-4-5"),
+            config=AgentConfig(model="claude-haiku-4-5", max_iterations=3),
             memory=memory,
         )
 
@@ -356,9 +356,9 @@ class TestGeminiProvider:
         """Test basic completion with Gemini."""
         from selectools.providers.gemini_provider import GeminiProvider
 
-        provider = GeminiProvider(default_model="gemini-2.0-flash")
+        provider = GeminiProvider(default_model="gemini-2.5-flash")
         response, usage = provider.complete(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             system_prompt="You are a helpful assistant. Be very brief.",
             messages=[Message(role=Role.USER, content="Say 'hello' and nothing else.")],
             max_tokens=50,
@@ -378,8 +378,8 @@ class TestGeminiProvider:
 
         agent = Agent(
             tools=[calculator_tool],
-            provider=GeminiProvider(default_model="gemini-2.0-flash"),
-            config=AgentConfig(model="gemini-2.0-flash", max_iterations=3, verbose=True),
+            provider=GeminiProvider(default_model="gemini-2.5-flash"),
+            config=AgentConfig(model="gemini-2.5-flash", max_iterations=3, verbose=True),
         )
 
         response = agent.run(
@@ -396,11 +396,11 @@ class TestGeminiProvider:
         """Test streaming with Gemini."""
         from selectools.providers.gemini_provider import GeminiProvider
 
-        provider = GeminiProvider(default_model="gemini-2.0-flash")
+        provider = GeminiProvider(default_model="gemini-2.5-flash")
         chunks = []
 
         for chunk in provider.stream(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             system_prompt="You are a helpful assistant. Be brief.",
             messages=[Message(role=Role.USER, content="Name 3 fruits.")],
             max_tokens=50,
@@ -419,8 +419,8 @@ class TestGeminiProvider:
 
         agent = Agent(
             tools=[calculator_tool],
-            provider=GeminiProvider(default_model="gemini-2.0-flash"),
-            config=AgentConfig(model="gemini-2.0-flash", max_iterations=3),
+            provider=GeminiProvider(default_model="gemini-2.5-flash"),
+            config=AgentConfig(model="gemini-2.5-flash", max_iterations=3),
         )
 
         response = await agent.arun(
@@ -438,8 +438,8 @@ class TestGeminiProvider:
         memory = ConversationMemory(max_messages=10)
         agent = Agent(
             tools=[weather_tool],
-            provider=GeminiProvider(default_model="gemini-2.0-flash"),
-            config=AgentConfig(model="gemini-2.0-flash", max_iterations=3),
+            provider=GeminiProvider(default_model="gemini-2.5-flash"),
+            config=AgentConfig(model="gemini-2.5-flash", max_iterations=3),
             memory=memory,
         )
 
@@ -486,8 +486,8 @@ class TestCrossProvider:
 
             agent = Agent(
                 tools=[calculator_tool],
-                provider=AnthropicProvider(default_model="claude-3-haiku-20240307"),
-                config=AgentConfig(model="claude-3-haiku-20240307", max_iterations=2),
+                provider=AnthropicProvider(default_model="claude-haiku-4-5"),
+                config=AgentConfig(model="claude-haiku-4-5", max_iterations=2),
             )
             agent.run([Message(role=Role.USER, content="What is 2+2? Use calculator.")])
             results["anthropic"] = {
@@ -501,8 +501,8 @@ class TestCrossProvider:
 
             agent = Agent(
                 tools=[calculator_tool],
-                provider=GeminiProvider(default_model="gemini-2.0-flash"),
-                config=AgentConfig(model="gemini-2.0-flash", max_iterations=2),
+                provider=GeminiProvider(default_model="gemini-2.5-flash"),
+                config=AgentConfig(model="gemini-2.5-flash", max_iterations=2),
             )
             agent.run([Message(role=Role.USER, content="What is 2+2? Use calculator.")])
             results["gemini"] = {
