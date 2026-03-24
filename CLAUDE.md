@@ -330,7 +330,8 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 - **v0.17.3** ✅ Agent Runtime Controls — token budget, cancellation, cost attribution, structured results, approval gate, SimpleStepObserver
 - **v0.17.4** ✅ Agent Intelligence — token estimation, model switching, knowledge memory enhancement (4 store backends)
 - **v0.17.5** ✅ Bug Hunt & Async Guardrails — 91 validated fixes, async guardrails, 40 regression tests
-- **v0.17.6** 🟡 Caching & Context — semantic caching, prompt compression, conversation branching
+- **v0.17.6** 🟡 Quick Wins — ReAct/CoT reasoning strategies, tool result caching, Python 3.9–3.13 CI matrix
+- **v0.17.7** 🟡 Caching & Context — semantic caching, prompt compression, conversation branching
 - **v0.18.0** 🟡 Multi-Agent Orchestration — see `MULTI_AGENT_PLAN.md`
 - **v0.18.x** 🟡 Composability Layer — Pipeline with `@step` + `|` operator (LCEL alternative)
 - **v0.19.0** 🟡 Serve & Deploy — `selectools serve`, FastAPI/Flask, Docker/Helm, `selectools doctor`
