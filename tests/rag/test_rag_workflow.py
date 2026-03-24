@@ -415,14 +415,20 @@ class TestRAGTools:
 
     def test_rag_tool_no_results(self, mock_embedder: Mock) -> None:
         """Test RAGTool with no results above threshold."""
+        # Use orthogonal embeddings to guarantee low similarity
+        doc_embedding = [1.0] + [0.0] * 127  # unit vector along dim 0
+        query_embedding = [0.0] + [1.0] + [0.0] * 126  # unit vector along dim 1
+        mock_embedder.embed_texts.side_effect = lambda texts: [doc_embedding] * len(texts)
+        mock_embedder.embed_query.side_effect = lambda q: query_embedding
+
         vector_store = VectorStore.create("memory", embedder=mock_embedder)
 
         # Add document
         docs = [Document(text="Python programming.", metadata={})]
         vector_store.add_documents(docs)
 
-        # Create tool with perfect match threshold
-        rag_tool = RAGTool(vector_store=vector_store, top_k=1, score_threshold=1.0)
+        # Create tool with high threshold — orthogonal vectors have similarity ~0
+        rag_tool = RAGTool(vector_store=vector_store, top_k=1, score_threshold=0.5)
 
         result = rag_tool.search_knowledge_base.function(
             rag_tool, "completely unrelated query xyz123"
