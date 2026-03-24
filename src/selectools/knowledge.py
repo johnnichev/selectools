@@ -158,8 +158,7 @@ class FileKnowledgeStore:
         return entries
 
     def _save_all(self, entries: List[KnowledgeEntry]) -> None:
-        tmp_path = self._entries_path + ".tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
+        with open(self._entries_path, "w", encoding="utf-8") as f:
             for e in entries:
                 d = {
                     "id": e.id,
@@ -173,9 +172,6 @@ class FileKnowledgeStore:
                     "metadata": e.metadata,
                 }
                 f.write(json.dumps(d) + "\n")
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp_path, self._entries_path)
 
     def save(self, entry: KnowledgeEntry) -> str:
         with self._lock:
@@ -191,9 +187,10 @@ class FileKnowledgeStore:
         return entry.id
 
     def get(self, entry_id: str) -> Optional[KnowledgeEntry]:
-        for e in self._load_all():
-            if e.id == entry_id:
-                return e
+        with self._lock:
+            for e in self._load_all():
+                if e.id == entry_id:
+                    return e
         return None
 
     def query(
@@ -203,7 +200,8 @@ class FileKnowledgeStore:
         since: Optional[datetime] = None,
         limit: int = 50,
     ) -> List[KnowledgeEntry]:
-        entries = self._load_all()
+        with self._lock:
+            entries = self._load_all()
         result = []
         for e in entries:
             if e.is_expired:
@@ -229,7 +227,8 @@ class FileKnowledgeStore:
         return False
 
     def count(self) -> int:
-        return len(self._load_all())
+        with self._lock:
+            return len(self._load_all())
 
     def prune(
         self,
@@ -289,6 +288,13 @@ class SQLiteKnowledgeStore:
                     metadata TEXT DEFAULT '{}'
                 )"""
             )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_category ON knowledge(category)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_knowledge_importance ON knowledge(importance)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_knowledge_created ON knowledge(created_at)"
+            )
 
     def _row_to_entry(self, row: tuple) -> KnowledgeEntry:
         return KnowledgeEntry(
@@ -345,14 +351,13 @@ class SQLiteKnowledgeStore:
             clauses.append("created_at >= ?")
             params.append(since.isoformat())
         where = " AND ".join(clauses)
-        sql = (
-            f"SELECT * FROM knowledge WHERE {where} ORDER BY importance DESC LIMIT ?"  # nosec B608
-        )
-        params.append(limit)
+        # LIMIT is applied in Python after TTL filtering to avoid returning
+        # fewer results than requested when expired entries are present.
+        sql = f"SELECT * FROM knowledge WHERE {where} ORDER BY importance DESC"  # nosec B608
         with sqlite3.connect(self._db_path) as conn:
             rows = conn.execute(sql, params).fetchall()
         entries = [self._row_to_entry(r) for r in rows]
-        return [e for e in entries if not e.is_expired]
+        return [e for e in entries if not e.is_expired][:limit]
 
     def delete(self, entry_id: str) -> bool:
         with self._lock, sqlite3.connect(self._db_path) as conn:

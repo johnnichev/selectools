@@ -215,7 +215,7 @@ async function poll(){
       document.getElementById('latency').textContent=(s.latency_p50||0).toFixed(0)+'ms';
     }
     const casesEl=document.getElementById('cases');
-    casesEl.innerHTML=s.cases.map(c=>'<div class="case-row"><span class="badge '+c.verdict+'">'+c.verdict+'</span><span class="case-name">'+c.name+'</span><span class="latency">'+c.latency_ms.toFixed(0)+'ms</span></div>').join('');
+    casesEl.innerHTML='';s.cases.forEach(c=>{const row=document.createElement('div');row.className='case-row';const badge=document.createElement('span');badge.className='badge '+c.verdict;badge.textContent=c.verdict;const nm=document.createElement('span');nm.className='case-name';nm.textContent=c.name;const lat=document.createElement('span');lat.className='latency';lat.textContent=c.latency_ms.toFixed(0)+'ms';row.appendChild(badge);row.appendChild(nm);row.appendChild(lat);casesEl.appendChild(row)});
   }catch(e){}
   if(document.getElementById('status').textContent.indexOf('Complete')===-1){
     setTimeout(poll,500);

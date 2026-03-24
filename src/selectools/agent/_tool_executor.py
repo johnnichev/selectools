@@ -64,7 +64,10 @@ class _ToolExecutorMixin:
             tool_args=tool_args,
             available_tools=list(self._tools_by_name.keys()),
             timeout=self.config.request_timeout,
+            fail_closed=getattr(self.config, "coherence_fail_closed", False),
         )
+        if result.usage:
+            self.usage.add_usage(result.usage)
         if not result.coherent:
             return (
                 f"Coherence check failed for tool '{tool_name}': "
@@ -91,7 +94,10 @@ class _ToolExecutorMixin:
             tool_args=tool_args,
             available_tools=list(self._tools_by_name.keys()),
             timeout=self.config.request_timeout,
+            fail_closed=getattr(self.config, "coherence_fail_closed", False),
         )
+        if result.usage:
+            self.usage.add_usage(result.usage)
         if not result.coherent:
             return (
                 f"Coherence check failed for tool '{tool_name}': "
@@ -149,12 +155,6 @@ class _ToolExecutorMixin:
         if result.decision == PolicyDecision.REVIEW:
             if self.config.confirm_action is None:
                 return f"Tool '{tool_name}' requires approval but no confirm_action configured: {result.reason}"
-            # Guard against async confirm_action in sync context
-            if inspect.iscoroutinefunction(self.config.confirm_action):
-                return (
-                    f"Tool '{tool_name}' requires approval but confirm_action is async. "
-                    f"Use arun() or astream() instead of run() for async confirm_action callbacks."
-                )
             try:
                 with ThreadPoolExecutor(max_workers=1) as executor:
                     future = executor.submit(
@@ -211,6 +211,14 @@ class _ToolExecutorMixin:
 
         if run_id:
             self._notify_observers(
+                "on_policy_decision",
+                run_id,
+                tool_name,
+                decision_str,
+                result.reason,
+                tool_args,
+            )
+            await self._anotify_observers(
                 "on_policy_decision",
                 run_id,
                 tool_name,
@@ -505,6 +513,9 @@ class _ToolExecutorMixin:
             start = time.time()
             if run_id:
                 self._notify_observers("on_tool_start", run_id, call_id, tool_name, parameters)
+                await self._anotify_observers(
+                    "on_tool_start", run_id, call_id, tool_name, parameters
+                )
 
             chunk_counter = {"count": 0}
 
@@ -532,11 +543,28 @@ class _ToolExecutorMixin:
                         result,
                         dur * 1000,
                     )
+                    await self._anotify_observers(
+                        "on_tool_end",
+                        run_id,
+                        call_id,
+                        tool_name,
+                        result,
+                        dur * 1000,
+                    )
                 return _Result(tc, result, False, dur, tool, chunk_counter["count"])
             except Exception as exc:
                 dur = time.time() - start
                 if run_id:
                     self._notify_observers(
+                        "on_tool_error",
+                        run_id,
+                        call_id,
+                        tool_name,
+                        exc,
+                        parameters,
+                        dur * 1000,
+                    )
+                    await self._anotify_observers(
                         "on_tool_error",
                         run_id,
                         call_id,
@@ -576,6 +604,13 @@ class _ToolExecutorMixin:
                     cost=0.0,
                     chunk_count=r.chunk_count,
                 )
+            if not r.is_error and self.usage.iterations:
+                self.usage.tool_usage[r.tool_call.tool_name] = (
+                    self.usage.tool_usage.get(r.tool_call.tool_name, 0) + 1
+                )
+                self.usage.tool_tokens[r.tool_call.tool_name] = self.usage.tool_tokens.get(
+                    r.tool_call.tool_name, 0
+                ) + (self.usage.iterations[-1].total_tokens if self.usage.iterations else 0)
 
             if trace is not None:
                 step_type = StepType.ERROR if r.is_error else StepType.TOOL_EXECUTION

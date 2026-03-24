@@ -8,6 +8,7 @@ LLM provider via ``provider`` and ``model`` for classification.
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import List, Optional
 
 from .base import Guardrail, GuardrailAction, GuardrailResult
@@ -40,9 +41,13 @@ class TopicGuardrail(Guardrail):
         ]
 
     def check(self, content: str) -> GuardrailResult:
+        # Normalize Unicode to prevent bypass via homoglyphs / zero-width chars
+        normalized = unicodedata.normalize("NFKD", content)
+        normalized = re.sub(r"[\u200b\u200c\u200d\ufeff\u00ad]", "", normalized)
+
         matched: List[str] = []
         for pattern, topic in zip(self._patterns, self.deny):
-            if pattern.search(content):
+            if pattern.search(normalized):
                 matched.append(topic)
 
         if matched:

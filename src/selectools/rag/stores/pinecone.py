@@ -154,11 +154,12 @@ class PineconeVectorStore(VectorStore):
         # Convert to SearchResult objects
         search_results = []
         for match in query_response.matches:
-            # Extract text from metadata
+            # Extract text from metadata without mutating the response object
             metadata = match.metadata or {}
-            text = metadata.pop("text", "")
+            text = metadata.get("text", "")
+            meta = {k: v for k, v in metadata.items() if k != "text"}
 
-            doc = Document(text=text, metadata=metadata)
+            doc = Document(text=text, metadata=meta)
             search_results.append(SearchResult(document=doc, score=match.score))
 
         return search_results

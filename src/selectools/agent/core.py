@@ -1066,13 +1066,27 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
 
                 # Cancellation check (R2)
                 if self.config.cancellation_token and self.config.cancellation_token.is_cancelled:
-                    yield StreamChunk(content="Agent run was cancelled")
+                    _result = self._build_cancelled_result(ctx)
+                    await self._anotify_observers(
+                        "on_cancelled", ctx.run_id, ctx.iteration, "Agent run was cancelled"
+                    )
+                    await self._anotify_observers("on_run_end", ctx.run_id, _result)
+                    yield _result
                     return
 
                 # Budget check (R1)
                 budget_msg = self._check_budget(ctx)
                 if budget_msg:
-                    yield StreamChunk(content=budget_msg)
+                    _result = self._build_budget_exceeded_result(ctx, budget_msg)
+                    await self._anotify_observers(
+                        "on_budget_exceeded",
+                        ctx.run_id,
+                        budget_msg,
+                        self.usage.total_tokens,
+                        self.usage.total_cost_usd,
+                    )
+                    await self._anotify_observers("on_run_end", ctx.run_id, _result)
+                    yield _result
                     return
 
                 # Model selection (R10)
@@ -1332,7 +1346,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
 
                 # Post-tool cancellation check (R2)
                 if self.config.cancellation_token and self.config.cancellation_token.is_cancelled:
-                    yield StreamChunk(content="Agent run was cancelled")
+                    _result = self._build_cancelled_result(ctx)
+                    await self._anotify_observers(
+                        "on_cancelled", ctx.run_id, ctx.iteration, "Agent run was cancelled"
+                    )
+                    await self._anotify_observers("on_run_end", ctx.run_id, _result)
+                    yield _result
                     return
 
                 self._notify_observers(
@@ -1343,6 +1362,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 )
 
             _result = self._build_max_iterations_result(ctx)
+            await self._anotify_observers("on_run_end", ctx.run_id, _result)
             yield _result
             return
         except Exception as exc:
@@ -1399,12 +1419,26 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
 
                 # Cancellation check (R2)
                 if self.config.cancellation_token and self.config.cancellation_token.is_cancelled:
-                    return self._build_cancelled_result(ctx)
+                    result = self._build_cancelled_result(ctx)
+                    await self._anotify_observers(
+                        "on_cancelled", ctx.run_id, ctx.iteration, "cancelled"
+                    )
+                    await self._anotify_observers("on_run_end", ctx.run_id, result)
+                    return result
 
                 # Budget check (R1)
                 budget_msg = self._check_budget(ctx)
                 if budget_msg:
-                    return self._build_budget_exceeded_result(ctx, budget_msg)
+                    result = self._build_budget_exceeded_result(ctx, budget_msg)
+                    await self._anotify_observers(
+                        "on_budget_exceeded",
+                        ctx.run_id,
+                        budget_msg,
+                        self.usage.total_tokens,
+                        self.usage.total_cost_usd,
+                    )
+                    await self._anotify_observers("on_run_end", ctx.run_id, result)
+                    return result
 
                 # Model selection (R10)
                 if self.config.model_selector:
@@ -1559,7 +1593,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
 
                 # Post-tool cancellation check (R2)
                 if self.config.cancellation_token and self.config.cancellation_token.is_cancelled:
-                    return self._build_cancelled_result(ctx)
+                    result = self._build_cancelled_result(ctx)
+                    await self._anotify_observers(
+                        "on_cancelled", ctx.run_id, ctx.iteration, "cancelled"
+                    )
+                    await self._anotify_observers("on_run_end", ctx.run_id, result)
+                    return result
 
                 self._notify_observers(
                     "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
@@ -1568,7 +1607,9 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
                 )
 
-            return self._build_max_iterations_result(ctx)
+            result = self._build_max_iterations_result(ctx)
+            await self._anotify_observers("on_run_end", ctx.run_id, result)
+            return result
         except Exception as exc:
             if not self.memory:
                 self._history = self._history[: ctx.history_checkpoint]

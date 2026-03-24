@@ -502,7 +502,7 @@ class ContextualChunker:
                 temperature=0.0,
             )
 
-            context_line = response_msg.content.strip()
+            context_line = (response_msg.content or "").strip()
             enriched_text = f"{self.context_prefix}{context_line}\n\n{chunk_doc.text}"
 
             metadata = chunk_doc.metadata.copy()

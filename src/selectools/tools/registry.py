@@ -55,6 +55,9 @@ class ToolRegistry:
         injected_kwargs: Optional[Dict[str, Any]] = None,
         config_injector: Optional[Callable[[], Dict[str, Any]]] = None,
         streaming: bool = False,
+        screen_output: bool = False,
+        terminal: bool = False,
+        requires_approval: bool = False,
     ) -> Callable[[Callable[..., Any]], Tool]:
         """
         Decorator to register a function as a tool in this registry.
@@ -66,6 +69,9 @@ class ToolRegistry:
             injected_kwargs: Dependency injection kwargs.
             config_injector: Dependency injection callable.
             streaming: Whether tool is streaming.
+            screen_output: Screen this tool's output for prompt injection.
+            terminal: If True, executing this tool stops the agent loop.
+            requires_approval: If True, the tool always requires human approval.
 
         Returns:
             Decorator that returns the registered Tool instance.
@@ -80,6 +86,9 @@ class ToolRegistry:
                 injected_kwargs=injected_kwargs,
                 config_injector=config_injector,
                 streaming=streaming,
+                screen_output=screen_output,
+                terminal=terminal,
+                requires_approval=requires_approval,
             )(func)
 
             # Register it

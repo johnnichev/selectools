@@ -53,9 +53,11 @@ class GuardrailsPipeline:
     @staticmethod
     def _run_chain(guardrails: List[Guardrail], content: str) -> GuardrailResult:
         current = content
+        triggered_names: List[str] = []
         for g in guardrails:
             result = g.check(current)
             if not result.passed:
+                triggered_names.append(g.name)
                 if g.action == GuardrailAction.BLOCK:
                     raise GuardrailError(
                         guardrail_name=g.name,
@@ -73,7 +75,8 @@ class GuardrailsPipeline:
                     continue
             else:
                 current = result.content
-        return GuardrailResult(passed=True, content=current)
+        guardrail_name = ", ".join(triggered_names) if triggered_names else None
+        return GuardrailResult(passed=True, content=current, guardrail_name=guardrail_name)
 
 
 __all__ = ["GuardrailsPipeline"]

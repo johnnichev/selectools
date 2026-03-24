@@ -155,7 +155,8 @@ class OutputEvaluator:
                             evaluator_name=self.name,
                             expected=case.expect_output_regex,
                             actual=content[:200],
-                            message=f"Output does not match regex: {case.expect_output_regex}",
+                            message=f"Response does not match regex "
+                            f"'{case.expect_output_regex}'",
                         )
                     )
             except re.error as exc:
@@ -193,7 +194,14 @@ class StructuredOutputEvaluator:
             )
             return failures
 
-        parsed_dict = parsed if isinstance(parsed, dict) else vars(parsed)
+        if hasattr(parsed, "model_dump"):
+            parsed_dict = parsed.model_dump()
+        elif hasattr(parsed, "__dict__"):
+            parsed_dict = vars(parsed)
+        elif isinstance(parsed, dict):
+            parsed_dict = parsed
+        else:
+            parsed_dict = {}
         for key, expected_val in case.expect_parsed.items():
             actual_val = parsed_dict.get(key)
             if actual_val != expected_val:

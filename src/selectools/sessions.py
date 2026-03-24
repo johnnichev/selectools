@@ -216,6 +216,7 @@ class SQLiteSessionStore:
 
         conn = sqlite3.connect(self._db_path)
         try:
+            conn.execute("PRAGMA journal_mode=WAL")
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS sessions (

@@ -5,12 +5,12 @@ Tool metadata, schemas, and runtime validation.
 from __future__ import annotations
 
 import asyncio
-import concurrent.futures
 import contextvars
 import difflib
 import functools
 import inspect
 import json
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Union
 
@@ -293,6 +293,12 @@ class Tool:
         if value is None:
             return f"Parameter '{param.name}' is None"
 
+        if isinstance(value, bool) and param.param_type in (int, float):
+            return (
+                f"Expected {param.param_type.__name__} for '{param.name}', got bool. "
+                f"Pass an integer or float value instead."
+            )
+
         if param.param_type is float:
             if not isinstance(value, (float, int)):
                 return f"Parameter '{param.name}' must be a number"
@@ -378,6 +384,8 @@ class Tool:
         Dicts, lists, Pydantic models, and dataclasses are serialized as JSON.
         Strings pass through unchanged.  All other types fall back to ``str()``.
         """
+        if result is None:
+            return ""
         if isinstance(result, str):
             return result
         if isinstance(result, (dict, list)):
@@ -422,7 +430,8 @@ class Tool:
                 except RuntimeError:
                     _loop = None
                 if _loop and _loop.is_running():
-                    # Already in an event loop — run in a new thread
+                    import concurrent.futures
+
                     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                         result = pool.submit(asyncio.run, result).result()
                 else:

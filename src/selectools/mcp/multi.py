@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from typing import Any, Dict, List, Optional, Set
 
 from ..tools.base import Tool
@@ -90,19 +91,18 @@ class MultiMCPClient:
                 server_tools = await client.list_tools()
                 for tool in server_tools:
                     if self.prefix_tools:
-                        # Re-create with prefix
-                        from .bridge import mcp_to_tool
-
-                        prefixed_name = f"{name}_{tool.name}"
-                        tool.name = prefixed_name
+                        prefixed = copy.copy(tool)
+                        prefixed.name = f"{name}_{tool.name}"
+                        seen_names.add(prefixed.name)
+                        all_tools.append(prefixed)
                     else:
                         if tool.name in seen_names:
                             raise ValueError(
                                 f"Tool name collision: '{tool.name}' exists in multiple "
                                 f"MCP servers. Use prefix_tools=True to avoid conflicts."
                             )
-                    seen_names.add(tool.name)
-                    all_tools.append(tool)
+                        seen_names.add(tool.name)
+                        all_tools.append(tool)
             except Exception as e:
                 if not isinstance(e, ValueError):
                     # Server failed during tool listing — mark as failed
