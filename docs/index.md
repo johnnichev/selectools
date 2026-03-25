@@ -136,12 +136,15 @@ print(result.reasoning)       # Why the agent chose get_weather
 | **Entity Memory** | Auto-extract named entities with LRU-pruned registry and context injection |
 | **Knowledge Graph** | Relationship triple extraction with in-memory and SQLite storage |
 | **Cross-Session Knowledge** | Daily logs + persistent facts with auto-registered `remember` tool |
-| **AgentObserver Protocol** | 31-event lifecycle observer with run/call ID correlation, `SimpleStepObserver`, and OTel export |
+| **AgentObserver Protocol** | 32-event lifecycle observer with run/call ID correlation, `SimpleStepObserver`, and OTel export |
 | **Runtime Controls** | Token/cost budget limits, cooperative cancellation, per-tool approval gates, model switching per iteration |
 | **Reasoning Strategies** | Built-in ReAct, Chain-of-Thought, and Plan-Then-Act via `reasoning_strategy` config |
 | **Tool Result Caching** | `@tool(cacheable=True, cache_ttl=60)` — skip re-execution for identical tool calls |
+| **Semantic Cache** | `SemanticCache` — embedding-based cache hits for paraphrased queries via cosine similarity |
+| **Prompt Compression** | Proactive context-window management — summarises old messages when fill-rate exceeds threshold |
+| **Conversation Branching** | `memory.branch()` and `store.branch()` — fork history for A/B exploration and checkpointing |
 | **Eval Framework** | 39 built-in evaluators, A/B testing, regression detection, HTML reports, JUnit XML |
-| **2220 Tests** | Unit, integration, regression, and E2E |
+| **2275 Tests** | Unit, integration, regression, and E2E |
 
 ---
 

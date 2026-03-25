@@ -542,7 +542,7 @@ agent = Agent(
 )
 ```
 
-28 lifecycle events: run, LLM, tool, iteration, batch, policy, structured output, fallback, retry, memory trim, guardrail, coherence, screening, session, entity, KG. See `observer.py` for full reference.
+32 lifecycle events: run, LLM, tool, iteration, batch, policy, structured output, fallback, retry, memory trim, guardrail, coherence, screening, session, entity, KG, budget exceeded, cancelled, prompt compressed. See `observer.py` for full reference.
 
 ### E2E Streaming & Parallel Execution
 
