@@ -72,7 +72,7 @@ jobs:
             echo "Skipping TestPyPI publish (missing token)"
             exit 0
           fi
-          twine upload --repository testpypi dist/*
+          twine upload --repository testpypi --skip-existing dist/*
 
   publish-pypi:
     runs-on: ubuntu-latest
@@ -99,4 +99,4 @@ jobs:
             echo "Skipping PyPI publish (missing token)"
             exit 0
           fi
-          twine upload dist/*
+          twine upload --skip-existing dist/*
