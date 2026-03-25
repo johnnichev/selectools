@@ -1,6 +1,6 @@
 """Public exports for the selectools package."""
 
-__version__ = "0.17.6"
+__version__ = "0.17.7"
 
 # Import submodules (lazy loading for optional dependencies)
 from . import embeddings, evals, guardrails, models, rag, toolbox
@@ -8,6 +8,7 @@ from .agent import Agent, AgentConfig
 from .analytics import AgentAnalytics, ToolMetrics
 from .audit import AuditLogger, PrivacyLevel
 from .cache import Cache, CacheKeyBuilder, CacheStats, InMemoryCache
+from .cache_semantic import SemanticCache
 from .cancellation import CancellationToken
 from .coherence import CoherenceResult
 from .entity_memory import Entity, EntityMemory
@@ -143,6 +144,7 @@ __all__ = [
     "CacheStats",
     "CacheKeyBuilder",
     "InMemoryCache",
+    "SemanticCache",
     # Tool policy
     "ToolPolicy",
     "PolicyDecision",

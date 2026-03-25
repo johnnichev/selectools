@@ -411,6 +411,9 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     Message(role=Role.SYSTEM, content=kg_ctx),
                 )
 
+        # Prompt compression (modifies self._history view only, not self.memory)
+        self._maybe_compress_context(run_id, trace)
+
         return _RunContext(
             trace=trace,
             run_id=run_id,

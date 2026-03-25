@@ -118,6 +118,15 @@ class AgentConfig:
                prompt.  Valid values: ``"react"`` (Thought → Action → Observation),
                ``"cot"`` (Chain-of-Thought step-by-step), ``"plan_then_act"``
                (plan first, then execute).  Default: None (no strategy).
+        compress_context: Proactively summarize old messages when the estimated
+               token count exceeds ``compress_threshold`` of the model's context
+               window.  Operates on the per-call history view only — the permanent
+               ``ConversationMemory`` is never modified.  Default: False.
+        compress_threshold: Fraction of the model's context window at which
+               compression is triggered.  Range: ``(0.0, 1.0]``.  Default: 0.75.
+        compress_keep_recent: Number of recent conversation turns to always keep
+               verbatim.  Each "turn" is one user + one assistant message pair.
+               Default: 4.
     """
 
     name: str = "agent"
@@ -168,3 +177,6 @@ class AgentConfig:
     max_total_tokens: Optional[int] = None
     max_cost_usd: Optional[float] = None
     cancellation_token: Optional[CancellationToken] = None
+    compress_context: bool = False
+    compress_threshold: float = 0.75
+    compress_keep_recent: int = 4

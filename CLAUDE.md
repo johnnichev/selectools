@@ -62,8 +62,8 @@ src/selectools/
 ├── models.py                # 152 model registry with pricing (single source of truth)
 ├── pricing.py               # Derives pricing from models.py
 ├── usage.py                 # Token + cost tracking
-├── trace.py                 # AgentTrace, TraceStep (16 step types — see list below)
-├── observer.py              # AgentObserver (31 sync events) + AsyncAgentObserver (28 async events) + LoggingObserver + SimpleStepObserver
+├── trace.py                 # AgentTrace, TraceStep (17 step types — see list below)
+├── observer.py              # AgentObserver (32 sync events) + AsyncAgentObserver (29 async events) + LoggingObserver + SimpleStepObserver
 ├── policy.py                # ToolPolicy (allow/review/deny rules)
 ├── parser.py                # ToolCallParser (JSON extraction from LLM responses)
 ├── prompt.py                # PromptBuilder (system prompt generation)
@@ -94,7 +94,7 @@ src/selectools/
     ├── junit.py             # JUnit XML for CI
     └── __main__.py          # CLI: python -m selectools.evals
 
-tests/                       # 2220 tests (unit, integration, regression, E2E)
+tests/                       # 2275 tests (unit, integration, regression, E2E)
 ├── agent/                   # Agent core tests
 ├── providers/               # Provider-specific tests
 ├── rag/                     # RAG pipeline tests
@@ -103,7 +103,7 @@ tests/                       # 2220 tests (unit, integration, regression, E2E)
 ├── core/                    # Framework-level tests
 └── test_*.py                # Module-level unit tests
 
-examples/                    # 38 numbered example scripts (01-38)
+examples/                    # 54 numbered example scripts (01-54)
 notebooks/getting_started.ipynb  # Interactive getting-started guide
 
 docs/                        # MkDocs Material documentation
@@ -275,6 +275,7 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 | `kg_extraction` | v0.16.0 | Knowledge graph triples extracted |
 | `budget_exceeded` | v0.17.3 | Agent stopped due to token/cost budget limit |
 | `cancelled` | v0.17.3 | Agent run cancelled via CancellationToken |
+| `prompt_compressed` | v0.17.7 | Older history summarised to free context window |
 
 ## Common Pitfalls (from past bugs)
 

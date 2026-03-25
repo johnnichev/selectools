@@ -418,6 +418,24 @@ class AgentObserver:
         """Called when the model_selector switches the model for an iteration."""
 
     # ------------------------------------------------------------------
+    # Prompt compression events
+    # ------------------------------------------------------------------
+
+    def on_prompt_compressed(
+        self,
+        run_id: str,
+        before_tokens: int,
+        after_tokens: int,
+        messages_compressed: int,
+    ) -> None:
+        """Called when prompt compression reduces the context before an LLM call.
+
+        ``before_tokens`` and ``after_tokens`` are estimates from
+        :func:`~selectools.token_estimation.estimate_run_tokens`.
+        ``messages_compressed`` is the count of messages replaced by the summary.
+        """
+
+    # ------------------------------------------------------------------
     # Eval events
     # ------------------------------------------------------------------
 
@@ -748,6 +766,18 @@ class LoggingObserver(AgentObserver):
             iteration=iteration,
             old_model=old_model,
             new_model=new_model,
+        )
+
+    def on_prompt_compressed(
+        self, run_id: str, before_tokens: int, after_tokens: int, messages_compressed: int
+    ) -> None:
+        self._emit(
+            "prompt_compressed",
+            run_id,
+            before_tokens=before_tokens,
+            after_tokens=after_tokens,
+            messages_compressed=messages_compressed,
+            tokens_saved=before_tokens - after_tokens,
         )
 
     def on_eval_start(self, suite_name: str, total_cases: int, model: str) -> None:
@@ -1116,6 +1146,19 @@ class AsyncAgentObserver(AgentObserver):
     ) -> None:
         """Async counterpart of :meth:`on_model_switch`."""
 
+    # ------------------------------------------------------------------
+    # Prompt compression events
+    # ------------------------------------------------------------------
+
+    async def a_on_prompt_compressed(
+        self,
+        run_id: str,
+        before_tokens: int,
+        after_tokens: int,
+        messages_compressed: int,
+    ) -> None:
+        """Async counterpart of :meth:`on_prompt_compressed`."""
+
 
 # ======================================================================
 # Convenience observers
@@ -1315,6 +1358,17 @@ class SimpleStepObserver(AgentObserver):
             iteration=iteration,
             old_model=old_model,
             new_model=new_model,
+        )
+
+    def on_prompt_compressed(
+        self, run_id: str, before_tokens: int, after_tokens: int, messages_compressed: int
+    ) -> None:
+        self._cb(
+            "prompt_compressed",
+            run_id,
+            before_tokens=before_tokens,
+            after_tokens=after_tokens,
+            messages_compressed=messages_compressed,
         )
 
     def on_eval_start(self, suite_name: str, total_cases: int, model: str) -> None:

@@ -5,6 +5,61 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.7] - 2026-03-25
+
+### Added
+
+#### SemanticCache
+- New `SemanticCache` in `src/selectools/cache_semantic.py` — drop-in replacement for `InMemoryCache`
+- Embeds cache keys with any `EmbeddingProvider` and serves hits based on cosine similarity
+- Configurable `similarity_threshold` (default 0.92), `max_size` (LRU), `default_ttl`
+- Thread-safe (internal `threading.Lock`); pure-Python cosine similarity (no NumPy)
+- `stats` property returns `CacheStats` with hit/miss/eviction counters and `hit_rate`
+
+```python
+from selectools.cache_semantic import SemanticCache
+from selectools.embeddings.openai import OpenAIEmbeddingProvider
+
+cache = SemanticCache(
+    embedding_provider=OpenAIEmbeddingProvider(),
+    similarity_threshold=0.92,
+    max_size=500,
+)
+config = AgentConfig(cache=cache)
+# "What's the weather in NYC?" hits cache for "Weather in New York City?"
+```
+
+#### Prompt Compression
+- New `compress_context`, `compress_threshold`, `compress_keep_recent` fields on `AgentConfig`
+- Fires before each LLM call when estimated fill-rate ≥ threshold; summarises old messages into a `[Compressed context]` system message
+- Only modifies `self._history` (per-call view) — `self.memory` is never touched
+- New `StepType.PROMPT_COMPRESSED` added to `AgentTrace`
+- New `on_prompt_compressed(run_id, before_tokens, after_tokens, messages_compressed)` observer event on both `AgentObserver` and `AsyncAgentObserver`
+
+```python
+config = AgentConfig(
+    compress_context=True,
+    compress_threshold=0.75,  # trigger at 75 % context fill
+    compress_keep_recent=4,   # keep last 4 turns verbatim
+)
+```
+
+#### Conversation Branching
+- New `ConversationMemory.branch()` — returns an independent snapshot; changes to branch don't affect original
+- New `SessionStore.branch(source_id, new_id)` — forks a persisted session; supported by all three backends (`JsonFileSessionStore`, `SQLiteSessionStore`, `RedisSessionStore`)
+- Raises `ValueError` if `source_id` not found
+
+```python
+checkpoint = agent.memory.branch()     # snapshot in-memory
+store.branch("main", "experiment")     # fork a persisted session
+```
+
+### Stats
+- **55 new tests** (total: 2275)
+- **3 new examples** (52: semantic cache, 53: prompt compression, 54: conversation branching; total: 54)
+- **1 new StepType** — `prompt_compressed` (total: 17)
+- **1 new observer event** — `on_prompt_compressed` (total: 32 sync / 29 async)
+
 ## [0.17.6] - 2026-03-24
 
 ### Added
