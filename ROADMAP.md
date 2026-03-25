@@ -215,9 +215,9 @@ v0.17.5  ✅ Bug Hunt & Async Guardrails
 v0.17.6  ✅ Quick Wins
          ReAct/CoT reasoning strategies → Tool result caching → Python 3.9–3.13 CI matrix
 
-v0.17.7  🟡 Caching & Context
+v0.17.7  ✅ Caching & Context
          Semantic caching → Prompt compression → Conversation branching
-         (~50 tests, 3 examples)
+         (55 tests, 3 examples)
 
 v0.18.0  🟡 Multi-Agent Orchestration
          AgentGraph → GraphState → Typed reducers → Resume-from-yield interrupts
@@ -387,7 +387,7 @@ First-class MCP support lets Selectools agents use any MCP-compatible tool serve
 
 ---
 
-## v0.17.7: Caching & Context 🟡
+## v0.17.7: Caching & Context ✅
 
 Focus: Smarter token management and memory exploration.
 

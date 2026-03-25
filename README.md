@@ -12,6 +12,32 @@ An open-source project from **[NichevLabs](https://nichevlabs.com)**.
 
 ## What's New in v0.17
 
+### v0.17.7 — Caching & Context
+
+```python
+from selectools.cache_semantic import SemanticCache
+from selectools.embeddings.openai import OpenAIEmbeddingProvider
+
+# Semantic cache — cache hits for paraphrased queries
+cache = SemanticCache(
+    embedding_provider=OpenAIEmbeddingProvider(),
+    similarity_threshold=0.92,
+)
+config = AgentConfig(cache=cache)
+# "Weather in NYC?" hits cache for "What's the weather in New York City?"
+
+# Prompt compression — prevent context-window overflow
+config = AgentConfig(
+    compress_context=True,
+    compress_threshold=0.75,   # trigger at 75 % context fill
+    compress_keep_recent=4,    # keep last 4 turns verbatim
+)
+
+# Conversation branching — fork history for A/B exploration
+branch = agent.memory.branch()   # independent snapshot
+store.branch("main", "experiment")  # fork a persisted session
+```
+
 ### v0.17.6 — Quick Wins
 
 ```python
@@ -158,7 +184,7 @@ report.to_html("report.html")
 | **Cross-Session Knowledge** | Daily logs + persistent facts with auto-registered `remember` tool. |
 | **MCP Integration** | Connect to any MCP tool server (stdio + HTTP). MCPClient, MultiMCPClient, MCPServer. Circuit breaker, retry, graceful degradation. |
 | **Eval Framework** | 39 built-in evaluators (21 deterministic + 18 LLM-as-judge). A/B testing, regression detection, snapshot testing, HTML reports, JUnit XML, CI integration. |
-| **AgentObserver Protocol** | 31-event lifecycle observer with `run_id`/`call_id` correlation. Built-in `LoggingObserver` + `SimpleStepObserver`. |
+| **AgentObserver Protocol** | 32-event lifecycle observer with `run_id`/`call_id` correlation. Built-in `LoggingObserver` + `SimpleStepObserver`. |
 | **Runtime Controls** | Token/cost budget limits, cooperative cancellation, per-tool approval gates, model switching per iteration. |
 | **Production Hardened** | Retries with backoff, per-tool timeouts, iteration caps, cost warnings, observability hooks + observers. |
 | **Library-First** | Not a framework. No magic globals, no hidden state. Use as much or as little as you need. |
@@ -186,10 +212,13 @@ report.to_html("report.html")
 - **Token Budget & Cancellation**: `max_total_tokens`, `max_cost_usd` hard limits; `CancellationToken` for cooperative stopping
 - **Token Estimation**: `estimate_run_tokens()` for pre-execution budget checks
 - **Model Switching**: `model_selector` callback for per-iteration model selection
-- **51 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, eval framework, and more
+- **Semantic Cache**: `SemanticCache` — embedding-based cache hits for paraphrased queries (cosine similarity, LRU + TTL)
+- **Prompt Compression**: Auto-summarise old history when context window fills up; `compress_context`, `compress_threshold`, `compress_keep_recent`
+- **Conversation Branching**: `ConversationMemory.branch()` and `SessionStore.branch()` for A/B exploration and checkpointing
+- **54 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, eval framework, and more
 - **Built-in Eval Framework**: 39 evaluators (21 deterministic + 18 LLM-as-judge), A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing
-- **AgentObserver Protocol**: 31 lifecycle events with `run_id` correlation, `LoggingObserver`, `SimpleStepObserver`, OTel export
-- **2220 Tests**: Unit, integration, regression, and E2E with real API calls
+- **AgentObserver Protocol**: 32 lifecycle events with `run_id` correlation, `LoggingObserver`, `SimpleStepObserver`, OTel export
+- **2275 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 
@@ -758,7 +787,7 @@ pytest tests/ -x -q          # All tests
 pytest tests/ -k "not e2e"   # Skip E2E (no API keys needed)
 ```
 
-2220 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, and E2E integration.
+2275 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, and E2E integration.
 
 ## License
 

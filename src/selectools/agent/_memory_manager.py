@@ -4,10 +4,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, List, Optional
 
+from ..token_estimation import estimate_run_tokens
+from ..trace import AgentTrace, StepType, TraceStep
 from ..types import Message, Role
 
 if TYPE_CHECKING:
     from ..memory import ConversationMemory
+
+
+def _format_messages_as_text(messages: List[Message]) -> str:
+    """Render a list of messages as 'ROLE: content' lines joined by newlines."""
+    return "\n".join(f"{m.role.value.upper()}: {m.content or ''}" for m in messages)
 
 
 class _MemoryManagerMixin:
@@ -17,6 +24,11 @@ class _MemoryManagerMixin:
     _history, _notify_observers, etc.) which are expected to be provided
     by the Agent class that inherits from this mixin.
     """
+
+    # Declared here so mypy resolves the type when _maybe_compress_context
+    # both reads and assigns self._history (assignment triggers has-type errors
+    # without this annotation).
+    _history: List[Message]
 
     def _memory_add(self, msg: Message, run_id: str) -> None:
         """Add message to memory and notify observers if trimming occurred."""
@@ -64,12 +76,7 @@ class _MemoryManagerMixin:
         try:
             provider = self.config.summarize_provider or self.provider
             model = self.config.summarize_model or self.config.model
-            text_parts = []
-            for m in trimmed:
-                prefix = m.role.value.upper()
-                text_parts.append(f"{prefix}: {m.content or ''}")
-            trimmed_text = "\n".join(text_parts)
-
+            trimmed_text = _format_messages_as_text(trimmed)
             prompt_msg = Message(
                 role=Role.USER,
                 content=(
@@ -126,6 +133,101 @@ class _MemoryManagerMixin:
                 )
         except Exception:  # nosec B110
             pass  # never crash the agent for entity extraction failure
+
+    def _maybe_compress_context(self, run_id: str, trace: AgentTrace) -> None:
+        """Proactively summarize old history messages if context is getting full.
+
+        Only fires when ``config.compress_context`` is True and the estimated
+        token fill-rate exceeds ``config.compress_threshold``.  Modifies
+        ``self._history`` (the per-call view) only — ``self.memory`` is untouched.
+        """
+        if not self.config.compress_context:
+            return
+
+        estimate = estimate_run_tokens(
+            messages=self._history,
+            tools=self.tools,
+            system_prompt=self._system_prompt,
+            model=self._effective_model,
+        )
+        context_window = estimate.context_window or 128_000
+        if context_window == 0:
+            return
+
+        fill_rate = estimate.total_tokens / context_window
+        if fill_rate < self.config.compress_threshold:
+            return
+
+        # Each "turn" is one user + one assistant message, so keep_recent * 2 messages.
+        keep_recent = self.config.compress_keep_recent * 2
+        system_msgs: List[Message] = []
+        non_system: List[Message] = []
+        for m in self._history:
+            (system_msgs if m.role == Role.SYSTEM else non_system).append(m)
+
+        if len(non_system) <= keep_recent:
+            return  # nothing old enough to compress
+
+        to_compress = non_system[:-keep_recent] if keep_recent else non_system
+        to_keep_recent = non_system[-keep_recent:] if keep_recent else []
+
+        if len(to_compress) < 2:
+            return
+
+        try:
+            compressed_text = _format_messages_as_text(to_compress)
+
+            prompt_msg = Message(
+                role=Role.USER,
+                content=(
+                    "Summarize the following conversation excerpt in 3-5 sentences. "
+                    "Preserve key facts, decisions, and context needed to continue "
+                    "the conversation:\n\n" + compressed_text
+                ),
+            )
+            result = self.provider.complete(
+                model=self._effective_model,
+                system_prompt="You are a concise summarizer.",
+                messages=[prompt_msg],
+                max_tokens=300,
+            )
+            summary_msg = result[0] if isinstance(result, tuple) else result
+            summary_text = (summary_msg.content or "").strip()
+            if not summary_text:
+                return
+
+            summary_message = Message(
+                role=Role.SYSTEM,
+                content=f"[Compressed context] {summary_text}",
+            )
+            self._history = system_msgs + [summary_message] + to_keep_recent
+
+            after_estimate = estimate_run_tokens(
+                messages=self._history,
+                tools=self.tools,
+                system_prompt=self._system_prompt,
+                model=self._effective_model,
+            )
+            trace.steps.append(
+                TraceStep(
+                    type=StepType.PROMPT_COMPRESSED,
+                    summary=(
+                        f"Compressed {len(to_compress)} messages: "
+                        f"{estimate.total_tokens}→{after_estimate.total_tokens} tokens"
+                    ),
+                    prompt_tokens=estimate.total_tokens,
+                    completion_tokens=after_estimate.total_tokens,
+                )
+            )
+            self._notify_observers(
+                "on_prompt_compressed",
+                run_id,
+                estimate.total_tokens,
+                after_estimate.total_tokens,
+                len(to_compress),
+            )
+        except Exception:  # nosec B110
+            pass  # never crash the agent for a compression failure
 
     def _extract_kg_triples(self, run_id: str) -> None:
         """Extract relationship triples from recent messages if knowledge_graph is configured."""

@@ -38,6 +38,7 @@ class StepType(str, Enum):
     KG_EXTRACTION = "kg_extraction"
     BUDGET_EXCEEDED = "budget_exceeded"
     CANCELLED = "cancelled"
+    PROMPT_COMPRESSED = "prompt_compressed"
 
 
 @dataclass

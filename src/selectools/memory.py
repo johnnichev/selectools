@@ -221,6 +221,33 @@ class ConversationMemory:
             break
         return removed
 
+    def branch(self) -> "ConversationMemory":
+        """Return an independent snapshot of this memory.
+
+        The returned memory has the same configuration (``max_messages``,
+        ``max_tokens``) and an independent copy of the current message list
+        and summary.  Changes to either memory do not affect the other.
+
+        Example::
+
+            branch = agent.memory.branch()
+            branch_agent = Agent(tools=agent.tools, provider=provider, memory=branch)
+            result = branch_agent.run("What if we tried X instead?")
+            # agent.memory is unchanged
+
+        Returns:
+            A new :class:`ConversationMemory` instance with an independent copy
+            of the current state.
+        """
+        copy = ConversationMemory(
+            max_messages=self.max_messages,
+            max_tokens=self.max_tokens,
+        )
+        copy._messages = list(self._messages)
+        copy._summary = self._summary
+        copy._last_trimmed = []
+        return copy
+
     def __len__(self) -> int:
         """Return the number of messages in history."""
         return len(self._messages)

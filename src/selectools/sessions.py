@@ -57,6 +57,17 @@ class SessionStore(Protocol):
         """Check whether a session exists."""
         ...
 
+    def branch(self, source_id: str, new_id: str) -> None:
+        """Copy session *source_id* to *new_id*.
+
+        The two sessions are completely independent after branching — modifying
+        one does not affect the other.
+
+        Raises:
+            ValueError: If *source_id* does not exist.
+        """
+        ...
+
 
 # ======================================================================
 # JSON file backend
@@ -187,6 +198,13 @@ class JsonFileSessionStore:
             except (json.JSONDecodeError, OSError):
                 return False
         return not self._is_expired(data)
+
+    def branch(self, source_id: str, new_id: str) -> None:
+        """Copy session *source_id* to a new session *new_id*."""
+        memory = self.load(source_id)
+        if memory is None:
+            raise ValueError(f"Session {source_id!r} not found")
+        self.save(new_id, memory)
 
 
 # ======================================================================
@@ -332,6 +350,13 @@ class SQLiteSessionStore:
             return False
         return not self._is_expired_ts(row[0])
 
+    def branch(self, source_id: str, new_id: str) -> None:
+        """Copy session *source_id* to a new session *new_id*."""
+        memory = self.load(source_id)
+        if memory is None:
+            raise ValueError(f"Session {source_id!r} not found")
+        self.save(new_id, memory)
+
 
 # ======================================================================
 # Redis backend
@@ -448,6 +473,13 @@ class RedisSessionStore:
 
     def exists(self, session_id: str) -> bool:
         return bool(self._client.exists(self._key(session_id)))
+
+    def branch(self, source_id: str, new_id: str) -> None:
+        """Copy session *source_id* to a new session *new_id*."""
+        memory = self.load(source_id)
+        if memory is None:
+            raise ValueError(f"Session {source_id!r} not found")
+        self.save(new_id, memory)
 
 
 __all__ = [

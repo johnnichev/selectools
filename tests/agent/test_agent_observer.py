@@ -869,6 +869,7 @@ class TestLoggingObserver:
         lo.on_policy_decision("r", "tool_a", "allow", "matched rule", {})
         lo.on_structured_validate("r", True, 1)
         lo.on_error("r", Exception("err"), {})
+        lo.on_prompt_compressed("r", 80_000, 5_000, 10)
 
     def test_logging_observer_integrates_with_agent(self, caplog: pytest.LogCaptureFixture) -> None:
         with caplog.at_level(logging.INFO, logger="selectools.observer"):
