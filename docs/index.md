@@ -219,7 +219,7 @@ Loop continues or returns AgentResult (.parsed, .trace, .reasoning)
 [:fontawesome-brands-python: PyPI Package](https://pypi.org/project/selectools/){ .md-button }
 [:fontawesome-brands-github: GitHub Repository](https://github.com/johnnichev/selectools){ .md-button }
 [:material-notebook: Getting Started Notebook](https://github.com/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb){ .md-button }
-[:material-code-tags: 51 Example Scripts](https://github.com/johnnichev/selectools/tree/main/examples){ .md-button }
+[:material-code-tags: 54 Example Scripts](https://github.com/johnnichev/selectools/tree/main/examples){ .md-button }
 
 ---
 
