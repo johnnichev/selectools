@@ -33,14 +33,17 @@ def failing_step(text: str) -> str:
     raise ValueError("boom")
 
 
-counter = {"calls": 0}
+def make_flaky(threshold: int = 3):
+    """Create a flaky function that succeeds after `threshold` calls."""
+    state = {"calls": 0}
 
+    def flaky(text: str) -> str:
+        state["calls"] += 1
+        if state["calls"] < threshold:
+            raise ValueError("not yet")
+        return text.upper()
 
-def flaky_step(text: str) -> str:
-    counter["calls"] += 1
-    if counter["calls"] < 3:
-        raise ValueError("not yet")
-    return text.upper()
+    return flaky
 
 
 # ---------------------------------------------------------------------------
@@ -245,8 +248,8 @@ class TestRetryAndErrors:
         assert result.output == "TEST!"
 
     def test_retry_succeeds(self):
-        counter["calls"] = 0
-        s = Step(flaky_step, retry=3)
+        flaky = make_flaky(threshold=3)
+        s = Step(flaky, retry=3)
         pipeline = Pipeline(steps=[s])
         result = pipeline.run("hello")
         assert result.output == "HELLO"
@@ -416,6 +419,70 @@ class TestGraphBridge:
         graph.add_node("process", pipeline, next_node=AgentGraph.END)
         result = graph.run("start")
         assert result.content == "HELLO WORLD!"
+
+
+# ---------------------------------------------------------------------------
+# Import from selectools
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# kwargs handling
+# ---------------------------------------------------------------------------
+
+
+class TestKwargsHandling:
+    def test_kwargs_passed_to_step_that_accepts_them(self):
+        """Steps that accept **kwargs receive pipeline-level kwargs."""
+
+        @step
+        def greet(name: str, **kwargs) -> str:
+            lang = kwargs.get("lang", "en")
+            return f"{'Hola' if lang == 'es' else 'Hello'} {name}"
+
+        pipeline = Pipeline(steps=[greet])
+        result = pipeline.run("World", lang="es")
+        assert result.output == "Hola World"
+
+    def test_kwargs_filtered_for_step_without_kwargs(self):
+        """Steps without **kwargs don't crash when pipeline has extra kwargs."""
+        pipeline = Step(upper) | Step(add_exclaim)
+        result = pipeline.run("hello", lang="es", verbose=True)
+        assert result.output == "HELLO!"
+
+    def test_kwargs_filtered_for_named_params(self):
+        """Steps receive only the kwargs they accept by name."""
+
+        def translate(text: str, lang: str = "en") -> str:
+            return f"[{lang}] {text}"
+
+        pipeline = Pipeline(steps=[Step(translate)])
+        result = pipeline.run("hello", lang="es", extra="ignored")
+        assert result.output == "[es] hello"
+
+    def test_kwargs_in_parallel(self):
+        """parallel() filters kwargs per child step."""
+
+        def with_kw(x: str, **kwargs) -> str:
+            return f"kw:{kwargs.get('tag', 'none')}"
+
+        def without_kw(x: str) -> str:
+            return "no_kw"
+
+        p = parallel(with_kw, without_kw)
+        result = p("input", tag="test")
+        assert result["with_kw"] == "kw:test"
+        assert result["without_kw"] == "no_kw"
+
+    def test_kwargs_in_branch(self):
+        """branch() filters kwargs for the selected target."""
+
+        def needs_lang(x: str, lang: str = "en") -> str:
+            return f"[{lang}]"
+
+        b = branch(router=lambda x: "a", a=needs_lang)
+        result = b("input", lang="fr")
+        assert result == "[fr]"
 
 
 # ---------------------------------------------------------------------------

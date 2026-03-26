@@ -30,10 +30,31 @@ Usage::
 from __future__ import annotations
 
 import asyncio
+import inspect
 import time
 from dataclasses import dataclass, field
 from functools import wraps
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+
+
+def _filter_kwargs(fn: Callable, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    """Return only the kwargs that *fn* accepts.
+
+    If *fn* has a ``**kwargs`` catch-all, all kwargs pass through.
+    Otherwise only named parameters present in the signature are forwarded.
+    """
+    if not kwargs:
+        return kwargs
+    try:
+        sig = inspect.signature(fn)
+    except (ValueError, TypeError):
+        return kwargs
+    has_var_keyword = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+    if has_var_keyword:
+        return kwargs
+    accepted = set(sig.parameters.keys())
+    return {k: v for k, v in kwargs.items() if k in accepted}
+
 
 # ---------------------------------------------------------------------------
 # Step — decorator that wraps a plain function
@@ -336,9 +357,10 @@ class Pipeline:
             result = s.run(current, **kwargs)
             return result.output
         fn = s.fn if isinstance(s, Step) else s
+        filtered = _filter_kwargs(fn, kwargs)
         if asyncio.iscoroutinefunction(fn):
-            return asyncio.run(fn(current, **kwargs))
-        return fn(current, **kwargs)
+            return asyncio.run(fn(current, **filtered))
+        return fn(current, **filtered)
 
     async def _aexecute_step(self, s: Any, current: Any, kwargs: Dict[str, Any]) -> Any:
         """Execute a single step asynchronously."""
@@ -346,9 +368,10 @@ class Pipeline:
             result = await s.arun(current, **kwargs)
             return result.output
         fn = s.fn if isinstance(s, Step) else s
+        filtered = _filter_kwargs(fn, kwargs)
         if asyncio.iscoroutinefunction(fn):
-            return await fn(current, **kwargs)
-        return fn(current, **kwargs)
+            return await fn(current, **filtered)
+        return fn(current, **filtered)
 
     def __repr__(self) -> str:  # noqa: D105
         names = [getattr(s, "name", type(s).__name__) for s in self._steps]
@@ -399,15 +422,17 @@ def parallel(*steps_or_fns: Union[Step, Callable]) -> Step:
         results = {}
         for s in wrapped:
             fn = s.fn if isinstance(s, Step) else s
-            results[s.name] = fn(input, **kwargs)
+            filtered = _filter_kwargs(fn, kwargs)
+            results[s.name] = fn(input, **filtered)
         return results
 
     async def _parallel_async(input: Any, **kwargs: Any) -> Dict[str, Any]:
         async def _run(s: Step) -> Tuple[str, Any]:
             fn = s.fn if isinstance(s, Step) else s
+            filtered = _filter_kwargs(fn, kwargs)
             if asyncio.iscoroutinefunction(fn):
-                return s.name, await fn(input, **kwargs)
-            return s.name, fn(input, **kwargs)
+                return s.name, await fn(input, **filtered)
+            return s.name, fn(input, **filtered)
 
         pairs = await asyncio.gather(*[_run(s) for s in wrapped])
         return dict(pairs)
@@ -474,7 +499,8 @@ def branch(
             )
 
         fn = target.fn if isinstance(target, Step) else target
-        return fn(input, **kwargs)
+        filtered = _filter_kwargs(fn, kwargs)
+        return fn(input, **filtered)
 
     branch_names = list(branches.keys())
     return Step(_branch_fn, name=f"branch({','.join(branch_names)})")
