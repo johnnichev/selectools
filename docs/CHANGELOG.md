@@ -5,7 +5,10 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.18.0] - 2026-03-25
+## [0.18.0b1] - 2026-03-26 (Beta)
+
+> Beta pre-release. Install with `pip install selectools==0.18.0b1`.
+> Regular `pip install selectools` stays on 0.17.7 until stable release.
 
 ### Added
 
