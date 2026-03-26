@@ -12,6 +12,7 @@
 5. [Module Dependencies](#module-dependencies)
 6. [Design Principles](#design-principles)
 7. [RAG Integration](#rag-integration)
+8. [Multi-Agent Orchestration](#multi-agent-orchestration)
 
 ---
 
@@ -25,7 +26,7 @@ Selectools is a production-ready Python framework for building AI agents with to
 - **Production-Ready**: Robust error handling, retry logic, timeouts, and validation
 - **RAG Support**: 4 embedding providers, 4 vector stores, document loaders
 - **Developer-Friendly**: Type hints, `@tool` decorator, automatic schema inference
-- **Observable**: `AgentObserver` + `AsyncAgentObserver` protocol (31 events with `run_id`), `LoggingObserver`, `SimpleStepObserver`, analytics, usage tracking, and cost monitoring (legacy hooks deprecated)
+- **Observable**: `AgentObserver` + `AsyncAgentObserver` protocol (44 events with `run_id`), `LoggingObserver`, `SimpleStepObserver`, analytics, usage tracking, and cost monitoring (legacy hooks deprecated)
 - **Native Tool Calling**: OpenAI, Anthropic, and Gemini native function calling APIs
 - **Streaming**: E2E token-level streaming with native tool call support via `Agent.astream`
 - **Parallel Execution**: Concurrent tool execution via `asyncio.gather` / `ThreadPoolExecutor`
@@ -46,6 +47,7 @@ Selectools is a production-ready Python framework for building AI agents with to
 - **Entity Memory**: Auto-extract named entities with LRU-pruned registry
 - **Knowledge Graph**: Relationship triple extraction and keyword-based querying
 - **Cross-Session Knowledge**: Daily logs + persistent facts with auto-registered `remember` tool
+- **Multi-Agent Orchestration**: Compose agents into directed graphs with routing, parallel execution, checkpointing, and human-in-the-loop support
 
 ---
 
@@ -333,7 +335,7 @@ Enforces typed responses from LLMs:
 
 Structured timeline of every agent execution:
 
-- `TraceStep` types: `llm_call`, `tool_selection`, `tool_execution`, `cache_hit`, `error`, `structured_retry`, `session_load`, `session_save`, `memory_summarize`, `entity_extraction`, `kg_extraction`
+- 27 `TraceStep` types including `llm_call`, `tool_selection`, `tool_execution`, `cache_hit`, `error`, `structured_retry`, `session_load`, `session_save`, `memory_summarize`, `entity_extraction`, `kg_extraction`, plus 10 graph-specific types (`graph_node_start`, `graph_node_end`, `graph_routing`, etc.)
 - Captures timestamps, durations, input/output summaries, token usage
 - `AgentTrace` container with `.to_dict()`, `.to_json()`, `.timeline()`, `.filter()`
 - Always populated on `result.trace` — zero cost when not accessed
@@ -360,7 +362,7 @@ Resilient provider orchestration:
 
 Class-based lifecycle observability:
 
-- 31 event methods with `run_id` correlation for concurrent requests
+- 44 event methods with `run_id` correlation for concurrent requests
 - `call_id` for matching parallel tool start/end pairs
 - `AsyncAgentObserver` provides async equivalents of all observer events
 - Built-in `LoggingObserver` for structured JSON log output
@@ -650,7 +652,7 @@ Single source of truth for 152 models:
 
 **Problem:** Black box behavior makes debugging hard.
 
-**Solution:** `AgentObserver` protocol (31 lifecycle events, `run_id` correlation):
+**Solution:** `AgentObserver` protocol (44 lifecycle events including 13 graph events, `run_id` correlation):
 
 - `on_run_start/end`, `on_iteration_start/end`
 - `on_tool_start/end/error/chunk`
@@ -882,6 +884,49 @@ print(cache.stats)  # CacheStats(hits=1, misses=1, ...)
 - `LocalProvider` for offline testing
 - `SELECTOOLS_BBOX_MOCK_JSON` for deterministic tool calls
 - Mock vector stores for RAG tests
+
+---
+
+## Multi-Agent Orchestration
+
+The orchestration layer (v0.18.0) enables composing multiple agents into directed graphs with automatic routing, parallel execution, and human-in-the-loop support.
+
+### Architecture
+
+```
+AgentGraph
+  ├── GraphState (shared context: messages, data, history, metadata, errors)
+  ├── GraphNode (wraps Agent or callable with ContextMode + transforms)
+  ├── Routing
+  │   ├── Static edges (add_edge)
+  │   ├── Conditional edges (add_conditional_edge + router function)
+  │   └── Scatter (dynamic parallel fan-out)
+  ├── ParallelGroupNode (asyncio.gather with MergePolicy)
+  ├── SubgraphNode (nested graph with input_map/output_map)
+  ├── CheckpointStore (InMemory, File, SQLite)
+  │   └── HITL: InterruptRequest → checkpoint → resume at yield point
+  └── Loop/Stall Detection (state hash tracking)
+
+SupervisorAgent (high-level wrapper)
+  ├── plan_and_execute (LLM generates JSON plan → sequential AgentGraph)
+  ├── round_robin (agents take turns, completion check)
+  ├── dynamic (LLM router selects agent per step)
+  └── magentic (Task Ledger + Progress Ledger + auto-replan)
+```
+
+### Key Design Decisions
+
+1. **Plain Python routing** — Router functions are plain `def route(state) -> str`. No compile step, no Pregel, no DSL.
+
+2. **Generator-node HITL** — Nodes that need human input are Python generators. `yield InterruptRequest(...)` pauses at the exact yield point. On resume, the graph injects the response via `gen.asend()`. This avoids LangGraph's documented foot-gun where the entire node re-executes on resume.
+
+3. **ContextMode prevents context explosion** — Each node declares how much conversation history it receives. `LAST_MESSAGE` (default) sends only the most recent user message, preventing unbounded token growth across long chains.
+
+4. **Agents are the primitives** — `AgentGraph` composes existing `Agent` instances. No new "graph agent" abstraction needed. Any callable `(GraphState) -> GraphState` also works as a node.
+
+### Trace Integration
+
+Graph execution produces 10 new `StepType` values (`graph_node_start`, `graph_node_end`, `graph_routing`, etc.) and fires 13 new observer events, fully integrated with the existing `AgentTrace` and `AgentObserver` infrastructure.
 
 ---
 

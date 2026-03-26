@@ -136,15 +136,16 @@ print(result.reasoning)       # Why the agent chose get_weather
 | **Entity Memory** | Auto-extract named entities with LRU-pruned registry and context injection |
 | **Knowledge Graph** | Relationship triple extraction with in-memory and SQLite storage |
 | **Cross-Session Knowledge** | Daily logs + persistent facts with auto-registered `remember` tool |
-| **AgentObserver Protocol** | 32-event lifecycle observer with run/call ID correlation, `SimpleStepObserver`, and OTel export |
+| **AgentObserver Protocol** | 45-event lifecycle observer with run/call ID correlation, `SimpleStepObserver`, and OTel export |
 | **Runtime Controls** | Token/cost budget limits, cooperative cancellation, per-tool approval gates, model switching per iteration |
 | **Reasoning Strategies** | Built-in ReAct, Chain-of-Thought, and Plan-Then-Act via `reasoning_strategy` config |
 | **Tool Result Caching** | `@tool(cacheable=True, cache_ttl=60)` — skip re-execution for identical tool calls |
 | **Semantic Cache** | `SemanticCache` — embedding-based cache hits for paraphrased queries via cosine similarity |
 | **Prompt Compression** | Proactive context-window management — summarises old messages when fill-rate exceeds threshold |
 | **Conversation Branching** | `memory.branch()` and `store.branch()` — fork history for A/B exploration and checkpointing |
+| **Multi-Agent Orchestration** | `AgentGraph` for directed graphs, `SupervisorAgent` with 4 strategies, HITL via generator nodes, parallel execution, 3 checkpoint backends |
 | **Eval Framework** | 39 built-in evaluators, A/B testing, regression detection, HTML reports, JUnit XML |
-| **2275 Tests** | Unit, integration, regression, and E2E |
+| **2397 Tests** | Unit, integration, regression, and E2E |
 
 ---
 
@@ -182,6 +183,10 @@ print(result.reasoning)       # Why the agent chose get_weather
     19. **[Knowledge Graph](modules/KNOWLEDGE_GRAPH.md)** — Relationship triple extraction
     20. **[Knowledge Memory](modules/KNOWLEDGE.md)** — Cross-session durable memory
 
+!!! abstract "Multi-Agent"
+    21. **[Orchestration](modules/ORCHESTRATION.md)** — Agent graphs, routing, parallel execution, HITL
+    22. **[Supervisor](modules/SUPERVISOR.md)** — 4 coordination strategies for multi-agent teams
+
 ---
 
 ## Architecture at a Glance
@@ -210,6 +215,12 @@ TOOL EXECUTION → parallel if multiple → OUTPUT SCREENING
 TRACE records step → AUDIT LOGGER writes JSONL → USAGE tracks costs
   ↓
 Loop continues or returns AgentResult (.parsed, .trace, .reasoning)
+
+Multi-Agent layer (optional):
+  AGENT_GRAPH → directed graph of agents with routing, parallel fan-out,
+                and checkpoint-backed state
+  SUPERVISOR  → coordinates agent teams via round-robin, priority,
+                adaptive, or LLM-based strategy selection
 ```
 
 ---
@@ -219,7 +230,7 @@ Loop continues or returns AgentResult (.parsed, .trace, .reasoning)
 [:fontawesome-brands-python: PyPI Package](https://pypi.org/project/selectools/){ .md-button }
 [:fontawesome-brands-github: GitHub Repository](https://github.com/johnnichev/selectools){ .md-button }
 [:material-notebook: Getting Started Notebook](https://github.com/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb){ .md-button }
-[:material-code-tags: 54 Example Scripts](https://github.com/johnnichev/selectools/tree/main/examples){ .md-button }
+[:material-code-tags: 61 Example Scripts](https://github.com/johnnichev/selectools/tree/main/examples){ .md-button }
 
 ---
 

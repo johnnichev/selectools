@@ -469,6 +469,133 @@ class AgentObserver:
     ) -> None:
         """Called when an eval suite finishes."""
 
+    # ------------------------------------------------------------------
+    # Graph orchestration events (v0.18.0)
+    # ------------------------------------------------------------------
+
+    def on_graph_start(
+        self,
+        run_id: str,
+        graph_name: str,
+        entry_node: str,
+        state: Dict[str, Any],
+    ) -> None:
+        """Called when an AgentGraph begins execution."""
+
+    def on_graph_end(
+        self,
+        run_id: str,
+        graph_name: str,
+        steps: int,
+        total_duration_ms: float,
+    ) -> None:
+        """Called when an AgentGraph completes execution."""
+
+    def on_graph_error(
+        self,
+        run_id: str,
+        graph_name: str,
+        node_name: str,
+        error: Exception,
+    ) -> None:
+        """Called when a graph execution encounters an unrecoverable error."""
+
+    def on_node_start(
+        self,
+        run_id: str,
+        node_name: str,
+        step: int,
+    ) -> None:
+        """Called before a graph node begins executing."""
+
+    def on_node_end(
+        self,
+        run_id: str,
+        node_name: str,
+        step: int,
+        duration_ms: float,
+    ) -> None:
+        """Called after a graph node completes successfully."""
+
+    def on_graph_routing(
+        self,
+        run_id: str,
+        from_node: str,
+        to_node: str,
+    ) -> None:
+        """Called after routing resolves the next node to execute."""
+
+    def on_graph_interrupt(
+        self,
+        run_id: str,
+        node_name: str,
+        interrupt_id: str,
+    ) -> None:
+        """Called when a generator node yields an InterruptRequest.
+
+        ``interrupt_id`` is the checkpoint ID to pass to ``graph.resume()``.
+        """
+
+    def on_graph_resume(
+        self,
+        run_id: str,
+        node_name: str,
+        interrupt_id: str,
+    ) -> None:
+        """Called when a graph resumes execution after an interrupt."""
+
+    def on_parallel_start(
+        self,
+        run_id: str,
+        group_name: str,
+        child_nodes: List[str],
+    ) -> None:
+        """Called before a ParallelGroupNode fans out to child nodes."""
+
+    def on_parallel_end(
+        self,
+        run_id: str,
+        group_name: str,
+        child_count: int,
+    ) -> None:
+        """Called after all parallel branches complete and state is merged."""
+
+    def on_stall_detected(
+        self,
+        run_id: str,
+        node_name: str,
+        stall_count: int,
+    ) -> None:
+        """Called when the graph detects a stall (unchanged state for stall_threshold steps).
+
+        Fires ``StepType.GRAPH_STALL`` in the trace. Use to trigger alerts
+        or custom recovery logic.
+        """
+
+    def on_loop_detected(
+        self,
+        run_id: str,
+        node_name: str,
+        loop_count: int,
+    ) -> None:
+        """Called when the graph detects a hard loop (same state hash repeated).
+
+        Fires ``StepType.GRAPH_LOOP_DETECTED`` in the trace. The graph
+        raises ``GraphExecutionError`` after this event.
+        """
+
+    def on_supervisor_replan(
+        self,
+        run_id: str,
+        stall_count: int,
+        new_plan: str,
+    ) -> None:
+        """Called when SupervisorAgent replans from scratch after max_stalls.
+
+        Only fires for SupervisorStrategy.MAGENTIC. ``new_plan`` is the
+        supervisor's new JSON plan after replanning.
+        """
+
 
 # ======================================================================
 # Built-in observers
@@ -778,6 +905,81 @@ class LoggingObserver(AgentObserver):
             after_tokens=after_tokens,
             messages_compressed=messages_compressed,
             tokens_saved=before_tokens - after_tokens,
+        )
+
+    def on_graph_start(
+        self, run_id: str, graph_name: str, entry_node: str, state: Dict[str, Any]
+    ) -> None:
+        self._emit("graph_start", run_id, graph_name=graph_name, entry_node=entry_node)
+
+    def on_graph_end(
+        self, run_id: str, graph_name: str, steps: int, total_duration_ms: float
+    ) -> None:
+        self._emit(
+            "graph_end",
+            run_id,
+            graph_name=graph_name,
+            steps=steps,
+            total_duration_ms=round(total_duration_ms, 2),
+        )
+
+    def on_graph_error(
+        self, run_id: str, graph_name: str, node_name: str, error: Exception
+    ) -> None:
+        self._emit(
+            "graph_error",
+            run_id,
+            graph_name=graph_name,
+            node_name=node_name,
+            error=str(error),
+            error_type=type(error).__name__,
+        )
+
+    def on_node_start(self, run_id: str, node_name: str, step: int) -> None:
+        self._emit("node_start", run_id, node_name=node_name, step=step)
+
+    def on_node_end(self, run_id: str, node_name: str, step: int, duration_ms: float) -> None:
+        self._emit(
+            "node_end",
+            run_id,
+            node_name=node_name,
+            step=step,
+            duration_ms=round(duration_ms, 2),
+        )
+
+    def on_graph_routing(self, run_id: str, from_node: str, to_node: str) -> None:
+        self._emit("graph_routing", run_id, from_node=from_node, to_node=to_node)
+
+    def on_graph_interrupt(self, run_id: str, node_name: str, interrupt_id: str) -> None:
+        self._emit("graph_interrupt", run_id, node_name=node_name, interrupt_id=interrupt_id)
+
+    def on_graph_resume(self, run_id: str, node_name: str, interrupt_id: str) -> None:
+        self._emit("graph_resume", run_id, node_name=node_name, interrupt_id=interrupt_id)
+
+    def on_parallel_start(self, run_id: str, group_name: str, child_nodes: List[str]) -> None:
+        self._emit(
+            "parallel_start",
+            run_id,
+            group_name=group_name,
+            child_nodes=child_nodes,
+            child_count=len(child_nodes),
+        )
+
+    def on_parallel_end(self, run_id: str, group_name: str, child_count: int) -> None:
+        self._emit("parallel_end", run_id, group_name=group_name, child_count=child_count)
+
+    def on_stall_detected(self, run_id: str, node_name: str, stall_count: int) -> None:
+        self._emit("stall_detected", run_id, node_name=node_name, stall_count=stall_count)
+
+    def on_loop_detected(self, run_id: str, node_name: str, loop_count: int) -> None:
+        self._emit("loop_detected", run_id, node_name=node_name, loop_count=loop_count)
+
+    def on_supervisor_replan(self, run_id: str, stall_count: int, new_plan: str) -> None:
+        self._emit(
+            "supervisor_replan",
+            run_id,
+            stall_count=stall_count,
+            plan_length=len(new_plan),
         )
 
     def on_eval_start(self, suite_name: str, total_cases: int, model: str) -> None:
@@ -1159,6 +1361,59 @@ class AsyncAgentObserver(AgentObserver):
     ) -> None:
         """Async counterpart of :meth:`on_prompt_compressed`."""
 
+    # ------------------------------------------------------------------
+    # Graph orchestration events (v0.18.0)
+    # ------------------------------------------------------------------
+
+    async def a_on_graph_start(
+        self, run_id: str, graph_name: str, entry_node: str, state: Dict[str, Any]
+    ) -> None:
+        """Async counterpart of :meth:`on_graph_start`."""
+
+    async def a_on_graph_end(
+        self, run_id: str, graph_name: str, steps: int, total_duration_ms: float
+    ) -> None:
+        """Async counterpart of :meth:`on_graph_end`."""
+
+    async def a_on_graph_error(
+        self, run_id: str, graph_name: str, node_name: str, error: Exception
+    ) -> None:
+        """Async counterpart of :meth:`on_graph_error`."""
+
+    async def a_on_node_start(self, run_id: str, node_name: str, step: int) -> None:
+        """Async counterpart of :meth:`on_node_start`."""
+
+    async def a_on_node_end(
+        self, run_id: str, node_name: str, step: int, duration_ms: float
+    ) -> None:
+        """Async counterpart of :meth:`on_node_end`."""
+
+    async def a_on_graph_routing(self, run_id: str, from_node: str, to_node: str) -> None:
+        """Async counterpart of :meth:`on_graph_routing`."""
+
+    async def a_on_graph_interrupt(self, run_id: str, node_name: str, interrupt_id: str) -> None:
+        """Async counterpart of :meth:`on_graph_interrupt`."""
+
+    async def a_on_graph_resume(self, run_id: str, node_name: str, interrupt_id: str) -> None:
+        """Async counterpart of :meth:`on_graph_resume`."""
+
+    async def a_on_parallel_start(
+        self, run_id: str, group_name: str, child_nodes: List[str]
+    ) -> None:
+        """Async counterpart of :meth:`on_parallel_start`."""
+
+    async def a_on_parallel_end(self, run_id: str, group_name: str, child_count: int) -> None:
+        """Async counterpart of :meth:`on_parallel_end`."""
+
+    async def a_on_stall_detected(self, run_id: str, node_name: str, stall_count: int) -> None:
+        """Async counterpart of :meth:`on_stall_detected`."""
+
+    async def a_on_loop_detected(self, run_id: str, node_name: str, loop_count: int) -> None:
+        """Async counterpart of :meth:`on_loop_detected`."""
+
+    async def a_on_supervisor_replan(self, run_id: str, stall_count: int, new_plan: str) -> None:
+        """Async counterpart of :meth:`on_supervisor_replan`."""
+
 
 # ======================================================================
 # Convenience observers
@@ -1370,6 +1625,51 @@ class SimpleStepObserver(AgentObserver):
             after_tokens=after_tokens,
             messages_compressed=messages_compressed,
         )
+
+    def on_graph_start(self, run_id, graph_name, entry_node, state):
+        self._cb(run_id, "graph_start", graph_name=graph_name, entry_node=entry_node)
+
+    def on_graph_end(self, run_id, graph_name, steps, total_duration_ms):
+        self._cb(
+            run_id,
+            "graph_end",
+            graph_name=graph_name,
+            steps=steps,
+            total_duration_ms=total_duration_ms,
+        )
+
+    def on_graph_error(self, run_id, graph_name, node_name, error):
+        self._cb(run_id, "graph_error", graph_name=graph_name, node_name=node_name, error=error)
+
+    def on_node_start(self, run_id, node_name, step):
+        self._cb(run_id, "node_start", node_name=node_name, step=step)
+
+    def on_node_end(self, run_id, node_name, step, duration_ms):
+        self._cb(run_id, "node_end", node_name=node_name, step=step, duration_ms=duration_ms)
+
+    def on_graph_routing(self, run_id, from_node, to_node):
+        self._cb(run_id, "graph_routing", from_node=from_node, to_node=to_node)
+
+    def on_graph_interrupt(self, run_id, node_name, interrupt_id):
+        self._cb(run_id, "graph_interrupt", node_name=node_name, interrupt_id=interrupt_id)
+
+    def on_graph_resume(self, run_id, node_name, interrupt_id):
+        self._cb(run_id, "graph_resume", node_name=node_name, interrupt_id=interrupt_id)
+
+    def on_parallel_start(self, run_id, group_name, child_nodes):
+        self._cb(run_id, "parallel_start", group_name=group_name, child_nodes=child_nodes)
+
+    def on_parallel_end(self, run_id, group_name, child_count):
+        self._cb(run_id, "parallel_end", group_name=group_name, child_count=child_count)
+
+    def on_stall_detected(self, run_id, node_name, stall_count):
+        self._cb(run_id, "stall_detected", node_name=node_name, stall_count=stall_count)
+
+    def on_loop_detected(self, run_id, node_name, loop_count):
+        self._cb(run_id, "loop_detected", node_name=node_name, loop_count=loop_count)
+
+    def on_supervisor_replan(self, run_id, stall_count, new_plan):
+        self._cb(run_id, "supervisor_replan", stall_count=stall_count, new_plan=new_plan)
 
     def on_eval_start(self, suite_name: str, total_cases: int, model: str) -> None:
         self._cb("eval_start", "", suite_name=suite_name, total_cases=total_cases, model=model)

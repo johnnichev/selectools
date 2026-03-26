@@ -62,8 +62,8 @@ src/selectools/
 ├── models.py                # 152 model registry with pricing (single source of truth)
 ├── pricing.py               # Derives pricing from models.py
 ├── usage.py                 # Token + cost tracking
-├── trace.py                 # AgentTrace, TraceStep (17 step types — see list below)
-├── observer.py              # AgentObserver (32 sync events) + AsyncAgentObserver (29 async events) + LoggingObserver + SimpleStepObserver
+├── trace.py                 # AgentTrace, TraceStep (27 step types — see list below)
+├── observer.py              # AgentObserver (45 sync events) + AsyncAgentObserver (42 async events) + LoggingObserver + SimpleStepObserver
 ├── policy.py                # ToolPolicy (allow/review/deny rules)
 ├── parser.py                # ToolCallParser (JSON extraction from LLM responses)
 ├── prompt.py                # PromptBuilder (system prompt generation)
@@ -93,8 +93,15 @@ src/selectools/
     ├── html.py              # Interactive HTML report
     ├── junit.py             # JUnit XML for CI
     └── __main__.py          # CLI: python -m selectools.evals
+├── orchestration/           # Multi-agent orchestration (v0.18.0)
+│   ├── __init__.py          # Public exports (30+ symbols)
+│   ├── state.py             # GraphState, MergePolicy, ContextMode, InterruptRequest, Scatter
+│   ├── node.py              # GraphNode, ParallelGroupNode, SubgraphNode
+│   ├── graph.py             # AgentGraph engine (~700 lines)
+│   ├── checkpoint.py        # CheckpointStore protocol + 3 backends
+│   └── supervisor.py        # SupervisorAgent with 4 strategies
 
-tests/                       # 2275 tests (unit, integration, regression, E2E)
+tests/                       # 2397 tests (unit, integration, regression, E2E)
 ├── agent/                   # Agent core tests
 ├── providers/               # Provider-specific tests
 ├── rag/                     # RAG pipeline tests
@@ -103,7 +110,7 @@ tests/                       # 2275 tests (unit, integration, regression, E2E)
 ├── core/                    # Framework-level tests
 └── test_*.py                # Module-level unit tests
 
-examples/                    # 54 numbered example scripts (01-54)
+examples/                    # 61 numbered example scripts (01-61)
 notebooks/getting_started.ipynb  # Interactive getting-started guide
 
 docs/                        # MkDocs Material documentation
@@ -276,6 +283,16 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 | `budget_exceeded` | v0.17.3 | Agent stopped due to token/cost budget limit |
 | `cancelled` | v0.17.3 | Agent run cancelled via CancellationToken |
 | `prompt_compressed` | v0.17.7 | Older history summarised to free context window |
+| `graph_node_start` | v0.18.0 | Graph node execution began |
+| `graph_node_end` | v0.18.0 | Graph node execution completed |
+| `graph_routing` | v0.18.0 | Graph router resolved next node |
+| `graph_checkpoint` | v0.18.0 | Graph state checkpointed |
+| `graph_interrupt` | v0.18.0 | Graph paused for human input |
+| `graph_resume` | v0.18.0 | Graph execution resumed from checkpoint |
+| `graph_parallel_start` | v0.18.0 | Parallel group execution began |
+| `graph_parallel_end` | v0.18.0 | Parallel group execution completed |
+| `graph_stall` | v0.18.0 | Graph state unchanged for N steps |
+| `graph_loop_detected` | v0.18.0 | Hard loop detected (same state hash) |
 
 ## Common Pitfalls (from past bugs)
 
@@ -333,10 +350,10 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 - **v0.17.5** ✅ Bug Hunt & Async Guardrails — 91 validated fixes, async guardrails, 40 regression tests
 - **v0.17.6** ✅ Quick Wins — ReAct/CoT reasoning strategies, tool result caching, Python 3.9–3.13 CI matrix
 - **v0.17.7** 🟡 Caching & Context — semantic caching, prompt compression, conversation branching
-- **v0.18.0** 🟡 Multi-Agent Orchestration — see `MULTI_AGENT_PLAN.md`
-- **v0.18.x** 🟡 Composability Layer — Pipeline with `@step` + `|` operator (LCEL alternative)
-- **v0.19.0** 🟡 Serve & Deploy — `selectools serve`, FastAPI/Flask, Docker/Helm, `selectools doctor`
-- **v0.19.x** 🟡 Enterprise Hardening — Apache-2.0, security audit, compliance, stability markers
+- **v0.18.0** ✅ Multi-Agent Orchestration — AgentGraph, SupervisorAgent, HITL, checkpointing, parallel execution
+- **v0.18.x** 🟡 Composability Layer — Pipeline + `@step` + `|` operator + tool composition (LCEL answer)
+- **v0.19.0** 🟡 Serve & Deploy — Structured AgentConfig, `selectools serve`, FastAPI/Flask, YAML config, templates, playground
+- **v0.19.x** 🟡 Enterprise Hardening — security audit, stability markers, Postgres checkpoint, deprecation policy
 - **v0.20.0** 🟡 Advanced Agent Patterns — PlanAndExecute, ReflectiveAgent, Debate, TeamLead, 50+ evaluators
-- **v0.20.x** 🟡 Connector Expansion + Performance — Qdrant, pgvector, FAISS, Bedrock, Azure, benchmarks
-- **v0.21.0** 🟡 Polish & Community — playground, migration guide, cookbook, tool marketplace
+- **v0.20.x** 🟡 Connector Expansion — Bedrock, Azure, FAISS, Qdrant, pgvector, CSV/JSON/HTML loaders, benchmarks
+- **v0.21.0** 🟡 Polish & Community — tool marketplace, visual builder, trace viewer, migration guide, cookbook

@@ -12,273 +12,57 @@ An open-source project from [NichevLabs](https://nichevlabs.com).
 
 ---
 
-## v0.16.0: Memory & Persistence
+v0.17.0 ✅ Eval Framework
+39 evaluators → A/B testing → snapshots → regression → HTML/JUnit → CI → templates
 
-Focus: Durable conversation state, cross-session knowledge, and advanced memory strategies.
+v0.17.1 ✅ MCP Client/Server
+MCPClient → mcp_tools() → MCPServer → MultiMCPClient → tool interop
 
-### Persistent Conversation Sessions
+v0.17.3 ✅ Agent Runtime Controls
+Token budget → Cancellation → Cost attribution → Structured results → Approval gate → SimpleStepObserver
 
-**Problem**: `ConversationMemory` is in-memory only. Process restarts lose all history. Chat applications need sessions that survive restarts.
+v0.17.4 ✅ Agent Intelligence
+Token estimation → Model switching → Knowledge memory enhancement (4 store backends)
 
-**What it does**: `SessionStore` protocol with pluggable backends. Sessions auto-persist after each turn with TTL-based expiry.
+v0.17.5 ✅ Bug Hunt & Async Guardrails
+91 validated fixes (13 critical, 26 high, 52 medium+low) → Async guardrails
+→ 40 regression tests → 5 new Common Pitfalls
 
-**API**:
+v0.17.6 ✅ Quick Wins
+ReAct/CoT reasoning strategies → Tool result caching → Python 3.9–3.13 CI matrix
 
-```python
-from selectools.memory import JsonFileSessionStore
+v0.17.7 ✅ Caching & Context
+Semantic caching → Prompt compression → Conversation branching
+(55 tests, 3 examples)
 
-store = JsonFileSessionStore(directory="./sessions")
-agent = Agent(
-    tools=[...], provider=provider,
-    config=AgentConfig(session_store=store, session_id="user-123"),
-)
-result = agent.ask("What was my last question?")  # auto-persisted
-```
+v0.18.0 ✅ Multi-Agent Orchestration
+AgentGraph → GraphState → Typed reducers → Resume-from-yield interrupts
+→ Scatter fan-out → Checkpointing → SupervisorAgent → Graph visualization
 
-**Scope**:
+v0.18.x 🟡 Composability Layer
+Pipeline → @step decorator → | operator → parallel/branch/retry
+→ Tool composition (@compose) → Type-safe composition (LCEL answer)
 
-- `SessionStore` protocol: `save()`, `load()`, `list()`, `delete()`
-- Three backends: JSON file, SQLite, Redis
-- Auto-save after each turn
-- TTL-based expiry
-- Tool-pair-preserving trim on load
+v0.19.0 🟡 Serve & Deploy
+Structured AgentConfig refactor (41 fields → nested dataclasses)
+→ selectools serve CLI → FastAPI AgentRouter → Flask AgentBlueprint
+→ Playground UI → YAML agent config → Agent templates (5 built-in)
 
-**Touches**: New `sessions.py`, `AgentConfig`, `agent/core.py`.
+v0.19.x 🟡 Enterprise Hardening
+Security audit → Stability markers (Production/Stable)
+→ Deprecation policy → Compatibility matrix → Postgres checkpoint backend
 
-### Summarize-on-Trim
+v0.20.0 🟡 Advanced Agent Patterns
+PlanAndExecute → ReflectiveAgent → Debate → TeamLead
+→ 50+ evaluators (semantic similarity, rubric, multi-turn coherence)
 
-**Problem**: Old messages are silently dropped when history exceeds limits. Important early context is lost.
+v0.20.x 🟡 Connector Expansion + Performance
+AWS Bedrock provider → Azure OpenAI → FAISS → Qdrant → pgvector
+→ CSV/JSON/HTML/URL loaders → Published benchmarks
 
-**What it does**: Before trimming, summarize the messages being removed and inject the summary as a system-level context message.
-
-**API**:
-
-```python
-memory = ConversationMemory(
-    max_messages=30,
-    summarize_on_trim=True,
-    summarize_provider=provider,
-)
-```
-
-**Scope**:
-
-- LLM-generated 2-3 sentence summary of trimmed messages
-- Summary injected as system message at conversation start
-- Configurable summary model (use a cheap model like Haiku)
-
-**Touches**: `memory.py`, provider integration.
-
-### Entity Memory
-
-**Problem**: The agent can't track entities (people, orgs, projects) mentioned across turns. Each turn starts with no entity context.
-
-**What it does**: Automatically extract named entities from conversation, maintain an entity registry, and inject relevant entity context into prompts.
-
-**API**:
-
-```python
-from selectools.memory import EntityMemory
-
-memory = EntityMemory(provider=provider)
-agent = Agent(tools=[...], provider=provider, memory=memory)
-
-agent.ask("I'm working with Alice from Acme Corp on Project Alpha")
-agent.ask("What project am I working on?")
-# Agent knows: Alice (person, Acme Corp), Acme Corp (org), Project Alpha (project)
-```
-
-**Scope**:
-
-- LLM-based entity extraction after each turn
-- Entity types: person, organization, project, location, date, custom
-- Entity registry: name → type, attributes, last mentioned
-- System prompt injection of relevant entities
-- Configurable: extraction model, max entities, relevance window
-
-**Touches**: New `entity_memory.py`, `PromptBuilder` integration.
-
-### Knowledge Graph Memory
-
-**Problem**: Entity memory tracks individual entities but not relationships between them. "Alice manages Project Alpha" is lost.
-
-**What it does**: Build a graph of (subject, relation, object) triples from conversations. Query the graph to inject relevant relationship context into prompts.
-
-**API**:
-
-```python
-from selectools.memory import KnowledgeGraphMemory
-
-memory = KnowledgeGraphMemory(provider=provider, storage="sqlite")
-agent = Agent(tools=[...], provider=provider, memory=memory)
-
-agent.ask("Alice manages Project Alpha and reports to Bob")
-# Graph: (Alice, manages, Project Alpha), (Alice, reports_to, Bob)
-
-agent.ask("Who manages Project Alpha?")
-# Relevant triples injected: (Alice, manages, Project Alpha)
-```
-
-**Scope**:
-
-- LLM-based triple extraction
-- Storage: in-memory dict (default), SQLite (persistent)
-- Query: retrieve triples relevant to current query via keyword + embedding match
-- System prompt injection of relevant triples
-- Graph operations: add, query, merge, prune
-
-**Touches**: New `knowledge_graph.py`, storage backend, `PromptBuilder`.
-
-### Cross-Session Knowledge Memory
-
-**Problem**: Even with persistent sessions, each session is isolated. There's no way for an agent to "remember" facts across conversations (e.g., user preferences, prior decisions).
-
-**What it does**: A file-based or DB-backed knowledge memory with two layers: a daily log (append-only entries from the current day) and a long-term store (curated facts that persist indefinitely). A built-in `remember` tool lets the agent save facts explicitly. Relevant memories are auto-injected into the system prompt.
-
-**API**:
-
-```python
-from selectools.memory import KnowledgeMemory
-
-knowledge = KnowledgeMemory(
-    directory="./workspace",
-    recent_days=2,           # inject last 2 days into system prompt
-    max_context_chars=5000,  # cap memory injection size
-)
-
-agent = Agent(
-    tools=[...],
-    provider=provider,
-    config=AgentConfig(knowledge_memory=knowledge),
-)
-```
-
-**Scope**:
-
-- Daily log files (`memory/YYYY-MM-DD.md`) + persistent `MEMORY.md`
-- Built-in `remember` tool: agent can save categorized facts
-- System prompt auto-injection of recent and long-term memories
-- Configurable retention and context window
-
-**Touches**: New `knowledge.py` module, `PromptBuilder` integration, built-in tool in `toolbox/`.
-
-| Feature                              | Priority  | Impact | Effort |
-| ------------------------------------ | --------- | ------ | ------ |
-| **Persistent Conversation Sessions** | ✅ Done   | High   | Medium |
-| **Summarize-on-Trim**                | ✅ Done   | Medium | Small  |
-| **Cross-Session Knowledge Memory**   | ✅ Done   | Medium | Medium |
-| **Entity Memory**                    | ✅ Done   | High   | Medium |
-| **Knowledge Graph Memory**           | ✅ Done   | High   | Large  |
-
----
-
-## Implementation Order
-
-```
-v0.13.0  ✅ Structured Output + Safety Foundation (Complete)
-         Tool-pair trimming → Structured output → Execution traces → Reasoning
-         → Fallback providers → Batch → Tool policy → Human-in-the-loop
-
-v0.14.0  ✅ AgentObserver Protocol + Production Hardening (Complete)
-         AgentObserver (15 events) → LoggingObserver → OTel export
-         → Model registry (145 models) → max_completion_tokens fix → 11 bug fixes
-
-v0.14.1  ✅ Streaming & Provider Fixes (Complete)
-         13 streaming bug fixes → 141 new tests → Unit tests for 6 untested modules
-
-v0.15.0  ✅ Enterprise Reliability (Complete)
-         Guardrails engine → Audit logging → Tool output screening → Coherence checking
-
-v0.16.0  ✅ Memory & Persistence (Complete)
-         Sessions → Summarize-on-trim → Knowledge memory → Entity memory → KG memory
-
-v0.16.5  ✅ Design Patterns & Code Quality
-         StepType/ModelType enums → Agent mixin split → Provider base class → Terminal actions
-         → Async observers → Gemini 3.x thought signatures → Hooks deprecation → ADRs
-
-v0.17.0  ✅ Eval Framework
-         39 evaluators → A/B testing → snapshots → regression → HTML/JUnit → CI → templates
-
-v0.17.1  ✅ MCP Client/Server
-         MCPClient → mcp_tools() → MCPServer → MultiMCPClient → tool interop
-
-v0.17.3  ✅ Agent Runtime Controls
-         Token budget → Cancellation → Cost attribution → Structured results → Approval gate → SimpleStepObserver
-
-v0.17.4  ✅ Agent Intelligence
-         Token estimation → Model switching → Knowledge memory enhancement (4 store backends)
-
-v0.17.5  ✅ Bug Hunt & Async Guardrails
-         91 validated fixes (13 critical, 26 high, 52 medium+low) → Async guardrails
-         → 40 regression tests → 5 new Common Pitfalls
-
-v0.17.6  ✅ Quick Wins
-         ReAct/CoT reasoning strategies → Tool result caching → Python 3.9–3.13 CI matrix
-
-v0.17.7  ✅ Caching & Context
-         Semantic caching → Prompt compression → Conversation branching
-         (55 tests, 3 examples)
-
-v0.18.0  🟡 Multi-Agent Orchestration
-         AgentGraph → GraphState → Typed reducers → Resume-from-yield interrupts
-         → Scatter fan-out → Checkpointing → SupervisorAgent → Graph visualization
-
-v0.18.x  🟡 Composability Layer
-         Pipeline primitives → @step decorator → | operator chaining → parallel/branch/retry
-         → Type-safe composition (LCEL alternative)
-
-v0.19.0  🟡 Serve & Deploy
-         selectools serve CLI → FastAPI AgentRouter → Flask AgentBlueprint
-         → Playground UI → Docker/Helm templates → selectools doctor CLI
-
-v0.19.x  🟡 Enterprise Hardening
-         Apache-2.0 license → Security audit → Stability markers (Production/Stable)
-         → Compliance features → Deprecation policy → Compatibility matrix
-
-v0.20.0  🟡 Advanced Agent Patterns
-         PlanAndExecute → ReflectiveAgent → Debate → TeamLead
-         → 50+ evaluators (semantic similarity, rubric, multi-turn coherence)
-
-v0.20.x  🟡 Connector Expansion + Performance
-         Qdrant → pgvector → FAISS → Bedrock → Azure OpenAI
-         → Confluence/GitHub/Notion/Slack loaders → Published benchmarks
-
-v0.21.0  🟡 Polish & Community
-         HTML trace viewer → Interactive playground → Tool marketplace
-         → LangChain migration guide → Cookbook
-```
-
----
-
-## v0.16.5: Design Patterns & Code Quality ✅
-
-Focus: Structural refactoring to prevent the class of bugs found in v0.16.0–v0.16.4 and prepare a clean foundation for v0.17.0 multi-agent orchestration.
-
-### Highlights
-
-- **Agent decomposed into 4 mixins** — `core.py` 3128→1448 lines (-54%)
-- **StepType + ModelType** converted to `str, Enum` for type safety
-- **Terminal actions** — `@tool(terminal=True)` and `stop_condition` callback
-- **AsyncAgentObserver** — async lifecycle hooks with `blocking` flag
-- **Gemini 3.x thought signatures** — `ToolCall.thought_signature` field
-- **Hooks deprecated** — wrapped via `_HooksAdapter`, single observer pipeline
-- **OpenAI/Ollama share base class** — Template Method pattern (-75% duplication)
-- **163 new tests** (total: 1640), 53 architecture fitness tests
-- **6 ADRs** in `docs/decisions/`
-
-See [CHANGELOG](CHANGELOG.md) for full details.
-
----
-
-## v0.16.6: Gemini thought_signature crash fix ✅
-
-Fixed `UnicodeDecodeError` when Gemini 3.x returns non-UTF-8 binary `thought_signature`. Replaced UTF-8 encode/decode with base64 across all 5 affected locations. 2 new regression tests (total: 1642).
-
----
-
-## v0.16.7: Cleanup ✅
-
-Removed unused CLI module (`cli.py` + console script entry point). Completed README example table (28-38). Fixed stale counts across CONTRIBUTING.md, ARCHITECTURE.md, QUICKSTART.md, AGENT.md. Total: 1620 tests.
+v0.21.0 🟡 Polish & Community
+Tool marketplace → Visual agent builder → Enhanced trace viewer
+→ LangChain migration guide → Cookbook → Documentation generation
 
 ---
 
@@ -330,19 +114,19 @@ src/selectools/evals/
 
 Every team building agents needs evaluation. Today they either build it from scratch or pay for a SaaS product. Selectools ships it as a library — zero dependencies, runs in your test suite, produces structured reports.
 
-| Feature | Status | Impact | Effort |
-|---|---|---|---|
-| **EvalSuite + TestCase** | ✅ Done | High | Medium |
-| **Built-in Evaluators (39)** | ✅ Done | High | Medium |
-| **EvalReport** | ✅ Done | Medium | Small |
-| **Dataset Loader (JSON/YAML)** | ✅ Done | Medium | Small |
-| **Regression Detection** | ✅ Done | High | Medium |
-| **HTML Report Export** | ✅ Done | Medium | Small |
-| **JUnit XML for CI** | ✅ Done | Medium | Small |
-| **Pairwise A/B eval** | ✅ Done | Medium | Small |
-| **Snapshot testing** | ✅ Done | Medium | Small |
-| **Live eval dashboard** | ✅ Done | Medium | Medium |
-| **SVG badge generator** | ✅ Done | Low | Small |
+| Feature                        | Status  | Impact | Effort |
+| ------------------------------ | ------- | ------ | ------ |
+| **EvalSuite + TestCase**       | ✅ Done | High   | Medium |
+| **Built-in Evaluators (39)**   | ✅ Done | High   | Medium |
+| **EvalReport**                 | ✅ Done | Medium | Small  |
+| **Dataset Loader (JSON/YAML)** | ✅ Done | Medium | Small  |
+| **Regression Detection**       | ✅ Done | High   | Medium |
+| **HTML Report Export**         | ✅ Done | Medium | Small  |
+| **JUnit XML for CI**           | ✅ Done | Medium | Small  |
+| **Pairwise A/B eval**          | ✅ Done | Medium | Small  |
+| **Snapshot testing**           | ✅ Done | Medium | Small  |
+| **Live eval dashboard**        | ✅ Done | Medium | Medium |
+| **SVG badge generator**        | ✅ Done | Low    | Small  |
 
 ---
 
@@ -378,12 +162,12 @@ server.serve(host="0.0.0.0", port=8080)
 
 First-class MCP support lets Selectools agents use any MCP-compatible tool server — massive integration surface area without building individual connectors.
 
-| Feature | Status | Impact | Effort |
-|---|---|---|---|
-| **MCPClient** | ✅ Done | High | Medium |
-| **mcp_tools() adapter** | ✅ Done | High | Small |
-| **MCPServer** | ✅ Done | Medium | Medium |
-| **MultiMCPClient** | ✅ Done | Medium | Small |
+| Feature                 | Status  | Impact | Effort |
+| ----------------------- | ------- | ------ | ------ |
+| **MCPClient**           | ✅ Done | High   | Medium |
+| **mcp_tools() adapter** | ✅ Done | High   | Small  |
+| **MCPServer**           | ✅ Done | Medium | Medium |
+| **MultiMCPClient**      | ✅ Done | Medium | Small  |
 
 ---
 
@@ -435,15 +219,17 @@ branch_result = branch_agent.run("...")    # explore without affecting main
 session_store.branch(source_id="conv-123", new_id="conv-123-alt")
 ```
 
-| Feature | Status | Impact | Effort |
-|---|---|---|---|
-| **SemanticCache** | 🟡 High | High | Medium |
-| **Prompt compression** | 🟡 High | Medium | Medium |
-| **Conversation branching** | 🟡 Medium | Medium | Small |
+| Feature                    | Status    | Impact | Effort |
+| -------------------------- | --------- | ------ | ------ |
+| **SemanticCache**          | 🟡 High   | High   | Medium |
+| **Prompt compression**     | 🟡 High   | Medium | Medium |
+| **Conversation branching** | 🟡 Medium | Medium | Small  |
 
 ---
 
-## v0.18.0: Multi-Agent Orchestration 🟡
+## v0.18.0: Multi-Agent Orchestration ✅
+
+**Status: ✅ Implemented in v0.18.0**
 
 Focus: DAG-based multi-agent workflows that are simpler and more Pythonic than LangGraph.
 
@@ -518,10 +304,89 @@ result = graph.run("Write a blog post about AI agents")
 
 | Feature                     | Status    | Impact | Effort |
 | --------------------------- | --------- | ------ | ------ |
-| **AgentGraph + GraphState** | 🟡 High   | High   | Large  |
-| **Checkpointing**           | 🟡 High   | High   | Medium |
-| **Parallel Nodes**          | 🟡 Medium | High   | Medium |
-| **SupervisorAgent**         | 🟡 Medium | High   | Medium |
+| **AgentGraph + GraphState** | ✅ High   | High   | Large  |
+| **Checkpointing**           | ✅ High   | High   | Medium |
+| **Parallel Nodes**          | ✅ Medium | High   | Medium |
+| **SupervisorAgent**         | ✅ Medium | High   | Medium |
+
+---
+
+## v0.18.x: Composability Layer 🟡
+
+Focus: Give selectools a composable pipeline abstraction — the answer to LangChain's LCEL. Lets users chain agents, tools, and transforms with the `|` operator.
+
+### Pipeline + @step Decorator
+
+```python
+from selectools import Pipeline, step
+
+@step
+def summarize(text: str) -> str:
+    """Summarize input text."""
+    return agent.run(f"Summarize: {text}").content
+
+@step
+def translate(text: str, lang: str = "es") -> str:
+    """Translate text to target language."""
+    return agent.run(f"Translate to {lang}: {text}").content
+
+# Compose with | operator
+pipeline = summarize | translate
+result = pipeline.run("Long article text here...")
+
+# Or build programmatically
+pipeline = Pipeline(steps=[summarize, translate])
+result = pipeline.run(input_data)
+```
+
+### Tool Composition
+
+```python
+from selectools import tool, compose
+
+@tool()
+def fetch_data(url: str) -> str: ...
+
+@tool()
+def parse_json(text: str) -> dict: ...
+
+@tool()
+def extract_field(data: dict, field: str) -> str: ...
+
+# Chain tools into a single composite tool
+fetch_and_extract = compose(fetch_data, parse_json, extract_field)
+agent = Agent(tools=[fetch_and_extract], ...)
+```
+
+### Parallel & Branch Primitives
+
+```python
+from selectools import Pipeline, parallel, branch
+
+# Fan-out to multiple steps, merge results
+research = parallel(search_web, search_docs, search_db)
+
+# Conditional branching
+route = branch(
+    lambda x: "technical" if "code" in x else "general",
+    technical=code_review_pipeline,
+    general=summarize_pipeline,
+)
+
+full_pipeline = research | route | final_review
+```
+
+### Key Differentiator
+
+LangChain's LCEL is powerful but opaque — debugging `chain.invoke()` requires understanding Runnable internals. Selectools pipelines are plain Python: each `@step` is a function, `|` is sugar for sequential composition, and every step produces a trace entry.
+
+| Feature | Status | Impact | Effort |
+| --- | --- | --- | --- |
+| **Pipeline + @step** | 🟡 High | High | Medium |
+| **\| operator** | 🟡 High | High | Small |
+| **Tool composition (@compose)** | 🟡 High | Medium | Small |
+| **parallel() / branch()** | 🟡 Medium | Medium | Medium |
+| **Type-safe step chaining** | 🟡 Medium | Medium | Medium |
 
 ---
 
@@ -638,15 +503,142 @@ Built-in: `InMemoryTraceStore`, `SQLiteTraceStore`, `JSONLTraceStore`.
 
 Export formats: HTML (self-contained report), CSV, Datadog APM, Langfuse, OTel.
 
-| Feature                     | Status    | Impact | Effort |
-| --------------------------- | --------- | ------ | ------ |
-| **FastAPI AgentRouter**     | 🟡 High   | High   | Medium |
-| **Flask AgentBlueprint**    | 🟡 Medium | Medium | Small  |
-| **Playground**              | 🟡 Medium | High   | Medium |
-| **Trace Store**             | 🟡 High   | High   | Medium |
-| **HTML Trace Export**       | 🟡 Medium | High   | Medium |
-| **Agent Templates**         | 🟡 Medium | Medium | Small  |
-| **YAML Config**             | 🟡 Low    | Medium | Small  |
+| Feature                  | Status    | Impact | Effort |
+| ------------------------ | --------- | ------ | ------ |
+| **FastAPI AgentRouter**  | 🟡 High   | High   | Medium |
+| **Flask AgentBlueprint** | 🟡 Medium | Medium | Small  |
+| **Playground**           | 🟡 Medium | High   | Medium |
+| **Trace Store**          | 🟡 High   | High   | Medium |
+| **HTML Trace Export**    | 🟡 Medium | High   | Medium |
+| **Agent Templates**      | 🟡 Medium | Medium | Small  |
+| **YAML Config**          | 🟡 Low    | Medium | Small  |
+
+---
+
+## v0.19.x: Enterprise Hardening 🟡
+
+Focus: Production readiness signals that enterprise teams require before adopting a framework.
+
+### Security Audit
+
+- Dependency vulnerability scan (Snyk/Safety)
+- Code audit for OWASP Top 10 in all provider/tool paths
+- Bandit scan clean (currently uses `# nosec` annotations — verify each one)
+- Document security model: what's trusted, what's validated, what's user-controlled
+
+### Stability Markers
+
+```python
+# Module-level stability markers
+__stability__ = "stable"      # agent, types, trace, observer
+__stability__ = "beta"        # orchestration, evals, mcp
+__stability__ = "alpha"       # serve (v0.19.0), pipeline (v0.18.x)
+```
+
+Documented in each module's docstring. Public API surface frozen for `stable` modules — breaking changes require a major version bump.
+
+### Postgres Checkpoint Backend
+
+```python
+from selectools.orchestration import PostgresCheckpointStore
+
+store = PostgresCheckpointStore(dsn="postgresql://user:pass@host/db")
+result = graph.run("...", checkpoint_store=store)
+```
+
+Closes the gap vs LangGraph's `PostgresSaver`. Uses `asyncpg` (optional dependency).
+
+### Additional Items
+
+- Deprecation policy: 2-version warning before removal
+- Compatibility matrix: Python 3.9-3.13, provider SDK versions
+- SBOM generation for compliance teams
+
+| Feature | Status | Impact | Effort |
+| --- | --- | --- | --- |
+| **Security audit** | 🟡 High | High | Medium |
+| **Stability markers** | 🟡 High | Medium | Small |
+| **Postgres checkpoint** | 🟡 High | High | Medium |
+| **Deprecation policy** | 🟡 Medium | Medium | Small |
+| **Compatibility matrix** | 🟡 Medium | Medium | Small |
+
+---
+
+## v0.20.0: Advanced Agent Patterns 🟡
+
+Focus: Higher-level agent architectures built on the v0.18.0 orchestration primitives. Each pattern is a pre-built `AgentGraph` topology.
+
+### PlanAndExecute Agent
+
+```python
+from selectools.patterns import PlanAndExecuteAgent
+
+agent = PlanAndExecuteAgent(
+    planner=planner_agent,
+    executors={"research": researcher, "write": writer, "review": reviewer},
+    provider=provider,
+)
+result = agent.run("Write a technical blog post about vector databases")
+# Planner creates structured plan → executors handle each step → result aggregated
+```
+
+### ReflectiveAgent
+
+```python
+from selectools.patterns import ReflectiveAgent
+
+agent = ReflectiveAgent(
+    actor=writer_agent,
+    critic=reviewer_agent,
+    max_reflections=3,
+)
+result = agent.run("Draft a press release")
+# Actor produces draft → Critic evaluates → Actor revises → repeat until satisfied
+```
+
+### Debate Pattern
+
+```python
+from selectools.patterns import DebateAgent
+
+agent = DebateAgent(
+    agents={"optimist": optimist_agent, "skeptic": skeptic_agent},
+    judge=judge_agent,
+    max_rounds=3,
+)
+result = agent.run("Should we adopt microservices?")
+# Agents argue positions → Judge synthesizes final answer
+```
+
+### TeamLead Pattern
+
+```python
+from selectools.patterns import TeamLeadAgent
+
+agent = TeamLeadAgent(
+    lead=lead_agent,
+    team={"analyst": analyst, "engineer": engineer, "writer": writer},
+    delegation_strategy="dynamic",
+)
+result = agent.run("Investigate and fix the billing discrepancy")
+# Lead delegates tasks, reviews work, coordinates handoffs
+```
+
+### Expanded Eval Suite (50+ evaluators)
+
+- Semantic similarity (embedding-based)
+- Multi-turn coherence (conversation-level)
+- Custom rubric scoring
+- Agent trajectory evaluation (did the agent follow the right path?)
+- Tool efficiency (did the agent use the minimum tools needed?)
+
+| Feature | Status | Impact | Effort |
+| --- | --- | --- | --- |
+| **PlanAndExecute** | 🟡 High | High | Medium |
+| **ReflectiveAgent** | 🟡 High | High | Medium |
+| **Debate** | 🟡 Medium | Medium | Medium |
+| **TeamLead** | 🟡 Medium | Medium | Medium |
+| **50+ evaluators** | 🟡 Medium | High | Large |
 
 ---
 
@@ -787,166 +779,8 @@ Focus: Niche integrations, community sharing, and developer experience polish.
 
 ## Backlog (Unscheduled)
 
-| Feature                    | Notes                                            |
-| -------------------------- | ------------------------------------------------ |
-| Tool Composition           | `@compose` decorator for chaining tools          |
-| Universal Vision Support   | Unified vision API across providers              |
-| AWS Bedrock Provider       | VPC-native model access (Claude, Llama, Mistral) |
-| Rate Limiting & Quotas     | Per-tool and per-user quotas                     |
-| Structured AgentConfig     | Group 41 fields into nested dataclasses (RetryConfig, CoherenceConfig, etc.) with backward compat |
-| Enhanced Testing Framework | Snapshot testing, load tests                     |
-| Documentation Generation   | Auto-generate docs from tool definitions         |
-| Prompt Optimization        | Automatic prompt compression                     |
-| CRM & Business Tools       | HubSpot, Salesforce integrations                 |
-
----
-
-## Release History
-
-### v0.17.6 - Quick Wins
-
-- ✅ **Reasoning Strategies**: `AgentConfig(reasoning_strategy="react"/"cot"/"plan_then_act")` injects structured reasoning instructions into system prompt; `REASONING_STRATEGIES` dict exported
-- ✅ **Tool Result Caching**: `@tool(cacheable=True, cache_ttl=300)` caches tool results by name + args in existing `config.cache`; wired into all 4 execution paths; `StepType.CACHE_HIT` recorded on hit
-- ✅ **Python 3.9–3.13 CI Matrix**: GitHub Actions strategy matrix; zero compat issues
-- ✅ **Provider defaults updated**: Anthropic → `claude-sonnet-4-6`, Gemini → `gemini-3-flash-preview`, OpenAI → `gpt-5-mini`; `AgentConfig.model` default → `gpt-5-mini`
-- ✅ **Model registry: 152 models** (added `gpt-5.4-mini`, `gpt-5.4-nano`, `claude-opus-4`, `claude-sonnet-4`, `claude-opus-4-1`, `gemini-3.1-flash-image-preview`)
-- ✅ **37 new tests** (total: 2220)
-
-### v0.17.5 - Bug Hunt & Async Guardrails
-
-- ✅ **91 validated bug fixes** (13 critical, 26 high, 52 medium+low): FallbackProvider stream success recording, async guardrail blocking, `astream()` prompt leak, model reference consistency, datetime deprecation, and more
-- ✅ **Async guardrails**: `Guardrail.acheck()` with executor fallback; `GuardrailsPipeline.acheck_input()/acheck_output()`; `arun()`/`astream()` use async paths
-- ✅ **5 new Common Pitfalls** (#14–#18) documented in CLAUDE.md
-- ✅ **40 regression tests** (total: 2183)
-
-### v0.17.4 - Agent Intelligence
-
-- ✅ **Token Estimation**: `estimate_tokens()`, `estimate_run_tokens()`, `TokenEstimate` — pre-flight cost/token prediction without calling the LLM
-- ✅ **Model Switching**: `AgentConfig(model_selector=fn)` — per-iteration model selection callback; `on_model_switch` observer event
-- ✅ **Knowledge Memory Enhancement**: `KnowledgeMemory` now supports 4 store backends (File, SQLite, Redis, Supabase); `SQLiteKnowledgeStore`, `RedisKnowledgeStore`, `SupabaseKnowledgeStore` added
-- ✅ **58 new tests** (total: 2143)
-
-### v0.17.3 - Agent Runtime Controls
-
-- ✅ **Token/Cost Budgets**: `AgentConfig(max_total_tokens=..., max_cost_usd=...)` with `BudgetExceededError`; `budget_exceeded` trace step
-- ✅ **Cooperative Cancellation**: `CancellationToken` with thread-safe `cancel()`; checked at top of each iteration and after tool execution; `cancelled` trace step
-- ✅ **SimpleStepObserver**: Lightweight single-callback observer for quick integrations
-- ✅ **Structured Results**: `AgentResult` enriched with budget/cancellation context
-- ✅ **Per-tool Approval Gate**: `@tool(requires_approval=True)` + `AgentConfig(confirm_action=fn)`
-- ✅ **61 new tests** (total: 2085)
-
-### v0.17.1 - MCP Client/Server
-
-- ✅ **MCPClient**: Discover and call tools from any MCP-compliant server with circuit breaker
-- ✅ **mcp_tools()**: Adapter that converts MCP tool definitions to `List[Tool]` for drop-in agent use
-- ✅ **MCPServer**: Expose `@tool` functions as MCP-compliant endpoints
-- ✅ **MultiMCPClient**: Fan-out across multiple MCP servers with deduplication
-
-### v0.16.1 - Consolidation & Hardening
-
-- ✅ **6 bug fixes**: `arun()` tool_usage stats, `astream()` dead code after yield, `memory.from_dict()` boundary fix, `EntityMemory` thread safety, `KnowledgeMemory` thread safety, `SQLiteTripleStore` WAL mode
-- ✅ **mypy**: Resolved all 5 type errors across `sessions.py` and `knowledge_graph.py` (0 errors now)
-- ✅ **68 new tests** (total: 1487): Redis sessions, edge cases, memory boundary, memory integration, async memory, consolidation regression
-
-### v0.16.0 - Memory & Persistence
-
-- ✅ **Persistent Sessions**: `SessionStore` protocol with 3 backends (JSON file, SQLite, Redis), TTL expiry, auto-save/load via `AgentConfig`
-- ✅ **Summarize-on-Trim**: LLM-generated summaries of trimmed messages, injected as system context; configurable provider/model
-- ✅ **Entity Memory**: LLM-based entity extraction (person, org, project, location, date, custom), LRU-pruned registry, system prompt injection
-- ✅ **Knowledge Graph Memory**: Triple extraction (subject, relation, object), in-memory and SQLite storage, keyword-based querying
-- ✅ **Cross-Session Knowledge**: Daily log files + persistent `MEMORY.md`, auto-registered `remember` tool, system prompt injection
-- ✅ **Memory Tools**: Built-in `remember` tool auto-registered when `knowledge_memory` is configured
-- ✅ **4 new observer events**: `on_session_load`, `on_session_save`, `on_memory_summarize`, `on_entity_extraction` (total: 19)
-- ✅ **5 new trace step types**: `session_load`, `session_save`, `memory_summarize`, `entity_extraction`, `kg_extraction`
-- ✅ **182 new tests** (total: 1365)
-
-### v0.15.0 - Enterprise Reliability
-
-- ✅ **Guardrails Engine**: `GuardrailsPipeline` with 5 built-in guardrails (Topic, PII, Toxicity, Format, Length) and block/rewrite/warn actions
-- ✅ **Audit Logging**: JSONL `AuditLogger` with 4 privacy levels, daily rotation, thread-safe writes
-- ✅ **Tool Output Screening**: 15 prompt injection patterns, per-tool `screen_output=True` or global via config
-- ✅ **Coherence Checking**: LLM-based intent verification before each tool execution
-- ✅ **83 new tests** (total: 1183)
-
-### v0.14.1 - Streaming & Provider Fixes
-
-- ✅ **13 streaming bug fixes**: All providers' `stream()`/`astream()` now pass `tools` and yield `ToolCall` objects
-- ✅ **Agent core fixes**: `_streaming_call`/`_astreaming_call` pass tools and don't stringify `ToolCall` objects
-- ✅ **Ollama `_format_messages`**: Correct `TOOL` role mapping and `ASSISTANT` tool_calls inclusion
-- ✅ **FallbackProvider `astream()`**: Error handling, failover, and circuit breaker support
-- ✅ **141 new tests** (total: 1100): Regression tests, recording-provider tests, unit tests for 6 previously untested modules
-
-### v0.14.0 - AgentObserver Protocol & Production Hardening
-
-- ✅ **AgentObserver Protocol**: 15 lifecycle events with `run_id`/`call_id` correlation
-- ✅ **LoggingObserver**: Structured JSON logs for ELK/Datadog
-- ✅ **OTel Span Export**: `AgentTrace.to_otel_spans()` for OpenTelemetry
-- ✅ **Model Registry Update**: 145 models with March 2026 pricing (GPT-5.4, Claude Sonnet 4.6, Gemini 3.1 Pro)
-- ✅ **OpenAI `max_completion_tokens`**: Auto-detection for GPT-5.x, GPT-4.1, o-series models
-- ✅ **11 bug fixes**: Structured output parser bypass, policy bypass in parallel execution, memory trim observer gap, infinite recursion in batch+fallback, async policy timeout, None content handling, and more
-
-### v0.13.0 - Structured Output, Observability & Safety
-
-- ✅ **Structured Output Parsers**: Pydantic / JSON Schema `response_format` on `run()` / `arun()` / `ask()` with auto-retry
-- ✅ **Execution Traces**: `result.trace` with `TraceStep` timeline (`llm_call`, `tool_selection`, `tool_execution`, `error`)
-- ✅ **Reasoning Visibility**: `result.reasoning` and `result.reasoning_history` extracted from LLM responses
-- ✅ **Provider Fallback Chain**: `FallbackProvider` with circuit breaker and `on_fallback` callback
-- ✅ **Batch Processing**: `agent.batch()` / `agent.abatch()` with `max_concurrency` and per-request error isolation
-- ✅ **Tool-Pair-Aware Trimming**: `ConversationMemory` preserves tool_use/tool_result pairs during sliding window trim
-- ✅ **Tool Policy Engine**: `ToolPolicy` with glob-based allow/review/deny rules and argument-level conditions
-- ✅ **Human-in-the-Loop Approval**: `confirm_action` callback for `review` tools with `approval_timeout`
-
-### v0.12.x - Hybrid Search, Reranking, Advanced Chunking & Dynamic Tools
-
-- ✅ **BM25**: Pure-Python Okapi BM25 keyword search; configurable k1/b; stop word removal; zero dependencies
-- ✅ **HybridSearcher**: Vector + BM25 fusion via RRF or weighted linear combination
-- ✅ **HybridSearchTool**: Agent-ready `@tool` with source attribution and score thresholds
-- ✅ **FusionMethod**: `RRF` (rank-based) and `WEIGHTED` (normalised score) strategies
-- ✅ **Reranker ABC**: Protocol for cross-encoder reranking with `rerank(query, results, top_k)`
-- ✅ **CohereReranker**: Cohere Rerank API v2 (`rerank-v3.5` default)
-- ✅ **JinaReranker**: Jina AI Rerank API (`jina-reranker-v2-base-multilingual` default)
-- ✅ **HybridSearcher integration**: Optional `reranker=` param for post-fusion re-scoring
-- ✅ **SemanticChunker**: Embedding-based topic-boundary splitting; cosine similarity threshold
-- ✅ **ContextualChunker**: LLM-generated context prepended to each chunk (Anthropic-style contextual retrieval)
-- ✅ **ToolLoader**: Discover `@tool` functions from modules, files, and directories; hot-reload support
-- ✅ **Agent dynamic tools**: `add_tool`, `add_tools`, `remove_tool`, `replace_tool` with prompt rebuild
-
-### v0.12.0 - Response Caching
-
-- ✅ **InMemoryCache**: Thread-safe LRU + TTL cache with `OrderedDict`; zero dependencies
-- ✅ **RedisCache**: Distributed TTL cache for multi-process deployments (optional `redis` dep)
-- ✅ **CacheKeyBuilder**: Deterministic SHA-256 keys from (model, prompt, messages, tools, temperature)
-- ✅ **Agent Integration**: `AgentConfig(cache=...)` checks cache before every provider call
-
-### v0.11.0 - Streaming & Parallel Execution
-
-- ✅ **E2E Streaming**: Native tool streaming via `Agent.astream` with `Union[str, ToolCall]` provider protocol
-- ✅ **Parallel Tool Execution**: `asyncio.gather` for async, `ThreadPoolExecutor` for sync; enabled by default
-- ✅ **Full Type Safety**: 0 mypy errors across 80+ source and test files
-
-### v0.10.0 - Critical Architecture
-
-- ✅ **Native Function Calling**: OpenAI, Anthropic, and Gemini native tool APIs
-- ✅ **Context Propagation**: `contextvars.copy_context()` for async tool execution
-- ✅ **Routing Mode**: `AgentConfig(routing_only=True)` for classification without execution
-
-### v0.9.0 - Core Capabilities & Reliability
-
-- ✅ **Custom System Prompt**: `AgentConfig(system_prompt=...)` for domain instructions
-- ✅ **Structured AgentResult**: `run()` returns `AgentResult` with tool calls, args, and iterations
-- ✅ **Reusable Agent Instances**: `Agent.reset()` clears history/memory for clean reuse
-
-### v0.8.0 - Embeddings & RAG
-
-- ✅ **Full RAG Stack**: VectorStore (Memory/SQLite/Chroma), Embeddings (OpenAI/Gemini), Document Loaders
-- ✅ **RAG Tools**: `RAGTool` and `SemanticSearchTool` for knowledge base queries
-
-### v0.6.0 - High-Impact Features
-
-- ✅ **Observability Hooks**: `on_agent_start`, `on_tool_end` lifecycle events
-- ✅ **Streaming Tools**: Generators yield results progressively
-
-### v0.5.0 - Production Readiness
-
-- ✅ **Cost Tracking**: Token counting and USD estimation
-- ✅ **Better Errors**: PyTorch-style error messages with suggestions
+| Feature                  | Notes                               | Target   |
+| ------------------------ | ----------------------------------- | -------- |
+| Universal Vision Support | Unified vision API across providers | Deferred |
+| Rate Limiting & Quotas   | Per-tool and per-user quotas        | v0.21.x  |
+| CRM & Business Tools     | HubSpot, Salesforce integrations    | v0.21.x  |

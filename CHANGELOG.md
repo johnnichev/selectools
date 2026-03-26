@@ -5,6 +5,84 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0] - 2026-03-25
+
+### Added
+
+#### Multi-Agent Orchestration — AgentGraph
+
+The single biggest feature since launch. Build directed graphs of agent nodes with plain Python routing — no compile step, no Pregel, no DSL.
+
+```python
+from selectools import AgentGraph
+
+graph = AgentGraph()
+graph.add_node("planner", planner_agent)
+graph.add_node("writer", writer_agent)
+graph.add_edge("planner", "writer")
+graph.add_edge("writer", AgentGraph.END)
+graph.set_entry("planner")
+result = graph.run("Write a blog post about AI safety")
+```
+
+- **AgentGraph** — Directed graph of Agent nodes (or callables) with `run()`, `arun()`, `astream()`
+- **GraphState** — Shared context with `messages`, `data`, `history`, `metadata`, `errors`
+- **ContextMode** — `LAST_MESSAGE` (default), `LAST_N`, `FULL`, `SUMMARY`, `CUSTOM` — prevents context explosion
+- **Routing** — `add_edge()` for static, `add_conditional_edge()` for dynamic, `Scatter` for fan-out
+- **Parallel Execution** — `add_parallel_nodes()` with `MergePolicy` (LAST_WINS, FIRST_WINS, APPEND)
+- **Human-in-the-Loop** — Generator nodes with `yield InterruptRequest()`. Resumes at the exact yield point (LangGraph restarts the whole node)
+- **Checkpointing** — `CheckpointStore` protocol with 3 backends: `InMemoryCheckpointStore`, `FileCheckpointStore`, `SQLiteCheckpointStore`
+- **Subgraph Composition** — `add_subgraph()` with `input_map`/`output_map` for state key translation
+- **Error Handling** — `ErrorPolicy` (ABORT, SKIP, RETRY) at graph and per-node level
+- **Loop & Stall Detection** — State hash tracking; hard loops raise, stalls fire observer events
+- **Budget & Cancellation** — `max_total_tokens`, `max_cost_usd`, `cancellation_token` propagated to all nodes
+- **Visualization** — `to_mermaid()` and `visualize("ascii")` for graph inspection
+
+#### SupervisorAgent — High-Level Coordination
+
+```python
+from selectools import SupervisorAgent
+
+supervisor = SupervisorAgent(
+    agents={"researcher": researcher, "writer": writer},
+    provider=provider,
+    strategy="plan_and_execute",
+)
+result = supervisor.run("Write a report on AI safety")
+```
+
+- **4 Strategies**: `plan_and_execute`, `round_robin`, `dynamic`, `magentic`
+- **ModelSplit** — `planner_model` (expensive) + `executor_model` (cheap) for 70-90% cost reduction
+- **Magentic-One** — Task Ledger + Progress Ledger + auto-replan after `max_stalls` consecutive unproductive steps
+- **Delegation Constraints** — Explicit allow-lists preventing ping-pong delegation loops
+
+#### New Trace & Observer Infrastructure
+
+- 10 new `StepType` values: `graph_node_start`, `graph_node_end`, `graph_routing`, `graph_checkpoint`, `graph_interrupt`, `graph_resume`, `graph_parallel_start`, `graph_parallel_end`, `graph_stall`, `graph_loop_detected`
+- 13 new observer events: `on_graph_start`, `on_graph_end`, `on_graph_error`, `on_node_start`, `on_node_end`, `on_graph_routing`, `on_graph_interrupt`, `on_graph_resume`, `on_parallel_start`, `on_parallel_end`, `on_stall_detected`, `on_loop_detected`, `on_supervisor_replan`
+- Total: 27 StepTypes, 45 sync observer events, 42 async observer events
+
+#### New Examples
+
+- `examples/55_agent_graph_linear.py` — 3-node sequential pipeline
+- `examples/56_agent_graph_parallel.py` — Parallel fan-out with merge
+- `examples/57_agent_graph_conditional.py` — Conditional routing
+- `examples/58_agent_graph_hitl.py` — Human-in-the-loop with generator nodes
+- `examples/59_agent_graph_checkpointing.py` — Durable checkpoint/resume
+- `examples/60_supervisor_agent.py` — SupervisorAgent with 4 strategies
+- `examples/61_agent_graph_subgraph.py` — Nested subgraph composition
+
+### Stats
+
+- Tests: 2275 → 2397 (+122)
+- Examples: 54 → 61 (+7)
+- StepTypes: 17 → 27 (+10)
+- Sync observer events: 32 → 45 (+13)
+- Async observer events: 29 → 42 (+13)
+- New source files: 6 (orchestration package)
+
+---
+
 ## [0.17.7] - 2026-03-25
 
 ### Added

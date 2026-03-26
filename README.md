@@ -2,7 +2,7 @@
 
 [![PyPI version](https://badge.fury.io/py/selectools.svg)](https://badge.fury.io/py/selectools)
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://johnnichev.github.io/selectools)
-[![License: LGPL v3](https://img.shields.io/badge/License-LGPL_v3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![Evaluators](https://img.shields.io/badge/evaluators-39-06b6d4.svg)](https://johnnichev.github.io/selectools/modules/EVALS/)
 
@@ -10,7 +10,46 @@ An open-source project from **[NichevLabs](https://nichevlabs.com)**.
 
 **Production-ready AI agents with tool calling, RAG, and hybrid search.** Connect LLMs to your Python functions, embed and search your documents with vector + keyword fusion, stream responses in real time, and dynamically manage tools at runtime. Works with OpenAI, Anthropic, Gemini, and Ollama. Tracks costs automatically.
 
-## What's New in v0.17
+## What's New in v0.18
+
+### v0.18.0 — Multi-Agent Orchestration
+
+```python
+from selectools import AgentGraph, SupervisorAgent, AgentConfig, OpenAIProvider, tool
+
+# Build a multi-agent graph in plain Python — no DSL, no compile step
+graph = AgentGraph()
+graph.add_node("planner", planner_agent)
+graph.add_node("writer", writer_agent)
+graph.add_node("reviewer", reviewer_agent)
+graph.add_edge("planner", "writer")
+graph.add_edge("writer", "reviewer")
+graph.add_edge("reviewer", AgentGraph.END)
+graph.set_entry("planner")
+result = graph.run("Write a blog post about AI safety")
+
+# Or use SupervisorAgent for automatic coordination
+supervisor = SupervisorAgent(
+    agents={"researcher": researcher, "writer": writer},
+    provider=OpenAIProvider(),
+    strategy="plan_and_execute",  # also: round_robin, dynamic, magentic
+)
+result = supervisor.run("Write a comprehensive report on LLM safety")
+```
+
+- **AgentGraph** — Directed graph of agent nodes with plain Python routing
+- **4 Supervisor Strategies** — plan_and_execute, round_robin, dynamic, magentic (Magentic-One pattern)
+- **Human-in-the-Loop** — Generator nodes with `yield InterruptRequest()` — resumes at exact yield point (LangGraph restarts the whole node)
+- **Parallel Execution** — `add_parallel_nodes()` with 3 merge policies (LAST_WINS, FIRST_WINS, APPEND)
+- **Checkpointing** — 3 backends (InMemory, File, SQLite) for durable mid-graph persistence
+- **Subgraph Composition** — Nest graphs inside graphs with explicit state mapping
+- **ModelSplit** — Separate planner/executor models for 70-90% cost reduction
+- **Loop & Stall Detection** — State hash tracking with observer events
+- **10 New StepTypes** — Full trace visibility into graph execution
+- **13 New Observer Events** — on_graph_start/end, on_node_start/end, on_graph_interrupt/resume, and more
+
+<details>
+<summary><strong>v0.17.x highlights</strong></summary>
 
 ### v0.17.7 — Caching & Context
 
@@ -55,6 +94,11 @@ def web_search(query: str) -> str:
 ```
 
 Also: Python 3.9–3.13 CI matrix (verified zero compatibility issues).
+
+</details>
+
+<details>
+<summary><strong>v0.17.4 and earlier</strong></summary>
 
 ### v0.17.4 — Agent Intelligence
 
@@ -130,6 +174,8 @@ report.to_html("report.html")
 - **A/B Testing**, regression detection, snapshot testing
 - **HTML reports**, JUnit XML, CLI, GitHub Action integration
 
+</details>
+
 > Full changelog: [CHANGELOG.md](https://github.com/johnnichev/selectools/blob/main/CHANGELOG.md)
 
 <details>
@@ -184,7 +230,8 @@ report.to_html("report.html")
 | **Cross-Session Knowledge** | Daily logs + persistent facts with auto-registered `remember` tool. |
 | **MCP Integration** | Connect to any MCP tool server (stdio + HTTP). MCPClient, MultiMCPClient, MCPServer. Circuit breaker, retry, graceful degradation. |
 | **Eval Framework** | 39 built-in evaluators (21 deterministic + 18 LLM-as-judge). A/B testing, regression detection, snapshot testing, HTML reports, JUnit XML, CI integration. |
-| **AgentObserver Protocol** | 32-event lifecycle observer with `run_id`/`call_id` correlation. Built-in `LoggingObserver` + `SimpleStepObserver`. |
+| **Multi-Agent Orchestration** | `AgentGraph` for directed agent graphs, `SupervisorAgent` with 4 strategies, HITL via generator nodes, parallel execution, checkpointing, subgraph composition. |
+| **AgentObserver Protocol** | 45-event lifecycle observer with `run_id`/`call_id` correlation. Built-in `LoggingObserver` + `SimpleStepObserver`. |
 | **Runtime Controls** | Token/cost budget limits, cooperative cancellation, per-tool approval gates, model switching per iteration. |
 | **Production Hardened** | Retries with backoff, per-tool timeouts, iteration caps, cost warnings, observability hooks + observers. |
 | **Library-First** | Not a framework. No magic globals, no hidden state. Use as much or as little as you need. |
@@ -215,10 +262,11 @@ report.to_html("report.html")
 - **Semantic Cache**: `SemanticCache` — embedding-based cache hits for paraphrased queries (cosine similarity, LRU + TTL)
 - **Prompt Compression**: Auto-summarise old history when context window fills up; `compress_context`, `compress_threshold`, `compress_keep_recent`
 - **Conversation Branching**: `ConversationMemory.branch()` and `SessionStore.branch()` for A/B exploration and checkpointing
-- **54 Examples**: RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, eval framework, and more
+- **Multi-Agent Orchestration**: `AgentGraph` with routing, parallel execution, HITL, checkpointing; `SupervisorAgent` with 4 strategies (plan_and_execute, round_robin, dynamic, magentic)
+- **61 Examples**: Multi-agent graphs, RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, eval framework, and more
 - **Built-in Eval Framework**: 39 evaluators (21 deterministic + 18 LLM-as-judge), A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing
-- **AgentObserver Protocol**: 32 lifecycle events with `run_id` correlation, `LoggingObserver`, `SimpleStepObserver`, OTel export
-- **2275 Tests**: Unit, integration, regression, and E2E with real API calls
+- **AgentObserver Protocol**: 45 lifecycle events with `run_id` correlation, `LoggingObserver`, `SimpleStepObserver`, OTel export
+- **2397 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 
@@ -791,7 +839,7 @@ pytest tests/ -k "not e2e"   # Skip E2E (no API keys needed)
 
 ## License
 
-**LGPL-3.0-or-later** - Use freely in commercial applications. Only modifications to the library itself must be shared. See [LICENSE](LICENSE).
+**Apache-2.0** — Use freely in commercial applications. No copyleft restrictions. See [LICENSE](LICENSE).
 
 ## Contributing
 

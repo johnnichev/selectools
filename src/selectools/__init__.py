@@ -1,6 +1,6 @@
 """Public exports for the selectools package."""
 
-__version__ = "0.17.7"
+__version__ = "0.18.0"
 
 # Import submodules (lazy loading for optional dependencies)
 from . import embeddings, evals, guardrails, models, rag, toolbox
@@ -62,6 +62,29 @@ from .models import (
     OpenAI,
 )
 from .observer import AgentObserver, AsyncAgentObserver, LoggingObserver, SimpleStepObserver
+from .orchestration import (
+    STATE_KEY_LAST_OUTPUT,
+    AgentGraph,
+    CheckpointStore,
+    ContextMode,
+    ErrorPolicy,
+    FileCheckpointStore,
+    GraphEvent,
+    GraphEventType,
+    GraphNode,
+    GraphResult,
+    GraphState,
+    InMemoryCheckpointStore,
+    InterruptRequest,
+    MergePolicy,
+    ModelSplit,
+    ParallelGroupNode,
+    Scatter,
+    SQLiteCheckpointStore,
+    SubgraphNode,
+    SupervisorAgent,
+    SupervisorStrategy,
+)
 from .parser import ToolCallParser
 from .policy import PolicyDecision, PolicyResult, ToolPolicy
 from .pricing import PRICING, calculate_cost, calculate_embedding_cost, get_model_pricing
@@ -208,4 +231,26 @@ __all__ = [
     "embeddings",
     "rag",
     "toolbox",
+    # Orchestration
+    "AgentGraph",
+    "GraphResult",
+    "ErrorPolicy",
+    "GraphState",
+    "GraphEvent",
+    "GraphEventType",
+    "MergePolicy",
+    "ContextMode",
+    "InterruptRequest",
+    "Scatter",
+    "STATE_KEY_LAST_OUTPUT",
+    "GraphNode",
+    "ParallelGroupNode",
+    "SubgraphNode",
+    "CheckpointStore",
+    "InMemoryCheckpointStore",
+    "FileCheckpointStore",
+    "SQLiteCheckpointStore",
+    "SupervisorAgent",
+    "SupervisorStrategy",
+    "ModelSplit",
 ]

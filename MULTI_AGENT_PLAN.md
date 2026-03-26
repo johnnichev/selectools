@@ -5,6 +5,7 @@
 > **Target**: Biggest feature since launch. Closes the single largest competitive gap.
 >
 > **Foundation work completed across v0.16.5–v0.17.7**:
+>
 > - Agent decomposed into 4 mixins (`core.py` 3128 → 1448 lines)
 > - `StepType` is `str, Enum` with 17 members — ready for graph step types
 > - `_execute_single_tool` / `_aexecute_single_tool` extracted — graph nodes can reuse
@@ -31,7 +32,7 @@ This section is the design brief. Every architecture decision traces back to a s
 
 LangGraph's `interrupt()` **restarts the entire node from the beginning** on resume. This is a documented foot-gun: if your node made an API call, sent an email, or stored a record before calling `interrupt()`, those operations re-execute on resume.
 
-From LangGraph's own docs: *"When using interrupt, the node function is re-executed from the beginning when the graph resumes."* Maintainers acknowledge this as intended behavior.
+From LangGraph's own docs: _"When using interrupt, the node function is re-executed from the beginning when the graph resumes."_ Maintainers acknowledge this as intended behavior.
 
 **Our approach**: Generator nodes. A node is a Python generator that `yield`s an `InterruptRequest`. When the graph resumes, it fast-forwards to the correct yield point using cached intermediate state. Side effects before the yield are naturally protected because they were stored in `state.data` (the convention the pattern encourages) and are loaded from checkpoint on resume.
 
@@ -119,6 +120,11 @@ LangGraph requires learning StateGraph, MessageAnnotation, Pregel channels, and 
 11. **Async callable dispatch**: `_aexecute_node` dispatches based on type: `Agent` → `agent.arun()`, async callable → `await fn(state)`, async generator → interrupt machinery, sync callable → `loop.run_in_executor(None, fn, state)`.
 12. **`path_map` for conditional edges**: Optional dict mapping router return values to node names. Enables compile-time validation.
 13. **Per-node visit limits**: `GraphNode.max_visits = 0` (0 = unlimited). Prevents runaway loops without relying solely on global `max_steps`.
+14. **Context scoping between nodes**: `GraphNode.context_mode` controls what conversation history is passed to child agents. Default: `"last_message"` (not full history). Prevents silent context explosion — the #1 production failure mode across all frameworks. Supported modes: `"last_message"`, `"last_n"` (configurable N), `"full"`, `"summary"` (calls provider to compress), custom `Callable[[GraphState], List[Message]]`.
+15. **Loop and stall detection**: Graph engine tracks state hashes per step. Hard loop (same state hash seen twice) → `StepType.GRAPH_LOOP_DETECTED` + error. Stall (state hash unchanged for `stall_threshold` consecutive steps) → `StepType.GRAPH_STALL` + `on_stall_detected` observer event. Both are configurable: `enable_loop_detection=True`, `stall_threshold=3`.
+16. **No unconstrained delegation**: `SupervisorAgent` always requires explicit `delegation_constraints` dict. Eliminates the delegation ping-pong infinite loop (CrewAI's #1 production failure mode). Workers can only delegate to nodes in their explicit allow-list.
+17. **Fast-path routing**: `AgentGraph(fast_route_fn=...)` — an optional callable that receives initial state and returns a node name for simple-intent requests, bypassing full graph orchestration. Reduces token overhead by ~60% for single-intent requests (confirmed production pattern from AWS Bedrock and Microsoft ISE).
+18. **Cost-split execution in SupervisorAgent**: `model_split=ModelSplit(planner_model="gpt-4o", executor_model="gpt-4o-mini")` routes orchestration decisions to an expensive model and worker execution to a cheap model. Production-documented 70-90% token cost reduction.
 
 ---
 
@@ -154,7 +160,7 @@ Phase 8: Docs & Release   → docs, examples, CHANGELOG, version bump
 
 ## Phase 1: Primitives
 
-### `src/selectools/orchestration/state.py` (~180 lines)
+### `src/selectools/orchestration/state.py` (~220 lines)
 
 ```python
 STATE_KEY_LAST_OUTPUT: str = "__last_output__"  # canonical key for inter-node handoff
@@ -164,6 +170,15 @@ class MergePolicy(str, Enum):
     LAST_WINS = "last_wins"   # conflicting keys: last parallel branch wins
     FIRST_WINS = "first_wins" # conflicting keys: first result wins
     APPEND = "append"         # list values are appended, others use LAST_WINS
+
+
+class ContextMode(str, Enum):
+    """Controls what conversation history is forwarded to a node's agent."""
+    LAST_MESSAGE = "last_message"   # only the most recent user message (default)
+    LAST_N = "last_n"               # last N messages (GraphNode.context_n)
+    FULL = "full"                   # full state.messages history
+    SUMMARY = "summary"             # provider-compressed summary of prior messages
+    CUSTOM = "custom"               # use GraphNode.input_transform (most flexible)
 
 
 @dataclass
@@ -256,6 +271,8 @@ class GraphNode:
     ]
     input_transform: Optional[Callable[[GraphState], List[Message]]] = None
     output_transform: Optional[Callable[[AgentResult, GraphState], GraphState]] = None
+    context_mode: ContextMode = ContextMode.LAST_MESSAGE  # what history to forward
+    context_n: int = 6          # used when context_mode == LAST_N
     max_iterations: int = 1    # re-execution limit in a cycle (distinct from graph max_steps)
     max_visits: int = 0        # 0 = unlimited; graph raises if exceeded
     error_policy: Optional["ErrorPolicy"] = None   # None = inherit from graph
@@ -326,6 +343,7 @@ def merge_states(states: List[GraphState], policy: MergePolicy) -> GraphState:
 ```
 
 ### Tests: `tests/test_orchestration_primitives.py` (~55 tests)
+
 - `GraphState` construction, `to_dict`/`from_dict` round-trip, `from_prompt`
 - `_interrupt_responses` excluded from serialization
 - `GraphNode`, `ParallelGroupNode`, `SubgraphNode` construction
@@ -354,6 +372,8 @@ class GraphResult:
     interrupted: bool = False                         # True if execution paused for HITL
     interrupt_id: Optional[str] = None               # checkpoint_id to pass to graph.resume()
     steps: int = 0                                    # total iterations executed
+    stalls: int = 0                                   # stall events detected during run
+    loops_detected: int = 0                          # hard loop events detected
 ```
 
 **`ErrorPolicy`**:
@@ -383,6 +403,9 @@ class AgentGraph:
         max_cost_usd: Optional[float] = None,
         input_guardrails: Optional[GuardrailsPipeline] = None,
         output_guardrails: Optional[GuardrailsPipeline] = None,
+        enable_loop_detection: bool = True,    # detect repeated state hashes → GRAPH_LOOP_DETECTED
+        stall_threshold: int = 3,              # unchanged state for N steps → GRAPH_STALL
+        fast_route_fn: Optional[Callable[["GraphState"], Optional[str]]] = None,  # bypass full graph for simple intents
     ): ...
 
     # --- Node management ---
@@ -730,6 +753,7 @@ class GraphExecutionError(SelectoolsError):
 ```
 
 ### Tests: `tests/test_orchestration_graph.py` (~130 tests)
+
 - Linear graph: A → B → C → END
 - Conditional routing: validates `path_map`, catches invalid router returns
 - Dynamic fan-out via `Scatter`: graph builds parallel group on the fly
@@ -757,6 +781,7 @@ This is the centerpiece feature. Implemented as part of `graph.py` and `checkpoi
 ### `InterruptRequest` flow (full specification):
 
 **First-pass execution:**
+
 1. Generator node yields `InterruptRequest(prompt, payload)`
 2. `_aexecute_generator_node` sees a yielded `InterruptRequest` with no matching `_interrupt_responses` key
 3. `state.data` at this point contains all intermediate values the node computed and stored before the yield
@@ -765,6 +790,7 @@ This is the centerpiece feature. Implemented as part of `graph.py` and `checkpoi
 6. Human reads `result.state.data` or `result.interrupt_id` and makes a decision
 
 **Resume path:**
+
 1. `graph.resume(interrupt_id, response, checkpoint_store)` is called
 2. Loads `(state, step)` from checkpoint — `state.data` has intermediate values from first pass
 3. Sets `state._interrupt_responses[interrupt_key] = response`
@@ -794,6 +820,7 @@ async def review_node(state: GraphState) -> AsyncGenerator:
 ```
 
 ### Tests: `tests/test_orchestration_interrupt.py` (~40 tests, part of graph test file or separate)
+
 - Generator node yields `InterruptRequest` → `GraphResult.interrupted = True`
 - `resume()` injects response into correct yield point
 - Generator continues after `yield` with human response as expression value
@@ -836,15 +863,16 @@ class CheckpointMetadata:
 
 **3 Backends:**
 
-| Backend | Storage | Thread safety |
-|---------|---------|---------------|
-| `InMemoryCheckpointStore` | `Dict[str, ...]` | `threading.Lock` |
-| `FileCheckpointStore(directory)` | `{dir}/{graph_id}/{id}.json` | `threading.Lock` + `os.makedirs` |
-| `SQLiteCheckpointStore(db_path)` | `checkpoints` table, WAL mode | SQLite-level |
+| Backend                          | Storage                       | Thread safety                    |
+| -------------------------------- | ----------------------------- | -------------------------------- |
+| `InMemoryCheckpointStore`        | `Dict[str, ...]`              | `threading.Lock`                 |
+| `FileCheckpointStore(directory)` | `{dir}/{graph_id}/{id}.json`  | `threading.Lock` + `os.makedirs` |
+| `SQLiteCheckpointStore(db_path)` | `checkpoints` table, WAL mode | SQLite-level                     |
 
 Serialization uses `GraphState.to_dict()`. `_interrupt_responses` is serialized separately in a `__interrupt__` key within the checkpoint — it must survive the checkpoint/resume cycle.
 
 ### Tests: `tests/test_orchestration_checkpoint.py` (~55 tests)
+
 - All 3 backends: save/load round-trip, list, delete
 - `interrupted=True` flag persisted in `CheckpointMetadata`
 - `_interrupt_responses` survives serialization round-trip
@@ -859,7 +887,7 @@ Serialization uses `GraphState.to_dict()`. `_interrupt_responses` is serialized 
 
 ### Modify: `src/selectools/observer.py`
 
-Add 10 new methods to `AgentObserver` (total: **42 sync events**, up from 32):
+Add 13 new methods to `AgentObserver` (total: **45 sync events**, up from 32):
 
 ```python
 # Graph-level lifecycle
@@ -877,27 +905,34 @@ def on_graph_resume(self, run_id: str, node_name: str, interrupt_id: str) -> Non
 # Parallel execution
 def on_parallel_start(self, run_id: str, group_name: str, child_nodes: List[str]) -> None: ...
 def on_parallel_end(self, run_id: str, group_name: str, child_count: int) -> None: ...
+# Loop / stall detection (critical for cost control — prevents $47k runaway bills)
+def on_stall_detected(self, run_id: str, node_name: str, stall_count: int) -> None: ...
+def on_loop_detected(self, run_id: str, node_name: str, loop_count: int) -> None: ...
+# Supervisor replan (Magentic-One pattern)
+def on_supervisor_replan(self, run_id: str, stall_count: int, new_plan: str) -> None: ...
 ```
 
-Add 10 matching async methods to `AsyncAgentObserver` (total: **39 async events**, up from 29).
+Add 13 matching async methods to `AsyncAgentObserver` (total: **42 async events**, up from 29).
 
 Update `LoggingObserver` (emit JSON for all 10 new events) and `SimpleStepObserver` (delegate to `self._cb()`) with implementations.
 
 ### Modify: `src/selectools/trace.py`
 
-Add 8 new `StepType` enum members (total: **25**, up from 17):
+Add 10 new `StepType` enum members (total: **27**, up from 17):
 
 ```python
 class StepType(str, Enum):
     # ... existing 17 ...
-    GRAPH_NODE_START   = "graph_node_start"
-    GRAPH_NODE_END     = "graph_node_end"
-    GRAPH_ROUTING      = "graph_routing"
-    GRAPH_CHECKPOINT   = "graph_checkpoint"
-    GRAPH_INTERRUPT    = "graph_interrupt"
-    GRAPH_RESUME       = "graph_resume"
+    GRAPH_NODE_START     = "graph_node_start"
+    GRAPH_NODE_END       = "graph_node_end"
+    GRAPH_ROUTING        = "graph_routing"
+    GRAPH_CHECKPOINT     = "graph_checkpoint"
+    GRAPH_INTERRUPT      = "graph_interrupt"
+    GRAPH_RESUME         = "graph_resume"
     GRAPH_PARALLEL_START = "graph_parallel_start"
     GRAPH_PARALLEL_END   = "graph_parallel_end"
+    GRAPH_STALL          = "graph_stall"           # state unchanged for stall_threshold steps
+    GRAPH_LOOP_DETECTED  = "graph_loop_detected"   # identical state hash repeated
 ```
 
 The `AgentGraph` creates a root `AgentTrace` for the entire execution. Each node's `Agent` produces its own child `AgentTrace` linked via `parent_run_id`. Root trace captures graph-level steps; child traces capture agent-internal steps.
@@ -932,6 +967,7 @@ from .orchestration import (
 Update StepType count assertion: 17 → 25.
 
 ### Tests: `tests/test_orchestration_integration.py` (~45 tests)
+
 - Observer events fire in correct order during graph execution
 - `LoggingObserver` emits JSON for all 10 new events
 - `SimpleStepObserver` routes all 10 new events to callback
@@ -952,6 +988,18 @@ class SupervisorStrategy(str, Enum):
     PLAN_AND_EXECUTE = "plan_and_execute"
     ROUND_ROBIN = "round_robin"
     DYNAMIC = "dynamic"
+    MAGENTIC = "magentic"     # Magentic-One pattern: Task Ledger + Progress Ledger + stall detection + replan
+
+
+@dataclass
+class ModelSplit:
+    """Use an expensive model for planning/orchestration and a cheap model for execution.
+
+    Production-documented 70-90% token cost reduction (plan-and-execute pattern).
+    Example: ModelSplit(planner_model="gpt-4o", executor_model="gpt-4o-mini")
+    """
+    planner_model: str
+    executor_model: str
 
 
 class SupervisorAgent:
@@ -961,6 +1009,9 @@ class SupervisorAgent:
         provider: Provider,
         strategy: SupervisorStrategy = SupervisorStrategy.PLAN_AND_EXECUTE,
         max_rounds: int = 10,
+        max_stalls: int = 2,           # MAGENTIC strategy: stalls before replan
+        model_split: Optional[ModelSplit] = None,  # expensive planner + cheap executor
+        delegation_constraints: Optional[Dict[str, List[str]]] = None,  # explicit allow-lists; prevents ping-pong
         cancellation_token: Optional[CancellationToken] = None,
         max_total_tokens: Optional[int] = None,
         max_cost_usd: Optional[float] = None,
@@ -974,11 +1025,12 @@ class SupervisorAgent:
 
 All strategies build and execute an `AgentGraph` internally — the supervisor is a convenience wrapper:
 
-| Strategy | How it works |
-|----------|-------------|
-| `plan_and_execute` | Supervisor LLM generates JSON plan `[{"agent": name, "task": str}]` → linear chain of agent nodes |
-| `round_robin` | Each agent participates in each round; supervisor checks after each full round whether to continue (up to `max_rounds`) |
-| `dynamic` | Router LLM node selects best agent per step based on current state + task description |
+| Strategy           | How it works                                                                                                                                                                                                                                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `plan_and_execute` | Supervisor LLM generates JSON plan `[{"agent": name, "task": str}]` → linear chain of agent nodes. With `model_split`, expensive model plans, cheap models execute.                                                                                                                                                 |
+| `round_robin`      | Each agent participates in each round; supervisor checks after each full round whether to continue (up to `max_rounds`)                                                                                                                                                                                             |
+| `dynamic`          | Router LLM node selects best agent per step based on current state + task description                                                                                                                                                                                                                               |
+| `magentic`         | Magentic-One Orchestrator pattern. Maintains `task_ledger` (facts, guesses, plan) and `progress_ledger` (is_complete, is_progressing, next_agent, stall_count). After `max_stalls` consecutive steps with no progress, replans from scratch and fires `on_supervisor_replan`. This is the most autonomous strategy. |
 
 **Usage example:**
 
@@ -1001,6 +1053,7 @@ print(result.total_usage)
 ```
 
 ### Tests: `tests/test_orchestration_supervisor.py` (~55 tests)
+
 - `plan_and_execute`: mock LLM plan generation, sequential execution, result aggregation
 - `round_robin`: full cycle, early-exit when done, `max_rounds` limit enforced
 - `dynamic`: LLM router node selects agents, state reflects routing history
@@ -1048,6 +1101,7 @@ graph TD
 ```
 
 ### Tests: `tests/test_orchestration_viz.py` (~15 tests)
+
 - `to_mermaid()`: linear, conditional, cyclic, parallel groups all rendered
 - `to_mermaid()` for an empty graph (no edges): no crash
 - `visualize("ascii")`: executes without error
@@ -1058,10 +1112,12 @@ graph TD
 ## Phase 8: Docs & Release
 
 ### New Docs
+
 - `docs/modules/ORCHESTRATION.md` — full module reference (AgentGraph, GraphState, CheckpointStore, SupervisorAgent, HITL, parallel execution, subgraphs, visualization)
 - `docs/modules/SUPERVISOR.md` — supervisor patterns with all 3 strategies
 
 ### Updated Docs
+
 - `docs/ARCHITECTURE.md` — add orchestration tier diagram showing graph → node agents → providers
 - `docs/QUICKSTART.md` — multi-agent quickstart section (10-line example)
 - `docs/index.md` — feature table: add orchestration rows, update test/example counts
@@ -1072,17 +1128,18 @@ graph TD
 
 ### Examples (55–61)
 
-| File | Demonstrates |
-|------|-------------|
-| `examples/55_agent_graph_linear.py` | Basic 3-node linear pipeline with `LocalProvider` |
-| `examples/56_agent_graph_parallel.py` | Parallel fan-out with `MergePolicy.APPEND` |
-| `examples/57_agent_graph_conditional.py` | Conditional routing with `path_map` validation |
-| `examples/58_agent_graph_hitl.py` | Generator node with `yield InterruptRequest` + `resume()` |
-| `examples/59_agent_graph_checkpointing.py` | `FileCheckpointStore` save/resume mid-graph |
-| `examples/60_supervisor_agent.py` | All 3 supervisor strategies |
-| `examples/61_agent_graph_subgraph.py` | Nested subgraph with `input_map`/`output_map` |
+| File                                       | Demonstrates                                              |
+| ------------------------------------------ | --------------------------------------------------------- |
+| `examples/55_agent_graph_linear.py`        | Basic 3-node linear pipeline with `LocalProvider`         |
+| `examples/56_agent_graph_parallel.py`      | Parallel fan-out with `MergePolicy.APPEND`                |
+| `examples/57_agent_graph_conditional.py`   | Conditional routing with `path_map` validation            |
+| `examples/58_agent_graph_hitl.py`          | Generator node with `yield InterruptRequest` + `resume()` |
+| `examples/59_agent_graph_checkpointing.py` | `FileCheckpointStore` save/resume mid-graph               |
+| `examples/60_supervisor_agent.py`          | All 3 supervisor strategies                               |
+| `examples/61_agent_graph_subgraph.py`      | Nested subgraph with `input_map`/`output_map`             |
 
 ### Release Artifacts
+
 - Version: `0.17.7` → `0.18.0` in `__init__.py` + `pyproject.toml`
 - `CHANGELOG.md` entry
 - Git tag: `v0.18.0`
@@ -1090,20 +1147,53 @@ graph TD
 
 ---
 
-## How This Beats LangGraph
+## How This Beats Every Competitor
 
-| LangGraph | Selectools AgentGraph | Evidence |
-|-----------|----------------------|----------|
-| `interrupt()` restarts node from beginning — tools with side effects re-execute | Generator nodes with `yield InterruptRequest` — state cached before yield, resume injects response at exact yield point | LangGraph docs: *"the node function is re-executed from the beginning when the graph resumes"* |
-| `StateGraph(MyState)` + `Annotated[list, add_messages]` + `compile()` + `MemorySaver` | `AgentGraph()` + `add_node()` + `run()` | Zero new concepts to learn |
-| `@task` cache breaks silently in production (new container = empty cache) | `FileCheckpointStore` / `SQLiteCheckpointStore` — explicit, durable, self-hosted | Community issue: *"3 days debugging @task caching across Lambda invocations"* |
-| LangGraph Studio, cron, auth = paid Platform | `to_mermaid()`, `FileCheckpointStore`, built-in observer — zero cloud dependency | LangGraph pricing page |
-| No built-in budget enforcement | `max_total_tokens` / `max_cost_usd` at graph + node levels | Selectools v0.17.3+ |
-| No cooperative cancellation | `CancellationToken` propagates to all nodes — cancel from any thread | Selectools v0.17.3+ |
-| `CompiledGraph` nesting with `invoke()` | `AgentGraph.__call__` — any graph is a node via duck typing | No framework concept required |
-| Sub-graph state mapping requires `InputTransformer`/`OutputTransformer` | `add_subgraph(input_map={"a": "b"})` — 2 dicts | Explicit over magic |
-| Parallel `Send()` requires returning list of `Command(goto=node, update={...})` | `return [Scatter("worker", {"task": t}) for t in tasks]` — plain Python list | Readability |
-| No built-in observability | 10 new observer events, 8 new StepTypes — every graph step is traced | Selectools observer pattern |
+### vs LangGraph
+
+| LangGraph                                                                                            | Selectools AgentGraph                                                                                                   | Evidence                                                                                                                           |
+| ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `interrupt()` restarts node from beginning — tools with side effects re-execute                      | Generator nodes with `yield InterruptRequest` — state cached before yield, resume injects response at exact yield point | LangGraph docs: _"the node function is re-executed from the beginning when the graph resumes"_; blog: "double ticket creation bug" |
+| `@task` cache breaks silently in production (checkpointer injected at runtime = empty cache)         | `FileCheckpointStore` / `SQLiteCheckpointStore` — explicit, durable, self-hosted                                        | Community: _"3 days debugging @task caching across Lambda invocations"_                                                            |
+| `StateGraph(MyState)` + `Annotated[list, add_messages]` + `compile()` + `MemorySaver`                | `AgentGraph()` + `add_node()` + `run()` — no compile step                                                               | Zero new concepts to learn                                                                                                         |
+| LangGraph Studio, cron, auth = paid Platform                                                         | `to_mermaid()`, `to_html()`, `FileCheckpointStore`, built-in observer — zero cloud dependency                           | LangGraph pricing page                                                                                                             |
+| CVE-2025-64439: RCE via checkpoint deserialization (`{"type": "constructor"}` → arbitrary code exec) | No dynamic import in checkpoint deserialization — only known types                                                      | GitHub advisory GHSA-wwqv-p2pp-99h5                                                                                                |
+| No loop detection — `GraphRecursionError` crash at step 25                                           | `enable_loop_detection=True` + `stall_threshold` + `on_stall_detected` observer                                         | AgentPatterns.tech: $0.08→$12 per task in runaway loops                                                                            |
+| No built-in budget enforcement                                                                       | `max_total_tokens` / `max_cost_usd` at graph + node levels                                                              | Selectools v0.17.3+                                                                                                                |
+| `Command` doesn't override static edges — both fire (double execution)                               | No hidden edge interactions — conditional edges replace static edges cleanly                                            | LangGraph forum: "double agent message"                                                                                            |
+| Parallel `Send()` API requires list of `Command(goto=node, update={...})`                            | `return [Scatter("worker", {"task": t}) for t in tasks]` — plain Python                                                 | Readability                                                                                                                        |
+| No built-in observability (paid LangSmith required for production tracing)                           | 45 sync observer events, 27 StepTypes — OTel export, zero cloud needed                                                  | Selectools observer pattern                                                                                                        |
+
+### vs CrewAI
+
+| CrewAI                                                                                          | Selectools                                                                          | Evidence                                           |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `allow_delegation=True` → delegation ping-pong infinite loops                                   | `delegation_constraints={"worker": ["supervisor"]}` — explicit allow-lists required | CrewAI issues #330, #1823, #4783                   |
+| `human_input=True` uses `input()` — completely broken in web/async                              | Generator HITL is async-native; callback HITL works in any context                  | Community consensus                                |
+| `@persist` checkpointing: no auto-restart, no duplicate prevention, no distributed coordination | `CheckpointStore` with idempotency keys, explicit resume API, 3 backends            | Diagrid: _"Checkpoints Are Not Durable Execution"_ |
+| ~56% token overhead (full role/goal/backstory in every message)                                 | Agent persona in system prompt only, not inter-node messages                        | Production token analysis                          |
+| No first-party testing utilities                                                                | `RecordingProvider` + `LocalProvider` + `EvalSuite`                                 | LangChain closed testing request as "not planned"  |
+| Long-term memory broken in multiple configurations                                              | `ConversationMemory` + `EntityMemory` + `KnowledgeMemory` — all tested              | CrewAI issues #1222, #2026                         |
+
+### vs AutoGen / AG2
+
+| AutoGen                                                                                              | Selectools                                                                          | Evidence                                              |
+| ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| GroupChat speaker selection: LLM hallucinates agent names → `ValueError`                             | `path_map` validation on conditional edges + deterministic fallback                 | AutoGen issues #1440, #3462                           |
+| Package fragmentation: `pyautogen`, `autogen`, `autogen-agentchat`, `ag2`, Microsoft Agent Framework | One package: `selectools`                                                           | AutoGen community: _"Turf wars in the AutoGen arena"_ |
+| AutoGen has a sunset date (Microsoft Agent Framework supersedes v0.4)                                | No sunset date; semver; backward-compatible                                         | Microsoft blog: _"AutoGen enters maintenance mode"_   |
+| No loop detection or stall recovery                                                                  | `stall_threshold` + `on_stall_detected` + `SupervisorStrategy.MAGENTIC` auto-replan | Production pattern from Magentic-One research         |
+
+### Universal Pain Points: Selectools' Position
+
+| Pain Point                       | Status                                                                                           |
+| -------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Observability black box          | **Solved**: 45 observer events, parent_run_id chain, OTel export                                 |
+| No testing primitives            | **Solved**: RecordingProvider, LocalProvider, EvalSuite (39 evaluators) — nobody else ships this |
+| Token cost spirals               | **Solved**: max_cost_usd + stall_threshold + loop detection + model_split                        |
+| Context window management        | **Solved**: estimate_run_tokens + compress_context + ContextMode scoping per node                |
+| Unreliable error recovery        | **Solved**: CheckpointStore with step-level persistence, idempotency, explicit resume            |
+| Context explosion between agents | **Solved**: ContextMode.LAST_MESSAGE default prevents parent history flood                       |
 
 ---
 
@@ -1111,68 +1201,67 @@ graph TD
 
 ### New (~8 source files)
 
-| File | Est. lines |
-|------|------------|
-| `src/selectools/orchestration/__init__.py` | ~40 |
-| `src/selectools/orchestration/state.py` | ~180 |
-| `src/selectools/orchestration/node.py` | ~200 |
-| `src/selectools/orchestration/graph.py` | ~650 |
-| `src/selectools/orchestration/checkpoint.py` | ~260 |
-| `src/selectools/orchestration/supervisor.py` | ~300 |
-| **Total source** | **~1,630 lines** |
+| File                                         | Est. lines       |
+| -------------------------------------------- | ---------------- |
+| `src/selectools/orchestration/__init__.py`   | ~40              |
+| `src/selectools/orchestration/state.py`      | ~180             |
+| `src/selectools/orchestration/node.py`       | ~200             |
+| `src/selectools/orchestration/graph.py`      | ~650             |
+| `src/selectools/orchestration/checkpoint.py` | ~260             |
+| `src/selectools/orchestration/supervisor.py` | ~300             |
+| **Total source**                             | **~1,630 lines** |
 
 ### New (~6 test files + 7 examples)
 
-| File | Tests |
-|------|-------|
-| `tests/test_orchestration_primitives.py` | ~55 |
-| `tests/test_orchestration_graph.py` | ~130 |
-| `tests/test_orchestration_checkpoint.py` | ~55 |
-| `tests/test_orchestration_integration.py` | ~45 |
-| `tests/test_orchestration_supervisor.py` | ~55 |
-| `tests/test_orchestration_viz.py` | ~15 |
-| **Total new tests** | **~355** |
-| **Total tests after** | **~2,630** |
-| **New examples** | **7 (55–61)** |
+| File                                      | Tests         |
+| ----------------------------------------- | ------------- |
+| `tests/test_orchestration_primitives.py`  | ~55           |
+| `tests/test_orchestration_graph.py`       | ~130          |
+| `tests/test_orchestration_checkpoint.py`  | ~55           |
+| `tests/test_orchestration_integration.py` | ~45           |
+| `tests/test_orchestration_supervisor.py`  | ~55           |
+| `tests/test_orchestration_viz.py`         | ~15           |
+| **Total new tests**                       | **~355**      |
+| **Total tests after**                     | **~2,630**    |
+| **New examples**                          | **7 (55–61)** |
 
 ### Modified (5 files)
 
-| File | Changes |
-|------|---------|
-| `src/selectools/observer.py` | +10 sync + 10 async events; `LoggingObserver` + `SimpleStepObserver` |
-| `src/selectools/trace.py` | +8 `StepType` members (17 → 25) |
-| `src/selectools/exceptions.py` | Flesh out `GraphExecutionError` fields |
-| `src/selectools/__init__.py` | New exports + version bump |
-| `pyproject.toml` | Version bump |
+| File                           | Changes                                                              |
+| ------------------------------ | -------------------------------------------------------------------- |
+| `src/selectools/observer.py`   | +10 sync + 10 async events; `LoggingObserver` + `SimpleStepObserver` |
+| `src/selectools/trace.py`      | +8 `StepType` members (17 → 25)                                      |
+| `src/selectools/exceptions.py` | Flesh out `GraphExecutionError` fields                               |
+| `src/selectools/__init__.py`   | New exports + version bump                                           |
+| `pyproject.toml`               | Version bump                                                         |
 
 ---
 
 ## Verification
 
 After each phase:
+
 1. `black src/ tests/ --line-length=100 && isort src/ tests/ --profile=black --line-length=100`
 2. `flake8 src/ && mypy src/`
 3. `pytest tests/ -x -q` — ALL must pass
 
-After all phases:
-4. `cp CHANGELOG.md docs/CHANGELOG.md && mkdocs build` — verify docs build, no broken links
-5. Manual smoke test: 3-node linear graph with `LocalProvider`, verify `GraphResult` fields, aggregated usage, correct event sequence
+After all phases: 4. `cp CHANGELOG.md docs/CHANGELOG.md && mkdocs build` — verify docs build, no broken links 5. Manual smoke test: 3-node linear graph with `LocalProvider`, verify `GraphResult` fields, aggregated usage, correct event sequence
 
 ---
 
 ## Resolved Design Questions
 
-| Question | Decision | Rationale |
-|----------|----------|-----------|
-| `default_input_transform` canonical key | `STATE_KEY_LAST_OUTPUT = "__last_output__"` in `state.data` | Eliminates ambiguity for all inter-node handoffs |
-| Parallel groups: registered as nodes? | Yes — `add_parallel_nodes` writes to `self._nodes[name]` | Fixes `add_edge` validation; natural API |
-| Async callable dispatch | `asyncio.iscoroutinefunction` → `await fn(state)`; `isasyncgenfunction` → HITL machinery; else → `run_in_executor` | Handles all 4 cases cleanly |
-| Async-in-sync threading hazard | Sync parallel uses `ThreadPoolExecutor` with `agent.run()` (sync); never `asyncio.run()` inside existing loop | Matches existing parallel tool execution pattern |
-| TypedDict reducers | Implement `MergePolicy` enum + `merge_states()` helper; TypedDict with `Annotated` is a power-user opt-in | Covers 90% of use cases simply; keeps 100% coverage |
-| HITL mechanism | Generator nodes with `yield InterruptRequest`; `state.data` is the side-effect cache | Best Python idiom for suspend/resume; natural protection from re-execution |
-| Graph-level guardrails | Yes — `input_guardrails` before first node, `output_guardrails` after last node | Already resolved in original plan |
-| `path_map` for conditional edges | Optional kwarg on `add_conditional_edge` | Opt-in; enables compile-time validation without forcing it |
-| Per-node visit counter | `GraphNode.max_visits = 0` (0 = unlimited); `_visit_counts` tracked per run | Prevents runaway cycles without global-only `max_steps` |
-| `SubgraphNode` vs `__call__` | Both: `add_subgraph` for explicit key mapping; `__call__` for duck-typing composition | Different use cases; explicit mapping is safer |
-| Streaming modes | Ship 3: full-state `values`, per-node-delta `updates`, raw-text `messages` (via `GraphEventType`) | Matches LangGraph's most-used 3 of 5; defer rest |
-| `SupervisorStrategy` type | `str, Enum` (consistent with `StepType`, `ErrorPolicy`, `ModelType`) | ADR-003 pattern |
+| Question                                | Decision                                                                                                           | Rationale                                                                  |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| `default_input_transform` canonical key | `STATE_KEY_LAST_OUTPUT = "__last_output__"` in `state.data`                                                        | Eliminates ambiguity for all inter-node handoffs                           |
+| Parallel groups: registered as nodes?   | Yes — `add_parallel_nodes` writes to `self._nodes[name]`                                                           | Fixes `add_edge` validation; natural API                                   |
+| Async callable dispatch                 | `asyncio.iscoroutinefunction` → `await fn(state)`; `isasyncgenfunction` → HITL machinery; else → `run_in_executor` | Handles all 4 cases cleanly                                                |
+| Async-in-sync threading hazard          | Sync parallel uses `ThreadPoolExecutor` with `agent.run()` (sync); never `asyncio.run()` inside existing loop      | Matches existing parallel tool execution pattern                           |
+| TypedDict reducers                      | Implement `MergePolicy` enum + `merge_states()` helper; TypedDict with `Annotated` is a power-user opt-in          | Covers 90% of use cases simply; keeps 100% coverage                        |
+| HITL mechanism                          | Generator nodes with `yield InterruptRequest`; `state.data` is the side-effect cache                               | Best Python idiom for suspend/resume; natural protection from re-execution |
+| Graph-level guardrails                  | Yes — `input_guardrails` before first node, `output_guardrails` after last node                                    | Already resolved in original plan                                          |
+| `path_map` for conditional edges        | Optional kwarg on `add_conditional_edge`                                                                           | Opt-in; enables compile-time validation without forcing it                 |
+| Per-node visit counter                  | `GraphNode.max_visits = 0` (0 = unlimited); `_visit_counts` tracked per run                                        | Prevents runaway cycles without global-only `max_steps`                    |
+| `SubgraphNode` vs `__call__`            | Both: `add_subgraph` for explicit key mapping; `__call__` for duck-typing composition                              | Different use cases; explicit mapping is safer                             |
+| Streaming modes                         | Ship 3: full-state `values`, per-node-delta `updates`, raw-text `messages` (via `GraphEventType`)                  | Matches LangGraph's most-used 3 of 5; defer rest                           |
+| `SupervisorStrategy` type               | `str, Enum` (consistent with `StepType`, `ErrorPolicy`, `ModelType`)                                               | ADR-003 pattern                                                            |
