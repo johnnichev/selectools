@@ -3,7 +3,7 @@
 [![PyPI version](https://badge.fury.io/py/selectools.svg)](https://badge.fury.io/py/selectools)
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://johnnichev.github.io/selectools)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
-[![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![Evaluators](https://img.shields.io/badge/evaluators-39-06b6d4.svg)](https://johnnichev.github.io/selectools/modules/EVALS/)
 
 An open-source project from **[NichevLabs](https://nichevlabs.com)**.
@@ -627,7 +627,7 @@ agent = Agent(
 )
 ```
 
-32 lifecycle events: run, LLM, tool, iteration, batch, policy, structured output, fallback, retry, memory trim, guardrail, coherence, screening, session, entity, KG, budget exceeded, cancelled, prompt compressed. See `observer.py` for full reference.
+45 lifecycle events: run, LLM, tool, iteration, batch, policy, structured output, fallback, retry, memory trim, guardrail, coherence, screening, session, entity, KG, budget exceeded, cancelled, prompt compressed, plus 13 graph events (graph start/end, node start/end, routing, interrupt, resume, parallel, stall, loop, supervisor replan). See `observer.py` for full reference.
 
 ### E2E Streaming & Parallel Execution
 
@@ -702,11 +702,7 @@ config = AgentConfig(
     approval_timeout=60.0,       # Seconds before auto-deny
     enable_analytics=True,
     verbose=False,
-    hooks={                      # Lifecycle callbacks
-        "on_tool_start": lambda name, args: ...,
-        "on_tool_end": lambda name, result, duration: ...,
-        "on_llm_end": lambda response, usage: ...,
-    },
+    observers=[LoggingObserver()],  # Lifecycle observer (replaces deprecated hooks)
     system_prompt="You are a helpful assistant...",
 )
 ```
@@ -763,7 +759,7 @@ def process_file(filepath: str) -> Generator[str, None, None]:
         for i, line in enumerate(f, 1):
             yield f"[Line {i}] {line.strip()}\n"
 
-config = AgentConfig(hooks={"on_tool_chunk": lambda name, chunk: print(chunk, end="")})
+config = AgentConfig(observers=[SimpleStepObserver(lambda event, run_id, **kw: print(kw.get("chunk", ""), end=""))])
 ```
 
 ## Conversation Memory
@@ -833,6 +829,29 @@ Examples are numbered by difficulty. Start from 01 and work your way up.
 | 36 | `36_knowledge_graph.py` | Triple extraction, in-memory and SQLite storage | No |
 | 37 | `37_knowledge_memory.py` | Cross-session facts, daily logs, `remember` tool | No |
 | 38 | `38_terminal_tools.py` | `@tool(terminal=True)`, `stop_condition` callback | No |
+| 39 | `39_eval_framework.py` | EvalSuite, TestCase, evaluators, HTML reports | No |
+| 40 | `40_eval_advanced.py` | Pairwise A/B, regression detection, snapshots | No |
+| 41 | `41_mcp_client.py` | MCPClient, mcp_tools(), tool interop | No |
+| 42 | `42_mcp_server.py` | MCPServer, expose tools as MCP endpoints | No |
+| 43 | `43_token_budget.py` | `max_total_tokens`, `max_cost_usd` budget limits | No |
+| 44 | `44_cancellation.py` | CancellationToken, cooperative stopping | No |
+| 45 | `45_approval_gate.py` | `@tool(requires_approval=True)`, confirm_action | No |
+| 46 | `46_simple_observer.py` | SimpleStepObserver, single-callback integration | No |
+| 47 | `47_token_estimation.py` | `estimate_run_tokens()`, pre-flight cost checks | No |
+| 48 | `48_model_switching.py` | `model_selector` callback, per-iteration model | No |
+| 49 | `49_knowledge_stores.py` | SQLite, Redis, Supabase knowledge stores | No |
+| 50 | `50_reasoning_strategies.py` | ReAct, Chain-of-Thought, Plan-then-Act | No |
+| 51 | `51_tool_result_caching.py` | `@tool(cacheable=True, cache_ttl=300)` | No |
+| 52 | `52_semantic_cache.py` | SemanticCache with embedding similarity | Yes |
+| 53 | `53_prompt_compression.py` | Auto-summarize old history on context fill | No |
+| 54 | `54_conversation_branching.py` | `memory.branch()`, `store.branch()` | No |
+| 55 | `55_agent_graph_linear.py` | Linear AgentGraph pipeline | No |
+| 56 | `56_agent_graph_parallel.py` | Parallel fan-out with merge policies | No |
+| 57 | `57_agent_graph_conditional.py` | Conditional routing with plain Python | No |
+| 58 | `58_agent_graph_hitl.py` | Human-in-the-loop with generator nodes | No |
+| 59 | `59_agent_graph_checkpointing.py` | Checkpoint, interrupt, resume | No |
+| 60 | `60_supervisor_agent.py` | SupervisorAgent with 4 strategies | No |
+| 61 | `61_agent_graph_subgraph.py` | Nested subgraph composition | No |
 
 Run any example:
 
@@ -862,6 +881,19 @@ Also available in [`docs/`](docs/README.md):
 | [MEMORY](docs/modules/MEMORY.md) | Conversation memory + tool-pair trimming |
 | [USAGE](docs/modules/USAGE.md) | Cost tracking & analytics |
 | [MODELS](docs/modules/MODELS.md) | Model registry & pricing |
+| [SESSIONS](docs/modules/SESSIONS.md) | Persistent session stores (JSON, SQLite, Redis) |
+| [ENTITY_MEMORY](docs/modules/ENTITY_MEMORY.md) | Entity extraction and tracking |
+| [KNOWLEDGE_GRAPH](docs/modules/KNOWLEDGE_GRAPH.md) | Triple extraction and storage |
+| [KNOWLEDGE](docs/modules/KNOWLEDGE.md) | Cross-session knowledge memory |
+| [GUARDRAILS](docs/modules/GUARDRAILS.md) | Input/output validation pipeline |
+| [AUDIT](docs/modules/AUDIT.md) | JSONL audit logging |
+| [SECURITY](docs/modules/SECURITY.md) | Screening & coherence checking |
+| [EVALS](docs/modules/EVALS.md) | 39 evaluators, A/B testing, regression |
+| [MCP](docs/modules/MCP.md) | MCP client/server integration |
+| [BUDGET](docs/modules/BUDGET.md) | Token/cost budget limits |
+| [CANCELLATION](docs/modules/CANCELLATION.md) | Cooperative cancellation |
+| [ORCHESTRATION](docs/modules/ORCHESTRATION.md) | AgentGraph, routing, parallel, HITL |
+| [SUPERVISOR](docs/modules/SUPERVISOR.md) | SupervisorAgent, 4 strategies |
 | [PARSER](docs/modules/PARSER.md) | Tool call parsing |
 | [PROMPT](docs/modules/PROMPT.md) | System prompt generation |
 
@@ -872,7 +904,7 @@ pytest tests/ -x -q          # All tests
 pytest tests/ -k "not e2e"   # Skip E2E (no API keys needed)
 ```
 
-2275 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, and E2E integration.
+2529 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, orchestration, pipelines, and E2E integration with real API calls.
 
 ## License
 
