@@ -43,19 +43,29 @@ class TestStepTypeEnum:
         "BUDGET_EXCEEDED": "budget_exceeded",
         "CANCELLED": "cancelled",
         "PROMPT_COMPRESSED": "prompt_compressed",
+        "GRAPH_NODE_START": "graph_node_start",
+        "GRAPH_NODE_END": "graph_node_end",
+        "GRAPH_ROUTING": "graph_routing",
+        "GRAPH_CHECKPOINT": "graph_checkpoint",
+        "GRAPH_INTERRUPT": "graph_interrupt",
+        "GRAPH_RESUME": "graph_resume",
+        "GRAPH_PARALLEL_START": "graph_parallel_start",
+        "GRAPH_PARALLEL_END": "graph_parallel_end",
+        "GRAPH_STALL": "graph_stall",
+        "GRAPH_LOOP_DETECTED": "graph_loop_detected",
     }
 
-    def test_all_17_members_exist(self) -> None:
-        """All 17 expected members are present on the StepType enum."""
+    def test_all_27_members_exist(self) -> None:
+        """All 27 expected members are present on the StepType enum."""
         for attr_name, str_value in self.EXPECTED_MEMBERS.items():
             member = getattr(StepType, attr_name, None)
             assert member is not None, f"StepType.{attr_name} missing"
             assert member.value == str_value
 
     def test_no_extra_members(self) -> None:
-        """StepType has exactly 17 members — no accidental extras."""
+        """StepType has exactly 27 members — no accidental extras."""
         members = [m for m in StepType]
-        assert len(members) == 17
+        assert len(members) == 27
 
     def test_backward_compat_string_equality(self) -> None:
         """Each StepType member compares equal to its plain string value."""

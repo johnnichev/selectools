@@ -39,6 +39,16 @@ class StepType(str, Enum):
     BUDGET_EXCEEDED = "budget_exceeded"
     CANCELLED = "cancelled"
     PROMPT_COMPRESSED = "prompt_compressed"
+    GRAPH_NODE_START = "graph_node_start"
+    GRAPH_NODE_END = "graph_node_end"
+    GRAPH_ROUTING = "graph_routing"
+    GRAPH_CHECKPOINT = "graph_checkpoint"
+    GRAPH_INTERRUPT = "graph_interrupt"
+    GRAPH_RESUME = "graph_resume"
+    GRAPH_PARALLEL_START = "graph_parallel_start"
+    GRAPH_PARALLEL_END = "graph_parallel_end"
+    GRAPH_STALL = "graph_stall"
+    GRAPH_LOOP_DETECTED = "graph_loop_detected"
 
 
 @dataclass
@@ -63,6 +73,14 @@ class TraceStep:
     error: Optional[str] = None
 
     summary: Optional[str] = None
+
+    node_name: Optional[str] = None
+    step_number: Optional[int] = None
+    checkpoint_id: Optional[str] = None
+    interrupt_key: Optional[str] = None
+    from_node: Optional[str] = None
+    to_node: Optional[str] = None
+    children: Optional[List[str]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)

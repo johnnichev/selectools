@@ -896,3 +896,63 @@ class TestGeminiThoughtSignatureNonUtf8:
         # TOOL echo part: also has original bytes
         echo_part = contents[1].parts[0]
         assert getattr(echo_part, "thought_signature", None) == raw_binary
+
+
+class TestAnthropicSystemMessages:
+    """Anthropic rejects 'system' role in messages — context injections must be
+    converted to user role.  Reported by user: Anthropic 400 error when using
+    prompt compression, entity memory, or knowledge graph with AnthropicProvider.
+    """
+
+    def test_system_messages_converted_to_user_in_anthropic(self):
+        """SYSTEM messages in history must become user role for Anthropic."""
+        from selectools.providers.anthropic_provider import AnthropicProvider
+        from selectools.types import Message, Role
+
+        # Create a provider instance without calling the API
+        # We just need to test _format_messages
+        provider = object.__new__(AnthropicProvider)
+
+        messages = [
+            Message(role=Role.USER, content="Hello"),
+            Message(role=Role.SYSTEM, content="[Compressed context] Summary of earlier chat"),
+            Message(role=Role.ASSISTANT, content="I understand"),
+            Message(role=Role.SYSTEM, content="[Entity context] User is John"),
+            Message(role=Role.USER, content="What did we discuss?"),
+        ]
+
+        formatted = provider._format_messages(messages)
+
+        # No message should have role="system"
+        for msg in formatted:
+            assert (
+                msg["role"] != "system"
+            ), f"Found role='system' in formatted messages — Anthropic will reject this"
+
+        # SYSTEM messages should be converted to user role
+        assert formatted[1]["role"] == "user"
+        assert formatted[1]["content"][0]["text"] == "[Compressed context] Summary of earlier chat"
+        assert formatted[3]["role"] == "user"
+        assert formatted[3]["content"][0]["text"] == "[Entity context] User is John"
+
+    def test_gemini_system_messages_converted_to_user(self):
+        """SYSTEM messages should also be handled in Gemini provider."""
+        from selectools.providers.gemini_provider import GeminiProvider
+        from selectools.types import Message, Role
+
+        provider = object.__new__(GeminiProvider)
+
+        messages = [
+            Message(role=Role.USER, content="Hello"),
+            Message(role=Role.SYSTEM, content="[Compressed context] Summary"),
+            Message(role=Role.USER, content="Continue"),
+        ]
+
+        try:
+            from google.genai import types  # noqa: F401
+
+            formatted = provider._format_contents("system prompt", messages)
+            # SYSTEM message should become user role, not cause an error
+            assert formatted[1].role == "user"
+        except ImportError:
+            pytest.skip("google-genai not installed")

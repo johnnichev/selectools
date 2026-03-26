@@ -255,12 +255,13 @@ class GeminiProvider(Provider):
                     parts.append(
                         types.Part(
                             function_response=types.FunctionResponse(
-                                name=message.tool_name, response={"result": message.content}
+                                name=message.tool_name,
+                                response={"result": message.content or ""},
                             )
                         )
                     )
                 else:
-                    parts.append(types.Part(text=f"Tool output: {message.content}"))
+                    parts.append(types.Part(text=f"Tool output: {message.content or ''}"))
 
             elif role == Role.ASSISTANT.value:
                 role = "model"
@@ -296,6 +297,14 @@ class GeminiProvider(Provider):
                             )
                         )
                     )
+
+            elif role == Role.SYSTEM.value:
+                # Gemini handles system instructions via config, not messages.
+                # Context injections (compressed context, entity memory) arrive
+                # as SYSTEM messages — convert to user messages.
+                role = "user"
+                if message.content:
+                    parts.append(types.Part(text=message.content))
 
             else:
                 role = "user"  # Fallback

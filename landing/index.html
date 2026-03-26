@@ -87,9 +87,11 @@
           <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">Anthropic</span>
           <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">Gemini</span>
           <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">Ollama</span>
-          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">146 Models</span>
+          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">152 Models</span>
           <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">39 Evaluators</span>
-          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">2183 Tests</span>
+          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">2435 Tests</span>
+          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">Multi-Agent</span>
+          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">Composable Pipelines</span>
         </div>
       </div>
     </div>
@@ -114,7 +116,7 @@
         <div class="fade-in code-block rounded-xl p-8 border border-slate-700">
           <div class="text-3xl mb-4">&#128176;</div>
           <h3 class="text-lg font-semibold mb-2 text-white">"I don't know what my agents cost"</h3>
-          <p class="text-slate-400 text-sm leading-relaxed"><code class="text-brand-cyan">result.usage.total_cost</code> — automatic per-call token counts and dollar costs across all providers. 146 models with built-in pricing data.</p>
+          <p class="text-slate-400 text-sm leading-relaxed"><code class="text-brand-cyan">result.usage.total_cost</code> — automatic per-call token counts and dollar costs across all providers. 152 models with built-in pricing data.</p>
         </div>
       </div>
     </div>
@@ -209,7 +211,7 @@ result = agent.run(<span class="text-green-400">"Find our refund policy"</span>)
         </div>
         <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition">
           <div class="text-2xl mb-3">&#127919;</div>
-          <h3 class="font-semibold mb-1">146 Models</h3>
+          <h3 class="font-semibold mb-1">152 Models</h3>
           <p class="text-sm text-slate-400">Type-safe constants with built-in pricing data for all providers</p>
         </div>
         <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition">
@@ -239,8 +241,18 @@ result = agent.run(<span class="text-green-400">"Find our refund policy"</span>)
         </div>
         <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition">
           <div class="text-2xl mb-3">&#128202;</div>
-          <h3 class="font-semibold mb-1">22 Eval Evaluators</h3>
+          <h3 class="font-semibold mb-1">39 Evaluators</h3>
           <p class="text-sm text-slate-400">Built-in agent testing: tool use, correctness, safety, LLM-as-judge, regression detection</p>
+        </div>
+        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-cyan/50 transition col-span-2">
+          <div class="text-2xl mb-3">&#129302;</div>
+          <h3 class="font-semibold mb-1">Multi-Agent Orchestration</h3>
+          <p class="text-sm text-slate-400">AgentGraph for directed agent graphs with plain Python routing. 4 SupervisorAgent strategies. HITL resumes at yield point (not node restart). Parallel execution, checkpointing, subgraph composition.</p>
+        </div>
+        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition col-span-2">
+          <div class="text-2xl mb-3">&#128640;</div>
+          <h3 class="font-semibold mb-1">Composable Pipelines</h3>
+          <p class="text-sm text-slate-400"><code class="text-brand-cyan text-xs">Pipeline</code> + <code class="text-brand-cyan text-xs">@step</code> + <code class="text-brand-cyan text-xs">|</code> operator + <code class="text-brand-cyan text-xs">parallel()</code> + <code class="text-brand-cyan text-xs">branch()</code> &mdash; chain agents, tools, and transforms with plain Python. Also: <code class="text-brand-cyan text-xs">AgentGraph.chain(a, b, c).run(prompt)</code> for one-line multi-agent pipelines.</p>
         </div>
       </div>
     </div>
@@ -407,9 +419,15 @@ report.<span class="text-yellow-300">to_html</span>(<span class="text-green-400"
             </tr>
             <tr class="comparison-row border-b border-slate-700/50">
               <td class="px-4 py-3 text-slate-300">Multi-agent</td>
-              <td class="px-4 py-3 text-yellow-400">Coming v0.18.0</td>
+              <td class="px-4 py-3 text-green-400">AgentGraph + Supervisor</td>
               <td class="px-4 py-3 text-green-400">LangGraph</td>
               <td class="px-4 py-3 text-green-400">Core feature</td>
+            </tr>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-4 py-3 text-slate-300">HITL resume</td>
+              <td class="px-4 py-3 text-green-400">Exact yield point</td>
+              <td class="px-4 py-3 text-yellow-400">Restarts entire node</td>
+              <td class="px-4 py-3 text-slate-500">Not built-in</td>
             </tr>
             <tr class="comparison-row">
               <td class="px-4 py-3 text-slate-300">Community</td>
@@ -540,7 +558,7 @@ report.<span class="text-yellow-300">to_html</span>(<span class="text-green-400"
       <div class="flex flex-wrap justify-center gap-4">
         <a href="QUICKSTART/" class="bg-brand-blue hover:bg-blue-600 text-white font-semibold px-8 py-3 rounded-lg transition">Quickstart Guide</a>
         <a href="https://github.com/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb" class="border border-slate-700 hover:border-slate-500 text-slate-300 font-semibold px-8 py-3 rounded-lg transition">Interactive Notebook</a>
-        <a href="https://github.com/johnnichev/selectools/tree/main/examples" class="border border-slate-700 hover:border-slate-500 text-slate-300 font-semibold px-8 py-3 rounded-lg transition">38 Examples</a>
+        <a href="https://github.com/johnnichev/selectools/tree/main/examples" class="border border-slate-700 hover:border-slate-500 text-slate-300 font-semibold px-8 py-3 rounded-lg transition">61 Examples</a>
       </div>
     </div>
   </section>
@@ -550,7 +568,7 @@ report.<span class="text-yellow-300">to_html</span>(<span class="text-green-400"
     <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
       <div class="text-center md:text-left">
         <p class="text-slate-400 text-sm">An open-source project from <a href="https://nichevlabs.com" class="text-brand-cyan hover:underline">NichevLabs</a>.</p>
-        <p class="text-slate-500 text-xs mt-1">LGPL-3.0 &middot; Python 3.13+ &middot; v0.16.7</p>
+        <p class="text-slate-500 text-xs mt-1">Apache-2.0 &middot; Python 3.9+ &middot; v0.18.0b1</p>
       </div>
       <div class="flex items-center gap-6 text-sm text-slate-400">
         <a href="https://github.com/johnnichev/selectools" class="hover:text-white transition">GitHub</a>

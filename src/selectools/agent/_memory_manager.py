@@ -75,7 +75,7 @@ class _MemoryManagerMixin:
             return
         try:
             provider = self.config.summarize_provider or self.provider
-            model = self.config.summarize_model or self.config.model
+            model = self.config.summarize_model or self._effective_model
             trimmed_text = _format_messages_as_text(trimmed)
             prompt_msg = Message(
                 role=Role.USER,
@@ -123,7 +123,7 @@ class _MemoryManagerMixin:
             return
         try:
             recent = self._history[-em._relevance_window :]
-            entities = em.extract_entities(recent, model=self.config.model)
+            entities = em.extract_entities(recent, model=self._effective_model)
             if entities:
                 em.update(entities)
                 self._notify_observers(
@@ -236,7 +236,7 @@ class _MemoryManagerMixin:
             return
         try:
             recent = self._history[-kg._relevance_window :]
-            triples = kg.extract_triples(recent, model=self.config.model)
+            triples = kg.extract_triples(recent, model=self._effective_model)
             if triples:
                 kg.store.add_many(triples)
                 self._notify_observers(

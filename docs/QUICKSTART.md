@@ -465,6 +465,60 @@ config = AgentConfig(
 
 When a terminal tool fires, `AgentResult.content` contains the tool's return value.
 
+## Step 17: Multi-Agent Graph
+
+```python
+from selectools import Agent, AgentConfig, AgentGraph, tool
+from selectools.providers.stubs import LocalProvider
+
+@tool()
+def plan_task(task: str) -> str:
+    """Break a task into steps."""
+    return f"Plan for '{task}': 1) Research, 2) Draft, 3) Review"
+
+@tool()
+def write_draft(outline: str) -> str:
+    """Write a draft from an outline."""
+    return f"Draft based on: {outline}"
+
+planner = Agent(tools=[plan_task], provider=LocalProvider(), config=AgentConfig(max_iterations=2))
+writer = Agent(tools=[write_draft], provider=LocalProvider(), config=AgentConfig(max_iterations=2))
+
+graph = AgentGraph()
+graph.add_node("planner", planner)
+graph.add_node("writer", writer)
+graph.add_edge("planner", "writer")
+graph.add_edge("writer", AgentGraph.END)
+graph.set_entry("planner")
+
+result = graph.run("Write a blog post about Python")
+print(result.content)
+print(f"Nodes executed: {list(result.node_results.keys())}")
+```
+
+Multi-agent graphs let you compose agents into pipelines. Each node can be an `Agent`, an async function, or a sync callable. The graph handles routing, state passing, and trace aggregation.
+
+## Step 18: Supervisor Agent
+
+```python
+from selectools import SupervisorAgent
+from selectools.providers.stubs import LocalProvider
+
+supervisor = SupervisorAgent(
+    agents={"planner": planner, "writer": writer},
+    provider=LocalProvider(),
+    strategy="round_robin",
+    max_rounds=2,
+)
+result = supervisor.run("Write a blog post about AI agents")
+print(result.content)
+print(f"Steps taken: {result.steps}")
+```
+
+`SupervisorAgent` wraps `AgentGraph` with automatic coordination. Four strategies: `plan_and_execute`, `round_robin`, `dynamic`, `magentic`. See [Orchestration](modules/ORCHESTRATION.md) and [Supervisor](modules/SUPERVISOR.md) for full details.
+
+---
+
 ## What's Next?
 
 You now know the core API. Here is where to go from here:
@@ -499,7 +553,7 @@ You now know the core API. Here is where to go from here:
 | Track entities across turns | [Entity Memory Guide](modules/ENTITY_MEMORY.md) |
 | Build a knowledge graph | [Knowledge Graph Guide](modules/KNOWLEDGE_GRAPH.md) |
 | Add cross-session memory | [Knowledge Memory Guide](modules/KNOWLEDGE.md) |
-| See working examples | [examples/](https://github.com/johnnichev/selectools/tree/main/examples) (38 numbered scripts, 01–38) |
+| See working examples | [examples/](https://github.com/johnnichev/selectools/tree/main/examples) (61 numbered scripts, 01–61) |
 
 ---
 

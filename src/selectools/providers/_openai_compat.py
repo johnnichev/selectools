@@ -345,13 +345,13 @@ class _OpenAICompatibleBase(ABC):
     def _format_content(self, message: Message) -> str | List[Any]:
         if message.image_base64:
             return [
-                {"type": "text", "text": message.content},
+                {"type": "text", "text": message.content or ""},
                 {
                     "type": "image_url",
                     "image_url": {"url": f"data:image/jpeg;base64,{message.image_base64}"},
                 },
             ]
-        return message.content
+        return message.content or ""
 
     def _map_tool_to_openai(self, tool: Tool) -> Dict[str, Any]:
         """Convert a selectools.Tool to OpenAI tool schema."""

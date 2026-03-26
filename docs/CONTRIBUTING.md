@@ -612,7 +612,7 @@ class YourEmbeddingProvider(EmbeddingProvider):
 
 ## License
 
-By contributing to Selectools, you agree that your contributions will be licensed under the LGPL-3.0-or-later license.
+By contributing to Selectools, you agree that your contributions will be licensed under the Apache-2.0 license.
 
 ---
 

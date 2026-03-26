@@ -119,6 +119,9 @@ nav:
     - Vector Stores: modules/VECTOR_STORES.md
   - Evaluation:
     - Eval Framework: modules/EVALS.md
+  - Multi-Agent:
+    - Orchestration: modules/ORCHESTRATION.md
+    - Supervisor: modules/SUPERVISOR.md
   - Integration:
     - MCP Client/Server: modules/MCP.md
   - Security:
