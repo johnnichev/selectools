@@ -303,7 +303,7 @@ report.to_html("report.html")
 - **61 Examples**: Multi-agent graphs, RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, eval framework, and more
 - **Built-in Eval Framework**: 39 evaluators (21 deterministic + 18 LLM-as-judge), A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing
 - **AgentObserver Protocol**: 45 lifecycle events with `run_id` correlation, `LoggingObserver`, `SimpleStepObserver`, OTel export
-- **2435 Tests**: Unit, integration, regression, and E2E with real API calls
+- **2529 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 

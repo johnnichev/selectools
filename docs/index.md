@@ -146,7 +146,7 @@ print(result.reasoning)       # Why the agent chose get_weather
 | **Multi-Agent Orchestration** | `AgentGraph` for directed graphs, `SupervisorAgent` with 4 strategies, HITL via generator nodes, parallel execution, 3 checkpoint backends |
 | **Composable Pipelines** | `Pipeline` + `@step` + `|` operator + `parallel()` + `branch()` — chain agents, tools, and transforms with plain Python |
 | **Eval Framework** | 39 built-in evaluators, A/B testing, regression detection, HTML reports, JUnit XML |
-| **2435 Tests** | Unit, integration, regression, and E2E |
+| **2529 Tests** | Unit, integration, regression, and E2E |
 
 ---
 
