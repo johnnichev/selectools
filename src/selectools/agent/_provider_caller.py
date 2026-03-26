@@ -285,6 +285,13 @@ class _ProviderCallerMixin:
             attempts += 1
             try:
                 if run_id:
+                    self._notify_observers(
+                        "on_llm_start",
+                        run_id,
+                        self._history,
+                        self._effective_model,
+                        self._system_prompt,
+                    )
                     await self._anotify_observers(
                         "on_llm_start",
                         run_id,
@@ -296,6 +303,7 @@ class _ProviderCallerMixin:
                 if self.config.stream and getattr(self.provider, "supports_streaming", False):
                     response_text = await self._astreaming_call(stream_handler=stream_handler)
                     if run_id:
+                        self._notify_observers("on_llm_end", run_id, response_text, None)
                         await self._anotify_observers("on_llm_end", run_id, response_text, None)
                     return Message(role=Role.ASSISTANT, content=response_text)
 
