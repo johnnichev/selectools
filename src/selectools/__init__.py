@@ -86,6 +86,7 @@ from .orchestration import (
     SupervisorStrategy,
 )
 from .parser import ToolCallParser
+from .pipeline import Pipeline, Step, StepResult, branch, parallel, step
 from .policy import PolicyDecision, PolicyResult, ToolPolicy
 from .pricing import PRICING, calculate_cost, calculate_embedding_cost, get_model_pricing
 from .prompt import REASONING_STRATEGIES, PromptBuilder
