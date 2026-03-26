@@ -658,6 +658,11 @@ class AgentGraph:
                 if isinstance(node, ParallelGroupNode):
                     child_results, state = await self._aexecute_parallel(node, state, trace, run_id)
                     node_results.update(child_results)
+                    # Accumulate usage from all parallel children
+                    for child_list in child_results.values():
+                        for child_result in child_list:
+                            if child_result.usage:
+                                usage = _merge_usage(usage, child_result.usage)
 
                 elif isinstance(node, SubgraphNode):
                     result, state = await self._aexecute_subgraph(node, state, trace, run_id)
@@ -913,6 +918,10 @@ class AgentGraph:
                     )
                     child_results, state = await self._aexecute_parallel(node, state, trace, run_id)
                     node_results.update(child_results)
+                    for _cl in child_results.values():
+                        for _cr in _cl:
+                            if _cr.usage:
+                                usage = _merge_usage(usage, _cr.usage)
                     yield GraphEvent(type=GraphEventType.PARALLEL_END, node_name=current)
 
                 elif isinstance(node, SubgraphNode):
