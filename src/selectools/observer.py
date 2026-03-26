@@ -1627,49 +1627,49 @@ class SimpleStepObserver(AgentObserver):
         )
 
     def on_graph_start(self, run_id, graph_name, entry_node, state):
-        self._cb(run_id, "graph_start", graph_name=graph_name, entry_node=entry_node)
+        self._cb("graph_start", run_id, graph_name=graph_name, entry_node=entry_node, state=state)
 
     def on_graph_end(self, run_id, graph_name, steps, total_duration_ms):
         self._cb(
-            run_id,
             "graph_end",
+            run_id,
             graph_name=graph_name,
             steps=steps,
             total_duration_ms=total_duration_ms,
         )
 
     def on_graph_error(self, run_id, graph_name, node_name, error):
-        self._cb(run_id, "graph_error", graph_name=graph_name, node_name=node_name, error=error)
+        self._cb("graph_error", run_id, graph_name=graph_name, node_name=node_name, error=error)
 
     def on_node_start(self, run_id, node_name, step):
-        self._cb(run_id, "node_start", node_name=node_name, step=step)
+        self._cb("node_start", run_id, node_name=node_name, step=step)
 
     def on_node_end(self, run_id, node_name, step, duration_ms):
-        self._cb(run_id, "node_end", node_name=node_name, step=step, duration_ms=duration_ms)
+        self._cb("node_end", run_id, node_name=node_name, step=step, duration_ms=duration_ms)
 
     def on_graph_routing(self, run_id, from_node, to_node):
-        self._cb(run_id, "graph_routing", from_node=from_node, to_node=to_node)
+        self._cb("graph_routing", run_id, from_node=from_node, to_node=to_node)
 
     def on_graph_interrupt(self, run_id, node_name, interrupt_id):
-        self._cb(run_id, "graph_interrupt", node_name=node_name, interrupt_id=interrupt_id)
+        self._cb("graph_interrupt", run_id, node_name=node_name, interrupt_id=interrupt_id)
 
     def on_graph_resume(self, run_id, node_name, interrupt_id):
-        self._cb(run_id, "graph_resume", node_name=node_name, interrupt_id=interrupt_id)
+        self._cb("graph_resume", run_id, node_name=node_name, interrupt_id=interrupt_id)
 
     def on_parallel_start(self, run_id, group_name, child_nodes):
-        self._cb(run_id, "parallel_start", group_name=group_name, child_nodes=child_nodes)
+        self._cb("parallel_start", run_id, group_name=group_name, child_nodes=child_nodes)
 
     def on_parallel_end(self, run_id, group_name, child_count):
-        self._cb(run_id, "parallel_end", group_name=group_name, child_count=child_count)
+        self._cb("parallel_end", run_id, group_name=group_name, child_count=child_count)
 
     def on_stall_detected(self, run_id, node_name, stall_count):
-        self._cb(run_id, "stall_detected", node_name=node_name, stall_count=stall_count)
+        self._cb("stall_detected", run_id, node_name=node_name, stall_count=stall_count)
 
     def on_loop_detected(self, run_id, node_name, loop_count):
-        self._cb(run_id, "loop_detected", node_name=node_name, loop_count=loop_count)
+        self._cb("loop_detected", run_id, node_name=node_name, loop_count=loop_count)
 
     def on_supervisor_replan(self, run_id, stall_count, new_plan):
-        self._cb(run_id, "supervisor_replan", stall_count=stall_count, new_plan=new_plan)
+        self._cb("supervisor_replan", run_id, stall_count=stall_count, new_plan=new_plan)
 
     def on_eval_start(self, suite_name: str, total_cases: int, model: str) -> None:
         self._cb("eval_start", "", suite_name=suite_name, total_cases=total_cases, model=model)

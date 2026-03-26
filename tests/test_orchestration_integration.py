@@ -177,7 +177,7 @@ class TestNewObserverMethods:
     def test_simple_step_observer_routes_graph_events(self):
         received = []
 
-        def cb(run_id, event_type, **kwargs):
+        def cb(event_type, run_id, **kwargs):
             received.append(event_type)
 
         obs = SimpleStepObserver(cb)

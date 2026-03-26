@@ -439,7 +439,7 @@ class SupervisorAgent:
 
             agent_name = (await self._call_planner(system, routing_prompt)).strip()
 
-            if agent_name == "DONE" or not agent_name:
+            if agent_name.strip().upper() == "DONE" or not agent_name:
                 break
 
             if agent_name not in self.agents:
@@ -513,7 +513,7 @@ class SupervisorAgent:
             is_progressing = progress.get("is_progressing", True)
             next_agent = progress.get("next_agent", "")
 
-            if is_complete or next_agent == "DONE":
+            if is_complete or next_agent.strip().upper() == "DONE":
                 break
 
             if not is_progressing:
@@ -539,7 +539,9 @@ class SupervisorAgent:
                 next_agent = self._first_agent_name
 
             agent = self.agents[next_agent]
-            agent_task = progress.get("reason", state.data.get(STATE_KEY_LAST_OUTPUT, prompt))
+            agent_task = progress.get(
+                "task", progress.get("reason", state.data.get(STATE_KEY_LAST_OUTPUT, prompt))
+            )
             messages = [Message(role=Role.USER, content=agent_task or prompt)]
             result = await agent.arun(messages, parent_run_id=run_id)
             combined_usage = _apply_result_to_state(

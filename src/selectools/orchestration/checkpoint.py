@@ -22,6 +22,7 @@ Protocol::
 
 from __future__ import annotations
 
+import copy
 import json
 import os
 import sqlite3
@@ -92,7 +93,7 @@ def _serialize_checkpoint(state: GraphState, step: int) -> Dict:
     """Serialize state + interrupt responses into a JSON-safe dict."""
     d = state.to_dict()
     # Separately serialize _interrupt_responses (excluded from to_dict)
-    d["__interrupt__"] = state._interrupt_responses.copy()
+    d["__interrupt__"] = copy.deepcopy(state._interrupt_responses)
     d["__step__"] = step
     d["__node_name__"] = state.current_node
     d["__interrupted__"] = bool(state.metadata.get("__pending_interrupt_key__"))

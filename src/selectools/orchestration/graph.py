@@ -21,7 +21,6 @@ import inspect
 import json
 import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import (
@@ -1213,62 +1212,68 @@ class AgentGraph:
 
         # Apply scatter patches per-branch (if this parallel group came from Scatter)
         scatter_patches = self._scatter_patches.pop(node.name, {})
-        for i, child_name in enumerate(node.child_node_names):
-            if child_name in scatter_patches:
-                branch_states[i].data.update(scatter_patches[child_name])
+        try:
+            for i, child_name in enumerate(node.child_node_names):
+                if child_name in scatter_patches:
+                    branch_states[i].data.update(scatter_patches[child_name])
 
-        async def run_child(
-            child_name: str, branch_state: GraphState
-        ) -> Tuple[str, AgentResult, GraphState]:
-            child_node = self._nodes.get(child_name)
-            if child_node is None:
-                raise GraphExecutionError(
-                    self.name, child_name, KeyError(f"Child node {child_name!r} not found"), 0
-                )
-            if isinstance(child_node, GraphNode):
-                result, new_state, _ = await self._aexecute_node(
-                    child_node, branch_state, trace, run_id
-                )
+            async def run_child(
+                child_name: str, branch_state: GraphState
+            ) -> Tuple[str, AgentResult, GraphState]:
+                child_node = self._nodes.get(child_name)
+                if child_node is None:
+                    raise GraphExecutionError(
+                        self.name, child_name, KeyError(f"Child node {child_name!r} not found"), 0
+                    )
+                if isinstance(child_node, GraphNode):
+                    result, new_state, _ = await self._aexecute_node(
+                        child_node, branch_state, trace, run_id
+                    )
+                else:
+                    result = _make_synthetic_result(branch_state)
+                    new_state = branch_state
+                return child_name, result, new_state
+
+            child_outputs = await asyncio.gather(
+                *[
+                    run_child(name, bstate)
+                    for name, bstate in zip(node.child_node_names, branch_states)
+                ],
+                return_exceptions=True,
+            )
+
+            child_results: Dict[str, List[AgentResult]] = {}
+            branch_final_states: List[GraphState] = []
+            for i, output in enumerate(child_outputs):
+                if isinstance(output, BaseException):
+                    child_name = node.child_node_names[i]
+                    state.errors.append(
+                        {"node": child_name, "error": str(output), "type": type(output).__name__}
+                    )
+                    if self.error_policy == ErrorPolicy.ABORT:
+                        exc = output if isinstance(output, Exception) else Exception(str(output))
+                        raise GraphExecutionError(self.name, child_name, exc, 0) from output
+                    continue  # SKIP: log error and proceed
+                child_name, result, new_state = output
+                child_results.setdefault(child_name, []).append(result)
+                branch_final_states.append(new_state)
+
+            if not branch_final_states:
+                # All children failed — return parent state unchanged
+                merged = state
+            elif node.merge_fn:
+                merged = node.merge_fn(branch_final_states)
             else:
-                result = _make_synthetic_result(branch_state)
-                new_state = branch_state
-            return child_name, result, new_state
+                merged = merge_states(branch_final_states, node.merge_policy)
 
-        child_outputs = await asyncio.gather(
-            *[
-                run_child(name, bstate)
-                for name, bstate in zip(node.child_node_names, branch_states)
-            ],
-            return_exceptions=True,
-        )
-
-        child_results: Dict[str, List[AgentResult]] = {}
-        branch_final_states: List[GraphState] = []
-        for i, output in enumerate(child_outputs):
-            if isinstance(output, BaseException):
-                child_name = node.child_node_names[i]
-                state.errors.append(
-                    {"node": child_name, "error": str(output), "type": type(output).__name__}
-                )
-                if self.error_policy == ErrorPolicy.ABORT:
-                    exc = output if isinstance(output, Exception) else Exception(str(output))
-                    raise GraphExecutionError(self.name, child_name, exc, 0) from output
-                continue  # SKIP: log error and proceed
-            child_name, result, new_state = output
-            child_results.setdefault(child_name, []).append(result)
-            branch_final_states.append(new_state)
-
-        if not branch_final_states:
-            # All children failed — return parent state unchanged
-            merged = state
-        elif node.merge_fn:
-            merged = node.merge_fn(branch_final_states)
-        else:
-            merged = merge_states(branch_final_states, node.merge_policy)
-
-        self._notify("on_parallel_end", run_id, node.name, len(child_outputs))
-        self._trace_step(trace, StepType.GRAPH_PARALLEL_END, node_name=node.name)
-        return child_results, merged
+            self._notify("on_parallel_end", run_id, node.name, len(child_outputs))
+            self._trace_step(trace, StepType.GRAPH_PARALLEL_END, node_name=node.name)
+            return child_results, merged
+        except BaseException:
+            # Restore scatter patches so a retry/resume can reuse them
+            if scatter_patches:
+                self._scatter_patches[node.name] = scatter_patches
+            raise
 
     async def _aexecute_subgraph(
         self,
