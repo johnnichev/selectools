@@ -297,6 +297,14 @@ class GeminiProvider(Provider):
                         )
                     )
 
+            elif role == Role.SYSTEM.value:
+                # Gemini handles system instructions via config, not messages.
+                # Context injections (compressed context, entity memory) arrive
+                # as SYSTEM messages — convert to user messages.
+                role = "user"
+                if message.content:
+                    parts.append(types.Part(text=message.content))
+
             else:
                 role = "user"  # Fallback
                 if message.content:

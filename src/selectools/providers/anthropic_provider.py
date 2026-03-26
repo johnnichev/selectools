@@ -198,6 +198,17 @@ class AnthropicProvider(Provider):
             role = message.role.value
             content: List[Dict[str, Any]] = []
 
+            if role == Role.SYSTEM.value:
+                # Anthropic rejects "system" role in messages — it must be the
+                # top-level `system` parameter.  Context injections (compressed
+                # context, entity memory, knowledge graph) arrive as SYSTEM
+                # messages in history; convert to user messages so the model
+                # still sees the context.
+                role = "user"
+                content.append({"type": "text", "text": message.content or ""})
+                formatted.append({"role": role, "content": content})
+                continue
+
             if role == Role.TOOL.value:
                 # Map logical TOOL role to Anthropic USER role with tool_result block
                 role = "user"
