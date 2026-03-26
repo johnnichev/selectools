@@ -92,7 +92,9 @@ class Step:
         on_error: str = "raise",
     ) -> None:
         self.fn = fn
-        self.name = name or fn.__name__
+        self.name = (
+            name or getattr(fn, "__name__", None) or getattr(fn, "name", None) or type(fn).__name__
+        )
         self.retry = retry
         self.on_error = on_error
         self.is_async = asyncio.iscoroutinefunction(fn)

@@ -262,6 +262,8 @@ class AgentGraph:
             names: Optional node names (auto-generated as step_0, step_1, ... if omitted).
             **graph_kwargs: Passed to AgentGraph constructor (name, observers, etc.).
         """
+        if not agents:
+            raise ValueError("AgentGraph.chain() requires at least one agent")
         graph = cls(**graph_kwargs)
         node_names = names or [f"step_{i}" for i in range(len(agents))]
         if len(node_names) != len(agents):
@@ -508,7 +510,9 @@ class AgentGraph:
             raise GraphExecutionError(self.name, "", ValueError("No entry node set"), 0)
 
         # Normalize input
-        if isinstance(prompt_or_state, str):
+        if prompt_or_state is None:
+            state = GraphState.from_prompt("")
+        elif isinstance(prompt_or_state, str):
             state = GraphState.from_prompt(prompt_or_state)
         else:
             state = prompt_or_state
@@ -799,7 +803,9 @@ class AgentGraph:
         Yields events for node start/end, routing, interrupts, parallel,
         and the final GRAPH_END with the complete result.
         """
-        if isinstance(prompt_or_state, str):
+        if prompt_or_state is None:
+            state = GraphState.from_prompt("")
+        elif isinstance(prompt_or_state, str):
             state = GraphState.from_prompt(prompt_or_state)
         else:
             state = prompt_or_state
