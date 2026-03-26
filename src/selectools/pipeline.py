@@ -266,12 +266,13 @@ class Pipeline:
 
                 if retry_count > 0:
                     for attempt in range(retry_count):
+                        retry_start = time.time()
                         try:
                             current = self._execute_step(s, current, kwargs)
                             trace.append(
                                 {
                                     "step": step_name,
-                                    "duration_ms": round((time.time() - start) * 1000, 2),
+                                    "duration_ms": round((time.time() - retry_start) * 1000, 2),
                                     "status": "ok",
                                     "retry": attempt + 1,
                                 }
@@ -329,12 +330,13 @@ class Pipeline:
 
                 if retry_count > 0:
                     for attempt in range(retry_count):
+                        retry_start = time.time()
                         try:
                             current = await self._aexecute_step(s, current, kwargs)
                             trace.append(
                                 {
                                     "step": step_name,
-                                    "duration_ms": round((time.time() - start) * 1000, 2),
+                                    "duration_ms": round((time.time() - retry_start) * 1000, 2),
                                     "status": "ok",
                                     "retry": attempt + 1,
                                 }
