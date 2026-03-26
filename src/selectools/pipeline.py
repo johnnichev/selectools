@@ -260,10 +260,7 @@ class Pipeline:
                                 if on_error == "skip":
                                     break
                                 raise
-                    else:
-                        steps_run += 1
                 elif on_error == "skip":
-                    steps_run += 1
                     continue
                 else:
                     raise
@@ -326,10 +323,7 @@ class Pipeline:
                                 if on_error == "skip":
                                     break
                                 raise
-                    else:
-                        steps_run += 1
                 elif on_error == "skip":
-                    steps_run += 1
                     continue
                 else:
                     raise
@@ -480,8 +474,6 @@ def branch(
             )
 
         fn = target.fn if isinstance(target, Step) else target
-        if asyncio.iscoroutinefunction(fn):
-            return asyncio.run(fn(input, **kwargs))
         return fn(input, **kwargs)
 
     branch_names = list(branches.keys())
