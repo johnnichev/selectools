@@ -274,7 +274,7 @@ def merge_states(states: List[GraphState], policy: MergePolicy) -> GraphState:
     if not states:
         raise ValueError("Cannot merge empty list of states")
     if len(states) == 1:
-        return states[0]
+        return copy.deepcopy(states[0])
 
     merged_messages: List[Any] = []
     merged_history: List[Any] = []

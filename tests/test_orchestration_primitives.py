@@ -157,10 +157,14 @@ class TestMergeStates:
         merged = merge_states([s1, s2], MergePolicy.LAST_WINS)
         assert len(merged.errors) == 2
 
-    def test_single_state_returns_same_object(self):
+    def test_single_state_returns_independent_copy(self):
+        """Single-state merge returns a deep copy to prevent mutation leaks."""
         s = self._make_state("x", {"a": 1})
         merged = merge_states([s], MergePolicy.LAST_WINS)
-        assert merged is s
+        assert merged is not s  # Must be a copy, not same object
+        assert merged.data == s.data
+        merged.data["a"] = 999
+        assert s.data["a"] == 1  # Original unaffected
 
     def test_empty_list_raises(self):
         with pytest.raises(ValueError):
