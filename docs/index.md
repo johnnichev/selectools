@@ -144,8 +144,9 @@ print(result.reasoning)       # Why the agent chose get_weather
 | **Prompt Compression** | Proactive context-window management — summarises old messages when fill-rate exceeds threshold |
 | **Conversation Branching** | `memory.branch()` and `store.branch()` — fork history for A/B exploration and checkpointing |
 | **Multi-Agent Orchestration** | `AgentGraph` for directed graphs, `SupervisorAgent` with 4 strategies, HITL via generator nodes, parallel execution, 3 checkpoint backends |
+| **Composable Pipelines** | `Pipeline` + `@step` + `|` operator + `parallel()` + `branch()` — chain agents, tools, and transforms with plain Python |
 | **Eval Framework** | 39 built-in evaluators, A/B testing, regression detection, HTML reports, JUnit XML |
-| **2397 Tests** | Unit, integration, regression, and E2E |
+| **2435 Tests** | Unit, integration, regression, and E2E |
 
 ---
 
@@ -183,9 +184,10 @@ print(result.reasoning)       # Why the agent chose get_weather
     19. **[Knowledge Graph](modules/KNOWLEDGE_GRAPH.md)** — Relationship triple extraction
     20. **[Knowledge Memory](modules/KNOWLEDGE.md)** — Cross-session durable memory
 
-!!! abstract "Multi-Agent"
+!!! abstract "Multi-Agent & Composition"
     21. **[Orchestration](modules/ORCHESTRATION.md)** — Agent graphs, routing, parallel execution, HITL
     22. **[Supervisor](modules/SUPERVISOR.md)** — 4 coordination strategies for multi-agent teams
+    23. **Pipeline** — Composable pipelines with `@step`, `|` operator, `parallel()`, `branch()`
 
 ---
 

@@ -100,8 +100,9 @@ src/selectools/
 │   ├── graph.py             # AgentGraph engine (~700 lines)
 │   ├── checkpoint.py        # CheckpointStore protocol + 3 backends
 │   └── supervisor.py        # SupervisorAgent with 4 strategies
+├── pipeline.py              # Pipeline, Step, StepResult, @step, parallel(), branch() — composable pipelines (v0.18.0)
 
-tests/                       # 2397 tests (unit, integration, regression, E2E)
+tests/                       # 2435 tests (unit, integration, regression, E2E)
 ├── agent/                   # Agent core tests
 ├── providers/               # Provider-specific tests
 ├── rag/                     # RAG pipeline tests
@@ -350,8 +351,8 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 - **v0.17.5** ✅ Bug Hunt & Async Guardrails — 91 validated fixes, async guardrails, 40 regression tests
 - **v0.17.6** ✅ Quick Wins — ReAct/CoT reasoning strategies, tool result caching, Python 3.9–3.13 CI matrix
 - **v0.17.7** 🟡 Caching & Context — semantic caching, prompt compression, conversation branching
-- **v0.18.0** ✅ Multi-Agent Orchestration — AgentGraph, SupervisorAgent, HITL, checkpointing, parallel execution
-- **v0.18.x** 🟡 Composability Layer — Pipeline + `@step` + `|` operator + tool composition (LCEL answer)
+- **v0.18.0** ✅ Multi-Agent Orchestration + Composable Pipelines — AgentGraph, SupervisorAgent, HITL, checkpointing, parallel execution; Pipeline + `@step` + `|` operator + `parallel()` + `branch()`
+- **v0.18.x** 🟡 Advanced Composition — type-safe step contracts, streaming composition, tool composition (`@compose`)
 - **v0.19.0** 🟡 Serve & Deploy — Structured AgentConfig, `selectools serve`, FastAPI/Flask, YAML config, templates, playground
 - **v0.19.x** 🟡 Enterprise Hardening — security audit, stability markers, Postgres checkpoint, deprecation policy
 - **v0.20.0** 🟡 Advanced Agent Patterns — PlanAndExecute, ReflectiveAgent, Debate, TeamLead, 50+ evaluators

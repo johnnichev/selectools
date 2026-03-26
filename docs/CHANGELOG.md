@@ -56,6 +56,32 @@ result = supervisor.run("Write a report on AI safety")
 - **Magentic-One** — Task Ledger + Progress Ledger + auto-replan after `max_stalls` consecutive unproductive steps
 - **Delegation Constraints** — Explicit allow-lists preventing ping-pong delegation loops
 
+#### Composable Pipelines
+
+Chain agents, tools, and transforms with the `|` operator — the selectools answer to LangChain's LCEL, but plain Python.
+
+```python
+from selectools import Pipeline, step, parallel, branch
+
+@step
+def summarize(text: str) -> str:
+    return agent.run(f"Summarize: {text}").content
+
+@step
+def translate(text: str, lang: str = "es") -> str:
+    return agent.run(f"Translate to {lang}: {text}").content
+
+pipeline = summarize | translate
+result = pipeline.run("Long article text here...")
+```
+
+- **Pipeline** — Sequential composition with `Pipeline(steps=[...])` or `step_a | step_b`
+- **@step decorator** — Wrap any sync/async callable into a composable `Step`
+- **parallel()** — Fan-out to multiple steps, merge results
+- **branch()** — Conditional routing based on input data
+- **StepResult** — Each step produces a typed result with name, duration, and output
+- New exports: `Pipeline`, `Step`, `StepResult`, `step`, `parallel`, `branch`
+
 #### New Trace & Observer Infrastructure
 
 - 10 new `StepType` values: `graph_node_start`, `graph_node_end`, `graph_routing`, `graph_checkpoint`, `graph_interrupt`, `graph_resume`, `graph_parallel_start`, `graph_parallel_end`, `graph_stall`, `graph_loop_detected`
@@ -74,12 +100,13 @@ result = supervisor.run("Write a report on AI safety")
 
 ### Stats
 
-- Tests: 2275 → 2397 (+122)
+- Tests: 2275 → 2435 (+160)
 - Examples: 54 → 61 (+7)
 - StepTypes: 17 → 27 (+10)
 - Sync observer events: 32 → 45 (+13)
 - Async observer events: 29 → 42 (+13)
-- New source files: 6 (orchestration package)
+- Bug fixes: 35
+- New source files: 7 (orchestration package + pipeline.py)
 
 ---
 

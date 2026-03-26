@@ -35,13 +35,14 @@ v0.17.7 ✅ Caching & Context
 Semantic caching → Prompt compression → Conversation branching
 (55 tests, 3 examples)
 
-v0.18.0 ✅ Multi-Agent Orchestration
+v0.18.0 ✅ Multi-Agent Orchestration + Composable Pipelines
 AgentGraph → GraphState → Typed reducers → Resume-from-yield interrupts
 → Scatter fan-out → Checkpointing → SupervisorAgent → Graph visualization
+→ Pipeline → @step → | operator → parallel() → branch()
 
-v0.18.x 🟡 Composability Layer
-Pipeline → @step decorator → | operator → parallel/branch/retry
-→ Tool composition (@compose) → Type-safe composition (LCEL answer)
+v0.18.x 🟡 Advanced Composition
+Type-safe step contracts → Streaming composition → Tool composition (@compose)
+→ retry() / cache() step wrappers
 
 v0.19.0 🟡 Serve & Deploy
 Structured AgentConfig refactor (41 fields → nested dataclasses)
@@ -311,14 +312,14 @@ result = graph.run("Write a blog post about AI agents")
 
 ---
 
-## v0.18.x: Composability Layer 🟡
+## v0.18.0: Composable Pipelines ✅ (shipped alongside orchestration)
 
 Focus: Give selectools a composable pipeline abstraction — the answer to LangChain's LCEL. Lets users chain agents, tools, and transforms with the `|` operator.
 
-### Pipeline + @step Decorator
+**Core primitives shipped in v0.18.0:**
 
 ```python
-from selectools import Pipeline, step
+from selectools import Pipeline, step, parallel, branch
 
 @step
 def summarize(text: str) -> str:
@@ -337,25 +338,6 @@ result = pipeline.run("Long article text here...")
 # Or build programmatically
 pipeline = Pipeline(steps=[summarize, translate])
 result = pipeline.run(input_data)
-```
-
-### Tool Composition
-
-```python
-from selectools import tool, compose
-
-@tool()
-def fetch_data(url: str) -> str: ...
-
-@tool()
-def parse_json(text: str) -> dict: ...
-
-@tool()
-def extract_field(data: dict, field: str) -> str: ...
-
-# Chain tools into a single composite tool
-fetch_and_extract = compose(fetch_data, parse_json, extract_field)
-agent = Agent(tools=[fetch_and_extract], ...)
 ```
 
 ### Parallel & Branch Primitives
@@ -382,11 +364,18 @@ LangChain's LCEL is powerful but opaque — debugging `chain.invoke()` requires 
 
 | Feature | Status | Impact | Effort |
 | --- | --- | --- | --- |
-| **Pipeline + @step** | 🟡 High | High | Medium |
-| **\| operator** | 🟡 High | High | Small |
+| **Pipeline + @step** | ✅ Done | High | Medium |
+| **\| operator** | ✅ Done | High | Small |
+| **parallel() / branch()** | ✅ Done | Medium | Medium |
+
+### Remaining for v0.18.x
+
+| Feature | Status | Impact | Effort |
+| --- | --- | --- | --- |
 | **Tool composition (@compose)** | 🟡 High | Medium | Small |
-| **parallel() / branch()** | 🟡 Medium | Medium | Medium |
-| **Type-safe step chaining** | 🟡 Medium | Medium | Medium |
+| **Type-safe step contracts** | 🟡 Medium | Medium | Medium |
+| **Streaming composition** | 🟡 Medium | Medium | Medium |
+| **retry() / cache() wrappers** | 🟡 Medium | Medium | Small |
 
 ---
 

@@ -48,6 +48,39 @@ result = supervisor.run("Write a comprehensive report on LLM safety")
 - **10 New StepTypes** — Full trace visibility into graph execution
 - **13 New Observer Events** — on_graph_start/end, on_node_start/end, on_graph_interrupt/resume, and more
 
+### v0.18.0 — Composable Pipelines
+
+```python
+from selectools import Pipeline, step, parallel, branch
+
+@step
+def summarize(text: str) -> str:
+    return agent.run(f"Summarize: {text}").content
+
+@step
+def translate(text: str, lang: str = "es") -> str:
+    return agent.run(f"Translate to {lang}: {text}").content
+
+# Compose with | operator
+pipeline = summarize | translate
+result = pipeline.run("Long article text here...")
+
+# Fan-out to multiple steps, merge results
+research = parallel(search_web, search_docs, search_db)
+
+# Conditional branching
+route = branch(
+    lambda x: "technical" if "code" in x else "general",
+    technical=code_review_pipeline,
+    general=summarize_pipeline,
+)
+```
+
+- **Pipeline** — Chain steps sequentially with `|` operator or `Pipeline(steps=[...])`
+- **@step decorator** — Wrap any sync/async callable into a composable pipeline step
+- **parallel()** — Fan-out to multiple steps and merge results
+- **branch()** — Conditional routing based on input data
+
 <details>
 <summary><strong>v0.17.x highlights</strong></summary>
 
@@ -231,6 +264,7 @@ report.to_html("report.html")
 | **MCP Integration** | Connect to any MCP tool server (stdio + HTTP). MCPClient, MultiMCPClient, MCPServer. Circuit breaker, retry, graceful degradation. |
 | **Eval Framework** | 39 built-in evaluators (21 deterministic + 18 LLM-as-judge). A/B testing, regression detection, snapshot testing, HTML reports, JUnit XML, CI integration. |
 | **Multi-Agent Orchestration** | `AgentGraph` for directed agent graphs, `SupervisorAgent` with 4 strategies, HITL via generator nodes, parallel execution, checkpointing, subgraph composition. |
+| **Composable Pipelines** | `Pipeline` + `@step` + `|` operator + `parallel()` + `branch()` — chain agents, tools, and transforms with plain Python. |
 | **AgentObserver Protocol** | 45-event lifecycle observer with `run_id`/`call_id` correlation. Built-in `LoggingObserver` + `SimpleStepObserver`. |
 | **Runtime Controls** | Token/cost budget limits, cooperative cancellation, per-tool approval gates, model switching per iteration. |
 | **Production Hardened** | Retries with backoff, per-tool timeouts, iteration caps, cost warnings, observability hooks + observers. |
@@ -263,10 +297,11 @@ report.to_html("report.html")
 - **Prompt Compression**: Auto-summarise old history when context window fills up; `compress_context`, `compress_threshold`, `compress_keep_recent`
 - **Conversation Branching**: `ConversationMemory.branch()` and `SessionStore.branch()` for A/B exploration and checkpointing
 - **Multi-Agent Orchestration**: `AgentGraph` with routing, parallel execution, HITL, checkpointing; `SupervisorAgent` with 4 strategies (plan_and_execute, round_robin, dynamic, magentic)
+- **Composable Pipelines**: `Pipeline` + `@step` + `|` operator + `parallel()` + `branch()` — chain agents, tools, and transforms
 - **61 Examples**: Multi-agent graphs, RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, eval framework, and more
 - **Built-in Eval Framework**: 39 evaluators (21 deterministic + 18 LLM-as-judge), A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing
 - **AgentObserver Protocol**: 45 lifecycle events with `run_id` correlation, `LoggingObserver`, `SimpleStepObserver`, OTel export
-- **2397 Tests**: Unit, integration, regression, and E2E with real API calls
+- **2435 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 
