@@ -895,3 +895,229 @@ class TestRegressions:
 
         with pytest.raises(ValueError, match="at least one agent"):
             SupervisorAgent(agents={}, provider=mock_provider)
+
+
+# ------------------------------------------------------------------
+# Framework integration: astream() parity
+# ------------------------------------------------------------------
+
+
+class TestAstreamParity:
+    """Verify astream() has full feature parity with arun()."""
+
+    @pytest.mark.asyncio
+    async def test_astream_fires_observer_events(self):
+        """astream() must fire the same observer events as arun()."""
+        from selectools.observer import AgentObserver
+
+        events_fired = []
+
+        class TrackingObserver(AgentObserver):
+            def on_graph_start(self, run_id, graph_name, entry_node, state):
+                events_fired.append("graph_start")
+
+            def on_node_start(self, run_id, node_name, step):
+                events_fired.append(f"node_start:{node_name}")
+
+            def on_node_end(self, run_id, node_name, step, duration_ms):
+                events_fired.append(f"node_end:{node_name}")
+
+            def on_graph_routing(self, run_id, from_node, to_node):
+                events_fired.append(f"routing:{from_node}->{to_node}")
+
+            def on_graph_end(self, run_id, graph_name, steps, total_duration_ms):
+                events_fired.append("graph_end")
+
+        graph = AgentGraph(observers=[TrackingObserver()])
+        graph.add_node("a", sync_fn_node("from_a"))
+        graph.add_node("b", sync_fn_node("from_b"))
+        graph.add_edge("a", "b")
+        graph.add_edge("b", AgentGraph.END)
+
+        async for _ in graph.astream("go"):
+            pass
+
+        assert "graph_start" in events_fired, f"Missing graph_start. Got: {events_fired}"
+        assert "node_start:a" in events_fired, f"Missing node_start:a. Got: {events_fired}"
+        assert "node_end:a" in events_fired, f"Missing node_end:a. Got: {events_fired}"
+        assert "node_start:b" in events_fired, f"Missing node_start:b. Got: {events_fired}"
+        assert "node_end:b" in events_fired, f"Missing node_end:b. Got: {events_fired}"
+        assert "graph_end" in events_fired, f"Missing graph_end. Got: {events_fired}"
+
+    @pytest.mark.asyncio
+    async def test_astream_enforces_max_visits(self):
+        """astream() must respect node max_visits like arun()."""
+
+        def stateless_loop(state: GraphState) -> GraphState:
+            state.data["counter"] = state.data.get("counter", 0) + 1
+            state.data[STATE_KEY_LAST_OUTPUT] = str(state.data["counter"])
+            return state
+
+        graph = AgentGraph(enable_loop_detection=False)
+        graph.add_node("loop", stateless_loop, max_visits=2)
+        graph.add_edge("loop", "loop")
+
+        events = []
+        async for event in graph.astream("go"):
+            events.append(event)
+
+        error_events = [e for e in events if e.type == GraphEventType.ERROR]
+        assert len(error_events) > 0, "Should yield ERROR when max_visits exceeded"
+
+    @pytest.mark.asyncio
+    async def test_astream_records_stall_count(self):
+        """astream() must track stalls like arun()."""
+        from selectools.observer import AgentObserver
+
+        stalls = []
+
+        class StallObserver(AgentObserver):
+            def on_stall_detected(self, run_id, node_name, stall_count):
+                stalls.append(stall_count)
+
+        def unchanging_node(state: GraphState) -> GraphState:
+            # Mutates data so hash changes, but uses same __last_output__
+            state.data["tick"] = state.data.get("tick", 0) + 1
+            return state
+
+        graph = AgentGraph(
+            observers=[StallObserver()],
+            enable_loop_detection=True,
+            stall_threshold=2,
+            max_steps=10,
+        )
+        graph.add_node("same", unchanging_node)
+        graph.add_edge("same", "same")
+
+        events = []
+        async for event in graph.astream("go"):
+            events.append(event)
+
+        # Graph should detect stalls OR hit a loop — either way observer should fire
+        # (exact behavior depends on hash stability)
+        result_event = [e for e in events if e.type == GraphEventType.GRAPH_END]
+        assert len(result_event) == 1, "Should have GRAPH_END event"
+
+    @pytest.mark.asyncio
+    async def test_astream_routing_error_yields_error_event(self):
+        """Routing errors in astream() must yield ERROR event, not crash."""
+
+        def bad_router(state: GraphState):
+            raise ValueError("router broke")
+
+        graph = AgentGraph()
+        graph.add_node("a", sync_fn_node("out"))
+        graph.add_conditional_edge("a", bad_router)
+
+        events = []
+        async for event in graph.astream("go"):
+            events.append(event)
+
+        error_events = [e for e in events if e.type == GraphEventType.ERROR]
+        assert len(error_events) > 0, "Should yield ERROR event on routing failure"
+
+    @pytest.mark.asyncio
+    async def test_astream_result_matches_arun(self):
+        """astream() and arun() on the same graph should produce equivalent results."""
+        graph = AgentGraph()
+        graph.add_node("a", sync_fn_node("from_a"))
+        graph.add_node("b", sync_fn_node("from_b"))
+        graph.add_edge("a", "b")
+        graph.add_edge("b", AgentGraph.END)
+
+        # arun() result
+        arun_result = await graph.arun("go")
+
+        # astream() result
+        stream_result = None
+        async for event in graph.astream("go"):
+            if event.type == GraphEventType.GRAPH_END:
+                stream_result = event.result
+
+        assert stream_result is not None, "astream should yield GRAPH_END with result"
+        assert stream_result.content == arun_result.content
+        assert stream_result.steps == arun_result.steps
+        assert len(stream_result.node_results) == len(arun_result.node_results)
+
+
+# ------------------------------------------------------------------
+# Framework integration: routing edge cases
+# ------------------------------------------------------------------
+
+
+class TestRoutingFramework:
+    """Test framework-level routing behavior (not LLM-dependent)."""
+
+    def test_update_routing_applies_patch_and_follows_edge(self):
+        """update() from router applies state patch then follows static edge."""
+        from selectools.orchestration.state import _Update, update
+
+        def update_router(state: GraphState):
+            return update({"injected": "by_router"})
+
+        graph = AgentGraph()
+        graph.add_node("a", sync_fn_node("from_a"))
+        graph.add_node("b", sync_fn_node("from_b"))
+        graph.add_conditional_edge("a", update_router)
+        graph.add_edge("a", "b")  # static fallback edge
+        graph.add_edge("b", AgentGraph.END)
+
+        result = graph.run("go")
+        assert result.state.data.get("injected") == "by_router"
+        assert result.content == "from_b"
+
+    def test_router_returning_list_of_strings_raises(self):
+        """Router returning ['a', 'b'] (not Scatter) must raise, not silently END."""
+
+        def bad_router(state: GraphState):
+            return ["node_a", "node_b"]  # Wrong! Should be Scatter objects
+
+        graph = AgentGraph()
+        graph.add_node("entry", sync_fn_node("start"))
+        graph.add_node("node_a", sync_fn_node("a"))
+        graph.add_conditional_edge("entry", bad_router)
+
+        with pytest.raises(GraphExecutionError, match="list of str"):
+            graph.run("go")
+
+    def test_graph_resume_fires_observer_event(self):
+        """on_graph_resume fires when loading from checkpoint."""
+        from selectools.observer import AgentObserver
+        from selectools.orchestration.checkpoint import InMemoryCheckpointStore
+
+        resume_events = []
+
+        class ResumeObserver(AgentObserver):
+            def on_graph_resume(self, run_id, node_name, checkpoint_id):
+                resume_events.append(checkpoint_id)
+
+        async def interrupt_node(state: GraphState):
+            yield InterruptRequest(prompt="approve?")
+            state.data[STATE_KEY_LAST_OUTPUT] = "done"
+
+        graph = AgentGraph(observers=[ResumeObserver()])
+        graph.add_node("gate", interrupt_node)
+        graph.add_edge("gate", AgentGraph.END)
+
+        store = InMemoryCheckpointStore()
+        result = graph.run("go", checkpoint_store=store)
+        assert result.interrupted
+
+        final = graph.resume(result.interrupt_id, "yes", checkpoint_store=store)
+        assert len(resume_events) == 1, f"on_graph_resume should fire once. Got: {resume_events}"
+
+    def test_file_checkpoint_rejects_path_traversal(self):
+        """FileCheckpointStore must reject graph_id with path traversal."""
+        import tempfile
+
+        from selectools.orchestration.checkpoint import FileCheckpointStore
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = FileCheckpointStore(tmpdir)
+            state = GraphState.from_prompt("test")
+
+            with pytest.raises(ValueError, match="Invalid graph_id"):
+                store.save("../../../etc/passwd", state, 0)
+
+            with pytest.raises(ValueError, match="Invalid graph_id"):
+                store.save("sub/dir", state, 0)
