@@ -176,7 +176,7 @@ print(result.reasoning)       # Why the agent chose get_weather
     15. **[Error Handling](modules/EXCEPTIONS.md)** — Custom exception hierarchy
 
 !!! abstract "Evaluation"
-    16. **[Eval Framework](modules/EVALS.md)** — 22 built-in evaluators, A/B testing, regression detection, snapshot testing
+    16. **[Eval Framework](modules/EVALS.md)** — 39 built-in evaluators, A/B testing, regression detection, snapshot testing
 
 !!! abstract "Memory & Persistence"
     17. **[Sessions](modules/SESSIONS.md)** — Persistent session storage with 3 backends

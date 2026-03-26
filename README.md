@@ -205,7 +205,7 @@ report = suite.run()
 report.to_html("report.html")
 ```
 
-- **39 Evaluators** — 21 deterministic + 18 LLM-as-judge
+- **39 Evaluators** — 22 deterministic + 17 LLM-as-judge
 - **A/B Testing**, regression detection, snapshot testing
 - **HTML reports**, JUnit XML, CLI, GitHub Action integration
 
@@ -264,7 +264,7 @@ report.to_html("report.html")
 | **Knowledge Graph** | Relationship triple extraction with in-memory and SQLite storage and keyword-based querying. |
 | **Cross-Session Knowledge** | Daily logs + persistent facts with auto-registered `remember` tool. |
 | **MCP Integration** | Connect to any MCP tool server (stdio + HTTP). MCPClient, MultiMCPClient, MCPServer. Circuit breaker, retry, graceful degradation. |
-| **Eval Framework** | 39 built-in evaluators (21 deterministic + 18 LLM-as-judge). A/B testing, regression detection, snapshot testing, HTML reports, JUnit XML, CI integration. |
+| **Eval Framework** | 39 built-in evaluators (22 deterministic + 17 LLM-as-judge). A/B testing, regression detection, snapshot testing, HTML reports, JUnit XML, CI integration. |
 | **Multi-Agent Orchestration** | `AgentGraph` for directed agent graphs, `SupervisorAgent` with 4 strategies, HITL via generator nodes, parallel execution, checkpointing, subgraph composition. |
 | **Composable Pipelines** | `Pipeline` + `@step` + `|` operator + `parallel()` + `branch()` — chain agents, tools, and transforms with plain Python. |
 | **AgentObserver Protocol** | 45-event lifecycle observer with `run_id`/`call_id` correlation. Built-in `LoggingObserver` + `SimpleStepObserver`. |
@@ -301,7 +301,7 @@ report.to_html("report.html")
 - **Multi-Agent Orchestration**: `AgentGraph` with routing, parallel execution, HITL, checkpointing; `SupervisorAgent` with 4 strategies (plan_and_execute, round_robin, dynamic, magentic)
 - **Composable Pipelines**: `Pipeline` + `@step` + `|` operator + `parallel()` + `branch()` — chain agents, tools, and transforms
 - **61 Examples**: Multi-agent graphs, RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, eval framework, and more
-- **Built-in Eval Framework**: 39 evaluators (21 deterministic + 18 LLM-as-judge), A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing
+- **Built-in Eval Framework**: 39 evaluators (22 deterministic + 17 LLM-as-judge), A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing
 - **AgentObserver Protocol**: 45 lifecycle events with `run_id` correlation, `LoggingObserver`, `SimpleStepObserver`, OTel export
 - **2529 Tests**: Unit, integration, regression, and E2E with real API calls
 

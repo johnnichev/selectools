@@ -7,7 +7,7 @@ This file provides context for AI coding agents (Claude, Cursor, Copilot, etc.) 
 **Selectools** is a production-ready Python library for building AI agents with tool calling, RAG, and hybrid search. It supports OpenAI, Anthropic, Gemini, and Ollama providers.
 
 - **Version**: Check `src/selectools/__init__.py` for current version
-- **Python**: 3.13+ (CI runs 3.13)
+- **Python**: 3.9+ (CI runs 3.9, 3.10, 3.11, 3.12, 3.13)
 - **Package manager**: pip + setuptools
 - **Source layout**: `src/selectools/` (src-layout)
 - **Tests**: `tests/` (pytest)
@@ -79,8 +79,8 @@ src/selectools/
 ├── env.py                   # Environment variable helpers
 └── evals/                   # Built-in eval framework (39 evaluators)
     ├── types.py             # TestCase, CaseResult, CaseVerdict, EvalFailure
-    ├── evaluators.py        # 21 deterministic evaluators
-    ├── llm_evaluators.py    # 18 LLM-as-judge evaluators
+    ├── evaluators.py        # 22 deterministic evaluators
+    ├── llm_evaluators.py    # 17 LLM-as-judge evaluators
     ├── suite.py             # EvalSuite orchestration
     ├── report.py            # EvalReport with stats and export
     ├── dataset.py           # DatasetLoader (JSON/YAML)

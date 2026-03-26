@@ -248,7 +248,7 @@ agent = Agent(
 
 ## Step 9: Monitor with AgentObserver
 
-For production observability, use `AgentObserver` — a class-based protocol with 31 lifecycle events. Every callback gets a `run_id` for cross-request correlation. For simpler integrations, use `SimpleStepObserver` which routes all events to a single callback:
+For production observability, use `AgentObserver` — a class-based protocol with 45 lifecycle events. Every callback gets a `run_id` for cross-request correlation. For simpler integrations, use `SimpleStepObserver` which routes all events to a single callback:
 
 ```python
 from selectools import Agent, AgentConfig
