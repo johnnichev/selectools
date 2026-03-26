@@ -187,7 +187,10 @@ class FileCheckpointStore:
         os.makedirs(directory, exist_ok=True)
 
     def _graph_dir(self, graph_id: str) -> str:
-        d = os.path.join(self._directory, graph_id)
+        safe_id = os.path.basename(graph_id)
+        if not safe_id or safe_id != graph_id:
+            raise ValueError(f"Invalid graph_id: {graph_id!r}")
+        d = os.path.join(self._directory, safe_id)
         os.makedirs(d, exist_ok=True)
         return d
 

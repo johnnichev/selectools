@@ -536,6 +536,15 @@ class AgentGraph:
         unchanged_streak = 0
         seen_hashes: set = set()
 
+        if checkpoint_id and checkpoint_store:
+            self._notify("on_graph_resume", run_id, state.current_node, checkpoint_id)
+            self._trace_step(
+                trace,
+                StepType.GRAPH_RESUME,
+                node_name=state.current_node,
+                checkpoint_id=checkpoint_id,
+            )
+
         # Fast-path routing
         if self.fast_route_fn is not None and not checkpoint_id:
             fast_node = self.fast_route_fn(state)
@@ -816,6 +825,8 @@ class AgentGraph:
             node_name=self._entry_node,
             state=state,
         )
+        self._notify("on_graph_start", run_id, self.name, self._entry_node, state.to_dict())
+        self._trace_step(trace, StepType.GRAPH_NODE_START, node_name=self.name, step_number=0)
 
         current = self._entry_node
         step = 0
@@ -840,9 +851,28 @@ class AgentGraph:
                 )
                 break
 
+            if isinstance(node, GraphNode) and node.max_visits > 0:
+                if visit_counts[current] > node.max_visits:
+                    yield GraphEvent(
+                        type=GraphEventType.ERROR,
+                        node_name=current,
+                        error=RuntimeError(
+                            f"Node {current!r} exceeded max_visits={node.max_visits}"
+                        ),
+                    )
+                    break
+
             if self.enable_loop_detection:
                 h = _state_hash(state)
                 if h in seen_hashes:
+                    loop_count += 1
+                    self._notify("on_loop_detected", run_id, current, loop_count)
+                    self._trace_step(
+                        trace,
+                        StepType.GRAPH_LOOP_DETECTED,
+                        node_name=current,
+                        step_number=step,
+                    )
                     yield GraphEvent(
                         type=GraphEventType.ERROR,
                         node_name=current,
@@ -852,11 +882,23 @@ class AgentGraph:
                 seen_hashes.add(h)
                 if h == prev_hash:
                     unchanged_streak += 1
+                    if unchanged_streak >= self.stall_threshold:
+                        stall_count += 1
+                        self._notify("on_stall_detected", run_id, current, stall_count)
+                        self._trace_step(
+                            trace,
+                            StepType.GRAPH_STALL,
+                            node_name=current,
+                            step_number=step,
+                        )
                 else:
                     unchanged_streak = 0
                 prev_hash = h
 
+            self._notify("on_node_start", run_id, current, step)
+            self._trace_step(trace, StepType.GRAPH_NODE_START, node_name=current, step_number=step)
             yield GraphEvent(type=GraphEventType.NODE_START, node_name=current)
+            node_start_time = time.time()
 
             try:
                 if isinstance(node, ParallelGroupNode):
@@ -895,6 +937,16 @@ class AgentGraph:
                             ckpt_id = checkpoint_store.save(run_id, state, step)
                         else:
                             ckpt_id = f"{run_id}_{step}"
+                        self._notify("on_graph_interrupt", run_id, current, ckpt_id)
+                        self._trace_step(
+                            trace,
+                            StepType.GRAPH_INTERRUPT,
+                            node_name=current,
+                            interrupt_key=interrupt_key,
+                            checkpoint_id=ckpt_id,
+                        )
+                        duration_ms = (time.time() - graph_start) * 1000
+                        self._notify("on_graph_end", run_id, self.name, step, duration_ms)
                         yield GraphEvent(
                             type=GraphEventType.GRAPH_INTERRUPT,
                             node_name=current,
@@ -903,6 +955,7 @@ class AgentGraph:
                         break
 
             except Exception as exc:
+                self._notify("on_graph_error", run_id, self.name, current, exc)
                 yield GraphEvent(
                     type=GraphEventType.ERROR,
                     node_name=current,
@@ -911,18 +964,45 @@ class AgentGraph:
                 if self.error_policy == ErrorPolicy.ABORT:
                     break
 
+            node_duration_ms = (time.time() - node_start_time) * 1000
+            self._notify("on_node_end", run_id, current, step, node_duration_ms)
+            self._trace_step(
+                trace,
+                StepType.GRAPH_NODE_END,
+                node_name=current,
+                step_number=step,
+                duration_ms=node_duration_ms,
+            )
             yield GraphEvent(type=GraphEventType.NODE_END, node_name=current)
 
             if checkpoint_store:
                 checkpoint_store.save(run_id, state, step)
 
             prev_node = current
-            current = self._resolve_next_node(current, state, trace, run_id)
+            try:
+                current = self._resolve_next_node(current, state, trace, run_id)
+            except GraphExecutionError as exc:
+                yield GraphEvent(
+                    type=GraphEventType.ERROR,
+                    node_name=prev_node,
+                    error=exc,
+                )
+                break
             yield GraphEvent(
                 type=GraphEventType.ROUTING,
                 node_name=prev_node,
                 next_node=current,
             )
+
+        total_duration_ms = (time.time() - graph_start) * 1000
+        self._trace_step(
+            trace,
+            StepType.GRAPH_NODE_END,
+            node_name=self.name,
+            step_number=step,
+            duration_ms=total_duration_ms,
+        )
+        self._notify("on_graph_end", run_id, self.name, step, total_duration_ms)
 
         final_result = GraphResult(
             content=state.data.get(STATE_KEY_LAST_OUTPUT, ""),
@@ -1098,6 +1178,13 @@ class AgentGraph:
                 else:
                     value.interrupt_key = interrupt_key
                     state.metadata[_STATE_KEY_PENDING_INTERRUPT] = interrupt_key
+                    self._notify("on_graph_interrupt", run_id, node.name, interrupt_key)
+                    self._trace_step(
+                        trace,
+                        StepType.GRAPH_INTERRUPT,
+                        node_name=node.name,
+                        interrupt_key=interrupt_key,
+                    )
                     synthetic = _make_synthetic_result(state)
                     return synthetic, state, True
 
@@ -1265,12 +1352,27 @@ class AgentGraph:
                     next_node = self._handle_scatter(raw, state)
                     result = next_node
                 else:
-                    result = self.END
+                    raise GraphExecutionError(
+                        self.name,
+                        current,
+                        TypeError(
+                            f"Router returned list of {type(raw[0]).__name__},"
+                            " expected list of Scatter"
+                        ),
+                        0,
+                    )
             elif isinstance(raw, Scatter):
                 next_node = self._handle_scatter([raw], state)
                 result = next_node
             elif isinstance(raw, _Goto):
                 result = raw.node_name
+            elif isinstance(raw, _Update):
+                state.data.update(raw.patch)
+                # After applying patch, check for static edge from current node
+                if current in self._edges:
+                    result = self._edges[current]
+                else:
+                    result = self.END
             elif isinstance(raw, str):
                 if current in self._path_maps:
                     pmap = self._path_maps[current]

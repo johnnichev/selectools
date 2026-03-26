@@ -296,7 +296,10 @@ class SupervisorAgent:
                 system_prompt=system,
                 tools=[],
             )
-        except Exception:
+        except Exception as exc:
+            import logging
+
+            logging.getLogger("selectools.orchestration").warning("Planner call failed: %s", exc)
             return ""
 
         return result_msg.content or ""
@@ -592,9 +595,9 @@ def _looks_complete(text: str) -> bool:
     """Heuristic: does the output text look like a completed task?"""
     if not text:
         return False
-    text_lower = text.lower()
-    completion_signals = ["task complete", "done.", "finished.", "complete.", "all done"]
-    return any(signal in text_lower for signal in completion_signals)
+    text_lower = text.lower().strip()
+    exact_endings = ["done.", "finished.", "complete.", "all done.", "all done", "task complete"]
+    return any(text_lower.endswith(signal) for signal in exact_endings)
 
 
 def _format_history(history: List[Any]) -> str:
