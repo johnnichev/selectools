@@ -75,7 +75,7 @@ class _MemoryManagerMixin:
             return
         try:
             provider = self.config.summarize_provider or self.provider
-            model = self.config.summarize_model or self.config.model
+            model = self.config.summarize_model or self._effective_model
             trimmed_text = _format_messages_as_text(trimmed)
             prompt_msg = Message(
                 role=Role.USER,

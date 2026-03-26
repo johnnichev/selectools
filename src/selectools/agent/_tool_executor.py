@@ -82,7 +82,7 @@ class _ToolExecutorMixin:
         if not self.config.coherence_check:
             return None
         provider = self.config.coherence_provider or self.provider
-        model = self.config.coherence_model or self.config.model
+        model = self.config.coherence_model or self._effective_model
         result = check_coherence(
             provider=provider,
             model=model,
@@ -112,7 +112,7 @@ class _ToolExecutorMixin:
         if not self.config.coherence_check:
             return None
         provider = self.config.coherence_provider or self.provider
-        model = self.config.coherence_model or self.config.model
+        model = self.config.coherence_model or self._effective_model
         result = await acheck_coherence(
             provider=provider,
             model=model,
