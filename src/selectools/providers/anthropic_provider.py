@@ -216,7 +216,7 @@ class AnthropicProvider(Provider):
                     {
                         "type": "tool_result",
                         "tool_use_id": message.tool_call_id or "unknown",
-                        "content": message.content,
+                        "content": message.content or "",
                     }
                 )
             else:

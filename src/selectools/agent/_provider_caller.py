@@ -285,13 +285,6 @@ class _ProviderCallerMixin:
             attempts += 1
             try:
                 if run_id:
-                    self._notify_observers(
-                        "on_llm_start",
-                        run_id,
-                        self._history,
-                        self._effective_model,
-                        self._system_prompt,
-                    )
                     await self._anotify_observers(
                         "on_llm_start",
                         run_id,
@@ -303,7 +296,6 @@ class _ProviderCallerMixin:
                 if self.config.stream and getattr(self.provider, "supports_streaming", False):
                     response_text = await self._astreaming_call(stream_handler=stream_handler)
                     if run_id:
-                        self._notify_observers("on_llm_end", run_id, response_text, None)
                         await self._anotify_observers("on_llm_end", run_id, response_text, None)
                     return Message(role=Role.ASSISTANT, content=response_text)
 
@@ -453,9 +445,9 @@ class _ProviderCallerMixin:
                 max_tokens=self.config.max_tokens,
                 timeout=self.config.request_timeout,
             ):
-                if chunk:
-                    aggregated.append(str(chunk))
+                if isinstance(chunk, str) and chunk:
+                    aggregated.append(chunk)
                     if stream_handler:
-                        stream_handler(str(chunk))
+                        stream_handler(chunk)
 
         return "".join(aggregated)

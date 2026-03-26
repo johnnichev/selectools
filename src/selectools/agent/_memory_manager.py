@@ -123,7 +123,7 @@ class _MemoryManagerMixin:
             return
         try:
             recent = self._history[-em._relevance_window :]
-            entities = em.extract_entities(recent, model=self.config.model)
+            entities = em.extract_entities(recent, model=self._effective_model)
             if entities:
                 em.update(entities)
                 self._notify_observers(
@@ -236,7 +236,7 @@ class _MemoryManagerMixin:
             return
         try:
             recent = self._history[-kg._relevance_window :]
-            triples = kg.extract_triples(recent, model=self.config.model)
+            triples = kg.extract_triples(recent, model=self._effective_model)
             if triples:
                 kg.store.add_many(triples)
                 self._notify_observers(
