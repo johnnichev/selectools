@@ -67,7 +67,7 @@ class EvalReport:
         latencies = sorted(self._latencies())
         if not latencies:
             return 0.0
-        idx = int(len(latencies) * 0.95)
+        idx = max(0, int(len(latencies) * 0.95) - 1)
         return latencies[min(idx, len(latencies) - 1)]
 
     @property
@@ -75,7 +75,7 @@ class EvalReport:
         latencies = sorted(self._latencies())
         if not latencies:
             return 0.0
-        idx = int(len(latencies) * 0.99)
+        idx = max(0, int(len(latencies) * 0.99) - 1)
         return latencies[min(idx, len(latencies) - 1)]
 
     @property

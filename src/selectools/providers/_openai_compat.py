@@ -326,7 +326,7 @@ class _OpenAICompatibleBase(ABC):
                                 tool_call_deltas[index]["id"] = tc_delta.id
                             if tc_delta.function:
                                 if tc_delta.function.name:
-                                    tool_call_deltas[index]["name"] += tc_delta.function.name
+                                    tool_call_deltas[index]["name"] = tc_delta.function.name
                                 if tc_delta.function.arguments:
                                     tool_call_deltas[index][
                                         "arguments"
@@ -334,7 +334,7 @@ class _OpenAICompatibleBase(ABC):
 
                     # Check for finish reason to emit completed tool calls
                     finish_reason = chunk.choices[0].finish_reason
-                    if finish_reason == "tool_calls":
+                    if finish_reason in ("tool_calls", "stop") and tool_call_deltas:
                         for index in sorted(tool_call_deltas.keys()):
                             tc_info = tool_call_deltas[index]
                             try:
