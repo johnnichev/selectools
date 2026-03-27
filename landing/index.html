@@ -71,7 +71,7 @@
           Not Duct Tape
         </h1>
         <p class="text-xl text-slate-400 mb-10 leading-relaxed">
-          Production-ready Python framework for LLM agents. Built-in audit logging, cost tracking, prompt injection defense, and hybrid RAG. Drop-in support for OpenAI, Anthropic, Gemini, and Ollama.
+          Production-ready Python framework for AI agents and multi-agent orchestration. Compose agent graphs with plain Python routing, build pipelines with the <code class="text-brand-cyan">|</code> operator, and get HITL that resumes at the exact yield point. Built-in guardrails, audit logging, cost tracking, and 39 evaluators. OpenAI, Anthropic, Gemini, Ollama.
         </p>
         <div class="flex flex-wrap gap-4 items-center mb-10">
           <button onclick="copyPip()" class="copy-btn code-block text-brand-cyan font-mono text-sm px-5 py-3 rounded-lg border border-slate-700 hover:border-brand-cyan transition flex items-center gap-3">
@@ -361,7 +361,7 @@ report.<span class="text-yellow-300">to_html</span>(<span class="text-green-400"
   <section class="py-20 px-6 border-t border-slate-800" id="compare">
     <div class="max-w-5xl mx-auto">
       <h2 class="text-3xl font-bold mb-4 text-center">How We Compare</h2>
-      <p class="text-slate-400 text-center mb-14 max-w-2xl mx-auto">Choose LangChain for ecosystem breadth. Choose Selectools when compliance, observability, and evaluation aren't optional.</p>
+      <p class="text-slate-400 text-center mb-14 max-w-2xl mx-auto">Choose LangChain for ecosystem breadth. Choose Selectools when multi-agent orchestration, compliance, observability, and evaluation aren't optional.</p>
 
       <h3 class="text-xl font-semibold mb-4 text-center">Agent Framework Comparison</h3>
       <div class="code-block rounded-xl border border-slate-700 overflow-hidden overflow-x-auto mb-12">
@@ -428,6 +428,30 @@ report.<span class="text-yellow-300">to_html</span>(<span class="text-green-400"
               <td class="px-4 py-3 text-green-400">Exact yield point</td>
               <td class="px-4 py-3 text-yellow-400">Restarts entire node</td>
               <td class="px-4 py-3 text-slate-500">Not built-in</td>
+            </tr>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-4 py-3 text-slate-300">Composable pipelines</td>
+              <td class="px-4 py-3 text-green-400">@step + | + parallel + branch</td>
+              <td class="px-4 py-3 text-yellow-400">LCEL (complex)</td>
+              <td class="px-4 py-3 text-slate-500">Not built-in</td>
+            </tr>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-4 py-3 text-slate-300">Checkpointing</td>
+              <td class="px-4 py-3 text-green-400">3 backends (Memory, File, SQLite)</td>
+              <td class="px-4 py-3 text-green-400">SQLite, Postgres</td>
+              <td class="px-4 py-3 text-slate-500">Limited</td>
+            </tr>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-4 py-3 text-slate-300">Parallel execution</td>
+              <td class="px-4 py-3 text-green-400">3 merge policies + custom</td>
+              <td class="px-4 py-3 text-green-400">Fan-out + Send API</td>
+              <td class="px-4 py-3 text-yellow-400">Per-task async only</td>
+            </tr>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-4 py-3 text-slate-300">Zero extra dependencies</td>
+              <td class="px-4 py-3 text-green-400">Pure Python orchestration</td>
+              <td class="px-4 py-3 text-slate-500">langchain-core required</td>
+              <td class="px-4 py-3 text-slate-500">chromadb bundled</td>
             </tr>
             <tr class="comparison-row">
               <td class="px-4 py-3 text-slate-300">Community</td>

@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to Selectools! We welcome contributions from the community.
 
-**Current Version:** v0.18.0b1
+**Current Version:** v0.18.0
 **Test Status:** 2529 tests passing (100%)
 **Python:** 3.9+
 

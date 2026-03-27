@@ -350,7 +350,7 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 - **v0.17.4** ✅ Agent Intelligence — token estimation, model switching, knowledge memory enhancement (4 store backends)
 - **v0.17.5** ✅ Bug Hunt & Async Guardrails — 91 validated fixes, async guardrails, 40 regression tests
 - **v0.17.6** ✅ Quick Wins — ReAct/CoT reasoning strategies, tool result caching, Python 3.9–3.13 CI matrix
-- **v0.17.7** 🟡 Caching & Context — semantic caching, prompt compression, conversation branching
+- **v0.17.7** ✅ Caching & Context — semantic caching, prompt compression, conversation branching
 - **v0.18.0** ✅ Multi-Agent Orchestration + Composable Pipelines — AgentGraph, SupervisorAgent, HITL, checkpointing, parallel execution; Pipeline + `@step` + `|` operator + `parallel()` + `branch()`
 - **v0.18.x** 🟡 Advanced Composition — type-safe step contracts, streaming composition, tool composition (`@compose`)
 - **v0.19.0** 🟡 Serve & Deploy — Structured AgentConfig, `selectools serve`, FastAPI/Flask, YAML config, templates, playground
