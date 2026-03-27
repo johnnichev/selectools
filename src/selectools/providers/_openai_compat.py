@@ -203,57 +203,64 @@ class _OpenAICompatibleBase(ABC):
 
         tool_call_deltas: Dict[int, Dict[str, Any]] = {}
 
-        for chunk in response:
-            try:
-                delta = chunk.choices[0].delta if chunk.choices else None
-                if not delta:
-                    continue
+        try:
+            for chunk in response:
+                try:
+                    delta = chunk.choices[0].delta if chunk.choices else None
+                    if not delta:
+                        continue
 
-                # Text content
-                if delta.content:
-                    content = delta.content
-                    if isinstance(content, list):
-                        content = "".join(
-                            [part.text for part in content if getattr(part, "text", None)]
-                        )
-                    yield content
-
-                # Tool calls
-                if getattr(delta, "tool_calls", None):
-                    for tc_delta in delta.tool_calls:
-                        index = tc_delta.index
-                        if index not in tool_call_deltas:
-                            tool_call_deltas[index] = {
-                                "id": self._initial_tool_call_id(tc_delta),
-                                "name": "",
-                                "arguments": "",
-                            }
-                        if tc_delta.id:
-                            tool_call_deltas[index]["id"] = tc_delta.id
-                        if tc_delta.function and tc_delta.function.name:
-                            tool_call_deltas[index]["name"] = tc_delta.function.name
-                        if tc_delta.function and tc_delta.function.arguments:
-                            tool_call_deltas[index]["arguments"] += tc_delta.function.arguments
-
-                # Emit completed tool calls at end of stream
-                finish = chunk.choices[0].finish_reason if chunk.choices else None
-                if finish in ("tool_calls", "stop") and tool_call_deltas:
-                    for tc_data in tool_call_deltas.values():
-                        try:
-                            params = (
-                                json.loads(tc_data["arguments"]) if tc_data["arguments"] else {}
+                    # Text content
+                    if delta.content:
+                        content = delta.content
+                        if isinstance(content, list):
+                            content = "".join(
+                                [part.text for part in content if getattr(part, "text", None)]
                             )
-                        except json.JSONDecodeError:
-                            params = {}
-                        yield ToolCall(
-                            tool_name=tc_data["name"],
-                            parameters=params,
-                            id=tc_data["id"],
-                        )
-                    tool_call_deltas.clear()
+                        yield content
 
-            except Exception as exc:  # noqa: BLE001
-                raise self._wrap_error(exc, "stream parsing") from exc
+                    # Tool calls
+                    if getattr(delta, "tool_calls", None):
+                        for tc_delta in delta.tool_calls:
+                            index = tc_delta.index
+                            if index not in tool_call_deltas:
+                                tool_call_deltas[index] = {
+                                    "id": self._initial_tool_call_id(tc_delta),
+                                    "name": "",
+                                    "arguments": "",
+                                }
+                            if tc_delta.id:
+                                tool_call_deltas[index]["id"] = tc_delta.id
+                            if tc_delta.function and tc_delta.function.name:
+                                tool_call_deltas[index]["name"] = tc_delta.function.name
+                            if tc_delta.function and tc_delta.function.arguments:
+                                tool_call_deltas[index]["arguments"] += tc_delta.function.arguments
+
+                    # Emit completed tool calls at end of stream
+                    finish = chunk.choices[0].finish_reason if chunk.choices else None
+                    if finish in ("tool_calls", "stop") and tool_call_deltas:
+                        for tc_data in tool_call_deltas.values():
+                            try:
+                                params = (
+                                    json.loads(tc_data["arguments"]) if tc_data["arguments"] else {}
+                                )
+                            except json.JSONDecodeError:
+                                params = {}
+                            yield ToolCall(
+                                tool_name=tc_data["name"],
+                                parameters=params,
+                                id=tc_data["id"],
+                            )
+                        tool_call_deltas.clear()
+
+                except ProviderError:
+                    raise
+                except Exception as exc:  # noqa: BLE001
+                    raise self._wrap_error(exc, "stream parsing") from exc
+        except ProviderError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            raise self._wrap_error(exc, "streaming failed mid-stream") from exc
 
     async def astream(
         self,
@@ -293,56 +300,65 @@ class _OpenAICompatibleBase(ABC):
         # Track partial tool calls
         tool_call_deltas: Dict[int, Dict[str, Any]] = {}
 
-        async for chunk in response:
-            try:
-                if not chunk.choices:
-                    continue
-                delta = chunk.choices[0].delta
+        try:
+            async for chunk in response:
+                try:
+                    if not chunk.choices:
+                        continue
+                    delta = chunk.choices[0].delta
 
-                # 1. Handle text content
-                if delta.content:
-                    yield delta.content
+                    # 1. Handle text content
+                    if delta.content:
+                        yield delta.content
 
-                # 2. Handle tool calls
-                if delta.tool_calls:
-                    for tc_delta in delta.tool_calls:
-                        index = tc_delta.index
-                        if index not in tool_call_deltas:
-                            tool_call_deltas[index] = {
-                                "id": self._initial_tool_call_id(tc_delta),
-                                "name": "",
-                                "arguments": "",
-                            }
+                    # 2. Handle tool calls
+                    if delta.tool_calls:
+                        for tc_delta in delta.tool_calls:
+                            index = tc_delta.index
+                            if index not in tool_call_deltas:
+                                tool_call_deltas[index] = {
+                                    "id": self._initial_tool_call_id(tc_delta),
+                                    "name": "",
+                                    "arguments": "",
+                                }
 
-                        if tc_delta.id:
-                            tool_call_deltas[index]["id"] = tc_delta.id
-                        if tc_delta.function:
-                            if tc_delta.function.name:
-                                tool_call_deltas[index]["name"] += tc_delta.function.name
-                            if tc_delta.function.arguments:
-                                tool_call_deltas[index]["arguments"] += tc_delta.function.arguments
+                            if tc_delta.id:
+                                tool_call_deltas[index]["id"] = tc_delta.id
+                            if tc_delta.function:
+                                if tc_delta.function.name:
+                                    tool_call_deltas[index]["name"] += tc_delta.function.name
+                                if tc_delta.function.arguments:
+                                    tool_call_deltas[index][
+                                        "arguments"
+                                    ] += tc_delta.function.arguments
 
-                # Check for finish reason to emit completed tool calls
-                finish_reason = chunk.choices[0].finish_reason
-                if finish_reason == "tool_calls":
-                    for index in sorted(tool_call_deltas.keys()):
-                        tc_info = tool_call_deltas[index]
-                        try:
-                            params = (
-                                json.loads(tc_info["arguments"]) if tc_info["arguments"] else {}
+                    # Check for finish reason to emit completed tool calls
+                    finish_reason = chunk.choices[0].finish_reason
+                    if finish_reason == "tool_calls":
+                        for index in sorted(tool_call_deltas.keys()):
+                            tc_info = tool_call_deltas[index]
+                            try:
+                                params = (
+                                    json.loads(tc_info["arguments"]) if tc_info["arguments"] else {}
+                                )
+                            except json.JSONDecodeError:
+                                params = {}
+
+                            yield ToolCall(
+                                tool_name=tc_info["name"],
+                                parameters=params,
+                                id=tc_info["id"],
                             )
-                        except json.JSONDecodeError:
-                            params = {}
+                        tool_call_deltas = {}  # Clear for next iteration if any
 
-                        yield ToolCall(
-                            tool_name=tc_info["name"],
-                            parameters=params,
-                            id=tc_info["id"],
-                        )
-                    tool_call_deltas = {}  # Clear for next iteration if any
-
-            except Exception as exc:  # noqa: BLE001
-                raise self._wrap_error(exc, "async stream parsing") from exc
+                except ProviderError:
+                    raise
+                except Exception as exc:  # noqa: BLE001
+                    raise self._wrap_error(exc, "async stream parsing") from exc
+        except ProviderError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            raise self._wrap_error(exc, "async streaming failed mid-stream") from exc
 
     # -- message formatting (identical for OpenAI and Ollama) -----------------
 

@@ -210,35 +210,42 @@ class GeminiProvider(Provider):
         except Exception as exc:
             raise ProviderError(f"Gemini streaming failed: {exc}") from exc
 
-        for chunk in stream:
-            if chunk.text:
-                yield chunk.text
+        try:
+            for chunk in stream:
+                if chunk.text:
+                    yield chunk.text
 
-            candidates = chunk.candidates if hasattr(chunk, "candidates") else None
-            if candidates:
-                for candidate in candidates:
-                    if candidate.content and candidate.content.parts:
-                        for part in candidate.content.parts:
-                            if part.function_call:
-                                tc_id = f"call_{uuid.uuid4().hex}"
-                                raw_sig = getattr(part, "thought_signature", None)
-                                sig_str = (
-                                    (
-                                        base64.b64encode(raw_sig).decode("ascii")
-                                        if isinstance(raw_sig, bytes)
-                                        else str(raw_sig)
+                candidates = chunk.candidates if hasattr(chunk, "candidates") else None
+                if candidates:
+                    for candidate in candidates:
+                        if candidate.content and candidate.content.parts:
+                            for part in candidate.content.parts:
+                                if part.function_call:
+                                    tc_id = f"call_{uuid.uuid4().hex}"
+                                    raw_sig = getattr(part, "thought_signature", None)
+                                    sig_str = (
+                                        (
+                                            base64.b64encode(raw_sig).decode("ascii")
+                                            if isinstance(raw_sig, bytes)
+                                            else str(raw_sig)
+                                        )
+                                        if raw_sig
+                                        else None
                                     )
-                                    if raw_sig
-                                    else None
-                                )
-                                yield ToolCall(
-                                    tool_name=str(part.function_call.name or ""),
-                                    parameters=(
-                                        part.function_call.args if part.function_call.args else {}
-                                    ),
-                                    id=tc_id,
-                                    thought_signature=sig_str,
-                                )
+                                    yield ToolCall(
+                                        tool_name=str(part.function_call.name or ""),
+                                        parameters=(
+                                            part.function_call.args
+                                            if part.function_call.args
+                                            else {}
+                                        ),
+                                        id=tc_id,
+                                        thought_signature=sig_str,
+                                    )
+        except ProviderError:
+            raise
+        except Exception as exc:
+            raise ProviderError(f"Gemini streaming failed mid-stream: {exc}") from exc
 
     def _format_contents(self, system_prompt: str, messages: List[Message]) -> List:
         """
@@ -509,35 +516,42 @@ class GeminiProvider(Provider):
         except Exception as exc:
             raise ProviderError(f"Gemini async streaming failed: {exc}") from exc
 
-        async for chunk in stream:
-            if chunk.text:
-                yield chunk.text
+        try:
+            async for chunk in stream:
+                if chunk.text:
+                    yield chunk.text
 
-            candidates = chunk.candidates if hasattr(chunk, "candidates") else None
-            if candidates:
-                for candidate in candidates:
-                    if candidate.content and candidate.content.parts:
-                        for part in candidate.content.parts:
-                            if part.function_call:
-                                tc_id = f"call_{uuid.uuid4().hex}"
-                                raw_sig = getattr(part, "thought_signature", None)
-                                sig_str = (
-                                    (
-                                        base64.b64encode(raw_sig).decode("ascii")
-                                        if isinstance(raw_sig, bytes)
-                                        else str(raw_sig)
+                candidates = chunk.candidates if hasattr(chunk, "candidates") else None
+                if candidates:
+                    for candidate in candidates:
+                        if candidate.content and candidate.content.parts:
+                            for part in candidate.content.parts:
+                                if part.function_call:
+                                    tc_id = f"call_{uuid.uuid4().hex}"
+                                    raw_sig = getattr(part, "thought_signature", None)
+                                    sig_str = (
+                                        (
+                                            base64.b64encode(raw_sig).decode("ascii")
+                                            if isinstance(raw_sig, bytes)
+                                            else str(raw_sig)
+                                        )
+                                        if raw_sig
+                                        else None
                                     )
-                                    if raw_sig
-                                    else None
-                                )
-                                yield ToolCall(
-                                    tool_name=str(part.function_call.name or ""),
-                                    parameters=(
-                                        part.function_call.args if part.function_call.args else {}
-                                    ),
-                                    id=tc_id,
-                                    thought_signature=sig_str,
-                                )
+                                    yield ToolCall(
+                                        tool_name=str(part.function_call.name or ""),
+                                        parameters=(
+                                            part.function_call.args
+                                            if part.function_call.args
+                                            else {}
+                                        ),
+                                        id=tc_id,
+                                        thought_signature=sig_str,
+                                    )
+        except ProviderError:
+            raise
+        except Exception as exc:
+            raise ProviderError(f"Gemini async streaming failed mid-stream: {exc}") from exc
 
 
 __all__ = ["GeminiProvider"]

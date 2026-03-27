@@ -450,7 +450,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             reasoning_history=ctx.reasoning_history,
             trace=ctx.trace,
             provider_used=getattr(self.provider, "provider_used", None),
-            usage=copy.copy(self.usage),
+            usage=copy.deepcopy(self.usage),
         )
         self._notify_observers("on_run_end", ctx.run_id, result)
         return result
@@ -473,7 +473,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             reasoning_history=ctx.reasoning_history,
             trace=ctx.trace,
             provider_used=getattr(self.provider, "provider_used", None),
-            usage=copy.copy(self.usage),
+            usage=copy.deepcopy(self.usage),
         )
         self._notify_observers("on_run_end", ctx.run_id, result)
         return result
@@ -524,7 +524,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             reasoning_history=ctx.reasoning_history,
             trace=ctx.trace,
             provider_used=getattr(self.provider, "provider_used", None),
-            usage=copy.copy(self.usage),
+            usage=copy.deepcopy(self.usage),
         )
         self._notify_observers("on_run_end", ctx.run_id, result)
         return result
@@ -547,7 +547,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             reasoning_history=ctx.reasoning_history,
             trace=ctx.trace,
             provider_used=getattr(self.provider, "provider_used", None),
-            usage=copy.copy(self.usage),
+            usage=copy.deepcopy(self.usage),
         )
         self._notify_observers("on_run_end", ctx.run_id, result)
         return result
@@ -1010,7 +1010,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         reasoning_history=ctx.reasoning_history,
                         trace=ctx.trace,
                         provider_used=getattr(self.provider, "provider_used", None),
-                        usage=copy.copy(self.usage),
+                        usage=copy.deepcopy(self.usage),
                     )
                     self._notify_observers("on_run_end", ctx.run_id, _result)
                     return _result
@@ -1356,7 +1356,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         reasoning_history=ctx.reasoning_history,
                         trace=ctx.trace,
                         provider_used=getattr(self.provider, "provider_used", None),
-                        usage=copy.copy(self.usage),
+                        usage=copy.deepcopy(self.usage),
                     )
                     self._notify_observers("on_run_end", ctx.run_id, _result)
                     await self._anotify_observers("on_run_end", ctx.run_id, _result)
@@ -1619,7 +1619,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         reasoning_history=ctx.reasoning_history,
                         trace=ctx.trace,
                         provider_used=getattr(self.provider, "provider_used", None),
-                        usage=copy.copy(self.usage),
+                        usage=copy.deepcopy(self.usage),
                     )
                     self._notify_observers("on_run_end", ctx.run_id, _result)
                     await self._anotify_observers("on_run_end", ctx.run_id, _result)

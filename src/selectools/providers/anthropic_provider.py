@@ -182,54 +182,67 @@ class AnthropicProvider(Provider):
         current_tool_name: str = ""
         current_tool_json: str = ""
 
-        for event in stream:
-            event_type = getattr(event, "type", None)
+        try:
+            for event in stream:
+                event_type = getattr(event, "type", None)
 
-            if event_type == "content_block_delta":
-                delta = getattr(event, "delta", None)
-                if not delta:
-                    continue
-                delta_type = getattr(delta, "type", None)
+                if event_type == "content_block_delta":
+                    delta = getattr(event, "delta", None)
+                    if not delta:
+                        continue
+                    delta_type = getattr(delta, "type", None)
 
-                if delta_type == "text_delta":
-                    text = getattr(delta, "text", None)
-                    if text:
-                        yield text
-                elif delta_type == "input_json_delta":
-                    partial = getattr(delta, "partial_json", None)
-                    if partial:
-                        current_tool_json += partial
+                    if delta_type == "text_delta":
+                        text = getattr(delta, "text", None)
+                        if text:
+                            yield text
+                    elif delta_type == "input_json_delta":
+                        partial = getattr(delta, "partial_json", None)
+                        if partial:
+                            current_tool_json += partial
 
-            elif event_type == "content_block_start":
-                block = getattr(event, "content_block", None)
-                if block and getattr(block, "type", None) == "tool_use":
-                    current_tool_id = getattr(block, "id", None)
-                    current_tool_name = getattr(block, "name", "") or ""
-                    current_tool_json = ""
+                elif event_type == "content_block_start":
+                    block = getattr(event, "content_block", None)
+                    if block and getattr(block, "type", None) == "tool_use":
+                        current_tool_id = getattr(block, "id", None)
+                        current_tool_name = getattr(block, "name", "") or ""
+                        current_tool_json = ""
 
-            elif event_type == "content_block_stop":
-                if current_tool_name:
-                    try:
-                        params = json.loads(current_tool_json) if current_tool_json else {}
-                    except json.JSONDecodeError:
-                        params = {}
-                    yield ToolCall(
-                        tool_name=current_tool_name,
-                        parameters=params,
-                        id=current_tool_id or "",
-                    )
-                    current_tool_id = None
-                    current_tool_name = ""
-                    current_tool_json = ""
+                elif event_type == "content_block_stop":
+                    if current_tool_name:
+                        try:
+                            params = json.loads(current_tool_json) if current_tool_json else {}
+                        except json.JSONDecodeError:
+                            params = {}
+                        yield ToolCall(
+                            tool_name=current_tool_name,
+                            parameters=params,
+                            id=current_tool_id or "",
+                        )
+                        current_tool_id = None
+                        current_tool_name = ""
+                        current_tool_json = ""
+        except ProviderError:
+            raise
+        except Exception as exc:
+            raise ProviderError(f"Anthropic streaming failed mid-stream: {exc}") from exc
 
     def _format_messages(self, messages: List[Message]) -> List[dict]:
         """
         Format messages for Anthropic's API.
 
         Anthropic expects messages with explicit content blocks and does not
-        support the TOOL role, so we convert TOOL messages to ASSISTANT.
+        support the TOOL role, so we convert TOOL messages to user messages
+        with ``tool_result`` blocks.
+
+        SYSTEM messages are converted to user messages but are collected
+        separately and prepended at the start of the formatted list to
+        prevent them from breaking the required assistant(tool_use) ->
+        user(tool_result) adjacency that Anthropic enforces.
         """
         formatted = []
+        system_converted: List[dict] = []
+
         for message in messages:
             role = message.role.value
             content: List[Dict[str, Any]] = []
@@ -238,11 +251,15 @@ class AnthropicProvider(Provider):
                 # Anthropic rejects "system" role in messages — it must be the
                 # top-level `system` parameter.  Context injections (compressed
                 # context, entity memory, knowledge graph) arrive as SYSTEM
-                # messages in history; convert to user messages so the model
-                # still sees the context.
-                role = "user"
-                content.append({"type": "text", "text": message.content or ""})
-                formatted.append({"role": role, "content": content})
+                # messages in history; convert to user messages.  We collect
+                # them and prepend later so they never sit between an assistant
+                # tool_use and the matching user tool_result.
+                system_converted.append(
+                    {
+                        "role": "user",
+                        "content": [{"type": "text", "text": message.content or ""}],
+                    }
+                )
                 continue
 
             if role == Role.TOOL.value:
@@ -288,6 +305,12 @@ class AnthropicProvider(Provider):
                     content = [{"type": "text", "text": ""}]
 
             formatted.append({"role": role, "content": content})
+
+        # Prepend converted SYSTEM messages at the start so they never break
+        # tool_use -> tool_result adjacency.
+        if system_converted:
+            formatted = system_converted + formatted
+
         return formatted
 
     def _map_tool_to_anthropic(self, tool: Tool) -> Dict[str, Any]:
@@ -416,45 +439,50 @@ class AnthropicProvider(Provider):
         current_tool_name: str = ""
         current_tool_json: str = ""
 
-        async for event in stream:
-            event_type = getattr(event, "type", None)
+        try:
+            async for event in stream:
+                event_type = getattr(event, "type", None)
 
-            if event_type == "content_block_delta":
-                delta = getattr(event, "delta", None)
-                if not delta:
-                    continue
-                delta_type = getattr(delta, "type", None)
+                if event_type == "content_block_delta":
+                    delta = getattr(event, "delta", None)
+                    if not delta:
+                        continue
+                    delta_type = getattr(delta, "type", None)
 
-                if delta_type == "text_delta":
-                    text = getattr(delta, "text", None)
-                    if text:
-                        yield text
-                elif delta_type == "input_json_delta":
-                    partial = getattr(delta, "partial_json", None)
-                    if partial:
-                        current_tool_json += partial
+                    if delta_type == "text_delta":
+                        text = getattr(delta, "text", None)
+                        if text:
+                            yield text
+                    elif delta_type == "input_json_delta":
+                        partial = getattr(delta, "partial_json", None)
+                        if partial:
+                            current_tool_json += partial
 
-            elif event_type == "content_block_start":
-                block = getattr(event, "content_block", None)
-                if block and getattr(block, "type", None) == "tool_use":
-                    current_tool_id = getattr(block, "id", None)
-                    current_tool_name = getattr(block, "name", "") or ""
-                    current_tool_json = ""
+                elif event_type == "content_block_start":
+                    block = getattr(event, "content_block", None)
+                    if block and getattr(block, "type", None) == "tool_use":
+                        current_tool_id = getattr(block, "id", None)
+                        current_tool_name = getattr(block, "name", "") or ""
+                        current_tool_json = ""
 
-            elif event_type == "content_block_stop":
-                if current_tool_name:
-                    try:
-                        params = json.loads(current_tool_json) if current_tool_json else {}
-                    except json.JSONDecodeError:
-                        params = {}
-                    yield ToolCall(
-                        tool_name=current_tool_name,
-                        parameters=params,
-                        id=current_tool_id or "",
-                    )
-                    current_tool_id = None
-                    current_tool_name = ""
-                    current_tool_json = ""
+                elif event_type == "content_block_stop":
+                    if current_tool_name:
+                        try:
+                            params = json.loads(current_tool_json) if current_tool_json else {}
+                        except json.JSONDecodeError:
+                            params = {}
+                        yield ToolCall(
+                            tool_name=current_tool_name,
+                            parameters=params,
+                            id=current_tool_id or "",
+                        )
+                        current_tool_id = None
+                        current_tool_name = ""
+                        current_tool_json = ""
+        except ProviderError:
+            raise
+        except Exception as exc:
+            raise ProviderError(f"Anthropic async streaming failed mid-stream: {exc}") from exc
 
 
 __all__ = ["AnthropicProvider"]

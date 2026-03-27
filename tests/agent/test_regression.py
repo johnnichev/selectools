@@ -929,11 +929,18 @@ class TestAnthropicSystemMessages:
                 msg["role"] != "system"
             ), f"Found role='system' in formatted messages — Anthropic will reject this"
 
-        # SYSTEM messages should be converted to user role
+        # SYSTEM messages should be converted to user role and prepended at the
+        # start so they never break tool_use -> tool_result adjacency.
+        assert formatted[0]["role"] == "user"
+        assert formatted[0]["content"][0]["text"] == "[Compressed context] Summary of earlier chat"
         assert formatted[1]["role"] == "user"
-        assert formatted[1]["content"][0]["text"] == "[Compressed context] Summary of earlier chat"
-        assert formatted[3]["role"] == "user"
-        assert formatted[3]["content"][0]["text"] == "[Entity context] User is John"
+        assert formatted[1]["content"][0]["text"] == "[Entity context] User is John"
+
+        # Non-system messages follow in their original relative order
+        assert formatted[2]["role"] == "user"  # original "Hello"
+        assert formatted[2]["content"][0]["text"] == "Hello"
+        assert formatted[3]["role"] == "assistant"  # original "I understand"
+        assert formatted[4]["role"] == "user"  # original "What did we discuss?"
 
     def test_gemini_system_messages_converted_to_user(self):
         """SYSTEM messages should also be handled in Gemini provider."""
