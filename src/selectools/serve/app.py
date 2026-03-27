@@ -53,7 +53,11 @@ class AgentRouter:
         if not prompt:
             return {"error": "prompt is required"}
 
-        result = self.agent.run(prompt)
+        try:
+            result = self.agent.run(prompt)
+        except Exception as exc:
+            return {"error": str(exc), "type": type(exc).__name__}
+
         response = InvokeResponse(
             content=result.content or "",
             tool_calls=[

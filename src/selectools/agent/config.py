@@ -208,6 +208,23 @@ class AgentConfig:
             TraceConfig,
         )
 
+        # Auto-unpack dicts into config objects (for YAML / dict-based config)
+        def _unpack(val, cls):
+            if isinstance(val, dict):
+                return cls(**val)
+            return val
+
+        self.retry = _unpack(self.retry, RetryConfig)
+        self.tool = _unpack(self.tool, ToolConfig)
+        self.coherence = _unpack(self.coherence, CoherenceConfig)
+        self.guardrail = _unpack(self.guardrail, GuardrailsConfig)
+        self.session = _unpack(self.session, SessionConfig)
+        self.summarize = _unpack(self.summarize, SummarizeConfig)
+        self.memory = _unpack(self.memory, MemoryConfig)
+        self.budget = _unpack(self.budget, BudgetConfig)
+        self.trace = _unpack(self.trace, TraceConfig)
+        self.compress = _unpack(self.compress, CompressConfig)
+
         # Sync nested -> flat (nested takes precedence when provided)
         if isinstance(self.retry, RetryConfig):
             self.max_retries = self.retry.max_retries
