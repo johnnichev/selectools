@@ -647,10 +647,12 @@ def retry(step_or_fn: Union[Step, Callable], attempts: int = 3) -> Step:
 def cache_step(
     step_or_fn: Union[Step, Callable],
     ttl: int = 300,
+    max_size: int = 1000,
 ) -> Step:
-    """Wrap a step with result caching.
+    """Wrap a step with result caching (LRU + TTL).
 
     Caches based on input value. Same input returns cached output.
+    Evicts oldest entries when max_size is reached.
 
     Usage::
 
@@ -659,10 +661,12 @@ def cache_step(
     Args:
         step_or_fn: Step or callable to wrap.
         ttl: Cache time-to-live in seconds.
+        max_size: Maximum cache entries before LRU eviction.
     """
     wrapped = _ensure_step(step_or_fn)
     _cache: Dict[str, Any] = {}
     _timestamps: Dict[str, float] = {}
+    _order: List[str] = []
 
     def cached_fn(input: Any, **kwargs: Any) -> Any:
         key = str(input)
@@ -674,6 +678,12 @@ def cache_step(
         result = fn(input, **filtered)
         _cache[key] = result
         _timestamps[key] = now
+        _order.append(key)
+        # LRU eviction
+        while len(_order) > max_size:
+            old_key = _order.pop(0)
+            _cache.pop(old_key, None)
+            _timestamps.pop(old_key, None)
         return result
 
     return Step(cached_fn, name=f"cached({wrapped.name})")
