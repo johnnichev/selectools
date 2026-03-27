@@ -5,6 +5,16 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.1] - 2026-03-27
+
+### Fixed
+
+- **OpenAI/Ollama async streaming tool name concatenation** — `astream()` used `+=` instead of `=` for tool function names, causing names to double (e.g., "get_weatherget_weather"). Sync `stream()` was correct.
+- **OpenAI/Ollama async streaming missing "stop" finish reason** — `astream()` only emitted tool calls on `finish_reason="tool_calls"`, missing the `"stop"` case. Tool calls silently lost when model stopped after tool use.
+- **Eval report p95/p99 off-by-one** — Percentile index calculation was one position too high.
+
+---
+
 ## [0.18.0] - 2026-03-27
 
 ### Added
