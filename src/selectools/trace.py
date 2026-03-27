@@ -169,8 +169,6 @@ class AgentTrace:
         for step_dict in d.get("steps", []):
             step_type_str = step_dict.get("type", "error")
             try:
-                from .trace import StepType
-
                 step_type = StepType(step_type_str)
             except (ValueError, KeyError):
                 step_type = StepType.ERROR

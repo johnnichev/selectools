@@ -17,6 +17,7 @@ Usage::
 from __future__ import annotations
 
 import json
+import re
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -43,6 +44,9 @@ class PostgresCheckpointStore:
     """
 
     def __init__(self, dsn: str, table: str = "checkpoints") -> None:
+        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", table):
+            raise ValueError(f"Invalid table name: {table!r}")
+
         try:
             import psycopg2  # type: ignore[import-untyped]
         except ImportError:

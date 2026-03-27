@@ -242,42 +242,92 @@ class AgentConfig:
             self.coherence_provider = self.coherence.provider
             self.coherence_model = self.coherence.model
             self.coherence_fail_closed = self.coherence.fail_closed
+        else:
+            self.coherence = CoherenceConfig(
+                enabled=self.coherence_check,
+                provider=self.coherence_provider,
+                model=self.coherence_model,
+                fail_closed=self.coherence_fail_closed,
+            )
 
         if isinstance(self.guardrail, GuardrailsConfig):
             self.guardrails = self.guardrail.pipeline
             self.screen_tool_output = self.guardrail.screen_tool_output
             self.output_screening_patterns = self.guardrail.output_screening_patterns
+        else:
+            self.guardrail = GuardrailsConfig(
+                pipeline=self.guardrails,
+                screen_tool_output=self.screen_tool_output,
+                output_screening_patterns=self.output_screening_patterns,
+            )
 
         if isinstance(self.session, SessionConfig):
             self.session_store = self.session.store
             self.session_id = self.session.session_id
+        else:
+            self.session = SessionConfig(
+                store=self.session_store,
+                session_id=self.session_id,
+            )
 
         if isinstance(self.summarize, SummarizeConfig):
             self.summarize_on_trim = self.summarize.enabled
             self.summarize_provider = self.summarize.provider
             self.summarize_model = self.summarize.model
             self.summarize_max_tokens = self.summarize.max_tokens
+        else:
+            self.summarize = SummarizeConfig(
+                enabled=self.summarize_on_trim,
+                provider=self.summarize_provider,
+                model=self.summarize_model,
+                max_tokens=self.summarize_max_tokens,
+            )
 
         if isinstance(self.memory, MemoryConfig):
             self.entity_memory = self.memory.entity_memory
             self.knowledge_graph = self.memory.knowledge_graph
             self.knowledge_memory = self.memory.knowledge_memory
+        else:
+            self.memory = MemoryConfig(
+                entity_memory=self.entity_memory,
+                knowledge_graph=self.knowledge_graph,
+                knowledge_memory=self.knowledge_memory,
+            )
 
         if isinstance(self.budget, BudgetConfig):
             self.max_total_tokens = self.budget.max_total_tokens
             self.max_cost_usd = self.budget.max_cost_usd
             self.cost_warning_threshold = self.budget.cost_warning_threshold
             self.cancellation_token = self.budget.cancellation_token
+        else:
+            self.budget = BudgetConfig(
+                max_total_tokens=self.max_total_tokens,
+                max_cost_usd=self.max_cost_usd,
+                cost_warning_threshold=self.cost_warning_threshold,
+                cancellation_token=self.cancellation_token,
+            )
 
         if isinstance(self.trace, TraceConfig):
             self.trace_tool_result_chars = self.trace.tool_result_chars
             self.trace_metadata = self.trace.metadata
             self.parent_run_id = self.trace.parent_run_id
+        else:
+            self.trace = TraceConfig(
+                tool_result_chars=self.trace_tool_result_chars,
+                metadata=self.trace_metadata,
+                parent_run_id=self.parent_run_id,
+            )
 
         if isinstance(self.compress, CompressConfig):
             self.compress_context = self.compress.enabled
             self.compress_threshold = self.compress.threshold
             self.compress_keep_recent = self.compress.keep_recent
+        else:
+            self.compress = CompressConfig(
+                enabled=self.compress_context,
+                threshold=self.compress_threshold,
+                keep_recent=self.compress_keep_recent,
+            )
 
         # Hooks deprecation (existing logic)
         if self.hooks is not None:

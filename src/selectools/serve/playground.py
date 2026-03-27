@@ -56,7 +56,11 @@ async function send() {
   btn.disabled = true;
 
   addMsg('user', prompt);
-  const assistantEl = addMsg('assistant', '<span class="typing"></span><span class="typing" style="animation-delay:0.2s"></span><span class="typing" style="animation-delay:0.4s"></span>');
+  const assistantEl = document.createElement('div');
+  assistantEl.className = 'msg assistant';
+  assistantEl.innerHTML = '<span class="typing"></span><span class="typing" style="animation-delay:0.2s"></span><span class="typing" style="animation-delay:0.4s"></span>';
+  chat.appendChild(assistantEl);
+  chat.scrollTop = chat.scrollHeight;
 
   try {
     const res = await fetch('/stream', {
@@ -82,18 +86,24 @@ async function send() {
           const parsed = JSON.parse(data);
           if (parsed.type === 'chunk') {
             text += parsed.content;
-            assistantEl.innerHTML = text;
+            assistantEl.textContent = text;
           } else if (parsed.type === 'result') {
             if (!text) text = parsed.content;
-            meta = `${parsed.iterations} iterations`;
-            assistantEl.innerHTML = text + '<div class="meta">' + meta + '</div>';
+            meta = parsed.iterations + ' iterations';
+            assistantEl.textContent = text;
+            const metaEl = document.createElement('div');
+            metaEl.className = 'meta';
+            metaEl.textContent = meta;
+            assistantEl.appendChild(metaEl);
           }
         } catch {}
       }
     }
-    if (!text) assistantEl.innerHTML = '<em style="color:#64748b">No response</em>';
+    if (!text) { assistantEl.textContent = 'No response'; assistantEl.style.color = '#64748b'; assistantEl.style.fontStyle = 'italic'; }
   } catch (err) {
-    assistantEl.innerHTML = '<em style="color:#ef4444">Error: ' + err.message + '</em>';
+    assistantEl.textContent = 'Error: ' + err.message;
+    assistantEl.style.color = '#ef4444';
+    assistantEl.style.fontStyle = 'italic';
   }
   btn.disabled = false;
   input.focus();
@@ -102,7 +112,7 @@ async function send() {
 function addMsg(role, content) {
   const el = document.createElement('div');
   el.className = 'msg ' + role;
-  el.innerHTML = content;
+  el.textContent = content;
   chat.appendChild(el);
   chat.scrollTop = chat.scrollHeight;
   return el;

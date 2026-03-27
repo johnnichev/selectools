@@ -336,15 +336,15 @@ class JSONLTraceStore:
 
     def delete(self, run_id: str) -> bool:
         # JSONL is append-only; delete rewrites the file
-        entries = [e for e in self._iter_entries() if e.get("run_id") != run_id]
-        original_count = sum(1 for _ in self._iter_entries())
-        if len(entries) == original_count:
-            return False
         with self._lock:
+            entries = list(self._iter_entries())
+            filtered = [e for e in entries if e.get("run_id") != run_id]
+            if len(filtered) == len(entries):
+                return False
             with open(self._path, "w", encoding="utf-8") as f:
-                for entry in entries:
+                for entry in filtered:
                     f.write(json.dumps(entry, default=str) + "\n")
-        return True
+            return True
 
     def _iter_entries(self):
         if not self._path.exists():
