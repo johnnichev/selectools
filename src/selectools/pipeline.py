@@ -511,6 +511,61 @@ def branch(
 
 
 # ---------------------------------------------------------------------------
+# retry() / cache() step wrappers
+# ---------------------------------------------------------------------------
+
+
+def retry(step_or_fn: Union[Step, Callable], attempts: int = 3) -> Step:
+    """Wrap a step with retry logic.
+
+    Usage::
+
+        pipeline = preprocess | retry(flaky_api_call, 3) | postprocess
+
+    Args:
+        step_or_fn: Step or callable to wrap.
+        attempts: Number of retry attempts (total calls = 1 + attempts).
+    """
+    wrapped = _ensure_step(step_or_fn)
+    return Step(wrapped.fn, name=wrapped.name, retry=attempts, on_error="raise")
+
+
+def cache_step(
+    step_or_fn: Union[Step, Callable],
+    ttl: int = 300,
+) -> Step:
+    """Wrap a step with result caching.
+
+    Caches based on input value. Same input returns cached output.
+
+    Usage::
+
+        pipeline = preprocess | cache_step(expensive_call, ttl=600) | postprocess
+
+    Args:
+        step_or_fn: Step or callable to wrap.
+        ttl: Cache time-to-live in seconds.
+    """
+    wrapped = _ensure_step(step_or_fn)
+    _cache: Dict[str, Any] = {}
+    _timestamps: Dict[str, float] = {}
+
+    def cached_fn(input: Any, **kwargs: Any) -> Any:
+        key = str(input)
+        now = time.time()
+        if key in _cache and (now - _timestamps.get(key, 0)) < ttl:
+            return _cache[key]
+        fn = wrapped.fn
+        filtered = _filter_kwargs(fn, kwargs)
+        result = fn(input, **filtered)
+        _cache[key] = result
+        _timestamps[key] = now
+        return result
+
+    return Step(cached_fn, name=f"cached({wrapped.name})")
+
+
+# ---------------------------------------------------------------------------
 # Exports
 # ---------------------------------------------------------------------------
 
@@ -521,4 +576,6 @@ __all__ = [
     "step",
     "parallel",
     "branch",
+    "retry",
+    "cache_step",
 ]

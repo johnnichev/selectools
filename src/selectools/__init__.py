@@ -23,6 +23,7 @@ from .cache import Cache, CacheKeyBuilder, CacheStats, InMemoryCache
 from .cache_semantic import SemanticCache
 from .cancellation import CancellationToken
 from .coherence import CoherenceResult
+from .compose import compose
 from .entity_memory import Entity, EntityMemory
 from .evals import EvalReport, EvalSuite, TestCase
 from .exceptions import (
@@ -98,7 +99,7 @@ from .orchestration import (
     SupervisorStrategy,
 )
 from .parser import ToolCallParser
-from .pipeline import Pipeline, Step, StepResult, branch, parallel, step
+from .pipeline import Pipeline, Step, StepResult, branch, cache_step, parallel, retry, step
 from .policy import PolicyDecision, PolicyResult, ToolPolicy
 from .pricing import PRICING, calculate_cost, calculate_embedding_cost, get_model_pricing
 from .prompt import REASONING_STRATEGIES, PromptBuilder
