@@ -56,6 +56,39 @@ def _filter_kwargs(fn: Callable, kwargs: Dict[str, Any]) -> Dict[str, Any]:
     return {k: v for k, v in kwargs.items() if k in accepted}
 
 
+def _is_subtype(output: type, expected: type) -> bool:
+    """Check if output type is compatible with expected input type."""
+    try:
+        # Skip generics (Dict[str, Any], List[int], etc.) — can't issubclass
+        if hasattr(output, "__origin__") or hasattr(expected, "__origin__"):
+            return True  # Can't validate generics, assume compatible
+        if output is Any or expected is Any:
+            return True
+        return issubclass(output, expected)
+    except TypeError:
+        return True  # Unknown types — don't warn
+
+
+def _get_type_hints(fn: Callable) -> Dict[str, Any]:
+    """Extract input/return type hints from a function, safely."""
+    try:
+        import typing
+
+        hints = typing.get_type_hints(fn)
+        result: Dict[str, Any] = {}
+        params = list(hints.keys())
+        # First non-return param is the "input"
+        for p in params:
+            if p != "return":
+                result["input"] = hints[p]
+                break
+        if "return" in hints:
+            result["return"] = hints["return"]
+        return result
+    except Exception:
+        return {}
+
+
 # ---------------------------------------------------------------------------
 # Step — decorator that wraps a plain function
 # ---------------------------------------------------------------------------
@@ -90,6 +123,8 @@ class Step:
         name: Optional[str] = None,
         retry: int = 0,
         on_error: str = "raise",
+        input_type: Optional[type] = None,
+        output_type: Optional[type] = None,
     ) -> None:
         self.fn = fn
         self.name = (
@@ -98,6 +133,19 @@ class Step:
         self.retry = retry
         self.on_error = on_error
         self.is_async = asyncio.iscoroutinefunction(fn)
+
+        # Type contracts (optional)
+        self.input_type = input_type
+        self.output_type = output_type
+
+        # Auto-infer from type hints if not explicitly set
+        if input_type is None or output_type is None:
+            hints = _get_type_hints(fn)
+            if input_type is None and hints.get("input"):
+                self.input_type = hints["input"]
+            if output_type is None and hints.get("return"):
+                self.output_type = hints["return"]
+
         # Preserve function metadata
         wraps(fn)(self)
 
@@ -196,6 +244,33 @@ class Pipeline:
                 self._steps.append(Step(s))
             else:
                 raise TypeError(f"Pipeline step must be callable, got {type(s).__name__}")
+
+        # Validate type contracts between adjacent steps
+        self._validate_type_contracts()
+
+    def _validate_type_contracts(self) -> None:
+        """Check that adjacent steps have compatible types (when annotated)."""
+        for i in range(len(self._steps) - 1):
+            current = self._steps[i]
+            next_step = self._steps[i + 1]
+
+            out_type = getattr(current, "output_type", None)
+            in_type = getattr(next_step, "input_type", None)
+
+            if out_type is not None and in_type is not None:
+                # Check compatibility — basic check, not full subtype analysis
+                if out_type is not in_type and not _is_subtype(out_type, in_type):
+                    current_name = getattr(current, "name", f"step_{i}")
+                    next_name = getattr(next_step, "name", f"step_{i + 1}")
+                    out_name = getattr(out_type, "__name__", str(out_type))
+                    in_name = getattr(in_type, "__name__", str(in_type))
+                    import warnings
+
+                    warnings.warn(
+                        f"Pipeline type mismatch: {current_name!r} outputs {out_name} "
+                        f"but {next_name!r} expects {in_name}",
+                        stacklevel=3,
+                    )
 
     @property
     def steps(self) -> List[Union[Step, Pipeline]]:
@@ -354,6 +429,45 @@ class Pipeline:
                     raise
 
         return StepResult(output=current, trace=trace, steps_run=steps_run)
+
+    async def astream(self, input: Any, **kwargs: Any):
+        """Stream the pipeline — runs all steps, yields chunks from the last step.
+
+        Earlier steps run to completion. The final step's output is yielded
+        as it's produced (if the step is a generator). Otherwise yields the
+        complete output as a single chunk.
+
+        Usage::
+
+            async for chunk in pipeline.astream("input"):
+                print(chunk, end="")
+        """
+        # Run all steps except the last
+        current = input
+        for s in self._steps[:-1]:
+            current = await self._aexecute_step(s, current, kwargs)
+
+        # Stream the last step
+        if not self._steps:
+            yield input
+            return
+
+        last = self._steps[-1]
+        fn: Callable = last.fn if isinstance(last, Step) else last  # type: ignore[assignment]
+        filtered = _filter_kwargs(fn, kwargs)
+
+        if asyncio.iscoroutinefunction(fn):
+            result = await fn(current, **filtered)
+            yield result
+        elif inspect.isgeneratorfunction(fn):
+            for chunk in fn(current, **filtered):
+                yield chunk
+        elif inspect.isasyncgenfunction(fn):
+            async for chunk in fn(current, **filtered):
+                yield chunk
+        else:
+            result = fn(current, **filtered)
+            yield result
 
     def _execute_step(self, s: Any, current: Any, kwargs: Dict[str, Any]) -> Any:
         """Execute a single step synchronously."""
