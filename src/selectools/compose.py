@@ -78,29 +78,31 @@ def compose(
             result = fn(result)
         return result
 
-    # Create a Tool with the first function's schema but composite execution
-    @tool_decorator(description=composite_desc)
-    def _placeholder(**kwargs: Any) -> str:
-        return ""
-
-    # Build the composite tool manually
+    # Build composite tool
     first_tool = tools_or_fns[0] if isinstance(tools_or_fns[0], Tool) else None
     if first_tool:
-        schema = first_tool.schema()
+        # Create wrapper that accepts the first tool's named params
+        def named_composite(**kwargs: Any) -> Any:
+            result = first_fn(**kwargs)
+            for fn in fns[1:]:
+                result = fn(result)
+            return result
+
         return Tool(
             name=composite_name,
             description=composite_desc,
             parameters=first_tool.parameters,
-            function=composite_fn,
+            function=named_composite,
+            _skip_validation=True,
         )
 
-    # For plain callables, wrap with @tool
-    @tool_decorator(description=composite_desc)
-    def wrapped(**kwargs: Any) -> str:
-        return str(composite_fn(**kwargs))
-
-    wrapped._tool.name = composite_name  # type: ignore[attr-defined]
-    return wrapped
+    # For plain callables, create a minimal tool
+    return Tool(
+        name=composite_name,
+        description=composite_desc,
+        parameters=[],
+        function=composite_fn,
+    )
 
 
 __all__ = ["compose"]
