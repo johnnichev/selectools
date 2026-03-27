@@ -490,7 +490,8 @@ def test_anthropic_provider_with_mocked_client() -> None:
         def create(**kwargs: Any) -> Any:
             if kwargs.get("stream"):
                 event = types.SimpleNamespace(
-                    type="content_block_delta", delta=types.SimpleNamespace(text="hello anthropic")
+                    type="content_block_delta",
+                    delta=types.SimpleNamespace(type="text_delta", text="hello anthropic"),
                 )
                 return [event]
             return types.SimpleNamespace(content=[fake_resp_block], usage=FakeUsage())

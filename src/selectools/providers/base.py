@@ -59,9 +59,9 @@ class Provider(Protocol):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> Iterable[str]:
+    ) -> Iterable[Union[str, "ToolCall"]]:
         """
-        Yield assistant text chunks for providers that support streaming.
+        Yield assistant text chunks and ToolCall objects for providers that support streaming.
 
         Implementations should raise ProviderError if streaming is not supported
         or fails.

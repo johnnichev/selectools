@@ -173,8 +173,13 @@ class _OpenAICompatibleBase(ABC):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> Iterable[str]:
-        """Stream response chunks. Note: Does not return usage stats."""
+    ) -> Iterable[Union[str, ToolCall]]:
+        """Stream response chunks with tool call support.
+
+        Yields:
+            str: Text content deltas.
+            ToolCall: Complete tool call objects when all argument chunks arrive.
+        """
         formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
         model_name = model or self.default_model
 
@@ -196,17 +201,57 @@ class _OpenAICompatibleBase(ABC):
         except Exception as exc:  # noqa: BLE001
             raise self._wrap_error(exc, "streaming") from exc
 
+        tool_call_deltas: Dict[int, Dict[str, Any]] = {}
+
         for chunk in response:
             try:
                 delta = chunk.choices[0].delta if chunk.choices else None
-                if not delta or not delta.content:
+                if not delta:
                     continue
-                content = delta.content
-                if isinstance(content, list):
-                    content = "".join(
-                        [part.text for part in content if getattr(part, "text", None)]
-                    )
-                yield content
+
+                # Text content
+                if delta.content:
+                    content = delta.content
+                    if isinstance(content, list):
+                        content = "".join(
+                            [part.text for part in content if getattr(part, "text", None)]
+                        )
+                    yield content
+
+                # Tool calls
+                if getattr(delta, "tool_calls", None):
+                    for tc_delta in delta.tool_calls:
+                        index = tc_delta.index
+                        if index not in tool_call_deltas:
+                            tool_call_deltas[index] = {
+                                "id": self._initial_tool_call_id(tc_delta),
+                                "name": "",
+                                "arguments": "",
+                            }
+                        if tc_delta.id:
+                            tool_call_deltas[index]["id"] = tc_delta.id
+                        if tc_delta.function and tc_delta.function.name:
+                            tool_call_deltas[index]["name"] = tc_delta.function.name
+                        if tc_delta.function and tc_delta.function.arguments:
+                            tool_call_deltas[index]["arguments"] += tc_delta.function.arguments
+
+                # Emit completed tool calls at end of stream
+                finish = chunk.choices[0].finish_reason if chunk.choices else None
+                if finish in ("tool_calls", "stop") and tool_call_deltas:
+                    for tc_data in tool_call_deltas.values():
+                        try:
+                            params = (
+                                json.loads(tc_data["arguments"]) if tc_data["arguments"] else {}
+                            )
+                        except json.JSONDecodeError:
+                            params = {}
+                        yield ToolCall(
+                            tool_name=tc_data["name"],
+                            parameters=params,
+                            id=tc_data["id"],
+                        )
+                    tool_call_deltas.clear()
+
             except Exception as exc:  # noqa: BLE001
                 raise self._wrap_error(exc, "stream parsing") from exc
 

@@ -179,11 +179,13 @@ class GeminiProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> Iterable[str]:
+    ) -> Iterable[Union[str, ToolCall]]:
         """
         Stream responses from Gemini's generate_content_stream API.
 
-        Yields text chunks and ToolCall objects as they arrive.
+        Yields:
+            str: Text content deltas.
+            ToolCall: Complete tool call objects when a function_call part arrives.
         """
         from google.genai import types
 
@@ -211,6 +213,32 @@ class GeminiProvider(Provider):
         for chunk in stream:
             if chunk.text:
                 yield chunk.text
+
+            candidates = chunk.candidates if hasattr(chunk, "candidates") else None
+            if candidates:
+                for candidate in candidates:
+                    if candidate.content and candidate.content.parts:
+                        for part in candidate.content.parts:
+                            if part.function_call:
+                                tc_id = f"call_{uuid.uuid4().hex}"
+                                raw_sig = getattr(part, "thought_signature", None)
+                                sig_str = (
+                                    (
+                                        base64.b64encode(raw_sig).decode("ascii")
+                                        if isinstance(raw_sig, bytes)
+                                        else str(raw_sig)
+                                    )
+                                    if raw_sig
+                                    else None
+                                )
+                                yield ToolCall(
+                                    tool_name=str(part.function_call.name or ""),
+                                    parameters=(
+                                        part.function_call.args if part.function_call.args else {}
+                                    ),
+                                    id=tc_id,
+                                    thought_signature=sig_str,
+                                )
 
     def _format_contents(self, system_prompt: str, messages: List[Message]) -> List:
         """

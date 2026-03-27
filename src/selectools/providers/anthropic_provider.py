@@ -151,11 +151,13 @@ class AnthropicProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> Iterable[str]:
+    ) -> Iterable[Union[str, ToolCall]]:
         """
         Stream responses from Anthropic's messages API.
 
-        Yields text chunks as they arrive from the API.
+        Yields:
+            str: Text content deltas.
+            ToolCall: Complete tool call objects when a tool_use block finishes.
         """
         payload = self._format_messages(messages)
         model_name = model or self.default_model
@@ -176,15 +178,49 @@ class AnthropicProvider(Provider):
         except Exception as exc:
             raise ProviderError(f"Anthropic streaming failed: {exc}") from exc
 
+        current_tool_id: str | None = None
+        current_tool_name: str = ""
+        current_tool_json: str = ""
+
         for event in stream:
             event_type = getattr(event, "type", None)
 
-            # Extract text deltas
             if event_type == "content_block_delta":
                 delta = getattr(event, "delta", None)
-                text = getattr(delta, "text", None) if delta else None
-                if text:
-                    yield text
+                if not delta:
+                    continue
+                delta_type = getattr(delta, "type", None)
+
+                if delta_type == "text_delta":
+                    text = getattr(delta, "text", None)
+                    if text:
+                        yield text
+                elif delta_type == "input_json_delta":
+                    partial = getattr(delta, "partial_json", None)
+                    if partial:
+                        current_tool_json += partial
+
+            elif event_type == "content_block_start":
+                block = getattr(event, "content_block", None)
+                if block and getattr(block, "type", None) == "tool_use":
+                    current_tool_id = getattr(block, "id", None)
+                    current_tool_name = getattr(block, "name", "") or ""
+                    current_tool_json = ""
+
+            elif event_type == "content_block_stop":
+                if current_tool_name:
+                    try:
+                        params = json.loads(current_tool_json) if current_tool_json else {}
+                    except json.JSONDecodeError:
+                        params = {}
+                    yield ToolCall(
+                        tool_name=current_tool_name,
+                        parameters=params,
+                        id=current_tool_id or "",
+                    )
+                    current_tool_id = None
+                    current_tool_name = ""
+                    current_tool_json = ""
 
     def _format_messages(self, messages: List[Message]) -> List[dict]:
         """
