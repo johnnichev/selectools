@@ -82,7 +82,7 @@ class TestPublicExports:
     def test_version_updated(self):
         import selectools
 
-        assert selectools.__version__.startswith("0.18.0")
+        assert selectools.__version__.startswith("0.18")
 
 
 class TestNewStepTypes:

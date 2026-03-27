@@ -180,3 +180,113 @@ class AgentConfig:
     compress_context: bool = False
     compress_threshold: float = 0.75
     compress_keep_recent: int = 4
+
+    # -- Nested config groups (optional, for YAML / clean APIs) --
+    # When provided, nested values take precedence over flat fields.
+    retry: Optional[Any] = None  # RetryConfig
+    tool: Optional[Any] = None  # ToolConfig
+    coherence: Optional[Any] = None  # CoherenceConfig (name collision with coherence_check)
+    guardrail: Optional[Any] = None  # GuardrailsConfig
+    session: Optional[Any] = None  # SessionConfig
+    summarize: Optional[Any] = None  # SummarizeConfig
+    memory: Optional[Any] = None  # MemoryConfig
+    budget: Optional[Any] = None  # BudgetConfig
+    trace: Optional[Any] = None  # TraceConfig
+    compress: Optional[Any] = None  # CompressConfig
+
+    def __post_init__(self) -> None:  # noqa: D105
+        from .config_groups import (
+            BudgetConfig,
+            CoherenceConfig,
+            CompressConfig,
+            GuardrailsConfig,
+            MemoryConfig,
+            RetryConfig,
+            SessionConfig,
+            SummarizeConfig,
+            ToolConfig,
+            TraceConfig,
+        )
+
+        # Sync nested -> flat (nested takes precedence when provided)
+        if isinstance(self.retry, RetryConfig):
+            self.max_retries = self.retry.max_retries
+            self.retry_backoff_seconds = self.retry.backoff_seconds
+            self.request_timeout = self.retry.request_timeout
+            self.rate_limit_cooldown_seconds = self.retry.rate_limit_cooldown_seconds
+        else:
+            self.retry = RetryConfig(
+                max_retries=self.max_retries,
+                backoff_seconds=self.retry_backoff_seconds,
+                request_timeout=self.request_timeout,
+                rate_limit_cooldown_seconds=self.rate_limit_cooldown_seconds,
+            )
+
+        if isinstance(self.tool, ToolConfig):
+            self.tool_timeout_seconds = self.tool.timeout_seconds
+            self.tool_policy = self.tool.policy
+            self.confirm_action = self.tool.confirm_action
+            self.approval_timeout = self.tool.approval_timeout
+            self.parallel_tool_execution = self.tool.parallel_execution
+        else:
+            self.tool = ToolConfig(
+                timeout_seconds=self.tool_timeout_seconds,
+                policy=self.tool_policy,
+                confirm_action=self.confirm_action,
+                approval_timeout=self.approval_timeout,
+                parallel_execution=self.parallel_tool_execution,
+            )
+
+        if isinstance(self.coherence, CoherenceConfig):
+            self.coherence_check = self.coherence.enabled
+            self.coherence_provider = self.coherence.provider
+            self.coherence_model = self.coherence.model
+            self.coherence_fail_closed = self.coherence.fail_closed
+
+        if isinstance(self.guardrail, GuardrailsConfig):
+            self.guardrails = self.guardrail.pipeline
+            self.screen_tool_output = self.guardrail.screen_tool_output
+            self.output_screening_patterns = self.guardrail.output_screening_patterns
+
+        if isinstance(self.session, SessionConfig):
+            self.session_store = self.session.store
+            self.session_id = self.session.session_id
+
+        if isinstance(self.summarize, SummarizeConfig):
+            self.summarize_on_trim = self.summarize.enabled
+            self.summarize_provider = self.summarize.provider
+            self.summarize_model = self.summarize.model
+            self.summarize_max_tokens = self.summarize.max_tokens
+
+        if isinstance(self.memory, MemoryConfig):
+            self.entity_memory = self.memory.entity_memory
+            self.knowledge_graph = self.memory.knowledge_graph
+            self.knowledge_memory = self.memory.knowledge_memory
+
+        if isinstance(self.budget, BudgetConfig):
+            self.max_total_tokens = self.budget.max_total_tokens
+            self.max_cost_usd = self.budget.max_cost_usd
+            self.cost_warning_threshold = self.budget.cost_warning_threshold
+            self.cancellation_token = self.budget.cancellation_token
+
+        if isinstance(self.trace, TraceConfig):
+            self.trace_tool_result_chars = self.trace.tool_result_chars
+            self.trace_metadata = self.trace.metadata
+            self.parent_run_id = self.trace.parent_run_id
+
+        if isinstance(self.compress, CompressConfig):
+            self.compress_context = self.compress.enabled
+            self.compress_threshold = self.compress.threshold
+            self.compress_keep_recent = self.compress.keep_recent
+
+        # Hooks deprecation (existing logic)
+        if self.hooks is not None:
+            import warnings
+
+            warnings.warn(
+                "AgentConfig.hooks is deprecated and will be removed in a future "
+                "version. Use AgentConfig.observers with AgentObserver subclasses "
+                "instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
