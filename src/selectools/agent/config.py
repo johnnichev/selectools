@@ -212,6 +212,15 @@ class AgentConfig:
         def _unpack(val, cls):
             if isinstance(val, dict):
                 return cls(**val)
+            if val is not None and not isinstance(val, cls):
+                import warnings
+
+                warnings.warn(
+                    f"Expected {cls.__name__} or dict for config group, "
+                    f"got {type(val).__name__}. Using defaults.",
+                    stacklevel=3,
+                )
+                return None
             return val
 
         self.retry = _unpack(self.retry, RetryConfig)

@@ -236,7 +236,10 @@ def _resolve_tools(tool_specs: List[Any], base_dir: Optional[Path] = None) -> li
 
                 file_path = spec
                 if base_dir and not os.path.isabs(spec):
-                    file_path = str(base_dir / spec)
+                    resolved = (base_dir / spec).resolve()
+                    if not str(resolved).startswith(str(base_dir.resolve())):
+                        raise ValueError(f"Tool path escapes config directory: {spec!r}")
+                    file_path = str(resolved)
                 loaded = ToolLoader.from_file(file_path)
                 tools.extend(loaded)
             else:
