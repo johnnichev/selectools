@@ -157,6 +157,30 @@ class AgentTrace:
             d["metadata"] = self.metadata
         return d
 
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "AgentTrace":
+        """Reconstruct an AgentTrace from a dict produced by to_dict()."""
+        trace = cls(
+            metadata=d.get("metadata", {}),
+        )
+        trace.run_id = d.get("run_id", trace.run_id)
+        trace.start_time = d.get("start_time", trace.start_time)
+        trace.parent_run_id = d.get("parent_run_id")
+        for step_dict in d.get("steps", []):
+            step_type_str = step_dict.get("type", "error")
+            try:
+                from .trace import StepType
+
+                step_type = StepType(step_type_str)
+            except (ValueError, KeyError):
+                step_type = StepType.ERROR
+            step = TraceStep(type=step_type)
+            for k, v in step_dict.items():
+                if k != "type" and hasattr(step, k):
+                    setattr(step, k, v)
+            trace.steps.append(step)
+        return trace
+
     def to_json(self, filepath: str) -> None:
         with open(filepath, "w") as f:
             json.dump(self.to_dict(), f, indent=2)
