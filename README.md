@@ -12,8 +12,6 @@ An open-source project from **[NichevLabs](https://nichevlabs.com)**.
 
 ## What's New in v0.18
 
-> **Beta**: `pip install selectools==0.18.0b1` — stable release coming soon after real-world validation.
-
 ### v0.18.0 — Multi-Agent Orchestration
 
 ```python
