@@ -355,4 +355,5 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 - **v0.18.x** 🟡 Advanced Composition — type-safe step contracts, streaming composition, tool composition (`@compose`)
 - **v0.19.0** 🟡 Serve & Deploy — Structured AgentConfig, `selectools serve`, FastAPI/Flask, YAML config, templates, playground
 - **v0.19.x** 🟡 Enterprise Hardening + Polish & Community — security audit, stability markers, trace viewer, benchmarks, launch, community growth
-- **v0.20.0** 🟡 Advanced Agent Patterns + Connectors — PlanAndExecute, ReflectiveAgent, Debate, TeamLead, 50+ evaluators, Bedrock, Azure, FAISS, Qdrant, loaders
+- **v0.20.0** 🟡 Advanced Agent Patterns + Connectors — PlanAndExecute, ReflectiveAgent, Debate, TeamLead, 50+ evaluators, Bedrock, Azure, FAISS, Qdrant, loaders, Visual Agent Builder
+- **v1.0.0** 🟡 Stable Release — API freeze, stability markers, security audit, deprecation policy, Production/Stable classifier

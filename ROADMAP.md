@@ -56,6 +56,11 @@ PlanAndExecute → ReflectiveAgent → Debate → TeamLead
 → 50+ evaluators → AWS Bedrock → Azure OpenAI → FAISS → Qdrant
 → CSV/JSON/HTML/URL loaders → Visual Agent Builder (web UI)
 
+v1.0.0  🟡 Stable Release
+API freeze → Stability markers on all modules → Deprecation policy
+→ Security audit published → Compatibility matrix → 0.x→1.0 migration guide
+→ PyPI classifier: Production/Stable
+
 ---
 
 ## v0.17.0: Eval Framework ✅
