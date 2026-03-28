@@ -122,6 +122,13 @@ nav:
   - Multi-Agent:
     - Orchestration: modules/ORCHESTRATION.md
     - Supervisor: modules/SUPERVISOR.md
+  - Composition:
+    - Pipelines: modules/PIPELINE.md
+  - Deployment:
+    - Serve & Deploy: modules/SERVE.md
+    - Agent Templates: modules/TEMPLATES.md
+  - Observability:
+    - Trace Store: modules/TRACE_STORE.md
   - Integration:
     - MCP Client/Server: modules/MCP.md
   - Security:
