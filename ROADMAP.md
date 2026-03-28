@@ -40,18 +40,15 @@ AgentGraph → GraphState → Typed reducers → Resume-from-yield interrupts
 → Scatter fan-out → Checkpointing → SupervisorAgent → Graph visualization
 → Pipeline → @step → | operator → parallel() → branch()
 
-v0.18.x 🟡 Advanced Composition
-Type-safe step contracts → Streaming composition → Tool composition (@compose)
-→ retry() / cache() step wrappers
-
-v0.19.0 🟡 Serve & Deploy
-Structured AgentConfig refactor (41 fields → nested dataclasses)
-→ selectools serve CLI → FastAPI AgentRouter → Flask AgentBlueprint
-→ Playground UI → YAML agent config → Agent templates (5 built-in)
+v0.19.0 ✅ Serve, Deploy & Complete Composition
+selectools serve CLI → Playground UI → YAML config → 5 agent templates
+→ Structured AgentConfig → compose() → retry() / cache_step()
+→ Type-safe step contracts → Streaming composition → pipeline.astream()
+→ PostgresCheckpointStore → TraceStore (3 backends) → selectools doctor
 
 v0.19.x 🟡 Enterprise Hardening
 Security audit → Stability markers (Production/Stable)
-→ Deprecation policy → Compatibility matrix → Postgres checkpoint backend
+→ Deprecation policy → Compatibility matrix
 
 v0.20.0 🟡 Advanced Agent Patterns
 PlanAndExecute → ReflectiveAgent → Debate → TeamLead
@@ -368,20 +365,24 @@ LangChain's LCEL is powerful but opaque — debugging `chain.invoke()` requires 
 | **\| operator** | ✅ Done | High | Small |
 | **parallel() / branch()** | ✅ Done | Medium | Medium |
 
-### Remaining for v0.18.x
+### Advanced Composition (shipped in v0.19.0)
 
 | Feature | Status | Impact | Effort |
 | --- | --- | --- | --- |
-| **Tool composition (@compose)** | 🟡 High | Medium | Small |
-| **Type-safe step contracts** | 🟡 Medium | Medium | Medium |
-| **Streaming composition** | 🟡 Medium | Medium | Medium |
-| **retry() / cache() wrappers** | 🟡 Medium | Medium | Small |
+| **Tool composition (@compose)** | ✅ Done | Medium | Small |
+| **Type-safe step contracts** | ✅ Done | Medium | Medium |
+| **Streaming composition (astream)** | ✅ Done | Medium | Medium |
+| **retry() / cache_step() wrappers** | ✅ Done | Medium | Small |
 
 ---
 
-## v0.19.0: Serve & Deploy 🟡
+## v0.19.0: Serve, Deploy & Complete Composition ✅
 
-Focus: REST API deployment, agent templates, and developer experience — going from library to platform.
+**Status: ✅ Shipped in v0.19.0**
+
+Focus: REST API deployment, agent templates, developer experience, advanced composition, and production persistence — going from library to platform.
+
+**What shipped:** `selectools serve` CLI + playground UI, 5 agent templates, YAML config, structured AgentConfig (10 nested dataclasses), `compose()`, `retry()`, `cache_step()`, type-safe step contracts, `pipeline.astream()`, PostgresCheckpointStore, TraceStore (3 backends), `selectools doctor`.
 
 ### Selectools Serve (REST API Deployment)
 
@@ -492,15 +493,20 @@ Built-in: `InMemoryTraceStore`, `SQLiteTraceStore`, `JSONLTraceStore`.
 
 Export formats: HTML (self-contained report), CSV, Datadog APM, Langfuse, OTel.
 
-| Feature                  | Status    | Impact | Effort |
-| ------------------------ | --------- | ------ | ------ |
-| **FastAPI AgentRouter**  | 🟡 High   | High   | Medium |
-| **Flask AgentBlueprint** | 🟡 Medium | Medium | Small  |
-| **Playground**           | 🟡 Medium | High   | Medium |
-| **Trace Store**          | 🟡 High   | High   | Medium |
-| **HTML Trace Export**    | 🟡 Medium | High   | Medium |
-| **Agent Templates**      | 🟡 Medium | Medium | Small  |
-| **YAML Config**          | 🟡 Low    | Medium | Small  |
+| Feature | Status | Impact | Effort |
+| --- | --- | --- | --- |
+| **AgentRouter (HTTP serve)** | ✅ Done | High | Medium |
+| **Playground UI** | ✅ Done | High | Medium |
+| **Trace Store (3 backends)** | ✅ Done | High | Medium |
+| **Structured AgentConfig** | ✅ Done | High | Medium |
+| **YAML Config** | ✅ Done | Medium | Small |
+| **5 Agent Templates** | ✅ Done | Medium | Small |
+| **compose()** | ✅ Done | Medium | Small |
+| **retry() / cache_step()** | ✅ Done | Medium | Small |
+| **Type-safe contracts** | ✅ Done | Medium | Medium |
+| **pipeline.astream()** | ✅ Done | Medium | Small |
+| **PostgresCheckpointStore** | ✅ Done | High | Medium |
+| **selectools doctor** | ✅ Done | Medium | Small |
 
 ---
 
