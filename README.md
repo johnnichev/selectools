@@ -8,7 +8,21 @@
 
 An open-source project from **[NichevLabs](https://nichevlabs.com)**.
 
-**Production-ready AI agents with tool calling, RAG, and hybrid search.** Connect LLMs to your Python functions, embed and search your documents with vector + keyword fusion, stream responses in real time, and dynamically manage tools at runtime. Works with OpenAI, Anthropic, Gemini, and Ollama. Tracks costs automatically.
+**Multi-agent orchestration in plain Python.** Build agent graphs, compose pipelines with `|`, deploy with one command. No DSL, no compile step, no paid debugger. Works with OpenAI, Anthropic, Gemini, and Ollama.
+
+### 3 Ways to Build
+
+```python
+# 1. Single agent — 5 lines
+agent = Agent(tools=[search, calculate], provider=OpenAIProvider())
+result = agent.run("What is 15 * 7?")
+
+# 2. Multi-agent graph — 1 line
+result = AgentGraph.chain(planner, writer, reviewer).run("Write a blog post")
+
+# 3. Deploy — 1 command
+# selectools serve agent.yaml
+```
 
 ## What's New in v0.18
 
@@ -235,6 +249,17 @@ report.to_html("report.html")
 - **v0.14.0**: AgentObserver Protocol (25 events), 145 models with March 2026 pricing, OpenAI `max_completion_tokens` auto-detection, 11 bug fixes
 
 </details>
+
+## Coming from LangChain?
+
+| LangChain/LangGraph | selectools |
+|---|---|
+| `StateGraph` + `add_node` + `add_edge` + `compile()` | `AgentGraph.chain(a, b, c).run(prompt)` |
+| LCEL `prompt \| llm \| parser` with Runnable protocol | `@step` + `\|` on plain functions |
+| `interrupt()` restarts the whole node on resume | `yield InterruptRequest()` resumes at yield point |
+| LangSmith (paid) for tracing and evals | Built-in: 39 evaluators + traces, zero cost |
+| 5+ packages (`langchain-core`, `langgraph`, `langsmith`...) | 1 package: `pip install selectools` |
+| `langserve` for deployment | `selectools serve agent.yaml` |
 
 ## Why Selectools
 
