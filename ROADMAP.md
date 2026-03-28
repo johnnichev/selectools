@@ -54,7 +54,7 @@ Security audit → Stability markers → Deprecation policy → Compatibility ma
 v0.20.0 🟡 Advanced Agent Patterns + Connector Expansion
 PlanAndExecute → ReflectiveAgent → Debate → TeamLead
 → 50+ evaluators → AWS Bedrock → Azure OpenAI → FAISS → Qdrant
-→ CSV/JSON/HTML/URL loaders
+→ CSV/JSON/HTML/URL loaders → Visual Agent Builder (web UI)
 
 ---
 
@@ -709,5 +709,5 @@ Individual stores/loaders remain installable a la carte: `pip install selectools
 | Niche Loaders (Slack, Confluence, Jira, Discord, Email, Docx, Excel, XML) | Community-driven | Future |
 | Niche Vector Stores (Milvus, OpenSearch, Lance) | As demand dictates | Future |
 | Niche Toolbox (Email, Calendar, Browser, Financial) | As demand dictates | Future |
-| Visual Agent Builder | Web UI for designing agent configs (generates YAML) | Future |
+| ~~Visual Agent Builder~~ | Moved to v0.20.0 | |
 | CRM & Business Tools     | HubSpot, Salesforce integrations    | v0.21.x  |
