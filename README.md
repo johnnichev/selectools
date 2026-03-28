@@ -261,6 +261,8 @@ report.to_html("report.html")
 | 5+ packages (`langchain-core`, `langgraph`, `langsmith`...) | 1 package: `pip install selectools` |
 | `langserve` for deployment | `selectools serve agent.yaml` |
 
+> Full migration guide with code examples: **[Coming from LangChain](docs/MIGRATION.md)**
+
 ## Why Selectools
 
 | Capability | What You Get |

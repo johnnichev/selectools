@@ -84,6 +84,7 @@ nav:
   - Home: index.md
   - Getting Started:
     - Quickstart: QUICKSTART.md
+    - Coming from LangChain: MIGRATION.md
     - Cookbook: COOKBOOK.md
     - API Keys: KEYS.md
     - Architecture: ARCHITECTURE.md

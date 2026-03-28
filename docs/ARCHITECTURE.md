@@ -1,7 +1,43 @@
 # Selectools Architecture
 
-**Version:** 0.18.0
+**Version:** 0.19.0
 **Last Updated:** March 2026
+
+## System Overview
+
+```mermaid
+graph TD
+    A[User Prompt] --> B[Agent]
+    B --> C{Single or Multi?}
+    C -->|Single| D[Tool Calling Loop]
+    C -->|Multi| E[AgentGraph]
+    E --> F[Node: Agent A]
+    E --> G[Node: Agent B]
+    E --> H[Node: Agent C]
+    F --> I[Routing]
+    G --> I
+    H --> I
+    I --> J{More nodes?}
+    J -->|Yes| E
+    J -->|No| K[GraphResult]
+
+    D --> L[AgentResult]
+    L --> M[Pipeline]
+    M --> N["@step | @step | @step"]
+    K --> M
+
+    M --> O[Serve]
+    O --> P["POST /invoke"]
+    O --> Q["POST /stream (SSE)"]
+    O --> R["GET /playground"]
+
+    style B fill:#3b82f6,color:#fff
+    style E fill:#06b6d4,color:#fff
+    style M fill:#8b5cf6,color:#fff
+    style O fill:#10b981,color:#fff
+```
+
+**The flow:** User prompt → Agent (single or graph) → Pipeline composition → Serve as HTTP API.
 
 ## Table of Contents
 
