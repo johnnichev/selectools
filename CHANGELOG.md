@@ -5,6 +5,39 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0] - 2026-03-28
+
+### Added
+
+#### Serve & Deploy
+- `selectools serve agent.yaml` — one-command HTTP deployment with SSE streaming
+- `selectools doctor` — diagnoses API keys, dependencies, provider connectivity
+- Endpoints: POST /invoke, POST /stream (SSE), GET /health, GET /schema, GET /playground
+- Self-contained chat playground UI (zero JavaScript dependencies)
+
+#### Configuration & Templates
+- Structured AgentConfig — 10 nested dataclasses (RetryConfig, BudgetConfig, etc.) with backward compat
+- YAML agent config — `from_yaml("agent.yaml")`
+- 5 agent templates: customer_support, data_analyst, research_assistant, code_reviewer, rag_chatbot
+
+#### Advanced Composition
+- `compose(tool_a, tool_b)` — chain tools into a single composite tool
+- `retry(step, 3)` and `cache_step(step, ttl=300)` pipeline wrappers
+- `pipeline.astream(input)` — streaming composition
+- Type-safe step contracts with mismatch warnings
+
+#### Persistence & Observability
+- PostgresCheckpointStore (`pip install selectools[postgres]`)
+- TraceStore with 3 backends: InMemoryTraceStore, SQLiteTraceStore, JSONLTraceStore
+
+### Fixed
+- 10 bugs: config sync, XSS, JSONL race, path traversal, cache leak, serve errors
+
+### Stats
+- Tests: 2566 (+531), Examples: 69 (+15), 4 new module docs, COOKBOOK.md
+
+---
+
 ## [0.18.1] - 2026-03-27
 
 ### Fixed
