@@ -46,21 +46,15 @@ selectools serve CLI → Playground UI → YAML config → 5 agent templates
 → Type-safe step contracts → Streaming composition → pipeline.astream()
 → PostgresCheckpointStore → TraceStore (3 backends) → selectools doctor
 
-v0.19.x 🟡 Enterprise Hardening
-Security audit → Stability markers (Production/Stable)
-→ Deprecation policy → Compatibility matrix
+v0.19.x 🟡 Enterprise Hardening + Polish & Community
+Security audit → Stability markers → Deprecation policy → Compatibility matrix
+→ Published benchmarks → Enhanced trace viewer → Tool marketplace foundations
+→ GitHub community growth → Blog content → Conference outreach
 
-v0.20.0 🟡 Advanced Agent Patterns
+v0.20.0 🟡 Advanced Agent Patterns + Connector Expansion
 PlanAndExecute → ReflectiveAgent → Debate → TeamLead
-→ 50+ evaluators (semantic similarity, rubric, multi-turn coherence)
-
-v0.20.x 🟡 Connector Expansion + Performance
-AWS Bedrock provider → Azure OpenAI → FAISS → Qdrant → pgvector
-→ CSV/JSON/HTML/URL loaders → Published benchmarks
-
-v0.21.0 🟡 Polish & Community
-Tool marketplace → Visual agent builder → Enhanced trace viewer
-→ LangChain migration guide → Cookbook → Documentation generation
+→ 50+ evaluators → AWS Bedrock → Azure OpenAI → FAISS → Qdrant
+→ CSV/JSON/HTML/URL loaders
 
 ---
 
@@ -510,52 +504,35 @@ Export formats: HTML (self-contained report), CSV, Datadog APM, Langfuse, OTel.
 
 ---
 
-## v0.19.x: Enterprise Hardening 🟡
+## v0.19.x: Enterprise Hardening + Polish & Community 🟡
 
-Focus: Production readiness signals that enterprise teams require before adopting a framework.
+Focus: Production readiness, community growth, and developer trust signals. This is the "make it trustworthy" release series before adding new features in v0.20.
 
-### Security Audit
-
-- Dependency vulnerability scan (Snyk/Safety)
-- Code audit for OWASP Top 10 in all provider/tool paths
-- Bandit scan clean (currently uses `# nosec` annotations — verify each one)
-- Document security model: what's trusted, what's validated, what's user-controlled
-
-### Stability Markers
-
-```python
-# Module-level stability markers
-__stability__ = "stable"      # agent, types, trace, observer
-__stability__ = "beta"        # orchestration, evals, mcp
-__stability__ = "alpha"       # serve (v0.19.0), pipeline (v0.18.x)
-```
-
-Documented in each module's docstring. Public API surface frozen for `stable` modules — breaking changes require a major version bump.
-
-### Postgres Checkpoint Backend
-
-```python
-from selectools.orchestration import PostgresCheckpointStore
-
-store = PostgresCheckpointStore(dsn="postgresql://user:pass@host/db")
-result = graph.run("...", checkpoint_store=store)
-```
-
-Closes the gap vs LangGraph's `PostgresSaver`. Uses `asyncpg` (optional dependency).
-
-### Additional Items
-
-- Deprecation policy: 2-version warning before removal
-- Compatibility matrix: Python 3.9-3.13, provider SDK versions
-- SBOM generation for compliance teams
+### Enterprise Hardening
 
 | Feature | Status | Impact | Effort |
 | --- | --- | --- | --- |
-| **Security audit** | 🟡 High | High | Medium |
-| **Stability markers** | 🟡 High | Medium | Small |
-| **Postgres checkpoint** | 🟡 High | High | Medium |
-| **Deprecation policy** | 🟡 Medium | Medium | Small |
-| **Compatibility matrix** | 🟡 Medium | Medium | Small |
+| **Security audit** (Snyk + bandit + OWASP review) | 🟡 | High | Medium |
+| **Stability markers** (`__stability__ = "stable"/"beta"/"alpha"`) | 🟡 | Medium | Small |
+| **Deprecation policy** (2-version warning before removal) | 🟡 | Medium | Small |
+| **Compatibility matrix** (Python 3.9-3.13 + provider SDK versions) | 🟡 | Medium | Small |
+| **SBOM generation** for compliance teams | 🟡 | Low | Small |
+| ~~Postgres checkpoint~~ | ✅ Done in v0.19.0 | | |
+
+### Polish & Community
+
+| Feature | Status | Impact | Effort |
+| --- | --- | --- | --- |
+| **Enhanced trace viewer** (interactive HTML) | 🟡 | High | Medium |
+| **Tool marketplace foundations** (publish/discover community tools) | 🟡 | High | Large |
+| **Published performance benchmarks** on landing page | ✅ Done | | |
+| **LangChain migration guide** | ✅ Done (docs/MIGRATION.md) | | |
+| **Cookbook** | ✅ Done (docs/COOKBOOK.md) | | |
+| **Blog content** (5 posts written, ready to publish) | 🟡 Publish | High | Small |
+| **Show HN + Product Hunt + Reddit launch** | 🟡 Publish | High | Small |
+| **awesome-python / awesome-llm-agents submissions** | 🟡 | Medium | Small |
+| **good-first-issue labels** for contributor onboarding | 🟡 | Medium | Small |
+| **Conference CFP** (PyCon, AI Engineer Summit) | 🟡 | Medium | Small |
 
 ---
 
@@ -637,9 +614,9 @@ result = agent.run("Investigate and fix the billing discrepancy")
 
 ---
 
-## v0.20.x: Connector Expansion + Performance 🟡
+### Connector Expansion (also in v0.20.0)
 
-Focus: Close the integration gap with LangChain by adding high-demand document loaders, vector stores, and toolbox modules.
+Close the integration gap with LangChain by adding high-demand document loaders, vector stores, and provider support.
 
 ### Current Inventory
 
@@ -722,60 +699,15 @@ Individual stores/loaders remain installable a la carte: `pip install selectools
 
 ---
 
-## v0.21.0: Polish & Community 🟡
-
-Focus: Niche integrations, community sharing, and developer experience polish.
-
-### Niche Document Loaders
-
-| Loader                                      | Dependencies       |
-| ------------------------------------------- | ------------------ |
-| `from_slack(channel_id, token)`             | `requests`         |
-| `from_confluence(page_id, base_url, token)` | `requests`         |
-| `from_jira(project_key, token)`             | `requests`         |
-| `from_discord(channel_id, token)`           | `requests`         |
-| `from_email(imap_server, credentials)`      | stdlib `imaplib`   |
-| `from_docx(path)`                           | `python-docx`      |
-| `from_excel(path, sheet)`                   | `openpyxl`         |
-| `from_xml(path, text_xpath)`                | stdlib `xml.etree` |
-
-### Niche Vector Stores
-
-| Store                   | Dependencies    |
-| ----------------------- | --------------- |
-| `MilvusVectorStore`     | `pymilvus`      |
-| `OpenSearchVectorStore` | `opensearch-py` |
-| `LanceVectorStore`      | `lancedb`       |
-
-### Niche Toolbox Modules
-
-| Module               | Tools                                                          |
-| -------------------- | -------------------------------------------------------------- |
-| `email_tools.py`     | `send_email`, `read_inbox`, `search_emails`                    |
-| `calendar_tools.py`  | `create_event`, `list_events`, `find_free_slots`               |
-| `browser_tools.py`   | `navigate`, `click`, `extract_text`, `screenshot` (Playwright) |
-| `financial_tools.py` | `stock_price`, `exchange_rate`, `market_summary`               |
-
-### Community Features
-
-- **Tool Marketplace/Registry**: Publish and discover community `@tool` functions
-- **Visual Agent Builder**: Web UI for designing agent configurations (generates YAML)
-- **Enhanced HTML Trace Viewer**: Interactive timeline with filter, search, cost breakdown
-
-| Feature                       | Status | Impact | Effort |
-| ----------------------------- | ------ | ------ | ------ |
-| **Niche Loaders (8)**         | 🟡 Low | Medium | Medium |
-| **Niche Stores (3)**          | 🟡 Low | Low    | Medium |
-| **Niche Toolbox (4 modules)** | 🟡 Low | Medium | Medium |
-| **Tool Marketplace**          | 🟡 Low | High   | Large  |
-| **Visual Agent Builder**      | 🟡 Low | Medium | Large  |
-
----
-
 ## Backlog (Unscheduled)
 
-| Feature                  | Notes                               | Target   |
-| ------------------------ | ----------------------------------- | -------- |
+| Feature | Notes | Target |
+| --- | --- | --- |
 | Universal Vision Support | Unified vision API across providers | Deferred |
-| Rate Limiting & Quotas   | Per-tool and per-user quotas        | v0.21.x  |
+| Rate Limiting & Quotas | Per-tool and per-user quotas | Future |
+| CRM & Business Tools | HubSpot, Salesforce integrations | Future |
+| Niche Loaders (Slack, Confluence, Jira, Discord, Email, Docx, Excel, XML) | Community-driven | Future |
+| Niche Vector Stores (Milvus, OpenSearch, Lance) | As demand dictates | Future |
+| Niche Toolbox (Email, Calendar, Browser, Financial) | As demand dictates | Future |
+| Visual Agent Builder | Web UI for designing agent configs (generates YAML) | Future |
 | CRM & Business Tools     | HubSpot, Salesforce integrations    | v0.21.x  |
