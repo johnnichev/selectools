@@ -523,6 +523,24 @@ report.<span class="text-yellow-300">to_html</span>(<span class="text-green-400"
               <td class="px-4 py-3 text-slate-500">langchain-core required</td>
               <td class="px-4 py-3 text-slate-500">chromadb bundled</td>
             </tr>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-4 py-3 text-slate-300">Deployment CLI</td>
+              <td class="px-4 py-3 text-green-400"><code class="text-xs">selectools serve</code></td>
+              <td class="px-4 py-3 text-slate-500">LangServe (separate)</td>
+              <td class="px-4 py-3 text-slate-500">Enterprise only</td>
+            </tr>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-4 py-3 text-slate-300">Agent templates</td>
+              <td class="px-4 py-3 text-green-400">5 built-in + YAML config</td>
+              <td class="px-4 py-3 text-slate-500">Not built-in</td>
+              <td class="px-4 py-3 text-slate-500">Not built-in</td>
+            </tr>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-4 py-3 text-slate-300">Trace persistence</td>
+              <td class="px-4 py-3 text-green-400">3 backends (free)</td>
+              <td class="px-4 py-3 text-slate-500">LangSmith (paid)</td>
+              <td class="px-4 py-3 text-slate-500">Not built-in</td>
+            </tr>
             <tr class="comparison-row">
               <td class="px-4 py-3 text-slate-300">Community</td>
               <td class="px-4 py-3 text-yellow-400">Growing</td>
@@ -531,6 +549,30 @@ report.<span class="text-yellow-300">to_html</span>(<span class="text-green-400"
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Benchmark Numbers -->
+      <div class="grid sm:grid-cols-4 gap-6 mt-16 mb-16">
+        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 text-center">
+          <div class="text-3xl font-bold text-brand-cyan mb-1">1 line</div>
+          <div class="text-sm text-slate-400">3-agent pipeline</div>
+          <div class="text-xs text-slate-600 mt-1">vs 25 lines (LangGraph)</div>
+        </div>
+        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 text-center">
+          <div class="text-3xl font-bold text-brand-cyan mb-1">39/40</div>
+          <div class="text-sm text-slate-400">framework scorecard</div>
+          <div class="text-xs text-slate-600 mt-1">vs 23/40 (LangGraph)</div>
+        </div>
+        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 text-center">
+          <div class="text-3xl font-bold text-brand-cyan mb-1">2566</div>
+          <div class="text-sm text-slate-400">tests passing</div>
+          <div class="text-xs text-slate-600 mt-1">40 real API evals</div>
+        </div>
+        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 text-center">
+          <div class="text-3xl font-bold text-brand-cyan mb-1">$0.03</div>
+          <div class="text-sm text-slate-400">per eval run</div>
+          <div class="text-xs text-slate-600 mt-1">40 tests, 3 providers</div>
+        </div>
       </div>
 
       <h3 class="text-xl font-semibold mb-4 mt-12 text-center">Eval Framework Comparison</h3>
