@@ -60,6 +60,13 @@ class ToolPolicy:
         4. ``allow`` glob patterns
         5. Default → review
         """
+        if not tool_name:
+            return PolicyResult(
+                decision=PolicyDecision.DENY,
+                reason="Empty tool name rejected",
+                matched_rule="builtin:empty_name",
+            )
+
         if tool_args is not None:
             for rule in self.deny_when:
                 if fnmatch.fnmatch(tool_name, rule.get("tool", "*")):

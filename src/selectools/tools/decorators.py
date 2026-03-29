@@ -5,13 +5,14 @@ Decorators for tool definition and registration.
 from __future__ import annotations
 
 import inspect
+import sys
 from typing import Any, Callable, Dict, List, Optional, Union, get_args, get_origin, get_type_hints
 
 from .base import ParamMetadata, Tool, ToolParameter
 
 
 def _unwrap_type(type_hint: Any) -> Any:
-    """Unwrap Optional[T] to T."""
+    """Unwrap Optional[T] / Union[T, None] to T."""
     origin = get_origin(type_hint)
     if origin is Union:
         args = get_args(type_hint)
@@ -19,6 +20,15 @@ def _unwrap_type(type_hint: Any) -> Any:
         non_none_args = [a for a in args if a is not type(None)]
         if len(non_none_args) == 1:
             return _unwrap_type(non_none_args[0])
+    # Handle Python 3.10+ X | Y syntax (types.UnionType)
+    if sys.version_info >= (3, 10):
+        import types  # noqa: PLC0415
+
+        if isinstance(type_hint, types.UnionType):
+            args = get_args(type_hint)
+            non_none_args = [a for a in args if a is not type(None)]
+            if len(non_none_args) == 1:
+                return _unwrap_type(non_none_args[0])
     return type_hint
 
 
