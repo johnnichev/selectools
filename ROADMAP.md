@@ -46,10 +46,12 @@ selectools serve CLI → Playground UI → YAML config → 5 agent templates
 → Type-safe step contracts → Streaming composition → pipeline.astream()
 → PostgresCheckpointStore → TraceStore (3 backends) → selectools doctor
 
-v0.19.x 🟡 Enterprise Hardening + Advanced Patterns + Polish & Community
+v0.19.1 🟡 Advanced Agent Patterns
+PlanAndExecute → ReflectiveAgent → Debate → TeamLead → 50+ evaluators
+
+v0.19.2 🟡 Enterprise Hardening + Polish & Community
 Security audit → Stability markers → Deprecation policy → Compatibility matrix
-→ PlanAndExecute → ReflectiveAgent → Debate → TeamLead → 50+ evaluators
-→ Published benchmarks → Enhanced trace viewer → Tool marketplace foundations
+→ Enhanced trace viewer → Launch posts → Community seeding
 
 v0.20.0 🟡 Visual Agent Builder
 Zero-install web UI → Drag-drop graph builder → YAML/Python export → Live test execution
@@ -65,24 +67,9 @@ API freeze → Stability markers on all modules → Deprecation policy
 
 ---
 
-## v0.19.x: Enterprise Hardening + Polish & Community + Advanced Agent Patterns 🟡
+## v0.19.1: Advanced Agent Patterns 🟡
 
-Focus: Production readiness, community growth, and developer trust signals. This is the "make it trustworthy" release series before adding new features in v0.20.
-
-### Enterprise Hardening
-
-| Feature                                                            | Status | Impact | Effort |
-| ------------------------------------------------------------------ | ------ | ------ | ------ |
-| **Security audit** (Snyk + bandit + OWASP review)                  | 🟡     | High   | Medium |
-| **Stability markers** (`__stability__ = "stable"/"beta"/"alpha"`)  | 🟡     | Medium | Small  |
-| **Deprecation policy** (2-version warning before removal)          | 🟡     | Medium | Small  |
-| **Compatibility matrix** (Python 3.9-3.13 + provider SDK versions) | 🟡     | Medium | Small  |
-| **SBOM generation** for compliance teams                           | 🟡     | Low    | Small  |
-| **Enhanced trace viewer** (interactive HTML)                       | 🟡     | High   | Medium |
-
-### Advanced Agent Patterns
-
-Higher-level agent architectures built on the v0.18.0 orchestration primitives. Each pattern is a pre-built `AgentGraph` topology.
+Higher-level agent architectures built on the v0.18.0 orchestration primitives. Closes the "Advanced patterns" competitive gap. Each pattern is a standalone class — they wire up the AgentGraph topology for you.
 
 ### PlanAndExecute Agent
 
@@ -107,9 +94,10 @@ agent = ReflectiveAgent(
     actor=writer_agent,
     critic=reviewer_agent,
     max_reflections=3,
+    stop_condition="approved",
 )
 result = agent.run("Draft a press release")
-# Actor produces draft → Critic evaluates → Actor revises → repeat until satisfied
+# Actor produces draft → Critic evaluates → Actor revises → repeat until approved
 ```
 
 ### Debate Pattern
@@ -134,27 +122,44 @@ from selectools.patterns import TeamLeadAgent
 agent = TeamLeadAgent(
     lead=lead_agent,
     team={"analyst": analyst, "engineer": engineer, "writer": writer},
-    delegation_strategy="dynamic",
+    delegation_strategy="dynamic",  # or "sequential", "parallel"
 )
 result = agent.run("Investigate and fix the billing discrepancy")
 # Lead delegates tasks, reviews work, coordinates handoffs
 ```
 
-### Expanded Eval Suite (50+ evaluators)
+### Expanded Eval Suite (50 evaluators, up from 39)
 
-- Semantic similarity (embedding-based)
-- Multi-turn coherence (conversation-level)
-- Custom rubric scoring
-- Agent trajectory evaluation (did the agent follow the right path?)
-- Tool efficiency (did the agent use the minimum tools needed?)
+11 new evaluators across two categories:
 
-| Feature             | Status    | Impact | Effort |
-| ------------------- | --------- | ------ | ------ |
-| **PlanAndExecute**  | 🟡 High   | High   | Medium |
-| **ReflectiveAgent** | 🟡 High   | High   | Medium |
-| **Debate**          | 🟡 Medium | Medium | Medium |
-| **TeamLead**        | 🟡 Medium | Medium | Medium |
-| **50+ evaluators**  | 🟡 Medium | High   | Large  |
+**New deterministic (+7):** `ReadabilityEvaluator`, `AgentTrajectoryEvaluator`, `ToolEfficiencyEvaluator`, `SemanticSimilarityEvaluator`, `MultiTurnCoherenceEvaluator`, `JsonSchemaEvaluator`, `KeywordDensityEvaluator`
+
+**New LLM-as-judge (+4):** `FactConsistencyEvaluator`, `CustomRubricEvaluator`, `AnswerAttributionEvaluator`, `StepReasoningEvaluator`
+
+| Feature             | Status | Impact | Effort |
+| ------------------- | ------ | ------ | ------ |
+| **PlanAndExecute**  | 🟡     | High   | Medium |
+| **ReflectiveAgent** | 🟡     | High   | Medium |
+| **Debate**          | 🟡     | Medium | Medium |
+| **TeamLead**        | 🟡     | Medium | Medium |
+| **50 evaluators**   | 🟡     | High   | Medium |
+
+---
+
+## v0.19.2: Enterprise Hardening + Polish & Community 🟡
+
+Focus: Production readiness, community growth, and developer trust signals. This is the "make it trustworthy" release before the big Visual Agent Builder announcement in v0.20.0.
+
+### Enterprise Hardening
+
+| Feature                                                            | Status | Impact | Effort |
+| ------------------------------------------------------------------ | ------ | ------ | ------ |
+| **Security audit** (Snyk + bandit + OWASP review)                  | 🟡     | High   | Medium |
+| **Stability markers** (`__stability__ = "stable"/"beta"/"alpha"`)  | 🟡     | Medium | Small  |
+| **Deprecation policy** (2-version warning before removal)          | 🟡     | Medium | Small  |
+| **Compatibility matrix** (Python 3.9-3.13 + provider SDK versions) | 🟡     | Medium | Small  |
+| **SBOM generation** for compliance teams                           | 🟡     | Low    | Small  |
+| **Enhanced trace viewer** (interactive HTML)                       | 🟡     | High   | Medium |
 
 ---
 

@@ -367,7 +367,8 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 - **v0.18.0** ✅ Multi-Agent Orchestration + Composable Pipelines — AgentGraph, SupervisorAgent, HITL, checkpointing, parallel execution; Pipeline + `@step` + `|` operator + `parallel()` + `branch()`
 - **v0.18.x** ✅ Advanced Composition — type-safe step contracts, streaming composition, tool composition (`@compose`)
 - **v0.19.0** ✅ Serve & Deploy — Structured AgentConfig, `selectools serve`, FastAPI/Flask, YAML config, templates, playground
-- **v0.19.x** 🟡 Enterprise Hardening + Advanced Patterns + Community — security audit, stability markers, PlanAndExecute, ReflectiveAgent, Debate, TeamLead, 50+ evaluators, launch, community growth
+- **v0.19.1** 🟡 Advanced Agent Patterns — PlanAndExecuteAgent, ReflectiveAgent, DebateAgent, TeamLeadAgent, 11 new evaluators (39 → 50 total)
+- **v0.19.2** 🟡 Enterprise Hardening + Community — security audit, stability markers, deprecation policy, enhanced trace viewer, launch posts
 - **v0.20.0** 🟡 Visual Agent Builder — `selectools serve --builder`, drag-drop AgentGraph UI, YAML/Python export, live test, self-contained HTML
 - **v0.21.0** 🟡 Connector Expansion — Bedrock, Azure, FAISS, Qdrant, pgvector, CSV/JSON/HTML/URL loaders, code/search/GitHub/DB toolbox
 - **v1.0.0** 🟡 Stable Release — API freeze, stability markers, security audit, deprecation policy, Production/Stable classifier
