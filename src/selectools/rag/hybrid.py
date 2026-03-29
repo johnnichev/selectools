@@ -157,8 +157,10 @@ class HybridSearcher:
             raise ValueError(f"top_k must be >= 1, got {top_k}")
 
         candidate_k = top_k * 2
-        v_top_k = vector_top_k or candidate_k
-        k_top_k = keyword_top_k or candidate_k
+        # Use `is None` so that an explicit vector_top_k=0 stays zero rather
+        # than being treated as "unset" (0 is falsy).
+        v_top_k = candidate_k if vector_top_k is None else vector_top_k
+        k_top_k = candidate_k if keyword_top_k is None else keyword_top_k
 
         vector_results = self._vector_search(query, v_top_k, filter)
         keyword_results = self.bm25.search(query, top_k=k_top_k, filter=filter)

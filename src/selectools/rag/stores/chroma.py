@@ -114,8 +114,9 @@ class ChromaVectorStore(VectorStore):
         texts = [doc.text for doc in documents]
         metadatas = [doc.metadata for doc in documents]
 
-        # Add to Chroma collection
-        self.collection.add(ids=ids, embeddings=embeddings, documents=texts, metadatas=metadatas)  # type: ignore
+        # Upsert to Chroma collection (idempotent — avoids duplicate-ID errors on
+        # re-indexing the same documents).
+        self.collection.upsert(ids=ids, embeddings=embeddings, documents=texts, metadatas=metadatas)  # type: ignore
 
         return ids
 
@@ -143,10 +144,16 @@ class ChromaVectorStore(VectorStore):
             # For more complex filters, users can pass Chroma-formatted where clauses
             where = filter
 
+        # Clamp n_results to the number of stored documents to avoid a ChromaDB
+        # error when the collection is smaller than top_k.
+        n_results = min(top_k, self.collection.count())
+        if n_results == 0:
+            return []
+
         # Query Chroma
         results = self.collection.query(
             query_embeddings=[query_embedding],  # type: ignore
-            n_results=top_k,
+            n_results=n_results,
             where=where,
             include=["documents", "metadatas", "distances"],
         )

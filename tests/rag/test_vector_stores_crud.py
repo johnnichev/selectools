@@ -433,7 +433,7 @@ class TestChromaVectorStore:
             doc_ids = store.add_documents(sample_documents)
 
             assert len(doc_ids) == 3
-            mock_collection.add.assert_called_once()
+            mock_collection.upsert.assert_called_once()
 
     def test_search_basic(self, mock_embedder: Mock) -> None:
         """Test basic search."""
@@ -444,6 +444,7 @@ class TestChromaVectorStore:
         mock_chroma.EphemeralClient.return_value = mock_client
 
         # Mock query results
+        mock_collection.count.return_value = 10  # collection has enough docs for n_results clamping
         mock_collection.query.return_value = {
             "ids": [["id1", "id2"]],
             "documents": [["doc1", "doc2"]],

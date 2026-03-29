@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 import re
+import threading
 from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
@@ -177,6 +178,7 @@ class BM25:
         self.b = b
         self.remove_stopwords = remove_stopwords
 
+        self._lock = threading.Lock()
         self._docs: List[_IndexedDoc] = []
         self._doc_count: int = 0
         self._avg_doc_len: float = 0.0
@@ -212,8 +214,8 @@ class BM25:
         Args:
             documents: Documents to index.
         """
-        self._docs = []
-        self._df = {}
+        new_docs: List[_IndexedDoc] = []
+        new_df: Dict[str, int] = {}
         total_len = 0
 
         for doc in documents:
@@ -224,14 +226,16 @@ class BM25:
                 term_freqs=dict(tf),
                 doc_len=len(tokens),
             )
-            self._docs.append(idx_doc)
+            new_docs.append(idx_doc)
             total_len += idx_doc.doc_len
-
             for term in tf:
-                self._df[term] = self._df.get(term, 0) + 1
+                new_df[term] = new_df.get(term, 0) + 1
 
-        self._doc_count = len(self._docs)
-        self._avg_doc_len = total_len / self._doc_count if self._doc_count else 0.0
+        with self._lock:
+            self._docs = new_docs
+            self._df = new_df
+            self._doc_count = len(self._docs)
+            self._avg_doc_len = total_len / self._doc_count if self._doc_count else 0.0
 
     def add_documents(self, documents: List[Document]) -> None:
         """
@@ -242,7 +246,9 @@ class BM25:
         Args:
             documents: Documents to add.
         """
-        total_len = self._avg_doc_len * self._doc_count
+        new_docs: List[_IndexedDoc] = []
+        new_df_delta: Dict[str, int] = {}
+        total_new_len = 0
 
         for doc in documents:
             tokens = self.tokenize(doc.text)
@@ -252,14 +258,18 @@ class BM25:
                 term_freqs=dict(tf),
                 doc_len=len(tokens),
             )
-            self._docs.append(idx_doc)
-            total_len += idx_doc.doc_len
-
+            new_docs.append(idx_doc)
+            total_new_len += idx_doc.doc_len
             for term in tf:
-                self._df[term] = self._df.get(term, 0) + 1
+                new_df_delta[term] = new_df_delta.get(term, 0) + 1
 
-        self._doc_count = len(self._docs)
-        self._avg_doc_len = total_len / self._doc_count if self._doc_count else 0.0
+        with self._lock:
+            self._docs.extend(new_docs)
+            for term, delta in new_df_delta.items():
+                self._df[term] = self._df.get(term, 0) + delta
+            self._doc_count = len(self._docs)
+            total_len = self._avg_doc_len * (self._doc_count - len(new_docs)) + total_new_len
+            self._avg_doc_len = total_len / self._doc_count if self._doc_count else 0.0
 
     def search(
         self,
@@ -280,6 +290,9 @@ class BM25:
             List of ``SearchResult`` objects sorted by BM25 score (highest first).
             Scores are non-negative; documents with zero relevance are excluded.
         """
+        if top_k < 1:
+            raise ValueError(f"top_k must be >= 1, got {top_k}")
+
         if self._doc_count == 0:
             return []
 

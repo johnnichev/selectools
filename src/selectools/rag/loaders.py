@@ -179,8 +179,19 @@ class DocumentLoader:
         if not file_path.exists():
             raise FileNotFoundError(f"PDF file not found: {path}")
 
-        # Read PDF
-        reader = PdfReader(path)
+        # Read PDF — raises PdfReadError for encrypted/corrupt files
+        try:
+            from pypdf.errors import PdfReadError
+        except ImportError:
+            PdfReadError = Exception  # type: ignore[misc,assignment]
+
+        try:
+            reader = PdfReader(path)
+        except PdfReadError as e:
+            raise ValueError(
+                f"Could not read PDF {path!r} — it may be encrypted or corrupt: {e}"
+            ) from e
+
         documents = []
 
         for page_num, page in enumerate(reader.pages):

@@ -84,8 +84,13 @@ class InMemoryVectorStore(VectorStore):
 
         new_embeddings = np.array(embeddings, dtype=np.float32)
         with self._lock:
-            # Capacity check is inside the lock so the read + warn are atomic
-            if self.max_documents and len(self.documents) + len(documents) > self.max_documents:
+            # Capacity check is inside the lock so the read + warn are atomic.
+            # Use `is not None` so max_documents=0 is treated as "no limit" rather
+            # than "zero capacity" (zero is falsy, which would skip the check).
+            if (
+                self.max_documents is not None
+                and len(self.documents) + len(documents) > self.max_documents
+            ):
                 import warnings
 
                 warnings.warn(
@@ -179,8 +184,11 @@ class InMemoryVectorStore(VectorStore):
             ids: List of document IDs to delete
         """
         with self._lock:
+            # Deduplicate so the same index isn't removed twice (which would
+            # delete two list entries but only one numpy row, corrupting alignment).
+            seen_ids = dict.fromkeys(ids)  # preserves order, drops duplicates
             indices_to_remove = []
-            for doc_id in ids:
+            for doc_id in seen_ids:
                 if doc_id in self.ids:
                     indices_to_remove.append(self.ids.index(doc_id))
 

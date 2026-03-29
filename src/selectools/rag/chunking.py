@@ -464,10 +464,16 @@ class ContextualChunker:
         if not hasattr(base_chunker, "split_documents"):
             raise TypeError("base_chunker must have a split_documents(documents) method")
 
+        template = prompt_template or self._DEFAULT_PROMPT
+        if "{document}" not in template or "{chunk}" not in template:
+            raise ValueError(
+                "prompt_template must contain both {document} and {chunk} placeholders"
+            )
+
         self.base_chunker = base_chunker
         self.provider = provider
         self.model = model
-        self.prompt_template = prompt_template or self._DEFAULT_PROMPT
+        self.prompt_template = template
         self.max_document_chars = max_document_chars
         self.context_prefix = context_prefix
 
@@ -508,15 +514,19 @@ class ContextualChunker:
                 chunk=safe_chunk,
             )
 
-            response_msg, _ = self.provider.complete(
-                model=self.model,
-                system_prompt="You are a concise technical writer.",
-                messages=[Message(role=Role.USER, content=prompt)],
-                tools=[],
-                temperature=0.0,
-            )
-
-            context_line = (response_msg.content or "").strip()
+            try:
+                response_msg, _ = self.provider.complete(
+                    model=self.model,
+                    system_prompt="You are a concise technical writer.",
+                    messages=[Message(role=Role.USER, content=prompt)],
+                    tools=[],
+                    temperature=0.0,
+                )
+                context_line = (response_msg.content or "").strip()
+            except Exception:
+                # If context generation fails, fall back to no context rather
+                # than aborting the entire chunking pipeline.
+                context_line = ""
             enriched_text = f"{self.context_prefix}{context_line}\n\n{chunk_doc.text}"
 
             metadata = chunk_doc.metadata.copy()

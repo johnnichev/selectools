@@ -193,6 +193,13 @@ Every provider implements the `Provider` protocol from `providers/base.py`:
 
 When implementing a new feature, ALWAYS complete ALL of these steps:
 
+### 0. Pre-Release Quality Gate (MANDATORY — must pass before git tag)
+
+- [ ] **Ralph loop**: `bash scripts/ralph_bug_hunt.sh` exits 0
+       (all 7 modules achieve 3 consecutive clean passes)
+- [ ] **Security scan**: `bandit -r src/ -ll -q -c pyproject.toml` — zero HIGH/CRITICAL findings
+- [ ] Full test suite: `pytest tests/ -k "not e2e" -x -q` — all pass
+
 ### 1. Cross-Feature Impact Analysis
 
 - [ ] How does this feature interact with existing features?

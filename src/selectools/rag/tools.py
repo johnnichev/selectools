@@ -216,9 +216,10 @@ class SemanticSearchTool:
             source = result.document.metadata.get("source", "Unknown")
             filename = result.document.metadata.get("filename", source)
 
+            preview = result.document.text[:200]
+            suffix = "..." if len(result.document.text) > 200 else ""
             output_parts.append(
-                f"{i+1}. {filename} (similarity: {result.score:.2f})\n"
-                f"   {result.document.text[:200]}...\n"
+                f"{i+1}. {filename} (similarity: {result.score:.2f})\n" f"   {preview}{suffix}\n"
             )
 
         return "\n".join(output_parts)

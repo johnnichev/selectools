@@ -5,6 +5,56 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.1] - 2026-03-29
+
+### Added
+
+#### Advanced Agent Patterns (`selectools.patterns`)
+
+Four production-ready multi-agent coordination patterns, each with sync `.run()` and async `.arun()`:
+
+- **`PlanAndExecuteAgent`** — Planner LLM generates a typed JSON execution plan (`PlanStep` list); executor agents run sequentially with context chaining. Optional replanning on step failure (`replanner=True`).
+- **`ReflectiveAgent`** — Actor–critic loop: actor drafts, critic reviews, actor revises. Stops when critic includes a configurable `stop_condition` word (default: `"approved"`) or `max_reflections` is reached. Returns `ReflectiveResult` with per-round `ReflectionRound` records.
+- **`DebateAgent`** — Multiple agents argue assigned positions over `max_rounds` rounds (each sees prior transcript); a judge agent synthesizes a final conclusion. Returns `DebateResult` with `DebateRound` records.
+- **`TeamLeadAgent`** — Lead agent generates subtask plan; team members execute via `sequential`, `parallel` (AgentGraph fan-out), or `dynamic` (lead reviews after each result and may reassign) strategies. Returns `TeamLeadResult` with `Subtask` records.
+
+All pattern symbols exported from `selectools` top-level:
+`PlanAndExecuteAgent`, `PlanStep`, `ReflectiveAgent`, `ReflectionRound`, `ReflectiveResult`,
+`DebateAgent`, `DebateRound`, `DebateResult`, `TeamLeadAgent`, `Subtask`, `TeamLeadResult`
+
+#### Expanded Eval Framework (38 → 50 evaluators)
+
+8 new deterministic evaluators:
+- `ReadabilityEvaluator` — Flesch-Kincaid score (pure Python, no deps); activated by `TestCase.expect_readability_gte`
+- `AgentTrajectoryEvaluator` — verifies tool call sequence is an in-order subsequence of expected; activated by `expect_trajectory`
+- `ToolEfficiencyEvaluator` — enforces max tool call count; activated by `expect_max_tools`
+- `SemanticSimilarityEvaluator` — TF-IDF cosine similarity (pure Python); activated by `expect_semantic_similarity_gte`
+- `MultiTurnCoherenceEvaluator` — regex contradiction detector; activated by `expect_coherent_turns`
+- `JsonSchemaEvaluator` — JSON parse + schema validate (uses `jsonschema` if installed, else minimal fallback); activated by `expect_json_schema`
+- `KeywordDensityEvaluator` — keyword presence + density ratio; activated by `expect_keywords` / `expect_keyword_density_min`
+- `ForbiddenWordsEvaluator` — fails if any forbidden word appears; activated by `expect_no_keywords`
+
+4 new LLM-as-judge evaluators:
+- `FactConsistencyEvaluator` — checks output doesn't contradict `case.context`
+- `CustomRubricEvaluator` — per-criterion scoring from `criteria` list or `case.rubric`
+- `AnswerAttributionEvaluator` — claim traceability to `case.context`
+- `StepReasoningEvaluator` — step-by-step reasoning quality; uses `case.rubric` or default rubric
+
+9 new `TestCase` fields: `expect_readability_gte`, `expect_trajectory`, `expect_max_tools`,
+`expect_semantic_similarity_gte`, `expect_coherent_turns`, `expect_json_schema`,
+`expect_keywords`, `expect_keyword_density_min`, `expect_no_keywords`
+
+#### New Example Scripts
+- `examples/70_plan_and_execute.py` — PlanAndExecuteAgent with scripted provider
+- `examples/71_reflective_agent.py` — ReflectiveAgent 2-round reflection loop
+- `examples/72_debate_agent.py` — DebateAgent with optimist/skeptic/judge
+- `examples/73_team_lead_agent.py` — TeamLeadAgent with all 3 delegation strategies
+
+### Stats
+- Tests: 2599 (+33), Examples: 73 (+4), Evaluators: 50 (+12)
+
+---
+
 ## [0.19.0] - 2026-03-28
 
 ### Added
