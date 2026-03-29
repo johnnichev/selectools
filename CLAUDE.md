@@ -149,6 +149,7 @@ python3 -m twine upload dist/*
 ## Key Conventions
 
 ### Code Style
+
 - Line length: 100 characters
 - Formatter: Black + isort
 - Type hints: Required on all public APIs (mypy enforced)
@@ -156,13 +157,16 @@ python3 -m twine upload dist/*
 - No comments explaining what code does — only non-obvious intent
 
 ### File Naming
+
 - Source modules: `snake_case.py`
 - Test files: `test_<module>.py`
 - Example files: `NN_descriptive_name.py` (zero-padded number)
 - Doc files: `UPPER_CASE.md` for modules, `lower_case.md` for guides
 
 ### Provider Pattern
+
 Every provider implements the `Provider` protocol from `providers/base.py`:
+
 - `complete()` / `acomplete()` — synchronous/async completion
 - `stream()` / `astream()` — synchronous/async streaming (yields `str | ToolCall`)
 - `_format_messages()` — converts internal `Message` objects to provider-specific format
@@ -170,12 +174,14 @@ Every provider implements the `Provider` protocol from `providers/base.py`:
 - Must handle `ToolCall` objects properly (not stringify them)
 
 ### Agent Core Pattern
+
 - `run()` / `arun()` — main sync/async execution
 - `astream()` — async streaming with tool calls
 - `batch()` / `abatch()` — concurrent multi-prompt execution
 - All methods produce `AgentResult` with `.content`, `.trace`, `.reasoning`, `.usage`
 
 ### Testing Pattern
+
 - Unit tests mock providers — never call real APIs
 - Use `RecordingProvider` to verify exact arguments passed to provider methods
 - E2E tests use `@pytest.mark.e2e` and are skipped in CI
@@ -188,6 +194,7 @@ Every provider implements the `Provider` protocol from `providers/base.py`:
 When implementing a new feature, ALWAYS complete ALL of these steps:
 
 ### 1. Cross-Feature Impact Analysis
+
 - [ ] How does this feature interact with existing features?
 - [ ] Does it need integration in `agent/core.py` (the main loop)?
 - [ ] Does `AgentConfig` need new fields?
@@ -197,6 +204,7 @@ When implementing a new feature, ALWAYS complete ALL of these steps:
 - [ ] Does `AgentResult` need new fields?
 
 ### 2. Implementation
+
 - [ ] Create new module(s) in `src/selectools/`
 - [ ] Integrate with `agent/core.py` if it affects the agent loop
 - [ ] Update `agent/config.py` with new config options
@@ -206,6 +214,7 @@ When implementing a new feature, ALWAYS complete ALL of these steps:
 - [ ] Run `flake8 src/` to check linting
 
 ### 3. Testing (CRITICAL — bugs found in production are unacceptable)
+
 - [ ] Unit tests for the new module (`tests/test_<module>.py`)
 - [ ] Integration tests if it touches the agent loop
 - [ ] Regression tests for any edge cases discovered
@@ -214,6 +223,7 @@ When implementing a new feature, ALWAYS complete ALL of these steps:
 - [ ] Verify no tests were broken by the change
 
 ### 4. Documentation Updates (ALL of these, every time)
+
 - [ ] **Module doc**: Create or update `docs/modules/<MODULE>.md`
 - [ ] **Architecture doc**: Update `docs/ARCHITECTURE.md` if it adds a new component
 - [ ] **Quickstart**: Update `docs/QUICKSTART.md` if it's user-facing
@@ -224,6 +234,7 @@ When implementing a new feature, ALWAYS complete ALL of these steps:
 - [ ] Verify all internal links work: `cp CHANGELOG.md docs/CHANGELOG.md && mkdocs build`
 
 ### 5. Release Artifacts (for each release)
+
 - [ ] **Version bump**: `src/selectools/__init__.py` + `pyproject.toml`
 - [ ] **CHANGELOG.md**: Add detailed entry with features, fixes, and migration guide
 - [ ] **README.md**: Update "What's New" section, feature table, stats (model count, test count, example count)
@@ -234,6 +245,7 @@ When implementing a new feature, ALWAYS complete ALL of these steps:
 - [ ] **Verify**: GitHub Pages docs auto-deploy after merge to main
 
 ### 6. Cross-Reference Audit
+
 - [ ] Search for hardcoded counts (model count, test count, example count) across all docs
 - [ ] Verify pricing references match `models.py`
 - [ ] Ensure no broken links (relative paths, anchor references)
@@ -253,6 +265,7 @@ gh pr merge <number> --merge --delete-branch
 ```
 
 For releases with version bumps:
+
 ```
 git checkout -b release/vX.Y.Z
 # bump version, update changelog, etc.
@@ -265,35 +278,35 @@ python3 -m build && python3 -m twine upload dist/*
 
 Every `AgentTrace` contains `TraceStep` entries with one of these types:
 
-| StepType | Added | Description |
-|---|---|---|
-| `llm_call` | v0.13.0 | Provider API call (model, tokens, duration) |
-| `tool_selection` | v0.13.0 | LLM chose a tool (name, args, reasoning) |
-| `tool_execution` | v0.13.0 | Tool executed (name, result, duration) |
-| `cache_hit` | v0.13.0 | Response served from cache |
-| `error` | v0.13.0 | Error during execution |
-| `structured_retry` | v0.13.0 | Structured output validation failed, retrying |
-| `guardrail` | v0.15.0 | Input/output guardrail triggered |
-| `coherence_check` | v0.15.0 | Coherence check blocked a tool call |
-| `output_screening` | v0.15.0 | Tool output screening detected injection |
-| `session_load` | v0.16.0 | Session loaded from store |
-| `session_save` | v0.16.0 | Session saved to store |
-| `memory_summarize` | v0.16.0 | Trimmed messages summarized |
-| `entity_extraction` | v0.16.0 | Entities extracted from conversation |
-| `kg_extraction` | v0.16.0 | Knowledge graph triples extracted |
-| `budget_exceeded` | v0.17.3 | Agent stopped due to token/cost budget limit |
-| `cancelled` | v0.17.3 | Agent run cancelled via CancellationToken |
-| `prompt_compressed` | v0.17.7 | Older history summarised to free context window |
-| `graph_node_start` | v0.18.0 | Graph node execution began |
-| `graph_node_end` | v0.18.0 | Graph node execution completed |
-| `graph_routing` | v0.18.0 | Graph router resolved next node |
-| `graph_checkpoint` | v0.18.0 | Graph state checkpointed |
-| `graph_interrupt` | v0.18.0 | Graph paused for human input |
-| `graph_resume` | v0.18.0 | Graph execution resumed from checkpoint |
-| `graph_parallel_start` | v0.18.0 | Parallel group execution began |
-| `graph_parallel_end` | v0.18.0 | Parallel group execution completed |
-| `graph_stall` | v0.18.0 | Graph state unchanged for N steps |
-| `graph_loop_detected` | v0.18.0 | Hard loop detected (same state hash) |
+| StepType               | Added   | Description                                     |
+| ---------------------- | ------- | ----------------------------------------------- |
+| `llm_call`             | v0.13.0 | Provider API call (model, tokens, duration)     |
+| `tool_selection`       | v0.13.0 | LLM chose a tool (name, args, reasoning)        |
+| `tool_execution`       | v0.13.0 | Tool executed (name, result, duration)          |
+| `cache_hit`            | v0.13.0 | Response served from cache                      |
+| `error`                | v0.13.0 | Error during execution                          |
+| `structured_retry`     | v0.13.0 | Structured output validation failed, retrying   |
+| `guardrail`            | v0.15.0 | Input/output guardrail triggered                |
+| `coherence_check`      | v0.15.0 | Coherence check blocked a tool call             |
+| `output_screening`     | v0.15.0 | Tool output screening detected injection        |
+| `session_load`         | v0.16.0 | Session loaded from store                       |
+| `session_save`         | v0.16.0 | Session saved to store                          |
+| `memory_summarize`     | v0.16.0 | Trimmed messages summarized                     |
+| `entity_extraction`    | v0.16.0 | Entities extracted from conversation            |
+| `kg_extraction`        | v0.16.0 | Knowledge graph triples extracted               |
+| `budget_exceeded`      | v0.17.3 | Agent stopped due to token/cost budget limit    |
+| `cancelled`            | v0.17.3 | Agent run cancelled via CancellationToken       |
+| `prompt_compressed`    | v0.17.7 | Older history summarised to free context window |
+| `graph_node_start`     | v0.18.0 | Graph node execution began                      |
+| `graph_node_end`       | v0.18.0 | Graph node execution completed                  |
+| `graph_routing`        | v0.18.0 | Graph router resolved next node                 |
+| `graph_checkpoint`     | v0.18.0 | Graph state checkpointed                        |
+| `graph_interrupt`      | v0.18.0 | Graph paused for human input                    |
+| `graph_resume`         | v0.18.0 | Graph execution resumed from checkpoint         |
+| `graph_parallel_start` | v0.18.0 | Parallel group execution began                  |
+| `graph_parallel_end`   | v0.18.0 | Parallel group execution completed              |
+| `graph_stall`          | v0.18.0 | Graph state unchanged for N steps               |
+| `graph_loop_detected`  | v0.18.0 | Hard loop detected (same state hash)            |
 
 ## Common Pitfalls (from past bugs)
 
@@ -352,8 +365,9 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 - **v0.17.6** ✅ Quick Wins — ReAct/CoT reasoning strategies, tool result caching, Python 3.9–3.13 CI matrix
 - **v0.17.7** ✅ Caching & Context — semantic caching, prompt compression, conversation branching
 - **v0.18.0** ✅ Multi-Agent Orchestration + Composable Pipelines — AgentGraph, SupervisorAgent, HITL, checkpointing, parallel execution; Pipeline + `@step` + `|` operator + `parallel()` + `branch()`
-- **v0.18.x** 🟡 Advanced Composition — type-safe step contracts, streaming composition, tool composition (`@compose`)
-- **v0.19.0** 🟡 Serve & Deploy — Structured AgentConfig, `selectools serve`, FastAPI/Flask, YAML config, templates, playground
+- **v0.18.x** ✅ Advanced Composition — type-safe step contracts, streaming composition, tool composition (`@compose`)
+- **v0.19.0** ✅ Serve & Deploy — Structured AgentConfig, `selectools serve`, FastAPI/Flask, YAML config, templates, playground
 - **v0.19.x** 🟡 Enterprise Hardening + Advanced Patterns + Community — security audit, stability markers, PlanAndExecute, ReflectiveAgent, Debate, TeamLead, 50+ evaluators, launch, community growth
-- **v0.20.0** 🟡 Connectors + Visual Agent Builder — Bedrock, Azure, FAISS, Qdrant, loaders, Visual Agent Builder
+- **v0.20.0** 🟡 Visual Agent Builder — `selectools serve --builder`, drag-drop AgentGraph UI, YAML/Python export, live test, self-contained HTML
+- **v0.21.0** 🟡 Connector Expansion — Bedrock, Azure, FAISS, Qdrant, pgvector, CSV/JSON/HTML/URL loaders, code/search/GitHub/DB toolbox
 - **v1.0.0** 🟡 Stable Release — API freeze, stability markers, security audit, deprecation policy, Production/Stable classifier
