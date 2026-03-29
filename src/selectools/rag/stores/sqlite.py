@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import sqlite3
 import threading
+import uuid
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
@@ -64,36 +64,33 @@ class SQLiteVectorStore(VectorStore):
 
     def _init_db(self) -> None:
         """Initialize the database schema."""
-        conn = sqlite3.connect(self.db_path)
-        conn.execute("PRAGMA journal_mode=WAL")
-        cursor = conn.cursor()
+        with self._lock:
+            conn = sqlite3.connect(self.db_path)
+            conn.execute("PRAGMA journal_mode=WAL")
+            cursor = conn.cursor()
 
-        # Create documents table
-        cursor.execute(
+            # Create documents table
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS documents (
+                    id TEXT PRIMARY KEY,
+                    text TEXT NOT NULL,
+                    metadata TEXT,
+                    embedding TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
             """
-            CREATE TABLE IF NOT EXISTS documents (
-                id TEXT PRIMARY KEY,
-                text TEXT NOT NULL,
-                metadata TEXT,
-                embedding TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        """
-        )
 
-        # Create index on metadata for faster filtering
-        cursor.execute(
+            # Create index on metadata for faster filtering
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_metadata ON documents(metadata)
             """
-            CREATE INDEX IF NOT EXISTS idx_metadata ON documents(metadata)
-        """
-        )
+            )
 
-        conn.commit()
-        conn.close()
-
-    def _connect(self) -> sqlite3.Connection:
-        """Create a connection. Caller must use with self._lock."""
-        return sqlite3.connect(self.db_path)
+            conn.commit()
+            conn.close()
 
     def add_documents(
         self, documents: List[Document], embeddings: Optional[List[List[float]]] = None
@@ -111,37 +108,28 @@ class SQLiteVectorStore(VectorStore):
         if not documents:
             return []
 
-        # Compute embeddings if not provided
+        # Compute embeddings outside the lock (potentially slow network call)
         if embeddings is None:
             texts = [doc.text for doc in documents]
             embeddings = self.embedder.embed_texts(texts)
 
+        # UUID-based IDs: unique per insertion regardless of content or batch order,
+        # matching InMemoryVectorStore's counter-based scheme.
+        ids = [f"doc_{uuid.uuid4().hex}" for _ in documents]
+
         with self._lock:
             conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
-        # Generate IDs and insert documents
-        ids = []
-        for i, (doc, embedding) in enumerate(zip(documents, embeddings)):
-            # Generate unique ID
-            doc_id = f"doc_{hashlib.sha256(doc.text.encode()).hexdigest()[:16]}_{i}"
-            ids.append(doc_id)
-
-            # Serialize data
-            metadata_json = json.dumps(doc.metadata)
-            embedding_json = json.dumps(embedding)
-
-            # Insert into database
-            cursor.execute(
-                """
-                INSERT OR REPLACE INTO documents (id, text, metadata, embedding)
-                VALUES (?, ?, ?, ?)
-            """,
-                (doc_id, doc.text, metadata_json, embedding_json),
-            )
-
-        conn.commit()
-        conn.close()
+            cursor = conn.cursor()
+            for doc_id, doc, embedding in zip(ids, documents, embeddings):
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO documents (id, text, metadata, embedding)
+                    VALUES (?, ?, ?, ?)
+                """,
+                    (doc_id, doc.text, json.dumps(doc.metadata), json.dumps(embedding)),
+                )
+            conn.commit()
+            conn.close()
 
         return ids
 
@@ -162,26 +150,23 @@ class SQLiteVectorStore(VectorStore):
         Returns:
             List of SearchResult objects, sorted by similarity
         """
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+        with self._lock:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, text, metadata, embedding FROM documents")
+            rows = cursor.fetchall()
+            conn.close()
 
-        # Fetch all documents (with optional metadata filtering)
+        if not rows:
+            return []
+
+        # Apply metadata filter in Python (flexible matching)
         if filter:
-            # Simple metadata filtering (exact match on JSON string)
-            cursor.execute("SELECT id, text, metadata, embedding FROM documents")
-            rows = cursor.fetchall()
-            # Filter in Python for more flexible matching
-            filtered_rows = []
-            for row in rows:
-                metadata = json.loads(row[2])
-                if all(metadata.get(k) == v for k, v in filter.items()):
-                    filtered_rows.append(row)
-            rows = filtered_rows
-        else:
-            cursor.execute("SELECT id, text, metadata, embedding FROM documents")
-            rows = cursor.fetchall()
-
-        conn.close()
+            rows = [
+                row
+                for row in rows
+                if all(json.loads(row[2]).get(k) == v for k, v in filter.items())
+            ]
 
         if not rows:
             return []
@@ -199,17 +184,18 @@ class SQLiteVectorStore(VectorStore):
             metadata = json.loads(metadata_json)
             embedding = np.array(json.loads(embedding_json), dtype=np.float32)
 
-            # Cosine similarity
             doc_norm = np.linalg.norm(embedding)
             if doc_norm == 0:
                 continue
 
             similarity = np.dot(embedding, query_vec) / (doc_norm * query_norm)
+            results.append(
+                SearchResult(
+                    document=Document(text=text, metadata=metadata, embedding=embedding.tolist()),
+                    score=float(similarity),
+                )
+            )
 
-            doc = Document(text=text, metadata=metadata, embedding=embedding.tolist())
-            results.append(SearchResult(document=doc, score=float(similarity)))
-
-        # Sort by similarity (highest first) and return top-k
         results.sort(key=lambda x: x.score, reverse=True)
         return results[:top_k]
 
@@ -223,25 +209,22 @@ class SQLiteVectorStore(VectorStore):
         if not ids:
             return
 
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
-        # Delete documents
-        placeholders = ",".join("?" for _ in ids)
-        cursor.execute(f"DELETE FROM documents WHERE id IN ({placeholders})", ids)  # nosec
-
-        conn.commit()
-        conn.close()
+        with self._lock:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            placeholders = ",".join("?" for _ in ids)
+            cursor.execute(f"DELETE FROM documents WHERE id IN ({placeholders})", ids)  # nosec
+            conn.commit()
+            conn.close()
 
     def clear(self) -> None:
         """Clear all documents from the store."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
-        cursor.execute("DELETE FROM documents")
-
-        conn.commit()
-        conn.close()
+        with self._lock:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM documents")
+            conn.commit()
+            conn.close()
 
 
 __all__ = ["SQLiteVectorStore"]

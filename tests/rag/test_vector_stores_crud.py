@@ -409,7 +409,7 @@ class TestChromaVectorStore:
         mock_client = Mock()
         mock_collection = Mock()
         mock_client.get_or_create_collection.return_value = mock_collection
-        mock_chroma.Client.return_value = mock_client
+        mock_chroma.EphemeralClient.return_value = mock_client
 
         with patch.dict("sys.modules", {"chromadb": mock_chroma}):
             from selectools.rag.stores.chroma import ChromaVectorStore
@@ -423,7 +423,7 @@ class TestChromaVectorStore:
         mock_client = Mock()
         mock_collection = Mock()
         mock_client.get_or_create_collection.return_value = mock_collection
-        mock_chroma.Client.return_value = mock_client
+        mock_chroma.EphemeralClient.return_value = mock_client
 
         with patch.dict("sys.modules", {"chromadb": mock_chroma}):
             from selectools.rag.stores.chroma import ChromaVectorStore
@@ -441,7 +441,7 @@ class TestChromaVectorStore:
         mock_client = Mock()
         mock_collection = Mock()
         mock_client.get_or_create_collection.return_value = mock_collection
-        mock_chroma.Client.return_value = mock_client
+        mock_chroma.EphemeralClient.return_value = mock_client
 
         # Mock query results
         mock_collection.query.return_value = {
@@ -469,7 +469,7 @@ class TestChromaVectorStore:
         mock_client = Mock()
         mock_collection = Mock()
         mock_client.get_or_create_collection.return_value = mock_collection
-        mock_chroma.Client.return_value = mock_client
+        mock_chroma.EphemeralClient.return_value = mock_client
 
         with patch.dict("sys.modules", {"chromadb": mock_chroma}):
             from selectools.rag.stores.chroma import ChromaVectorStore

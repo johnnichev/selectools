@@ -77,18 +77,6 @@ class InMemoryVectorStore(VectorStore):
         if not documents:
             return []
 
-        if self.max_documents:
-            with self._lock:
-                current_count = len(self.documents)
-            if current_count + len(documents) > self.max_documents:
-                import warnings
-
-                warnings.warn(
-                    f"InMemoryVectorStore exceeding max_documents ({self.max_documents}). "
-                    f"Consider using SQLiteVectorStore for large collections.",
-                    stacklevel=2,
-                )
-
         # Compute embeddings outside the lock (potentially slow IO operation)
         if embeddings is None:
             texts = [doc.text for doc in documents]
@@ -96,6 +84,15 @@ class InMemoryVectorStore(VectorStore):
 
         new_embeddings = np.array(embeddings, dtype=np.float32)
         with self._lock:
+            # Capacity check is inside the lock so the read + warn are atomic
+            if self.max_documents and len(self.documents) + len(documents) > self.max_documents:
+                import warnings
+
+                warnings.warn(
+                    f"InMemoryVectorStore exceeding max_documents ({self.max_documents}). "
+                    f"Consider using SQLiteVectorStore for large collections.",
+                    stacklevel=2,
+                )
             # Generate IDs
             new_ids = [f"doc_{self._id_counter + i}" for i in range(len(documents))]
             self._id_counter += len(documents)

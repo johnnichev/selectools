@@ -124,6 +124,10 @@ class DocumentLoader:
         # Find matching files
         if recursive and "**" not in glob_pattern:
             pattern = f"**/{glob_pattern}"
+        elif not recursive and "**" in glob_pattern:
+            # Strip recursive wildcard so recursive=False is honoured even when
+            # the caller passes a pattern that contains **
+            pattern = glob_pattern.replace("**/", "").replace("**", "")
         else:
             pattern = glob_pattern
 
@@ -180,9 +184,9 @@ class DocumentLoader:
         documents = []
 
         for page_num, page in enumerate(reader.pages):
-            text = page.extract_text()
+            text = page.extract_text()  # returns None for image-only / encrypted pages
 
-            if not text.strip():
+            if not (text or "").strip():
                 # Skip empty pages
                 continue
 

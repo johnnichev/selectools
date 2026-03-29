@@ -55,6 +55,11 @@ class TextSplitter:
             raise ValueError("chunk_overlap cannot be negative")
         if chunk_overlap >= chunk_size:
             raise ValueError("chunk_overlap must be less than chunk_size")
+        if length_function("a") != 1:
+            raise ValueError(
+                "length_function must count characters (length_function('a') must equal 1). "
+                "Token-counting functions produce incorrect chunk boundaries."
+            )
 
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
@@ -228,19 +233,20 @@ class RecursiveTextSplitter(TextSplitter):
 
                 # Start new chunk with overlap
                 if self.chunk_overlap > 0 and current_chunk:
-                    # Keep last part for overlap
-                    overlap_text = (
-                        separator.join(current_chunk) if separator else "".join(current_chunk)
-                    )
-                    overlap_length = self.length_function(overlap_text)
-
-                    if overlap_length > self.chunk_overlap:
-                        # Trim overlap to fit
-                        overlap_text = overlap_text[-self.chunk_overlap :]
-
-                    current_chunk = (
-                        [overlap_text, split] if separator else list(overlap_text) + [split]
-                    )
+                    # Build overlap from complete segments (walk backward) so we
+                    # never slice mid-separator (e.g. cutting "\n\n" into "\n").
+                    sep_len = self.length_function(separator) if separator else 0
+                    overlap_parts: List[str] = []
+                    overlap_len = 0
+                    for seg in reversed(current_chunk):
+                        seg_len = self.length_function(seg)
+                        extra = sep_len if overlap_parts else 0
+                        if overlap_len + seg_len + extra <= self.chunk_overlap:
+                            overlap_parts.insert(0, seg)
+                            overlap_len += seg_len + extra
+                        else:
+                            break
+                    current_chunk = overlap_parts + [split] if overlap_parts else [split]
                     current_length = self.length_function(
                         separator.join(current_chunk) if separator else "".join(current_chunk)
                     )
@@ -492,9 +498,14 @@ class ContextualChunker:
             full_text = doc_text_map[origin_idx]
             truncated_doc = full_text[: self.max_document_chars]
 
+            # Escape closing XML delimiters so a malicious document cannot break
+            # out of the <document>/<chunk> tags and inject instructions.
+            safe_doc = truncated_doc.replace("</document>", "<\\/document>")
+            safe_chunk = chunk_doc.text.replace("</chunk>", "<\\/chunk>")
+
             prompt = self.prompt_template.format(
-                document=truncated_doc,
-                chunk=chunk_doc.text,
+                document=safe_doc,
+                chunk=safe_chunk,
             )
 
             response_msg, _ = self.provider.complete(

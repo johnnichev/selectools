@@ -75,7 +75,8 @@ class ChromaVectorStore(VectorStore):
         if persist_directory:
             self.client = chromadb.PersistentClient(path=persist_directory, **chroma_kwargs)
         else:
-            self.client = chromadb.Client(**chroma_kwargs)
+            # chromadb.Client() was removed in chromadb ≥ 0.4; use EphemeralClient for in-memory
+            self.client = chromadb.EphemeralClient(**chroma_kwargs)
 
         # Get or create collection
         self.collection = self.client.get_or_create_collection(

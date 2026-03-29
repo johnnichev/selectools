@@ -338,7 +338,8 @@ class BM25:
             idf = math.log((self._doc_count - df + 0.5) / (df + 0.5) + 1.0)
 
             numerator = tf * (self.k1 + 1)
-            denominator = tf + self.k1 * (1 - self.b + self.b * idx_doc.doc_len / self._avg_doc_len)
+            avg_len = self._avg_doc_len if self._avg_doc_len > 0 else 1e-8
+            denominator = tf + self.k1 * (1 - self.b + self.b * idx_doc.doc_len / avg_len)
             score += idf * numerator / denominator
 
         return score
