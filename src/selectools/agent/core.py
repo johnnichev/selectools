@@ -1225,15 +1225,16 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         )
                     if _usage:
                         self.usage.add_usage(_usage, tool_name=None)
-                    self._notify_observers("on_llm_end", ctx.run_id, response_msg.content, _usage)
+                    _response_content = response_msg.content or ""
+                    self._notify_observers("on_llm_end", ctx.run_id, _response_content, _usage)
                     await self._anotify_observers(
-                        "on_llm_end", ctx.run_id, response_msg.content, _usage
+                        "on_llm_end", ctx.run_id, _response_content, _usage
                     )
                     if _usage:
                         self._notify_observers("on_usage", ctx.run_id, _usage)
                         await self._anotify_observers("on_usage", ctx.run_id, _usage)
-                    yield StreamChunk(content=response_msg.content)
-                    full_content = response_msg.content
+                    yield StreamChunk(content=_response_content)
+                    full_content = _response_content
                     if response_msg.tool_calls:
                         current_tool_calls = response_msg.tool_calls
                 else:

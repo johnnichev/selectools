@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
@@ -58,6 +59,7 @@ class InMemoryVectorStore(VectorStore):
         self.embeddings: Optional[np.ndarray] = None
         self.ids: List[str] = []
         self._id_counter = 0
+        self._lock = threading.Lock()
 
     def add_documents(
         self, documents: List[Document], embeddings: Optional[List[List[float]]] = None
@@ -75,34 +77,38 @@ class InMemoryVectorStore(VectorStore):
         if not documents:
             return []
 
-        if self.max_documents and len(self.documents) + len(documents) > self.max_documents:
-            import warnings
+        if self.max_documents:
+            with self._lock:
+                current_count = len(self.documents)
+            if current_count + len(documents) > self.max_documents:
+                import warnings
 
-            warnings.warn(
-                f"InMemoryVectorStore exceeding max_documents ({self.max_documents}). "
-                f"Consider using SQLiteVectorStore for large collections.",
-                stacklevel=2,
-            )
+                warnings.warn(
+                    f"InMemoryVectorStore exceeding max_documents ({self.max_documents}). "
+                    f"Consider using SQLiteVectorStore for large collections.",
+                    stacklevel=2,
+                )
 
-        # Compute embeddings if not provided
+        # Compute embeddings outside the lock (potentially slow IO operation)
         if embeddings is None:
             texts = [doc.text for doc in documents]
             embeddings = self.embedder.embed_texts(texts)
 
-        # Generate IDs
-        new_ids = [f"doc_{self._id_counter + i}" for i in range(len(documents))]
-        self._id_counter += len(documents)
-
-        # Add to storage
-        self.documents.extend(documents)
-        self.ids.extend(new_ids)
-
-        # Update embeddings matrix
         new_embeddings = np.array(embeddings, dtype=np.float32)
-        if self.embeddings is None:
-            self.embeddings = new_embeddings
-        else:
-            self.embeddings = np.vstack([self.embeddings, new_embeddings])
+        with self._lock:
+            # Generate IDs
+            new_ids = [f"doc_{self._id_counter + i}" for i in range(len(documents))]
+            self._id_counter += len(documents)
+
+            # Add to storage
+            self.documents.extend(documents)
+            self.ids.extend(new_ids)
+
+            # Update embeddings matrix
+            if self.embeddings is None:
+                self.embeddings = new_embeddings
+            else:
+                self.embeddings = np.vstack([self.embeddings, new_embeddings])
 
         return new_ids
 
@@ -123,20 +129,25 @@ class InMemoryVectorStore(VectorStore):
         Returns:
             List of SearchResult objects, sorted by similarity
         """
-        if self.embeddings is None or len(self.embeddings) == 0:
+        with self._lock:
+            embeddings_snapshot = self.embeddings
+            documents_snapshot = list(self.documents)
+            ids_snapshot = list(self.ids)
+
+        if embeddings_snapshot is None or len(embeddings_snapshot) == 0:
             return []
 
-        # Compute cosine similarity
+        # Compute cosine similarity on snapshot (no lock held during computation)
         query_vec = np.array(query_embedding, dtype=np.float32)
         query_norm = np.linalg.norm(query_vec)
-        doc_norms = np.linalg.norm(self.embeddings, axis=1)
+        doc_norms = np.linalg.norm(embeddings_snapshot, axis=1)
 
         # Avoid division by zero
         if query_norm == 0:
             return []
 
         # Cosine similarity = dot product / (norm1 * norm2)
-        similarities = np.dot(self.embeddings, query_vec) / (doc_norms * query_norm + 1e-8)
+        similarities = np.dot(embeddings_snapshot, query_vec) / (doc_norms * query_norm + 1e-8)
 
         # Get top-k indices (overfetch when filter present to compensate for filtering)
         fetch_k = min(top_k * 4, len(similarities)) if filter else top_k
@@ -149,7 +160,7 @@ class InMemoryVectorStore(VectorStore):
         # Build results with optional filtering
         results = []
         for idx in top_indices:
-            doc = self.documents[idx]
+            doc = documents_snapshot[idx]
 
             # Apply metadata filter if provided
             if filter and not self._matches_filter(doc, filter):
@@ -170,25 +181,27 @@ class InMemoryVectorStore(VectorStore):
         Args:
             ids: List of document IDs to delete
         """
-        indices_to_remove = []
-        for doc_id in ids:
-            if doc_id in self.ids:
-                indices_to_remove.append(self.ids.index(doc_id))
+        with self._lock:
+            indices_to_remove = []
+            for doc_id in ids:
+                if doc_id in self.ids:
+                    indices_to_remove.append(self.ids.index(doc_id))
 
-        if indices_to_remove:
-            # Delete in batch (reverse order for list, single call for numpy)
-            for idx in sorted(indices_to_remove, reverse=True):
-                del self.documents[idx]
-                del self.ids[idx]
-            if self.embeddings is not None and indices_to_remove:
-                self.embeddings = np.delete(self.embeddings, sorted(indices_to_remove), axis=0)
+            if indices_to_remove:
+                # Delete in batch (reverse order for list, single call for numpy)
+                for idx in sorted(indices_to_remove, reverse=True):
+                    del self.documents[idx]
+                    del self.ids[idx]
+                if self.embeddings is not None:
+                    self.embeddings = np.delete(self.embeddings, sorted(indices_to_remove), axis=0)
 
     def clear(self) -> None:
         """Clear all documents from the store."""
-        self.documents = []
-        self.embeddings = None
-        self.ids = []
-        self._id_counter = 0
+        with self._lock:
+            self.documents = []
+            self.embeddings = None
+            self.ids = []
+            self._id_counter = 0
 
     def _matches_filter(self, doc: Document, filter: Dict[str, Any]) -> bool:
         """

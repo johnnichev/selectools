@@ -10,6 +10,7 @@ import difflib
 import functools
 import inspect
 import json
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Union
@@ -17,6 +18,24 @@ from typing import Any, Callable, Dict, List, Optional, Union
 from ..exceptions import ToolExecutionError, ToolValidationError
 
 JsonSchema = Dict[str, Any]
+
+# Shared executor for running async tools from sync contexts.
+# Created lazily; avoids per-call thread overhead.
+_ASYNC_TOOL_EXECUTOR: Optional[ThreadPoolExecutor] = None
+_ASYNC_TOOL_EXECUTOR_LOCK = threading.Lock()
+
+
+def _get_async_tool_executor() -> ThreadPoolExecutor:
+    global _ASYNC_TOOL_EXECUTOR
+    if _ASYNC_TOOL_EXECUTOR is None:
+        with _ASYNC_TOOL_EXECUTOR_LOCK:
+            if _ASYNC_TOOL_EXECUTOR is None:
+                _ASYNC_TOOL_EXECUTOR = ThreadPoolExecutor(
+                    max_workers=4, thread_name_prefix="selectools_async_tool"
+                )
+    return _ASYNC_TOOL_EXECUTOR
+
+
 ParameterValue = Union[str, int, float, bool, dict, list]
 ParamMetadata = Dict[str, Any]
 
@@ -438,10 +457,7 @@ class Tool:
                 except RuntimeError:
                     _loop = None
                 if _loop and _loop.is_running():
-                    import concurrent.futures
-
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                        result = pool.submit(asyncio.run, result).result()
+                    result = _get_async_tool_executor().submit(asyncio.run, result).result()
                 else:
                     result = asyncio.run(result)
 

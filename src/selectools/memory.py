@@ -4,6 +4,7 @@ Conversation memory management for maintaining multi-turn dialogue history.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any, Dict, List, Optional
 
 from .types import Message, Role
@@ -243,7 +244,10 @@ class ConversationMemory:
             max_messages=self.max_messages,
             max_tokens=self.max_tokens,
         )
-        copy._messages = list(self._messages)
+        copy._messages = [
+            replace(msg, tool_calls=list(msg.tool_calls)) if msg.tool_calls else msg
+            for msg in self._messages
+        ]
         copy._summary = self._summary
         copy._last_trimmed = []
         return copy

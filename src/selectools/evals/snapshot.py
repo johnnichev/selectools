@@ -86,7 +86,8 @@ class SnapshotStore:
     def save(self, report: Any, suite_name: str = "default") -> Path:
         """Save current agent outputs as the snapshot."""
         self._dir.mkdir(parents=True, exist_ok=True)
-        path = self._dir / f"{suite_name}.snapshot.json"
+        safe_name = Path(suite_name).name  # strip any directory components
+        path = self._dir / f"{safe_name}.snapshot.json"
 
         snapshot: Dict[str, Any] = {}
         for idx, cr in enumerate(report.case_results):
@@ -112,7 +113,8 @@ class SnapshotStore:
 
     def load(self, suite_name: str = "default") -> Optional[Dict[str, Any]]:
         """Load a stored snapshot."""
-        path = self._dir / f"{suite_name}.snapshot.json"
+        safe_name = Path(suite_name).name
+        path = self._dir / f"{safe_name}.snapshot.json"
         if not path.exists():
             return None
         return json.loads(path.read_text())
@@ -122,7 +124,7 @@ class SnapshotStore:
 
         Returns a SnapshotResult with new/removed/changed cases.
         """
-        stored = self.load(suite_name)
+        stored = self.load(Path(suite_name).name)
         if stored is None:
             # No snapshot exists — everything is new
             names = [

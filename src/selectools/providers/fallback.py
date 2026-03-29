@@ -8,6 +8,7 @@ providers that have failed repeatedly.
 
 from __future__ import annotations
 
+import threading
 import time
 from typing import (
     TYPE_CHECKING,
@@ -71,6 +72,7 @@ class FallbackProvider:
         self.on_fallback = on_fallback
         self.provider_used: Optional[str] = None
 
+        self._cb_lock = threading.Lock()
         self._failures: dict[str, int] = {}
         self._circuit_open_until: dict[str, float] = {}
 
@@ -83,22 +85,25 @@ class FallbackProvider:
         return any(getattr(p, "supports_async", False) for p in self.providers)
 
     def _is_circuit_open(self, name: str) -> bool:
-        until = self._circuit_open_until.get(name, 0.0)
-        if until and time.time() < until:
-            return True
-        if until and time.time() >= until:
-            self._circuit_open_until.pop(name, None)
-            self._failures[name] = 0
-        return False
+        with self._cb_lock:
+            until = self._circuit_open_until.get(name, 0.0)
+            if until and time.time() < until:
+                return True
+            if until and time.time() >= until:
+                self._circuit_open_until.pop(name, None)
+                self._failures[name] = 0
+            return False
 
     def _record_failure(self, name: str) -> None:
-        self._failures[name] = self._failures.get(name, 0) + 1
-        if self._failures[name] >= self.circuit_breaker_threshold:
-            self._circuit_open_until[name] = time.time() + self.circuit_breaker_cooldown
+        with self._cb_lock:
+            self._failures[name] = self._failures.get(name, 0) + 1
+            if self._failures[name] >= self.circuit_breaker_threshold:
+                self._circuit_open_until[name] = time.time() + self.circuit_breaker_cooldown
 
     def _record_success(self, name: str) -> None:
-        self._failures[name] = 0
-        self._circuit_open_until.pop(name, None)
+        with self._cb_lock:
+            self._failures[name] = 0
+            self._circuit_open_until.pop(name, None)
 
     def complete(
         self,

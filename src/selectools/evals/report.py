@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import statistics
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -67,16 +68,16 @@ class EvalReport:
         latencies = sorted(self._latencies())
         if not latencies:
             return 0.0
-        idx = max(0, int(len(latencies) * 0.95) - 1)
-        return latencies[min(idx, len(latencies) - 1)]
+        idx = min(math.ceil(len(latencies) * 0.95), len(latencies)) - 1
+        return latencies[idx]
 
     @property
     def latency_p99(self) -> float:
         latencies = sorted(self._latencies())
         if not latencies:
             return 0.0
-        idx = max(0, int(len(latencies) * 0.99) - 1)
-        return latencies[min(idx, len(latencies) - 1)]
+        idx = min(math.ceil(len(latencies) * 0.99), len(latencies)) - 1
+        return latencies[idx]
 
     @property
     def latency_mean(self) -> float:

@@ -4,6 +4,7 @@ Registry for managing and discovering tools.
 
 from __future__ import annotations
 
+import warnings
 from typing import Any, Callable, Dict, List, Optional
 
 from .base import ParamMetadata, Tool
@@ -29,9 +30,11 @@ class ToolRegistry:
             tool_instance: The Tool object to register.
         """
         if tool_instance.name in self._tools:
-            # We overwrite existing tools with the same name mostly silently,
-            # but in a real system we might want to log a warning.
-            pass
+            warnings.warn(
+                f"Tool {tool_instance.name!r} is already registered and will be overwritten.",
+                UserWarning,
+                stacklevel=2,
+            )
         self._tools[tool_instance.name] = tool_instance
 
     def get(self, name: str) -> Optional[Tool]:
