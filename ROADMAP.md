@@ -46,466 +46,20 @@ selectools serve CLI → Playground UI → YAML config → 5 agent templates
 → Type-safe step contracts → Streaming composition → pipeline.astream()
 → PostgresCheckpointStore → TraceStore (3 backends) → selectools doctor
 
-v0.19.x 🟡 Enterprise Hardening + Polish & Community
+v0.19.x 🟡 Enterprise Hardening + Advanced Patterns + Polish & Community
 Security audit → Stability markers → Deprecation policy → Compatibility matrix
+→ PlanAndExecute → ReflectiveAgent → Debate → TeamLead → 50+ evaluators
 → Published benchmarks → Enhanced trace viewer → Tool marketplace foundations
 → GitHub community growth → Blog content → Conference outreach
 
-v0.20.0 🟡 Advanced Agent Patterns + Connector Expansion
-PlanAndExecute → ReflectiveAgent → Debate → TeamLead
-→ 50+ evaluators → AWS Bedrock → Azure OpenAI → FAISS → Qdrant
+v0.20.0 🟡 Connector Expansion + Visual Agent Builder
+AWS Bedrock → Azure OpenAI → FAISS → Qdrant
 → CSV/JSON/HTML/URL loaders → Visual Agent Builder (web UI)
 
-v1.0.0  🟡 Stable Release
+v1.0.0 🟡 Stable Release
 API freeze → Stability markers on all modules → Deprecation policy
 → Security audit published → Compatibility matrix → 0.x→1.0 migration guide
 → PyPI classifier: Production/Stable
-
----
-
-## v0.17.0: Eval Framework ✅
-
-Focus: Built-in evaluation and testing for AI agents — a capability no other framework ships as a library feature.
-
-### EvalSuite
-
-```python
-from selectools.evals import EvalSuite, TestCase
-
-suite = EvalSuite(agent=agent, cases=[
-    TestCase(input="Cancel my account", expect_tool="cancel_subscription"),
-    TestCase(input="Check my balance", expect_contains="balance"),
-    TestCase(input="What's 2+2?", expect_output="4"),
-])
-report = suite.run()
-print(report.accuracy)       # 0.95
-print(report.latency_p50)    # 1.2s
-print(report.total_cost)     # $0.003
-```
-
-### Built-in Evaluators
-
-- `ToolUseEvaluator` — did the agent pick the right tool?
-- `CorrectnessEvaluator` — LLM-as-judge: is the output correct?
-- `RelevanceEvaluator` — LLM-as-judge: is the output relevant?
-- `FaithfulnessEvaluator` — RAG-specific: is the output grounded in retrieved documents?
-- `LatencyEvaluator` — did the agent respond within the time budget?
-- `CostEvaluator` — did the agent stay within the cost budget?
-
-### Module Structure
-
-```
-src/selectools/evals/
-    __init__.py          # Public exports
-    types.py             # TestCase, CaseResult, CaseVerdict, EvalFailure
-    suite.py             # EvalSuite orchestration (run/arun, batch dispatch)
-    evaluators.py        # Evaluator protocol + built-in evaluators
-    report.py            # EvalReport with accuracy, latency, cost, regressions
-    dataset.py           # DatasetLoader (JSON/YAML/dict -> List[TestCase])
-    regression.py        # BaselineStore, RegressionDetector
-    html.py              # Self-contained HTML report renderer
-    junit.py             # JUnit XML output for CI
-```
-
-### Key Differentiator
-
-Every team building agents needs evaluation. Today they either build it from scratch or pay for a SaaS product. Selectools ships it as a library — zero dependencies, runs in your test suite, produces structured reports.
-
-| Feature                        | Status  | Impact | Effort |
-| ------------------------------ | ------- | ------ | ------ |
-| **EvalSuite + TestCase**       | ✅ Done | High   | Medium |
-| **Built-in Evaluators (39)**   | ✅ Done | High   | Medium |
-| **EvalReport**                 | ✅ Done | Medium | Small  |
-| **Dataset Loader (JSON/YAML)** | ✅ Done | Medium | Small  |
-| **Regression Detection**       | ✅ Done | High   | Medium |
-| **HTML Report Export**         | ✅ Done | Medium | Small  |
-| **JUnit XML for CI**           | ✅ Done | Medium | Small  |
-| **Pairwise A/B eval**          | ✅ Done | Medium | Small  |
-| **Snapshot testing**           | ✅ Done | Medium | Small  |
-| **Live eval dashboard**        | ✅ Done | Medium | Medium |
-| **SVG badge generator**        | ✅ Done | Low    | Small  |
-
----
-
-## v0.17.1: MCP Client/Server ✅
-
-Focus: Model Context Protocol integration for tool interoperability.
-
-### MCP Client
-
-Discover and call tools from any MCP-compliant server:
-
-```python
-from selectools.mcp import MCPClient, mcp_tools
-
-client = MCPClient(server_url="http://localhost:8080")
-tools = mcp_tools(client)   # Returns List[Tool] that proxy to MCP server
-
-agent = Agent(tools=tools + local_tools, provider=provider)
-```
-
-### MCP Server
-
-Expose `@tool` functions as MCP-compliant endpoints:
-
-```python
-from selectools.mcp import MCPServer
-
-server = MCPServer(tools=[search_tool, calculator_tool])
-server.serve(host="0.0.0.0", port=8080)
-```
-
-### Key Differentiator
-
-First-class MCP support lets Selectools agents use any MCP-compatible tool server — massive integration surface area without building individual connectors.
-
-| Feature                 | Status  | Impact | Effort |
-| ----------------------- | ------- | ------ | ------ |
-| **MCPClient**           | ✅ Done | High   | Medium |
-| **mcp_tools() adapter** | ✅ Done | High   | Small  |
-| **MCPServer**           | ✅ Done | Medium | Medium |
-| **MultiMCPClient**      | ✅ Done | Medium | Small  |
-
----
-
-## v0.17.7: Caching & Context ✅
-
-Focus: Smarter token management and memory exploration.
-
-### Semantic Caching
-
-Drop-in replacement for `InMemoryCache` that embeds cache keys and uses cosine similarity to serve semantically equivalent queries from cache — even if the exact prompt wording differs.
-
-```python
-from selectools.cache_semantic import SemanticCache
-from selectools.providers.openai_provider import OpenAIProvider
-
-cache = SemanticCache(
-    embedding_provider=OpenAIProvider(),
-    similarity_threshold=0.92,
-    max_size=1000,
-    ttl=3600,
-)
-agent = Agent(tools=[...], provider=provider, config=AgentConfig(cache=cache))
-# "What's the weather in NYC?" hits cache for "Weather in New York City?"
-```
-
-Same `Cache` protocol as `InMemoryCache` — zero migration cost.
-
-### Prompt Compression
-
-Before each LLM call, if the estimated token count exceeds a configurable threshold of the context window, proactively summarize old messages rather than letting the window overflow. Connects `estimate_run_tokens()` + `summarize_on_trim` into a proactive system.
-
-```python
-config = AgentConfig(
-    compress_context=True,
-    compress_threshold=0.75,   # start compressing at 75% of context window
-    compress_keep_recent=4,    # always keep the last N turns verbatim
-)
-```
-
-### Conversation Branching
-
-Deep-copy conversation state for exploration, what-if analysis, or agent evaluation.
-
-```python
-branch = agent.memory.branch()             # snapshot current state
-branch_result = branch_agent.run("...")    # explore without affecting main
-
-# Also works with session stores:
-session_store.branch(source_id="conv-123", new_id="conv-123-alt")
-```
-
-| Feature                    | Status    | Impact | Effort |
-| -------------------------- | --------- | ------ | ------ |
-| **SemanticCache**          | 🟡 High   | High   | Medium |
-| **Prompt compression**     | 🟡 High   | Medium | Medium |
-| **Conversation branching** | 🟡 Medium | Medium | Small  |
-
----
-
-## v0.18.0: Multi-Agent Orchestration ✅
-
-**Status: ✅ Implemented in v0.18.0**
-
-Focus: DAG-based multi-agent workflows that are simpler and more Pythonic than LangGraph.
-
-### Design Philosophy
-
-LangGraph requires learning StateGraph, MessageAnnotation, Pregel channels, and a custom checkpointing API before building anything. Selectools takes the opposite approach: **agents are the primitive, composition is plain Python**. An `AgentGraph` should feel like writing normal Python with `async/await`, not configuring a data pipeline.
-
-**Core principles**:
-
-1. **Agents are nodes, not functions** — each node is a full `Agent` instance with its own tools, provider, and config, reusing all existing infrastructure (traces, observers, guardrails, policies)
-2. **Edges are just Python functions** — no special `ConditionalEdge` class; a routing function takes the result and returns the next node name via plain `if/elif/else`
-3. **State is a typed dataclass** — no Pydantic models for state; just a `@dataclass` that gets passed between nodes
-4. **Checkpointing is serialization** — the state is JSON-serializable; checkpoint stores implement a 3-method protocol
-5. **HITL reuses existing patterns** — the existing `ToolPolicy` + `confirm_action` pattern already handles human-in-the-loop
-
-### Module Structure
-
-```
-src/selectools/orchestration/
-    __init__.py           # Public exports: AgentGraph, GraphNode, GraphState, GraphResult
-    graph.py              # AgentGraph: the DAG-based orchestration engine
-    node.py               # GraphNode: wraps Agent with input/output transforms
-    state.py              # GraphState: typed state container with merge semantics
-    checkpoint.py         # CheckpointStore protocol + InMemory, File, SQLite backends
-    supervisor.py         # SupervisorAgent: meta-agent for task decomposition
-```
-
-### Core Abstractions
-
-#### GraphState
-
-```python
-@dataclass
-class GraphState:
-    messages: List[Message]                    # Accumulated messages across nodes
-    data: Dict[str, Any]                       # Arbitrary key-value store for inter-node communication
-    current_node: str                          # Name of the currently executing node
-    history: List[Tuple[str, AgentResult]]     # Ordered list of (node_name, result) pairs
-    metadata: Dict[str, Any]                   # User-attached metadata (carried through checkpoints)
-```
-
-Intentionally flat and JSON-serializable. No Pydantic, no custom descriptors, no annotation magic.
-
-#### AgentGraph
-
-```python
-from selectools.orchestration import AgentGraph
-
-graph = AgentGraph()
-graph.add_node("planner", planner_agent)
-graph.add_node("researcher", researcher_agent)
-graph.add_node("writer", writer_agent)
-
-graph.add_edge("planner", "researcher")
-graph.add_conditional_edge("researcher", lambda state: "writer" if state.data.get("ready") else "researcher")
-graph.add_edge("writer", AgentGraph.END)
-
-graph.set_entry("planner")
-result = graph.run("Write a blog post about AI agents")
-```
-
-### How It Beats LangGraph
-
-| LangGraph                                                | Selectools AgentGraph                            | Why better                                                       |
-| -------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------- |
-| Custom `StateGraph` with `Annotated[list, add_messages]` | Plain `GraphState` dataclass                     | No custom type system to learn                                   |
-| `conditionalEdges` with special return constants         | Plain Python function returning a string         | Debuggable, testable, IDE-friendly                               |
-| Pregel channels for state management                     | `Dict[str, Any]` with merge functions            | Standard Python data structures                                  |
-| Separate `compile()` step before execution               | Validate + run in one step                       | No compilation phase, faster iteration                           |
-| Node functions receive raw state                         | Nodes are full `Agent` instances                 | Inherit all Agent features: tools, traces, observers, guardrails |
-| Complex interrupt/resume for human-in-the-loop           | Reuse existing `confirm_action` on `AgentConfig` | Zero new concepts for HITL                                       |
-
-| Feature                     | Status    | Impact | Effort |
-| --------------------------- | --------- | ------ | ------ |
-| **AgentGraph + GraphState** | ✅ High   | High   | Large  |
-| **Checkpointing**           | ✅ High   | High   | Medium |
-| **Parallel Nodes**          | ✅ Medium | High   | Medium |
-| **SupervisorAgent**         | ✅ Medium | High   | Medium |
-
----
-
-## v0.18.0: Composable Pipelines ✅ (shipped alongside orchestration)
-
-Focus: Give selectools a composable pipeline abstraction — the answer to LangChain's LCEL. Lets users chain agents, tools, and transforms with the `|` operator.
-
-**Core primitives shipped in v0.18.0:**
-
-```python
-from selectools import Pipeline, step, parallel, branch
-
-@step
-def summarize(text: str) -> str:
-    """Summarize input text."""
-    return agent.run(f"Summarize: {text}").content
-
-@step
-def translate(text: str, lang: str = "es") -> str:
-    """Translate text to target language."""
-    return agent.run(f"Translate to {lang}: {text}").content
-
-# Compose with | operator
-pipeline = summarize | translate
-result = pipeline.run("Long article text here...")
-
-# Or build programmatically
-pipeline = Pipeline(steps=[summarize, translate])
-result = pipeline.run(input_data)
-```
-
-### Parallel & Branch Primitives
-
-```python
-from selectools import Pipeline, parallel, branch
-
-# Fan-out to multiple steps, merge results
-research = parallel(search_web, search_docs, search_db)
-
-# Conditional branching
-route = branch(
-    lambda x: "technical" if "code" in x else "general",
-    technical=code_review_pipeline,
-    general=summarize_pipeline,
-)
-
-full_pipeline = research | route | final_review
-```
-
-### Key Differentiator
-
-LangChain's LCEL is powerful but opaque — debugging `chain.invoke()` requires understanding Runnable internals. Selectools pipelines are plain Python: each `@step` is a function, `|` is sugar for sequential composition, and every step produces a trace entry.
-
-| Feature | Status | Impact | Effort |
-| --- | --- | --- | --- |
-| **Pipeline + @step** | ✅ Done | High | Medium |
-| **\| operator** | ✅ Done | High | Small |
-| **parallel() / branch()** | ✅ Done | Medium | Medium |
-
-### Advanced Composition (shipped in v0.19.0)
-
-| Feature | Status | Impact | Effort |
-| --- | --- | --- | --- |
-| **Tool composition (@compose)** | ✅ Done | Medium | Small |
-| **Type-safe step contracts** | ✅ Done | Medium | Medium |
-| **Streaming composition (astream)** | ✅ Done | Medium | Medium |
-| **retry() / cache_step() wrappers** | ✅ Done | Medium | Small |
-
----
-
-## v0.19.0: Serve, Deploy & Complete Composition ✅
-
-**Status: ✅ Shipped in v0.19.0**
-
-Focus: REST API deployment, agent templates, developer experience, advanced composition, and production persistence — going from library to platform.
-
-**What shipped:** `selectools serve` CLI + playground UI, 5 agent templates, YAML config, structured AgentConfig (10 nested dataclasses), `compose()`, `retry()`, `cache_step()`, type-safe step contracts, `pipeline.astream()`, PostgresCheckpointStore, TraceStore (3 backends), `selectools doctor`.
-
-### Selectools Serve (REST API Deployment)
-
-**New `src/selectools/serve/` package**:
-
-```
-src/selectools/serve/
-    __init__.py          # Public exports: AgentRouter, AgentBlueprint, playground
-    fastapi.py           # FastAPI router
-    flask.py             # Flask blueprint
-    playground.py        # Self-contained chat UI + server
-    models.py            # Pydantic request/response models
-```
-
-#### FastAPI Router
-
-```python
-from selectools.serve import AgentRouter
-
-router = AgentRouter(agent=my_agent, prefix="/agent")
-# Creates:
-#   POST /agent/invoke     — single prompt → AgentResult as JSON
-#   POST /agent/batch      — multiple prompts → List[AgentResult]
-#   POST /agent/stream     — single prompt → SSE stream
-#   GET  /agent/schema     — OpenAPI schema for tools
-#   GET  /agent/health     — health check
-
-app = FastAPI()
-app.include_router(router)
-```
-
-#### Flask Blueprint
-
-```python
-from selectools.serve import AgentBlueprint
-
-blueprint = AgentBlueprint(agent=my_agent, prefix="/agent")
-app = Flask(__name__)
-app.register_blueprint(blueprint)
-```
-
-#### Playground
-
-```python
-from selectools.serve import playground
-
-playground(agent=my_agent, port=8000)   # Chat UI at http://localhost:8000
-```
-
-Self-contained HTML page served by minimal HTTP server. Zero-dependency chat interface.
-
-**Key differentiator vs LangServe**: Works with FastAPI AND Flask. Built-in playground with zero config.
-
-### Templates & Configuration
-
-**New `src/selectools/templates/` package**:
-
-| Template                | Pre-configured with                                         |
-| ----------------------- | ----------------------------------------------------------- |
-| `customer_support.py`   | Support tools, system prompt, guardrails, topic restriction |
-| `data_analyst.py`       | Code execution, data tools, CSV/JSON structured output      |
-| `research_assistant.py` | Search tools, web tools, RAG pipeline                       |
-| `code_reviewer.py`      | File tools, GitHub tools, structured output                 |
-| `rag_chatbot.py`        | RAG pipeline, memory, knowledge base config                 |
-
-**YAML Agent Configuration**:
-
-```yaml
-# agent.yaml
-provider: openai
-model: gpt-4o
-tools:
-  - selectools.toolbox.file_tools.read_file
-  - selectools.toolbox.web_tools.http_get
-  - ./my_custom_tool.py
-system_prompt: "You are a helpful assistant..."
-guardrails:
-  input:
-    - type: topic
-      deny: [politics, religion]
-```
-
-```python
-from selectools.templates import from_yaml
-agent = from_yaml("agent.yaml")
-```
-
-### Observability (Trace Store + Export)
-
-**New `src/selectools/observe/` package**:
-
-```
-src/selectools/observe/
-    __init__.py          # Public exports
-    trace_store.py       # TraceStore protocol + InMemory, SQLite, JSONL backends
-    export.py            # Export formatters (HTML, CSV, Datadog, Langfuse, OTel)
-```
-
-```python
-class TraceStore(Protocol):
-    def save(self, trace: AgentTrace) -> str: ...
-    def load(self, run_id: str) -> AgentTrace: ...
-    def query(self, filters: TraceFilter) -> List[AgentTrace]: ...
-    def list(self, limit: int, offset: int) -> List[AgentTraceSummary]: ...
-```
-
-Built-in: `InMemoryTraceStore`, `SQLiteTraceStore`, `JSONLTraceStore`.
-
-Export formats: HTML (self-contained report), CSV, Datadog APM, Langfuse, OTel.
-
-| Feature | Status | Impact | Effort |
-| --- | --- | --- | --- |
-| **AgentRouter (HTTP serve)** | ✅ Done | High | Medium |
-| **Playground UI** | ✅ Done | High | Medium |
-| **Trace Store (3 backends)** | ✅ Done | High | Medium |
-| **Structured AgentConfig** | ✅ Done | High | Medium |
-| **YAML Config** | ✅ Done | Medium | Small |
-| **5 Agent Templates** | ✅ Done | Medium | Small |
-| **compose()** | ✅ Done | Medium | Small |
-| **retry() / cache_step()** | ✅ Done | Medium | Small |
-| **Type-safe contracts** | ✅ Done | Medium | Medium |
-| **pipeline.astream()** | ✅ Done | Medium | Small |
-| **PostgresCheckpointStore** | ✅ Done | High | Medium |
-| **selectools doctor** | ✅ Done | Medium | Small |
 
 ---
 
@@ -515,35 +69,18 @@ Focus: Production readiness, community growth, and developer trust signals. This
 
 ### Enterprise Hardening
 
-| Feature | Status | Impact | Effort |
-| --- | --- | --- | --- |
-| **Security audit** (Snyk + bandit + OWASP review) | 🟡 | High | Medium |
-| **Stability markers** (`__stability__ = "stable"/"beta"/"alpha"`) | 🟡 | Medium | Small |
-| **Deprecation policy** (2-version warning before removal) | 🟡 | Medium | Small |
-| **Compatibility matrix** (Python 3.9-3.13 + provider SDK versions) | 🟡 | Medium | Small |
-| **SBOM generation** for compliance teams | 🟡 | Low | Small |
-| ~~Postgres checkpoint~~ | ✅ Done in v0.19.0 | | |
+| Feature                                                            | Status | Impact | Effort |
+| ------------------------------------------------------------------ | ------ | ------ | ------ |
+| **Security audit** (Snyk + bandit + OWASP review)                  | 🟡     | High   | Medium |
+| **Stability markers** (`__stability__ = "stable"/"beta"/"alpha"`)  | 🟡     | Medium | Small  |
+| **Deprecation policy** (2-version warning before removal)          | 🟡     | Medium | Small  |
+| **Compatibility matrix** (Python 3.9-3.13 + provider SDK versions) | 🟡     | Medium | Small  |
+| **SBOM generation** for compliance teams                           | 🟡     | Low    | Small  |
+| **Enhanced trace viewer** (interactive HTML)                       | 🟡     | High   | Medium |
 
-### Polish & Community
+### Advanced Agent Patterns
 
-| Feature | Status | Impact | Effort |
-| --- | --- | --- | --- |
-| **Enhanced trace viewer** (interactive HTML) | 🟡 | High | Medium |
-| **Tool marketplace foundations** (publish/discover community tools) | 🟡 | High | Large |
-| **Published performance benchmarks** on landing page | ✅ Done | | |
-| **LangChain migration guide** | ✅ Done (docs/MIGRATION.md) | | |
-| **Cookbook** | ✅ Done (docs/COOKBOOK.md) | | |
-| **Blog content** (5 posts written, ready to publish) | 🟡 Publish | High | Small |
-| **Show HN + Product Hunt + Reddit launch** | 🟡 Publish | High | Small |
-| **awesome-python / awesome-llm-agents submissions** | 🟡 | Medium | Small |
-| **good-first-issue labels** for contributor onboarding | 🟡 | Medium | Small |
-| **Conference CFP** (PyCon, AI Engineer Summit) | 🟡 | Medium | Small |
-
----
-
-## v0.20.0: Advanced Agent Patterns 🟡
-
-Focus: Higher-level agent architectures built on the v0.18.0 orchestration primitives. Each pattern is a pre-built `AgentGraph` topology.
+Higher-level agent architectures built on the v0.18.0 orchestration primitives. Each pattern is a pre-built `AgentGraph` topology.
 
 ### PlanAndExecute Agent
 
@@ -609,19 +146,19 @@ result = agent.run("Investigate and fix the billing discrepancy")
 - Agent trajectory evaluation (did the agent follow the right path?)
 - Tool efficiency (did the agent use the minimum tools needed?)
 
-| Feature | Status | Impact | Effort |
-| --- | --- | --- | --- |
-| **PlanAndExecute** | 🟡 High | High | Medium |
-| **ReflectiveAgent** | 🟡 High | High | Medium |
-| **Debate** | 🟡 Medium | Medium | Medium |
-| **TeamLead** | 🟡 Medium | Medium | Medium |
-| **50+ evaluators** | 🟡 Medium | High | Large |
+| Feature             | Status    | Impact | Effort |
+| ------------------- | --------- | ------ | ------ |
+| **PlanAndExecute**  | 🟡 High   | High   | Medium |
+| **ReflectiveAgent** | 🟡 High   | High   | Medium |
+| **Debate**          | 🟡 Medium | Medium | Medium |
+| **TeamLead**        | 🟡 Medium | Medium | Medium |
+| **50+ evaluators**  | 🟡 Medium | High   | Large  |
 
 ---
 
-### Connector Expansion (also in v0.20.0)
+## v0.20.0: Connector Expansion + Visual Agent Builder 🟡
 
-Close the integration gap with LangChain by adding high-demand document loaders, vector stores, and provider support.
+Close the integration gap with LangChain by adding high-demand providers, vector stores, document loaders, and a visual agent design tool.
 
 ### Current Inventory
 
@@ -706,13 +243,11 @@ Individual stores/loaders remain installable a la carte: `pip install selectools
 
 ## Backlog (Unscheduled)
 
-| Feature | Notes | Target |
-| --- | --- | --- |
-| Universal Vision Support | Unified vision API across providers | Deferred |
-| Rate Limiting & Quotas | Per-tool and per-user quotas | Future |
-| CRM & Business Tools | HubSpot, Salesforce integrations | Future |
-| Niche Loaders (Slack, Confluence, Jira, Discord, Email, Docx, Excel, XML) | Community-driven | Future |
-| Niche Vector Stores (Milvus, OpenSearch, Lance) | As demand dictates | Future |
-| Niche Toolbox (Email, Calendar, Browser, Financial) | As demand dictates | Future |
-| ~~Visual Agent Builder~~ | Moved to v0.20.0 | |
-| CRM & Business Tools     | HubSpot, Salesforce integrations    | v0.21.x  |
+| Feature                                                                   | Notes                               | Target |
+| ------------------------------------------------------------------------- | ----------------------------------- | ------ |
+| Universal Vision Support                                                  | Unified vision API across providers | Future |
+| Rate Limiting & Quotas                                                    | Per-tool and per-user quotas        | Future |
+| CRM & Business Tools                                                      | HubSpot, Salesforce integrations    | Future |
+| Niche Loaders (Slack, Confluence, Jira, Discord, Email, Docx, Excel, XML) | Community-driven                    | Future |
+| Niche Vector Stores (Milvus, OpenSearch, Lance)                           | As demand dictates                  | Future |
+| Niche Toolbox (Email, Calendar, Browser, Financial)                       | As demand dictates                  | Future |
