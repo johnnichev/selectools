@@ -50,7 +50,6 @@ v0.19.x 🟡 Enterprise Hardening + Advanced Patterns + Polish & Community
 Security audit → Stability markers → Deprecation policy → Compatibility matrix
 → PlanAndExecute → ReflectiveAgent → Debate → TeamLead → 50+ evaluators
 → Published benchmarks → Enhanced trace viewer → Tool marketplace foundations
-→ GitHub community growth → Blog content → Conference outreach
 
 v0.20.0 🟡 Connector Expansion + Visual Agent Builder
 AWS Bedrock → Azure OpenAI → FAISS → Qdrant
@@ -69,6 +68,7 @@ Focus: Production readiness, community growth, and developer trust signals. This
 
 ### Enterprise Hardening
 
+
 | Feature                                                            | Status | Impact | Effort |
 | ------------------------------------------------------------------ | ------ | ------ | ------ |
 | **Security audit** (Snyk + bandit + OWASP review)                  | 🟡     | High   | Medium |
@@ -77,6 +77,7 @@ Focus: Production readiness, community growth, and developer trust signals. This
 | **Compatibility matrix** (Python 3.9-3.13 + provider SDK versions) | 🟡     | Medium | Small  |
 | **SBOM generation** for compliance teams                           | 🟡     | Low    | Small  |
 | **Enhanced trace viewer** (interactive HTML)                       | 🟡     | High   | Medium |
+
 
 ### Advanced Agent Patterns
 
@@ -146,6 +147,7 @@ result = agent.run("Investigate and fix the billing discrepancy")
 - Agent trajectory evaluation (did the agent follow the right path?)
 - Tool efficiency (did the agent use the minimum tools needed?)
 
+
 | Feature             | Status    | Impact | Effort |
 | ------------------- | --------- | ------ | ------ |
 | **PlanAndExecute**  | 🟡 High   | High   | Medium |
@@ -153,6 +155,7 @@ result = agent.run("Investigate and fix the billing discrepancy")
 | **Debate**          | 🟡 Medium | Medium | Medium |
 | **TeamLead**        | 🟡 Medium | Medium | Medium |
 | **50+ evaluators**  | 🟡 Medium | High   | Large  |
+
 
 ---
 
@@ -162,6 +165,7 @@ Close the integration gap with LangChain by adding high-demand providers, vector
 
 ### Current Inventory
 
+
 | Category            | Count    | Items                                    |
 | ------------------- | -------- | ---------------------------------------- |
 | Document Loaders    | 4        | text, file, directory, PDF               |
@@ -170,9 +174,11 @@ Close the integration gap with LangChain by adding high-demand providers, vector
 | Toolbox             | 24 tools | file, web, data, datetime, text          |
 | Rerankers           | 2        | Cohere, Jina                             |
 
+
 ### New Document Loaders
 
 Add to `src/selectools/rag/loaders.py` as new static methods on `DocumentLoader`. Refactor to `loaders/` subpackage with `__init__.py` re-exporting everything to support SaaS loaders as separate files.
+
 
 | Loader                      | Method                                              | Dependencies                  | Complexity | Why it matters                                        |
 | --------------------------- | --------------------------------------------------- | ----------------------------- | ---------- | ----------------------------------------------------- |
@@ -186,9 +192,11 @@ Add to `src/selectools/rag/loaders.py` as new static methods on `DocumentLoader`
 | **GitHub**                  | `from_github(repo, path, branch, token)`            | `requests` (existing)         | Small      | Developer docs and code                               |
 | **SQL Database**            | `from_sql(connection_string, query)`                | `sqlalchemy` (optional)       | Medium     | Enterprise data in databases                          |
 
+
 ### New Vector Stores
 
 New files in `src/selectools/rag/stores/`. Each follows the same pattern as `chroma.py`: inherit `VectorStore`, implement `add_documents`, `search`, `delete`, `clear`, lazy-import the dependency. Register in `VectorStore.create()` factory.
+
 
 | Store            | File          | Dependencies       | Complexity | Why it matters                                                            |
 | ---------------- | ------------- | ------------------ | ---------- | ------------------------------------------------------------------------- |
@@ -198,16 +206,19 @@ New files in `src/selectools/rag/stores/`. Each follows the same pattern as `chr
 | **Weaviate**     | `weaviate.py` | `weaviate-client`  | Medium     | Popular cloud vector DB with GraphQL API                                  |
 | **Redis Vector** | `redis.py`    | `redis` (existing) | Medium     | Leverages existing Redis connection from `cache_redis.py`                 |
 
+
 ### New Toolbox Modules
 
 New files in `src/selectools/toolbox/`. Follow `@tool` decorator pattern, register in `get_all_tools()` and `get_tools_by_category()`.
 
+
 | Module                | Tools                                                           | Dependencies                   | Complexity   | Why it matters                        |
 | --------------------- | --------------------------------------------------------------- | ------------------------------ | ------------ | ------------------------------------- |
-| **`code_tools.py`**   | `execute_python`, `execute_shell`                               | stdlib `subprocess`            | Medium       | #1 most-used tool in agent frameworks |
-| **`search_tools.py`** | `google_search`, `duckduckgo_search`                            | `duckduckgo_search` (optional) | Small-Medium | #2 most-used tool category            |
-| **`github_tools.py`** | `create_issue`, `list_issues`, `create_pr`, `get_file_contents` | `requests` (existing)          | Medium       | Developer workflow automation         |
-| **`db_tools.py`**     | `query_database`, `list_tables`, `describe_table`               | `sqlalchemy` (optional)        | Medium       | Enterprise data access                |
+| `**code_tools.py`**   | `execute_python`, `execute_shell`                               | stdlib `subprocess`            | Medium       | #1 most-used tool in agent frameworks |
+| `**search_tools.py**` | `google_search`, `duckduckgo_search`                            | `duckduckgo_search` (optional) | Small-Medium | #2 most-used tool category            |
+| `**github_tools.py**` | `create_issue`, `list_issues`, `create_pr`, `get_file_contents` | `requests` (existing)          | Medium       | Developer workflow automation         |
+| `**db_tools.py**`     | `query_database`, `list_tables`, `describe_table`               | `sqlalchemy` (optional)        | Medium       | Enterprise data access                |
+
 
 ### Dependency Management
 
@@ -227,6 +238,7 @@ rag = [
 
 Individual stores/loaders remain installable a la carte: `pip install selectools faiss-cpu` works without the full `[rag]` group.
 
+
 | Feature                    | Status    | Impact | Effort |
 | -------------------------- | --------- | ------ | ------ |
 | **CSV/JSON/JSONL Loaders** | 🟡 High   | High   | Small  |
@@ -239,9 +251,11 @@ Individual stores/loaders remain installable a la carte: `pip install selectools
 | **SaaS Loaders**           | 🟡 Medium | Medium | Medium |
 | **GitHub/DB Toolbox**      | 🟡 Medium | Medium | Medium |
 
+
 ---
 
 ## Backlog (Unscheduled)
+
 
 | Feature                                                                   | Notes                               | Target |
 | ------------------------------------------------------------------------- | ----------------------------------- | ------ |
