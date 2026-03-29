@@ -250,7 +250,68 @@ Individual stores/loaders remain installable a la carte: `pip install selectools
 | **Search Tools**           | 🟡 High   | High   | Small  |
 | **SaaS Loaders**           | 🟡 Medium | Medium | Medium |
 | **GitHub/DB Toolbox**      | 🟡 Medium | Medium | Medium |
+| **Visual Agent Builder**   | 🟡 High   | High   | Large  |
 
+### Visual Agent Builder
+
+A web-based UI for designing, testing, and exporting agent configurations. Zero-install — served by `selectools serve --builder`.
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Visual Agent Builder                    [Export]    │
+├─────────────┬───────────────────────────────────────┤
+│             │                                       │
+│  Components │    ┌──────────┐    ┌──────────┐       │
+│  ─────────  │    │ Planner  │───▶│  Writer  │       │
+│  ☐ Agent    │    └──────────┘    └────┬─────┘       │
+│  ☐ Tool     │                         │             │
+│  ☐ Router   │                    ┌────▼─────┐       │
+│  ☐ Gate     │                    │ Reviewer │       │
+│  ☐ Parallel │                    └──────────┘       │
+│             │                                       │
+├─────────────┼───────────────────────────────────────┤
+│  Properties │    Model: gpt-4o  │ Tools: 3          │
+│  ─────────  │    Strategy: plan │ Budget: $0.50     │
+│  Name: ...  │                                       │
+│  Model: ... │    [▶ Test Run]   [💾 Save YAML]      │
+└─────────────┴───────────────────────────────────────┘
+```
+
+**Features:**
+- Drag-and-drop graph builder for AgentGraph topologies
+- Node palette: Agent, Tool, Router (conditional), Gate (HITL), Parallel group
+- Visual edge wiring with routing condition editor
+- Per-node configuration panel (model, tools, system prompt, budget)
+- Live test: run the graph against real providers from the UI
+- Export: generates `agent.yaml` or Python code
+- Import: load existing YAML configs into the builder
+- Served by selectools: `selectools serve --builder` (zero frontend deps)
+- Built as self-contained HTML/JS (same pattern as playground.py)
+
+**Technical approach:**
+- Single HTML file with embedded JS (no React, no build step)
+- Canvas-based graph rendering (or SVG with drag handlers)
+- Backend: new `/builder` endpoint on AgentServer
+  - `GET /builder` — serves the HTML
+  - `POST /builder/validate` — validates graph structure
+  - `POST /builder/export` — generates YAML or Python
+  - `POST /builder/run` — executes the designed graph
+- State stored in browser localStorage (no server state)
+
+**Why this matters:**
+- LangGraph has LangGraph Studio (paid, desktop app)
+- CrewAI has no visual builder
+- AutoGen has AutoGen Studio (separate app)
+- selectools: zero-install, runs in browser, exports to YAML/Python
+
+| Feature | Status | Impact | Effort |
+| --- | --- | --- | --- |
+| **Graph canvas (drag-drop nodes + edges)** | 🟡 | High | Large |
+| **Node configuration panel** | 🟡 | High | Medium |
+| **YAML export/import** | 🟡 | High | Small |
+| **Python code export** | 🟡 | Medium | Small |
+| **Live test execution** | 🟡 | High | Medium |
+| **Self-contained HTML (no build step)** | 🟡 | High | Medium |
 
 ---
 
