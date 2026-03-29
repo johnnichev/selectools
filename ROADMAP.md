@@ -63,7 +63,7 @@ API freeze → Stability markers on all modules → Deprecation policy
 
 ---
 
-## v0.19.x: Enterprise Hardening + Polish & Community 🟡
+## v0.19.x: Enterprise Hardening + Polish & Community + Advanced Agent Patterns 🟡
 
 Focus: Production readiness, community growth, and developer trust signals. This is the "make it trustworthy" release series before adding new features in v0.20.
 
