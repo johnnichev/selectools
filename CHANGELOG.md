@@ -50,6 +50,25 @@ All pattern symbols exported from `selectools` top-level:
 - `examples/72_debate_agent.py` — DebateAgent with optimist/skeptic/judge
 - `examples/73_team_lead_agent.py` — TeamLeadAgent with all 3 delegation strategies
 
+#### Quality Infrastructure
+
+- **Ralph loop** (`scripts/ralph_bug_hunt.sh` + `.claude/skills/ralph-bug-hunt/`) — autonomous per-module hunt-and-fix convergence system; runs until 3 consecutive clean passes per module (10-iter cap); outputs `RALPH_RESULT: CLEAN/FOUND` sentinel for scripted detection
+- **Bandit in CI** (`.github/workflows/ci.yml`) — `security` job runs `bandit -r src/ -ll -q` on every push; blocks on any HIGH/CRITICAL finding
+- **Property-based tests** (`tests/test_property_based.py`, `tests/rag/test_property_based_rag.py`) — 28 Hypothesis tests covering BM25, InMemoryCache, ConversationMemory, ToolPolicy, metadata filters, TextSplitter, RecursiveTextSplitter, HybridSearcher; `hypothesis>=6.100.0` added to dev extras
+- **Thread-safety smoke suite** (`tests/test_concurrency_smoke.py`) — 15 tests; 10 threads × 20 ops with `threading.Barrier` synchronized start; covers BM25, InMemoryVectorStore, SQLiteVectorStore, InMemoryCache, SemanticCache, ConversationMemory, KnowledgeMemory
+- **Production simulations** (`tests/simulations/`) — 16 integration tests across 5 files: `sim_agent_memory_pressure.py`, `sim_hybrid_search_load.py`, `sim_provider_failover.py`, `sim_rag_concurrent.py`, `sim_tool_errors.py`
+- **CLAUDE.md §0 Pre-Release Quality Gate** — mandatory gate added to release checklist (Ralph loop + bandit + full suite)
+
+#### RAG Bug Fixes (Phase 3)
+
+8 edge-case fixes from adversarial bug hunt:
+- `ChromaVectorStore`: n_results clamped to `collection.count()` before query (prevents Chroma crash on empty collections); `add()` → `upsert()` for idempotency
+- `HybridSearcher`: `vector_top_k` / `keyword_top_k` now correctly honour `None` (previously both defaulted to hard-coded fallback ignoring the parameter)
+- `ContextualChunker`: prompt template validated at construction (`{document}` + `{chunk}` required); provider exceptions caught with empty-string fallback
+- `PDFLoader`: `PdfReadError` now raised as `ValueError` with actionable message for encrypted/corrupt PDFs
+- `RAGToolkit.semantic_search`: result preview truncated to 200 chars with `...` suffix (prevents unbounded tool output)
+- `BM25.search`: `top_k < 1` now raises `ValueError` immediately
+
 ### Stats
 - Tests: 2664 (+98), Examples: 73 (+4), Evaluators: 50 (+12)
 
