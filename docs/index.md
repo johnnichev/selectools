@@ -144,9 +144,10 @@ print(result.reasoning)       # Why the agent chose get_weather
 | **Prompt Compression** | Proactive context-window management — summarises old messages when fill-rate exceeds threshold |
 | **Conversation Branching** | `memory.branch()` and `store.branch()` — fork history for A/B exploration and checkpointing |
 | **Multi-Agent Orchestration** | `AgentGraph` for directed graphs, `SupervisorAgent` with 4 strategies, HITL via generator nodes, parallel execution, 3 checkpoint backends |
+| **Advanced Agent Patterns** | `PlanAndExecuteAgent`, `ReflectiveAgent`, `DebateAgent`, `TeamLeadAgent` — high-level coordination patterns built on AgentGraph |
 | **Composable Pipelines** | `Pipeline` + `@step` + `|` operator + `parallel()` + `branch()` — chain agents, tools, and transforms with plain Python |
-| **Eval Framework** | 39 built-in evaluators, A/B testing, regression detection, HTML reports, JUnit XML |
-| **2529 Tests** | Unit, integration, regression, and E2E |
+| **Eval Framework** | 50 built-in evaluators, A/B testing, regression detection, HTML reports, JUnit XML |
+| **2664 Tests** | Unit, integration, regression, and E2E |
 
 ---
 
@@ -176,7 +177,7 @@ print(result.reasoning)       # Why the agent chose get_weather
     15. **[Error Handling](modules/EXCEPTIONS.md)** — Custom exception hierarchy
 
 !!! abstract "Evaluation"
-    16. **[Eval Framework](modules/EVALS.md)** — 39 built-in evaluators, A/B testing, regression detection, snapshot testing
+    16. **[Eval Framework](modules/EVALS.md)** — 50 built-in evaluators, A/B testing, regression detection, snapshot testing
 
 !!! abstract "Memory & Persistence"
     17. **[Sessions](modules/SESSIONS.md)** — Persistent session storage with 3 backends
@@ -187,7 +188,8 @@ print(result.reasoning)       # Why the agent chose get_weather
 !!! abstract "Multi-Agent & Composition"
     21. **[Orchestration](modules/ORCHESTRATION.md)** — Agent graphs, routing, parallel execution, HITL
     22. **[Supervisor](modules/SUPERVISOR.md)** — 4 coordination strategies for multi-agent teams
-    23. **Pipeline** — Composable pipelines with `@step`, `|` operator, `parallel()`, `branch()`
+    23. **[Patterns](modules/PATTERNS.md)** — PlanAndExecute, Reflective, Debate, TeamLead
+    24. **Pipeline** — Composable pipelines with `@step`, `|` operator, `parallel()`, `branch()`
 
 ---
 
@@ -232,7 +234,7 @@ Multi-Agent layer (optional):
 [:fontawesome-brands-python: PyPI Package](https://pypi.org/project/selectools/){ .md-button }
 [:fontawesome-brands-github: GitHub Repository](https://github.com/johnnichev/selectools){ .md-button }
 [:material-notebook: Getting Started Notebook](https://github.com/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb){ .md-button }
-[:material-code-tags: 61 Example Scripts](https://github.com/johnnichev/selectools/tree/main/examples){ .md-button }
+[:material-code-tags: 73 Example Scripts](https://github.com/johnnichev/selectools/tree/main/examples){ .md-button }
 
 ---
 

@@ -51,7 +51,7 @@ All pattern symbols exported from `selectools` top-level:
 - `examples/73_team_lead_agent.py` — TeamLeadAgent with all 3 delegation strategies
 
 ### Stats
-- Tests: 2599 (+33), Examples: 73 (+4), Evaluators: 50 (+12)
+- Tests: 2664 (+98), Examples: 73 (+4), Evaluators: 50 (+12)
 
 ---
 

@@ -46,7 +46,7 @@ selectools serve CLI → Playground UI → YAML config → 5 agent templates
 → Type-safe step contracts → Streaming composition → pipeline.astream()
 → PostgresCheckpointStore → TraceStore (3 backends) → selectools doctor
 
-v0.19.1 🟡 Advanced Agent Patterns
+v0.19.1 ✅ Advanced Agent Patterns
 PlanAndExecute → ReflectiveAgent → Debate → TeamLead → 50+ evaluators
 
 v0.19.2 🟡 Enterprise Hardening + Polish & Community
@@ -67,7 +67,7 @@ API freeze → Stability markers on all modules → Deprecation policy
 
 ---
 
-## v0.19.1: Advanced Agent Patterns 🟡
+## v0.19.1: Advanced Agent Patterns ✅
 
 Higher-level agent architectures built on the v0.18.0 orchestration primitives. Closes the "Advanced patterns" competitive gap. Each pattern is a standalone class — they wire up the AgentGraph topology for you.
 
