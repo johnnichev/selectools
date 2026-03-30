@@ -125,7 +125,14 @@ class _OpenAICompatibleBase(ABC):
         try:
             response = cast(Any, self._client.chat.completions.create(**args))
         except Exception as exc:  # noqa: BLE001
-            raise self._wrap_error(exc, "completion") from exc
+            if "temperature" in str(exc).lower() and "temperature" in args:
+                args.pop("temperature")
+                try:
+                    response = cast(Any, self._client.chat.completions.create(**args))
+                except Exception as exc2:  # noqa: BLE001
+                    raise self._wrap_error(exc2, "completion") from exc2
+            else:
+                raise self._wrap_error(exc, "completion") from exc
 
         return self._parse_response(response, model_name)
 
@@ -159,7 +166,14 @@ class _OpenAICompatibleBase(ABC):
         try:
             response = cast(Any, await self._async_client.chat.completions.create(**args))
         except Exception as exc:  # noqa: BLE001
-            raise self._wrap_error(exc, "async completion") from exc
+            if "temperature" in str(exc).lower() and "temperature" in args:
+                args.pop("temperature")
+                try:
+                    response = cast(Any, await self._async_client.chat.completions.create(**args))
+                except Exception as exc2:  # noqa: BLE001
+                    raise self._wrap_error(exc2, "async completion") from exc2
+            else:
+                raise self._wrap_error(exc, "async completion") from exc
 
         return self._parse_response(response, model_name)
 
@@ -199,7 +213,14 @@ class _OpenAICompatibleBase(ABC):
         try:
             response = cast(Any, self._client.chat.completions.create(**args))
         except Exception as exc:  # noqa: BLE001
-            raise self._wrap_error(exc, "streaming") from exc
+            if "temperature" in str(exc).lower() and "temperature" in args:
+                args.pop("temperature")
+                try:
+                    response = cast(Any, self._client.chat.completions.create(**args))
+                except Exception as exc2:  # noqa: BLE001
+                    raise self._wrap_error(exc2, "streaming") from exc2
+            else:
+                raise self._wrap_error(exc, "streaming") from exc
 
         tool_call_deltas: Dict[int, Dict[str, Any]] = {}
 
@@ -309,7 +330,14 @@ class _OpenAICompatibleBase(ABC):
         try:
             response = cast(Any, await self._async_client.chat.completions.create(**args))
         except Exception as exc:  # noqa: BLE001
-            raise self._wrap_error(exc, "async streaming") from exc
+            if "temperature" in str(exc).lower() and "temperature" in args:
+                args.pop("temperature")
+                try:
+                    response = cast(Any, await self._async_client.chat.completions.create(**args))
+                except Exception as exc2:  # noqa: BLE001
+                    raise self._wrap_error(exc2, "async streaming") from exc2
+            else:
+                raise self._wrap_error(exc, "async streaming") from exc
 
         # Track partial tool calls
         tool_call_deltas: Dict[int, Dict[str, Any]] = {}
