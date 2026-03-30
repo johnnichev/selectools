@@ -1,6 +1,6 @@
 """Public exports for the selectools package."""
 
-__version__ = "0.19.1"
+__version__ = "0.19.2"
 
 # Import submodules (lazy loading for optional dependencies)
 from . import embeddings, evals, guardrails, models, patterns, rag, toolbox
@@ -129,10 +129,11 @@ from .sessions import (
     SessionStore,
     SQLiteSessionStore,
 )
+from .stability import beta, deprecated, stable
 from .structured import ResponseFormat
 from .token_estimation import TokenEstimate, estimate_run_tokens, estimate_tokens
 from .tools import Tool, ToolParameter, ToolRegistry, tool
-from .trace import AgentTrace, StepType, TraceStep
+from .trace import AgentTrace, StepType, TraceStep, trace_to_html
 from .types import AgentResult, Message, Role, ToolCall
 from .usage import AgentUsage, UsageStats
 
@@ -201,6 +202,10 @@ __all__ = [
     "PolicyResult",
     # Structured output
     "ResponseFormat",
+    # Stability markers
+    "stable",
+    "beta",
+    "deprecated",
     # Observability
     "AgentObserver",
     "AsyncAgentObserver",
@@ -209,6 +214,7 @@ __all__ = [
     "AgentTrace",
     "StepType",
     "TraceStep",
+    "trace_to_html",
     # Guardrails
     "guardrails",
     "Guardrail",

@@ -139,6 +139,7 @@ nav:
   - Integration:
     - MCP Client/Server: modules/MCP.md
   - Security:
+    - Security Audit: SECURITY.md
     - Guardrails: modules/GUARDRAILS.md
     - Audit Logging: modules/AUDIT.md
     - Screening & Coherence: modules/SECURITY.md
@@ -151,6 +152,7 @@ nav:
     - Agent Decomposition: decisions/005-agent-decomposition.md
     - Agent Config Future: decisions/006-agent-config-future.md
   - Reference:
+    - Deprecation Policy: DEPRECATION_POLICY.md
     - Parser: modules/PARSER.md
     - Prompt: modules/PROMPT.md
     - Release Guide: RELEASE_GUIDE.md
