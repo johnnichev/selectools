@@ -92,7 +92,8 @@ class SnapshotStore:
         snapshot: Dict[str, Any] = {}
         for idx, cr in enumerate(report.case_results):
             base_key = cr.case.name or cr.case.input[:60]
-            key = f"{base_key}_{idx}" if not cr.case.name else base_key
+            # Always include idx suffix to prevent key collision when cases share the same name
+            key = f"{base_key}_{idx}"
             entry: Dict[str, Any] = {
                 "input": cr.case.input,
                 "verdict": cr.verdict.value,
@@ -108,7 +109,9 @@ class SnapshotStore:
                 entry["error"] = cr.error
             snapshot[key] = entry
 
-        path.write_text(json.dumps(snapshot, indent=2, sort_keys=True))
+        tmp = path.with_suffix(".snapshot.json.tmp")
+        tmp.write_text(json.dumps(snapshot, indent=2, sort_keys=True))
+        tmp.replace(path)
         return path
 
     def load(self, suite_name: str = "default") -> Optional[Dict[str, Any]]:
@@ -128,7 +131,7 @@ class SnapshotStore:
         if stored is None:
             # No snapshot exists — everything is new
             names = [
-                cr.case.name or f"{cr.case.input[:60]}_{idx}"
+                f"{cr.case.name or cr.case.input[:60]}_{idx}"
                 for idx, cr in enumerate(report.case_results)
             ]
             return SnapshotResult(new_cases=names)
@@ -136,7 +139,8 @@ class SnapshotStore:
         current_keys: Dict[str, Any] = {}
         for idx, cr in enumerate(report.case_results):
             base_key = cr.case.name or cr.case.input[:60]
-            key = f"{base_key}_{idx}" if not cr.case.name else base_key
+            # Always include idx suffix to match the key format used in save()
+            key = f"{base_key}_{idx}"
             entry: Dict[str, Any] = {
                 "verdict": cr.verdict.value,
                 "tool_calls": cr.tool_calls,

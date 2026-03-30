@@ -459,11 +459,13 @@ class TestAstreamCoherenceCheck:
                 config=AgentConfig(max_iterations=2, coherence_check=True),
             )
             result = await _collect_astream(agent, "Hi")
-            # Should have a coherence check trace step
+            # Should have a coherence_check trace step (not a generic error step)
             trace_types = [s.type for s in result.trace.steps]
-            assert "error" in trace_types
-            error_steps = [s for s in result.trace.steps if s.type == "error"]
-            assert any("Coherence" in (s.error or "") for s in error_steps)
+            assert (
+                "coherence_check" in trace_types
+            ), f"Expected 'coherence_check' step type, got: {trace_types}"
+            coherence_steps = [s for s in result.trace.steps if s.type == "coherence_check"]
+            assert any("Not coherent" in (s.error or "") for s in coherence_steps)
         finally:
             te_mod.acheck_coherence = original
 
@@ -1126,9 +1128,12 @@ class TestParallelCoherenceCheck:
                 config=AgentConfig(max_iterations=2, coherence_check=True),
             )
             result = agent.run("Use both tools")
-            # tool_b should have been blocked by coherence
-            error_steps = [s for s in result.trace.steps if s.type == "error"]
-            assert any("Coherence" in (s.error or "") for s in error_steps)
+            # tool_b should have been blocked by coherence — expect COHERENCE_CHECK step
+            coherence_steps = [s for s in result.trace.steps if s.type == "coherence_check"]
+            assert any("Not coherent" in (s.error or "") for s in coherence_steps), (
+                f"Expected coherence_check step with error. "
+                f"Step types: {[s.type for s in result.trace.steps]}"
+            )
         finally:
             te_mod.check_coherence = original
 
@@ -1155,8 +1160,11 @@ class TestParallelCoherenceCheck:
                 config=AgentConfig(max_iterations=2, coherence_check=True),
             )
             result = await agent.arun("Use both tools")
-            error_steps = [s for s in result.trace.steps if s.type == "error"]
-            assert any("Coherence" in (s.error or "") for s in error_steps)
+            coherence_steps = [s for s in result.trace.steps if s.type == "coherence_check"]
+            assert any("Not coherent" in (s.error or "") for s in coherence_steps), (
+                f"Expected coherence_check step with error. "
+                f"Step types: {[s.type for s in result.trace.steps]}"
+            )
         finally:
             te_mod.acheck_coherence = original
 

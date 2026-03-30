@@ -599,11 +599,11 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         if not self.config.guardrails or not self.config.guardrails.input:
             return content
         result = self.config.guardrails.check_input(content)
-        if trace and not result.passed:
+        if trace is not None and (not result.passed or result.guardrail_name):
             trace.add(
                 TraceStep(
                     type=StepType.GUARDRAIL,
-                    summary=f"Input guardrail: {result.reason}",
+                    summary=f"Input guardrail: {result.guardrail_name or result.reason}",
                 )
             )
         return result.content
@@ -613,11 +613,11 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         if not self.config.guardrails or not self.config.guardrails.output:
             return content
         result = self.config.guardrails.check_output(content)
-        if trace and not result.passed:
+        if trace is not None and (not result.passed or result.guardrail_name):
             trace.add(
                 TraceStep(
                     type=StepType.GUARDRAIL,
-                    summary=f"Output guardrail: {result.reason}",
+                    summary=f"Output guardrail: {result.guardrail_name or result.reason}",
                 )
             )
         return result.content
@@ -627,7 +627,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         if not self.config.guardrails or not self.config.guardrails.input:
             return content
         result = await self.config.guardrails.acheck_input(content)
-        if trace and (not result.passed or result.guardrail_name):
+        if trace is not None and (not result.passed or result.guardrail_name):
             trace.add(
                 TraceStep(
                     type=StepType.GUARDRAIL,
@@ -643,7 +643,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         if not self.config.guardrails or not self.config.guardrails.output:
             return content
         result = await self.config.guardrails.acheck_output(content)
-        if trace and (not result.passed or result.guardrail_name):
+        if trace is not None and (not result.passed or result.guardrail_name):
             trace.add(
                 TraceStep(
                     type=StepType.GUARDRAIL,
@@ -1109,9 +1109,15 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             skip_guardrails=True,
         )
 
-        # Async input guardrails (non-blocking)
+        # Async input guardrails (non-blocking).
+        # Only process the newly added messages — those are always at the tail of
+        # self._history (appended last by _prepare_run). Applying guardrails to
+        # the entire history would re-validate previously processed turns from
+        # memory, which wastes work and can corrupt already-validated content.
         if self.config.guardrails and self.config.guardrails.input:
-            for i, msg in enumerate(self._history):
+            new_msg_start = len(self._history) - len(messages)
+            for i in range(new_msg_start, len(self._history)):
+                msg = self._history[i]
                 if msg.role == Role.USER and msg.content:
                     self._history[i] = copy.copy(msg)
                     self._history[i].content = await self._arun_input_guardrails(
@@ -1210,7 +1216,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                             timeout=self.config.request_timeout,
                         )
                     else:
-                        loop = asyncio.get_event_loop()
+                        loop = asyncio.get_running_loop()
                         response_msg, _usage = await loop.run_in_executor(
                             None,
                             lambda: self.provider.complete(
@@ -1476,9 +1482,15 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             skip_guardrails=True,
         )
 
-        # Async input guardrails (non-blocking)
+        # Async input guardrails (non-blocking).
+        # Only process the newly added messages — those are always at the tail of
+        # self._history (appended last by _prepare_run). Applying guardrails to
+        # the entire history would re-validate previously processed turns from
+        # memory, which wastes work and can corrupt already-validated content.
         if self.config.guardrails and self.config.guardrails.input:
-            for i, msg in enumerate(self._history):
+            new_msg_start = len(self._history) - len(messages)
+            for i in range(new_msg_start, len(self._history)):
+                msg = self._history[i]
                 if msg.role == Role.USER and msg.content:
                     self._history[i] = copy.copy(msg)
                     self._history[i].content = await self._arun_input_guardrails(

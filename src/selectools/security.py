@@ -40,6 +40,16 @@ _DEFAULT_INJECTION_PATTERNS: List[re.Pattern[str]] = [
     re.compile(r"forget\s+(everything|all)", re.IGNORECASE),
     re.compile(r"act\s+as\s+if\s+you\s+are", re.IGNORECASE),
     re.compile(r"pretend\s+(you\s+are|to\s+be)", re.IGNORECASE),
+    # OpenAI/Llama special tokens used to inject synthetic turns
+    re.compile(r"<\|im_start\|>", re.IGNORECASE),
+    re.compile(r"<\|im_end\|>", re.IGNORECASE),
+    re.compile(r"<\|endoftext\|>", re.IGNORECASE),
+    # Common jailbreak / role-override patterns
+    re.compile(r"\bjailbreak\b", re.IGNORECASE),
+    re.compile(r"override\s+(your\s+)?(instructions|rules|guidelines|constraints)", re.IGNORECASE),
+    re.compile(r"from\s+now\s+on[,\s]", re.IGNORECASE),
+    re.compile(r"act\s+as\s+(DAN|an?\s+AI\s+without\s+restrictions?)", re.IGNORECASE),
+    re.compile(r"do\s+anything\s+now", re.IGNORECASE),
 ]
 
 
@@ -130,6 +140,9 @@ def screen_output(
     Returns:
         A :class:`ScreeningResult` indicating whether the content is safe.
     """
+    if content is None:
+        content = ""
+
     patterns = list(_DEFAULT_INJECTION_PATTERNS)
     if extra_patterns:
         for pat in extra_patterns:

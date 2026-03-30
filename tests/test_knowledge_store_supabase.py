@@ -227,3 +227,49 @@ class TestPrune:
         removed = store.prune(min_importance=0.5)
         assert removed == 0
         assert store.get("pinned") is not None
+
+
+# ---------------------------------------------------------------------------
+# Regression tests
+# ---------------------------------------------------------------------------
+
+
+class TestNaiveDatetimeRegression:
+    """Regression: naive datetimes from Supabase must not crash on is_expired comparisons."""
+
+    def test_naive_timestamp_from_supabase_does_not_crash_is_expired(
+        self, store: SupabaseKnowledgeStore
+    ) -> None:
+        """Regression: _row_to_entry must normalize naive datetimes to UTC-aware.
+
+        Supabase may return TIMESTAMPTZ values as strings without timezone info
+        (e.g. '2020-01-01T00:00:00').  Without normalization, datetime.fromisoformat()
+        returns a naive datetime, and comparing it with datetime.now(timezone.utc)
+        in is_expired raises TypeError.
+        """
+        # Inject a row with naive timestamps directly into the fake store
+        row = {
+            "id": "naive_test",
+            "content": "test",
+            "category": "fact",
+            "importance": 0.7,
+            "persistent": False,
+            "ttl_days": 1,
+            "created_at": "2020-01-01T00:00:00",  # naive, no tz
+            "updated_at": "2020-01-01T00:00:00",
+            "metadata": {},
+        }
+        store._client._tables.setdefault(store._table, []).append(row)
+
+        # Must not raise TypeError
+        result = store.get("naive_test")
+        assert result is not None
+        assert result.is_expired  # created in 2020 with ttl_days=1 is expired
+
+    def test_naive_since_does_not_crash_query(self, store: SupabaseKnowledgeStore) -> None:
+        """Regression: query(since=naive_datetime) must not raise TypeError."""
+        store.save(_make_entry(id="entry1"))
+        # Pass a naive datetime as since — should not crash
+        naive_since = datetime(2020, 1, 1)  # no tzinfo
+        results = store.query(since=naive_since)
+        assert len(results) == 1

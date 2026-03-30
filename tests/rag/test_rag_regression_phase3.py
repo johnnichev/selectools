@@ -573,3 +573,532 @@ class TestBM25ZeroDivisionGuard:
         # Should not raise ZeroDivisionError
         results = bm25.search("a", top_k=1)
         assert len(results) == 1
+
+
+# ============================================================================
+# Phase 4 regression: BM25.clear() thread safety
+# ============================================================================
+
+
+class TestBM25ClearThreadSafety:
+    """Regression: BM25.clear() must hold the lock to avoid concurrent data corruption."""
+
+    def test_concurrent_add_and_clear_no_corruption(self):
+        """clear() concurrent with add_documents() must not silently lose documents (Phase4)."""
+
+        from selectools.rag.bm25 import BM25
+
+        bm25 = BM25()
+        bm25.index_documents([Document(text="base doc")])
+        errors: list = []
+
+        def add_batch():
+            for _ in range(50):
+                try:
+                    bm25.add_documents([Document(text="added doc")])
+                except Exception as e:
+                    errors.append(e)
+
+        def clear_loop():
+            for _ in range(50):
+                try:
+                    bm25.clear()
+                except Exception as e:
+                    errors.append(e)
+
+        t1 = threading.Thread(target=add_batch)
+        t2 = threading.Thread(target=clear_loop)
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+        assert not errors, f"Concurrent clear/add raised: {errors}"
+
+    def test_clear_after_add_leaves_empty_state(self):
+        """Sequential clear after add must leave document_count=0 (Phase4)."""
+        from selectools.rag.bm25 import BM25
+
+        bm25 = BM25()
+        bm25.add_documents([Document(text=f"doc{i}") for i in range(10)])
+        assert bm25.document_count == 10
+        bm25.clear()
+        assert bm25.document_count == 0
+        assert bm25._docs == []
+        assert bm25._df == {}
+        assert bm25._avg_doc_len == 0.0
+
+
+# ============================================================================
+# Phase 4 regression: SemanticChunker IndexError on partial embeddings
+# ============================================================================
+
+
+class TestSemanticChunkerPartialEmbeddings:
+    """Regression: SemanticChunker must not crash when embedder returns fewer vectors (Phase4)."""
+
+    def test_fewer_embeddings_than_sentences_no_index_error(self):
+        """embedder returning 2 vectors for 5 sentences must not raise IndexError (Phase4)."""
+        from unittest.mock import Mock
+
+        from selectools.rag.chunking import SemanticChunker
+
+        mock_embedder = Mock()
+        # 5 sentences will be detected, but only return 2 embeddings
+        mock_embedder.embed_texts.return_value = [
+            [1.0, 0.0],
+            [0.9, 0.1],
+        ]
+
+        chunker = SemanticChunker(mock_embedder, similarity_threshold=0.5)
+        # Text produces >=5 sentences
+        text = "Alpha is first. Beta is second. Gamma is third. Delta is fourth. Epsilon is fifth."
+
+        # Must not raise IndexError
+        chunks = chunker.split_text(text)
+        assert isinstance(chunks, list)
+        # Should produce at least one chunk
+        assert len(chunks) >= 1
+
+    def test_single_embedding_returned_no_crash(self):
+        """Embedder returning 1 vector for multi-sentence text must not crash (Phase4)."""
+        from unittest.mock import Mock
+
+        from selectools.rag.chunking import SemanticChunker
+
+        mock_embedder = Mock()
+        mock_embedder.embed_texts.return_value = [[1.0, 0.0]]  # only 1 vector
+
+        chunker = SemanticChunker(mock_embedder, similarity_threshold=0.5)
+        text = "First sentence here. Second sentence there. Third sentence everywhere."
+
+        chunks = chunker.split_text(text)
+        assert isinstance(chunks, list)
+        assert len(chunks) >= 1
+
+
+# ============================================================================
+# Phase 4 regression: SQLiteVectorStore connection leak on exception
+# ============================================================================
+
+
+class TestSQLiteVectorStoreConnectionSafety:
+    """Regression: SQLite connections must be closed even when exceptions occur (Phase4)."""
+
+    def test_add_documents_closes_connection_on_exception(self, tmp_path):
+        """If cursor.execute raises, conn.close() must still be called (Phase4).
+
+        We verify the fix indirectly: after a simulated failure the database
+        file is still accessible (not locked), which would only be true if
+        the connection was properly closed.
+        """
+        import sqlite3
+        from unittest.mock import Mock, patch
+
+        from selectools.rag.stores.sqlite import SQLiteVectorStore
+
+        db_path = str(tmp_path / "test.db")
+        mock_embedder = Mock()
+        store = SQLiteVectorStore(embedder=mock_embedder, db_path=db_path)
+
+        # Use a wrapper connection class to track close() calls
+        closed_calls = []
+        original_connect = sqlite3.connect
+
+        class TrackingConnection:
+            """Thin wrapper that records close() invocations."""
+
+            def __init__(self, real_conn):
+                self._conn = real_conn
+
+            def cursor(self):
+                # Raise to simulate a disk-full error mid-insert
+                raise sqlite3.OperationalError("disk full")
+
+            def execute(self, *args, **kwargs):
+                return self._conn.execute(*args, **kwargs)
+
+            def commit(self):
+                return self._conn.commit()
+
+            def close(self):
+                closed_calls.append(True)
+                return self._conn.close()
+
+        def patched_connect(path, **kwargs):
+            return TrackingConnection(original_connect(path, **kwargs))
+
+        with patch("selectools.rag.stores.sqlite.sqlite3.connect", side_effect=patched_connect):
+            try:
+                store.add_documents([Document(text="test")], embeddings=[[0.1, 0.2]])
+            except Exception:
+                pass
+
+        # The connection must have been closed (via the finally block)
+        assert len(closed_calls) >= 1, "Connection was not closed after exception"
+
+
+# ============================================================================
+# Phase 4 regression: DocumentLoader.from_directory() path traversal guard
+# ============================================================================
+
+
+class TestDocumentLoaderPathTraversalGuard:
+    """Regression: glob_pattern with '..' must be rejected to prevent path traversal (Phase4)."""
+
+    def test_dotdot_in_glob_pattern_raises(self, tmp_path):
+        """A pattern containing '..' must raise ValueError (Phase4)."""
+        from selectools.rag.loaders import DocumentLoader
+
+        with pytest.raises(ValueError, match="path traversal"):
+            DocumentLoader.from_directory(str(tmp_path), glob_pattern="../*.txt")
+
+    def test_nested_dotdot_in_glob_pattern_raises(self, tmp_path):
+        """Nested '../..' patterns must also be rejected (Phase4)."""
+        from selectools.rag.loaders import DocumentLoader
+
+        with pytest.raises(ValueError, match="path traversal"):
+            DocumentLoader.from_directory(str(tmp_path), glob_pattern="../../etc/passwd")
+
+    def test_normal_glob_pattern_still_works(self, tmp_path):
+        """Standard glob patterns must continue to work after the traversal guard (Phase4)."""
+        from selectools.rag.loaders import DocumentLoader
+
+        # Create a test file
+        test_file = tmp_path / "sample.txt"
+        test_file.write_text("Hello from sample")
+
+        docs = DocumentLoader.from_directory(str(tmp_path), glob_pattern="*.txt")
+        assert len(docs) == 1
+        assert docs[0].text == "Hello from sample"
+
+    def test_wildcard_subdir_pattern_still_works(self, tmp_path):
+        """Recursive wildcard patterns like **/*.txt must not be blocked (Phase4)."""
+        from selectools.rag.loaders import DocumentLoader
+
+        sub = tmp_path / "sub"
+        sub.mkdir()
+        (sub / "a.txt").write_text("nested file")
+
+        docs = DocumentLoader.from_directory(str(tmp_path), glob_pattern="**/*.txt")
+        assert len(docs) == 1
+
+
+# ============================================================================
+# Phase 4 regression: SQLiteVectorStore NULL metadata guard in search()
+# ============================================================================
+
+
+class TestSQLiteNullMetadataGuard:
+    """Regression: NULL metadata from external DB writes must not crash search() (Phase4)."""
+
+    def test_filter_with_null_metadata_json_no_crash(self, tmp_path):
+        """A row with 'null' metadata must not crash the filter path (Phase4)."""
+        import json
+        import sqlite3
+        from unittest.mock import Mock
+
+        from selectools.rag.stores.sqlite import SQLiteVectorStore
+
+        db_path = str(tmp_path / "test.db")
+        mock_embedder = Mock()
+        store = SQLiteVectorStore(embedder=mock_embedder, db_path=db_path)
+
+        # Manually insert a row with null metadata
+        conn = sqlite3.connect(db_path)
+        embedding = json.dumps([0.1, 0.2])
+        conn.execute(
+            "INSERT INTO documents (id, text, metadata, embedding) VALUES (?, ?, ?, ?)",
+            ("manual_id", "text with null meta", "null", embedding),
+        )
+        conn.commit()
+        conn.close()
+
+        # search with filter must not crash with AttributeError
+        results = store.search([0.1, 0.2], top_k=5, filter={"source": "test"})
+        assert isinstance(results, list)
+
+    def test_search_with_null_metadata_no_crash(self, tmp_path):
+        """A row with 'null' metadata must not crash the non-filter path (Phase4)."""
+        import json
+        import sqlite3
+        from unittest.mock import Mock
+
+        from selectools.rag.stores.sqlite import SQLiteVectorStore
+
+        db_path = str(tmp_path / "test.db")
+        mock_embedder = Mock()
+        store = SQLiteVectorStore(embedder=mock_embedder, db_path=db_path)
+
+        conn = sqlite3.connect(db_path)
+        embedding = json.dumps([0.1, 0.2])
+        conn.execute(
+            "INSERT INTO documents (id, text, metadata, embedding) VALUES (?, ?, ?, ?)",
+            ("manual_id", "text with null meta", "null", embedding),
+        )
+        conn.commit()
+        conn.close()
+
+        # search without filter must also not crash
+        results = store.search([0.1, 0.2], top_k=5)
+        assert isinstance(results, list)
+        assert len(results) == 1
+        assert results[0].document.metadata == {}
+
+
+# ============================================================================
+# Pass 2 regression: BM25.search() race condition with index_documents/clear
+# ============================================================================
+
+
+class TestBM25SearchLockSnapshot:
+    """Regression: BM25.search() must snapshot shared state under lock (Pass 2).
+
+    Before the fix, search() read self._doc_count, self._docs, self._df, and
+    self._avg_doc_len without holding the lock.  A concurrent clear() or
+    index_documents() call could replace self._docs between the len check and
+    the iteration, producing an IndexError.
+    """
+
+    def test_concurrent_search_and_clear_no_index_error(self):
+        """search() concurrent with clear()+index_documents() must not raise IndexError."""
+        import threading
+
+        from selectools.rag.bm25 import BM25
+
+        bm25 = BM25()
+        bm25.index_documents([Document(text=f"doc {i}") for i in range(100)])
+
+        errors: list = []
+
+        def search_loop() -> None:
+            for _ in range(2000):
+                try:
+                    bm25.search("doc", top_k=5)
+                except IndexError as e:
+                    errors.append(e)
+                except Exception:
+                    pass  # other errors are not the regression we care about
+
+        def clear_reindex_loop() -> None:
+            for _ in range(100):
+                bm25.clear()
+                bm25.index_documents([Document(text=f"doc {i}") for i in range(100)])
+
+        t1 = threading.Thread(target=search_loop)
+        t2 = threading.Thread(target=clear_reindex_loop)
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+        assert not errors, f"Concurrent search/clear raised IndexError: {errors[:3]}"
+
+    def test_search_result_integrity_after_concurrent_add(self):
+        """Results from a concurrent search must have correct scores (not mix snapshots)."""
+        import threading
+
+        from selectools.rag.bm25 import BM25
+
+        bm25 = BM25()
+        bm25.index_documents([Document(text="alpha beta gamma")])
+        errors: list = []
+
+        def add_loop() -> None:
+            for _ in range(200):
+                bm25.add_documents([Document(text=f"delta epsilon {_}")])
+
+        def search_assert() -> None:
+            for _ in range(500):
+                try:
+                    results = bm25.search("alpha beta", top_k=3)
+                    # Each result must have a valid non-negative score
+                    for r in results:
+                        assert r.score >= 0.0, f"Negative score: {r.score}"
+                except IndexError as e:
+                    errors.append(e)
+
+        t1 = threading.Thread(target=add_loop)
+        t2 = threading.Thread(target=search_assert)
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+        assert not errors, f"IndexError during concurrent search/add: {errors[:3]}"
+
+    def test_search_returns_correct_results_after_fix(self):
+        """Normal search must still return correct ranked results after the snapshot fix."""
+        from selectools.rag.bm25 import BM25
+
+        bm25 = BM25()
+        bm25.index_documents(
+            [
+                Document(text="python programming language"),
+                Document(text="java enterprise application"),
+                Document(text="machine learning python neural"),
+            ]
+        )
+
+        results = bm25.search("python programming", top_k=2)
+
+        assert len(results) == 2
+        # Best match must be the python programming doc
+        assert "python programming" in results[0].document.text
+        # Scores must be descending
+        assert results[0].score >= results[1].score
+
+
+# ============================================================================
+# Pass 3 regression: SQLiteVectorStore SQL NULL metadata causes TypeError
+# ============================================================================
+
+
+class TestSQLiteVectorStoreSQLNullMetadata:
+    """Regression: SQL NULL metadata (Python None) must not raise TypeError in search().
+
+    The existing phase-4 test covers JSON string 'null' (which json.loads() decodes
+    to Python None, handled by 'or {}').  This test covers actual SQL NULL -- a
+    column value that arrives as Python None from sqlite3, for which json.loads(None)
+    raises TypeError before any 'or {}' guard can run.
+    """
+
+    def test_filter_with_sql_null_metadata_no_type_error(self, tmp_path):
+        """filter path: SQL NULL metadata must not raise TypeError (Pass 3)."""
+        import json
+        import sqlite3
+        from unittest.mock import Mock
+
+        from selectools.rag.stores.sqlite import SQLiteVectorStore
+
+        db_path = str(tmp_path / "test.db")
+        mock_embedder = Mock()
+        store = SQLiteVectorStore(embedder=mock_embedder, db_path=db_path)
+
+        # Insert a row with *actual* SQL NULL (not the JSON string "null")
+        conn = sqlite3.connect(db_path)
+        conn.execute(
+            "INSERT INTO documents (id, text, metadata, embedding) VALUES (?, ?, ?, ?)",
+            ("id_sql_null", "text with sql null meta", None, json.dumps([0.1, 0.2])),
+        )
+        conn.commit()
+        conn.close()
+
+        # Must not raise TypeError: the JSON object must be str, bytes or bytearray
+        try:
+            results = store.search([0.1, 0.2], top_k=5, filter={"source": "test"})
+        except TypeError as e:
+            pytest.fail(f"TypeError raised for SQL NULL metadata in filter path: {e}")
+
+        assert isinstance(results, list)
+
+    def test_no_filter_with_sql_null_metadata_no_type_error(self, tmp_path):
+        """non-filter path: SQL NULL metadata must not raise TypeError (Pass 3)."""
+        import json
+        import sqlite3
+        from unittest.mock import Mock
+
+        from selectools.rag.stores.sqlite import SQLiteVectorStore
+
+        db_path = str(tmp_path / "test.db")
+        mock_embedder = Mock()
+        store = SQLiteVectorStore(embedder=mock_embedder, db_path=db_path)
+
+        # Insert a row with *actual* SQL NULL metadata
+        conn = sqlite3.connect(db_path)
+        conn.execute(
+            "INSERT INTO documents (id, text, metadata, embedding) VALUES (?, ?, ?, ?)",
+            ("id_sql_null2", "searchable content", None, json.dumps([1.0, 0.0])),
+        )
+        conn.commit()
+        conn.close()
+
+        try:
+            results = store.search([1.0, 0.0], top_k=5)
+        except TypeError as e:
+            pytest.fail(f"TypeError raised for SQL NULL metadata in non-filter path: {e}")
+
+        assert len(results) == 1
+        # SQL NULL metadata must be normalised to an empty dict
+        assert results[0].document.metadata == {}
+
+
+# ============================================================================
+# P5-SC1 — SemanticChunker silent data loss when embedder returns k<n embeddings
+# ============================================================================
+
+
+class TestSemanticChunkerEmbedderTruncation:
+    """Regression: SemanticChunker must not silently discard sentences when the
+    embedder returns fewer vectors than sentences (P5-SC1).
+
+    Previously, when the embedder returned exactly 1 embedding for n>1 sentences,
+    the sentences list was truncated to [sentences[0]] and the 'len <= 1' branch
+    returned only the first sentence, silently dropping the remaining n-1 sentences.
+    """
+
+    def _make_chunker(self, embeddings):
+        from selectools.rag.chunking import SemanticChunker
+
+        mock_embedder = Mock()
+        mock_embedder.embed_texts.return_value = embeddings
+        return SemanticChunker(mock_embedder, similarity_threshold=0.5)
+
+    def test_one_embedding_for_three_sentences_returns_full_text(self):
+        """When embedder returns 1 vector for 3 sentences, full text is returned (P5-SC1)."""
+        chunker = self._make_chunker([[0.1, 0.2]])
+
+        text = "Sentence one. Sentence two. Sentence three."
+        chunks = chunker.split_text(text)
+
+        # Must not silently drop sentences 2 and 3.
+        assert len(chunks) == 1
+        combined = " ".join(chunks)
+        assert "Sentence one" in combined
+        assert "Sentence two" in combined
+        assert "Sentence three" in combined
+
+    def test_zero_embeddings_for_multiple_sentences_returns_full_text(self):
+        """When embedder returns 0 vectors, the full text is returned as fallback (P5-SC1)."""
+        chunker = self._make_chunker([])
+
+        text = "Sentence one. Sentence two. Sentence three."
+        chunks = chunker.split_text(text)
+
+        assert len(chunks) == 1
+        assert "Sentence one" in chunks[0]
+        assert "Sentence two" in chunks[0]
+        assert "Sentence three" in chunks[0]
+
+    def test_two_embeddings_for_three_sentences_truncates_correctly(self):
+        """When embedder returns 2 vectors for 3 sentences, first 2 sentences are used (P5-SC1).
+
+        k=2 is enough to compute 1 similarity value, so truncation is acceptable.
+        """
+        # High similarity so all go in one chunk
+        chunker = self._make_chunker([[0.1, 0.2], [0.15, 0.25]])
+
+        text = "Sentence one. Sentence two. Sentence three."
+        chunks = chunker.split_text(text)
+
+        # May drop sentence three (only k=2 embeddings available) but must not crash.
+        assert isinstance(chunks, list)
+        assert all(isinstance(c, str) and c.strip() for c in chunks)
+
+    def test_exactly_matching_embeddings_proceeds_normally(self):
+        """When embedder returns exactly len(sentences) vectors, normal chunking occurs (P5-SC1)."""
+        # Two embeddings, low similarity → should split into two chunks
+        chunker = self._make_chunker([[1.0, 0.0], [0.0, 1.0]])
+
+        text = "Sentence one. Sentence two."
+        chunks = chunker.split_text(text)
+
+        # Two orthogonal embeddings with threshold 0.5 should trigger a split.
+        assert len(chunks) == 2
+
+    def test_full_text_fallback_does_not_return_empty_for_whitespace_input(self):
+        """Zero-embedding fallback with whitespace-only text returns [] not [''] (P5-SC1)."""
+        chunker = self._make_chunker([])
+
+        chunks = chunker.split_text("   \n  ")
+        assert chunks == []

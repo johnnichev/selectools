@@ -157,8 +157,11 @@ class EvalReport:
         }
 
     def to_json(self, filepath: Union[str, Path]) -> None:
-        """Write JSON report to file."""
-        Path(filepath).write_text(json.dumps(self.to_dict(), indent=2))
+        """Write JSON report to file (atomic write via temp file)."""
+        dest = Path(filepath)
+        tmp = dest.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(self.to_dict(), indent=2))
+        tmp.replace(dest)
 
     def to_html(self, filepath: Union[str, Path], history: Optional[Any] = None) -> None:
         """Write self-contained HTML report to file.

@@ -357,3 +357,46 @@ class TestDocumentLoaderIntegration:
         assert callable(DocumentLoader.from_file)
         assert callable(DocumentLoader.from_directory)
         assert callable(DocumentLoader.from_pdf)
+
+
+# ============================================================================
+# Regression tests: degenerate glob patterns (pass 7)
+# ============================================================================
+
+
+class TestDocumentLoaderDegeneratePatterns:
+    """Regression: degenerate glob patterns must not crash (pass 7).
+
+    When recursive=False is combined with a glob_pattern that consists entirely
+    of '**' wildcards (e.g. '**', '**/'), stripping the recursive wildcard
+    produces an empty string pattern. Path.glob('') raises ValueError on
+    Python 3.9-3.12. The fix returns [] immediately when the computed pattern
+    is empty rather than calling Path.glob.
+    """
+
+    def test_glob_star_star_recursive_false_no_crash(self, temp_docs_dir: Path) -> None:
+        """glob_pattern='**' with recursive=False must return [] and not crash."""
+        docs = DocumentLoader.from_directory(str(temp_docs_dir), glob_pattern="**", recursive=False)
+        assert docs == []
+
+    def test_glob_star_star_slash_recursive_false_no_crash(self, temp_docs_dir: Path) -> None:
+        """glob_pattern='**/' with recursive=False must return [] and not crash."""
+        docs = DocumentLoader.from_directory(
+            str(temp_docs_dir), glob_pattern="**/", recursive=False
+        )
+        assert docs == []
+
+    def test_glob_double_star_recursive_false_no_crash(self, temp_docs_dir: Path) -> None:
+        """glob_pattern='**/**' with recursive=False must return [] and not crash."""
+        docs = DocumentLoader.from_directory(
+            str(temp_docs_dir), glob_pattern="**/**", recursive=False
+        )
+        assert docs == []
+
+    def test_valid_pattern_still_works_after_fix(self, temp_docs_dir: Path) -> None:
+        """Normal patterns must continue to work correctly after the guard is added."""
+        docs = DocumentLoader.from_directory(
+            str(temp_docs_dir), glob_pattern="**/*.txt", recursive=False
+        )
+        assert len(docs) == 2
+        assert all("test file" in d.text for d in docs)

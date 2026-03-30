@@ -124,6 +124,27 @@ class TestToolEvents:
         assert entry["decision"] == "deny"
 
 
+class TestPathTraversalPrevention:
+    def test_dotdot_path_is_normalized(self, tmp_audit_dir: str) -> None:
+        """Regression: log_dir with .. components must be resolved to a canonical path."""
+        traversal = os.path.join(tmp_audit_dir, "sub", "..", "..", "evil")
+        logger = AuditLogger(log_dir=traversal)
+        # The resolved path must not contain '..'
+        assert ".." not in logger._log_dir
+        # The resolved path is the real absolute path
+        assert os.path.isabs(logger._log_dir)
+
+    def test_relative_path_resolved_to_absolute(self, tmp_audit_dir: str) -> None:
+        """log_dir as a relative path must be stored as an absolute path."""
+        logger = AuditLogger(log_dir="./audit_relative_test")
+        assert os.path.isabs(logger._log_dir)
+        # Clean up
+        import shutil
+
+        if os.path.exists(logger._log_dir):
+            shutil.rmtree(logger._log_dir)
+
+
 class TestLLMEvents:
     def test_llm_end_with_usage(self, tmp_audit_dir: str) -> None:
         logger = AuditLogger(log_dir=tmp_audit_dir)
@@ -147,3 +168,28 @@ class TestLLMEvents:
         with open(os.path.join(tmp_audit_dir, os.listdir(tmp_audit_dir)[0])) as f:
             entry = json.loads(f.readline())
         assert entry["response_length"] == 13
+
+
+class TestNoneGuards:
+    def test_on_tool_end_none_result_include_content(self, tmp_audit_dir: str) -> None:
+        """Regression: on_tool_end with result=None and include_content=True previously raised
+        TypeError: object of type 'NoneType' has no len().
+
+        Tool executors can occasionally produce None results; the audit logger must
+        treat a None result length as 0 rather than crashing.
+        """
+        logger = AuditLogger(log_dir=tmp_audit_dir, include_content=True)
+        # Must not raise TypeError
+        logger.on_tool_end("r1", "c1", "search", None, 10.0)  # type: ignore[arg-type]
+        with open(os.path.join(tmp_audit_dir, os.listdir(tmp_audit_dir)[0])) as f:
+            entry = json.loads(f.readline())
+        assert entry["event"] == "tool_end"
+        assert entry["result_length"] == 0
+
+    def test_on_tool_end_empty_string_result(self, tmp_audit_dir: str) -> None:
+        """on_tool_end with empty string result must log result_length=0."""
+        logger = AuditLogger(log_dir=tmp_audit_dir, include_content=True)
+        logger.on_tool_end("r1", "c1", "search", "", 10.0)
+        with open(os.path.join(tmp_audit_dir, os.listdir(tmp_audit_dir)[0])) as f:
+            entry = json.loads(f.readline())
+        assert entry["result_length"] == 0

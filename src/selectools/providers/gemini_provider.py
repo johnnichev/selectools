@@ -95,10 +95,14 @@ class GeminiProvider(Provider):
         model_name = model or self.default_model
         contents = self._format_contents(system_prompt, messages)
 
+        http_options = (
+            types.HttpOptions(timeout=int(timeout * 1000)) if timeout is not None else None
+        )
         config = types.GenerateContentConfig(
             temperature=temperature,
             max_output_tokens=max_tokens,
             system_instruction=system_prompt if system_prompt else None,
+            http_options=http_options,
         )
 
         if tools:
@@ -192,10 +196,14 @@ class GeminiProvider(Provider):
         model_name = model or self.default_model
         contents = self._format_contents(system_prompt, messages)
 
+        http_options = (
+            types.HttpOptions(timeout=int(timeout * 1000)) if timeout is not None else None
+        )
         config = types.GenerateContentConfig(
             temperature=temperature,
             max_output_tokens=max_tokens,
             system_instruction=system_prompt if system_prompt else None,
+            http_options=http_options,
         )
 
         if tools:
@@ -212,8 +220,12 @@ class GeminiProvider(Provider):
 
         try:
             for chunk in stream:
-                if chunk.text:
-                    yield chunk.text
+                try:
+                    chunk_text = chunk.text
+                except ValueError:
+                    chunk_text = None
+                if chunk_text:
+                    yield chunk_text
 
                 candidates = chunk.candidates if hasattr(chunk, "candidates") else None
                 if candidates:
@@ -401,10 +413,14 @@ class GeminiProvider(Provider):
         model_name = model or self.default_model
         contents = self._format_contents(system_prompt, messages)
 
+        http_options = (
+            types.HttpOptions(timeout=int(timeout * 1000)) if timeout is not None else None
+        )
         config = types.GenerateContentConfig(
             temperature=temperature,
             max_output_tokens=max_tokens,
             system_instruction=system_prompt if system_prompt else None,
+            http_options=http_options,
         )
 
         if tools:
@@ -498,10 +514,14 @@ class GeminiProvider(Provider):
         model_name = model or self.default_model
         contents = self._format_contents(system_prompt, messages)
 
+        http_options = (
+            types.HttpOptions(timeout=int(timeout * 1000)) if timeout is not None else None
+        )
         config = types.GenerateContentConfig(
             temperature=temperature,
             max_output_tokens=max_tokens,
             system_instruction=system_prompt if system_prompt else None,
+            http_options=http_options,
         )
 
         if tools:
@@ -518,8 +538,12 @@ class GeminiProvider(Provider):
 
         try:
             async for chunk in stream:
-                if chunk.text:
-                    yield chunk.text
+                try:
+                    chunk_text = chunk.text
+                except ValueError:
+                    chunk_text = None
+                if chunk_text:
+                    yield chunk_text
 
                 candidates = chunk.candidates if hasattr(chunk, "candidates") else None
                 if candidates:

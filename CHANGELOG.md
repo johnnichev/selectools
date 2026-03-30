@@ -69,8 +69,31 @@ All pattern symbols exported from `selectools` top-level:
 - `RAGToolkit.semantic_search`: result preview truncated to 200 chars with `...` suffix (prevents unbounded tool output)
 - `BM25.search`: `top_k < 1` now raises `ValueError` immediately
 
+#### Ralph Loop Bug Hunt (8 passes, ~90 bugs fixed)
+
+Autonomous convergence system ran 8 passes across all 7 modules (agent, providers, tools, rag, memory, evals, security). All modules achieved a clean pass on pass 8. Selected fixes:
+
+- `_tool_executor.py`: ThreadPoolExecutor singleton for parallel dispatch (deadlock prevention with `tool_timeout_seconds`)
+- `_provider_caller.py`: async observer events now fire on LLM cache hits in `arun()`/`astream()`
+- `_openai_compat.py`: tool call deltas flushed after stream end (Ollama compatibility); TOOL `content=None` guarded
+- `fallback.py`: mid-stream fallback data corruption fixed; `_is_retriable` regex uses word boundaries
+- `gemini_provider.py`: timeout parameter now applied to all 4 methods
+- `tools/decorators.py`: `Optional[List[T]]` / `Optional[Dict[K,V]]` type unwrapping; `*args`/`**kwargs` excluded from schema
+- `tools/base.py`: `None` for optional parameters no longer raises `ToolValidationError`
+- `rag/bm25.py`: `search()` takes atomic snapshot under lock (concurrent clear/add safety)
+- `rag/chunking.py`: TextSplitter infinite loop guard; empty chunk filtering in RecursiveTextSplitter
+- `evals/llm_evaluators.py` + `coherence.py`: prompt injection fencing on all user-controlled fields (`_fence()` delimiters)
+- `evals/`: non-atomic writes replaced with tmp→replace in html.py, junit.py, snapshot.py, history.py
+- `evals/`: path traversal fixed in BaselineStore, SnapshotStore, HistoryStore
+- `memory.py`, `knowledge.py`, `sessions.py`: naive datetime normalization (6+ locations)
+- `knowledge_graph.py`: `confidence: null` from LLM no longer silently discards all triples
+- `policy.py`: `from_dict()` validates types at construction (string coercion, non-dict YAML)
+- `guardrails/`: ToxicityGuardrail, LengthGuardrail, FormatGuardrail threshold validation
+- `audit.py`: path traversal fix + `result=None` guard in `on_tool_end()`
+- 254 new regression tests added (2664 → 2918 total)
+
 ### Stats
-- Tests: 2664 (+98), Examples: 73 (+4), Evaluators: 50 (+12)
+- Tests: 2918 (+254 from ralph loop), Examples: 73 (+4), Evaluators: 50 (+12)
 
 ---
 

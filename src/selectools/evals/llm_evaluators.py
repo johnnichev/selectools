@@ -91,7 +91,7 @@ class LLMJudgeEvaluator:
 
         prompt = (
             f"Evaluate the following response on a scale of 0-10.\n\n"
-            f"Rubric: {rubric}\n\n"
+            f"Rubric:\n{_fence(rubric)}\n\n"
             f"User query:\n{_fence(case.input)}\n\n"
             f"Response:\n{_fence(content)}\n\n"
             f"Provide your assessment, then end with 'Score: X' where X is 0-10."
@@ -143,7 +143,7 @@ class CorrectnessEvaluator:
             f"Compare the response against the reference answer.\n\n"
             f"User query:\n{_fence(case.input)}\n"
             f"Reference answer:\n{_fence(case.reference)}\n"
-            f"Actual response: {content}\n\n"
+            f"Actual response:\n{_fence(content)}\n\n"
             f"Is the response factually correct and consistent with the reference?\n"
             f"Score 0-10 where 10 = perfectly correct. End with 'Score: X'."
         )
@@ -616,7 +616,7 @@ class InstructionFollowingEvaluator:
 
         prompt = (
             f"Did the response follow these specific instructions?\n\n"
-            f"Instructions: {case.rubric}\n"
+            f"Instructions:\n{_fence(case.rubric)}\n"
             f"User query:\n{_fence(case.input)}\n"
             f"Response:\n{_fence(content)}\n\n"
             f"Score 0-10 where 10 = perfectly followed instructions. End with 'Score: X'."
@@ -664,7 +664,8 @@ class ToneEvaluator:
         content = case_result.agent_result.content or ""
 
         prompt = (
-            f"Does the response match the expected tone: '{case.expected_tone}'?\n\n"
+            f"Does the response match the expected tone?\n"
+            f"Expected tone:\n{_fence(case.expected_tone)}\n\n"
             f"User query:\n{_fence(case.input)}\n"
             f"Response:\n{_fence(content)}\n\n"
             f"Score 0-10 where 10 = perfectly matches the tone. End with 'Score: X'."
@@ -930,7 +931,7 @@ class CustomRubricEvaluator:
         else:
             criteria = self.criteria
 
-        criteria_list = "\n".join(f"- {c}" for c in criteria)
+        criteria_list = "\n".join(f"- {_fence(c)}" for c in criteria)
         prompt = (
             f"Evaluate the response on each criterion below. Score each 0-10.\n\n"
             f"User query:\n{_fence(case.input)}\n"
@@ -1072,7 +1073,7 @@ class StepReasoningEvaluator:
 
         prompt = (
             f"Evaluate whether the response demonstrates clear step-by-step reasoning.\n\n"
-            f"Rubric: {rubric}\n\n"
+            f"Rubric:\n{_fence(rubric)}\n\n"
             f"User query:\n{_fence(case.input)}\n"
             f"Response:\n{_fence(content)}\n\n"
             f"Score 0-10 where 10 = excellent step-by-step reasoning. End with 'Score: X'."

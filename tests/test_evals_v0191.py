@@ -228,6 +228,32 @@ class TestSemanticSimilarityEvaluator:
         failures = ev.check(case, result)
         assert len(failures) == 1
 
+    def test_zero_threshold_is_not_falsy(self):
+        """Regression: expect_semantic_similarity_gte=0.0 must be respected, not treated as
+        falsy and replaced by self.threshold.  A 0.0 threshold means 'any similarity passes'."""
+        ev = SemanticSimilarityEvaluator(threshold=0.9)  # high constructor threshold
+        # 0.0 threshold: even completely dissimilar text should pass
+        case = _make_case(
+            reference="completely different content XYZ",
+            expect_semantic_similarity_gte=0.0,
+        )
+        result = _make_result("hello world python code banana")
+        # Must pass — threshold is 0.0
+        failures = ev.check(case, result)
+        assert failures == [], (
+            "expect_semantic_similarity_gte=0.0 was treated as falsy; "
+            "constructor threshold 0.9 was used instead"
+        )
+
+    def test_zero_threshold_constructor_activates_on_reference(self):
+        """SemanticSimilarityEvaluator(threshold=0.0) with a reference but no case threshold
+        should activate and always pass (similarity >= 0.0 is trivially true)."""
+        ev = SemanticSimilarityEvaluator(threshold=0.0)
+        case = _make_case(reference="xyz abc")  # no case-level threshold
+        result = _make_result("completely unrelated words mango grape")
+        failures = ev.check(case, result)
+        assert failures == []
+
 
 # ---------------------------------------------------------------------------
 # _tf_cosine helper (renamed from _tfidf_cosine in v0.19.1 bug hunt)

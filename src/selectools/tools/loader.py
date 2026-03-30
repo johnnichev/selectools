@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
-import os
 import sys
 from pathlib import Path
 from typing import List, Optional, Sequence
@@ -15,6 +14,17 @@ from .base import Tool
 def _is_tool(obj: object) -> bool:
     """Check if an object is a selectools Tool instance."""
     return isinstance(obj, Tool)
+
+
+def _module_name_for_path(path: Path) -> str:
+    """Derive a unique sys.modules key for a dynamic plugin file.
+
+    Includes a short hash of the absolute path so that two different directories
+    containing files with the same stem do not collide.
+    """
+    safe_stem = path.stem.replace("-", "_").replace(" ", "_")
+    path_hash = format(hash(str(path)) & 0xFFFFFFFF, "08x")
+    return f"_selectools_dynamic_.{safe_stem}_{path_hash}"
 
 
 class ToolLoader:
@@ -80,15 +90,22 @@ class ToolLoader:
         if not path.suffix == ".py":
             raise ValueError(f"Expected a .py file, got: {path}")
 
-        safe_stem = path.stem.replace("-", "_").replace(" ", "_")
-        module_name = f"_selectools_dynamic_.{safe_stem}"
+        module_name = _module_name_for_path(path)
         spec = importlib.util.spec_from_file_location(module_name, str(path))
         if spec is None or spec.loader is None:
             raise ImportError(f"Cannot create module spec for {path}")
 
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
-        spec.loader.exec_module(module)  # type: ignore[union-attr]
+        try:
+            spec.loader.exec_module(module)  # type: ignore[union-attr]
+        except SyntaxError as exc:
+            # Remove the partially-registered module so a future reload can succeed.
+            sys.modules.pop(module_name, None)
+            raise ImportError(f"Syntax error in {path}: {exc}") from exc
+        except Exception:
+            sys.modules.pop(module_name, None)
+            raise
 
         return [obj for obj in vars(module).values() if _is_tool(obj)]
 
@@ -130,7 +147,7 @@ class ToolLoader:
                 continue
             try:
                 tools.extend(ToolLoader.from_file(str(py_file)))
-            except (ImportError, SyntaxError, AttributeError) as exc:
+            except Exception as exc:
                 import logging
 
                 logging.getLogger(__name__).warning(
@@ -176,8 +193,7 @@ class ToolLoader:
             List of Tool instances from the reloaded file.
         """
         path = Path(file_path).resolve()
-        safe_stem = path.stem.replace("-", "_").replace(" ", "_")
-        module_name = f"_selectools_dynamic_.{safe_stem}"
+        module_name = _module_name_for_path(path)
 
         if module_name in sys.modules:
             del sys.modules[module_name]

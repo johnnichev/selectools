@@ -57,6 +57,13 @@ class SQLiteVectorStore(VectorStore):
             embedder: Embedding provider to use for computing embeddings
             db_path: Path to SQLite database file (will be created if doesn't exist)
         """
+        if db_path == ":memory:":
+            raise ValueError(
+                "SQLiteVectorStore does not support ':memory:' databases. "
+                "Each sqlite3.connect(':memory:') call creates a new empty database, "
+                "so documents written in one operation are invisible to the next. "
+                "Use a file path (e.g. db_path='vectors.db') or InMemoryVectorStore instead."
+            )
         self.embedder = embedder
         self.db_path = db_path
         self._lock = threading.Lock()
@@ -66,31 +73,33 @@ class SQLiteVectorStore(VectorStore):
         """Initialize the database schema."""
         with self._lock:
             conn = sqlite3.connect(self.db_path)
-            conn.execute("PRAGMA journal_mode=WAL")
-            cursor = conn.cursor()
+            try:
+                conn.execute("PRAGMA journal_mode=WAL")
+                cursor = conn.cursor()
 
-            # Create documents table
-            cursor.execute(
+                # Create documents table
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS documents (
+                        id TEXT PRIMARY KEY,
+                        text TEXT NOT NULL,
+                        metadata TEXT,
+                        embedding TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
                 """
-                CREATE TABLE IF NOT EXISTS documents (
-                    id TEXT PRIMARY KEY,
-                    text TEXT NOT NULL,
-                    metadata TEXT,
-                    embedding TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            """
-            )
 
-            # Create index on metadata for faster filtering
-            cursor.execute(
+                # Create index on metadata for faster filtering
+                cursor.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_metadata ON documents(metadata)
                 """
-                CREATE INDEX IF NOT EXISTS idx_metadata ON documents(metadata)
-            """
-            )
+                )
 
-            conn.commit()
-            conn.close()
+                conn.commit()
+            finally:
+                conn.close()
 
     def add_documents(
         self, documents: List[Document], embeddings: Optional[List[List[float]]] = None
@@ -119,17 +128,19 @@ class SQLiteVectorStore(VectorStore):
 
         with self._lock:
             conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            for doc_id, doc, embedding in zip(ids, documents, embeddings):
-                cursor.execute(
-                    """
-                    INSERT OR REPLACE INTO documents (id, text, metadata, embedding)
-                    VALUES (?, ?, ?, ?)
-                """,
-                    (doc_id, doc.text, json.dumps(doc.metadata), json.dumps(embedding)),
-                )
-            conn.commit()
-            conn.close()
+            try:
+                cursor = conn.cursor()
+                for doc_id, doc, embedding in zip(ids, documents, embeddings):
+                    cursor.execute(
+                        """
+                        INSERT OR REPLACE INTO documents (id, text, metadata, embedding)
+                        VALUES (?, ?, ?, ?)
+                    """,
+                        (doc_id, doc.text, json.dumps(doc.metadata), json.dumps(embedding)),
+                    )
+                conn.commit()
+            finally:
+                conn.close()
 
         return ids
 
@@ -152,20 +163,32 @@ class SQLiteVectorStore(VectorStore):
         """
         with self._lock:
             conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, text, metadata, embedding FROM documents")
-            rows = cursor.fetchall()
-            conn.close()
+            try:
+                cursor = conn.cursor()
+                cursor.execute("SELECT id, text, metadata, embedding FROM documents")
+                rows = cursor.fetchall()
+            finally:
+                conn.close()
 
         if not rows:
             return []
 
-        # Apply metadata filter in Python (flexible matching)
+        # Apply metadata filter in Python (flexible matching).
+        # Guard against NULL metadata stored by external writers:
+        #   - SQL NULL arrives as Python None → json.loads(None) raises TypeError.
+        #   - JSON string "null" → json.loads("null") returns Python None (not a dict).
+        # Both cases are handled by the helper below.
+        def _safe_meta(raw: object) -> dict:
+            if raw is None:
+                return {}
+            parsed = json.loads(raw)  # type: ignore[arg-type]
+            return parsed if isinstance(parsed, dict) else {}
+
         if filter:
             rows = [
                 row
                 for row in rows
-                if all(json.loads(row[2]).get(k) == v for k, v in filter.items())
+                if all(_safe_meta(row[2]).get(k) == v for k, v in filter.items())
             ]
 
         if not rows:
@@ -181,8 +204,16 @@ class SQLiteVectorStore(VectorStore):
         results = []
         for row in rows:
             doc_id, text, metadata_json, embedding_json = row
-            metadata = json.loads(metadata_json)
-            embedding = np.array(json.loads(embedding_json), dtype=np.float32)
+            metadata = _safe_meta(metadata_json)
+
+            # Guard against NULL or JSON-null embedding stored by external writers.
+            # json.loads('null') returns None and np.array(None, ...) raises TypeError.
+            if embedding_json is None:
+                continue
+            parsed_embedding = json.loads(embedding_json)
+            if not isinstance(parsed_embedding, list) or len(parsed_embedding) == 0:
+                continue
+            embedding = np.array(parsed_embedding, dtype=np.float32)
 
             doc_norm = np.linalg.norm(embedding)
             if doc_norm == 0:
@@ -211,20 +242,24 @@ class SQLiteVectorStore(VectorStore):
 
         with self._lock:
             conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            placeholders = ",".join("?" for _ in ids)
-            cursor.execute(f"DELETE FROM documents WHERE id IN ({placeholders})", ids)  # nosec
-            conn.commit()
-            conn.close()
+            try:
+                cursor = conn.cursor()
+                placeholders = ",".join("?" for _ in ids)
+                cursor.execute(f"DELETE FROM documents WHERE id IN ({placeholders})", ids)  # nosec
+                conn.commit()
+            finally:
+                conn.close()
 
     def clear(self) -> None:
         """Clear all documents from the store."""
         with self._lock:
             conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM documents")
-            conn.commit()
-            conn.close()
+            try:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM documents")
+                conn.commit()
+            finally:
+                conn.close()
 
 
 __all__ = ["SQLiteVectorStore"]

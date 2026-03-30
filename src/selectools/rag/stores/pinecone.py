@@ -115,9 +115,11 @@ class PineconeVectorStore(VectorStore):
             ids.append(doc_id)
 
             # Pinecone format: (id, values, metadata)
-            # Store text in metadata since Pinecone doesn't store original documents
+            # Store text in metadata since Pinecone doesn't store original documents.
+            # Use the namespaced key "__selectools_text__" to avoid clobbering a
+            # user-supplied "text" metadata field (which is a common key name).
             metadata = doc.metadata.copy()
-            metadata["text"] = doc.text
+            metadata["__selectools_text__"] = doc.text
 
             vectors.append((doc_id, embedding, metadata))
 
@@ -155,10 +157,22 @@ class PineconeVectorStore(VectorStore):
         # Convert to SearchResult objects
         search_results = []
         for match in query_response.matches:
-            # Extract text from metadata
+            # Extract text from metadata.  Support both the namespaced key
+            # (written by this store) and the legacy "text" key (written by
+            # older versions of this store, or external writers).
+            #
+            # Key removal strategy:
+            # - If "__selectools_text__" is present (new format): strip only that
+            #   key, leaving any user-supplied "text" metadata intact.
+            # - If only the legacy "text" key is present (old format): strip it
+            #   (it holds the document body, not user metadata).
             metadata = match.metadata or {}
-            text = metadata.get("text", "")
-            meta = {k: v for k, v in metadata.items() if k != "text"}
+            if "__selectools_text__" in metadata:
+                text = metadata["__selectools_text__"] or ""
+                meta = {k: v for k, v in metadata.items() if k != "__selectools_text__"}
+            else:
+                text = metadata.get("text", "")
+                meta = {k: v for k, v in metadata.items() if k != "text"}
 
             doc = Document(text=text, metadata=meta)
             search_results.append(SearchResult(document=doc, score=match.score))

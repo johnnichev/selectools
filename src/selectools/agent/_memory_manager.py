@@ -159,7 +159,8 @@ class _MemoryManagerMixin:
             return
 
         # Each "turn" is one user + one assistant message, so keep_recent * 2 messages.
-        keep_recent = self.config.compress_keep_recent * 2
+        # Always keep at least 1 message so the current user prompt is never compressed away.
+        keep_recent = max(self.config.compress_keep_recent * 2, 1)
         system_msgs: List[Message] = []
         non_system: List[Message] = []
         for m in self._history:

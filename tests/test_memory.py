@@ -512,3 +512,74 @@ class TestMixedRoles:
         assert len(history) == 2
         assert history[0].role == Role.ASSISTANT
         assert history[1].role == Role.USER
+
+
+# ======================================================================
+# Regression tests
+# ======================================================================
+
+
+class TestTokenLimitNoneContentRegression:
+    """Regression: token limit enforcement must not crash when content is None."""
+
+    def test_token_limit_with_none_content_does_not_raise(self) -> None:
+        """Regression: _enforce_limits() fallback uses 'msg.content or ""'.
+
+        Message.content is typed as str but providers can return None.
+        Without the guard, len(None) raises TypeError when the fallback
+        lambda is used for token estimation.
+        """
+        mem = ConversationMemory(max_messages=100, max_tokens=10)
+        # Add a message with None content (simulating a provider returning None)
+        msg = Message(role=Role.ASSISTANT, content="")
+        # Manually set content to None to simulate the provider bug
+        object.__setattr__(msg, "content", None)  # type: ignore[arg-type]
+        mem._messages.append(msg)
+        mem.add(_msg("A second message to trigger limit enforcement"))
+        # Must not raise TypeError
+        assert len(mem) >= 1
+
+
+class TestBranchDeepCopy:
+    """Regression: branch() must produce a fully independent copy."""
+
+    def test_branch_tool_call_parameters_are_independent(self) -> None:
+        """Regression: branch() used replace(tool_calls=list(...)) which created
+        a new list but shared the same ToolCall objects.  Mutating the parameters
+        dict of a branched ToolCall therefore mutated the original as well.
+        """
+        from selectools.types import ToolCall
+
+        mem = ConversationMemory()
+        tc = ToolCall(tool_name="search", parameters={"q": "original"}, id="tc1")
+        mem.add(_msg("Find something", Role.USER))
+        mem.add(Message(role=Role.ASSISTANT, content="", tool_calls=[tc]))
+
+        branched = mem.branch()
+
+        # Mutate the branch's tool_call parameters
+        branched_tc = branched.get_history()[1].tool_calls[0]
+        branched_tc.parameters["q"] = "modified"
+
+        # The original must be unchanged
+        original_tc = mem.get_history()[1].tool_calls[0]
+        assert (
+            original_tc.parameters["q"] == "original"
+        ), "branch() shared ToolCall.parameters dict — mutation affected original"
+
+    def test_branch_tool_call_objects_are_different_instances(self) -> None:
+        """branch() must create distinct ToolCall instances, not share references."""
+        from selectools.types import ToolCall
+
+        mem = ConversationMemory()
+        tc = ToolCall(tool_name="tool", parameters={"x": 1}, id="tc1")
+        mem.add(Message(role=Role.ASSISTANT, content="", tool_calls=[tc]))
+
+        branched = mem.branch()
+
+        original_tc = mem.get_history()[0].tool_calls[0]
+        branch_tc = branched.get_history()[0].tool_calls[0]
+        assert original_tc is not branch_tc, "branch() must create distinct ToolCall objects"
+        assert (
+            original_tc.parameters is not branch_tc.parameters
+        ), "branch() must deep-copy ToolCall.parameters"

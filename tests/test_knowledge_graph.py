@@ -446,6 +446,73 @@ class TestKGSerialization:
         restored = KnowledgeGraphMemory.from_dict(d, provider)
         assert restored.store.count() == 0
 
+    def test_max_triples_preserved_in_round_trip(self) -> None:
+        """Regression: max_triples must survive to_dict/from_dict round-trip.
+
+        Before the fix, to_dict() did not include max_triples, so from_dict()
+        always created an InMemoryTripleStore with default max_triples=200,
+        ignoring the user's custom limit.  This caused data loss when
+        len(stored_triples) > 200 on restore, and the pruning limit was wrong
+        for stores created with max_triples < 200.
+        """
+        provider = FakeExtractionProvider()
+        kg = KnowledgeGraphMemory(provider=provider, max_triples=50)
+        for i in range(30):
+            kg.store.add(Triple(subject=f"S{i}", relation="r", object=f"O{i}"))
+
+        d = kg.to_dict()
+        assert "max_triples" in d
+        assert d["max_triples"] == 50
+
+        restored = KnowledgeGraphMemory.from_dict(d, provider)
+        # The restored store must have the correct max_triples limit
+        assert restored._max_triples == 50
+        # All 30 triples should survive (under the 50 limit)
+        assert restored.store.count() == 30
+
+    def test_custom_max_triples_enforced_after_round_trip(self) -> None:
+        """Regression: pruning limit is correct after from_dict().
+
+        After restoring with max_triples=5, adding a 6th triple must prune
+        to 5, not to the old default of 200.
+        """
+        provider = FakeExtractionProvider()
+        kg = KnowledgeGraphMemory(provider=provider, max_triples=5)
+        for i in range(4):
+            kg.store.add(Triple(subject=f"S{i}", relation="r", object=f"O{i}"))
+
+        d = kg.to_dict()
+        restored = KnowledgeGraphMemory.from_dict(d, provider)
+        # Add one more to bring to the limit, then one more to trigger pruning
+        restored.store.add(Triple(subject="S4", relation="r", object="O4"))
+        restored.store.add(Triple(subject="S5", relation="r", object="O5"))
+        # Should be pruned back to 5
+        assert restored.store.count() == 5
+
+    def test_model_preserved_in_round_trip(self) -> None:
+        """Regression: model must survive to_dict/from_dict round-trip.
+
+        Before the fix, to_dict() did not include model, so from_dict()
+        always created a KnowledgeGraphMemory with model=None, ignoring
+        the user's custom extraction model.
+        """
+        provider = FakeExtractionProvider()
+        kg = KnowledgeGraphMemory(provider=provider, model="gpt-4o")
+        d = kg.to_dict()
+        assert "model" in d
+        assert d["model"] == "gpt-4o"
+
+        restored = KnowledgeGraphMemory.from_dict(d, provider)
+        assert restored._model == "gpt-4o"
+
+    def test_model_none_preserved_in_round_trip(self) -> None:
+        """Regression: model=None round-trips correctly."""
+        provider = FakeExtractionProvider()
+        kg = KnowledgeGraphMemory(provider=provider, model=None)
+        d = kg.to_dict()
+        restored = KnowledgeGraphMemory.from_dict(d, provider)
+        assert restored._model is None
+
 
 # ======================================================================
 # Agent integration
@@ -575,3 +642,63 @@ class TestKGAgentIntegration:
         kg_msgs = [m for m in system_msgs if "[Known Relationships]" in m.content]
         assert len(kg_msgs) == 1
         assert "Alice" in kg_msgs[0].content
+
+
+# ======================================================================
+# Regression tests
+# ======================================================================
+
+
+class TestKGExtractionRegressions:
+    """Regression tests for extract_triples() edge cases."""
+
+    def test_null_confidence_does_not_discard_all_triples(self) -> None:
+        """Regression: float(None) raised TypeError which was caught by the outer
+        except-all, silently discarding ALL triples whenever a single item had
+        confidence=null in the LLM response.
+
+        The fix wraps the float() cast per-item with a try/except that falls
+        back to confidence=1.0 for None or non-numeric values, so other triples
+        in the same response are preserved.
+        """
+        triples_json = json.dumps(
+            [
+                # One triple with null confidence
+                {"subject": "Alice", "relation": "works_at", "object": "Acme", "confidence": None},
+                # One with a valid confidence
+                {"subject": "Bob", "relation": "knows", "object": "Alice", "confidence": 0.9},
+                # One with a non-numeric string confidence
+                {
+                    "subject": "Acme",
+                    "relation": "is_a",
+                    "object": "company",
+                    "confidence": "high",
+                },
+            ]
+        )
+        provider = FakeExtractionProvider(triples_json)
+        kg = KnowledgeGraphMemory(provider=provider)
+        result = kg.extract_triples([Message(role=Role.USER, content="context")])
+
+        # All three triples must be extracted — null/invalid confidence must not
+        # abort the entire extraction.
+        assert len(result) == 3
+
+        by_subject = {t.subject: t for t in result}
+        # null confidence falls back to 1.0
+        assert by_subject["Alice"].confidence == 1.0
+        # valid float confidence is preserved
+        assert by_subject["Bob"].confidence == 0.9
+        # non-numeric string falls back to 1.0
+        assert by_subject["Acme"].confidence == 1.0
+
+    def test_missing_confidence_key_defaults_to_one(self) -> None:
+        """Regression: triple without 'confidence' key must default to 1.0."""
+        triples_json = json.dumps(
+            [{"subject": "A", "relation": "r", "object": "B"}]  # no confidence key
+        )
+        provider = FakeExtractionProvider(triples_json)
+        kg = KnowledgeGraphMemory(provider=provider)
+        result = kg.extract_triples([Message(role=Role.USER, content="test")])
+        assert len(result) == 1
+        assert result[0].confidence == 1.0

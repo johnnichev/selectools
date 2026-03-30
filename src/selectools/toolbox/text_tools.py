@@ -36,8 +36,16 @@ def count_text(text: str, detailed: bool = True) -> str:
             result.extend(
                 [
                     f"Characters (no spaces): {chars_no_spaces}",
-                    f"Average word length: {chars_no_spaces / len(words):.1f}" if words else "N/A",
-                    f"Average words per line: {len(words) / len(lines):.1f}" if lines else "N/A",
+                    (
+                        f"Average word length: {chars_no_spaces / len(words):.1f}"
+                        if words
+                        else "Average word length: N/A"
+                    ),
+                    (
+                        f"Average words per line: {len(words) / len(lines):.1f}"
+                        if lines
+                        else "Average words per line: N/A"
+                    ),
                 ]
             )
 

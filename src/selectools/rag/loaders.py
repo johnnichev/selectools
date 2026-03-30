@@ -121,6 +121,15 @@ class DocumentLoader:
         if not dir_path.is_dir():
             raise ValueError(f"Not a directory: {directory}")
 
+        # Reject patterns that could escape the directory via path traversal.
+        # Path components that are purely ".." or contain directory separators
+        # outside of the glob wildcard syntax are not legitimate glob patterns.
+        if ".." in Path(glob_pattern).parts:
+            raise ValueError(
+                f"glob_pattern must not contain '..' components to prevent path traversal: "
+                f"{glob_pattern!r}"
+            )
+
         # Find matching files
         if recursive and "**" not in glob_pattern:
             pattern = f"**/{glob_pattern}"
@@ -130,6 +139,11 @@ class DocumentLoader:
             pattern = glob_pattern.replace("**/", "").replace("**", "")
         else:
             pattern = glob_pattern
+
+        # Guard against degenerate patterns (e.g. '**' with recursive=False becomes '')
+        # that would raise ValueError inside Path.glob().
+        if not pattern:
+            return []
 
         file_paths = list(dir_path.glob(pattern))
 

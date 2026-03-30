@@ -328,6 +328,7 @@ class KnowledgeGraphMemory:
     ) -> None:
         self._provider = provider
         self._model = model
+        self._max_triples = max_triples
         self._max_context_triples = max_context_triples
         self._relevance_window = relevance_window
 
@@ -396,12 +397,17 @@ class KnowledgeGraphMemory:
                     continue
                 if "subject" not in item or "relation" not in item or "object" not in item:
                     continue
+                raw_conf = item.get("confidence")
+                try:
+                    confidence = float(raw_conf) if raw_conf is not None else 1.0
+                except (TypeError, ValueError):
+                    confidence = 1.0
                 extracted.append(
                     Triple(
                         subject=item["subject"],
                         relation=item["relation"],
                         object=item["object"],
-                        confidence=float(item.get("confidence", 1.0)),
+                        confidence=confidence,
                         source_turn=len(messages),
                         created_at=now,
                     )
@@ -457,8 +463,10 @@ class KnowledgeGraphMemory:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
+            "max_triples": self._max_triples,
             "max_context_triples": self._max_context_triples,
             "relevance_window": self._relevance_window,
+            "model": self._model,
             "triples": self._store.to_list(),
         }
 
@@ -466,6 +474,8 @@ class KnowledgeGraphMemory:
     def from_dict(cls, data: Dict[str, Any], provider: Any) -> "KnowledgeGraphMemory":
         mem = cls(
             provider=provider,
+            model=data.get("model"),
+            max_triples=data.get("max_triples", 200),
             max_context_triples=data.get("max_context_triples", 15),
             relevance_window=data.get("relevance_window", 10),
         )

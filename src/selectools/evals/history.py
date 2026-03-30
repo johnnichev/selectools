@@ -125,7 +125,8 @@ class HistoryStore:
     def record(self, report: Any) -> None:
         """Record an eval report to history."""
         self._dir.mkdir(parents=True, exist_ok=True)
-        path = self._dir / f"{report.metadata.suite_name}.jsonl"
+        safe_name = Path(report.metadata.suite_name).name  # strip directory components
+        path = self._dir / f"{safe_name}.jsonl"
 
         entry = {
             "run_id": report.metadata.run_id,
@@ -154,7 +155,8 @@ class HistoryStore:
             suite_name: Name of the eval suite.
             last_n: Only return the last N entries. None = all.
         """
-        path = self._dir / f"{suite_name}.jsonl"
+        safe_name = Path(suite_name).name  # strip directory components
+        path = self._dir / f"{safe_name}.jsonl"
         if not path.exists():
             return HistoryTrend()
 
@@ -162,25 +164,28 @@ class HistoryStore:
         for line in path.read_text().strip().split("\n"):
             if not line:
                 continue
-            data = json.loads(line)
-            entries.append(
-                HistoryEntry(
-                    run_id=data["run_id"],
-                    suite_name=data["suite_name"],
-                    timestamp=data["timestamp"],
-                    accuracy=data["accuracy"],
-                    pass_count=data["pass_count"],
-                    fail_count=data["fail_count"],
-                    error_count=data["error_count"],
-                    total_cost=data["total_cost"],
-                    total_tokens=data["total_tokens"],
-                    latency_p50=data["latency_p50"],
-                    latency_p95=data["latency_p95"],
-                    total_cases=data["total_cases"],
-                    model=data["model"],
-                    duration_ms=data["duration_ms"],
+            try:
+                data = json.loads(line)
+                entries.append(
+                    HistoryEntry(
+                        run_id=data["run_id"],
+                        suite_name=data["suite_name"],
+                        timestamp=data["timestamp"],
+                        accuracy=data["accuracy"],
+                        pass_count=data["pass_count"],
+                        fail_count=data["fail_count"],
+                        error_count=data["error_count"],
+                        total_cost=data["total_cost"],
+                        total_tokens=data.get("total_tokens", 0),
+                        latency_p50=data["latency_p50"],
+                        latency_p95=data["latency_p95"],
+                        total_cases=data["total_cases"],
+                        model=data["model"],
+                        duration_ms=data["duration_ms"],
+                    )
                 )
-            )
+            except (json.JSONDecodeError, KeyError):
+                continue  # skip corrupted or incomplete lines
 
         if last_n is not None:
             entries = entries[-last_n:]

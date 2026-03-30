@@ -103,8 +103,13 @@ class TextSplitter:
 
             chunks.append(chunk)
 
-            # Move start position forward, accounting for overlap
-            start = end - self.chunk_overlap
+            # Move start position forward, accounting for overlap.
+            # Guard against the edge case where a separator found near chunk_size//2
+            # makes end - chunk_overlap <= start (e.g. chunk_size=10, chunk_overlap=8,
+            # separator found at pos 6 → end=start+8, new_start=start+0). Without this
+            # clamp the loop would repeat the same start forever.
+            new_start = end - self.chunk_overlap
+            start = new_start if new_start > start else start + 1
 
         return chunks
 
@@ -199,9 +204,10 @@ class RecursiveTextSplitter(TextSplitter):
         if not text:
             return []
 
-        # Base case: no more separators or text is small enough
+        # Base case: no more separators or text is small enough.
+        # Return [] for whitespace-only text so callers never receive empty chunks.
         if not separators or self.length_function(text) <= self.chunk_size:
-            return [text] if text else []
+            return [text] if text and text.strip() else []
 
         # Try current separator
         separator = separators[0]
@@ -273,7 +279,11 @@ class RecursiveTextSplitter(TextSplitter):
             else:
                 final_chunks.append(chunk)
 
-        return final_chunks
+        # Filter out empty and whitespace-only chunks produced by consecutive
+        # separators (e.g. '\n\n\n\n' → ['', ''] after split('\n\n')).  Empty
+        # chunks create zero-content Documents that pollute BM25 indexes and
+        # produce zero-norm embedding vectors downstream.
+        return [c for c in final_chunks if c.strip()]
 
 
 def _split_into_sentences(text: str) -> List[str]:
@@ -362,6 +372,22 @@ class SemanticChunker:
             return [text.strip()] if text.strip() else []
 
         embeddings = self.embedder.embed_texts(sentences)
+
+        # Guard against embedders that return fewer vectors than sentences (e.g. API
+        # truncation or a buggy mock).  When truncation would reduce the usable
+        # sentence count to ≤1, fall back to returning the full text as a single
+        # chunk rather than silently discarding sentences that have no embedding.
+        # Only proceed with truncation when enough embeddings remain to drive
+        # meaningful similarity comparisons.
+        if len(embeddings) < len(sentences):
+            if len(embeddings) <= 1:
+                # Not enough embeddings to compute inter-sentence similarity;
+                # return the whole text as a single chunk to avoid data loss.
+                return [text.strip()] if text.strip() else []
+            sentences = sentences[: len(embeddings)]
+
+        if len(sentences) <= 1:
+            return [" ".join(sentences)] if sentences else [text.strip()]
 
         chunks: List[str] = []
         current_group: List[str] = [sentences[0]]

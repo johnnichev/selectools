@@ -925,7 +925,11 @@ class SemanticSimilarityEvaluator:
         self.threshold = threshold
 
     def check(self, case: TestCase, case_result: CaseResult) -> List[EvalFailure]:
-        threshold = case.expect_semantic_similarity_gte or self.threshold
+        threshold = (
+            case.expect_semantic_similarity_gte
+            if case.expect_semantic_similarity_gte is not None
+            else self.threshold
+        )
         if threshold is None:
             return []
         if case.reference is None or case_result.agent_result is None:

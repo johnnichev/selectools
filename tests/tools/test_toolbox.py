@@ -340,3 +340,94 @@ class TestWebTools:
             "POST" in web_tools.http_post.description
             or "request" in web_tools.http_post.description.lower()
         )
+
+
+# =============================================================================
+# Regression Tests — Ralph Bug Hunt
+# =============================================================================
+
+
+class TestDatetimeUtcnowDeprecation:
+    """Regression: get_current_time must not use the deprecated datetime.utcnow()."""
+
+    def test_get_current_time_utc_uses_aware_datetime(self) -> None:
+        """get_current_time(timezone='UTC') must return a result without DeprecationWarning."""
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            # Should not raise DeprecationWarning from utcnow()
+            result = datetime_tools.get_current_time.function(timezone="UTC")
+        assert "UTC" in result or "time" in result.lower()
+
+
+class TestDatetimeTimezoneParamShadowing:
+    """Regression: 'timezone' parameter must not shadow the datetime.timezone class."""
+
+    def test_get_current_time_utc_without_pytz_returns_time(self) -> None:
+        """get_current_time falls back to datetime.timezone.utc when pytz is absent.
+
+        The parameter name 'timezone' was shadowing the imported datetime.timezone
+        class, causing 'UTC'.utc AttributeError instead of returning the current time.
+        """
+        import sys
+        import types
+        import unittest.mock as mock
+
+        # Simulate pytz not being installed by temporarily hiding it
+        pytz_backup = sys.modules.get("pytz")
+        sys.modules["pytz"] = None  # type: ignore[assignment]
+        try:
+            # Re-import the function to pick up the mocked pytz absence
+            import importlib
+
+            import selectools.toolbox.datetime_tools as dt_mod
+
+            importlib.reload(dt_mod)
+            result = dt_mod.get_current_time.function(timezone="UTC")
+            # Must NOT return an error message
+            assert not result.startswith("❌"), f"Expected valid time, got: {result}"
+            assert "time" in result.lower() or ":" in result, f"No time in result: {result}"
+        finally:
+            # Restore pytz
+            if pytz_backup is None:
+                sys.modules.pop("pytz", None)
+            else:
+                sys.modules["pytz"] = pytz_backup
+            # Reload to restore normal state
+            import importlib
+
+            import selectools.toolbox.datetime_tools as dt_mod2
+
+            importlib.reload(dt_mod2)
+
+
+# =============================================================================
+# Regression Tests — Ralph Bug Hunt Pass 4
+# =============================================================================
+
+
+class TestCountTextEmptyInputLabels:
+    """Regression: count_text with empty or word-free text must include proper labels.
+
+    Previously the 'Average word length' entry was emitted as a bare 'N/A' string
+    with no label when the input had zero words, making the output line ambiguous.
+    """
+
+    def test_empty_string_average_word_length_has_label(self) -> None:
+        """Empty text must produce 'Average word length: N/A', not a bare 'N/A'."""
+        result = text_tools.count_text.function("", detailed=True)
+        assert (
+            "Average word length: N/A" in result
+        ), f"Expected labelled 'Average word length: N/A', got:\n{result}"
+
+    def test_non_empty_text_average_word_length_has_label(self) -> None:
+        """Non-empty text must still produce 'Average word length: X.Y'."""
+        result = text_tools.count_text.function("hello world", detailed=True)
+        assert "Average word length:" in result
+        assert "N/A" not in result
+
+    def test_detailed_false_no_averages(self) -> None:
+        """detailed=False must not include average word length line."""
+        result = text_tools.count_text.function("", detailed=False)
+        assert "Average word length" not in result

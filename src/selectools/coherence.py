@@ -38,11 +38,19 @@ class CoherenceResult:
 _COHERENCE_PROMPT = """You are a security auditor. Your task is to determine whether a proposed tool call is consistent with the user's ORIGINAL request.
 
 ORIGINAL USER REQUEST:
+<<<BEGIN_USER_CONTENT>>>
 {user_message}
+<<<END_USER_CONTENT>>>
 
 PROPOSED TOOL CALL:
-Tool: {tool_name}
-Arguments: {tool_args}
+Tool:
+<<<BEGIN_TOOL_NAME>>>
+{tool_name}
+<<<END_TOOL_NAME>>>
+Arguments:
+<<<BEGIN_TOOL_ARGS>>>
+{tool_args}
+<<<END_TOOL_ARGS>>>
 
 AVAILABLE TOOLS:
 {available_tools}
@@ -94,7 +102,16 @@ def check_coherence(
         )
         response_text = (response_msg.content or "").strip()
 
-        first_word = response_text.strip().upper().split()[0] if response_text.strip() else ""
+        if not response_text:
+            return CoherenceResult(
+                coherent=not fail_closed,
+                explanation=(
+                    f"Coherence check received empty response "
+                    f"({'denying' if fail_closed else 'allowing'} by default)"
+                ),
+            )
+
+        first_word = response_text.upper().split()[0]
         if first_word == "COHERENT":
             return CoherenceResult(coherent=True, usage=usage)
 
@@ -153,7 +170,16 @@ async def acheck_coherence(
             )
         response_text = (response_msg.content or "").strip()
 
-        first_word = response_text.strip().upper().split()[0] if response_text.strip() else ""
+        if not response_text:
+            return CoherenceResult(
+                coherent=not fail_closed,
+                explanation=(
+                    f"Coherence check received empty response "
+                    f"({'denying' if fail_closed else 'allowing'} by default)"
+                ),
+            )
+
+        first_word = response_text.upper().split()[0]
         if first_word == "COHERENT":
             return CoherenceResult(coherent=True, usage=usage)
 

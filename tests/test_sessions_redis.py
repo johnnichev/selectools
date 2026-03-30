@@ -352,3 +352,55 @@ class TestRedisSessionStoreEdgeCases:
         sessions = store.list()
         # The None value should be handled
         assert isinstance(sessions, list)
+
+    def test_list_does_not_crash_when_session_id_ends_with_meta(self) -> None:
+        """Regression: list() must not raise KeyError when the SCAN pattern matches
+        a data key whose session_id ends with ':meta'.
+
+        The SCAN pattern ``{prefix}*:meta`` can inadvertently match the data key
+        (not the meta key) of a session whose ID ends with ':meta'.  The data key
+        stores memory JSON which has no 'session_id' field, so accessing
+        ``meta["session_id"]`` raised an unhandled KeyError and crashed list().
+        """
+        fake = FakeRedis()
+        store = _make_redis_store(fake)
+
+        # Save a normal session so we know the store is working
+        store.save("normal", _memory_with_messages("Hi"))
+
+        # Inject a key that matches the *:meta pattern but contains memory JSON
+        # (simulates a data key whose session_id ends with ':meta')
+        memory_json = json.dumps(_memory_with_messages("tricky").to_dict(), ensure_ascii=False)
+        fake._store["selectools:session:tricky:meta"] = memory_json
+
+        # Must not raise KeyError — the entry with no 'session_id' key is skipped
+        sessions = store.list()
+        assert isinstance(sessions, list)
+        # The valid 'normal' session should still be returned
+        assert any(s.session_id == "normal" for s in sessions)
+
+    def test_list_deduplicates_scan_results(self) -> None:
+        """Regression: list() must not return duplicate SessionMetadata when SCAN
+        returns the same meta_key more than once (allowed by the Redis SCAN contract).
+        """
+
+        class DuplicatingScanFakeRedis(FakeRedis):
+            """Returns each key twice to simulate SCAN duplicates."""
+
+            def scan(self, cursor: int = 0, match: str = "*", count: int = 100) -> tuple:
+                import fnmatch
+
+                keys = [k for k in self._store if fnmatch.fnmatch(k, match)]
+                # Return every key twice
+                return (0, keys + keys)
+
+        fake = DuplicatingScanFakeRedis()
+        store = _make_redis_store(fake)
+        store.save("s1", _memory_with_messages("A"))
+        store.save("s2", _memory_with_messages("B"))
+
+        sessions = store.list()
+        # Despite SCAN returning each key twice, there must be no duplicates
+        ids = [s.session_id for s in sessions]
+        assert len(ids) == len(set(ids)), f"Duplicate session IDs in list(): {ids}"
+        assert set(ids) == {"s1", "s2"}

@@ -250,3 +250,252 @@ class TestGeminiFormatContents:
         part = formatted[0].parts[0]
         assert part.text is not None
         assert "Tool output" in part.text
+
+
+class TestOpenAIFormatMessagesNoneContent:
+    """Regression: TOOL messages with None content must be formatted as empty string.
+
+    OpenAI's API rejects None as message content; we must coerce to "".
+    """
+
+    def _get_provider(self) -> Any:
+        from selectools.providers.openai_provider import OpenAIProvider
+
+        provider = OpenAIProvider.__new__(OpenAIProvider)
+        provider.default_model = "gpt-4o"
+        provider.api_key = "test"
+        return provider
+
+    def test_tool_message_none_content_coerced_to_empty_string(self) -> None:
+        """TOOL messages with content=None must have content='' in the payload."""
+        provider = self._get_provider()
+        messages = [
+            Message(
+                role=Role.TOOL,
+                content=None,  # type: ignore[arg-type]
+                tool_call_id="call_1",
+            )
+        ]
+        formatted = provider._format_messages("sys", messages)
+        tool_msg = formatted[1]
+        assert tool_msg["content"] == "", f"Expected '', got {tool_msg['content']!r}"
+        assert tool_msg["content"] is not None, "content must not be None"
+
+    def test_tool_message_with_content_preserved(self) -> None:
+        """TOOL messages with real content must not be affected."""
+        provider = self._get_provider()
+        messages = [
+            Message(
+                role=Role.TOOL,
+                content="the result",
+                tool_call_id="call_2",
+            )
+        ]
+        formatted = provider._format_messages("sys", messages)
+        assert formatted[1]["content"] == "the result"
+
+
+class TestOpenAIParseResponseEmptyChoices:
+    """Regression: _parse_response() must raise ProviderError when choices is empty.
+
+    OpenAI returns an empty choices list when a request is blocked by content
+    filtering.  Previously this raised an IndexError (unhandled), now it must
+    raise ProviderError with a descriptive message.
+    """
+
+    def _get_provider(self) -> Any:
+        from selectools.providers.openai_provider import OpenAIProvider
+
+        provider = OpenAIProvider.__new__(OpenAIProvider)
+        provider.default_model = "gpt-4o"
+        provider.api_key = "test"
+        return provider
+
+    def test_empty_choices_raises_provider_error(self) -> None:
+
+        from selectools.providers.base import ProviderError
+
+        provider = self._get_provider()
+
+        # Simulate an OpenAI response with no choices (content-filtered)
+        mock_response = MagicMock()
+        mock_response.choices = []
+
+        with pytest.raises(ProviderError, match="empty choices"):
+            provider._parse_response(mock_response, "gpt-4o")
+
+    def test_single_choice_still_works(self) -> None:
+        """Regression guard: normal single-choice response must still parse correctly."""
+
+        provider = self._get_provider()
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = "Hello"
+        mock_choice.message.tool_calls = None
+
+        mock_usage = MagicMock()
+        mock_usage.prompt_tokens = 10
+        mock_usage.completion_tokens = 5
+        mock_usage.total_tokens = 15
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_response.usage = mock_usage
+
+        msg, stats = provider._parse_response(mock_response, "gpt-4o")
+        assert msg.content == "Hello"
+        assert stats.prompt_tokens == 10
+
+
+# ---------------------------------------------------------------------------
+# Regression: GeminiProvider silently ignored the timeout parameter
+#
+# All four methods (complete, stream, acomplete, astream) accepted a
+# `timeout` argument but never applied it to the GenerateContentConfig.
+# Users who set a timeout got no protection — the Gemini SDK simply used
+# its default (no timeout).  The fix passes
+# `http_options=types.HttpOptions(timeout=int(timeout * 1000))` into the
+# config when timeout is not None.
+# ---------------------------------------------------------------------------
+
+
+class TestGeminiTimeout:
+    """Regression: timeout parameter must be forwarded to GenerateContentConfig."""
+
+    def _get_provider(self) -> Any:
+        from selectools.providers.gemini_provider import GeminiProvider
+
+        provider = GeminiProvider.__new__(GeminiProvider)
+        provider.default_model = "gemini-test"
+        return provider
+
+    def _make_mock_response(self) -> Any:
+
+        mock_response = MagicMock()
+        mock_response.text = "hello"
+        mock_response.candidates = []
+        mock_usage = MagicMock()
+        mock_usage.prompt_token_count = 5
+        mock_usage.candidates_token_count = 3
+        mock_response.usage_metadata = mock_usage
+        return mock_response
+
+    def test_complete_passes_timeout_to_config(self) -> None:
+        """complete() must set http_options with timeout_ms when timeout is given."""
+        try:
+            from google.genai import types
+        except ImportError:
+            pytest.skip("google-genai not installed")
+
+        from unittest.mock import patch
+
+        provider = self._get_provider()
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = self._make_mock_response()
+        provider._client = mock_client
+
+        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+            provider.complete(
+                model="gemini-test",
+                system_prompt="sys",
+                messages=[Message(role=Role.USER, content="hi")],
+                timeout=5.0,
+            )
+
+        call_kwargs = mock_client.models.generate_content.call_args[1]
+        config = call_kwargs["config"]
+        assert config.http_options is not None, "http_options must be set when timeout is given"
+        assert (
+            config.http_options.timeout == 5000
+        ), f"Expected timeout_ms=5000, got {config.http_options.timeout}"
+
+    def test_complete_no_timeout_does_not_set_http_options(self) -> None:
+        """complete() must not set http_options when timeout=None."""
+        try:
+            from google.genai import types
+        except ImportError:
+            pytest.skip("google-genai not installed")
+
+        from unittest.mock import patch
+
+        provider = self._get_provider()
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = self._make_mock_response()
+        provider._client = mock_client
+
+        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+            provider.complete(
+                model="gemini-test",
+                system_prompt="sys",
+                messages=[Message(role=Role.USER, content="hi")],
+                timeout=None,
+            )
+
+        call_kwargs = mock_client.models.generate_content.call_args[1]
+        config = call_kwargs["config"]
+        assert (
+            config.http_options is None
+        ), "http_options must be None when timeout is not specified"
+
+    def test_stream_passes_timeout_to_config(self) -> None:
+        """stream() must set http_options with timeout_ms when timeout is given."""
+        try:
+            from google.genai import types
+        except ImportError:
+            pytest.skip("google-genai not installed")
+
+        from unittest.mock import patch
+
+        provider = self._get_provider()
+        mock_client = MagicMock()
+
+        mock_chunk = MagicMock()
+        mock_chunk.text = "hello"
+        mock_chunk.candidates = []
+        mock_client.models.generate_content_stream.return_value = iter([mock_chunk])
+        provider._client = mock_client
+
+        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+            list(
+                provider.stream(
+                    model="gemini-test",
+                    system_prompt="sys",
+                    messages=[Message(role=Role.USER, content="hi")],
+                    timeout=2.5,
+                )
+            )
+
+        call_kwargs = mock_client.models.generate_content_stream.call_args[1]
+        config = call_kwargs["config"]
+        assert config.http_options is not None
+        assert (
+            config.http_options.timeout == 2500
+        ), f"Expected timeout_ms=2500, got {config.http_options.timeout}"
+
+    def test_timeout_seconds_converted_to_milliseconds(self) -> None:
+        """Timeout in seconds must be converted to milliseconds (SDK uses ms)."""
+        try:
+            from google.genai import types
+        except ImportError:
+            pytest.skip("google-genai not installed")
+
+        from unittest.mock import patch
+
+        provider = self._get_provider()
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = self._make_mock_response()
+        provider._client = mock_client
+
+        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+            provider.complete(
+                model="gemini-test",
+                system_prompt="sys",
+                messages=[Message(role=Role.USER, content="hi")],
+                timeout=30.0,
+            )
+
+        call_kwargs = mock_client.models.generate_content.call_args[1]
+        config = call_kwargs["config"]
+        assert (
+            config.http_options.timeout == 30000
+        ), f"Expected 30000ms (30s), got {config.http_options.timeout}"

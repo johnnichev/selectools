@@ -301,3 +301,43 @@ class TestHistoryTrend:
         e2.latency_p50 = 150
         trend = HistoryTrend(entries=[e1, e2])
         assert trend.latency_trend == [100, 150]
+
+
+class TestHistoryStoreCorruptLine:
+    """Regression tests: HistoryStore.trend() must tolerate corrupted JSONL lines."""
+
+    def test_corrupt_line_skipped(self, tmp_path: Any) -> None:
+        """Regression: json.JSONDecodeError on a corrupt JSONL line must not crash trend()."""
+        store = HistoryStore(tmp_path / "hist")
+        store._dir.mkdir(parents=True, exist_ok=True)
+        valid_line = json.dumps(
+            {
+                "run_id": "abc",
+                "suite_name": "s",
+                "timestamp": 1.0,
+                "accuracy": 0.9,
+                "pass_count": 9,
+                "fail_count": 1,
+                "error_count": 0,
+                "total_cost": 0.01,
+                "total_tokens": 100,
+                "latency_p50": 50.0,
+                "latency_p95": 100.0,
+                "total_cases": 10,
+                "model": "gpt-4",
+                "duration_ms": 500.0,
+            }
+        )
+        (store._dir / "s.jsonl").write_text(valid_line + "\n" + "CORRUPT JSON\n")
+        trend = store.trend("s")
+        # Valid line is loaded; corrupt line is skipped
+        assert len(trend.entries) == 1
+        assert trend.entries[0].accuracy == 0.9
+
+    def test_all_corrupt_returns_empty(self, tmp_path: Any) -> None:
+        """All-corrupt JSONL file returns empty HistoryTrend without crashing."""
+        store = HistoryStore(tmp_path / "hist")
+        store._dir.mkdir(parents=True, exist_ok=True)
+        (store._dir / "s.jsonl").write_text("NOT JSON\nALSO NOT JSON\n")
+        trend = store.trend("s")
+        assert len(trend.entries) == 0

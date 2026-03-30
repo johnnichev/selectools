@@ -109,6 +109,26 @@ class TestPIIGuardrail:
         matches = g.detect("My badge is BADGE-123456")
         assert any(m.pii_type == "badge_id" for m in matches)
 
+    def test_redact_overlapping_matches_no_double_redaction(self) -> None:
+        """Regression: overlapping custom patterns must not double-redact content."""
+        g = PIIGuardrail(custom_patterns={"digits_long": r"\d+", "digits_short": r"\d{3}"})
+        content = "abc123def"
+        result = g.redact(content)
+        # The 3-digit run should appear exactly once in the redacted output
+        # and the original 'def' tail must be present
+        assert "def" in result
+        assert result.count("[DIGITS") == 1
+
+    def test_redact_non_overlapping_matches_all_redacted(self) -> None:
+        """Non-overlapping matches must all be redacted independently."""
+        g = PIIGuardrail(detect=["email", "ssn"])
+        content = "Email: user@example.com and SSN: 123-45-6789"
+        result = g.redact(content)
+        assert "user@example.com" not in result
+        assert "123-45-6789" not in result
+        assert "[EMAIL:" in result
+        assert "[SSN:" in result
+
 
 # ── ToxicityGuardrail ──────────────────────────────────────────────────
 
@@ -144,6 +164,28 @@ class TestToxicityGuardrail:
         matched = g.matched_words("hate and violence")
         assert "hate" in matched
         assert "violence" in matched
+
+    def test_default_threshold_is_0_1(self) -> None:
+        """Regression: docstring previously said default was 0.0 but actual default is 0.1."""
+        g = ToxicityGuardrail()
+        assert g.threshold == 0.1
+
+    def test_negative_threshold_raises(self) -> None:
+        """Regression: negative threshold would cause score > threshold always True."""
+        with pytest.raises(ValueError, match="threshold must be between"):
+            ToxicityGuardrail(threshold=-0.1)
+
+    def test_threshold_above_one_raises(self) -> None:
+        """Regression: threshold > 1.0 would silently never block any content."""
+        with pytest.raises(ValueError, match="threshold must be between"):
+            ToxicityGuardrail(threshold=1.1)
+
+    def test_threshold_boundary_zero_valid(self) -> None:
+        """threshold=0.0 and threshold=1.0 are both valid boundary values."""
+        g0 = ToxicityGuardrail(threshold=0.0)
+        assert g0.threshold == 0.0
+        g1 = ToxicityGuardrail(threshold=1.0)
+        assert g1.threshold == 1.0
 
 
 # ── FormatGuardrail ─────────────────────────────────────────────────────
@@ -187,6 +229,21 @@ class TestFormatGuardrail:
         result = g.check("hello world")
         assert result.passed is True
 
+    def test_negative_max_length_raises(self) -> None:
+        """Regression: negative max_length would cause all content to fail silently."""
+        with pytest.raises(ValueError, match="max_length must be non-negative"):
+            FormatGuardrail(max_length=-1)
+
+    def test_negative_min_length_raises(self) -> None:
+        """Regression: negative min_length is nonsensical and should be rejected."""
+        with pytest.raises(ValueError, match="min_length must be non-negative"):
+            FormatGuardrail(min_length=-5)
+
+    def test_max_less_than_min_raises(self) -> None:
+        """Regression: max_length < min_length is an impossible constraint."""
+        with pytest.raises(ValueError, match="max_length.*must be >= min_length"):
+            FormatGuardrail(min_length=10, max_length=5)
+
 
 # ── LengthGuardrail ────────────────────────────────────────────────────
 
@@ -227,6 +284,36 @@ class TestLengthGuardrail:
         g = LengthGuardrail(min_chars=1, max_chars=100, min_words=1, max_words=50)
         result = g.check("hello world")
         assert result.passed is True
+
+    def test_negative_max_chars_raises(self) -> None:
+        """Regression: negative max_chars causes all content to fail check."""
+        with pytest.raises(ValueError, match="max_chars must be non-negative"):
+            LengthGuardrail(max_chars=-1)
+
+    def test_negative_min_chars_raises(self) -> None:
+        """Regression: negative min_chars is nonsensical."""
+        with pytest.raises(ValueError, match="min_chars must be non-negative"):
+            LengthGuardrail(min_chars=-1)
+
+    def test_negative_max_words_raises(self) -> None:
+        """Regression: negative max_words causes all content to fail check."""
+        with pytest.raises(ValueError, match="max_words must be non-negative"):
+            LengthGuardrail(max_words=-5)
+
+    def test_negative_min_words_raises(self) -> None:
+        """Regression: negative min_words is nonsensical."""
+        with pytest.raises(ValueError, match="min_words must be non-negative"):
+            LengthGuardrail(min_words=-1)
+
+    def test_max_chars_less_than_min_chars_raises(self) -> None:
+        """Regression: max_chars < min_chars is an impossible constraint."""
+        with pytest.raises(ValueError, match="max_chars.*must be >= min_chars"):
+            LengthGuardrail(min_chars=10, max_chars=5)
+
+    def test_max_words_less_than_min_words_raises(self) -> None:
+        """Regression: max_words < min_words is an impossible constraint."""
+        with pytest.raises(ValueError, match="max_words.*must be >= min_words"):
+            LengthGuardrail(min_words=10, max_words=5)
 
 
 # ── GuardrailsPipeline ──────────────────────────────────────────────────
@@ -326,3 +413,53 @@ class TestCustomGuardrail:
         g = NoNumbersGuardrail()
         assert g.check("hello").passed is True
         assert g.check("hello 123").passed is False
+
+
+# ── Regression: falsy empty-list/set bugs ──────────────────────────────
+
+
+class TestPIIGuardrailEmptyDetectList:
+    def test_empty_detect_list_detects_nothing(self) -> None:
+        """Regression: PIIGuardrail(detect=[]) must use NO patterns, not all patterns.
+
+        Previously, an empty detect list was falsy, so the 'if detect:' branch was
+        skipped and ALL built-in patterns were loaded — the opposite of the intent.
+        """
+        g = PIIGuardrail(detect=[])
+        result = g.check("user@example.com")
+        # With detect=[], no patterns are active, so PII should not be detected
+        assert result.passed is True
+
+    def test_empty_detect_list_no_patterns(self) -> None:
+        """PIIGuardrail(detect=[]) must have empty _patterns dict."""
+        g = PIIGuardrail(detect=[])
+        assert g._patterns == {}
+
+    def test_none_detect_loads_all_defaults(self) -> None:
+        """PIIGuardrail(detect=None) must still use all built-in patterns."""
+        g = PIIGuardrail(detect=None)
+        assert len(g._patterns) > 0
+        assert "email" in g._patterns
+
+
+class TestToxicityGuardrailEmptyBlocklist:
+    def test_empty_blocklist_detects_nothing(self) -> None:
+        """Regression: ToxicityGuardrail(blocklist=set()) must use NO blocklist words.
+
+        Previously, an empty set was falsy, so 'blocklist or _DEFAULT_BLOCKLIST' fell
+        back to the default list — the opposite of the intent.
+        """
+        g = ToxicityGuardrail(blocklist=set(), threshold=0.0)
+        result = g.check("kill murder attack bomb")
+        # With empty blocklist, score should be 0.0 and content should pass
+        assert result.passed is True
+
+    def test_empty_blocklist_score_is_zero(self) -> None:
+        """ToxicityGuardrail(blocklist=set()) must have score=0.0 for any input."""
+        g = ToxicityGuardrail(blocklist=set(), threshold=0.0)
+        assert g.score("kill murder attack") == 0.0
+
+    def test_none_blocklist_loads_defaults(self) -> None:
+        """ToxicityGuardrail(blocklist=None) must still load the default blocklist."""
+        g = ToxicityGuardrail(blocklist=None)
+        assert len(g._blocklist) > 0

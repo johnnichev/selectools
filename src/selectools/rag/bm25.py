@@ -293,8 +293,16 @@ class BM25:
         if top_k < 1:
             raise ValueError(f"top_k must be >= 1, got {top_k}")
 
-        if self._doc_count == 0:
-            return []
+        # Take an atomic snapshot of all shared index state so that concurrent
+        # index_documents / add_documents / clear calls cannot race with the
+        # scoring loop below (which must not hold the lock during CPU work).
+        with self._lock:
+            if self._doc_count == 0:
+                return []
+            docs_snapshot = list(self._docs)
+            doc_count_snapshot = self._doc_count
+            avg_doc_len_snapshot = self._avg_doc_len
+            df_snapshot = dict(self._df)
 
         query_terms = self.tokenize(query)
         if not query_terms:
@@ -302,12 +310,14 @@ class BM25:
 
         scores: List[float] = []
 
-        for idx_doc in self._docs:
+        for idx_doc in docs_snapshot:
             if filter and not self._matches_filter(idx_doc.document, filter):
                 scores.append(0.0)
                 continue
 
-            score = self._score_document(idx_doc, query_terms)
+            score = self._score_document_snapshot(
+                idx_doc, query_terms, doc_count_snapshot, avg_doc_len_snapshot, df_snapshot
+            )
             scores.append(score)
 
         ranked = sorted(
@@ -322,7 +332,7 @@ class BM25:
                 break
             results.append(
                 SearchResult(
-                    document=self._docs[i].document,
+                    document=docs_snapshot[i].document,
                     score=scores[i],
                 )
             )
@@ -333,25 +343,44 @@ class BM25:
 
     def clear(self) -> None:
         """Remove all documents from the index."""
-        self._docs = []
-        self._doc_count = 0
-        self._avg_doc_len = 0.0
-        self._df = {}
+        with self._lock:
+            self._docs = []
+            self._doc_count = 0
+            self._avg_doc_len = 0.0
+            self._df = {}
 
     def _score_document(self, idx_doc: _IndexedDoc, query_terms: List[str]) -> float:
-        """Compute BM25 score for a single document against query terms."""
+        """Compute BM25 score using current instance state (not thread-safe — use snapshot variant)."""
+        return self._score_document_snapshot(
+            idx_doc, query_terms, self._doc_count, self._avg_doc_len, self._df
+        )
+
+    def _score_document_snapshot(
+        self,
+        idx_doc: _IndexedDoc,
+        query_terms: List[str],
+        doc_count: int,
+        avg_doc_len: float,
+        df: Dict[str, int],
+    ) -> float:
+        """Compute BM25 score against explicit (snapshot) index parameters.
+
+        Accepts pre-snapshotted ``doc_count``, ``avg_doc_len``, and ``df`` so
+        the caller can operate on a consistent view of the index without holding
+        the lock during CPU-bound scoring.
+        """
         score = 0.0
         for term in query_terms:
             if term not in idx_doc.term_freqs:
                 continue
 
             tf = idx_doc.term_freqs[term]
-            df = self._df.get(term, 0)
+            term_df = df.get(term, 0)
 
-            idf = math.log((self._doc_count - df + 0.5) / (df + 0.5) + 1.0)
+            idf = math.log((doc_count - term_df + 0.5) / (term_df + 0.5) + 1.0)
 
             numerator = tf * (self.k1 + 1)
-            avg_len = self._avg_doc_len if self._avg_doc_len > 0 else 1e-8
+            avg_len = avg_doc_len if avg_doc_len > 0 else 1e-8
             denominator = tf + self.k1 * (1 - self.b + self.b * idx_doc.doc_len / avg_len)
             score += idf * numerator / denominator
 

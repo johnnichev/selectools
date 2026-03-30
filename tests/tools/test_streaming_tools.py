@@ -425,5 +425,83 @@ class TestStreamingToolboxTools:
         assert "city" in result
 
 
+# =============================================================================
+# Regression Tests — Ralph Bug Hunt
+# =============================================================================
+
+
+class TestAsyncGeneratorInSyncContext:
+    """Regression: Tool.execute() must handle async generator functions correctly.
+
+    Previously, calling execute() on a tool backed by an async generator function
+    fell through to _serialize_result(), returning str(async_gen_obj) as garbage.
+    """
+
+    def test_async_gen_tool_execute_returns_accumulated_chunks(self) -> None:
+        """execute() on an async generator tool must return all chunks joined."""
+        from selectools.tools.base import Tool, ToolParameter
+
+        async def async_gen_fn(x: str):
+            yield "chunk1"
+            yield "|"
+            yield x
+
+        t = Tool(
+            name="async_gen_sync_test",
+            description="Async generator for sync execute regression test",
+            parameters=[ToolParameter("x", str, "Input value", required=True)],
+            function=async_gen_fn,
+            streaming=True,
+        )
+
+        assert t.is_async is True
+        result = t.execute({"x": "end"})
+        assert result == "chunk1|end", f"Expected 'chunk1|end', got: {repr(result)}"
+        assert "<async_generator" not in result, "Got raw async generator repr instead of chunks"
+
+    def test_async_gen_tool_execute_calls_chunk_callback(self) -> None:
+        """execute() on async generator tool must call chunk_callback for each chunk."""
+        from selectools.tools.base import Tool, ToolParameter
+
+        async def multi_chunk(n: int):
+            for i in range(n):
+                yield str(i)
+
+        t = Tool(
+            name="async_gen_callback_test",
+            description="Async generator callback test",
+            parameters=[ToolParameter("n", int, "Count", required=True)],
+            function=multi_chunk,
+            streaming=True,
+        )
+
+        received_chunks: list = []
+        result = t.execute({"n": 3}, chunk_callback=received_chunks.append)
+        assert result == "012"
+        assert received_chunks == ["0", "1", "2"]
+
+    def test_async_gen_tool_aexecute_still_works(self) -> None:
+        """aexecute() on async generator tool continues to work after the fix."""
+        import asyncio
+
+        from selectools.tools.base import Tool, ToolParameter
+
+        async def async_gen_fn(msg: str):
+            yield "hello"
+            yield " "
+            yield msg
+
+        t = Tool(
+            name="async_gen_aexecute_test",
+            description="aexecute regression test",
+            parameters=[ToolParameter("msg", str, "Message", required=True)],
+            function=async_gen_fn,
+            streaming=True,
+        )
+
+        result = asyncio.run(t.aexecute({"msg": "world"}))
+        assert result == "hello world"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

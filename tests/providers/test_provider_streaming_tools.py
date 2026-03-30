@@ -809,3 +809,380 @@ def _mock_block(block_type: str, **attrs: Any) -> Any:
 
 # Make MagicMock available at module level for FallbackProvider tests
 from unittest.mock import MagicMock
+
+# ============================================================================
+# REGRESSION: Gemini stream/astream crash on safety-filtered chunks (ValueError)
+# ============================================================================
+
+
+class TestGeminiStreamSafetyFilter:
+    """Verify Gemini stream/astream skip safety-filtered chunks without crashing."""
+
+    def _make_provider(self) -> Any:
+        from selectools.providers.gemini_provider import GeminiProvider
+
+        provider = GeminiProvider.__new__(GeminiProvider)
+        return provider
+
+    def test_stream_skips_safety_filtered_chunk(self) -> None:
+        """stream() must not crash when chunk.text raises ValueError (safety filter)."""
+        provider = self._make_provider()
+
+        safe_chunk = MagicMock()
+        safe_chunk.text = "hello"
+        safe_chunk.candidates = None
+
+        filtered_chunk = MagicMock()
+        # Accessing .text on a safety-filtered chunk raises ValueError in the Gemini SDK
+        type(filtered_chunk).text = property(
+            lambda self: (_ for _ in ()).throw(ValueError("no candidates"))
+        )
+        filtered_chunk.candidates = None
+
+        mock_stream = iter([safe_chunk, filtered_chunk])
+
+        provider._client = MagicMock()
+        provider._client.models.generate_content_stream.return_value = mock_stream
+        provider.default_model = "gemini-test"
+
+        from google.genai import types  # type: ignore[import]
+
+        provider._genai = MagicMock()
+
+        # Build minimal config mock
+        config_mock = MagicMock()
+        with (MagicMock() as _mock_types,):
+            pass
+
+        # Use a direct mock of _format_contents and _map_tool_to_gemini to avoid SDK calls
+        provider._format_contents = MagicMock(return_value=[])
+
+        # Patch the types import inside stream
+        import unittest.mock as um
+
+        with um.patch("selectools.providers.gemini_provider.GeminiProvider.stream") as _patched:
+            # We need to actually call the REAL stream method with mocked internals
+            pass
+
+        # Call the real stream method with mocked internals
+        from selectools.types import Message, Role
+
+        provider._format_contents = MagicMock(return_value=[])
+
+        with um.patch("google.genai.types.GenerateContentConfig") as MockConfig:
+            MockConfig.return_value = MagicMock()
+            provider._client.models.generate_content_stream.return_value = iter(
+                [safe_chunk, filtered_chunk]
+            )
+            results = list(
+                provider.stream(
+                    model="gemini-test",
+                    system_prompt="test",
+                    messages=[Message(role=Role.USER, content="hi")],
+                    max_tokens=100,
+                )
+            )
+
+        # The safe chunk's text should appear; the filtered chunk should be silently skipped
+        text_results = [r for r in results if isinstance(r, str)]
+        assert "hello" in text_results, "safe chunk text should be yielded"
+        assert len(results) == 1, f"filtered chunk should be skipped, got {results}"
+
+    @pytest.mark.asyncio
+    async def test_astream_skips_safety_filtered_chunk(self) -> None:
+        """astream() must not crash when chunk.text raises ValueError (safety filter)."""
+        from unittest.mock import AsyncMock
+
+        provider = self._make_provider()
+
+        safe_chunk = MagicMock()
+        safe_chunk.text = "world"
+        safe_chunk.candidates = None
+
+        filtered_chunk = MagicMock()
+        type(filtered_chunk).text = property(
+            lambda self: (_ for _ in ()).throw(ValueError("no candidates"))
+        )
+        filtered_chunk.candidates = None
+
+        provider._format_contents = MagicMock(return_value=[])
+
+        import unittest.mock as um
+
+        # The Gemini astream() does: stream = await client.aio.models.generate_content_stream(...)
+        # So generate_content_stream must be an async mock that returns an async iterable.
+        class AsyncIterableChunks:
+            def __aiter__(self) -> "AsyncIterableChunks":
+                self._idx = 0
+                return self
+
+            async def __anext__(self) -> Any:
+                chunks = [safe_chunk, filtered_chunk]
+                if self._idx >= len(chunks):
+                    raise StopAsyncIteration
+                chunk = chunks[self._idx]
+                self._idx += 1
+                return chunk
+
+        mock_stream = AsyncIterableChunks()
+
+        with um.patch("google.genai.types.GenerateContentConfig") as MockConfig:
+            MockConfig.return_value = MagicMock()
+            provider._client = MagicMock()
+            provider._client.aio = MagicMock()
+            provider._client.aio.models = MagicMock()
+            provider._client.aio.models.generate_content_stream = AsyncMock(
+                return_value=mock_stream
+            )
+
+            from selectools.types import Message, Role
+
+            results: List[Any] = []
+            async for item in provider.astream(
+                model="gemini-test",
+                system_prompt="test",
+                messages=[Message(role=Role.USER, content="hi")],
+                max_tokens=100,
+            ):
+                results.append(item)
+
+        text_results = [r for r in results if isinstance(r, str)]
+        assert "world" in text_results, "safe chunk text should be yielded"
+        assert len(results) == 1, f"filtered chunk should be skipped, got {results}"
+
+
+# ============================================================================
+# REGRESSION: FallbackProvider.astream() skips sync-only streaming providers
+# ============================================================================
+
+
+class TestFallbackAstreamSkipsSyncOnly:
+    """FallbackProvider.astream() must skip providers with supports_async=False."""
+
+    @pytest.mark.asyncio
+    async def test_astream_skips_sync_only_streaming_provider(self) -> None:
+        """A provider with supports_streaming=True but supports_async=False must be skipped."""
+        from selectools.providers.fallback import FallbackProvider
+
+        class SyncOnlyStreamProvider:
+            name = "sync-only"
+            supports_streaming = True
+            supports_async = False  # Async not supported
+
+            async def astream(self, **kwargs: Any) -> AsyncIterable[str]:
+                raise NotImplementedError("sync-only provider")
+                yield  # pragma: no cover
+
+        class AsyncStreamProvider:
+            name = "async-capable"
+            supports_streaming = True
+            supports_async = True
+
+            async def astream(self, **kwargs: Any) -> AsyncIterable[str]:
+                yield "from async provider"  # type: ignore[misc]
+
+        async_provider = AsyncStreamProvider()
+        fb = FallbackProvider(providers=[SyncOnlyStreamProvider(), async_provider])
+
+        chunks: List[str] = []
+        async for chunk in fb.astream(
+            model="test",
+            system_prompt="test",
+            messages=[Message(role=Role.USER, content="hi")],
+        ):
+            chunks.append(chunk)  # type: ignore[arg-type]
+
+        assert chunks == ["from async provider"], f"Expected async provider, got {chunks}"
+        assert fb.provider_used == "async-capable"
+
+    @pytest.mark.asyncio
+    async def test_astream_raises_if_only_sync_providers(self) -> None:
+        """If all providers are sync-only, astream() must raise ProviderError."""
+        from selectools.providers.fallback import FallbackProvider
+
+        class SyncOnlyProvider:
+            name = "sync-only"
+            supports_streaming = True
+            supports_async = False
+
+        fb = FallbackProvider(providers=[SyncOnlyProvider()])
+        with pytest.raises(ProviderError):
+            async for _ in fb.astream(
+                model="test",
+                system_prompt="test",
+                messages=[Message(role=Role.USER, content="hi")],
+            ):
+                pass
+
+
+# ============================================================================
+# REGRESSION: FallbackProvider.stream() return type includes ToolCall
+# ============================================================================
+
+
+class TestFallbackStreamYieldsToolCalls:
+    """FallbackProvider.stream() must yield ToolCall objects, not just strings."""
+
+    def test_stream_passes_toolcall_from_child(self) -> None:
+        """FallbackProvider.stream() must forward ToolCall objects from child providers."""
+        from selectools.providers.fallback import FallbackProvider
+
+        tc = ToolCall(tool_name="my_tool", parameters={"x": 1}, id="call_1")
+
+        class ToolCallStreamProvider:
+            name = "tc-provider"
+            supports_streaming = True
+
+            def stream(self, **kwargs: Any) -> Iterable[Union[str, ToolCall]]:
+                yield "text chunk"
+                yield tc
+
+        fb = FallbackProvider(providers=[ToolCallStreamProvider()])
+        results = list(
+            fb.stream(
+                model="test",
+                system_prompt="test",
+                messages=[Message(role=Role.USER, content="hi")],
+            )
+        )
+
+        assert len(results) == 2
+        assert results[0] == "text chunk"
+        assert isinstance(results[1], ToolCall)
+        assert results[1].tool_name == "my_tool"
+
+
+# ============================================================================
+# REGRESSION: _OpenAICompatibleBase stream/astream flush tool_call_deltas
+# when stream ends without a finish_reason chunk (e.g. Ollama).
+# ============================================================================
+
+
+class TestOpenAICompatFlushToolCallsAfterStream:
+    """Verify stream/astream flush accumulated tool_call_deltas after the loop
+    when no finish_reason chunk was received (e.g. some Ollama models)."""
+
+    def _build_delta_chunk(
+        self,
+        tc_index: int,
+        tc_id: str | None = None,
+        name: str | None = None,
+        arguments: str | None = None,
+        finish_reason: str | None = None,
+        content: str | None = None,
+    ) -> Any:
+        from unittest.mock import MagicMock
+
+        chunk = MagicMock()
+        delta = MagicMock()
+        delta.content = content
+        choice = MagicMock()
+        choice.delta = delta
+        choice.finish_reason = finish_reason
+        chunk.choices = [choice]
+
+        if name is not None or arguments is not None or tc_id is not None:
+            tc_delta = MagicMock()
+            tc_delta.index = tc_index
+            tc_delta.id = tc_id
+            func = MagicMock()
+            func.name = name
+            func.arguments = arguments
+            tc_delta.function = func
+            delta.tool_calls = [tc_delta]
+        else:
+            delta.tool_calls = None
+
+        return chunk
+
+    def test_stream_flushes_tool_calls_when_no_finish_reason(self) -> None:
+        """stream() must yield ToolCall even when finish_reason is never 'tool_calls'."""
+        from unittest.mock import MagicMock
+
+        from selectools.providers.openai_provider import OpenAIProvider
+
+        provider = OpenAIProvider.__new__(OpenAIProvider)
+        provider.default_model = "gpt-4o"
+
+        # Two chunks: first accumulates the tool call, second has no finish_reason.
+        chunks = [
+            self._build_delta_chunk(0, tc_id="call_1", name="my_tool", arguments='{"x": 42}'),
+            self._build_delta_chunk(0, finish_reason=None),  # stream ends, no finish_reason
+        ]
+        provider._client = MagicMock()
+        provider._client.chat.completions.create.return_value = iter(chunks)
+
+        results = list(
+            provider.stream(
+                model="gpt-4o",
+                system_prompt="sys",
+                messages=[Message(role=Role.USER, content="go")],
+                max_tokens=100,
+            )
+        )
+
+        tool_calls = [r for r in results if isinstance(r, ToolCall)]
+        assert len(tool_calls) == 1, f"Expected 1 ToolCall via flush, got {tool_calls}"
+        assert tool_calls[0].tool_name == "my_tool"
+        assert tool_calls[0].parameters == {"x": 42}
+
+    @pytest.mark.asyncio
+    async def test_astream_flushes_tool_calls_when_no_finish_reason(self) -> None:
+        """astream() must yield ToolCall even when finish_reason is never set."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        from selectools.providers.openai_provider import OpenAIProvider
+
+        provider = OpenAIProvider.__new__(OpenAIProvider)
+        provider.default_model = "gpt-4o"
+
+        chunks = [
+            self._build_delta_chunk(0, tc_id="call_2", name="tool_b", arguments='{"y": 7}'),
+            self._build_delta_chunk(0, finish_reason=None),
+        ]
+        provider._async_client = MagicMock()
+        provider._async_client.chat.completions.create = AsyncMock(
+            return_value=AsyncIteratorFromList(chunks)
+        )
+
+        results = []
+        async for item in provider.astream(
+            model="gpt-4o",
+            system_prompt="sys",
+            messages=[Message(role=Role.USER, content="go")],
+            max_tokens=100,
+        ):
+            results.append(item)
+
+        tool_calls = [r for r in results if isinstance(r, ToolCall)]
+        assert len(tool_calls) == 1, f"Expected 1 ToolCall via async flush, got {tool_calls}"
+        assert tool_calls[0].tool_name == "tool_b"
+        assert tool_calls[0].parameters == {"y": 7}
+
+    def test_stream_does_not_double_emit_when_finish_reason_present(self) -> None:
+        """When finish_reason='tool_calls' IS present, no duplicate emission from flush."""
+        from unittest.mock import MagicMock
+
+        from selectools.providers.openai_provider import OpenAIProvider
+
+        provider = OpenAIProvider.__new__(OpenAIProvider)
+        provider.default_model = "gpt-4o"
+
+        chunks = [
+            self._build_delta_chunk(0, tc_id="call_3", name="my_tool", arguments='{"z": 1}'),
+            self._build_delta_chunk(0, finish_reason="tool_calls"),
+        ]
+        provider._client = MagicMock()
+        provider._client.chat.completions.create.return_value = iter(chunks)
+
+        results = list(
+            provider.stream(
+                model="gpt-4o",
+                system_prompt="sys",
+                messages=[Message(role=Role.USER, content="go")],
+                max_tokens=100,
+            )
+        )
+
+        tool_calls = [r for r in results if isinstance(r, ToolCall)]
+        assert len(tool_calls) == 1, f"Expected exactly 1 ToolCall, got {len(tool_calls)}"

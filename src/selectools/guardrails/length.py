@@ -35,6 +35,18 @@ class LengthGuardrail(Guardrail):
         min_words: Optional[int] = None,
         action: GuardrailAction = GuardrailAction.BLOCK,
     ) -> None:
+        if max_chars is not None and max_chars < 0:
+            raise ValueError(f"max_chars must be non-negative, got {max_chars!r}")
+        if min_chars is not None and min_chars < 0:
+            raise ValueError(f"min_chars must be non-negative, got {min_chars!r}")
+        if max_words is not None and max_words < 0:
+            raise ValueError(f"max_words must be non-negative, got {max_words!r}")
+        if min_words is not None and min_words < 0:
+            raise ValueError(f"min_words must be non-negative, got {min_words!r}")
+        if max_chars is not None and min_chars is not None and max_chars < min_chars:
+            raise ValueError(f"max_chars ({max_chars}) must be >= min_chars ({min_chars})")
+        if max_words is not None and min_words is not None and max_words < min_words:
+            raise ValueError(f"max_words ({max_words}) must be >= min_words ({min_words})")
         self._max_chars = max_chars
         self._min_chars = min_chars
         self._max_words = max_words

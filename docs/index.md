@@ -147,7 +147,7 @@ print(result.reasoning)       # Why the agent chose get_weather
 | **Advanced Agent Patterns** | `PlanAndExecuteAgent`, `ReflectiveAgent`, `DebateAgent`, `TeamLeadAgent` — high-level coordination patterns built on AgentGraph |
 | **Composable Pipelines** | `Pipeline` + `@step` + `|` operator + `parallel()` + `branch()` — chain agents, tools, and transforms with plain Python |
 | **Eval Framework** | 50 built-in evaluators, A/B testing, regression detection, HTML reports, JUnit XML |
-| **2664 Tests** | Unit, integration, regression, and E2E |
+| **2918 Tests** | Unit, integration, regression, and E2E |
 
 ---
 

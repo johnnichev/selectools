@@ -63,7 +63,10 @@ def generate_badge(
   </g>
 </svg>"""
 
-    Path(filepath).write_text(svg)
+    dest = Path(filepath)
+    tmp = dest.with_suffix(".svg.tmp")
+    tmp.write_text(svg)
+    tmp.replace(dest)
 
 
 def generate_detailed_badge(
@@ -101,4 +104,7 @@ def generate_detailed_badge(
   </g>
 </svg>"""
 
-    Path(filepath).write_text(svg)
+    dest = Path(filepath)
+    tmp = dest.with_suffix(".svg.tmp")
+    tmp.write_text(svg)
+    tmp.replace(dest)

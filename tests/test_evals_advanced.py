@@ -256,8 +256,8 @@ class TestSnapshotStore:
 
         loaded = store.load("my-agent")
         assert loaded is not None
-        assert "case_0" in loaded
-        assert loaded["case_0"]["content"] == "response_0"
+        assert "case_0_0" in loaded
+        assert loaded["case_0_0"]["content"] == "response_0"
 
     def test_load_missing(self, tmp_path: Any) -> None:
         store = SnapshotStore(tmp_path / "snapshots")
@@ -300,7 +300,7 @@ class TestSnapshotStore:
 
         report2 = _make_report([CaseVerdict.PASS, CaseVerdict.PASS])
         result = store.compare(report2, "growing")
-        assert "case_1" in result.new_cases
+        assert "case_1_1" in result.new_cases
 
     def test_compare_removed_case(self, tmp_path: Any) -> None:
         store = SnapshotStore(tmp_path / "snapshots")
@@ -309,7 +309,7 @@ class TestSnapshotStore:
 
         report2 = _make_report([CaseVerdict.PASS])
         result = store.compare(report2, "shrinking")
-        assert "case_1" in result.removed_cases
+        assert "case_1_1" in result.removed_cases
 
     def test_summary(self, tmp_path: Any) -> None:
         store = SnapshotStore(tmp_path / "snapshots")
@@ -323,6 +323,28 @@ class TestSnapshotStore:
         s = result.summary()
         assert "Changed" in s
         assert "content" in s
+
+    def test_duplicate_named_cases_no_collision(self, tmp_path: Any) -> None:
+        """Regression: two cases with the same name must not overwrite each other in snapshot."""
+        # Both cases share the same name — previously the second silently overwrote the first
+        tc1 = TestCase(input="first input", name="same_name")
+        tc2 = TestCase(input="second input", name="same_name")
+        ar1 = _make_agent_result(content="response_1")
+        ar2 = _make_agent_result(content="response_2")
+        cr1 = CaseResult(case=tc1, verdict=CaseVerdict.PASS, agent_result=ar1)
+        cr2 = CaseResult(case=tc2, verdict=CaseVerdict.PASS, agent_result=ar2)
+        meta = EvalMetadata("dup", "m", "p", 0, "r", 2, 100.0, "0.1")
+        report = EvalReport(metadata=meta, case_results=[cr1, cr2])
+
+        store = SnapshotStore(tmp_path / "snapshots")
+        store.save(report, "dup-test")
+        loaded = store.load("dup-test")
+        assert loaded is not None
+        # Both entries must be present — keys differ by index suffix
+        assert len(loaded) == 2
+        contents = {v["content"] for v in loaded.values()}
+        assert "response_1" in contents
+        assert "response_2" in contents
 
 
 class TestSnapshotResult:

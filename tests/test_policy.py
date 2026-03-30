@@ -68,6 +68,23 @@ class TestEvaluateGlobPatterns:
         result = policy.evaluate("any_tool")
         assert result.decision == PolicyDecision.REVIEW
 
+    def test_whitespace_only_tool_name_is_denied(self) -> None:
+        """Regression: whitespace-only tool names must be DENY, not bypass the empty guard.
+
+        Previously, '   '.strip() == '' but 'not \"   \"' is False so the empty-name
+        check was skipped, allowing whitespace names to match wildcard allow patterns.
+        """
+        policy = ToolPolicy(allow=["*"])
+        result = policy.evaluate("   ")
+        assert result.decision == PolicyDecision.DENY
+        assert "empty" in result.reason.lower()
+
+    def test_tabs_and_newlines_in_tool_name_are_denied(self) -> None:
+        """Regression: tool names with only tabs/newlines must also be denied."""
+        policy = ToolPolicy(allow=["*"])
+        result = policy.evaluate("\t\n")
+        assert result.decision == PolicyDecision.DENY
+
 
 class TestEvaluationOrder:
     """Deny takes priority over review, which takes priority over allow."""
@@ -213,3 +230,174 @@ deny_when:
             assert policy.allow == []
         finally:
             os.unlink(path)
+
+    def test_yaml_list_raises_value_error(self) -> None:
+        """Regression: YAML file containing a list (not a dict) previously raised AttributeError.
+
+        yaml.safe_load returns a list for ``- item`` YAML; calling .get() on a list
+        raises AttributeError. The fix validates that the parsed value is a dict.
+        """
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write("- search_*\n- read_*\n")
+            f.flush()
+            path = f.name
+
+        try:
+            with pytest.raises(ValueError, match="must be a mapping"):
+                ToolPolicy.from_yaml(path)
+        finally:
+            os.unlink(path)
+
+    def test_yaml_scalar_raises_value_error(self) -> None:
+        """Regression: YAML file containing a bare scalar also raised AttributeError."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write("just_a_string\n")
+            f.flush()
+            path = f.name
+
+        try:
+            with pytest.raises(ValueError, match="must be a mapping"):
+                ToolPolicy.from_yaml(path)
+        finally:
+            os.unlink(path)
+
+    def test_yaml_string_allow_raises_value_error(self) -> None:
+        """Regression: YAML with 'allow: search_*' (string, not list) must raise ValueError.
+
+        When allow is a bare string 'search_*', from_dict iterates characters including '*',
+        which as a glob pattern matches ALL tool names — silently bypassing the entire policy.
+        """
+        yaml_content = "allow: search_*\n"
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write(yaml_content)
+            f.flush()
+            path = f.name
+
+        try:
+            with pytest.raises(ValueError, match="must be a list of strings"):
+                ToolPolicy.from_yaml(path)
+        finally:
+            os.unlink(path)
+
+    def test_yaml_deny_when_string_raises_value_error(self) -> None:
+        """Regression: YAML with 'deny_when: search_*' (string) must raise ValueError.
+
+        Previously, iterating a string in the deny_when loop caused AttributeError on .get().
+        """
+        yaml_content = "deny_when: search_*\n"
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write(yaml_content)
+            f.flush()
+            path = f.name
+
+        try:
+            with pytest.raises(ValueError, match="must be a list of mappings"):
+                ToolPolicy.from_yaml(path)
+        finally:
+            os.unlink(path)
+
+    def test_yaml_deny_when_list_of_strings_raises_value_error(self) -> None:
+        """Regression: YAML deny_when entries must be mappings, not bare strings."""
+        yaml_content = "deny_when:\n  - search_*\n  - read_*\n"
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write(yaml_content)
+            f.flush()
+            path = f.name
+
+        try:
+            with pytest.raises(ValueError, match=r"deny_when\[0\].*must be a mapping"):
+                ToolPolicy.from_yaml(path)
+        finally:
+            os.unlink(path)
+
+
+class TestFromDictValidation:
+    def test_string_allow_raises_value_error(self) -> None:
+        """Regression: from_dict with allow=str iterates characters, producing glob '*' which
+        allows every tool.  A string value must raise ValueError, not silently misbehave.
+
+        With allow='search_*', fnmatch iterates chars ['s','e','a','r','c','h','_','*'].
+        The bare '*' pattern matches ALL tool names — the entire policy is bypassed.
+        """
+        with pytest.raises(ValueError, match="must be a list of strings"):
+            ToolPolicy.from_dict({"allow": "search_*"})
+
+    def test_int_deny_raises_value_error(self) -> None:
+        """Regression: non-list deny causes TypeError in evaluate(); must raise at construction."""
+        with pytest.raises(ValueError, match="must be a list of strings"):
+            ToolPolicy.from_dict({"deny": 42})
+
+    def test_none_allow_becomes_empty_list(self) -> None:
+        """from_dict with allow=None must produce an empty allow list, not crash."""
+        policy = ToolPolicy.from_dict({"allow": None})
+        assert policy.allow == []
+
+    def test_none_deny_when_becomes_empty_list(self) -> None:
+        """from_dict with deny_when=None must produce an empty deny_when list."""
+        policy = ToolPolicy.from_dict({"deny_when": None})
+        assert policy.deny_when == []
+
+    def test_string_deny_when_raises_value_error(self) -> None:
+        """Regression: deny_when='bad' causes AttributeError on .get() in evaluate();
+        must raise ValueError at construction time instead.
+        """
+        with pytest.raises(ValueError, match="must be a list of mappings"):
+            ToolPolicy.from_dict({"deny_when": "search_*"})
+
+    def test_deny_when_with_non_dict_entry_raises_value_error(self) -> None:
+        """Regression: deny_when=[str] causes AttributeError on .get() in evaluate();
+        must raise ValueError at construction time instead.
+        """
+        with pytest.raises(ValueError, match=r"deny_when\[0\].*must be a mapping"):
+            ToolPolicy.from_dict({"deny_when": ["not_a_dict"]})
+
+    def test_deny_when_with_int_entry_raises_value_error(self) -> None:
+        """Regression: deny_when=[42] must raise ValueError, not AttributeError."""
+        with pytest.raises(ValueError, match=r"deny_when\[0\].*must be a mapping"):
+            ToolPolicy.from_dict({"deny_when": [42]})
+
+    def test_int_element_in_allow_list_raises_value_error(self) -> None:
+        """Regression: allow=[1, 2, 3] previously passed construction but crashed at evaluate()
+        with TypeError from fnmatch.fnmatch(tool_name, 1).
+        Must raise ValueError at construction time with a helpful message.
+        """
+        with pytest.raises(ValueError, match=r"allow\[0\].*must be a string"):
+            ToolPolicy.from_dict({"allow": [1, 2, 3]})
+
+    def test_int_element_in_deny_list_raises_value_error(self) -> None:
+        """Regression: deny=[42] previously crashed with TypeError at evaluate time."""
+        with pytest.raises(ValueError, match=r"deny\[0\].*must be a string"):
+            ToolPolicy.from_dict({"deny": [42]})
+
+    def test_int_element_in_review_list_raises_value_error(self) -> None:
+        """Regression: review=[None] previously crashed with TypeError at evaluate time."""
+        with pytest.raises(ValueError, match=r"review\[0\].*must be a string"):
+            ToolPolicy.from_dict({"review": [None]})
+
+    def test_deny_when_int_field_value_raises_value_error(self) -> None:
+        """Regression: deny_when with non-string field values previously crashed at evaluate()
+        with TypeError from fnmatch.fnmatch(..., 123).
+        Must raise ValueError at construction time.
+        """
+        with pytest.raises(ValueError, match=r"deny_when\[0\]\['pattern'\].*must be a string"):
+            ToolPolicy.from_dict({"deny_when": [{"tool": "search", "arg": "q", "pattern": 123}]})
+
+    def test_deny_when_non_string_tool_field_raises_value_error(self) -> None:
+        """Regression: deny_when entry with non-string 'tool' key must raise at construction."""
+        with pytest.raises(ValueError, match=r"deny_when\[0\]\['tool'\].*must be a string"):
+            ToolPolicy.from_dict({"deny_when": [{"tool": 42, "arg": "q", "pattern": "*"}]})
+
+    def test_valid_from_dict_still_works(self) -> None:
+        """Sanity check: valid from_dict must not be broken by the new validation."""
+        policy = ToolPolicy.from_dict(
+            {
+                "allow": ["search_*", "get_*"],
+                "review": ["send_*"],
+                "deny": ["delete_*"],
+                "deny_when": [{"tool": "send_email", "arg": "to", "pattern": "*@evil.com"}],
+            }
+        )
+        assert policy.evaluate("search_web").decision == PolicyDecision.ALLOW
+        assert policy.evaluate("send_sms").decision == PolicyDecision.REVIEW
+        assert policy.evaluate("delete_user").decision == PolicyDecision.DENY
+        assert policy.evaluate("send_email", {"to": "x@evil.com"}).decision == PolicyDecision.DENY
