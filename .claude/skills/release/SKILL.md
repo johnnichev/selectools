@@ -176,13 +176,12 @@ git push origin main --tags
 
 ---
 
-## Phase 9: PyPI Publish (after user confirms)
+## Phase 9: PyPI Publish (automatic via CI)
 
-```bash
-rm -rf dist/
-python3 -m build
-python3 -m twine upload dist/*
-```
+Pushing the tag triggers the `publish-pypi` job in `.github/workflows/ci.yml` automatically.
+No manual publish step needed — CI builds and uploads to PyPI after tests + security pass.
+
+Monitor at: https://github.com/johnnichev/selectools/actions
 
 ---
 
