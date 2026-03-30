@@ -4,6 +4,8 @@ Conversation memory management for maintaining multi-turn dialogue history.
 
 from __future__ import annotations
 
+import copy
+from dataclasses import replace
 from typing import Any, Dict, List, Optional
 
 from .types import Message, Role
@@ -183,7 +185,7 @@ class ConversationMemory:
         if self.max_tokens is not None:
             while len(self._messages) > 1:
                 total_tokens = sum(
-                    getattr(msg, "estimate_tokens", lambda: len(msg.content) // 4)()
+                    getattr(msg, "estimate_tokens", lambda: len(msg.content or "") // 4)()
                     for msg in self._messages
                 )
 
@@ -239,14 +241,27 @@ class ConversationMemory:
             A new :class:`ConversationMemory` instance with an independent copy
             of the current state.
         """
-        copy = ConversationMemory(
+        branched = ConversationMemory(
             max_messages=self.max_messages,
             max_tokens=self.max_tokens,
         )
-        copy._messages = list(self._messages)
-        copy._summary = self._summary
-        copy._last_trimmed = []
-        return copy
+        branched._messages = [
+            (
+                replace(
+                    msg,
+                    tool_calls=[
+                        replace(tc, parameters=copy.deepcopy(tc.parameters))
+                        for tc in msg.tool_calls
+                    ],
+                )
+                if msg.tool_calls
+                else msg
+            )
+            for msg in self._messages
+        ]
+        branched._summary = self._summary
+        branched._last_trimmed = []
+        return branched
 
     def __len__(self) -> int:
         """Return the number of messages in history."""

@@ -82,6 +82,33 @@ class TestCase:
     custom_evaluator: Optional[Callable[..., bool]] = None
     custom_evaluator_name: Optional[str] = None
 
+    # Readability assertion (Flesch Reading Ease score, higher = easier)
+    expect_readability_gte: Optional[float] = None
+
+    # Agent trajectory: tool names called in this order (subsequence check)
+    expect_trajectory: Optional[List[str]] = None
+
+    # Tool efficiency: maximum number of tool calls allowed
+    expect_max_tools: Optional[int] = None
+
+    # Semantic similarity against reference (TF-IDF cosine, 0-1)
+    expect_semantic_similarity_gte: Optional[float] = None
+
+    # Multi-turn coherence heuristic check
+    expect_coherent_turns: Optional[bool] = None
+
+    # JSON schema validation (JSON Schema dict)
+    expect_json_schema: Optional[Dict[str, Any]] = None
+
+    # Keyword presence: all keywords must appear in response
+    expect_keywords: Optional[List[str]] = None
+
+    # Keyword density: min ratio of keyword occurrences to total words
+    expect_keyword_density_min: Optional[float] = None
+
+    # Forbidden words: none of these may appear in response
+    expect_no_keywords: Optional[List[str]] = None
+
     # Metadata
     metadata: Dict[str, Any] = field(default_factory=dict)
     weight: float = 1.0

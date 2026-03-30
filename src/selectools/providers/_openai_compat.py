@@ -125,7 +125,14 @@ class _OpenAICompatibleBase(ABC):
         try:
             response = cast(Any, self._client.chat.completions.create(**args))
         except Exception as exc:  # noqa: BLE001
-            raise self._wrap_error(exc, "completion") from exc
+            if "temperature" in str(exc).lower() and "temperature" in args:
+                args.pop("temperature")
+                try:
+                    response = cast(Any, self._client.chat.completions.create(**args))
+                except Exception as exc2:  # noqa: BLE001
+                    raise self._wrap_error(exc2, "completion") from exc2
+            else:
+                raise self._wrap_error(exc, "completion") from exc
 
         return self._parse_response(response, model_name)
 
@@ -159,7 +166,14 @@ class _OpenAICompatibleBase(ABC):
         try:
             response = cast(Any, await self._async_client.chat.completions.create(**args))
         except Exception as exc:  # noqa: BLE001
-            raise self._wrap_error(exc, "async completion") from exc
+            if "temperature" in str(exc).lower() and "temperature" in args:
+                args.pop("temperature")
+                try:
+                    response = cast(Any, await self._async_client.chat.completions.create(**args))
+                except Exception as exc2:  # noqa: BLE001
+                    raise self._wrap_error(exc2, "async completion") from exc2
+            else:
+                raise self._wrap_error(exc, "async completion") from exc
 
         return self._parse_response(response, model_name)
 
@@ -199,7 +213,14 @@ class _OpenAICompatibleBase(ABC):
         try:
             response = cast(Any, self._client.chat.completions.create(**args))
         except Exception as exc:  # noqa: BLE001
-            raise self._wrap_error(exc, "streaming") from exc
+            if "temperature" in str(exc).lower() and "temperature" in args:
+                args.pop("temperature")
+                try:
+                    response = cast(Any, self._client.chat.completions.create(**args))
+                except Exception as exc2:  # noqa: BLE001
+                    raise self._wrap_error(exc2, "streaming") from exc2
+            else:
+                raise self._wrap_error(exc, "streaming") from exc
 
         tool_call_deltas: Dict[int, Dict[str, Any]] = {}
 
@@ -262,6 +283,20 @@ class _OpenAICompatibleBase(ABC):
         except Exception as exc:  # noqa: BLE001
             raise self._wrap_error(exc, "streaming failed mid-stream") from exc
 
+        # Flush any accumulated tool calls that were not emitted by a finish chunk.
+        # Some providers (e.g. Ollama) may end the stream without a finish_reason.
+        if tool_call_deltas:
+            for tc_data in tool_call_deltas.values():
+                try:
+                    params = json.loads(tc_data["arguments"]) if tc_data["arguments"] else {}
+                except json.JSONDecodeError:
+                    params = {}
+                yield ToolCall(
+                    tool_name=tc_data["name"],
+                    parameters=params,
+                    id=tc_data["id"],
+                )
+
     async def astream(
         self,
         *,
@@ -295,7 +330,14 @@ class _OpenAICompatibleBase(ABC):
         try:
             response = cast(Any, await self._async_client.chat.completions.create(**args))
         except Exception as exc:  # noqa: BLE001
-            raise self._wrap_error(exc, "async streaming") from exc
+            if "temperature" in str(exc).lower() and "temperature" in args:
+                args.pop("temperature")
+                try:
+                    response = cast(Any, await self._async_client.chat.completions.create(**args))
+                except Exception as exc2:  # noqa: BLE001
+                    raise self._wrap_error(exc2, "async streaming") from exc2
+            else:
+                raise self._wrap_error(exc, "async streaming") from exc
 
         # Track partial tool calls
         tool_call_deltas: Dict[int, Dict[str, Any]] = {}
@@ -360,6 +402,20 @@ class _OpenAICompatibleBase(ABC):
         except Exception as exc:  # noqa: BLE001
             raise self._wrap_error(exc, "async streaming failed mid-stream") from exc
 
+        # Flush any accumulated tool calls not emitted by a finish_reason chunk.
+        if tool_call_deltas:
+            for index in sorted(tool_call_deltas.keys()):
+                tc_info = tool_call_deltas[index]
+                try:
+                    params = json.loads(tc_info["arguments"]) if tc_info["arguments"] else {}
+                except json.JSONDecodeError:
+                    params = {}
+                yield ToolCall(
+                    tool_name=tc_info["name"],
+                    parameters=params,
+                    id=tc_info["id"],
+                )
+
     # -- message formatting (identical for OpenAI and Ollama) -----------------
 
     def _format_messages(self, system_prompt: str, messages: List[Message]) -> List[dict]:
@@ -371,7 +427,7 @@ class _OpenAICompatibleBase(ABC):
                 payload.append(
                     {
                         "role": "tool",
-                        "content": message.content,
+                        "content": message.content or "",
                         "tool_call_id": message.tool_call_id or "unknown",
                     }
                 )
@@ -425,6 +481,11 @@ class _OpenAICompatibleBase(ABC):
 
     def _parse_response(self, response: Any, model_name: str) -> tuple[Message, UsageStats]:
         """Parse an OpenAI-compatible chat completion response."""
+        if not response.choices:
+            raise ProviderError(
+                f"{self._get_provider_name()} returned an empty choices list "
+                "(possible content filtering or quota exceeded)"
+            )
         message = response.choices[0].message
         content = message.content
         tool_calls: List[ToolCall] = []
@@ -472,12 +533,13 @@ class _OpenAICompatibleBase(ABC):
         """
         return tc.id or f"call_{id(tc)}"
 
-    def _initial_tool_call_id(self, tc_delta: Any) -> str:
+    def _initial_tool_call_id(self, tc_delta: Any) -> str | None:
         """Provide the initial tool-call ID for a streaming delta.
 
         OpenAI always supplies ``tc_delta.id``.  Ollama may not.
+        Returns None when no ID is present; callers must handle None.
         """
-        return tc_delta.id
+        return tc_delta.id  # type: ignore[return-value]  # may be None
 
 
 __all__ = ["_OpenAICompatibleBase"]

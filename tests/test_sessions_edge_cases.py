@@ -243,3 +243,31 @@ class TestSQLiteEdgeCases:
         loaded = store.load("empty")
         assert loaded is not None
         assert len(loaded) == 0
+
+
+# ======================================================================
+# Regression tests for fixed bugs
+# ======================================================================
+
+
+class TestJsonFileSessionStoreLoadCorruptJSON:
+    def test_load_returns_none_for_corrupt_json(self, tmp_path: "os.PathLike[str]") -> None:
+        """Regression: load() must return None instead of raising on corrupt JSON."""
+        store = JsonFileSessionStore(directory=str(tmp_path))
+        path = os.path.join(str(tmp_path), "corrupt.json")
+        with open(path, "w") as f:
+            f.write("{not valid json{{{")
+
+        # Should return None, not raise JSONDecodeError
+        result = store.load("corrupt")
+        assert result is None
+
+    def test_load_returns_none_for_truncated_json(self, tmp_path: "os.PathLike[str]") -> None:
+        """Regression: load() must return None for truncated/incomplete JSON."""
+        store = JsonFileSessionStore(directory=str(tmp_path))
+        path = os.path.join(str(tmp_path), "truncated.json")
+        with open(path, "w") as f:
+            f.write('{"session_id": "truncated", "memory": {')  # truncated
+
+        result = store.load("truncated")
+        assert result is None

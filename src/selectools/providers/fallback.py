@@ -8,6 +8,8 @@ providers that have failed repeatedly.
 
 from __future__ import annotations
 
+import re
+import threading
 import time
 from typing import (
     TYPE_CHECKING,
@@ -30,12 +32,15 @@ if TYPE_CHECKING:
     from ..usage import UsageStats
 
 
-_RETRIABLE_SUBSTRINGS = ("timeout", "rate limit", "429", "500", "502", "503", "connection")
+_RETRIABLE_SUBSTRINGS = ("timeout", "rate limit", "connection")
+# HTTP status codes matched as whole words to avoid false positives on numbers
+# like "15003" or "expected 5000 tokens" matching "500".
+_RETRIABLE_STATUS_CODES = re.compile(r"\b(429|500|502|503)\b")
 
 
 def _is_retriable(exc: Exception) -> bool:
     msg = str(exc).lower()
-    return any(s in msg for s in _RETRIABLE_SUBSTRINGS)
+    return any(s in msg for s in _RETRIABLE_SUBSTRINGS) or bool(_RETRIABLE_STATUS_CODES.search(msg))
 
 
 class FallbackProvider:
@@ -71,6 +76,7 @@ class FallbackProvider:
         self.on_fallback = on_fallback
         self.provider_used: Optional[str] = None
 
+        self._cb_lock = threading.Lock()
         self._failures: dict[str, int] = {}
         self._circuit_open_until: dict[str, float] = {}
 
@@ -83,22 +89,25 @@ class FallbackProvider:
         return any(getattr(p, "supports_async", False) for p in self.providers)
 
     def _is_circuit_open(self, name: str) -> bool:
-        until = self._circuit_open_until.get(name, 0.0)
-        if until and time.time() < until:
-            return True
-        if until and time.time() >= until:
-            self._circuit_open_until.pop(name, None)
-            self._failures[name] = 0
-        return False
+        with self._cb_lock:
+            until = self._circuit_open_until.get(name, 0.0)
+            if until and time.time() < until:
+                return True
+            if until and time.time() >= until:
+                self._circuit_open_until.pop(name, None)
+                self._failures[name] = 0
+            return False
 
     def _record_failure(self, name: str) -> None:
-        self._failures[name] = self._failures.get(name, 0) + 1
-        if self._failures[name] >= self.circuit_breaker_threshold:
-            self._circuit_open_until[name] = time.time() + self.circuit_breaker_cooldown
+        with self._cb_lock:
+            self._failures[name] = self._failures.get(name, 0) + 1
+            if self._failures[name] >= self.circuit_breaker_threshold:
+                self._circuit_open_until[name] = time.time() + self.circuit_breaker_cooldown
 
     def _record_success(self, name: str) -> None:
-        self._failures[name] = 0
-        self._circuit_open_until.pop(name, None)
+        with self._cb_lock:
+            self._failures[name] = 0
+            self._circuit_open_until.pop(name, None)
 
     def complete(
         self,
@@ -144,6 +153,8 @@ class FallbackProvider:
                     continue
                 raise
 
+        if last_exc is None:
+            raise ProviderError("All providers are circuit-broken. Retry after cooldown.")
         raise ProviderError(f"All providers exhausted. Last error: {last_exc}") from last_exc
 
     async def acomplete(
@@ -202,6 +213,8 @@ class FallbackProvider:
                     continue
                 raise
 
+        if last_exc is None:
+            raise ProviderError("All providers are circuit-broken. Retry after cooldown.")
         raise ProviderError(f"All providers exhausted. Last error: {last_exc}") from last_exc
 
     def stream(
@@ -214,7 +227,7 @@ class FallbackProvider:
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> Iterable[str]:
+    ) -> Iterable[Union[str, ToolCall]]:
         last_exc: Optional[Exception] = None
 
         for provider in self.providers:
@@ -224,8 +237,9 @@ class FallbackProvider:
             if not getattr(provider, "supports_streaming", False):
                 continue
 
+            yielded_any = False
             try:
-                gen: Iterable[str] = provider.stream(
+                gen: Iterable[Union[str, ToolCall]] = provider.stream(
                     model=model,
                     system_prompt=system_prompt,
                     messages=messages,
@@ -234,15 +248,17 @@ class FallbackProvider:
                     max_tokens=max_tokens,
                     timeout=timeout,
                 )
-                # Wrap to record success/failure on consumption
+                # Track whether any chunks were yielded so we don't fall through
+                # to a different provider after partial output has been sent.
                 for chunk in gen:
+                    yielded_any = True
                     yield chunk
                 self._record_success(pname)
                 self.provider_used = pname
                 return
             except Exception as exc:
                 last_exc = exc
-                if _is_retriable(exc):
+                if _is_retriable(exc) and not yielded_any:
                     self._record_failure(pname)
                     if self.on_fallback:
                         next_name = self._next_available(pname) or "none"
@@ -253,7 +269,14 @@ class FallbackProvider:
                     continue
                 raise
 
-        raise ProviderError(f"No streaming provider available. Last error: {last_exc}")
+        if last_exc is None:
+            raise ProviderError(
+                "No streaming provider available: all providers are circuit-broken or "
+                "do not support streaming."
+            )
+        raise ProviderError(
+            f"No streaming provider available. Last error: {last_exc}"
+        ) from last_exc
 
     async def astream(
         self,
@@ -274,7 +297,10 @@ class FallbackProvider:
                 continue
             if not getattr(provider, "supports_streaming", False):
                 continue
+            if not getattr(provider, "supports_async", False):
+                continue
 
+            yielded_any = False
             try:
                 gen = provider.astream(
                     model=model,
@@ -285,15 +311,17 @@ class FallbackProvider:
                     max_tokens=max_tokens,
                     timeout=timeout,
                 )
-                # Wrap to record success/failure on consumption
+                # Track whether any chunks were yielded so we don't fall through
+                # to a different provider after partial output has been sent.
                 async for chunk in gen:
+                    yielded_any = True
                     yield chunk
                 self._record_success(pname)
                 self.provider_used = pname
                 return
             except Exception as exc:
                 last_exc = exc
-                if _is_retriable(exc):
+                if _is_retriable(exc) and not yielded_any:
                     self._record_failure(pname)
                     if self.on_fallback:
                         next_name = self._next_available(pname) or "none"
@@ -304,7 +332,14 @@ class FallbackProvider:
                     continue
                 raise
 
-        raise ProviderError(f"No async-streaming provider available. Last error: {last_exc}")
+        if last_exc is None:
+            raise ProviderError(
+                "No async-streaming provider available: all providers are circuit-broken or "
+                "do not support async streaming."
+            )
+        raise ProviderError(
+            f"No async-streaming provider available. Last error: {last_exc}"
+        ) from last_exc
 
     def _next_available(self, after_name: str) -> Optional[str]:
         found = False

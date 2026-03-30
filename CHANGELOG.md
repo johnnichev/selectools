@@ -5,6 +5,98 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.1] - 2026-03-29
+
+### Added
+
+#### Advanced Agent Patterns (`selectools.patterns`)
+
+Four production-ready multi-agent coordination patterns, each with sync `.run()` and async `.arun()`:
+
+- **`PlanAndExecuteAgent`** — Planner LLM generates a typed JSON execution plan (`PlanStep` list); executor agents run sequentially with context chaining. Optional replanning on step failure (`replanner=True`).
+- **`ReflectiveAgent`** — Actor–critic loop: actor drafts, critic reviews, actor revises. Stops when critic includes a configurable `stop_condition` word (default: `"approved"`) or `max_reflections` is reached. Returns `ReflectiveResult` with per-round `ReflectionRound` records.
+- **`DebateAgent`** — Multiple agents argue assigned positions over `max_rounds` rounds (each sees prior transcript); a judge agent synthesizes a final conclusion. Returns `DebateResult` with `DebateRound` records.
+- **`TeamLeadAgent`** — Lead agent generates subtask plan; team members execute via `sequential`, `parallel` (AgentGraph fan-out), or `dynamic` (lead reviews after each result and may reassign) strategies. Returns `TeamLeadResult` with `Subtask` records.
+
+All pattern symbols exported from `selectools` top-level:
+`PlanAndExecuteAgent`, `PlanStep`, `ReflectiveAgent`, `ReflectionRound`, `ReflectiveResult`,
+`DebateAgent`, `DebateRound`, `DebateResult`, `TeamLeadAgent`, `Subtask`, `TeamLeadResult`
+
+#### Expanded Eval Framework (38 → 50 evaluators)
+
+8 new deterministic evaluators:
+- `ReadabilityEvaluator` — Flesch-Kincaid score (pure Python, no deps); activated by `TestCase.expect_readability_gte`
+- `AgentTrajectoryEvaluator` — verifies tool call sequence is an in-order subsequence of expected; activated by `expect_trajectory`
+- `ToolEfficiencyEvaluator` — enforces max tool call count; activated by `expect_max_tools`
+- `SemanticSimilarityEvaluator` — TF-IDF cosine similarity (pure Python); activated by `expect_semantic_similarity_gte`
+- `MultiTurnCoherenceEvaluator` — regex contradiction detector; activated by `expect_coherent_turns`
+- `JsonSchemaEvaluator` — JSON parse + schema validate (uses `jsonschema` if installed, else minimal fallback); activated by `expect_json_schema`
+- `KeywordDensityEvaluator` — keyword presence + density ratio; activated by `expect_keywords` / `expect_keyword_density_min`
+- `ForbiddenWordsEvaluator` — fails if any forbidden word appears; activated by `expect_no_keywords`
+
+4 new LLM-as-judge evaluators:
+- `FactConsistencyEvaluator` — checks output doesn't contradict `case.context`
+- `CustomRubricEvaluator` — per-criterion scoring from `criteria` list or `case.rubric`
+- `AnswerAttributionEvaluator` — claim traceability to `case.context`
+- `StepReasoningEvaluator` — step-by-step reasoning quality; uses `case.rubric` or default rubric
+
+9 new `TestCase` fields: `expect_readability_gte`, `expect_trajectory`, `expect_max_tools`,
+`expect_semantic_similarity_gte`, `expect_coherent_turns`, `expect_json_schema`,
+`expect_keywords`, `expect_keyword_density_min`, `expect_no_keywords`
+
+#### New Example Scripts
+- `examples/70_plan_and_execute.py` — PlanAndExecuteAgent with scripted provider
+- `examples/71_reflective_agent.py` — ReflectiveAgent 2-round reflection loop
+- `examples/72_debate_agent.py` — DebateAgent with optimist/skeptic/judge
+- `examples/73_team_lead_agent.py` — TeamLeadAgent with all 3 delegation strategies
+
+#### Quality Infrastructure
+
+- **Ralph loop** (`scripts/ralph_bug_hunt.sh` + `.claude/skills/ralph-bug-hunt/`) — autonomous per-module hunt-and-fix convergence system; runs until 3 consecutive clean passes per module (10-iter cap); outputs `RALPH_RESULT: CLEAN/FOUND` sentinel for scripted detection
+- **Bandit in CI** (`.github/workflows/ci.yml`) — `security` job runs `bandit -r src/ -ll -q` on every push; blocks on any HIGH/CRITICAL finding
+- **Property-based tests** (`tests/test_property_based.py`, `tests/rag/test_property_based_rag.py`) — 28 Hypothesis tests covering BM25, InMemoryCache, ConversationMemory, ToolPolicy, metadata filters, TextSplitter, RecursiveTextSplitter, HybridSearcher; `hypothesis>=6.100.0` added to dev extras
+- **Thread-safety smoke suite** (`tests/test_concurrency_smoke.py`) — 15 tests; 10 threads × 20 ops with `threading.Barrier` synchronized start; covers BM25, InMemoryVectorStore, SQLiteVectorStore, InMemoryCache, SemanticCache, ConversationMemory, KnowledgeMemory
+- **Production simulations** (`tests/simulations/`) — 16 integration tests across 5 files: `sim_agent_memory_pressure.py`, `sim_hybrid_search_load.py`, `sim_provider_failover.py`, `sim_rag_concurrent.py`, `sim_tool_errors.py`
+- **CLAUDE.md §0 Pre-Release Quality Gate** — mandatory gate added to release checklist (Ralph loop + bandit + full suite)
+
+#### RAG Bug Fixes (Phase 3)
+
+8 edge-case fixes from adversarial bug hunt:
+- `ChromaVectorStore`: n_results clamped to `collection.count()` before query (prevents Chroma crash on empty collections); `add()` → `upsert()` for idempotency
+- `HybridSearcher`: `vector_top_k` / `keyword_top_k` now correctly honour `None` (previously both defaulted to hard-coded fallback ignoring the parameter)
+- `ContextualChunker`: prompt template validated at construction (`{document}` + `{chunk}` required); provider exceptions caught with empty-string fallback
+- `PDFLoader`: `PdfReadError` now raised as `ValueError` with actionable message for encrypted/corrupt PDFs
+- `RAGToolkit.semantic_search`: result preview truncated to 200 chars with `...` suffix (prevents unbounded tool output)
+- `BM25.search`: `top_k < 1` now raises `ValueError` immediately
+
+#### Ralph Loop Bug Hunt (8 passes, ~90 bugs fixed)
+
+Autonomous convergence system ran 8 passes across all 7 modules (agent, providers, tools, rag, memory, evals, security). All modules achieved a clean pass on pass 8. Selected fixes:
+
+- `_tool_executor.py`: ThreadPoolExecutor singleton for parallel dispatch (deadlock prevention with `tool_timeout_seconds`)
+- `_provider_caller.py`: async observer events now fire on LLM cache hits in `arun()`/`astream()`
+- `_openai_compat.py`: tool call deltas flushed after stream end (Ollama compatibility); TOOL `content=None` guarded
+- `fallback.py`: mid-stream fallback data corruption fixed; `_is_retriable` regex uses word boundaries
+- `gemini_provider.py`: timeout parameter now applied to all 4 methods
+- `tools/decorators.py`: `Optional[List[T]]` / `Optional[Dict[K,V]]` type unwrapping; `*args`/`**kwargs` excluded from schema
+- `tools/base.py`: `None` for optional parameters no longer raises `ToolValidationError`
+- `rag/bm25.py`: `search()` takes atomic snapshot under lock (concurrent clear/add safety)
+- `rag/chunking.py`: TextSplitter infinite loop guard; empty chunk filtering in RecursiveTextSplitter
+- `evals/llm_evaluators.py` + `coherence.py`: prompt injection fencing on all user-controlled fields (`_fence()` delimiters)
+- `evals/`: non-atomic writes replaced with tmp→replace in html.py, junit.py, snapshot.py, history.py
+- `evals/`: path traversal fixed in BaselineStore, SnapshotStore, HistoryStore
+- `memory.py`, `knowledge.py`, `sessions.py`: naive datetime normalization (6+ locations)
+- `knowledge_graph.py`: `confidence: null` from LLM no longer silently discards all triples
+- `policy.py`: `from_dict()` validates types at construction (string coercion, non-dict YAML)
+- `guardrails/`: ToxicityGuardrail, LengthGuardrail, FormatGuardrail threshold validation
+- `audit.py`: path traversal fix + `result=None` guard in `on_tool_end()`
+- 254 new regression tests added (2664 → 2918 total)
+
+### Stats
+- Tests: 2918 (+254 from ralph loop), Examples: 73 (+4), Evaluators: 50 (+12)
+
+---
+
 ## [0.19.0] - 2026-03-28
 
 ### Added

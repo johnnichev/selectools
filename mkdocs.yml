@@ -128,6 +128,7 @@ nav:
   - Multi-Agent:
     - Orchestration: modules/ORCHESTRATION.md
     - Supervisor: modules/SUPERVISOR.md
+    - Patterns: modules/PATTERNS.md
   - Composition:
     - Pipelines: modules/PIPELINE.md
   - Deployment:

@@ -60,6 +60,13 @@ class ToolPolicy:
         4. ``allow`` glob patterns
         5. Default → review
         """
+        if not tool_name or not tool_name.strip():
+            return PolicyResult(
+                decision=PolicyDecision.DENY,
+                reason="Empty tool name rejected",
+                matched_rule="builtin:empty_name",
+            )
+
         if tool_args is not None:
             for rule in self.deny_when:
                 if fnmatch.fnmatch(tool_name, rule.get("tool", "*")):
@@ -103,11 +110,48 @@ class ToolPolicy:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ToolPolicy":
+        def _coerce_list(key: str) -> List[str]:
+            val = data.get(key, [])
+            if val is None:
+                return []
+            if not isinstance(val, list):
+                raise ValueError(
+                    f"Policy '{key}' must be a list of strings, got {type(val).__name__!r}: {val!r}"
+                )
+            for i, item in enumerate(val):
+                if not isinstance(item, str):
+                    raise ValueError(
+                        f"Policy '{key}[{i}]' must be a string, got {type(item).__name__!r}: {item!r}"
+                    )
+            return val
+
+        def _coerce_deny_when(val: Any) -> List[Dict[str, str]]:
+            if val is None:
+                return []
+            if not isinstance(val, list):
+                raise ValueError(
+                    f"Policy 'deny_when' must be a list of mappings, got {type(val).__name__!r}"
+                )
+            rules: List[Dict[str, str]] = []
+            for i, entry in enumerate(val):
+                if not isinstance(entry, dict):
+                    raise ValueError(
+                        f"Policy 'deny_when[{i}]' must be a mapping, got {type(entry).__name__!r}: {entry!r}"
+                    )
+                for field_name, field_val in entry.items():
+                    if not isinstance(field_val, str):
+                        raise ValueError(
+                            f"Policy 'deny_when[{i}][{field_name!r}]' must be a string, "
+                            f"got {type(field_val).__name__!r}: {field_val!r}"
+                        )
+                rules.append(entry)
+            return rules
+
         return cls(
-            allow=data.get("allow", []),
-            review=data.get("review", []),
-            deny=data.get("deny", []),
-            deny_when=data.get("deny_when", []),
+            allow=_coerce_list("allow"),
+            review=_coerce_list("review"),
+            deny=_coerce_list("deny"),
+            deny_when=_coerce_deny_when(data.get("deny_when", [])),
         )
 
     @classmethod
@@ -151,7 +195,16 @@ class ToolPolicy:
             raise FileNotFoundError(f"Policy file not found: {yaml_path}")
 
         with yaml_path.open() as fh:
-            data: Dict[str, Any] = yaml.safe_load(fh) or {}
+            raw = yaml.safe_load(fh)
+
+        if raw is None:
+            data: Dict[str, Any] = {}
+        elif not isinstance(raw, dict):
+            raise ValueError(
+                f"Policy YAML must be a mapping (got {type(raw).__name__}): {yaml_path}"
+            )
+        else:
+            data = raw
 
         return cls.from_dict(data)
 

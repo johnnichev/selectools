@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import statistics
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -67,16 +68,16 @@ class EvalReport:
         latencies = sorted(self._latencies())
         if not latencies:
             return 0.0
-        idx = max(0, int(len(latencies) * 0.95) - 1)
-        return latencies[min(idx, len(latencies) - 1)]
+        idx = min(math.ceil(len(latencies) * 0.95), len(latencies)) - 1
+        return latencies[idx]
 
     @property
     def latency_p99(self) -> float:
         latencies = sorted(self._latencies())
         if not latencies:
             return 0.0
-        idx = max(0, int(len(latencies) * 0.99) - 1)
-        return latencies[min(idx, len(latencies) - 1)]
+        idx = min(math.ceil(len(latencies) * 0.99), len(latencies)) - 1
+        return latencies[idx]
 
     @property
     def latency_mean(self) -> float:
@@ -156,8 +157,11 @@ class EvalReport:
         }
 
     def to_json(self, filepath: Union[str, Path]) -> None:
-        """Write JSON report to file."""
-        Path(filepath).write_text(json.dumps(self.to_dict(), indent=2))
+        """Write JSON report to file (atomic write via temp file)."""
+        dest = Path(filepath)
+        tmp = dest.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(self.to_dict(), indent=2))
+        tmp.replace(dest)
 
     def to_html(self, filepath: Union[str, Path], history: Optional[Any] = None) -> None:
         """Write self-contained HTML report to file.

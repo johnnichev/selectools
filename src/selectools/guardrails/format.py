@@ -35,6 +35,12 @@ class FormatGuardrail(Guardrail):
         min_length: Optional[int] = None,
         action: GuardrailAction = GuardrailAction.BLOCK,
     ) -> None:
+        if max_length is not None and max_length < 0:
+            raise ValueError(f"max_length must be non-negative, got {max_length!r}")
+        if min_length is not None and min_length < 0:
+            raise ValueError(f"min_length must be non-negative, got {min_length!r}")
+        if max_length is not None and min_length is not None and max_length < min_length:
+            raise ValueError(f"max_length ({max_length}) must be >= min_length ({min_length})")
         self._require_json = require_json
         self._required_keys = required_keys or []
         self._max_length = max_length

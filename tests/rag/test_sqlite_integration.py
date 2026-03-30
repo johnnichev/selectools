@@ -436,6 +436,17 @@ class TestSQLiteErrorHandling:
             )
             store.add_documents([Document(text="test", metadata={})])
 
+    def test_in_memory_db_path_raises_value_error(self, mock_embedder: Mock) -> None:
+        """Regression: ':memory:' must raise ValueError immediately (pass 4).
+
+        SQLite ':memory:' databases are per-connection. Every sqlite3.connect(':memory:')
+        call returns a new empty database, so documents written by one call are
+        invisible to subsequent calls.  The guard prevents silent data loss and
+        confusing 'no such table' errors.
+        """
+        with pytest.raises(ValueError, match="memory"):
+            SQLiteVectorStore(embedder=mock_embedder, db_path=":memory:")
+
     def test_delete_nonexistent_documents(self, mock_embedder: Mock, temp_db_path: str) -> None:
         """Test deleting non-existent documents (should not error)."""
         store = SQLiteVectorStore(embedder=mock_embedder, db_path=temp_db_path)
@@ -447,4 +458,51 @@ class TestSQLiteErrorHandling:
         store.add_documents([Document(text="test", metadata={})])
         query_embedding = mock_embedder.embed_query("test")
         results = store.search(query_embedding, top_k=1)
+        assert len(results) == 1
+
+    def test_search_skips_rows_with_null_embedding_json(
+        self, mock_embedder: Mock, temp_db_path: str
+    ) -> None:
+        """Regression: rows with JSON-null embedding must not crash search (pass 4).
+
+        External writers or data corruption can store 'null' as the embedding value.
+        json.loads('null') returns Python None, and np.array(None, dtype=float32)
+        raises TypeError.  The fix skips such rows gracefully.
+        """
+        import json
+        import sqlite3
+
+        from selectools.rag.stores.sqlite import SQLiteVectorStore
+
+        # Seed the DB with a corrupt row (null embedding) and a valid row
+        conn = sqlite3.connect(temp_db_path)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS documents (
+                id TEXT PRIMARY KEY,
+                text TEXT NOT NULL,
+                metadata TEXT,
+                embedding TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "INSERT INTO documents VALUES (?, ?, ?, ?)",
+            ("corrupt_row", "corrupt doc", json.dumps({}), "null"),
+        )
+        conn.execute(
+            "INSERT INTO documents VALUES (?, ?, ?, ?)",
+            ("valid_row", "valid doc", json.dumps({}), json.dumps([0.5, 0.6])),
+        )
+        conn.commit()
+        conn.close()
+
+        store = SQLiteVectorStore(embedder=mock_embedder, db_path=temp_db_path)
+        results = store.search([0.5, 0.6], top_k=5)
+
+        # The corrupt row must be skipped; only the valid row is returned
+        texts = [r.document.text for r in results]
+        assert "valid doc" in texts, "Valid row must be returned"
+        assert "corrupt doc" not in texts, "Corrupt row must be skipped"
         assert len(results) == 1

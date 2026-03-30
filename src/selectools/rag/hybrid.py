@@ -153,9 +153,14 @@ class HybridSearcher:
             List of ``SearchResult`` objects sorted by fused (or reranked)
             score, highest first.
         """
+        if top_k < 1:
+            raise ValueError(f"top_k must be >= 1, got {top_k}")
+
         candidate_k = top_k * 2
-        v_top_k = vector_top_k or candidate_k
-        k_top_k = keyword_top_k or candidate_k
+        # Use `is None` so that an explicit vector_top_k=0 stays zero rather
+        # than being treated as "unset" (0 is falsy).
+        v_top_k = candidate_k if vector_top_k is None else vector_top_k
+        k_top_k = candidate_k if keyword_top_k is None else keyword_top_k
 
         vector_results = self._vector_search(query, v_top_k, filter)
         keyword_results = self.bm25.search(query, top_k=k_top_k, filter=filter)
@@ -263,7 +268,6 @@ class HybridSearcher:
             else:
                 key = id(result.document)
                 doc_map[key] = result
-                doc_scores[key] = 0.0
 
             doc_scores[key] = doc_scores.get(key, 0.0) + self.keyword_weight * norm_score
 

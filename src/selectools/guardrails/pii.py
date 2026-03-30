@@ -16,7 +16,7 @@ from .base import Guardrail, GuardrailAction, GuardrailResult
 _BUILTIN_PATTERNS: Dict[str, re.Pattern[str]] = {
     "email": re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
     "phone_us": re.compile(r"\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b"),
-    "ssn": re.compile(r"\b(?:\d{3}-\d{2}-\d{4}|\d{9})\b"),
+    "ssn": re.compile(r"\b(?:\d{3}-\d{2}-\d{4}|\d{3}\s\d{2}\s\d{4}|\d{9})\b"),
     "credit_card": re.compile(r"\b(?:\d{4}[-\s]?){3}\d{4}\b"),
     "ipv4": re.compile(
         r"\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b"
@@ -59,7 +59,7 @@ class PIIGuardrail(Guardrail):
         self._redact_char = redact_char
 
         patterns: Dict[str, re.Pattern[str]] = {}
-        if detect:
+        if detect is not None:
             for name in detect:
                 if name in _BUILTIN_PATTERNS:
                     patterns[name] = _BUILTIN_PATTERNS[name]
@@ -96,6 +96,9 @@ class PIIGuardrail(Guardrail):
         parts: List[str] = []
         last_end = 0
         for m in matches:
+            if m.start < last_end:
+                # Skip overlapping matches — the region was already redacted
+                continue
             parts.append(content[last_end : m.start])
             parts.append(f"[{m.pii_type.upper()}:{self._redact_char * min(len(m.value), 8)}]")
             last_end = m.end

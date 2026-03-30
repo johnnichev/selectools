@@ -213,9 +213,11 @@ class FileCheckpointStore:
         payload = {"meta": meta, "state": data}
 
         path = self._checkpoint_path(graph_id, checkpoint_id)
+        tmp_path = path + ".tmp"
         with self._lock:
-            with open(path, "w", encoding="utf-8") as f:
+            with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(payload, f, default=str)
+            os.replace(tmp_path, path)
         return checkpoint_id
 
     def load(self, checkpoint_id: str) -> Tuple[GraphState, int]:

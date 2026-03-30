@@ -4,6 +4,7 @@ Registry for managing and discovering tools.
 
 from __future__ import annotations
 
+import warnings
 from typing import Any, Callable, Dict, List, Optional
 
 from .base import ParamMetadata, Tool
@@ -29,9 +30,11 @@ class ToolRegistry:
             tool_instance: The Tool object to register.
         """
         if tool_instance.name in self._tools:
-            # We overwrite existing tools with the same name mostly silently,
-            # but in a real system we might want to log a warning.
-            pass
+            warnings.warn(
+                f"Tool {tool_instance.name!r} is already registered and will be overwritten.",
+                UserWarning,
+                stacklevel=2,
+            )
         self._tools[tool_instance.name] = tool_instance
 
     def get(self, name: str) -> Optional[Tool]:
@@ -58,6 +61,8 @@ class ToolRegistry:
         screen_output: bool = False,
         terminal: bool = False,
         requires_approval: bool = False,
+        cacheable: bool = False,
+        cache_ttl: int = 300,
     ) -> Callable[[Callable[..., Any]], Tool]:
         """
         Decorator to register a function as a tool in this registry.
@@ -72,6 +77,10 @@ class ToolRegistry:
             screen_output: Screen this tool's output for prompt injection.
             terminal: If True, executing this tool stops the agent loop.
             requires_approval: If True, the tool always requires human approval.
+            cacheable: If True, tool results are cached by name + args when
+                the agent has a cache configured.  Default: ``False``.
+            cache_ttl: Time-to-live in seconds for cached results.
+                Default: ``300`` (5 minutes).
 
         Returns:
             Decorator that returns the registered Tool instance.
@@ -89,6 +98,8 @@ class ToolRegistry:
                 screen_output=screen_output,
                 terminal=terminal,
                 requires_approval=requires_approval,
+                cacheable=cacheable,
+                cache_ttl=cache_ttl,
             )(func)
 
             # Register it

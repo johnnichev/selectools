@@ -672,12 +672,12 @@ class TestSnapshotE2E:
         store = SnapshotStore(tmp_path / "snapshots")
         result = store.compare(report, "test-suite")
         assert result.has_changes  # All new
-        assert "greeting" in result.new_cases
+        assert "greeting_0" in result.new_cases
 
         store.save(report, "test-suite")
         result2 = store.compare(report, "test-suite")
         assert not result2.has_changes
-        assert "greeting" in result2.unchanged
+        assert "greeting_0" in result2.unchanged
 
     def test_detect_output_change(self, tmp_path: Path) -> None:
         agent1 = _make_agent(["Response A"])

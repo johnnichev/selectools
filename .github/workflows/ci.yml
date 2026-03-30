@@ -29,9 +29,22 @@ jobs:
         run: |
           pytest -n auto
 
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install bandit
+        run: pip install bandit
+      - name: Security scan
+        run: bandit -r src/ -ll -q -c pyproject.toml
+
   build:
     runs-on: ubuntu-latest
-    needs: test
+    needs: [test, security]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6

@@ -10,6 +10,7 @@ import difflib
 import functools
 import inspect
 import json
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Union
@@ -17,6 +18,24 @@ from typing import Any, Callable, Dict, List, Optional, Union
 from ..exceptions import ToolExecutionError, ToolValidationError
 
 JsonSchema = Dict[str, Any]
+
+# Shared executor for running async tools from sync contexts.
+# Created lazily; avoids per-call thread overhead.
+_ASYNC_TOOL_EXECUTOR: Optional[ThreadPoolExecutor] = None
+_ASYNC_TOOL_EXECUTOR_LOCK = threading.Lock()
+
+
+def _get_async_tool_executor() -> ThreadPoolExecutor:
+    global _ASYNC_TOOL_EXECUTOR
+    if _ASYNC_TOOL_EXECUTOR is None:
+        with _ASYNC_TOOL_EXECUTOR_LOCK:
+            if _ASYNC_TOOL_EXECUTOR is None:
+                _ASYNC_TOOL_EXECUTOR = ThreadPoolExecutor(
+                    max_workers=4, thread_name_prefix="selectools_async_tool"
+                )
+    return _ASYNC_TOOL_EXECUTOR
+
+
 ParameterValue = Union[str, int, float, bool, dict, list]
 ParamMetadata = Dict[str, Any]
 
@@ -232,20 +251,25 @@ class Tool:
         param_names_set = {p.name for p in self.parameters}
         injected_names = set(self.injected_kwargs.keys())
 
-        # Check that all tool parameters exist in function signature
-        for param in self.parameters:
-            if param.name not in func_params and param.name not in injected_names:
-                func_param_names = [p for p in func_params.keys() if p not in injected_names]
-                suggestion = f"Available function parameters: {', '.join(func_param_names)}"
-                if not func_param_names:
-                    suggestion = "Function has no parameters"
+        # If the function accepts **kwargs it will accept any named parameter —
+        # skip the per-parameter existence check entirely.
+        has_var_keyword = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in func_params.values())
 
-                raise ToolValidationError(
-                    tool_name=self.name,
-                    param_name=param.name,
-                    issue=f"Parameter '{param.name}' not found in function signature",
-                    suggestion=suggestion,
-                )
+        # Check that all tool parameters exist in function signature
+        if not has_var_keyword:
+            for param in self.parameters:
+                if param.name not in func_params and param.name not in injected_names:
+                    func_param_names = [p for p in func_params.keys() if p not in injected_names]
+                    suggestion = f"Available function parameters: {', '.join(func_param_names)}"
+                    if not func_param_names:
+                        suggestion = "Function has no parameters"
+
+                    raise ToolValidationError(
+                        tool_name=self.name,
+                        param_name=param.name,
+                        issue=f"Parameter '{param.name}' not found in function signature",
+                        suggestion=suggestion,
+                    )
 
         # Check that required tool parameters don't have defaults in function
         for param in self.parameters:
@@ -364,6 +388,11 @@ class Tool:
             if param.name not in params:
                 continue
 
+            # Optional params that are explicitly None should be treated as absent —
+            # they will be omitted from call_args so the function default is used.
+            if not param.required and params[param.name] is None:
+                continue
+
             # Validate parameter type
             error = self._validate_single(param, params[param.name])
             if error:
@@ -423,13 +452,41 @@ class Tool:
         """
         self.validate(params)
 
-        call_args: Dict[str, Any] = dict(params)
+        # Build call args, omitting None values for optional params so that
+        # the function's own default is used (mirrors validate() behaviour).
+        optional_none = {
+            p.name for p in self.parameters if not p.required and params.get(p.name) is None
+        }
+        call_args: Dict[str, Any] = {k: v for k, v in params.items() if k not in optional_none}
         call_args.update(self.injected_kwargs)
         if self.config_injector:
             call_args.update(self.config_injector() or {})
 
         try:
             result = self.function(**call_args)
+
+            # Handle async generators called from sync context
+            if inspect.isasyncgen(result):
+
+                async def _drain_async_gen() -> str:
+                    chunks: list = []
+                    async for chunk in result:  # type: ignore[union-attr]
+                        chunk_str = str(chunk)
+                        chunks.append(chunk_str)
+                        if chunk_callback:
+                            chunk_callback(chunk_str)
+                    return "".join(chunks)
+
+                try:
+                    _loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    _loop = None
+                if _loop and _loop.is_running():
+                    return (
+                        _get_async_tool_executor().submit(asyncio.run, _drain_async_gen()).result()
+                    )
+                else:
+                    return asyncio.run(_drain_async_gen())
 
             # Handle async functions called from sync context
             if inspect.iscoroutine(result):
@@ -438,10 +495,7 @@ class Tool:
                 except RuntimeError:
                     _loop = None
                 if _loop and _loop.is_running():
-                    import concurrent.futures
-
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                        result = pool.submit(asyncio.run, result).result()
+                    result = _get_async_tool_executor().submit(asyncio.run, result).result()
                 else:
                     result = asyncio.run(result)
 
@@ -479,7 +533,12 @@ class Tool:
         """
         self.validate(params)
 
-        call_args: Dict[str, Any] = dict(params)
+        # Build call args, omitting None values for optional params so that
+        # the function's own default is used (mirrors validate() behaviour).
+        optional_none = {
+            p.name for p in self.parameters if not p.required and params.get(p.name) is None
+        }
+        call_args: Dict[str, Any] = {k: v for k, v in params.items() if k not in optional_none}
         call_args.update(self.injected_kwargs)
         if self.config_injector:
             call_args.update(self.config_injector() or {})

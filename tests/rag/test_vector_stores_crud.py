@@ -409,7 +409,7 @@ class TestChromaVectorStore:
         mock_client = Mock()
         mock_collection = Mock()
         mock_client.get_or_create_collection.return_value = mock_collection
-        mock_chroma.Client.return_value = mock_client
+        mock_chroma.EphemeralClient.return_value = mock_client
 
         with patch.dict("sys.modules", {"chromadb": mock_chroma}):
             from selectools.rag.stores.chroma import ChromaVectorStore
@@ -423,7 +423,7 @@ class TestChromaVectorStore:
         mock_client = Mock()
         mock_collection = Mock()
         mock_client.get_or_create_collection.return_value = mock_collection
-        mock_chroma.Client.return_value = mock_client
+        mock_chroma.EphemeralClient.return_value = mock_client
 
         with patch.dict("sys.modules", {"chromadb": mock_chroma}):
             from selectools.rag.stores.chroma import ChromaVectorStore
@@ -433,7 +433,7 @@ class TestChromaVectorStore:
             doc_ids = store.add_documents(sample_documents)
 
             assert len(doc_ids) == 3
-            mock_collection.add.assert_called_once()
+            mock_collection.upsert.assert_called_once()
 
     def test_search_basic(self, mock_embedder: Mock) -> None:
         """Test basic search."""
@@ -441,9 +441,10 @@ class TestChromaVectorStore:
         mock_client = Mock()
         mock_collection = Mock()
         mock_client.get_or_create_collection.return_value = mock_collection
-        mock_chroma.Client.return_value = mock_client
+        mock_chroma.EphemeralClient.return_value = mock_client
 
         # Mock query results
+        mock_collection.count.return_value = 10  # collection has enough docs for n_results clamping
         mock_collection.query.return_value = {
             "ids": [["id1", "id2"]],
             "documents": [["doc1", "doc2"]],
@@ -469,7 +470,7 @@ class TestChromaVectorStore:
         mock_client = Mock()
         mock_collection = Mock()
         mock_client.get_or_create_collection.return_value = mock_collection
-        mock_chroma.Client.return_value = mock_client
+        mock_chroma.EphemeralClient.return_value = mock_client
 
         with patch.dict("sys.modules", {"chromadb": mock_chroma}):
             from selectools.rag.stores.chroma import ChromaVectorStore
@@ -536,16 +537,16 @@ class TestPineconeVectorStore:
         mock_pinecone.Index.return_value = mock_index
         mock_pinecone_module.Pinecone.return_value = mock_pinecone
 
-        # Mock query results
+        # Mock query results — use the namespaced key written by the current store.
         mock_match1 = Mock()
         mock_match1.id = "id1"
         mock_match1.score = 0.9
-        mock_match1.metadata = {"text": "doc1", "cat": "a"}
+        mock_match1.metadata = {"__selectools_text__": "doc1", "cat": "a"}
 
         mock_match2 = Mock()
         mock_match2.id = "id2"
         mock_match2.score = 0.7
-        mock_match2.metadata = {"text": "doc2", "cat": "b"}
+        mock_match2.metadata = {"__selectools_text__": "doc2", "cat": "b"}
 
         mock_results = Mock()
         mock_results.matches = [mock_match1, mock_match2]
@@ -563,7 +564,104 @@ class TestPineconeVectorStore:
 
             assert len(results) == 2
             assert results[0].score == 0.9
+            assert results[0].document.text == "doc1"
+            assert results[0].document.metadata == {"cat": "a"}
             mock_index.query.assert_called_once()
+
+    def test_user_text_metadata_key_not_overwritten(self, mock_embedder: Mock) -> None:
+        """User-supplied 'text' metadata key must survive the add/search round-trip (regression).
+
+        Previously, add_documents stored doc.text as metadata['text'], silently
+        clobbering any user-supplied 'text' field.  The store now uses the
+        namespaced '__selectools_text__' key so the user field is preserved.
+        """
+        mock_pinecone_module = MagicMock()
+        mock_pinecone = Mock()
+        mock_index = Mock()
+        mock_pinecone.Index.return_value = mock_index
+        mock_pinecone_module.Pinecone.return_value = mock_pinecone
+
+        with patch.dict("sys.modules", {"pinecone": mock_pinecone_module}):
+            from selectools.rag.stores.pinecone import PineconeVectorStore
+
+            store = PineconeVectorStore(
+                embedder=mock_embedder, index_name="test-index", api_key="test_key"
+            )
+
+            # A document whose user metadata contains the key 'text'
+            doc = Document(text="hello world", metadata={"text": "user_value", "cat": "x"})
+            store.add_documents([doc], embeddings=[[0.1, 0.2]])
+
+            # Inspect what was upserted to Pinecone
+            call_kwargs = mock_index.upsert.call_args
+            vectors = call_kwargs[1]["vectors"] if call_kwargs[1] else call_kwargs[0][0]
+            stored_meta = vectors[0][2]  # (id, embedding, metadata) tuple
+
+            # The store must use the namespaced key, not 'text'
+            assert "__selectools_text__" in stored_meta
+            assert stored_meta["__selectools_text__"] == "hello world"
+            # The user's 'text' metadata must still be present
+            assert stored_meta.get("text") == "user_value"
+
+        # Simulate the search response using the namespaced key
+        mock_match = Mock()
+        mock_match.score = 0.95
+        mock_match.metadata = {
+            "__selectools_text__": "hello world",
+            "text": "user_value",
+            "cat": "x",
+        }
+        mock_results = Mock()
+        mock_results.matches = [mock_match]
+        mock_index.query.return_value = mock_results
+
+        with patch.dict("sys.modules", {"pinecone": mock_pinecone_module}):
+            from selectools.rag.stores.pinecone import PineconeVectorStore
+
+            store2 = PineconeVectorStore(
+                embedder=mock_embedder, index_name="test-index", api_key="test_key"
+            )
+            results = store2.search([0.1, 0.2], top_k=1)
+
+        assert len(results) == 1
+        assert results[0].document.text == "hello world"
+        # User's 'text' metadata key must be returned intact
+        assert results[0].document.metadata.get("text") == "user_value"
+        assert results[0].document.metadata.get("cat") == "x"
+        # The namespaced internal key must NOT appear in returned metadata
+        assert "__selectools_text__" not in results[0].document.metadata
+
+    def test_legacy_text_key_fallback_in_search(self, mock_embedder: Mock) -> None:
+        """search() must still work when Pinecone returns the legacy 'text' key (regression).
+
+        Indexes populated by an older version of the store use metadata['text'].
+        The updated search() must fall back to that key when '__selectools_text__'
+        is absent, preventing data loss on existing indexes.
+        """
+        mock_pinecone_module = MagicMock()
+        mock_pinecone = Mock()
+        mock_index = Mock()
+        mock_pinecone.Index.return_value = mock_index
+        mock_pinecone_module.Pinecone.return_value = mock_pinecone
+
+        mock_match = Mock()
+        mock_match.score = 0.8
+        mock_match.metadata = {"text": "legacy doc text", "source": "old_index"}
+        mock_results = Mock()
+        mock_results.matches = [mock_match]
+        mock_index.query.return_value = mock_results
+
+        with patch.dict("sys.modules", {"pinecone": mock_pinecone_module}):
+            from selectools.rag.stores.pinecone import PineconeVectorStore
+
+            store = PineconeVectorStore(
+                embedder=mock_embedder, index_name="test-index", api_key="test_key"
+            )
+            results = store.search([0.1, 0.2], top_k=1)
+
+        assert len(results) == 1
+        assert results[0].document.text == "legacy doc text"
+        assert results[0].document.metadata == {"source": "old_index"}
 
 
 # ============================================================================

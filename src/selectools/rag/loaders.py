@@ -121,11 +121,29 @@ class DocumentLoader:
         if not dir_path.is_dir():
             raise ValueError(f"Not a directory: {directory}")
 
+        # Reject patterns that could escape the directory via path traversal.
+        # Path components that are purely ".." or contain directory separators
+        # outside of the glob wildcard syntax are not legitimate glob patterns.
+        if ".." in Path(glob_pattern).parts:
+            raise ValueError(
+                f"glob_pattern must not contain '..' components to prevent path traversal: "
+                f"{glob_pattern!r}"
+            )
+
         # Find matching files
         if recursive and "**" not in glob_pattern:
             pattern = f"**/{glob_pattern}"
+        elif not recursive and "**" in glob_pattern:
+            # Strip recursive wildcard so recursive=False is honoured even when
+            # the caller passes a pattern that contains **
+            pattern = glob_pattern.replace("**/", "").replace("**", "")
         else:
             pattern = glob_pattern
+
+        # Guard against degenerate patterns (e.g. '**' with recursive=False becomes '')
+        # that would raise ValueError inside Path.glob().
+        if not pattern:
+            return []
 
         file_paths = list(dir_path.glob(pattern))
 
@@ -175,14 +193,25 @@ class DocumentLoader:
         if not file_path.exists():
             raise FileNotFoundError(f"PDF file not found: {path}")
 
-        # Read PDF
-        reader = PdfReader(path)
+        # Read PDF — raises PdfReadError for encrypted/corrupt files
+        try:
+            from pypdf.errors import PdfReadError
+        except ImportError:
+            PdfReadError = Exception  # type: ignore[misc,assignment]
+
+        try:
+            reader = PdfReader(path)
+        except PdfReadError as e:
+            raise ValueError(
+                f"Could not read PDF {path!r} — it may be encrypted or corrupt: {e}"
+            ) from e
+
         documents = []
 
         for page_num, page in enumerate(reader.pages):
-            text = page.extract_text()
+            text = page.extract_text()  # returns None for image-only / encrypted pages
 
-            if not text.strip():
+            if not (text or "").strip():
                 # Skip empty pages
                 continue
 

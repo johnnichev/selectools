@@ -4,7 +4,7 @@
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://johnnichev.github.io/selectools)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![Evaluators](https://img.shields.io/badge/evaluators-39-06b6d4.svg)](https://johnnichev.github.io/selectools/modules/EVALS/)
+[![Evaluators](https://img.shields.io/badge/evaluators-50-06b6d4.svg)](https://johnnichev.github.io/selectools/modules/EVALS/)
 
 An open-source project from **[NichevLabs](https://nichevlabs.com)**.
 
@@ -24,7 +24,57 @@ result = AgentGraph.chain(planner, writer, reviewer).run("Write a blog post")
 # selectools serve agent.yaml
 ```
 
-## What's New in v0.18
+## What's New in v0.19
+
+### v0.19.1 — Advanced Agent Patterns
+
+```python
+from selectools.patterns import PlanAndExecuteAgent, ReflectiveAgent, DebateAgent, TeamLeadAgent
+
+# PlanAndExecute — planner generates typed steps, executor runs them sequentially
+agent = PlanAndExecuteAgent(planner=planner, executor=executor, provider=provider)
+result = agent.run("Research and write a blog post about LLM safety")
+
+# ReflectiveAgent — actor drafts, critic reviews, actor revises until approved
+agent = ReflectiveAgent(actor=actor, critic=critic, provider=provider, max_reflections=3)
+result = agent.run("Draft a product announcement email")
+
+# DebateAgent — multiple agents argue, judge synthesizes conclusion
+agent = DebateAgent(agents={"optimist": opt, "skeptic": skep}, judge=judge, provider=provider)
+result = agent.run("Should we migrate our infrastructure to microservices?")
+
+# TeamLeadAgent — lead delegates subtasks, team executes in parallel or sequentially
+agent = TeamLeadAgent(lead=lead, team={"researcher": r, "writer": w}, provider=provider)
+result = agent.run("Produce a competitive analysis report")
+```
+
+- **PlanAndExecuteAgent** — Typed `PlanStep` list; optional replanning on step failure
+- **ReflectiveAgent** — Actor–critic loop with `ReflectionRound` records per revision
+- **DebateAgent** — N-agent debate with transcript, judge synthesis, `DebateResult`
+- **TeamLeadAgent** — `sequential`, `parallel`, or `dynamic` delegation strategies
+
+### v0.19.0 — Serve, Deploy & Complete Composition
+
+```python
+# One command deploys your agent over HTTP with SSE streaming
+# selectools serve agent.yaml
+
+# Compose tools into a single callable
+from selectools import compose
+search_and_summarize = compose(search_web, summarize)
+
+# Streaming composition
+async for chunk in pipeline.astream("input"):
+    print(chunk)
+```
+
+- **`selectools serve`** — HTTP deployment with SSE streaming, Playground UI, `/health`, `/schema`
+- **YAML config** — `AgentConfig.from_yaml("agent.yaml")`, 5 built-in templates
+- **`compose()`** — Chain tools into composite tool; `retry()` and `cache_step()` wrappers
+- **PostgresCheckpointStore** — Durable graph checkpointing backed by PostgreSQL
+
+<details>
+<summary><strong>v0.18.x highlights</strong></summary>
 
 ### v0.18.0 — Multi-Agent Orchestration
 
@@ -94,6 +144,8 @@ route = branch(
 - **@step decorator** — Wrap any sync/async callable into a composable pipeline step
 - **parallel()** — Fan-out to multiple steps and merge results
 - **branch()** — Conditional routing based on input data
+
+</details>
 
 <details>
 <summary><strong>v0.17.x highlights</strong></summary>
@@ -217,7 +269,7 @@ report = suite.run()
 report.to_html("report.html")
 ```
 
-- **39 Evaluators** — 22 deterministic + 17 LLM-as-judge
+- **50 Evaluators** — 30 deterministic + 21 LLM-as-judge
 - **A/B Testing**, regression detection, snapshot testing
 - **HTML reports**, JUnit XML, CLI, GitHub Action integration
 
@@ -257,7 +309,7 @@ report.to_html("report.html")
 | `StateGraph` + `add_node` + `add_edge` + `compile()` | `AgentGraph.chain(a, b, c).run(prompt)` |
 | LCEL `prompt \| llm \| parser` with Runnable protocol | `@step` + `\|` on plain functions |
 | `interrupt()` restarts the whole node on resume | `yield InterruptRequest()` resumes at yield point |
-| LangSmith (paid) for tracing and evals | Built-in: 39 evaluators + traces, zero cost |
+| LangSmith (paid) for tracing and evals | Built-in: 50 evaluators + traces, zero cost |
 | 5+ packages (`langchain-core`, `langgraph`, `langsmith`...) | 1 package: `pip install selectools` |
 | `langserve` for deployment | `selectools serve agent.yaml` |
 
@@ -289,7 +341,7 @@ report.to_html("report.html")
 | **Knowledge Graph** | Relationship triple extraction with in-memory and SQLite storage and keyword-based querying. |
 | **Cross-Session Knowledge** | Daily logs + persistent facts with auto-registered `remember` tool. |
 | **MCP Integration** | Connect to any MCP tool server (stdio + HTTP). MCPClient, MultiMCPClient, MCPServer. Circuit breaker, retry, graceful degradation. |
-| **Eval Framework** | 39 built-in evaluators (22 deterministic + 17 LLM-as-judge). A/B testing, regression detection, snapshot testing, HTML reports, JUnit XML, CI integration. |
+| **Eval Framework** | 50 built-in evaluators (30 deterministic + 21 LLM-as-judge). A/B testing, regression detection, snapshot testing, HTML reports, JUnit XML, CI integration. |
 | **Multi-Agent Orchestration** | `AgentGraph` for directed agent graphs, `SupervisorAgent` with 4 strategies, HITL via generator nodes, parallel execution, checkpointing, subgraph composition. |
 | **Composable Pipelines** | `Pipeline` + `@step` + `|` operator + `parallel()` + `branch()` — chain agents, tools, and transforms with plain Python. |
 | **AgentObserver Protocol** | 45-event lifecycle observer with `run_id`/`call_id` correlation. Built-in `LoggingObserver` + `SimpleStepObserver`. |
@@ -325,10 +377,10 @@ report.to_html("report.html")
 - **Conversation Branching**: `ConversationMemory.branch()` and `SessionStore.branch()` for A/B exploration and checkpointing
 - **Multi-Agent Orchestration**: `AgentGraph` with routing, parallel execution, HITL, checkpointing; `SupervisorAgent` with 4 strategies (plan_and_execute, round_robin, dynamic, magentic)
 - **Composable Pipelines**: `Pipeline` + `@step` + `|` operator + `parallel()` + `branch()` — chain agents, tools, and transforms
-- **61 Examples**: Multi-agent graphs, RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, eval framework, and more
-- **Built-in Eval Framework**: 39 evaluators (22 deterministic + 17 LLM-as-judge), A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing
+- **73 Examples**: Multi-agent graphs, RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, eval framework, advanced agent patterns, and more
+- **Built-in Eval Framework**: 50 evaluators (30 deterministic + 21 LLM-as-judge), A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing
 - **AgentObserver Protocol**: 45 lifecycle events with `run_id` correlation, `LoggingObserver`, `SimpleStepObserver`, OTel export
-- **2529 Tests**: Unit, integration, regression, and E2E with real API calls
+- **2918 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 
@@ -877,6 +929,18 @@ Examples are numbered by difficulty. Start from 01 and work your way up.
 | 59 | `59_agent_graph_checkpointing.py` | Checkpoint, interrupt, resume | No |
 | 60 | `60_supervisor_agent.py` | SupervisorAgent with 4 strategies | No |
 | 61 | `61_agent_graph_subgraph.py` | Nested subgraph composition | No |
+| 62 | `62_yaml_config.py` | Load AgentConfig from YAML | No |
+| 63 | `63_agent_templates.py` | Built-in agent templates | No |
+| 64 | `64_selectools_serve.py` | Serve agent over HTTP with `selectools serve` | No |
+| 65 | `65_tool_composition.py` | `compose()` tool chaining | No |
+| 66 | `66_streaming_pipeline.py` | `pipeline.astream()` streaming composition | No |
+| 67 | `67_type_safe_pipeline.py` | Type-safe step contracts | No |
+| 68 | `68_postgres_checkpoints.py` | PostgresCheckpointStore for AgentGraph | Yes + `[postgres]` |
+| 69 | `69_trace_store.py` | Trace storage and querying | No |
+| 70 | `70_plan_and_execute.py` | PlanAndExecuteAgent with typed steps | No |
+| 71 | `71_reflective_agent.py` | ReflectiveAgent actor–critic loop | No |
+| 72 | `72_debate_agent.py` | DebateAgent with optimist/skeptic/judge | No |
+| 73 | `73_team_lead_agent.py` | TeamLeadAgent with all 3 delegation strategies | No |
 
 Run any example:
 
@@ -913,12 +977,13 @@ Also available in [`docs/`](docs/README.md):
 | [GUARDRAILS](docs/modules/GUARDRAILS.md) | Input/output validation pipeline |
 | [AUDIT](docs/modules/AUDIT.md) | JSONL audit logging |
 | [SECURITY](docs/modules/SECURITY.md) | Screening & coherence checking |
-| [EVALS](docs/modules/EVALS.md) | 39 evaluators, A/B testing, regression |
+| [EVALS](docs/modules/EVALS.md) | 50 evaluators, A/B testing, regression |
 | [MCP](docs/modules/MCP.md) | MCP client/server integration |
 | [BUDGET](docs/modules/BUDGET.md) | Token/cost budget limits |
 | [CANCELLATION](docs/modules/CANCELLATION.md) | Cooperative cancellation |
 | [ORCHESTRATION](docs/modules/ORCHESTRATION.md) | AgentGraph, routing, parallel, HITL |
 | [SUPERVISOR](docs/modules/SUPERVISOR.md) | SupervisorAgent, 4 strategies |
+| [PATTERNS](docs/modules/PATTERNS.md) | PlanAndExecute, Reflective, Debate, TeamLead |
 | [PARSER](docs/modules/PARSER.md) | Tool call parsing |
 | [PROMPT](docs/modules/PROMPT.md) | System prompt generation |
 
@@ -929,7 +994,7 @@ pytest tests/ -x -q          # All tests
 pytest tests/ -k "not e2e"   # Skip E2E (no API keys needed)
 ```
 
-2529 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, orchestration, pipelines, and E2E integration with real API calls.
+2918 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, orchestration, pipelines, agent patterns, and E2E integration with real API calls.
 
 ## License
 

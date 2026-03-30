@@ -6,11 +6,50 @@ import asyncio
 import hashlib
 import inspect
 import json
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+
+# Module-level singleton for tool timeout execution — avoids spawning a new
+# thread pool on every tool call (see pitfall #20).
+_tool_timeout_executor: Optional[ThreadPoolExecutor] = None
+_tool_timeout_executor_lock = threading.Lock()
+
+# Separate executor for the outer parallel dispatch layer.  Using the same
+# pool for both the outer _run_one submissions and the inner timeout
+# submissions causes a thread-pool deadlock when the number of concurrent tool
+# calls is >= (max_workers / 2 + 1): outer workers block on inner futures that
+# can never start because all pool slots are taken.
+_parallel_dispatch_executor: Optional[ThreadPoolExecutor] = None
+_parallel_dispatch_executor_lock = threading.Lock()
+
+
+def _get_tool_timeout_executor() -> ThreadPoolExecutor:
+    """Return the shared ThreadPoolExecutor for tool timeout enforcement."""
+    global _tool_timeout_executor
+    if _tool_timeout_executor is None:
+        with _tool_timeout_executor_lock:
+            if _tool_timeout_executor is None:
+                _tool_timeout_executor = ThreadPoolExecutor(
+                    max_workers=16, thread_name_prefix="selectools_tool_timeout"
+                )
+    return _tool_timeout_executor
+
+
+def _get_parallel_dispatch_executor() -> ThreadPoolExecutor:
+    """Return the shared ThreadPoolExecutor for parallel tool dispatch."""
+    global _parallel_dispatch_executor
+    if _parallel_dispatch_executor is None:
+        with _parallel_dispatch_executor_lock:
+            if _parallel_dispatch_executor is None:
+                _parallel_dispatch_executor = ThreadPoolExecutor(
+                    max_workers=32, thread_name_prefix="selectools_parallel_dispatch"
+                )
+    return _parallel_dispatch_executor
+
 
 from ..coherence import CoherenceResult, acheck_coherence, check_coherence
 from ..policy import PolicyDecision, PolicyResult, ToolPolicy
@@ -188,17 +227,19 @@ class _ToolExecutorMixin:
                     f"Use arun() or astream() instead of run() for async callbacks."
                 )
             try:
-                with ThreadPoolExecutor(max_workers=1) as executor:
-                    future = executor.submit(
-                        self.config.confirm_action, tool_name, tool_args, result.reason
+                # Reuse the shared module-level executor — never create a new
+                # ThreadPoolExecutor per call (pitfall #20).
+                executor = _get_tool_timeout_executor()
+                future = executor.submit(
+                    self.config.confirm_action, tool_name, tool_args, result.reason
+                )
+                try:
+                    approved = future.result(timeout=self.config.approval_timeout)
+                except FuturesTimeoutError:
+                    return (
+                        f"Tool '{tool_name}' approval timed out "
+                        f"after {self.config.approval_timeout}s"
                     )
-                    try:
-                        approved = future.result(timeout=self.config.approval_timeout)
-                    except FuturesTimeoutError:
-                        return (
-                            f"Tool '{tool_name}' approval timed out "
-                            f"after {self.config.approval_timeout}s"
-                        )
                 if not approved:
                     return f"Tool '{tool_name}' rejected by reviewer: {result.reason}"
             except FuturesTimeoutError:
@@ -275,7 +316,7 @@ class _ToolExecutorMixin:
                         timeout=self.config.approval_timeout,
                     )
                 else:
-                    loop = asyncio.get_event_loop()
+                    loop = asyncio.get_running_loop()
                     approved = await asyncio.wait_for(
                         loop.run_in_executor(
                             None,
@@ -344,6 +385,7 @@ class _ToolExecutorMixin:
             duration: float
             tool: Optional[Tool]
             chunk_count: int
+            error_step_type: "StepType" = StepType.ERROR
 
         def _run_one(tc: ToolCall) -> _Result:
             tool_name = tc.tool_name
@@ -363,7 +405,15 @@ class _ToolExecutorMixin:
 
             coherence_error = self._check_coherence(user_text_for_coherence, tool_name, parameters)
             if coherence_error:
-                return _Result(tc, coherence_error, True, 0.0, tool, 0)
+                return _Result(
+                    tc,
+                    coherence_error,
+                    True,
+                    0.0,
+                    tool,
+                    0,
+                    error_step_type=StepType.COHERENCE_CHECK,
+                )
 
             # Tool result cache check
             cached_result = self._check_tool_cache(tool, parameters)
@@ -418,10 +468,14 @@ class _ToolExecutorMixin:
                 error_msg = f"Error executing tool '{tool_name}': {exc}"
                 return _Result(tc, error_msg, True, dur, tool, 0)
 
-        # Submit all tool calls to the thread pool
-        with ThreadPoolExecutor(max_workers=len(tool_calls_to_execute)) as pool:
-            futures = [pool.submit(_run_one, tc) for tc in tool_calls_to_execute]
-            results = [f.result() for f in futures]  # preserves order
+        # Submit outer _run_one tasks to the dedicated parallel-dispatch pool
+        # (NOT the tool-timeout pool).  Using the same pool for both levels
+        # causes a thread-pool deadlock when len(tool_calls_to_execute) >=
+        # max_workers/2+1: every dispatch-worker blocks on an inner timeout
+        # submission that can never start because all slots are taken.
+        pool = _get_parallel_dispatch_executor()
+        futures = [pool.submit(_run_one, tc) for tc in tool_calls_to_execute]
+        results = [f.result() for f in futures]  # preserves order
 
         last_tool_name: Optional[str] = None
         last_tool_args: Dict[str, Any] = {}
@@ -459,7 +513,7 @@ class _ToolExecutorMixin:
                 )
 
             if trace is not None:
-                step_type = StepType.ERROR if r.is_error else StepType.TOOL_EXECUTION
+                step_type = r.error_step_type if r.is_error else StepType.TOOL_EXECUTION
                 trace.add(
                     TraceStep(
                         type=step_type,
@@ -524,6 +578,7 @@ class _ToolExecutorMixin:
             duration: float
             tool: Optional[Tool]
             chunk_count: int
+            error_step_type: "StepType" = StepType.ERROR
 
         async def _run_one(tc: ToolCall) -> _Result:
             tool_name = tc.tool_name
@@ -546,7 +601,15 @@ class _ToolExecutorMixin:
                 user_text_for_coherence, tool_name, parameters
             )
             if coherence_error:
-                return _Result(tc, coherence_error, True, 0.0, tool, 0)
+                return _Result(
+                    tc,
+                    coherence_error,
+                    True,
+                    0.0,
+                    tool,
+                    0,
+                    error_step_type=StepType.COHERENCE_CHECK,
+                )
 
             # Tool result cache check
             cached_result = self._check_tool_cache(tool, parameters)
@@ -657,7 +720,7 @@ class _ToolExecutorMixin:
                 ) + (self.usage.iterations[-1].total_tokens if self.usage.iterations else 0)
 
             if trace is not None:
-                step_type = StepType.ERROR if r.is_error else StepType.TOOL_EXECUTION
+                step_type = r.error_step_type if r.is_error else StepType.TOOL_EXECUTION
                 trace.add(
                     TraceStep(
                         type=step_type,
@@ -705,18 +768,15 @@ class _ToolExecutorMixin:
         if self.config.tool_timeout_seconds is None:
             return tool.execute(parameters, chunk_callback=chunk_callback)
 
-        executor = ThreadPoolExecutor(max_workers=1)
+        executor = _get_tool_timeout_executor()
         future = executor.submit(tool.execute, parameters, chunk_callback)
         try:
             return future.result(timeout=self.config.tool_timeout_seconds)
         except FuturesTimeoutError:
             future.cancel()
-            executor.shutdown(wait=False)
             raise TimeoutError(
                 f"Tool '{tool.name}' timed out after {self.config.tool_timeout_seconds} seconds"
             )
-        finally:
-            executor.shutdown(wait=False)
 
     async def _aexecute_tool_with_timeout(
         self, tool: Tool, parameters: dict, chunk_callback: Optional[Callable[[str], None]] = None
@@ -797,7 +857,7 @@ class _ToolExecutorMixin:
             self._append_tool_result(coherence_error, tool_name, tool_call.id, run_id=ctx.run_id)
             ctx.trace.add(
                 TraceStep(
-                    type=StepType.ERROR,
+                    type=StepType.COHERENCE_CHECK,
                     tool_name=tool_name,
                     error=coherence_error,
                     summary=f"Coherence check failed for {tool_name}",
@@ -983,7 +1043,7 @@ class _ToolExecutorMixin:
             self._append_tool_result(coherence_error, tool_name, tool_call.id, run_id=ctx.run_id)
             ctx.trace.add(
                 TraceStep(
-                    type=StepType.ERROR,
+                    type=StepType.COHERENCE_CHECK,
                     tool_name=tool_name,
                     error=coherence_error,
                     summary=f"Coherence check failed for {tool_name}",

@@ -62,7 +62,7 @@ class LocalProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> Iterable[str]:
+    ) -> Iterable[Union[str, ToolCall]]:
         response_msg, _ = self.complete(
             model=model,
             system_prompt=system_prompt,

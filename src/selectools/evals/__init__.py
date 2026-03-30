@@ -3,23 +3,31 @@
 from .badge import generate_badge, generate_detailed_badge
 from .dataset import DatasetLoader
 from .evaluators import (
+    AgentTrajectoryEvaluator,
     ContainsEvaluator,
     CustomEvaluator,
     EndsWithEvaluator,
     Evaluator,
+    ForbiddenWordsEvaluator,
     InjectionResistanceEvaluator,
+    JsonSchemaEvaluator,
     JsonValidityEvaluator,
+    KeywordDensityEvaluator,
     LengthEvaluator,
     MarkdownFormatEvaluator,
+    MultiTurnCoherenceEvaluator,
     OutputEvaluator,
     PerformanceEvaluator,
     PIILeakEvaluator,
     PythonValidityEvaluator,
+    ReadabilityEvaluator,
     RefusalEvaluator,
+    SemanticSimilarityEvaluator,
     SentimentEvaluator,
     SQLValidityEvaluator,
     StartsWithEvaluator,
     StructuredOutputEvaluator,
+    ToolEfficiencyEvaluator,
     ToolOrderEvaluator,
     ToolUseEvaluator,
     UniqueToolsEvaluator,
@@ -29,6 +37,7 @@ from .evaluators import (
 from .generator import generate_cases
 from .history import HistoryEntry, HistoryStore, HistoryTrend
 from .llm_evaluators import (
+    AnswerAttributionEvaluator,
     BiasEvaluator,
     CoherenceEvaluator,
     CompletenessEvaluator,
@@ -36,6 +45,8 @@ from .llm_evaluators import (
     ContextPrecisionEvaluator,
     ContextRecallEvaluator,
     CorrectnessEvaluator,
+    CustomRubricEvaluator,
+    FactConsistencyEvaluator,
     FaithfulnessEvaluator,
     GrammarEvaluator,
     HallucinationEvaluator,
@@ -43,6 +54,7 @@ from .llm_evaluators import (
     LLMJudgeEvaluator,
     RelevanceEvaluator,
     SafetyEvaluator,
+    StepReasoningEvaluator,
     SummaryEvaluator,
     ToneEvaluator,
     ToxicityEvaluator,
@@ -70,7 +82,7 @@ __all__ = [
     "RegressionResult",
     # Evaluator protocol
     "Evaluator",
-    # Deterministic evaluators (21)
+    # Deterministic evaluators (29)
     "ToolUseEvaluator",
     "ContainsEvaluator",
     "OutputEvaluator",
@@ -92,7 +104,15 @@ __all__ = [
     "URLValidityEvaluator",
     "MarkdownFormatEvaluator",
     "CustomEvaluator",
-    # LLM-as-judge evaluators (18)
+    "ReadabilityEvaluator",
+    "AgentTrajectoryEvaluator",
+    "ToolEfficiencyEvaluator",
+    "SemanticSimilarityEvaluator",
+    "MultiTurnCoherenceEvaluator",
+    "JsonSchemaEvaluator",
+    "KeywordDensityEvaluator",
+    "ForbiddenWordsEvaluator",
+    # LLM-as-judge evaluators (21)
     "LLMJudgeEvaluator",
     "CorrectnessEvaluator",
     "RelevanceEvaluator",
@@ -110,6 +130,10 @@ __all__ = [
     "ContextPrecisionEvaluator",
     "GrammarEvaluator",
     "SafetyEvaluator",
+    "FactConsistencyEvaluator",
+    "CustomRubricEvaluator",
+    "AnswerAttributionEvaluator",
+    "StepReasoningEvaluator",
     # Pairwise A/B comparison
     "PairwiseEval",
     "PairwiseReport",

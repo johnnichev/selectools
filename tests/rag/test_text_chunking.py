@@ -408,3 +408,92 @@ class TestEdgeCases:
 
         assert len(chunks) == 5
         assert "".join(chunks) == text
+
+
+# ============================================================================
+# Regression tests (pass 4)
+# ============================================================================
+
+
+class TestTextSplitterInfiniteLoopGuard:
+    """Regression: high overlap + separator at chunk_size//2+1 must not loop forever (pass 4).
+
+    When chunk_overlap is close to chunk_size and a separator is found near the
+    first valid position (chunk_size//2 + 1), the adjusted `end` can be so close
+    to `start` that `end - chunk_overlap` equals or is less than `start`.  Without
+    the minimum-advance guard, split_text would loop on the same start position
+    forever.
+    """
+
+    def test_high_overlap_separator_no_infinite_loop(self) -> None:
+        """chunk_overlap=8, chunk_size=10, separator found at pos 6 must terminate."""
+        import signal
+
+        splitter = TextSplitter(chunk_size=10, chunk_overlap=8, separator="\n\n")
+
+        def _timeout(sig: int, frame: object) -> None:  # type: ignore[type-arg]
+            raise TimeoutError("split_text did not terminate (infinite loop detected)")
+
+        signal.signal(signal.SIGALRM, _timeout)
+        signal.alarm(3)
+        try:
+            chunks = splitter.split_text("012345\n\nabc")
+        finally:
+            signal.alarm(0)
+
+        # Must terminate with valid, non-empty chunks
+        assert len(chunks) >= 1
+        assert all(c for c in chunks), f"Empty chunk in result: {chunks}"
+
+    def test_all_content_covered_after_high_overlap_split(self) -> None:
+        """After fixing the infinite loop, the full text must still be covered."""
+        splitter = TextSplitter(chunk_size=10, chunk_overlap=8, separator="\n\n")
+        chunks = splitter.split_text("012345\n\nabc")
+        # The combined chunks must contain all meaningful content
+        combined = "".join(chunks)
+        assert "012345" in combined
+        assert "abc" in combined
+
+
+class TestRecursiveTextSplitterEmptyChunks:
+    """Regression: consecutive separators must not produce empty chunks (pass 4).
+
+    When text contains consecutive separators (e.g. '\n\n\n\n'), splitting on
+    '\n\n' yields ['hello', '', 'world']. The empty string was previously passed
+    through as a chunk, creating Document(text='') objects that pollute BM25
+    indexes and produce zero-norm embedding vectors.
+    """
+
+    def test_consecutive_separators_no_empty_chunks(self) -> None:
+        """Consecutive double-newlines must not produce empty string chunks."""
+        splitter = RecursiveTextSplitter(chunk_size=5, chunk_overlap=0)
+        chunks = splitter.split_text("hello\n\n\n\nworld")
+        assert "" not in chunks, f"Empty chunk found in: {chunks}"
+        assert "hello" in chunks
+        assert "world" in chunks
+
+    def test_all_separator_text_produces_no_chunks(self) -> None:
+        """Text composed entirely of separators must produce no chunks (or only non-empty ones)."""
+        splitter = RecursiveTextSplitter(chunk_size=100, chunk_overlap=0)
+        chunks = splitter.split_text("\n\n\n\n\n\n")
+        for chunk in chunks:
+            assert chunk.strip() != "", f"Whitespace-only chunk found: {repr(chunk)}"
+
+    def test_whitespace_section_between_separators_is_filtered(self) -> None:
+        """A whitespace-only section between separators must be dropped."""
+        splitter = RecursiveTextSplitter(chunk_size=100, chunk_overlap=0)
+        chunks = splitter.split_text("text1\n\n   \n\ntext2")
+        for chunk in chunks:
+            assert chunk.strip() != "", f"Whitespace-only chunk found: {repr(chunk)}"
+        assert any("text1" in c for c in chunks)
+        assert any("text2" in c for c in chunks)
+
+    def test_split_documents_no_empty_text_documents(self) -> None:
+        """split_documents must never produce a Document with empty text."""
+        from selectools.rag.vector_store import Document
+
+        splitter = RecursiveTextSplitter(chunk_size=5, chunk_overlap=0)
+        docs = [Document(text="hello\n\n\n\nworld"), Document(text="a\n\n\n\nb\n\n\n\nc")]
+        chunked = splitter.split_documents(docs)
+        for doc in chunked:
+            assert doc.text.strip() != "", f"Empty document text: {repr(doc.text)}"

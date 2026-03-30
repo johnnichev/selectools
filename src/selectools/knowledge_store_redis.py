@@ -64,6 +64,12 @@ class RedisKnowledgeStore:
 
     @staticmethod
     def _dict_to_entry(data: Dict[str, str]) -> KnowledgeEntry:
+        created_at = datetime.fromisoformat(data["created_at"])
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        updated_at = datetime.fromisoformat(data["updated_at"])
+        if updated_at.tzinfo is None:
+            updated_at = updated_at.replace(tzinfo=timezone.utc)
         return KnowledgeEntry(
             id=data["id"],
             content=data["content"],
@@ -71,8 +77,8 @@ class RedisKnowledgeStore:
             importance=float(data.get("importance", "0.5")),
             persistent=data.get("persistent") == "1",
             ttl_days=int(data["ttl_days"]) if data.get("ttl_days") else None,
-            created_at=datetime.fromisoformat(data["created_at"]),
-            updated_at=datetime.fromisoformat(data["updated_at"]),
+            created_at=created_at,
+            updated_at=updated_at,
             metadata=json.loads(data.get("metadata", "{}")),
         )
 
@@ -119,6 +125,11 @@ class RedisKnowledgeStore:
                 self._importance_key(), "+inf", str(min_importance)
             )
 
+        # Normalize naive since to UTC-aware to match stored entry datetimes.
+        since_aware: Optional[datetime] = None
+        if since is not None:
+            since_aware = since if since.tzinfo is not None else since.replace(tzinfo=timezone.utc)
+
         entries: List[KnowledgeEntry] = []
         for eid in candidate_ids:
             entry = self.get(eid)
@@ -128,7 +139,7 @@ class RedisKnowledgeStore:
                 continue
             if entry.importance < min_importance:
                 continue
-            if since is not None and entry.created_at < since:
+            if since_aware is not None and entry.created_at < since_aware:
                 continue
             entries.append(entry)
 

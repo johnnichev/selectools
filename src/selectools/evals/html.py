@@ -396,4 +396,7 @@ function filterByVerdict(v){{
 </body>
 </html>"""
 
-    Path(filepath).write_text(page)
+    dest = Path(filepath)
+    tmp = dest.with_suffix(".html.tmp")
+    tmp.write_text(page)
+    tmp.replace(dest)

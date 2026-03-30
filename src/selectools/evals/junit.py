@@ -41,4 +41,7 @@ def render_junit_xml(report: Any, filepath: Union[str, Path]) -> None:
 
     tree = ET.ElementTree(suite_el)
     ET.indent(tree, space="  ")
-    tree.write(str(filepath), encoding="unicode", xml_declaration=True)
+    dest = Path(filepath)
+    tmp = dest.with_suffix(".xml.tmp")
+    tree.write(str(tmp), encoding="unicode", xml_declaration=True)
+    tmp.replace(dest)

@@ -55,6 +55,11 @@ class TextSplitter:
             raise ValueError("chunk_overlap cannot be negative")
         if chunk_overlap >= chunk_size:
             raise ValueError("chunk_overlap must be less than chunk_size")
+        if length_function("a") != 1:
+            raise ValueError(
+                "length_function must count characters (length_function('a') must equal 1). "
+                "Token-counting functions produce incorrect chunk boundaries."
+            )
 
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
@@ -98,8 +103,13 @@ class TextSplitter:
 
             chunks.append(chunk)
 
-            # Move start position forward, accounting for overlap
-            start = end - self.chunk_overlap
+            # Move start position forward, accounting for overlap.
+            # Guard against the edge case where a separator found near chunk_size//2
+            # makes end - chunk_overlap <= start (e.g. chunk_size=10, chunk_overlap=8,
+            # separator found at pos 6 → end=start+8, new_start=start+0). Without this
+            # clamp the loop would repeat the same start forever.
+            new_start = end - self.chunk_overlap
+            start = new_start if new_start > start else start + 1
 
         return chunks
 
@@ -194,9 +204,10 @@ class RecursiveTextSplitter(TextSplitter):
         if not text:
             return []
 
-        # Base case: no more separators or text is small enough
+        # Base case: no more separators or text is small enough.
+        # Return [] for whitespace-only text so callers never receive empty chunks.
         if not separators or self.length_function(text) <= self.chunk_size:
-            return [text] if text else []
+            return [text] if text and text.strip() else []
 
         # Try current separator
         separator = separators[0]
@@ -228,19 +239,20 @@ class RecursiveTextSplitter(TextSplitter):
 
                 # Start new chunk with overlap
                 if self.chunk_overlap > 0 and current_chunk:
-                    # Keep last part for overlap
-                    overlap_text = (
-                        separator.join(current_chunk) if separator else "".join(current_chunk)
-                    )
-                    overlap_length = self.length_function(overlap_text)
-
-                    if overlap_length > self.chunk_overlap:
-                        # Trim overlap to fit
-                        overlap_text = overlap_text[-self.chunk_overlap :]
-
-                    current_chunk = (
-                        [overlap_text, split] if separator else list(overlap_text) + [split]
-                    )
+                    # Build overlap from complete segments (walk backward) so we
+                    # never slice mid-separator (e.g. cutting "\n\n" into "\n").
+                    sep_len = self.length_function(separator) if separator else 0
+                    overlap_parts: List[str] = []
+                    overlap_len = 0
+                    for seg in reversed(current_chunk):
+                        seg_len = self.length_function(seg)
+                        extra = sep_len if overlap_parts else 0
+                        if overlap_len + seg_len + extra <= self.chunk_overlap:
+                            overlap_parts.insert(0, seg)
+                            overlap_len += seg_len + extra
+                        else:
+                            break
+                    current_chunk = overlap_parts + [split] if overlap_parts else [split]
                     current_length = self.length_function(
                         separator.join(current_chunk) if separator else "".join(current_chunk)
                     )
@@ -267,7 +279,11 @@ class RecursiveTextSplitter(TextSplitter):
             else:
                 final_chunks.append(chunk)
 
-        return final_chunks
+        # Filter out empty and whitespace-only chunks produced by consecutive
+        # separators (e.g. '\n\n\n\n' → ['', ''] after split('\n\n')).  Empty
+        # chunks create zero-content Documents that pollute BM25 indexes and
+        # produce zero-norm embedding vectors downstream.
+        return [c for c in final_chunks if c.strip()]
 
 
 def _split_into_sentences(text: str) -> List[str]:
@@ -356,6 +372,22 @@ class SemanticChunker:
             return [text.strip()] if text.strip() else []
 
         embeddings = self.embedder.embed_texts(sentences)
+
+        # Guard against embedders that return fewer vectors than sentences (e.g. API
+        # truncation or a buggy mock).  When truncation would reduce the usable
+        # sentence count to ≤1, fall back to returning the full text as a single
+        # chunk rather than silently discarding sentences that have no embedding.
+        # Only proceed with truncation when enough embeddings remain to drive
+        # meaningful similarity comparisons.
+        if len(embeddings) < len(sentences):
+            if len(embeddings) <= 1:
+                # Not enough embeddings to compute inter-sentence similarity;
+                # return the whole text as a single chunk to avoid data loss.
+                return [text.strip()] if text.strip() else []
+            sentences = sentences[: len(embeddings)]
+
+        if len(sentences) <= 1:
+            return [" ".join(sentences)] if sentences else [text.strip()]
 
         chunks: List[str] = []
         current_group: List[str] = [sentences[0]]
@@ -458,10 +490,16 @@ class ContextualChunker:
         if not hasattr(base_chunker, "split_documents"):
             raise TypeError("base_chunker must have a split_documents(documents) method")
 
+        template = prompt_template or self._DEFAULT_PROMPT
+        if "{document}" not in template or "{chunk}" not in template:
+            raise ValueError(
+                "prompt_template must contain both {document} and {chunk} placeholders"
+            )
+
         self.base_chunker = base_chunker
         self.provider = provider
         self.model = model
-        self.prompt_template = prompt_template or self._DEFAULT_PROMPT
+        self.prompt_template = template
         self.max_document_chars = max_document_chars
         self.context_prefix = context_prefix
 
@@ -492,20 +530,29 @@ class ContextualChunker:
             full_text = doc_text_map[origin_idx]
             truncated_doc = full_text[: self.max_document_chars]
 
+            # Escape closing XML delimiters so a malicious document cannot break
+            # out of the <document>/<chunk> tags and inject instructions.
+            safe_doc = truncated_doc.replace("</document>", "<\\/document>")
+            safe_chunk = chunk_doc.text.replace("</chunk>", "<\\/chunk>")
+
             prompt = self.prompt_template.format(
-                document=truncated_doc,
-                chunk=chunk_doc.text,
+                document=safe_doc,
+                chunk=safe_chunk,
             )
 
-            response_msg, _ = self.provider.complete(
-                model=self.model,
-                system_prompt="You are a concise technical writer.",
-                messages=[Message(role=Role.USER, content=prompt)],
-                tools=[],
-                temperature=0.0,
-            )
-
-            context_line = (response_msg.content or "").strip()
+            try:
+                response_msg, _ = self.provider.complete(
+                    model=self.model,
+                    system_prompt="You are a concise technical writer.",
+                    messages=[Message(role=Role.USER, content=prompt)],
+                    tools=[],
+                    temperature=0.0,
+                )
+                context_line = (response_msg.content or "").strip()
+            except Exception:
+                # If context generation fails, fall back to no context rather
+                # than aborting the entire chunking pipeline.
+                context_line = ""
             enriched_text = f"{self.context_prefix}{context_line}\n\n{chunk_doc.text}"
 
             metadata = chunk_doc.metadata.copy()

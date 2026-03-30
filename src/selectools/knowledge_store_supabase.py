@@ -64,6 +64,12 @@ class SupabaseKnowledgeStore:
         metadata = row.get("metadata", {})
         if isinstance(metadata, str):
             metadata = json.loads(metadata)
+        created_at = datetime.fromisoformat(row["created_at"])
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        updated_at = datetime.fromisoformat(row["updated_at"])
+        if updated_at.tzinfo is None:
+            updated_at = updated_at.replace(tzinfo=timezone.utc)
         return KnowledgeEntry(
             id=row["id"],
             content=row["content"],
@@ -71,8 +77,8 @@ class SupabaseKnowledgeStore:
             importance=float(row.get("importance", 0.5)),
             persistent=bool(row.get("persistent", False)),
             ttl_days=row.get("ttl_days"),
-            created_at=datetime.fromisoformat(row["created_at"]),
-            updated_at=datetime.fromisoformat(row["updated_at"]),
+            created_at=created_at,
+            updated_at=updated_at,
             metadata=metadata,
         )
 
@@ -104,7 +110,9 @@ class SupabaseKnowledgeStore:
         if category is not None:
             builder = builder.eq("category", category)
         if since is not None:
-            builder = builder.gte("created_at", since.isoformat())
+            # Normalize naive since to UTC-aware for correct ISO string comparison.
+            since_aware = since if since.tzinfo is not None else since.replace(tzinfo=timezone.utc)
+            builder = builder.gte("created_at", since_aware.isoformat())
         builder = builder.order("importance", desc=True).limit(limit)
         response = builder.execute()
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 import re
+import threading
 from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
@@ -177,6 +178,7 @@ class BM25:
         self.b = b
         self.remove_stopwords = remove_stopwords
 
+        self._lock = threading.Lock()
         self._docs: List[_IndexedDoc] = []
         self._doc_count: int = 0
         self._avg_doc_len: float = 0.0
@@ -212,8 +214,8 @@ class BM25:
         Args:
             documents: Documents to index.
         """
-        self._docs = []
-        self._df = {}
+        new_docs: List[_IndexedDoc] = []
+        new_df: Dict[str, int] = {}
         total_len = 0
 
         for doc in documents:
@@ -224,14 +226,16 @@ class BM25:
                 term_freqs=dict(tf),
                 doc_len=len(tokens),
             )
-            self._docs.append(idx_doc)
+            new_docs.append(idx_doc)
             total_len += idx_doc.doc_len
-
             for term in tf:
-                self._df[term] = self._df.get(term, 0) + 1
+                new_df[term] = new_df.get(term, 0) + 1
 
-        self._doc_count = len(self._docs)
-        self._avg_doc_len = total_len / self._doc_count if self._doc_count else 0.0
+        with self._lock:
+            self._docs = new_docs
+            self._df = new_df
+            self._doc_count = len(self._docs)
+            self._avg_doc_len = total_len / self._doc_count if self._doc_count else 0.0
 
     def add_documents(self, documents: List[Document]) -> None:
         """
@@ -242,7 +246,9 @@ class BM25:
         Args:
             documents: Documents to add.
         """
-        total_len = self._avg_doc_len * self._doc_count
+        new_docs: List[_IndexedDoc] = []
+        new_df_delta: Dict[str, int] = {}
+        total_new_len = 0
 
         for doc in documents:
             tokens = self.tokenize(doc.text)
@@ -252,14 +258,18 @@ class BM25:
                 term_freqs=dict(tf),
                 doc_len=len(tokens),
             )
-            self._docs.append(idx_doc)
-            total_len += idx_doc.doc_len
-
+            new_docs.append(idx_doc)
+            total_new_len += idx_doc.doc_len
             for term in tf:
-                self._df[term] = self._df.get(term, 0) + 1
+                new_df_delta[term] = new_df_delta.get(term, 0) + 1
 
-        self._doc_count = len(self._docs)
-        self._avg_doc_len = total_len / self._doc_count if self._doc_count else 0.0
+        with self._lock:
+            self._docs.extend(new_docs)
+            for term, delta in new_df_delta.items():
+                self._df[term] = self._df.get(term, 0) + delta
+            self._doc_count = len(self._docs)
+            total_len = self._avg_doc_len * (self._doc_count - len(new_docs)) + total_new_len
+            self._avg_doc_len = total_len / self._doc_count if self._doc_count else 0.0
 
     def search(
         self,
@@ -280,8 +290,19 @@ class BM25:
             List of ``SearchResult`` objects sorted by BM25 score (highest first).
             Scores are non-negative; documents with zero relevance are excluded.
         """
-        if self._doc_count == 0:
-            return []
+        if top_k < 1:
+            raise ValueError(f"top_k must be >= 1, got {top_k}")
+
+        # Take an atomic snapshot of all shared index state so that concurrent
+        # index_documents / add_documents / clear calls cannot race with the
+        # scoring loop below (which must not hold the lock during CPU work).
+        with self._lock:
+            if self._doc_count == 0:
+                return []
+            docs_snapshot = list(self._docs)
+            doc_count_snapshot = self._doc_count
+            avg_doc_len_snapshot = self._avg_doc_len
+            df_snapshot = dict(self._df)
 
         query_terms = self.tokenize(query)
         if not query_terms:
@@ -289,12 +310,14 @@ class BM25:
 
         scores: List[float] = []
 
-        for idx_doc in self._docs:
+        for idx_doc in docs_snapshot:
             if filter and not self._matches_filter(idx_doc.document, filter):
                 scores.append(0.0)
                 continue
 
-            score = self._score_document(idx_doc, query_terms)
+            score = self._score_document_snapshot(
+                idx_doc, query_terms, doc_count_snapshot, avg_doc_len_snapshot, df_snapshot
+            )
             scores.append(score)
 
         ranked = sorted(
@@ -309,7 +332,7 @@ class BM25:
                 break
             results.append(
                 SearchResult(
-                    document=self._docs[i].document,
+                    document=docs_snapshot[i].document,
                     score=scores[i],
                 )
             )
@@ -320,25 +343,45 @@ class BM25:
 
     def clear(self) -> None:
         """Remove all documents from the index."""
-        self._docs = []
-        self._doc_count = 0
-        self._avg_doc_len = 0.0
-        self._df = {}
+        with self._lock:
+            self._docs = []
+            self._doc_count = 0
+            self._avg_doc_len = 0.0
+            self._df = {}
 
     def _score_document(self, idx_doc: _IndexedDoc, query_terms: List[str]) -> float:
-        """Compute BM25 score for a single document against query terms."""
+        """Compute BM25 score using current instance state (not thread-safe — use snapshot variant)."""
+        return self._score_document_snapshot(
+            idx_doc, query_terms, self._doc_count, self._avg_doc_len, self._df
+        )
+
+    def _score_document_snapshot(
+        self,
+        idx_doc: _IndexedDoc,
+        query_terms: List[str],
+        doc_count: int,
+        avg_doc_len: float,
+        df: Dict[str, int],
+    ) -> float:
+        """Compute BM25 score against explicit (snapshot) index parameters.
+
+        Accepts pre-snapshotted ``doc_count``, ``avg_doc_len``, and ``df`` so
+        the caller can operate on a consistent view of the index without holding
+        the lock during CPU-bound scoring.
+        """
         score = 0.0
         for term in query_terms:
             if term not in idx_doc.term_freqs:
                 continue
 
             tf = idx_doc.term_freqs[term]
-            df = self._df.get(term, 0)
+            term_df = df.get(term, 0)
 
-            idf = math.log((self._doc_count - df + 0.5) / (df + 0.5) + 1.0)
+            idf = math.log((doc_count - term_df + 0.5) / (term_df + 0.5) + 1.0)
 
             numerator = tf * (self.k1 + 1)
-            denominator = tf + self.k1 * (1 - self.b + self.b * idx_doc.doc_len / self._avg_doc_len)
+            avg_len = avg_doc_len if avg_doc_len > 0 else 1e-8
+            denominator = tf + self.k1 * (1 - self.b + self.b * idx_doc.doc_len / avg_len)
             score += idf * numerator / denominator
 
         return score

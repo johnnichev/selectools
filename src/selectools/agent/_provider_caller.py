@@ -3,9 +3,29 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, cast
+
+# Module-level singleton for running sync provider calls in an async context.
+# Creating a new ThreadPoolExecutor per call (inside a retry loop) wastes
+# resources and prevents thread reuse (pitfall #20).
+_async_provider_executor: Optional[ThreadPoolExecutor] = None
+_async_provider_executor_lock = threading.Lock()
+
+
+def _get_async_provider_executor() -> ThreadPoolExecutor:
+    """Return the shared ThreadPoolExecutor for sync provider calls in async context."""
+    global _async_provider_executor
+    if _async_provider_executor is None:
+        with _async_provider_executor_lock:
+            if _async_provider_executor is None:
+                _async_provider_executor = ThreadPoolExecutor(
+                    max_workers=16, thread_name_prefix="selectools_provider"
+                )
+    return _async_provider_executor
+
 
 from ..cache import CacheKeyBuilder
 from ..providers.base import ProviderError
@@ -252,7 +272,20 @@ class _ProviderCallerMixin:
                         self._effective_model,
                         self._system_prompt,
                     )
+                    await self._anotify_observers(
+                        "on_llm_start",
+                        run_id,
+                        self._history,
+                        self._effective_model,
+                        self._system_prompt,
+                    )
                     self._notify_observers(
+                        "on_llm_end",
+                        run_id,
+                        cached_msg.content,
+                        cached_usage,
+                    )
+                    await self._anotify_observers(
                         "on_llm_end",
                         run_id,
                         cached_msg.content,
@@ -264,7 +297,14 @@ class _ProviderCallerMixin:
                         self._effective_model,
                         cached_msg.content or "",
                     )
+                    await self._anotify_observers(
+                        "on_cache_hit",
+                        run_id,
+                        self._effective_model,
+                        cached_msg.content or "",
+                    )
                     self._notify_observers("on_usage", run_id, cached_usage)
+                    await self._anotify_observers("on_usage", run_id, cached_usage)
                 if self.config.verbose:
                     print("[agent] cache hit -- skipping provider call")
                 if trace is not None:
@@ -322,21 +362,21 @@ class _ProviderCallerMixin:
                     )
                     response_text = response_msg.content or ""
                 else:
-                    # Fallback to sync in executor
-                    loop = asyncio.get_event_loop()
-                    with ThreadPoolExecutor() as executor:
-                        response_msg, usage_stats = await loop.run_in_executor(
-                            executor,
-                            lambda: self.provider.complete(
-                                model=self._effective_model,
-                                system_prompt=self._system_prompt,
-                                messages=self._history,
-                                tools=self.tools,
-                                temperature=self.config.temperature,
-                                max_tokens=self.config.max_tokens,
-                                timeout=self.config.request_timeout,
-                            ),
-                        )
+                    # Fallback to sync in executor — reuse the module-level singleton
+                    # to avoid spawning a new thread pool on every retry attempt.
+                    loop = asyncio.get_running_loop()
+                    response_msg, usage_stats = await loop.run_in_executor(
+                        _get_async_provider_executor(),
+                        lambda: self.provider.complete(
+                            model=self._effective_model,
+                            system_prompt=self._system_prompt,
+                            messages=self._history,
+                            tools=self.tools,
+                            temperature=self.config.temperature,
+                            max_tokens=self.config.max_tokens,
+                            timeout=self.config.request_timeout,
+                        ),
+                    )
                     response_text = response_msg.content or ""
 
                 self.usage.add_usage(usage_stats, tool_name=None)

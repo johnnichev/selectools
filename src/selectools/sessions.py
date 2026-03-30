@@ -141,8 +141,11 @@ class JsonFileSessionStore:
         with self._lock:
             if not os.path.exists(path):
                 return None
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                return None
             if self._is_expired(data):
                 try:
                     os.remove(path)
@@ -441,6 +444,7 @@ class RedisSessionStore:
 
     def list(self) -> List[SessionMetadata]:
         results: List[SessionMetadata] = []
+        seen_ids: set = set()
         cursor: int = 0
         pattern = f"{self._prefix}*:meta"
         while True:
@@ -451,11 +455,17 @@ class RedisSessionStore:
                     continue
                 try:
                     meta = json.loads(raw)
-                except (json.JSONDecodeError, TypeError):
+                    # Guard against non-metadata JSON (e.g. data key accidentally
+                    # matched when session_id ends with ":meta") and SCAN duplicates.
+                    session_id = meta["session_id"]
+                except (json.JSONDecodeError, TypeError, KeyError):
                     continue
+                if session_id in seen_ids:
+                    continue
+                seen_ids.add(session_id)
                 results.append(
                     SessionMetadata(
-                        session_id=meta["session_id"],
+                        session_id=session_id,
                         message_count=meta.get("message_count", 0),
                         created_at=meta.get("created_at", 0),
                         updated_at=meta.get("updated_at", 0),

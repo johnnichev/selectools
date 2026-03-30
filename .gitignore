@@ -51,3 +51,6 @@ mypy_output.txt
 
 # Private
 .private/
+
+# Hypothesis test artifacts
+.hypothesis/

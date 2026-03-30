@@ -1,9 +1,9 @@
 """Public exports for the selectools package."""
 
-__version__ = "0.19.0"
+__version__ = "0.19.1"
 
 # Import submodules (lazy loading for optional dependencies)
-from . import embeddings, evals, guardrails, models, rag, toolbox
+from . import embeddings, evals, guardrails, models, patterns, rag, toolbox
 from .agent import Agent, AgentConfig
 from .agent.config_groups import (
     BudgetConfig,
@@ -99,6 +99,19 @@ from .orchestration import (
     SupervisorStrategy,
 )
 from .parser import ToolCallParser
+from .patterns import (
+    DebateAgent,
+    DebateResult,
+    DebateRound,
+    PlanAndExecuteAgent,
+    PlanStep,
+    ReflectionRound,
+    ReflectiveAgent,
+    ReflectiveResult,
+    Subtask,
+    TeamLeadAgent,
+    TeamLeadResult,
+)
 from .pipeline import Pipeline, Step, StepResult, branch, cache_step, parallel, retry, step
 from .policy import PolicyDecision, PolicyResult, ToolPolicy
 from .pricing import PRICING, calculate_cost, calculate_embedding_cost, get_model_pricing
@@ -267,4 +280,17 @@ __all__ = [
     "SupervisorAgent",
     "SupervisorStrategy",
     "ModelSplit",
+    # Patterns
+    "patterns",
+    "PlanAndExecuteAgent",
+    "PlanStep",
+    "ReflectiveAgent",
+    "ReflectionRound",
+    "ReflectiveResult",
+    "DebateAgent",
+    "DebateRound",
+    "DebateResult",
+    "TeamLeadAgent",
+    "Subtask",
+    "TeamLeadResult",
 ]

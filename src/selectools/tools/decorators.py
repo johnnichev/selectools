@@ -5,13 +5,21 @@ Decorators for tool definition and registration.
 from __future__ import annotations
 
 import inspect
+import sys
 from typing import Any, Callable, Dict, List, Optional, Union, get_args, get_origin, get_type_hints
 
 from .base import ParamMetadata, Tool, ToolParameter
 
 
 def _unwrap_type(type_hint: Any) -> Any:
-    """Unwrap Optional[T] to T."""
+    """Unwrap Optional[T] / Union[T, None] to T.
+
+    Also strips generic parameters from collection types so that
+    ``List[str]`` → ``list``, ``Dict[str, Any]`` → ``dict``, etc.
+    This allows parameters annotated as ``Optional[List[str]]`` to be
+    recognised as the supported ``list`` type rather than raising
+    ``ToolValidationError: Unsupported parameter type: typing.List[str]``.
+    """
     origin = get_origin(type_hint)
     if origin is Union:
         args = get_args(type_hint)
@@ -19,11 +27,27 @@ def _unwrap_type(type_hint: Any) -> Any:
         non_none_args = [a for a in args if a is not type(None)]
         if len(non_none_args) == 1:
             return _unwrap_type(non_none_args[0])
+    # Handle Python 3.10+ X | Y syntax (types.UnionType)
+    if sys.version_info >= (3, 10):
+        import types  # noqa: PLC0415
+
+        if isinstance(type_hint, types.UnionType):
+            args = get_args(type_hint)
+            non_none_args = [a for a in args if a is not type(None)]
+            if len(non_none_args) == 1:
+                return _unwrap_type(non_none_args[0])
+    # Strip generic parameters from collection types: List[str] → list,
+    # Dict[str, Any] → dict, list[str] → list (Python 3.9+ native syntax).
+    _SUPPORTED_ORIGINS = {list, dict}
+    if origin in _SUPPORTED_ORIGINS:
+        return origin
     return type_hint
 
 
 def _infer_parameters_from_callable(
-    func: Callable[..., Any], param_metadata: Optional[Dict[str, ParamMetadata]] = None
+    func: Callable[..., Any],
+    param_metadata: Optional[Dict[str, ParamMetadata]] = None,
+    injected_kwargs: Optional[Dict[str, Any]] = None,
 ) -> List[ToolParameter]:
     """
     Inspect function signature to create ToolParameter objects.
@@ -31,18 +55,33 @@ def _infer_parameters_from_callable(
     Args:
         func: The function to inspect.
         param_metadata: Optional manual overrides for parameter descriptions/enums.
+        injected_kwargs: Keys to exclude from inferred parameters (not visible to LLM).
 
     Returns:
         List of ToolParameter objects inferred from type hints.
     """
-    type_hints = get_type_hints(func)
+    try:
+        type_hints = get_type_hints(func)
+    except Exception:
+        # Forward references that can't be resolved fall back to raw annotations,
+        # which may be strings (PEP 563). Use an empty dict so all params default to str.
+        type_hints = getattr(func, "__annotations__", {})
     sig = inspect.signature(func)
     parameters = []
     param_metadata = param_metadata or {}
+    injected_names = set(injected_kwargs.keys()) if injected_kwargs else set()
 
     for name, param in sig.parameters.items():
         # Skip self/cls for methods
         if name in ("self", "cls"):
+            continue
+
+        # Skip *args and **kwargs — variadic collectors are not discrete LLM parameters
+        if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
+            continue
+
+        # Skip injected kwargs — they are provided at runtime, not by the LLM
+        if name in injected_names:
             continue
 
         # Get type hint (default to str if missing)
@@ -126,7 +165,7 @@ def tool(
     def decorator(func: Callable[..., Any]) -> Tool:
         tool_name = name or func.__name__
         tool_description = description or inspect.getdoc(func) or f"Tool {tool_name}"
-        parameters = _infer_parameters_from_callable(func, param_metadata)
+        parameters = _infer_parameters_from_callable(func, param_metadata, injected_kwargs)
 
         tool_instance = Tool(
             name=tool_name,

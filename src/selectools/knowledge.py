@@ -55,7 +55,10 @@ class KnowledgeEntry:
         """Whether this entry has passed its TTL."""
         if self.ttl_days is None:
             return False
-        return datetime.now(timezone.utc) > self.created_at + timedelta(days=self.ttl_days)
+        created = self.created_at
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) > created + timedelta(days=self.ttl_days)
 
 
 # ======================================================================
@@ -140,6 +143,12 @@ class FileKnowledgeStore:
                     continue
                 try:
                     d = json.loads(line)
+                    created_at = datetime.fromisoformat(d["created_at"])
+                    if created_at.tzinfo is None:
+                        created_at = created_at.replace(tzinfo=timezone.utc)
+                    updated_at = datetime.fromisoformat(d["updated_at"])
+                    if updated_at.tzinfo is None:
+                        updated_at = updated_at.replace(tzinfo=timezone.utc)
                     entries.append(
                         KnowledgeEntry(
                             id=d["id"],
@@ -148,12 +157,12 @@ class FileKnowledgeStore:
                             importance=d.get("importance", 0.5),
                             persistent=d.get("persistent", False),
                             ttl_days=d.get("ttl_days"),
-                            created_at=datetime.fromisoformat(d["created_at"]),
-                            updated_at=datetime.fromisoformat(d["updated_at"]),
+                            created_at=created_at,
+                            updated_at=updated_at,
                             metadata=d.get("metadata", {}),
                         )
                     )
-                except (json.JSONDecodeError, KeyError):
+                except (json.JSONDecodeError, KeyError, ValueError):
                     continue
         return entries
 
@@ -206,6 +215,10 @@ class FileKnowledgeStore:
     ) -> List[KnowledgeEntry]:
         with self._lock:
             entries = self._load_all()
+        # Normalize naive since to UTC-aware to match stored entry datetimes.
+        since_aware: Optional[datetime] = None
+        if since is not None:
+            since_aware = since if since.tzinfo is not None else since.replace(tzinfo=timezone.utc)
         result = []
         for e in entries:
             if e.is_expired:
@@ -214,7 +227,7 @@ class FileKnowledgeStore:
                 continue
             if e.importance < min_importance:
                 continue
-            if since and e.created_at < since:
+            if since_aware and e.created_at < since_aware:
                 continue
             result.append(e)
         result.sort(key=lambda x: x.importance, reverse=True)
@@ -303,6 +316,12 @@ class SQLiteKnowledgeStore:
             )
 
     def _row_to_entry(self, row: tuple) -> KnowledgeEntry:
+        created_at = datetime.fromisoformat(row[6])
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        updated_at = datetime.fromisoformat(row[7])
+        if updated_at.tzinfo is None:
+            updated_at = updated_at.replace(tzinfo=timezone.utc)
         return KnowledgeEntry(
             id=row[0],
             content=row[1],
@@ -310,8 +329,8 @@ class SQLiteKnowledgeStore:
             importance=row[3],
             persistent=bool(row[4]),
             ttl_days=row[5],
-            created_at=datetime.fromisoformat(row[6]),
-            updated_at=datetime.fromisoformat(row[7]),
+            created_at=created_at,
+            updated_at=updated_at,
             metadata=json.loads(row[8]) if row[8] else {},
         )
 
@@ -354,8 +373,11 @@ class SQLiteKnowledgeStore:
             clauses.append("category = ?")
             params.append(category)
         if since:
+            # Normalize naive since to UTC-aware so the ISO string comparison
+            # against stored '+00:00' timestamps is lexicographically correct.
+            since_aware = since if since.tzinfo is not None else since.replace(tzinfo=timezone.utc)
             clauses.append("created_at >= ?")
-            params.append(since.isoformat())
+            params.append(since_aware.isoformat())
         where = " AND ".join(clauses)
         # LIMIT is applied in Python after TTL filtering to avoid returning
         # fewer results than requested when expired entries are present.
@@ -392,12 +414,16 @@ class SQLiteKnowledgeStore:
                     continue
                 if ttl is not None:
                     created_dt = datetime.fromisoformat(created)
+                    if created_dt.tzinfo is None:
+                        created_dt = created_dt.replace(tzinfo=timezone.utc)
                     if now > created_dt + timedelta(days=ttl):
                         conn.execute("DELETE FROM knowledge WHERE id = ?", (row_id,))
                         removed += 1
                         continue
                 if max_age_days is not None:
                     created_dt = datetime.fromisoformat(created)
+                    if created_dt.tzinfo is None:
+                        created_dt = created_dt.replace(tzinfo=timezone.utc)
                     if now > created_dt + timedelta(days=max_age_days):
                         conn.execute("DELETE FROM knowledge WHERE id = ?", (row_id,))
                         removed += 1
@@ -512,12 +538,17 @@ class KnowledgeMemory:
         return entry_id
 
     def _enforce_max_entries(self) -> None:
-        """Evict lowest-importance non-persistent entries if over max_entries."""
-        current = self._store.count()
+        """Evict lowest-importance non-persistent entries if over max_entries.
+
+        Uses the live (non-expired) entry count from ``query()`` rather than
+        ``count()`` so that entries already past their TTL do not trigger
+        unnecessary eviction of valid entries.
+        """
+        # Use a large limit to fetch all live (non-expired) entries.
+        all_entries = self._store.query(limit=self._max_entries + 1000)
+        current = len(all_entries)
         if current <= self._max_entries:
             return
-        # Get all entries sorted by importance ascending
-        all_entries = self._store.query(limit=current + 1)
         all_entries.sort(key=lambda e: e.importance)
         to_remove = current - self._max_entries
         removed = 0

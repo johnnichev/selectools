@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import json as _json
 import re
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Dict, List, Optional, Protocol, Tuple, Union, runtime_checkable
 
 from .types import CaseResult, EvalFailure, TestCase
 
@@ -798,6 +799,393 @@ class MarkdownFormatEvaluator:
         return []
 
 
+class ReadabilityEvaluator:
+    """Checks expect_readability_gte — Flesch Reading Ease score.
+
+    Higher score = easier to read. Typical ranges:
+    - 90-100: Very easy (5th grade)
+    - 60-70: Standard (8th-9th grade)
+    - 30-50: Difficult (college level)
+    - 0-30: Very difficult (professional)
+    """
+
+    name: str = "readability"
+
+    def check(self, case: TestCase, case_result: CaseResult) -> List[EvalFailure]:
+        if case.expect_readability_gte is None or case_result.agent_result is None:
+            return []
+        content = case_result.agent_result.content or ""
+        if not content.strip():
+            return []
+
+        # Count words, sentences, syllables
+        # Split on whitespace that follows sentence-ending punctuation to avoid
+        # counting abbreviation dots (e.g. "Dr. Smith") as sentence boundaries.
+        sentences = max(1, len(re.split(r"(?<=[.!?])\s+", content.strip())))
+        words_list = content.split()
+        words = max(1, len(words_list))
+        syllables = sum(_count_syllables(w) for w in words_list)
+
+        score = 206.835 - 1.015 * (words / sentences) - 84.6 * (syllables / words)
+
+        if score < case.expect_readability_gte:
+            return [
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected=f">= {case.expect_readability_gte} Flesch score",
+                    actual=f"{score:.1f}",
+                    message=f"Readability score {score:.1f} below threshold "
+                    f"{case.expect_readability_gte} (higher = easier to read)",
+                )
+            ]
+        return []
+
+
+def _count_syllables(word: str) -> int:
+    """Count syllables in a word using vowel group heuristic."""
+    word = word.lower().rstrip(".,!?;:\"'")
+    if not word:
+        return 0
+    groups = len(re.findall(r"[aeiouy]+", word))
+    # Silent e: subtract 1 if word ends with 'e' and has more than 1 group
+    if word.endswith("e") and groups > 1:
+        groups -= 1
+    return max(1, groups)
+
+
+class AgentTrajectoryEvaluator:
+    """Checks expect_trajectory — tool names must appear as an in-order subsequence.
+
+    The expected steps must be a subsequence of the actual tool calls
+    (order-preserving, gaps allowed). E.g. expect=['search', 'write']
+    passes if actual=['search', 'read', 'write'].
+    """
+
+    name: str = "agent_trajectory"
+
+    def check(self, case: TestCase, case_result: CaseResult) -> List[EvalFailure]:
+        if case.expect_trajectory is None:
+            return []
+        actual = case_result.tool_calls
+        expected = case.expect_trajectory
+        if not expected:
+            return []
+
+        # Subsequence check: greedily match expected steps in order
+        ai = 0
+        for step in expected:
+            while ai < len(actual) and actual[ai] != step:
+                ai += 1
+            if ai >= len(actual):
+                return [
+                    EvalFailure(
+                        evaluator_name=self.name,
+                        expected=expected,
+                        actual=actual,
+                        message=f"Agent trajectory missing step '{step}'. "
+                        f"Expected subsequence {expected}, got {actual}",
+                    )
+                ]
+            ai += 1
+        return []
+
+
+class ToolEfficiencyEvaluator:
+    """Checks expect_max_tools — agent should not call more tools than needed."""
+
+    name: str = "tool_efficiency"
+
+    def check(self, case: TestCase, case_result: CaseResult) -> List[EvalFailure]:
+        if case.expect_max_tools is None:
+            return []
+        count = len(case_result.tool_calls)
+        if count > case.expect_max_tools:
+            return [
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected=f"<= {case.expect_max_tools} tool calls",
+                    actual=f"{count} tool calls",
+                    message=f"Agent called {count} tools (limit: {case.expect_max_tools}): "
+                    f"{case_result.tool_calls}",
+                )
+            ]
+        return []
+
+
+class SemanticSimilarityEvaluator:
+    """Checks expect_semantic_similarity_gte — TF-IDF cosine similarity against reference.
+
+    Pure Python implementation (no external deps). Requires ``reference`` on TestCase.
+    For embedding-based similarity, use a custom LLMJudgeEvaluator instead.
+    """
+
+    name: str = "semantic_similarity"
+
+    def __init__(self, *, threshold: Optional[float] = None) -> None:
+        self.threshold = threshold
+
+    def check(self, case: TestCase, case_result: CaseResult) -> List[EvalFailure]:
+        threshold = (
+            case.expect_semantic_similarity_gte
+            if case.expect_semantic_similarity_gte is not None
+            else self.threshold
+        )
+        if threshold is None:
+            return []
+        if case.reference is None or case_result.agent_result is None:
+            return []
+        content = case_result.agent_result.content or ""
+        if not content.strip() or not case.reference.strip():
+            return []
+
+        similarity = _tf_cosine(content, case.reference)
+
+        if similarity < threshold:
+            return [
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected=f">= {threshold:.2f} cosine similarity",
+                    actual=f"{similarity:.3f}",
+                    message=f"Semantic similarity {similarity:.3f} below threshold {threshold:.2f}",
+                )
+            ]
+        return []
+
+
+def _tf_cosine(text_a: str, text_b: str) -> float:
+    """Compute TF (term-frequency) cosine similarity between two texts (pure Python).
+
+    Uses raw term counts — no IDF weighting. Sufficient for short response
+    comparison; for embedding-based similarity use SemanticSimilarityEvaluator
+    with an LLM judge.
+    """
+    import math
+
+    def tokenize(text: str) -> List[str]:
+        return re.findall(r"[a-z0-9]+", text.lower())
+
+    tokens_a = tokenize(text_a)
+    tokens_b = tokenize(text_b)
+    if not tokens_a or not tokens_b:
+        return 0.0
+
+    vocab = list(set(tokens_a) | set(tokens_b))
+    vec_a = {w: tokens_a.count(w) for w in vocab}
+    vec_b = {w: tokens_b.count(w) for w in vocab}
+
+    dot = sum(vec_a[w] * vec_b[w] for w in vocab)
+    norm_a = math.sqrt(sum(v * v for v in vec_a.values()))
+    norm_b = math.sqrt(sum(v * v for v in vec_b.values()))
+
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
+class MultiTurnCoherenceEvaluator:
+    """Checks expect_coherent_turns — heuristic contradiction detector.
+
+    Lightweight regex-based check for explicit negation contradictions within
+    the response. For robust coherence checking, use CoherenceEvaluator (LLM-based).
+    """
+
+    name: str = "multi_turn_coherence"
+
+    # Patterns like "X is Y" ... "X is not Y" within the same text
+    _NEGATION_CONTRADICTION = re.compile(
+        r"\b(\w+)\s+is\s+(\w+)\b.{0,500}\b\1\s+is\s+not\s+\2\b",
+        re.IGNORECASE | re.DOTALL,
+    )
+    _ALT_NEGATION = re.compile(
+        r"\b(\w+)\s+is\s+not\s+(\w+)\b.{0,500}\b\1\s+is\s+\2\b",
+        re.IGNORECASE | re.DOTALL,
+    )
+
+    def check(self, case: TestCase, case_result: CaseResult) -> List[EvalFailure]:
+        if not case.expect_coherent_turns or case_result.agent_result is None:
+            return []
+        content = case_result.agent_result.content or ""
+        if not content.strip():
+            return []
+
+        if self._NEGATION_CONTRADICTION.search(content) or self._ALT_NEGATION.search(content):
+            return [
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected="coherent response with no contradictions",
+                    actual="contradiction pattern detected",
+                    message="Response contains contradictory statements "
+                    "(heuristic check — verify manually for false positives)",
+                )
+            ]
+        return []
+
+
+class JsonSchemaEvaluator:
+    """Checks expect_json_schema — parses response as JSON, then validates against schema.
+
+    Uses ``jsonschema`` library if available; falls back to a minimal validator
+    checking ``required`` fields and top-level ``type`` only.
+    """
+
+    name: str = "json_schema"
+
+    def check(self, case: TestCase, case_result: CaseResult) -> List[EvalFailure]:
+        if case.expect_json_schema is None or case_result.agent_result is None:
+            return []
+
+        content = case_result.agent_result.content or ""
+        # Strip markdown fences — match any language tag (```json, ```python, bare ```)
+        content = re.sub(r"^```[^\n]*\n?", "", content.strip())
+        content = re.sub(r"\n?```\s*$", "", content.strip())
+
+        try:
+            data = _json.loads(content)
+        except (ValueError, TypeError):
+            return [
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected="valid JSON matching schema",
+                    actual=content[:200],
+                    message="Response is not valid JSON",
+                )
+            ]
+
+        schema = case.expect_json_schema
+        errors = _validate_json_schema(data, schema)
+        if errors:
+            return [
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected=f"JSON matching schema: {schema}",
+                    actual=str(data)[:200],
+                    message="; ".join(errors),
+                )
+            ]
+        return []
+
+
+def _validate_json_schema(data: Any, schema: Dict[str, Any]) -> List[str]:
+    """Minimal JSON Schema validator. Uses jsonschema if available."""
+    try:
+        import jsonschema  # type: ignore
+
+        validator = jsonschema.Draft7Validator(schema)
+        return [e.message for e in validator.iter_errors(data)]
+    except ImportError:
+        pass
+
+    # Minimal fallback: check type and required fields
+    violations: List[str] = []
+    expected_type = schema.get("type")
+    if expected_type:
+        _SchemaPythonType = Union[type, Tuple[type, ...]]
+        type_map: Dict[str, _SchemaPythonType] = {
+            "object": dict,
+            "array": list,
+            "string": str,
+            "number": (int, float),
+            "integer": int,
+            "boolean": bool,
+            "null": type(None),
+        }
+        py_type = type_map.get(expected_type) if isinstance(expected_type, str) else None
+        if py_type is not None and not isinstance(data, py_type):
+            violations.append(f"Expected type '{expected_type}', got {type(data).__name__}")
+
+    required = schema.get("required", [])
+    if isinstance(data, dict):
+        for field in required:
+            if field not in data:
+                violations.append(f"Required field '{field}' is missing")
+
+    return violations
+
+
+class KeywordDensityEvaluator:
+    """Checks expect_keywords (all must appear) and expect_keyword_density_min.
+
+    - ``expect_keywords``: all listed keywords must appear (case-insensitive).
+    - ``expect_keyword_density_min``: minimum ratio of total keyword occurrences
+      to total words (e.g. 0.05 = keywords make up at least 5% of words).
+    """
+
+    name: str = "keyword_density"
+
+    def check(self, case: TestCase, case_result: CaseResult) -> List[EvalFailure]:
+        if case.expect_keywords is None or case_result.agent_result is None:
+            return []
+        content = case_result.agent_result.content or ""
+        content_lower = content.lower()
+        failures: List[EvalFailure] = []
+
+        missing = [
+            kw
+            for kw in case.expect_keywords
+            if not re.search(r"\b" + re.escape(kw.lower()) + r"\b", content_lower)
+        ]
+        if missing:
+            failures.append(
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected=f"all keywords present: {case.expect_keywords}",
+                    actual=f"missing: {missing}",
+                    message=f"Keywords missing from response: {missing}",
+                )
+            )
+
+        if case.expect_keyword_density_min is not None and not missing:
+            words = content.split()
+            total_words = max(1, len(words))
+            kw_occurrences = sum(
+                len(re.findall(r"\b" + re.escape(kw.lower()) + r"\b", content_lower))
+                for kw in case.expect_keywords
+            )
+            density = kw_occurrences / total_words
+            if density < case.expect_keyword_density_min:
+                failures.append(
+                    EvalFailure(
+                        evaluator_name=self.name,
+                        expected=f">= {case.expect_keyword_density_min:.3f} keyword density",
+                        actual=f"{density:.3f}",
+                        message=f"Keyword density {density:.3f} below minimum "
+                        f"{case.expect_keyword_density_min:.3f}",
+                    )
+                )
+
+        return failures
+
+
+class ForbiddenWordsEvaluator:
+    """Checks expect_no_keywords — none of the listed words may appear in the response.
+
+    Useful for safety checks (e.g. no competitor names, no profanity,
+    no confidential terms). Case-insensitive.
+    """
+
+    name: str = "forbidden_words"
+
+    def check(self, case: TestCase, case_result: CaseResult) -> List[EvalFailure]:
+        if case.expect_no_keywords is None or case_result.agent_result is None:
+            return []
+        content = (case_result.agent_result.content or "").lower()
+        found = [
+            kw
+            for kw in case.expect_no_keywords
+            if re.search(r"\b" + re.escape(kw.lower()) + r"\b", content)
+        ]
+        if found:
+            return [
+                EvalFailure(
+                    evaluator_name=self.name,
+                    expected=f"none of {case.expect_no_keywords} in response",
+                    actual=f"found: {found}",
+                    message=f"Forbidden words found in response: {found}",
+                )
+            ]
+        return []
+
+
 DEFAULT_EVALUATORS: List[Any] = [
     ToolUseEvaluator(),
     ContainsEvaluator(),
@@ -820,4 +1208,12 @@ DEFAULT_EVALUATORS: List[Any] = [
     URLValidityEvaluator(),
     MarkdownFormatEvaluator(),
     CustomEvaluator(),
+    ReadabilityEvaluator(),
+    AgentTrajectoryEvaluator(),
+    ToolEfficiencyEvaluator(),
+    SemanticSimilarityEvaluator(),
+    MultiTurnCoherenceEvaluator(),
+    JsonSchemaEvaluator(),
+    KeywordDensityEvaluator(),
+    ForbiddenWordsEvaluator(),
 ]

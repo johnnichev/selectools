@@ -152,6 +152,14 @@ class EvalSuite:
                     completed += 1
                     if self.on_progress:
                         self.on_progress(completed, len(self.cases))
+                    self._notify_observers(
+                        "eval_case_end",
+                        suite_name=self.name,
+                        case_name=result.case.name or result.case.input[:50],
+                        verdict=result.verdict.value,
+                        latency_ms=result.latency_ms,
+                        failures=len(result.failures),
+                    )
                 return result
 
             with ThreadPoolExecutor(max_workers=self.max_concurrency) as pool:
@@ -167,6 +175,13 @@ class EvalSuite:
         sem = asyncio.Semaphore(max(self.max_concurrency, 1))
         completed = 0
 
+        model = ""
+        if hasattr(self.agent, "config") and hasattr(self.agent.config, "model"):
+            model = self.agent.config.model or ""
+        self._notify_observers(
+            "eval_start", suite_name=self.name, total_cases=len(self.cases), model=model
+        )
+
         async def _run_with_sem(case: TestCase) -> CaseResult:
             nonlocal completed
             async with sem:
@@ -174,6 +189,14 @@ class EvalSuite:
                 completed += 1
                 if self.on_progress:
                     self.on_progress(completed, len(self.cases))
+                self._notify_observers(
+                    "eval_case_end",
+                    suite_name=self.name,
+                    case_name=result.case.name or result.case.input[:50],
+                    verdict=result.verdict.value,
+                    latency_ms=result.latency_ms,
+                    failures=len(result.failures),
+                )
                 return result
 
         tasks = [_run_with_sem(case) for case in self.cases]

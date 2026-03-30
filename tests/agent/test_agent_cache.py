@@ -8,6 +8,7 @@ import pytest
 
 from selectools import Agent, AgentConfig, InMemoryCache
 from selectools.cache import CacheKeyBuilder
+from selectools.observer import AsyncAgentObserver
 from selectools.tools import Tool, ToolParameter
 from selectools.types import Message, Role, ToolCall
 from selectools.usage import UsageStats
@@ -445,3 +446,44 @@ class TestCacheKeyIncludesTools:
             model="m", system_prompt="s", messages=msgs, tools=[tool_b], temperature=0.0
         )
         assert k1 != k2
+
+
+# ---------------------------------------------------------------------------
+# Regression: async observers must fire on cache hits in arun (bug fix)
+# ---------------------------------------------------------------------------
+
+
+class TestAsyncObserverCacheHit:
+    @pytest.mark.asyncio
+    async def test_async_observer_fires_on_cache_hit_in_arun(self) -> None:
+        """AsyncAgentObserver a_on_cache_hit must fire when arun serves from cache."""
+
+        class _RecordingAsyncObserver(AsyncAgentObserver):
+            blocking = True
+
+            def __init__(self) -> None:
+                self.cache_hits: List[str] = []
+                self.llm_ends: int = 0
+
+            async def a_on_cache_hit(self, run_id: str, model: str, response: str) -> None:
+                self.cache_hits.append(run_id)
+
+            async def a_on_llm_end(self, run_id: str, response: str, usage: Any) -> None:
+                self.llm_ends += 1
+
+        provider = FakeCachingProvider()
+        cache = InMemoryCache(max_size=10, default_ttl=60)
+        obs = _RecordingAsyncObserver()
+        config = AgentConfig(max_iterations=1, cache=cache, observers=[obs])
+        agent = Agent(tools=[_dummy_tool()], provider=provider, config=config)
+
+        # First call: cache miss
+        await agent.arun([Message(role=Role.USER, content="Async cache test")])
+        assert len(obs.cache_hits) == 0
+        first_llm_ends = obs.llm_ends
+
+        # Second call: cache hit — async observer must fire
+        agent.reset()
+        await agent.arun([Message(role=Role.USER, content="Async cache test")])
+        assert len(obs.cache_hits) == 1, "a_on_cache_hit must fire on arun cache hit"
+        assert obs.llm_ends > first_llm_ends, "a_on_llm_end must fire on arun cache hit"

@@ -78,7 +78,7 @@ class AnthropicProvider(Provider):
             timeout: Optional request timeout in seconds
 
         Returns:
-            Tuple of (response_text, usage_stats)
+            Tuple of (response_message, usage_stats)
 
         Raises:
             ProviderError: If the API call fails
@@ -338,7 +338,7 @@ class AnthropicProvider(Provider):
         Async version of complete() using AsyncAnthropic client.
 
         Returns:
-            Tuple of (response_text, usage_stats)
+            Tuple of (response_message, usage_stats)
         """
         payload = self._format_messages(messages)
         model_name = model or self.default_model

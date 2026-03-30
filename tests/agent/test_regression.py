@@ -963,3 +963,782 @@ class TestAnthropicSystemMessages:
             assert formatted[1].role == "user"
         except ImportError:
             pytest.skip("google-genai not installed")
+
+
+class TestToolTimeoutExecutorSingleton:
+    """Regression: _execute_tool_with_timeout must reuse a module-level
+    ThreadPoolExecutor singleton rather than spawning a new one per call.
+    Spawning per call leaks threads and creates excessive resource overhead
+    especially in tight loops (pitfall #20).
+    """
+
+    def test_tool_timeout_reuses_singleton_executor(self):
+        """Verify the module-level singleton is returned (not a new instance)."""
+        from selectools.agent._tool_executor import _get_tool_timeout_executor
+
+        exec1 = _get_tool_timeout_executor()
+        exec2 = _get_tool_timeout_executor()
+        assert exec1 is exec2, "Must return the same ThreadPoolExecutor singleton"
+
+    def test_tool_timeout_executor_thread_safe(self):
+        """Concurrent calls to _get_tool_timeout_executor return the same object."""
+        import threading as _threading
+
+        from selectools.agent._tool_executor import _get_tool_timeout_executor
+
+        results = []
+
+        def _grab():
+            results.append(_get_tool_timeout_executor())
+
+        threads = [_threading.Thread(target=_grab) for _ in range(10)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(set(id(e) for e in results)) == 1, "All threads must see the same singleton"
+
+    def test_tool_timeout_does_not_leak_on_success(self):
+        """A successful tool call with timeout should not create a new executor."""
+        from selectools.agent._tool_executor import _get_tool_timeout_executor
+
+        before = _get_tool_timeout_executor()
+
+        @tool()
+        def fast_tool(x: str) -> str:
+            """Quick tool."""
+            return f"ok:{x}"
+
+        provider = _SimpleProvider(content="no tool call")
+        agent = Agent(
+            tools=[fast_tool],
+            provider=provider,
+            config=AgentConfig(tool_timeout_seconds=5.0, max_iterations=1),
+        )
+        agent.run("hello")
+
+        after = _get_tool_timeout_executor()
+        assert before is after, "Singleton must not be replaced after a run"
+
+
+class TestProviderCallerExecutorSingleton:
+    """Regression: _acall_provider must NOT create a new ThreadPoolExecutor
+    inside the retry loop.  A fresh executor per attempt leaks threads
+    (pitfall #20).
+    """
+
+    def test_async_provider_executor_is_singleton(self):
+        """Verify the module-level async provider executor is a singleton."""
+        from selectools.agent._provider_caller import _get_async_provider_executor
+
+        exec1 = _get_async_provider_executor()
+        exec2 = _get_async_provider_executor()
+        assert exec1 is exec2, "Must return the same ThreadPoolExecutor singleton"
+
+    def test_async_provider_executor_thread_safe(self):
+        """Concurrent access returns the same singleton."""
+        import threading as _threading
+
+        from selectools.agent._provider_caller import _get_async_provider_executor
+
+        results = []
+
+        def _grab():
+            results.append(_get_async_provider_executor())
+
+        threads = [_threading.Thread(target=_grab) for _ in range(10)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(set(id(e) for e in results)) == 1, "All threads must see the same singleton"
+
+    def test_acall_provider_retries_use_same_executor(self):
+        """Async retries must not create a new ThreadPoolExecutor per attempt."""
+        import asyncio
+
+        from selectools.agent._provider_caller import _get_async_provider_executor
+
+        before = _get_async_provider_executor()
+
+        # Provider fails twice then succeeds — exercises the retry loop
+        provider = _SimpleProvider(content="recovered", fail_count=1)
+
+        agent = Agent(
+            tools=[noop_tool],
+            provider=provider,
+            config=AgentConfig(max_retries=2, max_iterations=1),
+        )
+
+        result = asyncio.run(agent.arun("hello"))
+        assert "recovered" in (result.content or "")
+
+        after = _get_async_provider_executor()
+        assert before is after, "Executor singleton must not be replaced after async retries"
+
+
+class TestParallelToolsExecutorSingleton:
+    """Regression: _execute_tools_parallel must NOT create a new ThreadPoolExecutor
+    per parallel execution call.  A new pool per call wastes resources and
+    prevents thread reuse (pitfall #20).
+    """
+
+    def test_parallel_tools_reuse_executor_singleton(self):
+        """Parallel tool execution must submit to the shared module-level executor."""
+        from selectools.agent._tool_executor import _get_tool_timeout_executor
+
+        call_counts: dict = {"tool_a": 0, "tool_b": 0}
+
+        @tool()
+        def tool_a() -> str:
+            """Tool A."""
+            call_counts["tool_a"] += 1
+            return "a"
+
+        @tool()
+        def tool_b() -> str:
+            """Tool B."""
+            call_counts["tool_b"] += 1
+            return "b"
+
+        tc_a = ToolCall(tool_name="tool_a", parameters={})
+        tc_b = ToolCall(tool_name="tool_b", parameters={})
+        provider = _SimpleProvider(
+            content=None,
+            tool_calls=[tc_a, tc_b],
+        )
+
+        # Capture the executor before the run
+        executor_before = _get_tool_timeout_executor()
+
+        # Second call returns no tool calls, ending the loop
+        call_no = {"n": 0}
+        original_complete = provider.complete
+
+        def complete_once(**kw):
+            call_no["n"] += 1
+            if call_no["n"] == 1:
+                return (
+                    Message(role=Role.ASSISTANT, content="", tool_calls=[tc_a, tc_b]),
+                    _DUMMY_USAGE,
+                )
+            return Message(role=Role.ASSISTANT, content="done"), _DUMMY_USAGE
+
+        provider.complete = complete_once
+
+        agent = Agent(
+            tools=[tool_a, tool_b],
+            provider=provider,
+            config=AgentConfig(parallel_tool_execution=True, max_iterations=3),
+        )
+        agent.run("run both tools")
+
+        executor_after = _get_tool_timeout_executor()
+        assert (
+            executor_before is executor_after
+        ), "Parallel tool execution must reuse the singleton executor, not create a new one"
+        assert call_counts["tool_a"] == 1
+        assert call_counts["tool_b"] == 1
+
+    def test_confirm_action_reuses_executor_singleton(self):
+        """confirm_action timeout enforcement must reuse the shared module-level executor."""
+        from selectools.agent._tool_executor import _get_tool_timeout_executor
+        from selectools.policy import ToolPolicy
+        from selectools.types import ToolCall
+
+        approval_calls: list = []
+
+        def my_confirm(tool_name: str, args: dict, reason: str) -> bool:
+            approval_calls.append(tool_name)
+            return True
+
+        @tool()
+        def secure_tool() -> str:
+            """Needs approval."""
+            return "secured"
+
+        # Use a policy that sets REVIEW for secure_tool
+        policy = ToolPolicy(review=["secure_tool"])
+
+        tc = ToolCall(tool_name="secure_tool", parameters={})
+        call_no = {"n": 0}
+
+        class _OnceProvider(Provider):
+            name = "once"
+            supports_streaming = False
+            supports_async = True
+            default_model = "test"
+
+            def complete(self, **kw):
+                call_no["n"] += 1
+                if call_no["n"] == 1:
+                    return Message(role=Role.ASSISTANT, content="", tool_calls=[tc]), _DUMMY_USAGE
+                return Message(role=Role.ASSISTANT, content="done"), _DUMMY_USAGE
+
+            async def acomplete(self, **kw):
+                return self.complete(**kw)
+
+        executor_before = _get_tool_timeout_executor()
+
+        agent = Agent(
+            tools=[secure_tool],
+            provider=_OnceProvider(),
+            config=AgentConfig(
+                tool_policy=policy,
+                confirm_action=my_confirm,
+                max_iterations=3,
+            ),
+        )
+        agent.run("do secure thing")
+
+        executor_after = _get_tool_timeout_executor()
+        assert (
+            executor_before is executor_after
+        ), "confirm_action must reuse the singleton executor, not create a new one"
+        assert approval_calls == ["secure_tool"]
+
+
+# ---------------------------------------------------------------------------
+# Pass 4 regressions
+# ---------------------------------------------------------------------------
+
+
+# Bug P4-1: Coherence check failures logged as StepType.ERROR instead of
+# StepType.COHERENCE_CHECK in sequential tool execution paths.
+# ---------------------------------------------------------------------------
+
+
+class TestCoherenceCheckTraceStepType:
+    """Coherence check failures must produce StepType.COHERENCE_CHECK trace steps."""
+
+    def _make_coherence_provider(self, incoherent: bool):
+        """Return a provider that fails coherence checks when incoherent=True."""
+        from unittest.mock import patch
+
+        from selectools.coherence import CoherenceResult
+
+        class _CoherenceProvider(Provider):
+            name = "coherence"
+            supports_streaming = False
+            supports_async = True
+            default_model = "test"
+
+            def complete(self, **kw):
+                return Message(role=Role.ASSISTANT, content="done"), _DUMMY_USAGE
+
+            async def acomplete(self, **kw):
+                return self.complete(**kw)
+
+        return _CoherenceProvider()
+
+    def test_sequential_coherence_failure_produces_correct_trace_step(self) -> None:
+        """Sequential path: coherence check failure → COHERENCE_CHECK trace step."""
+        from selectools.coherence import CoherenceResult
+        from selectools.trace import StepType
+
+        tc = ToolCall(tool_name="dummy_tool", parameters={"x": "v"}, id="c1")
+        call_no = {"n": 0}
+
+        class _TwoCallProvider(Provider):
+            name = "p"
+            supports_streaming = False
+            supports_async = False
+            default_model = "test"
+
+            def complete(self, **kw):
+                call_no["n"] += 1
+                if call_no["n"] == 1:
+                    return (
+                        Message(role=Role.ASSISTANT, content="", tool_calls=[tc]),
+                        _DUMMY_USAGE,
+                    )
+                return Message(role=Role.ASSISTANT, content="done"), _DUMMY_USAGE
+
+        from unittest.mock import patch
+
+        incoherent_result = CoherenceResult(coherent=False, explanation="not related")
+
+        agent = Agent(
+            tools=[dummy_tool],
+            provider=_TwoCallProvider(),
+            config=AgentConfig(
+                max_iterations=3,
+                coherence_check=True,
+            ),
+        )
+
+        with patch(
+            "selectools.agent._tool_executor.check_coherence", return_value=incoherent_result
+        ):
+            result = agent.run("do something")
+
+        coherence_steps = [s for s in result.trace.steps if s.type == StepType.COHERENCE_CHECK]
+        error_steps_for_coherence = [
+            s
+            for s in result.trace.steps
+            if s.type == StepType.ERROR
+            and s.tool_name == "dummy_tool"
+            and s.error
+            and "coherence" in s.error.lower()
+        ]
+        assert len(coherence_steps) >= 1, (
+            f"Expected COHERENCE_CHECK trace step, got none. "
+            f"Step types: {[s.type for s in result.trace.steps]}"
+        )
+        assert (
+            len(error_steps_for_coherence) == 0
+        ), "Coherence check failures must NOT produce ERROR trace steps"
+
+    @pytest.mark.asyncio
+    async def test_async_sequential_coherence_failure_produces_correct_trace_step(self) -> None:
+        """Async sequential path: coherence failure → COHERENCE_CHECK trace step."""
+        from selectools.coherence import CoherenceResult
+        from selectools.trace import StepType
+
+        tc = ToolCall(tool_name="dummy_tool", parameters={"x": "v"}, id="c1")
+        call_no = {"n": 0}
+
+        class _TwoCallProvider(Provider):
+            name = "p"
+            supports_streaming = False
+            supports_async = True
+            default_model = "test"
+
+            async def acomplete(self, **kw):
+                call_no["n"] += 1
+                if call_no["n"] == 1:
+                    return (
+                        Message(role=Role.ASSISTANT, content="", tool_calls=[tc]),
+                        _DUMMY_USAGE,
+                    )
+                return Message(role=Role.ASSISTANT, content="done"), _DUMMY_USAGE
+
+        from unittest.mock import AsyncMock, patch
+
+        incoherent_result = CoherenceResult(coherent=False, explanation="not related")
+
+        agent = Agent(
+            tools=[dummy_tool],
+            provider=_TwoCallProvider(),
+            config=AgentConfig(
+                max_iterations=3,
+                coherence_check=True,
+            ),
+        )
+
+        with patch(
+            "selectools.agent._tool_executor.acheck_coherence",
+            new=AsyncMock(return_value=incoherent_result),
+        ):
+            result = await agent.arun("do something")
+
+        coherence_steps = [s for s in result.trace.steps if s.type == StepType.COHERENCE_CHECK]
+        assert len(coherence_steps) >= 1, (
+            f"Expected COHERENCE_CHECK trace step in async path, got none. "
+            f"Step types: {[s.type for s in result.trace.steps]}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_parallel_coherence_failure_produces_correct_trace_step(self) -> None:
+        """Parallel path: coherence failure → COHERENCE_CHECK trace step."""
+        from unittest.mock import patch
+
+        from selectools.coherence import CoherenceResult
+        from selectools.trace import StepType
+
+        @tool()
+        def tool_a(x: str) -> str:
+            """Tool A."""
+            return f"a:{x}"
+
+        @tool()
+        def tool_b(x: str) -> str:
+            """Tool B."""
+            return f"b:{x}"
+
+        tc_a = ToolCall(tool_name="tool_a", parameters={"x": "v"}, id="ca")
+        tc_b = ToolCall(tool_name="tool_b", parameters={"x": "v"}, id="cb")
+        call_no = {"n": 0}
+
+        class _TwoCallProvider(Provider):
+            name = "p"
+            supports_streaming = False
+            supports_async = True
+            default_model = "test"
+
+            async def acomplete(self, **kw):
+                call_no["n"] += 1
+                if call_no["n"] == 1:
+                    return (
+                        Message(role=Role.ASSISTANT, content="", tool_calls=[tc_a, tc_b]),
+                        _DUMMY_USAGE,
+                    )
+                return Message(role=Role.ASSISTANT, content="done"), _DUMMY_USAGE
+
+        incoherent_result = CoherenceResult(coherent=False, explanation="not related")
+
+        agent = Agent(
+            tools=[tool_a, tool_b],
+            provider=_TwoCallProvider(),
+            config=AgentConfig(
+                max_iterations=3,
+                coherence_check=True,
+                parallel_tool_execution=True,
+            ),
+        )
+
+        from unittest.mock import AsyncMock
+
+        with patch(
+            "selectools.agent._tool_executor.acheck_coherence",
+            new=AsyncMock(return_value=incoherent_result),
+        ):
+            result = await agent.arun("do both tools")
+
+        coherence_steps = [s for s in result.trace.steps if s.type == StepType.COHERENCE_CHECK]
+        assert len(coherence_steps) >= 1, (
+            f"Expected COHERENCE_CHECK trace steps in parallel async path. "
+            f"Step types: {[s.type for s in result.trace.steps]}"
+        )
+
+
+# Bug P4-2: arun()/astream() apply input guardrails to ALL history messages
+# (including previous turns loaded from memory), not just the new messages.
+# ---------------------------------------------------------------------------
+
+
+class TestAsyncGuardrailsNewMessagesOnly:
+    """arun()/astream() must apply input guardrails only to newly added messages."""
+
+    def _make_rewriting_guardrail(self):
+        """Returns a guardrail that counts how many messages it processes."""
+        from selectools.guardrails import Guardrail, GuardrailResult
+
+        class _CountingGuardrail(Guardrail):
+            name = "counting"
+            check_count = 0
+
+            def check(self, content: str) -> GuardrailResult:
+                _CountingGuardrail.check_count += 1
+                return GuardrailResult(passed=True, content=content)
+
+        return _CountingGuardrail()
+
+    @pytest.mark.asyncio
+    async def test_arun_guardrails_only_applied_to_new_messages(self) -> None:
+        """arun(): input guardrails must process only the new messages, not history."""
+        from selectools.guardrails import Guardrail, GuardrailResult, GuardrailsPipeline
+
+        processed: List[str] = []
+
+        class _RecordingGuardrail(Guardrail):
+            name = "recording"
+
+            def check(self, content: str) -> GuardrailResult:
+                processed.append(content)
+                return GuardrailResult(passed=True, content=content)
+
+        pipeline = GuardrailsPipeline(input=[_RecordingGuardrail()])
+
+        # Provider always returns done
+        provider = _SimpleProvider("done")
+        agent = Agent(
+            tools=[noop_tool],
+            provider=provider,
+            config=AgentConfig(max_iterations=1, guardrails=pipeline),
+        )
+
+        # Simulate prior history: manually inject old user message
+        old_msg = Message(role=Role.USER, content="old history message")
+        agent._history = [old_msg]
+
+        # Run with a new message
+        await agent.arun("new message only")
+
+        # Guardrail should have processed exactly one message (the new one)
+        # NOT two messages (old + new)
+        assert "old history message" not in processed, (
+            "arun() must not re-validate previously stored history messages through guardrails. "
+            f"Processed: {processed}"
+        )
+        assert any(
+            "new message only" in p for p in processed
+        ), "arun() must apply guardrails to the new message"
+
+    @pytest.mark.asyncio
+    async def test_astream_guardrails_only_applied_to_new_messages(self) -> None:
+        """astream(): input guardrails must process only the new messages, not history."""
+        from selectools.guardrails import Guardrail, GuardrailResult, GuardrailsPipeline
+
+        processed: List[str] = []
+
+        class _RecordingGuardrail(Guardrail):
+            name = "recording"
+
+            def check(self, content: str) -> GuardrailResult:
+                processed.append(content)
+                return GuardrailResult(passed=True, content=content)
+
+        pipeline = GuardrailsPipeline(input=[_RecordingGuardrail()])
+
+        provider = _SimpleProvider("done")
+        agent = Agent(
+            tools=[noop_tool],
+            provider=provider,
+            config=AgentConfig(max_iterations=1, guardrails=pipeline),
+        )
+
+        # Simulate prior history
+        old_msg = Message(role=Role.USER, content="old history message")
+        agent._history = [old_msg]
+
+        # Consume astream
+        async for _ in agent.astream("new message only"):
+            pass
+
+        assert "old history message" not in processed, (
+            "astream() must not re-validate previously stored history messages. "
+            f"Processed: {processed}"
+        )
+        assert any(
+            "new message only" in p for p in processed
+        ), "astream() must apply guardrails to the new message"
+
+
+# Bug P5-1: Sync _run_input_guardrails / _run_output_guardrails never added
+# GUARDRAIL trace steps because they checked `not result.passed`, but
+# GuardrailsPipeline._run_chain() always returns passed=True (blocking raises,
+# warn/rewrite set guardrail_name instead of passed=False).
+# The fix mirrors the async guard: check `not result.passed or result.guardrail_name`.
+# ---------------------------------------------------------------------------
+
+
+class TestSyncGuardrailTraceStep:
+    """Sync guardrail methods must add GUARDRAIL trace steps when a guardrail fires."""
+
+    def test_input_guardrail_warn_adds_trace_step(self) -> None:
+        """A WARN guardrail must produce a GUARDRAIL TraceStep in sync run()."""
+        from selectools.guardrails import Guardrail, GuardrailAction, GuardrailResult
+        from selectools.guardrails.pipeline import GuardrailsPipeline
+        from selectools.trace import StepType
+
+        class _WarnGuardrail(Guardrail):
+            name = "warn-guard"
+            action = GuardrailAction.WARN
+
+            def check(self, content: str) -> GuardrailResult:
+                return GuardrailResult(passed=False, content=content, reason="flagged")
+
+        pipeline = GuardrailsPipeline(input=[_WarnGuardrail()])
+        provider = _SimpleProvider("done")
+        agent = Agent(
+            tools=[noop_tool],
+            provider=provider,
+            config=AgentConfig(max_iterations=1, guardrails=pipeline),
+        )
+        result = agent.run("test message")
+
+        guardrail_steps = [s for s in result.trace.steps if s.type == StepType.GUARDRAIL]
+        assert guardrail_steps, (
+            "Sync run() must add a GUARDRAIL trace step when a WARN guardrail fires. "
+            "The bug was: result.passed is always True so 'not result.passed' never fires."
+        )
+        assert "warn-guard" in guardrail_steps[0].summary
+
+    def test_output_guardrail_rewrite_adds_trace_step(self) -> None:
+        """A REWRITE output guardrail must produce a GUARDRAIL TraceStep in sync run()."""
+        from selectools.guardrails import Guardrail, GuardrailAction, GuardrailResult
+        from selectools.guardrails.pipeline import GuardrailsPipeline
+        from selectools.trace import StepType
+
+        class _RewriteGuardrail(Guardrail):
+            name = "rewrite-guard"
+            action = GuardrailAction.REWRITE
+
+            def check(self, content: str) -> GuardrailResult:
+                return GuardrailResult(passed=False, content="[redacted]", reason="pii found")
+
+        pipeline = GuardrailsPipeline(output=[_RewriteGuardrail()])
+        provider = _SimpleProvider("sensitive data")
+        agent = Agent(
+            tools=[noop_tool],
+            provider=provider,
+            config=AgentConfig(max_iterations=1, guardrails=pipeline),
+        )
+        result = agent.run("give me pii")
+
+        guardrail_steps = [s for s in result.trace.steps if s.type == StepType.GUARDRAIL]
+        assert (
+            guardrail_steps
+        ), "Sync run() must add a GUARDRAIL trace step when a REWRITE output guardrail fires."
+        assert "rewrite-guard" in guardrail_steps[0].summary
+        # Also verify the content was actually rewritten
+        assert result.content == "[redacted]"
+
+
+# Bug P6-1: compress_keep_recent=0 would discard the current user message.
+# When keep_recent = compress_keep_recent * 2 = 0, the slice logic
+# `non_system[:-0]` is interpreted as `non_system[:0] = []` (Python quirk),
+# causing ALL non-system messages — including the current user prompt — to be
+# fed to the compressor and then dropped. The LLM would never see the user's
+# message for that turn.
+# The fix: clamp keep_recent to max(keep_recent, 1) so at least the current
+# user message survives compression.
+# ---------------------------------------------------------------------------
+
+
+class TestCompressKeepRecentZero:
+    """compress_keep_recent=0 must not silently drop the current user message."""
+
+    def test_compress_keep_recent_zero_preserves_current_message(self) -> None:
+        """When compress_keep_recent=0, the current user message must survive compression."""
+
+        call_log: List[str] = []
+
+        class _TrackingProvider(_SimpleProvider):
+            def complete(self, **kwargs: Any) -> Tuple[Message, UsageStats]:
+                msgs = kwargs.get("messages", [])
+                for m in msgs:
+                    if m.role == Role.USER and m.content:
+                        call_log.append(m.content)
+                # First call returns a summary for compression; subsequent calls answer.
+                return (
+                    Message(role=Role.ASSISTANT, content="compressed summary"),
+                    _DUMMY_USAGE,
+                )
+
+        # Build an agent with a very low context window simulation.
+        # Patch estimate_run_tokens to always report high fill-rate.
+        import unittest.mock as mock
+
+        from selectools.token_estimation import TokenEstimate
+
+        provider = _TrackingProvider("response")
+        agent = Agent(
+            tools=[noop_tool],
+            provider=provider,
+            config=AgentConfig(
+                max_iterations=1,
+                compress_context=True,
+                compress_threshold=0.0,  # always compress
+                compress_keep_recent=0,  # the bug: keep nothing
+            ),
+        )
+        # Pre-load two history messages so compression has something to compress
+        agent._history = [
+            Message(role=Role.USER, content="old message 1"),
+            Message(role=Role.ASSISTANT, content="old response 1"),
+        ]
+
+        high_fill = TokenEstimate(
+            system_tokens=10_000,
+            message_tokens=80_000,
+            tool_schema_tokens=10_000,
+            total_tokens=100_000,
+            context_window=128_000,
+            remaining_tokens=28_000,
+            model="gpt-5-mini",
+            method="heuristic",
+        )
+        with mock.patch(
+            "selectools.agent._memory_manager.estimate_run_tokens",
+            return_value=high_fill,
+        ):
+            result = agent.run("current user message")
+
+        # The current user message must have been seen by the provider.
+        assert any("current user message" in msg for msg in call_log), (
+            "compress_keep_recent=0 must not discard the current user message. "
+            f"Provider received: {call_log}"
+        )
+
+
+class TestParallelDispatchExecutorSingleton:
+    """Regression: _execute_tools_parallel must use _get_parallel_dispatch_executor
+    (not the tool-timeout executor) to avoid a thread-pool deadlock when many
+    tool calls are combined with tool_timeout_seconds.
+
+    Root cause: if outer _run_one tasks and inner timeout submissions share the
+    same pool, outer workers block on inner futures that can never start once
+    all pool slots are occupied by outer workers.  Using a separate dispatch
+    pool eliminates the nesting.
+    """
+
+    def test_separate_dispatch_and_timeout_executors(self):
+        """The parallel-dispatch executor is distinct from the timeout executor."""
+        from selectools.agent._tool_executor import (
+            _get_parallel_dispatch_executor,
+            _get_tool_timeout_executor,
+        )
+
+        dispatch = _get_parallel_dispatch_executor()
+        timeout = _get_tool_timeout_executor()
+        assert dispatch is not timeout, (
+            "Parallel-dispatch and tool-timeout executors must be different "
+            "instances to prevent thread-pool deadlock"
+        )
+
+    def test_parallel_dispatch_executor_is_singleton(self):
+        """_get_parallel_dispatch_executor() returns the same object on every call."""
+        from selectools.agent._tool_executor import _get_parallel_dispatch_executor
+
+        a = _get_parallel_dispatch_executor()
+        b = _get_parallel_dispatch_executor()
+        assert a is b
+
+    def test_parallel_tools_with_timeout_do_not_deadlock(self):
+        """Many parallel tool calls combined with tool_timeout_seconds must not deadlock.
+
+        This specifically guards against the bug where both the dispatch layer
+        and the timeout layer shared the same ThreadPoolExecutor: with N tools
+        all slots get taken by outer workers, and inner (timeout) submissions
+        queue forever → deadlock.
+        """
+        import threading as _threading
+
+        call_count = {"n": 0}
+        lock = _threading.Lock()
+
+        @tool()
+        def slow_tool(idx: str) -> str:
+            """A tool that takes a little time."""
+            with lock:
+                call_count["n"] += 1
+            return f"done:{idx}"
+
+        # Build tool calls: one LLM response contains 10 tool calls at once.
+        tool_calls = [
+            ToolCall(tool_name="slow_tool", parameters={"idx": str(i)}) for i in range(10)
+        ]
+
+        call_iter = {"i": 0}
+
+        class _MultiToolProvider(Provider):
+            name = "multi"
+            supports_streaming = False
+            supports_async = False
+
+            def complete(self, **kwargs: Any) -> Tuple[Message, UsageStats]:
+                call_iter["i"] += 1
+                if call_iter["i"] == 1:
+                    return (
+                        Message(role=Role.ASSISTANT, content="", tool_calls=tool_calls),
+                        _DUMMY_USAGE,
+                    )
+                return Message(role=Role.ASSISTANT, content="all done"), _DUMMY_USAGE
+
+        agent = Agent(
+            tools=[slow_tool],
+            provider=_MultiToolProvider(),
+            config=AgentConfig(
+                max_iterations=5,
+                parallel_tool_execution=True,
+                tool_timeout_seconds=5.0,  # activates timeout submission path
+            ),
+        )
+
+        # Must complete within a reasonable timeout — not deadlock.
+        result = agent.run("run all tools")
+        assert call_count["n"] == 10, f"All 10 tool calls must execute, got {call_count['n']}"

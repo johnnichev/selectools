@@ -66,12 +66,14 @@ class AuditLogger(AgentObserver):
         daily_rotation: bool = True,
         include_content: bool = False,
     ) -> None:
-        self._log_dir = log_dir
+        # Resolve symlinks and ``..`` components so the log path is unambiguous
+        # and callers can inspect ``_log_dir`` to see the canonical location.
+        self._log_dir = os.path.realpath(os.path.abspath(log_dir))
         self._privacy = privacy
         self._daily_rotation = daily_rotation
         self._include_content = include_content
         self._lock = threading.Lock()
-        os.makedirs(log_dir, exist_ok=True)
+        os.makedirs(self._log_dir, exist_ok=True)
 
     def _log_path(self) -> str:
         if self._daily_rotation:
@@ -151,7 +153,7 @@ class AuditLogger(AgentObserver):
             "success": True,
         }
         if self._include_content:
-            entry["result_length"] = len(result)
+            entry["result_length"] = len(result) if result is not None else 0
         self._write(entry)
 
     def on_tool_error(

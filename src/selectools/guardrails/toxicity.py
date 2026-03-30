@@ -42,7 +42,7 @@ class ToxicityGuardrail(Guardrail):
 
     Args:
         threshold: Fraction of blocklist words found that triggers a
-            failure.  ``0.0`` means *any* match fails.  Default: ``0.0``.
+            failure.  ``0.0`` means *any* match fails.  Default: ``0.1``.
         blocklist: Custom set of toxic keywords.  Defaults to a built-in
             list of ~16 high-signal terms.
         action: ``block``, ``rewrite``, or ``warn``.  Default: ``block``.
@@ -63,8 +63,10 @@ class ToxicityGuardrail(Guardrail):
         false positives when common words (e.g. "kill" in "kill the
         process") appear in benign content.
         """
+        if not (0.0 <= threshold <= 1.0):
+            raise ValueError(f"threshold must be between 0.0 and 1.0, got {threshold!r}")
         self.threshold = threshold
-        self._blocklist = blocklist or _DEFAULT_BLOCKLIST
+        self._blocklist = blocklist if blocklist is not None else _DEFAULT_BLOCKLIST
         self.action = action
         self._word_re = re.compile(r"\b\w+\b")
 

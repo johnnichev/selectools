@@ -209,11 +209,12 @@ class EntityMemory:
         Returns:
             A formatted ``[Known Entities]`` block listing all tracked entities.
         """
-        if not self.entities:  # Uses the locked property
+        entities = self.entities  # single lock acquisition + sort
+        if not entities:
             return ""
 
         lines = ["[Known Entities]"]
-        for entity in self.entities:
+        for entity in entities:
             raw_attrs = entity.attributes if isinstance(entity.attributes, dict) else {}
             attrs = ", ".join(f"{k}: {v}" for k, v in raw_attrs.items())
             attr_str = f" ({attrs})" if attrs else ""
@@ -221,16 +222,20 @@ class EntityMemory:
         return "\n".join(lines)
 
     def to_dict(self) -> Dict[str, Any]:
+        with self._lock:
+            entities_snapshot = list(self._entities.values())
         return {
             "max_entities": self._max_entities,
             "relevance_window": self._relevance_window,
-            "entities": [e.to_dict() for e in self._entities.values()],
+            "model": self._model,
+            "entities": [e.to_dict() for e in entities_snapshot],
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any], provider: Any) -> "EntityMemory":
         mem = cls(
             provider=provider,
+            model=data.get("model"),
             max_entities=data.get("max_entities", 50),
             relevance_window=data.get("relevance_window", 10),
         )

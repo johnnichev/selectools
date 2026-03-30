@@ -256,6 +256,30 @@ class TestEntityMemorySerialization:
         restored = EntityMemory.from_dict(d, provider)
         assert len(restored.entities) == 0
 
+    def test_model_preserved_in_round_trip(self) -> None:
+        """Regression: model must survive to_dict/from_dict round-trip.
+
+        Before the fix, to_dict() did not include model, so from_dict()
+        always created an EntityMemory with model=None, ignoring the user's
+        custom extraction model.
+        """
+        provider = FakeExtractionProvider()
+        em = EntityMemory(provider=provider, model="gpt-4o")
+        d = em.to_dict()
+        assert "model" in d
+        assert d["model"] == "gpt-4o"
+
+        restored = EntityMemory.from_dict(d, provider)
+        assert restored._model == "gpt-4o"
+
+    def test_model_none_preserved_in_round_trip(self) -> None:
+        """Regression: model=None round-trips correctly."""
+        provider = FakeExtractionProvider()
+        em = EntityMemory(provider=provider, model=None)
+        d = em.to_dict()
+        restored = EntityMemory.from_dict(d, provider)
+        assert restored._model is None
+
 
 # ======================================================================
 # Agent integration
@@ -354,3 +378,49 @@ class TestEntityMemoryAgentIntegration:
         agent.provider = SimpleProvider()
         result = agent.run("Hello")
         assert result.content == "ok"
+
+
+# ======================================================================
+# Regression tests for thread-safety bugs
+# ======================================================================
+
+
+class TestEntityMemoryThreadSafety:
+    """Regression: to_dict() must not race with concurrent update()."""
+
+    def test_to_dict_concurrent_update_does_not_raise(self) -> None:
+        """Regression: to_dict() iterated self._entities.values() without holding the
+        lock, which caused RuntimeError: dictionary changed size during iteration when
+        a concurrent update() was running at the same time.
+        """
+        import threading
+
+        provider = FakeExtractionProvider(
+            json.dumps([{"name": f"Entity{i}", "entity_type": "x"} for i in range(20)])
+        )
+        em = EntityMemory(provider=provider, max_entities=10)
+
+        # Pre-populate with entities
+        em.update([Entity(name=f"Base{i}", entity_type="x") for i in range(5)])
+
+        errors: list = []
+
+        def update_loop() -> None:
+            for _ in range(50):
+                em.update([Entity(name=f"E{i}", entity_type="x") for i in range(10)])
+
+        def to_dict_loop() -> None:
+            for _ in range(50):
+                try:
+                    em.to_dict()
+                except RuntimeError as exc:
+                    errors.append(str(exc))
+
+        t1 = threading.Thread(target=update_loop)
+        t2 = threading.Thread(target=to_dict_loop)
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+        assert not errors, f"Thread safety errors: {errors}"

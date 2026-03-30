@@ -46,7 +46,7 @@ selectools serve CLI → Playground UI → YAML config → 5 agent templates
 → Type-safe step contracts → Streaming composition → pipeline.astream()
 → PostgresCheckpointStore → TraceStore (3 backends) → selectools doctor
 
-v0.19.1 🟡 Advanced Agent Patterns
+v0.19.1 ✅ Advanced Agent Patterns
 PlanAndExecute → ReflectiveAgent → Debate → TeamLead → 50+ evaluators
 
 v0.19.2 🟡 Enterprise Hardening + Polish & Community
@@ -67,7 +67,7 @@ API freeze → Stability markers on all modules → Deprecation policy
 
 ---
 
-## v0.19.1: Advanced Agent Patterns 🟡
+## v0.19.1: Advanced Agent Patterns ✅
 
 Higher-level agent architectures built on the v0.18.0 orchestration primitives. Closes the "Advanced patterns" competitive gap. Each pattern is a standalone class — they wire up the AgentGraph topology for you.
 
@@ -79,7 +79,6 @@ from selectools.patterns import PlanAndExecuteAgent
 agent = PlanAndExecuteAgent(
     planner=planner_agent,
     executors={"research": researcher, "write": writer, "review": reviewer},
-    provider=provider,
 )
 result = agent.run("Write a technical blog post about vector databases")
 # Planner creates structured plan → executors handle each step → result aggregated
@@ -132,17 +131,25 @@ result = agent.run("Investigate and fix the billing discrepancy")
 
 11 new evaluators across two categories:
 
-**New deterministic (+7):** `ReadabilityEvaluator`, `AgentTrajectoryEvaluator`, `ToolEfficiencyEvaluator`, `SemanticSimilarityEvaluator`, `MultiTurnCoherenceEvaluator`, `JsonSchemaEvaluator`, `KeywordDensityEvaluator`
+**New deterministic (+8):** `ReadabilityEvaluator`, `AgentTrajectoryEvaluator`, `ToolEfficiencyEvaluator`, `SemanticSimilarityEvaluator`, `MultiTurnCoherenceEvaluator`, `JsonSchemaEvaluator`, `KeywordDensityEvaluator`, `ForbiddenWordsEvaluator`
 
 **New LLM-as-judge (+4):** `FactConsistencyEvaluator`, `CustomRubricEvaluator`, `AnswerAttributionEvaluator`, `StepReasoningEvaluator`
 
 | Feature             | Status | Impact | Effort |
 | ------------------- | ------ | ------ | ------ |
-| **PlanAndExecute**  | 🟡     | High   | Medium |
-| **ReflectiveAgent** | 🟡     | High   | Medium |
-| **Debate**          | 🟡     | Medium | Medium |
-| **TeamLead**        | 🟡     | Medium | Medium |
-| **50 evaluators**   | 🟡     | High   | Medium |
+| **PlanAndExecute**  | ✅     | High   | Medium |
+| **ReflectiveAgent** | ✅     | High   | Medium |
+| **Debate**          | ✅     | Medium | Medium |
+| **TeamLead**        | ✅     | Medium | Medium |
+| **50 evaluators**   | ✅     | High   | Medium |
+
+### Quality Infrastructure
+
+- **Ralph loop** — autonomous hunt-and-fix convergence system (`scripts/ralph_bug_hunt.sh`, `/ralph-bug-hunt` skill)
+- **Bandit in CI** — security scan job on every push
+- **Property-based tests** — Hypothesis suite for structural invariants
+- **Thread-safety smoke suite** — 10-thread × 20-op concurrency tests
+- **Production simulations** — 16 integration tests covering memory pressure, provider failover, tool errors, concurrent load
 
 ---
 

@@ -37,13 +37,17 @@ class BaselineStore:
     def save(self, report: Any) -> Path:
         """Save an EvalReport as the new baseline for its suite name."""
         self._dir.mkdir(parents=True, exist_ok=True)
-        path = self._dir / f"{report.metadata.suite_name}.json"
-        path.write_text(json.dumps(report.to_dict(), indent=2))
+        safe_name = Path(report.metadata.suite_name).name  # strip directory components
+        path = self._dir / f"{safe_name}.json"
+        tmp_path = path.with_suffix(".json.tmp")
+        tmp_path.write_text(json.dumps(report.to_dict(), indent=2))
+        tmp_path.replace(path)
         return path
 
     def load(self, suite_name: str) -> Optional[Dict[str, Any]]:
         """Load a previously saved baseline by suite name."""
-        path = self._dir / f"{suite_name}.json"
+        safe_name = Path(suite_name).name  # strip directory components
+        path = self._dir / f"{safe_name}.json"
         if not path.exists():
             return None
         return json.loads(path.read_text())

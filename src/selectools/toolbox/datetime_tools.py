@@ -2,7 +2,9 @@
 Date and time utility tools.
 """
 
+import datetime as _dt
 from datetime import datetime, timedelta
+from datetime import timezone as _timezone
 from typing import Optional
 
 from ..tools import tool
@@ -29,7 +31,7 @@ def get_current_time(timezone: str = "UTC", format: str = "%Y-%m-%d %H:%M:%S %Z"
                 return (
                     "❌ Error: 'pytz' library required for timezone support. Run: pip install pytz"
                 )
-            now = datetime.utcnow()
+            now = datetime.now(_timezone.utc)
             formatted = now.strftime(format).replace("%Z", "UTC")
             return f"Current time: {formatted}"
 

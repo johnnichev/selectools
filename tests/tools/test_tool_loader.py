@@ -271,3 +271,152 @@ class TestAgentDynamicTools:
         old = agent.replace_tool(new_greet)
         assert old is not None
         assert agent._tools_by_name["greet"].description == "updated greet"
+
+
+# ---------------------------------------------------------------------------
+# Regression Tests — Ralph Bug Hunt Pass 4
+# ---------------------------------------------------------------------------
+
+
+class TestToolLoaderSyntaxError:
+    """Regression: from_file must raise ImportError (not SyntaxError) for broken files.
+
+    Previously exec_module propagated SyntaxError directly, violating the documented
+    contract (only FileNotFoundError and ImportError are declared).  The partially-
+    registered module was also left in sys.modules.
+    """
+
+    def test_syntax_error_raises_import_error(self, tmp_path: Path) -> None:
+        """from_file with a syntax-broken file must raise ImportError, not SyntaxError."""
+        broken = tmp_path / "broken.py"
+        broken.write_text("def oops(: this is not valid python\n")
+
+        with pytest.raises(ImportError, match="Syntax error"):
+            ToolLoader.from_file(str(broken))
+
+    def test_syntax_error_does_not_leave_module_in_sys_modules(self, tmp_path: Path) -> None:
+        """Modules that fail to load must be removed from sys.modules."""
+        import sys
+
+        broken = tmp_path / "orphan.py"
+        broken.write_text("INVALID ===\n")
+
+        try:
+            ToolLoader.from_file(str(broken))
+        except ImportError:
+            pass
+
+        # No _selectools_dynamic_ entry for this file should remain
+        leaked = [k for k in sys.modules if "orphan" in k and "_selectools_dynamic_" in k]
+        assert leaked == [], f"Leaked modules in sys.modules: {leaked}"
+
+    def test_from_directory_swallows_syntax_errors(self, tmp_path: Path) -> None:
+        """from_directory must silently skip files with syntax errors."""
+        good = tmp_path / "good.py"
+        good.write_text(PLUGIN_CODE)
+        bad = tmp_path / "bad.py"
+        bad.write_text("def oops(: broken\n")
+
+        tools = ToolLoader.from_directory(str(tmp_path))
+        tool_names = {t.name for t in tools}
+        assert "greet" in tool_names, "Good file's tools must still be loaded"
+
+    def test_from_directory_swallows_runtime_errors(self, tmp_path: Path) -> None:
+        """from_directory must silently skip files that raise arbitrary exceptions at import.
+
+        Regression: previously only ImportError/SyntaxError/AttributeError were caught,
+        so a module that raises RuntimeError (or any other exception) at import time would
+        propagate and abort the entire directory scan, leaving valid tools undiscovered.
+        """
+        good = tmp_path / "agood.py"
+        good.write_text(PLUGIN_CODE)
+        bad = tmp_path / "zbad.py"
+        bad.write_text("raise RuntimeError('module-level failure')\n")
+
+        # Must not raise; the RuntimeError must be caught and logged
+        tools = ToolLoader.from_directory(str(tmp_path))
+        tool_names = {t.name for t in tools}
+        assert "greet" in tool_names, "Good file's tools must still be loaded despite sibling error"
+        assert "farewell" in tool_names
+
+    def test_from_directory_swallows_value_error(self, tmp_path: Path) -> None:
+        """from_directory must swallow ValueError raised during module import."""
+        good = tmp_path / "agood.py"
+        good.write_text(PLUGIN_CODE)
+        bad = tmp_path / "zbad.py"
+        bad.write_text("raise ValueError('invalid config')\n")
+
+        tools = ToolLoader.from_directory(str(tmp_path))
+        assert any(t.name == "greet" for t in tools)
+
+
+class TestToolLoaderSameStemCollision:
+    """Regression: two files with identical stems from different directories must
+    not collide in sys.modules.  Previously both got the same key, so reloading
+    one would affect the other.
+    """
+
+    def test_same_stem_files_in_different_dirs_both_load(self, tmp_path: Path) -> None:
+        """Two files named 'search.py' in different dirs must both load correctly."""
+        dir_a = tmp_path / "dir_a"
+        dir_b = tmp_path / "dir_b"
+        dir_a.mkdir()
+        dir_b.mkdir()
+
+        (dir_a / "search.py").write_text(
+            "from selectools.tools import tool\n"
+            "@tool(description='Search A')\n"
+            "def search_a(q: str) -> str:\n"
+            "    return 'A:' + q\n"
+        )
+        (dir_b / "search.py").write_text(
+            "from selectools.tools import tool\n"
+            "@tool(description='Search B')\n"
+            "def search_b(q: str) -> str:\n"
+            "    return 'B:' + q\n"
+        )
+
+        tools_a = ToolLoader.from_file(str(dir_a / "search.py"))
+        tools_b = ToolLoader.from_file(str(dir_b / "search.py"))
+
+        assert len(tools_a) == 1
+        assert len(tools_b) == 1
+        assert tools_a[0].execute({"q": "x"}) == "A:x"
+        assert tools_b[0].execute({"q": "x"}) == "B:x"
+
+    def test_reload_file_targets_correct_module(self, tmp_path: Path) -> None:
+        """reload_file must only remove the specific file's module, not a same-stem sibling."""
+        import sys
+
+        dir_a = tmp_path / "dir_a"
+        dir_b = tmp_path / "dir_b"
+        dir_a.mkdir()
+        dir_b.mkdir()
+
+        (dir_a / "plugin.py").write_text(
+            "from selectools.tools import tool\n"
+            "@tool(description='Plugin A v1')\n"
+            "def plugin_a(x: str) -> str:\n"
+            "    return 'A:' + x\n"
+        )
+        (dir_b / "plugin.py").write_text(
+            "from selectools.tools import tool\n"
+            "@tool(description='Plugin B')\n"
+            "def plugin_b(x: str) -> str:\n"
+            "    return 'B:' + x\n"
+        )
+
+        tools_a = ToolLoader.from_file(str(dir_a / "plugin.py"))
+        tools_b = ToolLoader.from_file(str(dir_b / "plugin.py"))
+
+        # Reload A — B's module must remain in sys.modules
+        (dir_a / "plugin.py").write_text(
+            "from selectools.tools import tool\n"
+            "@tool(description='Plugin A v2')\n"
+            "def plugin_a(x: str) -> str:\n"
+            "    return 'A2:' + x\n"
+        )
+        tools_a_v2 = ToolLoader.reload_file(str(dir_a / "plugin.py"))
+        assert tools_a_v2[0].execute({"x": "t"}) == "A2:t"
+        # B's tool must still work from its own module
+        assert tools_b[0].execute({"x": "t"}) == "B:t"
