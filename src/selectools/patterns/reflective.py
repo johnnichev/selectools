@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from ..cancellation import CancellationToken
     from ..observer import AgentObserver
 
+from ..stability import beta
 from ..types import Message, Role
 
 
@@ -43,6 +44,7 @@ class ReflectiveResult:
         return len(self.rounds)
 
 
+@beta
 class ReflectiveAgent:
     """Actor-Critic loop: actor drafts, critic evaluates, actor revises.
 

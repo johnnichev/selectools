@@ -14,7 +14,10 @@ from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any, Dict, Iterator, List, Optional
 
+from selectools.stability import beta, stable
 
+
+@stable
 class StepType(str, Enum):
     """Enumeration of trace step types.
 
@@ -51,6 +54,7 @@ class StepType(str, Enum):
     GRAPH_LOOP_DETECTED = "graph_loop_detected"
 
 
+@stable
 @dataclass
 class TraceStep:
     """A single step in the agent execution timeline."""
@@ -91,6 +95,7 @@ def _new_run_id() -> str:
     return uuid.uuid4().hex
 
 
+@stable
 @dataclass
 class AgentTrace:
     """Ordered list of trace steps from a single agent run.
@@ -327,6 +332,7 @@ _STEP_COLORS: Dict[str, str] = {
 _DEFAULT_COLOR = "#64748b"
 
 
+@beta
 def trace_to_html(trace: "AgentTrace") -> str:
     """Render an AgentTrace as a standalone HTML waterfall timeline.
 

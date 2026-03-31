@@ -35,10 +35,12 @@ import logging
 import time
 from typing import Any, Callable, Dict, List, Optional
 
+from .stability import beta, stable
 from .types import AgentResult, Message
 from .usage import UsageStats
 
 
+@stable
 class AgentObserver:
     """Base class for agent lifecycle observers.
 
@@ -602,6 +604,7 @@ class AgentObserver:
 # ======================================================================
 
 
+@stable
 class LoggingObserver(AgentObserver):
     """Observer that writes structured JSON events to Python's logging module.
 
@@ -1021,6 +1024,7 @@ class LoggingObserver(AgentObserver):
         )
 
 
+@stable
 class AsyncAgentObserver(AgentObserver):
     """Base class for async agent lifecycle observers.
 
@@ -1420,6 +1424,7 @@ class AsyncAgentObserver(AgentObserver):
 # ======================================================================
 
 
+@beta
 class SimpleStepObserver(AgentObserver):
     """Observer that routes all lifecycle events to a single callback.
 

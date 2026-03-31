@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 from ..orchestration.graph import AgentGraph
 from ..orchestration.state import ContextMode, GraphState
 from ..orchestration.supervisor import _safe_json_parse
+from ..stability import beta
 from ..types import Message, Role
 
 
@@ -79,6 +80,7 @@ Team members: {members}
 """
 
 
+@beta
 class TeamLeadAgent:
     """Team lead delegates subtasks to agents and coordinates results.
 

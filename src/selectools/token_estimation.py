@@ -16,7 +16,10 @@ if TYPE_CHECKING:
     from .tools.base import Tool
     from .types import Message
 
+from .stability import stable
 
+
+@stable
 @dataclass
 class TokenEstimate:
     """Breakdown of estimated token usage for the first iteration of an agent run.
@@ -64,6 +67,7 @@ def _tiktoken_count(text: str, model: str) -> Optional[int]:
     return len(enc.encode(text))
 
 
+@stable
 def estimate_tokens(text: str, model: str = "gpt-4o") -> int:
     """Estimate the token count for a string.
 
@@ -85,6 +89,7 @@ def estimate_tokens(text: str, model: str = "gpt-4o") -> int:
     return _heuristic_count(text)
 
 
+@stable
 def estimate_run_tokens(
     messages: List[Message],
     tools: List[Tool],

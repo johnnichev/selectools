@@ -8,11 +8,13 @@ from __future__ import annotations
 
 from typing import Any, AsyncIterable, Iterable, List, Union
 
+from ..stability import beta
 from ..types import Message, Role, ToolCall
 from ..usage import UsageStats
 from .base import Provider
 
 
+@beta
 class LocalProvider(Provider):
     """
     Local fallback provider.

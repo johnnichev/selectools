@@ -8,6 +8,7 @@ import inspect
 import sys
 from typing import Any, Callable, Dict, List, Optional, Union, get_args, get_origin, get_type_hints
 
+from ..stability import stable
 from .base import ParamMetadata, Tool, ToolParameter
 
 
@@ -111,6 +112,7 @@ def _infer_parameters_from_callable(
     return parameters
 
 
+@stable
 def tool(
     *,
     name: Optional[str] = None,

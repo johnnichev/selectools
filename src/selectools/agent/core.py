@@ -18,6 +18,7 @@ from ..parser import ToolCallParser
 from ..prompt import PromptBuilder
 from ..providers.base import Provider, ProviderError
 from ..providers.openai_provider import OpenAIProvider
+from ..stability import stable
 from ..structured import (
     ResponseFormat,
     build_schema_instruction,
@@ -57,6 +58,7 @@ class _RunContext:
     terminal_tool_result: Optional[str] = None
 
 
+@stable
 class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryManagerMixin):
     """
     Provider-agnostic AI agent that iteratively calls tools to accomplish tasks.

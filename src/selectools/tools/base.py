@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Union
 
 from ..exceptions import ToolExecutionError, ToolValidationError
+from ..stability import stable
 
 JsonSchema = Dict[str, Any]
 
@@ -53,6 +54,7 @@ def _python_type_to_json(param_type: type) -> str:
     return type_map.get(param_type, "string")
 
 
+@stable
 @dataclass
 class ToolParameter:
     """
@@ -110,6 +112,7 @@ class ToolParameter:
         return schema
 
 
+@stable
 class Tool:
     """
     Encapsulates a callable tool with validation and schema generation.

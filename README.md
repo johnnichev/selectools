@@ -26,6 +26,22 @@ result = AgentGraph.chain(planner, writer, reviewer).run("Write a blog post")
 
 ## What's New in v0.19
 
+### v0.19.3 — Stability Markers Applied to All Public APIs
+
+Every public class and function exported from `selectools` now carries a stability marker:
+
+```python
+from selectools import Agent, AgentGraph, PlanAndExecuteAgent
+
+print(Agent.__stability__)               # "stable"
+print(AgentGraph.__stability__)          # "beta"
+print(PlanAndExecuteAgent.__stability__) # "beta"
+```
+
+**`@stable`** — 60+ core symbols (Agent, AgentConfig, providers, memory, tools, evals, guardrails, sessions, knowledge, cache, cancellation)
+
+**`@beta`** — 30+ newer symbols (AgentGraph, SupervisorAgent, Pipeline, @step, parallel, branch, all four patterns, compose)
+
 ### v0.19.2 — Enterprise Hardening
 
 ```python

@@ -14,6 +14,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 
+from .stability import stable
 from .types import Message, Role
 
 
@@ -301,6 +302,7 @@ _EXTRACTION_PROMPT = (
 )
 
 
+@stable
 class KnowledgeGraphMemory:
     """Maintains a knowledge graph of relationship triples from conversation.
 

@@ -19,11 +19,13 @@ from ..env import load_default_env
 from ..exceptions import ProviderConfigurationError
 from ..models import Gemini as GeminiModels
 from ..pricing import calculate_cost
+from ..stability import stable
 from ..types import Message, Role, ToolCall
 from ..usage import UsageStats
 from .base import Provider, ProviderError
 
 
+@stable
 class GeminiProvider(Provider):
     """
     Google Gemini adapter using the new google-genai SDK.

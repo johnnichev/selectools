@@ -9,9 +9,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+from ..stability import stable
 from .types import CaseResult, CaseVerdict, EvalMetadata
 
 
+@stable
 @dataclass
 class EvalReport:
     """Aggregated evaluation results with statistics."""

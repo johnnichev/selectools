@@ -20,12 +20,14 @@ if TYPE_CHECKING:
     from .tools.base import Tool
     from .types import Message
 
+from .stability import stable
 
 # ---------------------------------------------------------------------------
 # CacheStats
 # ---------------------------------------------------------------------------
 
 
+@stable
 @dataclass
 class CacheStats:
     """Tracks cache performance metrics."""
@@ -69,6 +71,7 @@ class _CacheEntry:
 # ---------------------------------------------------------------------------
 
 
+@stable
 @runtime_checkable
 class Cache(Protocol):
     """
@@ -109,6 +112,7 @@ class Cache(Protocol):
 # ---------------------------------------------------------------------------
 
 
+@stable
 class InMemoryCache:
     """
     Thread-safe in-memory LRU cache with per-entry TTL.
@@ -216,6 +220,7 @@ class InMemoryCache:
 # ---------------------------------------------------------------------------
 
 
+@stable
 class CacheKeyBuilder:
     """
     Builds deterministic cache keys from LLM request parameters.

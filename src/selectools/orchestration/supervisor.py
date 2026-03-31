@@ -45,6 +45,7 @@ if TYPE_CHECKING:
     from ..types import AgentResult
     from .checkpoint import CheckpointStore
 
+from ..stability import beta
 from ..types import Message, Role
 from ..usage import UsageStats
 from .graph import AgentGraph, ErrorPolicy, GraphResult, _merge_usage
@@ -168,6 +169,7 @@ def _safe_json_parse(text: str, default: Any = None) -> Any:
     return default
 
 
+@beta
 class SupervisorAgent:
     """High-level multi-agent coordinator.
 

@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Protocol
 
 from .memory import ConversationMemory
+from .stability import beta, stable
 
 
 @dataclass
@@ -34,6 +35,7 @@ class SessionMetadata:
     updated_at: float
 
 
+@stable
 class SessionStore(Protocol):
     """Protocol for persistent session backends."""
 
@@ -74,6 +76,7 @@ class SessionStore(Protocol):
 # ======================================================================
 
 
+@stable
 class JsonFileSessionStore:
     """File-based session store using one JSON file per session.
 
@@ -215,6 +218,7 @@ class JsonFileSessionStore:
 # ======================================================================
 
 
+@stable
 class SQLiteSessionStore:
     """SQLite-based session store.
 
@@ -366,6 +370,7 @@ class SQLiteSessionStore:
 # ======================================================================
 
 
+@beta
 class RedisSessionStore:
     """Redis-backed session store.
 

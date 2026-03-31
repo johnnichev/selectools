@@ -24,10 +24,12 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from .observer import AgentObserver
+from .stability import stable
 from .types import AgentResult, Message
 from .usage import UsageStats
 
 
+@stable
 class PrivacyLevel(str, Enum):
     """Controls how tool arguments are recorded in audit logs."""
 
@@ -37,6 +39,7 @@ class PrivacyLevel(str, Enum):
     NONE = "none"
 
 
+@stable
 class AuditLogger(AgentObserver):
     """JSONL audit logger that implements the AgentObserver protocol.
 

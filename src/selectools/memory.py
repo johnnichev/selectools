@@ -8,9 +8,11 @@ import copy
 from dataclasses import replace
 from typing import Any, Dict, List, Optional
 
+from .stability import stable
 from .types import Message, Role
 
 
+@stable
 class ConversationMemory:
     """
     Maintains conversation history with configurable limits.

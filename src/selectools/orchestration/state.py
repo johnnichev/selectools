@@ -17,10 +17,12 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 if TYPE_CHECKING:
     from ..types import AgentResult, Message
 
+from ..stability import beta
 
 STATE_KEY_LAST_OUTPUT: str = "__last_output__"
 
 
+@beta
 class MergePolicy(str, Enum):
     """Policy for merging parallel branch states.
 
@@ -34,6 +36,7 @@ class MergePolicy(str, Enum):
     APPEND = "append"
 
 
+@beta
 class ContextMode(str, Enum):
     """Controls what conversation history is forwarded to a node's agent.
 
@@ -51,6 +54,7 @@ class ContextMode(str, Enum):
     CUSTOM = "custom"
 
 
+@beta
 @dataclass
 class GraphState:
     """Shared context passed between nodes in an AgentGraph.
@@ -153,6 +157,7 @@ class GraphState:
         return cls(messages=[Message(role=Role.USER, content=prompt)])
 
 
+@beta
 @dataclass
 class InterruptRequest:
     """Yielded from generator nodes to pause execution for human input.
@@ -173,6 +178,7 @@ class InterruptRequest:
     interrupt_key: str = ""
 
 
+@beta
 @dataclass
 class Scatter:
     """Returned from routing functions to create dynamic parallel branches.

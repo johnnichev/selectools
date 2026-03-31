@@ -11,11 +11,13 @@ from typing import Any, Callable, Dict, List, Optional
 
 from .. import __version__
 from ..agent import Agent
+from ..stability import stable
 from .evaluators import DEFAULT_EVALUATORS
 from .report import EvalReport
 from .types import CaseResult, CaseVerdict, EvalFailure, EvalMetadata, TestCase
 
 
+@stable
 class EvalSuite:
     """Evaluate an agent against a list of test cases.
 

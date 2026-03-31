@@ -12,7 +12,10 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
+from selectools.stability import stable
 
+
+@stable
 class GuardrailAction(str, Enum):
     """Action to take when a guardrail check fails."""
 
@@ -21,6 +24,7 @@ class GuardrailAction(str, Enum):
     WARN = "warn"
 
 
+@stable
 @dataclass
 class GuardrailResult:
     """Result of a single guardrail check.
@@ -40,6 +44,7 @@ class GuardrailResult:
     guardrail_name: Optional[str] = None
 
 
+@stable
 class Guardrail:
     """Base class for all guardrails.
 

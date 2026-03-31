@@ -32,6 +32,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Protocol, Tuple, runtime_checkable
 
+from ..stability import beta
 from .state import GraphState
 
 
@@ -56,6 +57,7 @@ class CheckpointMetadata:
     created_at: datetime
 
 
+@beta
 @runtime_checkable
 class CheckpointStore(Protocol):
     """Protocol for checkpoint backends.
@@ -117,6 +119,7 @@ def _deserialize_checkpoint(data: Dict) -> Tuple[GraphState, int]:
 # ------------------------------------------------------------------
 
 
+@beta
 class InMemoryCheckpointStore:
     """Thread-safe in-memory checkpoint store.
 
@@ -172,6 +175,7 @@ class InMemoryCheckpointStore:
 # ------------------------------------------------------------------
 
 
+@beta
 class FileCheckpointStore:
     """File-based checkpoint store.
 
@@ -290,6 +294,7 @@ CREATE INDEX IF NOT EXISTS idx_checkpoints_graph_id ON checkpoints (graph_id);
 """
 
 
+@beta
 class SQLiteCheckpointStore:
     """SQLite-backed checkpoint store with WAL mode for concurrent access.
 

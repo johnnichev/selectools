@@ -11,6 +11,8 @@ from __future__ import annotations
 import re
 from typing import List, Optional, Set
 
+from selectools.stability import stable
+
 from .base import Guardrail, GuardrailAction, GuardrailResult
 
 _DEFAULT_BLOCKLIST: Set[str] = {
@@ -33,6 +35,7 @@ _DEFAULT_BLOCKLIST: Set[str] = {
 }
 
 
+@stable
 class ToxicityGuardrail(Guardrail):
     """Block content that exceeds a toxicity threshold.
 

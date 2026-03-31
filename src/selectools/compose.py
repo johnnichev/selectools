@@ -23,10 +23,12 @@ from __future__ import annotations
 
 from typing import Any, Callable, List, Optional, Sequence
 
+from .stability import beta
 from .tools.base import Tool
 from .tools.decorators import tool as tool_decorator
 
 
+@beta
 def compose(
     *tools_or_fns: Any,
     name: Optional[str] = None,
