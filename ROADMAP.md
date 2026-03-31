@@ -59,8 +59,9 @@ v0.19.3 ✅ Stability Markers Applied to All Public APIs
 @stable on 60+ core symbols → @beta on 30+ orchestration/pipeline/patterns symbols
 → Full stability introspection via .__stability__ on every exported class and function
 
-v0.20.0 🟡 Visual Agent Builder
-Zero-install web UI → Drag-drop graph builder → YAML/Python export → Live test execution
+v0.20.0 ✅ Visual Agent Builder
+Zero-install web UI → Drag-drop graph builder → YAML/Python export
+→ Self-contained HTML (no React, no CDN) → One command: selectools serve --builder
 
 v0.21.0 🟡 Connector Expansion
 AWS Bedrock → Azure OpenAI → FAISS → Qdrant

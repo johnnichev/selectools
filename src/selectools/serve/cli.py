@@ -24,12 +24,20 @@ def main() -> None:
 
     # serve
     serve_parser = subparsers.add_parser("serve", help="Serve an agent as HTTP API")
-    serve_parser.add_argument("config", help="Path to YAML config file or template name")
+    serve_parser.add_argument(
+        "config",
+        nargs="?",
+        default=None,
+        help="Path to YAML config file or template name (optional with --builder)",
+    )
     serve_parser.add_argument("--port", type=int, default=8000, help="Port (default: 8000)")
     serve_parser.add_argument(
         "--host", default="0.0.0.0", help="Host (default: 0.0.0.0)"  # nosec B104
     )
     serve_parser.add_argument("--no-playground", action="store_true", help="Disable playground UI")
+    serve_parser.add_argument(
+        "--builder", action="store_true", help="Enable visual agent builder UI at /builder"
+    )
 
     # doctor
     subparsers.add_parser("doctor", help="Diagnose API keys, deps, and config")
@@ -47,12 +55,24 @@ def main() -> None:
 def _cmd_serve(args: argparse.Namespace) -> None:
     """Start the agent server."""
     from ..templates import from_yaml, list_templates, load_template
+    from .app import create_app
 
     config_path = args.config
+    enable_builder = getattr(args, "builder", False)
 
-    # Check if it's a template name
-    if config_path in list_templates():
-        # Need a provider — check env
+    # Builder-only mode: no agent config required
+    if config_path is None:
+        if not enable_builder:
+            print("Error: provide a config file/template name, or use --builder.")
+            print("  selectools serve agent.yaml")
+            print("  selectools serve --builder")
+            sys.exit(1)
+        from .app import BuilderServer
+
+        srv = BuilderServer(host=args.host, port=args.port)
+        srv.serve()
+        return
+    elif config_path in list_templates():
         provider = _auto_provider()
         if provider is None:
             print(
@@ -69,11 +89,10 @@ def _cmd_serve(args: argparse.Namespace) -> None:
         print(f"Available templates: {', '.join(list_templates())}")
         sys.exit(1)
 
-    from .app import create_app
-
     app = create_app(
         agent,
         playground=not args.no_playground,
+        builder=enable_builder,
         host=args.host,
         port=args.port,
     )

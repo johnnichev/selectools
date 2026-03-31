@@ -5,6 +5,46 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0] - 2026-03-31
+
+### Added
+
+#### Visual Agent Builder (`selectools serve --builder`)
+
+Zero-install visual builder for AgentGraph topologies — drag-drop nodes, connect ports, configure agents, and export to Python or YAML. Ships in one `pip install selectools`. No React, no build step, no CDN.
+
+**Start it with one command:**
+
+```bash
+selectools serve --builder          # builder only, no agent needed
+selectools serve agent.yaml --builder   # builder + live agent
+```
+
+Open `http://localhost:8000/builder` in your browser.
+
+**What the builder does:**
+- Drag agent nodes, START, and END nodes onto a canvas
+- Click output ports (○) then input ports to connect them
+- Click edges to add condition labels (e.g. `"approved"`, `"needs_revision"`)
+- Select nodes to edit name, provider, model, system prompt, tools
+- Switch between Python and YAML output in the code panel
+- Copy to clipboard or download as file
+
+**New Python API:**
+
+```python
+from selectools.serve.app import BuilderServer, create_app
+
+# Builder-only server (no agent required)
+BuilderServer(port=8080).serve()
+
+# Agent + builder
+app = create_app(agent, playground=True, builder=True)
+app.serve()
+```
+
+**Tests:** 3144 total (2958 non-e2e) | **Examples:** 76 | **Models:** 152
+
 ## [0.19.3] - 2026-03-31
 
 ### Added
