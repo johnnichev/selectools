@@ -103,7 +103,7 @@ src/selectools/
 │   └── supervisor.py        # SupervisorAgent with 4 strategies
 ├── pipeline.py              # Pipeline, Step, StepResult, @step, parallel(), branch() — composable pipelines (v0.18.0)
 
-tests/                       # 2949 tests (unit, integration, regression, E2E)
+tests/                       # 3135 tests (unit, integration, regression, E2E)
 ├── agent/                   # Agent core tests
 ├── providers/               # Provider-specific tests
 ├── rag/                     # RAG pipeline tests
@@ -418,7 +418,7 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 - **v0.18.x** ✅ Advanced Composition — type-safe step contracts, streaming composition, tool composition (`@compose`)
 - **v0.19.0** ✅ Serve & Deploy — Structured AgentConfig, `selectools serve`, FastAPI/Flask, YAML config, templates, playground
 - **v0.19.1** ✅ Advanced Agent Patterns — PlanAndExecuteAgent, ReflectiveAgent, DebateAgent, TeamLeadAgent, 11 new evaluators (39 → 50 total), ralph loop (~90 bugs fixed, 2918 tests)
-- **v0.19.2** ✅ Enterprise Hardening — stability markers, trace_to_html(), deprecation policy, security audit (2949 tests)
+- **v0.19.2** ✅ Enterprise Hardening — stability markers, trace_to_html(), deprecation policy, security audit, property-based tests, concurrency smoke suite, 5 new production simulations (3135 tests)
 - **v0.20.0** 🟡 Visual Agent Builder — `selectools serve --builder`, drag-drop AgentGraph UI, YAML/Python export
 - **v0.20.0** 🟡 Visual Agent Builder — `selectools serve --builder`, drag-drop AgentGraph UI, YAML/Python export, live test, self-contained HTML
 - **v0.21.0** 🟡 Connector Expansion — Bedrock, Azure, FAISS, Qdrant, pgvector, CSV/JSON/HTML/URL loaders, code/search/GitHub/DB toolbox

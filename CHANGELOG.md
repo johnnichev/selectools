@@ -59,9 +59,23 @@ Public audit document covering all 41 `# nosec` annotations in `src/selectools/`
 
 ### Tests
 
-- Tests: 2918 → 2949 (+31)
+- Tests: 2918 → 3135 (+217)
   - `tests/test_stability.py` — 18 tests for `@stable`, `@beta`, `@deprecated` on functions and classes
   - `tests/test_trace_html.py` — 13 tests for `trace_to_html` (content, colors, XSS, pure function contract)
+  - `tests/test_property_based.py` — property-based tests (Hypothesis) for BM25, InMemoryCache, ConversationMemory, estimate_tokens, Policy, metadata filters
+  - `tests/rag/test_property_based_rag.py` — property-based RAG tests: TextSplitter chunk invariants, HybridSearcher bounds, InMemoryVectorStore filter consistency
+  - `tests/test_concurrency_smoke.py` — thread-safety smoke suite: BM25, InMemoryVectorStore, SQLiteVectorStore, InMemoryCache, SemanticCache, ConversationMemory, KnowledgeMemory under concurrent load
+  - `tests/simulations/sim_rag_concurrent.py` — concurrent indexing + querying of InMemoryVectorStore
+  - `tests/simulations/sim_agent_memory_pressure.py` — memory trim + summarize-on-trim under 150 messages
+  - `tests/simulations/sim_provider_failover.py` — FallbackProvider circuit breaker + fallback under 20 calls
+  - `tests/simulations/sim_tool_errors.py` — agent with failing + timing-out tools over 10 turns
+  - `tests/simulations/sim_hybrid_search_load.py` — HybridSearcher under 20-thread concurrent search load
+
+### Examples
+
+- Examples: 73 → 75 (+2)
+  - `examples/74_trace_to_html.py` — HTML trace waterfall from a multi-tool agent run
+  - `examples/75_stability_markers.py` — `@stable`, `@beta`, `@deprecated` with programmatic introspection
 
 ---
 
