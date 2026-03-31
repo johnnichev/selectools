@@ -152,6 +152,7 @@ nav:
     - Agent Decomposition: decisions/005-agent-decomposition.md
     - Agent Config Future: decisions/006-agent-config-future.md
   - Reference:
+    - Stability Markers: modules/STABILITY.md
     - Deprecation Policy: DEPRECATION_POLICY.md
     - Parser: modules/PARSER.md
     - Prompt: modules/PROMPT.md

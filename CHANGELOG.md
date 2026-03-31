@@ -5,6 +5,66 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.2] - 2026-03-31
+
+### Added
+
+#### Stability Markers (`selectools.stability`)
+
+Three decorators for annotating the stability of any public class or function:
+
+```python
+from selectools.stability import stable, beta, deprecated
+
+@stable          # API is frozen — breaking changes require a major version
+class MyAgent: ...
+
+@beta            # API may change in a minor release — no deprecation cycle guaranteed
+class MyNewFeature: ...
+
+@deprecated(since="0.19", replacement="MyNewFeature")
+class OldFeature: ...   # emits DeprecationWarning on instantiation or call
+```
+
+All three are exported from `selectools` directly: `from selectools import stable, beta, deprecated`.
+
+Deprecated objects expose `.__stability__`, `.__deprecated_since__`, and `.__deprecated_replacement__` for programmatic introspection.
+
+#### Trace HTML Viewer (`trace_to_html`)
+
+New function `trace_to_html(trace: AgentTrace) -> str` renders any `AgentTrace` as a standalone HTML waterfall timeline — no external dependencies, no JavaScript framework:
+
+```python
+from selectools import trace_to_html
+
+result = agent.run("What is the capital of France?")
+Path("trace.html").write_text(trace_to_html(result.trace))
+```
+
+Features: color-coded step types, proportional duration bars, expandable detail rows (model, tokens, cost, tool args/result, error), XSS-safe HTML escaping. Exported from `selectools` directly.
+
+#### Deprecation Policy (`docs/DEPRECATION_POLICY.md`)
+
+Formal deprecation window: any API deprecated in `v0.X` will not be removed before `v0.X+2`. Documents how to surface `DeprecationWarning` in tests, how to introspect stability programmatically, and what is covered by the policy.
+
+#### Security Audit (`docs/SECURITY.md`)
+
+Public audit document covering all 41 `# nosec` annotations in `src/selectools/` — each reviewed and justified individually. Categories: bare exception handling, pickle, SQL f-strings, MD5, bind to 0.0.0.0, xml.etree, false-positive password string. Zero findings requiring remediation.
+
+### Changed
+
+- `trace.py` — `trace_to_html` added; `__all__` updated
+- `CLAUDE.md` — stability marker guidance added (when to use `@stable` / `@beta` / `@deprecated`)
+- `feature` and `release` skills updated to enforce stability marker application on new public APIs
+
+### Tests
+
+- Tests: 2918 → 2949 (+31)
+  - `tests/test_stability.py` — 18 tests for `@stable`, `@beta`, `@deprecated` on functions and classes
+  - `tests/test_trace_html.py` — 13 tests for `trace_to_html` (content, colors, XSS, pure function contract)
+
+---
+
 ## [0.19.1] - 2026-03-29
 
 ### Added

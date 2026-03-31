@@ -49,9 +49,9 @@ selectools serve CLI → Playground UI → YAML config → 5 agent templates
 v0.19.1 ✅ Advanced Agent Patterns
 PlanAndExecute → ReflectiveAgent → Debate → TeamLead → 50+ evaluators
 
-v0.19.2 🟡 Enterprise Hardening + Polish & Community
-Security audit → Stability markers → Deprecation policy → Compatibility matrix
-→ Enhanced trace viewer → Launch posts → Community seeding
+v0.19.2 ✅ Enterprise Hardening
+Security audit → Stability markers (@stable/@beta/@deprecated) → Deprecation policy
+→ trace_to_html() waterfall viewer → 2949 tests
 
 v0.20.0 🟡 Visual Agent Builder
 Zero-install web UI → Drag-drop graph builder → YAML/Python export → Live test execution
