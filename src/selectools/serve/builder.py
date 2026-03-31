@@ -721,7 +721,7 @@ function genPython() {
     L.push(`    config=AgentConfig(`);
     L.push(`        name="${n.name}",`);
     if (n.system_prompt)
-      L.push(`        system_prompt="${n.system_prompt.replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\n/g,'\\n')}",`);
+      L.push(`        system_prompt=${JSON.stringify(n.system_prompt)},`);
     L.push(`    )`);
     L.push(`)`);
     L.push('');
