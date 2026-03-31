@@ -19,6 +19,24 @@ def _make_agent() -> Agent:
 
 
 class TestBuilderHtml:
+    def test_builder_js_syntax(self):
+        """JS block must have zero syntax errors (catches escaped newline bugs)."""
+        import os
+        import subprocess
+        import tempfile
+
+        script_start = BUILDER_HTML.find("<script>") + len("<script>")
+        script_end = BUILDER_HTML.rfind("</script>")
+        js = BUILDER_HTML[script_start:script_end]
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".js", delete=False) as f:
+            f.write(js)
+            js_file = f.name
+        try:
+            result = subprocess.run(["node", "--check", js_file], capture_output=True, text=True)
+            assert result.returncode == 0, f"JS syntax error:\n{result.stderr}"
+        finally:
+            os.unlink(js_file)
+
     def test_builder_html_is_nonempty(self):
         assert len(BUILDER_HTML) > 1000
 
