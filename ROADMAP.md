@@ -137,13 +137,15 @@ result = agent.run("Investigate and fix the billing discrepancy")
 
 **New LLM-as-judge (+4):** `FactConsistencyEvaluator`, `CustomRubricEvaluator`, `AnswerAttributionEvaluator`, `StepReasoningEvaluator`
 
+
 | Feature             | Status | Impact | Effort |
 | ------------------- | ------ | ------ | ------ |
-| **PlanAndExecute**  | ✅     | High   | Medium |
-| **ReflectiveAgent** | ✅     | High   | Medium |
-| **Debate**          | ✅     | Medium | Medium |
-| **TeamLead**        | ✅     | Medium | Medium |
-| **50 evaluators**   | ✅     | High   | Medium |
+| **PlanAndExecute**  | ✅      | High   | Medium |
+| **ReflectiveAgent** | ✅      | High   | Medium |
+| **Debate**          | ✅      | Medium | Medium |
+| **TeamLead**        | ✅      | Medium | Medium |
+| **50 evaluators**   | ✅      | High   | Medium |
+
 
 ### Quality Infrastructure
 
@@ -161,22 +163,26 @@ Focus: Production readiness and developer trust signals before the Visual Agent 
 
 ### Enterprise Hardening
 
-| Feature                                                            | Status | Impact | Effort |
-| ------------------------------------------------------------------ | ------ | ------ | ------ |
-| **Security audit** (bandit + manual nosec review)                  | ✅     | High   | Medium |
-| **Stability markers** (`@stable`, `@beta`, `@deprecated`)          | ✅     | Medium | Small  |
-| **Deprecation policy** (2-version window, `docs/DEPRECATION_POLICY.md`) | ✅ | Medium | Small  |
-| **Compatibility matrix** (Python × provider SDK × optional deps)   | ✅     | Medium | Small  |
-| **SBOM** (`sbom.json` via CycloneDX, published in repo)            | ✅     | Low    | Small  |
-| **Enhanced trace viewer** (`trace_to_html()` waterfall HTML)       | ✅     | High   | Medium |
+
+| Feature                                                                 | Status | Impact | Effort |
+| ----------------------------------------------------------------------- | ------ | ------ | ------ |
+| **Security audit** (bandit + manual nosec review)                       | ✅      | High   | Medium |
+| **Stability markers** (`@stable`, `@beta`, `@deprecated`)               | ✅      | Medium | Small  |
+| **Deprecation policy** (2-version window, `docs/DEPRECATION_POLICY.md`) | ✅      | Medium | Small  |
+| **Compatibility matrix** (Python × provider SDK × optional deps)        | ✅      | Medium | Small  |
+| **SBOM** (`sbom.json` via CycloneDX, published in repo)                 | ✅      | Low    | Small  |
+| **Enhanced trace viewer** (`trace_to_html()` waterfall HTML)            | ✅      | High   | Medium |
+
 
 ### Quality Infrastructure
 
-| Feature                                    | Status | Impact | Effort |
-| ------------------------------------------ | ------ | ------ | ------ |
-| **Property-based tests** (Hypothesis)      | ✅     | High   | Medium |
-| **Thread-safety smoke suite**              | ✅     | High   | Medium |
-| **Production simulations** (5 new)         | ✅     | High   | Medium |
+
+| Feature                               | Status | Impact | Effort |
+| ------------------------------------- | ------ | ------ | ------ |
+| **Property-based tests** (Hypothesis) | ✅      | High   | Medium |
+| **Thread-safety smoke suite**         | ✅      | High   | Medium |
+| **Production simulations** (5 new)    | ✅      | High   | Medium |
+
 
 ---
 
@@ -190,7 +196,7 @@ A web-based UI for designing, testing, and exporting agent configurations. Zero-
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  Visual Agent Builder                    [Export]    │
+│  Visual Agent Builder                    [Export]   │
 ├─────────────┬───────────────────────────────────────┤
 │             │                                       │
 │  Components │    ┌──────────┐    ┌──────────┐       │
@@ -239,6 +245,7 @@ A web-based UI for designing, testing, and exporting agent configurations. Zero-
 - AutoGen has AutoGen Studio (separate app)
 - selectools: zero-install, runs in browser, exports to YAML/Python
 
+
 | Feature                                    | Status | Impact | Effort |
 | ------------------------------------------ | ------ | ------ | ------ |
 | **Graph canvas (drag-drop nodes + edges)** | 🟡     | High   | Large  |
@@ -248,6 +255,7 @@ A web-based UI for designing, testing, and exporting agent configurations. Zero-
 | **Live test execution**                    | 🟡     | High   | Medium |
 | **Self-contained HTML (no build step)**    | 🟡     | High   | Medium |
 
+
 ---
 
 ## v0.21.0: Connector Expansion 🟡
@@ -255,6 +263,7 @@ A web-based UI for designing, testing, and exporting agent configurations. Zero-
 Close the integration gap with LangChain by adding high-demand providers, vector stores, document loaders, and toolbox modules.
 
 ### Current Inventory
+
 
 | Category            | Count    | Items                                    |
 | ------------------- | -------- | ---------------------------------------- |
@@ -264,9 +273,11 @@ Close the integration gap with LangChain by adding high-demand providers, vector
 | Toolbox             | 24 tools | file, web, data, datetime, text          |
 | Rerankers           | 2        | Cohere, Jina                             |
 
+
 ### New Document Loaders
 
 Add to `src/selectools/rag/loaders.py` as new static methods on `DocumentLoader`. Refactor to `loaders/` subpackage with `__init__.py` re-exporting everything to support SaaS loaders as separate files.
+
 
 | Loader                      | Method                                              | Dependencies                  | Complexity | Why it matters                                        |
 | --------------------------- | --------------------------------------------------- | ----------------------------- | ---------- | ----------------------------------------------------- |
@@ -280,9 +291,11 @@ Add to `src/selectools/rag/loaders.py` as new static methods on `DocumentLoader`
 | **GitHub**                  | `from_github(repo, path, branch, token)`            | `requests` (existing)         | Small      | Developer docs and code                               |
 | **SQL Database**            | `from_sql(connection_string, query)`                | `sqlalchemy` (optional)       | Medium     | Enterprise data in databases                          |
 
+
 ### New Vector Stores
 
 New files in `src/selectools/rag/stores/`. Each follows the same pattern as `chroma.py`: inherit `VectorStore`, implement `add_documents`, `search`, `delete`, `clear`, lazy-import the dependency. Register in `VectorStore.create()` factory.
+
 
 | Store            | File          | Dependencies       | Complexity | Why it matters                                                            |
 | ---------------- | ------------- | ------------------ | ---------- | ------------------------------------------------------------------------- |
@@ -292,16 +305,19 @@ New files in `src/selectools/rag/stores/`. Each follows the same pattern as `chr
 | **Weaviate**     | `weaviate.py` | `weaviate-client`  | Medium     | Popular cloud vector DB with GraphQL API                                  |
 | **Redis Vector** | `redis.py`    | `redis` (existing) | Medium     | Leverages existing Redis connection from `cache_redis.py`                 |
 
+
 ### New Toolbox Modules
 
 New files in `src/selectools/toolbox/`. Follow `@tool` decorator pattern, register in `get_all_tools()` and `get_tools_by_category()`.
 
+
 | Module                | Tools                                                           | Dependencies                   | Complexity   | Why it matters                        |
 | --------------------- | --------------------------------------------------------------- | ------------------------------ | ------------ | ------------------------------------- |
-| `**code_tools.py`\*\* | `execute_python`, `execute_shell`                               | stdlib `subprocess`            | Medium       | #1 most-used tool in agent frameworks |
-| `**search_tools.py**` | `google_search`, `duckduckgo_search`                            | `duckduckgo_search` (optional) | Small-Medium | #2 most-used tool category            |
+| `**code_tools.py`     | `execute_python`, `execute_shell`                               | stdlib `subprocess`            | Medium       | #1 most-used tool in agent frameworks |
+| `**search_tools.py`** | `google_search`, `duckduckgo_search`                            | `duckduckgo_search` (optional) | Small-Medium | #2 most-used tool category            |
 | `**github_tools.py**` | `create_issue`, `list_issues`, `create_pr`, `get_file_contents` | `requests` (existing)          | Medium       | Developer workflow automation         |
 | `**db_tools.py**`     | `query_database`, `list_tables`, `describe_table`               | `sqlalchemy` (optional)        | Medium       | Enterprise data access                |
+
 
 ### Dependency Management
 
@@ -321,6 +337,7 @@ rag = [
 
 Individual stores/loaders remain installable a la carte: `pip install selectools faiss-cpu` works without the full `[rag]` group.
 
+
 | Feature                    | Status    | Impact | Effort |
 | -------------------------- | --------- | ------ | ------ |
 | **CSV/JSON/JSONL Loaders** | 🟡 High   | High   | Small  |
@@ -333,9 +350,11 @@ Individual stores/loaders remain installable a la carte: `pip install selectools
 | **SaaS Loaders**           | 🟡 Medium | Medium | Medium |
 | **GitHub/DB Toolbox**      | 🟡 Medium | Medium | Medium |
 
+
 ---
 
 ## Backlog (Unscheduled)
+
 
 | Feature                                                                   | Notes                               | Target |
 | ------------------------------------------------------------------------- | ----------------------------------- | ------ |
