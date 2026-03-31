@@ -300,4 +300,179 @@ def _span_id() -> str:
     return uuid.uuid4().hex[:16]
 
 
-__all__ = ["TraceStep", "AgentTrace", "StepType"]
+# ---------------------------------------------------------------------------
+# HTML trace viewer
+# ---------------------------------------------------------------------------
+
+_STEP_COLORS: Dict[str, str] = {
+    "llm_call": "#3b82f6",
+    "tool_execution": "#8b5cf6",
+    "tool_selection": "#a78bfa",
+    "cache_hit": "#4ade80",
+    "error": "#f87171",
+    "guardrail": "#fbbf24",
+    "output_screening": "#fbbf24",
+    "coherence_check": "#fbbf24",
+    "graph_node_start": "#06b6d4",
+    "graph_node_end": "#06b6d4",
+    "graph_routing": "#06b6d4",
+    "graph_checkpoint": "#06b6d4",
+    "graph_interrupt": "#06b6d4",
+    "graph_resume": "#06b6d4",
+    "graph_parallel_start": "#06b6d4",
+    "graph_parallel_end": "#06b6d4",
+    "graph_stall": "#f97316",
+    "graph_loop_detected": "#f97316",
+}
+_DEFAULT_COLOR = "#64748b"
+
+
+def trace_to_html(trace: "AgentTrace") -> str:
+    """Render an AgentTrace as a standalone HTML waterfall timeline.
+
+    Returns a self-contained HTML string (no external dependencies).
+    The caller is responsible for writing it to disk if desired::
+
+        from selectools import trace_to_html
+        Path("trace.html").write_text(trace_to_html(result.trace))
+
+    Args:
+        trace: The ``AgentTrace`` to visualise.
+
+    Returns:
+        A complete HTML document as a string.
+    """
+    import html as _html
+
+    max_dur = max((s.duration_ms for s in trace.steps), default=1.0)
+    max_dur = max(max_dur, 1.0)  # guard against all-zero durations
+
+    total_ms = trace.total_duration_ms
+    llm_ms = trace.llm_duration_ms
+    tool_ms = trace.tool_duration_ms
+    llm_pct = f"{llm_ms / max(total_ms, 1) * 100:.0f}%"
+    tool_pct = f"{tool_ms / max(total_ms, 1) * 100:.0f}%"
+
+    def _esc(v: Any) -> str:
+        return _html.escape(str(v)) if v is not None else ""
+
+    def _detail(step: "TraceStep") -> str:
+        parts = []
+        if step.model:
+            parts.append(f"<b>model:</b> {_esc(step.model)}")
+        if step.prompt_tokens is not None:
+            parts.append(f"<b>prompt tokens:</b> {step.prompt_tokens}")
+        if step.completion_tokens is not None:
+            parts.append(f"<b>completion tokens:</b> {step.completion_tokens}")
+        if step.cost_usd is not None:
+            parts.append(f"<b>cost:</b> ${step.cost_usd:.6f}")
+        if step.tool_name:
+            parts.append(f"<b>tool:</b> {_esc(step.tool_name)}")
+        if step.tool_args:
+            parts.append(f"<b>args:</b> <code>{_esc(json.dumps(step.tool_args))}</code>")
+        if step.tool_result:
+            truncated = str(step.tool_result)[:300]
+            parts.append(f"<b>result:</b> <code>{_esc(truncated)}</code>")
+        if step.error:
+            parts.append(f"<b>error:</b> <span style='color:#f87171'>{_esc(step.error)}</span>")
+        if step.node_name:
+            parts.append(f"<b>node:</b> {_esc(step.node_name)}")
+        if step.from_node or step.to_node:
+            parts.append(f"<b>route:</b> {_esc(step.from_node)} → {_esc(step.to_node)}")
+        if step.summary:
+            parts.append(f"<b>summary:</b> {_esc(step.summary)}")
+        if step.reasoning:
+            parts.append(f"<b>reasoning:</b> {_esc(step.reasoning[:200])}")
+        return "<br>".join(parts) if parts else "<i>no details</i>"
+
+    rows = []
+    for i, step in enumerate(trace.steps):
+        type_val = step.type.value if hasattr(step.type, "value") else str(step.type)
+        color = _STEP_COLORS.get(type_val, _DEFAULT_COLOR)
+        bar_pct = step.duration_ms / max_dur * 100
+        label = step.summary or type_val
+        detail_html = _detail(step)
+        rows.append(
+            f"""
+      <tr onclick="toggleDetail('d{i}')" style="cursor:pointer">
+        <td style="color:#94a3b8;width:32px;text-align:right;padding-right:12px">{i + 1}</td>
+        <td style="width:160px">
+          <span style="background:{color};color:#0f172a;font-size:11px;font-weight:600;
+                       padding:2px 7px;border-radius:4px">{_esc(type_val)}</span>
+        </td>
+        <td style="width:200px;padding:0 12px">
+          <div style="background:#1e3a5f;border-radius:3px;height:10px;width:100%">
+            <div style="background:{color};border-radius:3px;height:10px;width:{bar_pct:.1f}%"></div>
+          </div>
+        </td>
+        <td style="color:#94a3b8;width:70px;text-align:right;padding-right:12px">
+          {step.duration_ms:.1f}ms
+        </td>
+        <td style="color:#e2e8f0">{_esc(label)}</td>
+      </tr>
+      <tr id="d{i}" style="display:none">
+        <td colspan="5" style="padding:8px 16px 12px 44px;color:#94a3b8;
+                               font-size:12px;background:#0f2035;border-bottom:1px solid #1e3a5f">
+          {detail_html}
+        </td>
+      </tr>"""
+        )
+
+    rows_html = "\n".join(rows)
+    run_id_display = _esc(trace.run_id[:16]) + "…" if len(trace.run_id) > 16 else _esc(trace.run_id)
+    step_count = len(trace.steps)
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Trace — {run_id_display}</title>
+<style>
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{ background: #0f172a; color: #e2e8f0; font-family: 'JetBrains Mono', 'Fira Code', monospace;
+          font-size: 13px; padding: 24px; }}
+  h1 {{ font-size: 16px; font-weight: 600; color: #f8fafc; margin-bottom: 4px; }}
+  .meta {{ color: #64748b; font-size: 12px; margin-bottom: 24px; }}
+  .stat {{ display: inline-block; margin-right: 24px; }}
+  .stat b {{ color: #e2e8f0; }}
+  table {{ width: 100%; border-collapse: collapse; }}
+  tr:hover td {{ background: #1a2744; }}
+  td {{ padding: 7px 4px; border-bottom: 1px solid #1e293b; vertical-align: middle; }}
+  code {{ background: #1e293b; padding: 1px 4px; border-radius: 3px; font-size: 11px; }}
+</style>
+</head>
+<body>
+<h1>Agent Trace</h1>
+<div class="meta">
+  <span class="stat"><b>run:</b> {run_id_display}</span>
+  <span class="stat"><b>steps:</b> {step_count}</span>
+  <span class="stat"><b>total:</b> {total_ms:.1f}ms</span>
+  <span class="stat"><b>llm:</b> {llm_ms:.1f}ms ({llm_pct})</span>
+  <span class="stat"><b>tools:</b> {tool_ms:.1f}ms ({tool_pct})</span>
+</div>
+<table>
+  <thead>
+    <tr>
+      <th style="color:#475569;text-align:right;padding-right:12px">#</th>
+      <th style="color:#475569;text-align:left">type</th>
+      <th style="color:#475569;padding:0 12px">duration</th>
+      <th style="color:#475569;text-align:right;padding-right:12px">ms</th>
+      <th style="color:#475569;text-align:left">label</th>
+    </tr>
+  </thead>
+  <tbody>
+{rows_html}
+  </tbody>
+</table>
+<script>
+function toggleDetail(id) {{
+  var el = document.getElementById(id);
+  el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
+}}
+</script>
+</body>
+</html>"""
+
+
+__all__ = ["TraceStep", "AgentTrace", "StepType", "trace_to_html"]

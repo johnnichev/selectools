@@ -147,7 +147,7 @@ print(result.reasoning)       # Why the agent chose get_weather
 | **Advanced Agent Patterns** | `PlanAndExecuteAgent`, `ReflectiveAgent`, `DebateAgent`, `TeamLeadAgent` — high-level coordination patterns built on AgentGraph |
 | **Composable Pipelines** | `Pipeline` + `@step` + `|` operator + `parallel()` + `branch()` — chain agents, tools, and transforms with plain Python |
 | **Eval Framework** | 50 built-in evaluators, A/B testing, regression detection, HTML reports, JUnit XML |
-| **2918 Tests** | Unit, integration, regression, and E2E |
+| **3135 Tests** | Unit, integration, regression, and E2E |
 
 ---
 
@@ -234,7 +234,7 @@ Multi-Agent layer (optional):
 [:fontawesome-brands-python: PyPI Package](https://pypi.org/project/selectools/){ .md-button }
 [:fontawesome-brands-github: GitHub Repository](https://github.com/johnnichev/selectools){ .md-button }
 [:material-notebook: Getting Started Notebook](https://github.com/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb){ .md-button }
-[:material-code-tags: 73 Example Scripts](https://github.com/johnnichev/selectools/tree/main/examples){ .md-button }
+[:material-code-tags: 75 Example Scripts](https://github.com/johnnichev/selectools/tree/main/examples){ .md-button }
 
 ---
 

@@ -1,0 +1,114 @@
+{
+  "components": [
+    {
+      "bom-ref": "requirements-L2",
+      "description": "requirements line 2: anthropic==0.75.0",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "type": "distribution",
+          "url": "https://pypi.org/simple/anthropic/"
+        }
+      ],
+      "name": "anthropic",
+      "purl": "pkg:pypi/anthropic@0.75.0",
+      "type": "library",
+      "version": "0.75.0"
+    },
+    {
+      "bom-ref": "requirements-L3",
+      "description": "requirements line 3: google-genai==1.47.0",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "type": "distribution",
+          "url": "https://pypi.org/simple/google-genai/"
+        }
+      ],
+      "name": "google-genai",
+      "purl": "pkg:pypi/google-genai@1.47.0",
+      "type": "library",
+      "version": "1.47.0"
+    },
+    {
+      "bom-ref": "requirements-L4",
+      "description": "requirements line 4: numpy==2.0.2",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "type": "distribution",
+          "url": "https://pypi.org/simple/numpy/"
+        }
+      ],
+      "name": "numpy",
+      "purl": "pkg:pypi/numpy@2.0.2",
+      "type": "library",
+      "version": "2.0.2"
+    },
+    {
+      "bom-ref": "requirements-L1",
+      "description": "requirements line 1: openai==1.109.1",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "type": "distribution",
+          "url": "https://pypi.org/simple/openai/"
+        }
+      ],
+      "name": "openai",
+      "purl": "pkg:pypi/openai@1.109.1",
+      "type": "library",
+      "version": "1.109.1"
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "requirements-L1"
+    },
+    {
+      "ref": "requirements-L2"
+    },
+    {
+      "ref": "requirements-L3"
+    },
+    {
+      "ref": "requirements-L4"
+    }
+  ],
+  "metadata": {
+    "component": {
+      "type": "library",
+      "bom-ref": "selectools@0.19.2",
+      "name": "selectools",
+      "version": "0.19.2",
+      "description": "Production-ready AI agents with tool calling, RAG, and multi-agent orchestration",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/selectools@0.19.2",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://johnnichev.github.io/selectools"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/johnnichev/selectools"
+        },
+        {
+          "type": "distribution",
+          "url": "https://pypi.org/project/selectools/"
+        }
+      ]
+    }
+  },
+  "serialNumber": "urn:uuid:f028de18-01d7-4b80-81b9-7f9e27ecac64",
+  "version": 1,
+  "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6"
+}

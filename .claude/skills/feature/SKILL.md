@@ -57,9 +57,23 @@ except ImportError:
 
 **For tool changes** — add flags to both `Tool.__init__()` in `tools/base.py` AND `@tool()` decorator in `tools/decorators.py`.
 
-## 3. Update Exports
+## 3. Update Exports + Stability Markers
 
 Add to `src/selectools/__init__.py` in the appropriate section.
+
+Then apply a stability marker to every new public class or function (at the definition, not the import):
+
+```python
+from selectools.stability import stable, beta, deprecated
+
+@beta           # first release → beta; promote to @stable in the next release
+class NewFeature: ...
+
+@deprecated(since="0.19", replacement="NewFeature")
+class OldFeature: ...  # keep for ≥ 2 minor versions, then remove
+```
+
+**Quick rule:** new feature in first release = `@beta`. Replacing an existing API = `@deprecated` on the old one. Mature, stable core API = `@stable`.
 
 ## 4. Format and Lint
 

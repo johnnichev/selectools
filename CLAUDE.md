@@ -62,7 +62,8 @@ src/selectools/
 ├── models.py                # 152 model registry with pricing (single source of truth)
 ├── pricing.py               # Derives pricing from models.py
 ├── usage.py                 # Token + cost tracking
-├── trace.py                 # AgentTrace, TraceStep (27 step types — see list below)
+├── stability.py             # @stable, @beta, @deprecated(since, replacement) — public API markers
+├── trace.py                 # AgentTrace, TraceStep (27 step types — see list below), trace_to_html()
 ├── observer.py              # AgentObserver (45 sync events) + AsyncAgentObserver (42 async events) + LoggingObserver + SimpleStepObserver
 ├── policy.py                # ToolPolicy (allow/review/deny rules)
 ├── parser.py                # ToolCallParser (JSON extraction from LLM responses)
@@ -102,7 +103,7 @@ src/selectools/
 │   └── supervisor.py        # SupervisorAgent with 4 strategies
 ├── pipeline.py              # Pipeline, Step, StepResult, @step, parallel(), branch() — composable pipelines (v0.18.0)
 
-tests/                       # 2918 tests (unit, integration, regression, E2E)
+tests/                       # 3135 tests (unit, integration, regression, E2E)
 ├── agent/                   # Agent core tests
 ├── providers/               # Provider-specific tests
 ├── rag/                     # RAG pipeline tests
@@ -145,6 +146,38 @@ mkdocs build                                          # Build static site
 python3 -m build
 python3 -m twine upload dist/*
 ```
+
+## Stability Markers
+
+Every public symbol exported from `__init__.py` should carry a stability marker from `selectools.stability`:
+
+```python
+from selectools.stability import stable, beta, deprecated
+
+@stable          # API is frozen — breaking changes require a major version
+def my_func(): ...
+
+@beta            # API may change in a minor release — no deprecation cycle
+class MyClass: ...
+
+@deprecated(since="0.19", replacement="NewThing")  # emits DeprecationWarning on use
+def old_func(): ...
+```
+
+**When to apply each marker:**
+
+| Marker | When to use |
+|--------|------------|
+| `@stable` | Core, widely-used public APIs that have been in at least one release. Default for new features once proven. |
+| `@beta` | New features in their first release, experimental APIs, CLI commands, and anything in `patterns/`. |
+| `@deprecated` | When removing or renaming a public API. Must stay for ≥ 2 minor releases before removal. |
+
+**Rules:**
+- Apply to the class or function definition, not to the import in `__init__.py`
+- `@deprecated` always requires both `since` (the version string, e.g. `"0.19"`) and `replacement` (the name users should switch to), unless there is no replacement
+- The deprecation window is 2 minor versions: deprecated in `0.X` → earliest removal in `0.X+2`
+- Check `obj.__stability__` programmatically; values are `"stable"`, `"beta"`, `"deprecated"`
+- Full policy: `docs/DEPRECATION_POLICY.md`
 
 ## Key Conventions
 
@@ -216,6 +249,10 @@ When implementing a new feature, ALWAYS complete ALL of these steps:
 - [ ] Integrate with `agent/core.py` if it affects the agent loop
 - [ ] Update `agent/config.py` with new config options
 - [ ] Update `src/selectools/__init__.py` with new public exports
+- [ ] **Apply stability markers** to every new public class/function (see `## Stability Markers` above):
+  - New features in their first release → `@beta`
+  - Core stable APIs → `@stable`
+  - Anything replacing an old API → add `@deprecated(since=..., replacement=...)` to the old one
 - [ ] Run `black` and `isort` on all new/modified files
 - [ ] Run `mypy src/` to check types
 - [ ] Run `flake8 src/` to check linting
@@ -381,7 +418,8 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 - **v0.18.x** ✅ Advanced Composition — type-safe step contracts, streaming composition, tool composition (`@compose`)
 - **v0.19.0** ✅ Serve & Deploy — Structured AgentConfig, `selectools serve`, FastAPI/Flask, YAML config, templates, playground
 - **v0.19.1** ✅ Advanced Agent Patterns — PlanAndExecuteAgent, ReflectiveAgent, DebateAgent, TeamLeadAgent, 11 new evaluators (39 → 50 total), ralph loop (~90 bugs fixed, 2918 tests)
-- **v0.19.2** 🟡 Enterprise Hardening + Community — security audit, stability markers, deprecation policy, enhanced trace viewer, launch posts
+- **v0.19.2** ✅ Enterprise Hardening — stability markers, trace_to_html(), deprecation policy, security audit, property-based tests, concurrency smoke suite, 5 new production simulations (3135 tests)
+- **v0.20.0** 🟡 Visual Agent Builder — `selectools serve --builder`, drag-drop AgentGraph UI, YAML/Python export
 - **v0.20.0** 🟡 Visual Agent Builder — `selectools serve --builder`, drag-drop AgentGraph UI, YAML/Python export, live test, self-contained HTML
 - **v0.21.0** 🟡 Connector Expansion — Bedrock, Azure, FAISS, Qdrant, pgvector, CSV/JSON/HTML/URL loaders, code/search/GitHub/DB toolbox
 - **v1.0.0** 🟡 Stable Release — API freeze, stability markers, security audit, deprecation policy, Production/Stable classifier
