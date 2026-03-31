@@ -1,0 +1,41 @@
+services:
+  builder:
+    image: python:3.12-slim
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "pip install -e '.[dev]' -q && selectools serve --builder --port 8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  agent:
+    image: python:3.12-slim
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "8001:8001"
+    command: >
+      sh -c "pip install -e '.[dev]' -q && python -c \"
+      from selectools import Agent, AgentConfig
+      from selectools.providers.stubs import LocalProvider
+      from selectools.toolbox import get_all_tools
+      from selectools.serve.app import create_app
+      agent = Agent(get_all_tools()[:4], provider=LocalProvider(), config=AgentConfig(name='demo'))
+      create_app(agent, playground=True, builder=True, host='0.0.0.0', port=8001).serve()
+      \""
+    environment:
+      - PYTHONUNBUFFERED=1
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    profiles:
+      - agent

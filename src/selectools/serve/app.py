@@ -265,6 +265,165 @@ class AgentServer:
             server.shutdown()
 
 
+def _builder_run_mock(
+    nodes_data: List[Dict[str, Any]],
+    input_msg: str,
+    emit: Any,
+) -> None:
+    """Execute a mock graph run (no API keys required)."""
+    agent_nodes = [n for n in nodes_data if n.get("type") == "agent"]
+    if not agent_nodes:
+        emit({"type": "error", "message": "No agent nodes in graph."})
+        return
+
+    total_tokens = 0
+    for n in agent_nodes:
+        node_id = n.get("id", "?")
+        node_name = n.get("name", node_id)
+        model = n.get("model", "gpt-4o-mini")
+        provider = n.get("provider", "openai")
+        emit({"type": "node_start", "node_id": node_id, "node_name": node_name})
+
+        tools_str = n.get("tools", "")
+        if tools_str:
+            for tool_name in [t.strip() for t in tools_str.split(",") if t.strip()][:2]:
+                emit(
+                    {
+                        "type": "tool_call",
+                        "node_id": node_id,
+                        "tool": tool_name,
+                        "args": {"query": input_msg[:40]},
+                    }
+                )
+                emit(
+                    {
+                        "type": "tool_result",
+                        "node_id": node_id,
+                        "tool": tool_name,
+                        "result": f"[mock result from {tool_name}]",
+                    }
+                )
+
+        mock_text = (
+            f"[MOCK] {node_name} processed your request using {provider}/{model}. "
+            f"In live mode this calls the real API. Input: {input_msg[:60]}"
+        )
+        for word in mock_text.split():
+            emit({"type": "chunk", "node_id": node_id, "content": word + " "})
+            time.sleep(0.025)
+
+        node_tokens = 45
+        total_tokens += node_tokens
+        emit({"type": "node_end", "node_id": node_id, "tokens": node_tokens, "cost": 0.0})
+
+    emit({"type": "run_end", "total_tokens": total_tokens, "total_cost": 0.0})
+
+
+def _builder_run_live(
+    nodes_data: List[Dict[str, Any]],
+    edges_data: List[Dict[str, Any]],
+    input_msg: str,
+    api_key: str,
+    emit: Any,
+) -> None:
+    """Execute a live graph run using the real provider."""
+    from ..agent.config import AgentConfig
+    from ..agent.core import Agent
+    from ..toolbox import get_all_tools
+
+    # Determine provider from first agent node
+    provider_name = "openai"
+    for n in nodes_data:
+        if n.get("type") == "agent":
+            provider_name = n.get("provider", "openai")
+            break
+
+    from ..providers.base import Provider as _Provider
+
+    live_provider: _Provider
+    try:
+        if provider_name == "anthropic":
+            from ..providers.anthropic_provider import AnthropicProvider
+
+            live_provider = AnthropicProvider(api_key=api_key)
+        elif provider_name == "gemini":
+            from ..providers.gemini_provider import GeminiProvider
+
+            live_provider = GeminiProvider(api_key=api_key)
+        elif provider_name == "ollama":
+            from ..providers.ollama_provider import OllamaProvider
+
+            live_provider = OllamaProvider()
+        else:
+            from ..providers.openai_provider import OpenAIProvider
+
+            live_provider = OpenAIProvider(api_key=api_key)
+    except Exception as exc:
+        emit({"type": "error", "message": f"Provider init failed: {exc}"})
+        return
+
+    toolbox = get_all_tools()
+    agent_nodes = [n for n in nodes_data if n.get("type") == "agent"]
+    if not agent_nodes:
+        emit({"type": "error", "message": "No agent nodes in graph."})
+        return
+
+    # Follow edges from START to determine execution order
+    start_node = next((n for n in nodes_data if n.get("type") == "start"), None)
+    ordered: List[Dict[str, Any]] = []
+    visited: set = set()
+
+    def _walk(nid: str) -> None:
+        if nid in visited:
+            return
+        visited.add(nid)
+        n = next((x for x in nodes_data if x["id"] == nid), None)
+        if n and n.get("type") == "agent":
+            ordered.append(n)
+        for e in edges_data:
+            if e.get("from") == nid:
+                _walk(e.get("to", ""))
+
+    if start_node:
+        _walk(start_node["id"])
+    for n in agent_nodes:
+        if n["id"] not in visited:
+            ordered.append(n)
+
+    total_tokens = 0
+    total_cost = 0.0
+    current_input = input_msg
+
+    for n in ordered:
+        node_id = n.get("id", "?")
+        node_name = n.get("name", node_id)
+        model = n.get("model", "gpt-4o-mini")
+        system_prompt = n.get("system_prompt", "")
+        emit({"type": "node_start", "node_id": node_id, "node_name": node_name})
+        try:
+            config = AgentConfig(
+                name=node_name,
+                model=model,
+                system_prompt=system_prompt or None,
+            )
+            agent = Agent(toolbox, provider=live_provider, config=config)
+            result = agent.run(current_input)
+            content = result.content or ""
+            for word in content.split():
+                emit({"type": "chunk", "node_id": node_id, "content": word + " "})
+            usage = result.usage
+            node_tokens = usage.total_tokens if usage else 0
+            node_cost = float(usage.total_cost_usd) if usage else 0.0
+            total_tokens += node_tokens
+            total_cost += node_cost
+            emit({"type": "node_end", "node_id": node_id, "tokens": node_tokens, "cost": node_cost})
+            current_input = content or current_input
+        except Exception as exc:
+            emit({"type": "error", "message": f"{node_name}: {exc}"})
+
+    emit({"type": "run_end", "total_tokens": total_tokens, "total_cost": total_cost})
+
+
 class BuilderServer:
     """Standalone visual builder server — no agent required.
 
@@ -276,6 +435,11 @@ class BuilderServer:
     Or via CLI::
 
         selectools serve --builder
+
+    Endpoints:
+        GET  /builder  — visual builder UI
+        GET  /health   — health check
+        POST /run      — execute graph (mock or live via SSE)
     """
 
     def __init__(
@@ -300,9 +464,54 @@ class BuilderServer:
                 else:
                     self._json({"error": "not found"}, 404)
 
+            def do_POST(self) -> None:  # noqa: N802
+                path = urlparse(self.path).path.rstrip("/")
+                if path != "/run":
+                    self._json({"error": "not found"}, 404)
+                    return
+                content_length = int(self.headers.get("Content-Length", 0))
+                body_bytes = self.rfile.read(content_length) if content_length else b"{}"
+                try:
+                    body = json.loads(body_bytes)
+                except json.JSONDecodeError:
+                    self._json({"error": "invalid JSON"}, 400)
+                    return
+
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream")
+                self.send_header("Cache-Control", "no-cache")
+                self.send_header("Connection", "keep-alive")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+
+                def emit(event: Dict[str, Any]) -> None:
+                    line = f"data: {json.dumps(event)}\n\n"
+                    self.wfile.write(line.encode("utf-8"))
+                    self.wfile.flush()
+
+                try:
+                    input_msg = body.get("input", "Hello")
+                    nodes_data = body.get("nodes", [])
+                    edges_data = body.get("edges", [])
+                    api_key = body.get("api_key", "").strip()
+                    mock_mode = not api_key
+
+                    emit({"type": "run_start", "mock": mock_mode})
+                    if mock_mode:
+                        _builder_run_mock(nodes_data, input_msg, emit)
+                    else:
+                        _builder_run_live(nodes_data, edges_data, input_msg, api_key, emit)
+                except Exception as exc:
+                    emit({"type": "error", "message": str(exc)})
+                finally:
+                    self.wfile.write(b"data: [DONE]\n\n")
+                    self.wfile.flush()
+
             def do_OPTIONS(self) -> None:  # noqa: N802
                 self.send_response(200)
                 self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type")
                 self.end_headers()
 
             def _json(self, data: Dict[str, Any], status: int = 200) -> None:
@@ -323,6 +532,7 @@ class BuilderServer:
 
         server = HTTPServer((self.host, actual_port), Handler)
         print(f"Visual agent builder at http://{self.host}:{actual_port}/builder")
+        print(f"  POST /run  — execute graph (mock or live via SSE)")
         print(f"\nPress Ctrl+C to stop.")
         try:
             server.serve_forever()
