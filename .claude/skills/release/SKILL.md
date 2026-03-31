@@ -75,6 +75,8 @@ This is the most commonly missed step. For EVERY new feature in this release, ve
 ### 4a. Feature-Level Doc Checklist
 
 For each new feature, verify:
+- [ ] **Stability marker** applied to every new public class/function (`@beta` for first release, `@stable` for mature APIs — see `## Stability Markers` in CLAUDE.md)
+- [ ] **Deprecated APIs** have `@deprecated(since=..., replacement=...)` applied and are listed in CHANGELOG migration notes
 - [ ] **Module doc** exists in `docs/modules/<FEATURE>.md`
 - [ ] **mkdocs.yml** nav includes the module doc
 - [ ] **Example script** exists in `examples/`

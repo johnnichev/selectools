@@ -62,7 +62,8 @@ src/selectools/
 ├── models.py                # 152 model registry with pricing (single source of truth)
 ├── pricing.py               # Derives pricing from models.py
 ├── usage.py                 # Token + cost tracking
-├── trace.py                 # AgentTrace, TraceStep (27 step types — see list below)
+├── stability.py             # @stable, @beta, @deprecated(since, replacement) — public API markers
+├── trace.py                 # AgentTrace, TraceStep (27 step types — see list below), trace_to_html()
 ├── observer.py              # AgentObserver (45 sync events) + AsyncAgentObserver (42 async events) + LoggingObserver + SimpleStepObserver
 ├── policy.py                # ToolPolicy (allow/review/deny rules)
 ├── parser.py                # ToolCallParser (JSON extraction from LLM responses)
@@ -146,6 +147,38 @@ python3 -m build
 python3 -m twine upload dist/*
 ```
 
+## Stability Markers
+
+Every public symbol exported from `__init__.py` should carry a stability marker from `selectools.stability`:
+
+```python
+from selectools.stability import stable, beta, deprecated
+
+@stable          # API is frozen — breaking changes require a major version
+def my_func(): ...
+
+@beta            # API may change in a minor release — no deprecation cycle
+class MyClass: ...
+
+@deprecated(since="0.19", replacement="NewThing")  # emits DeprecationWarning on use
+def old_func(): ...
+```
+
+**When to apply each marker:**
+
+| Marker | When to use |
+|--------|------------|
+| `@stable` | Core, widely-used public APIs that have been in at least one release. Default for new features once proven. |
+| `@beta` | New features in their first release, experimental APIs, CLI commands, and anything in `patterns/`. |
+| `@deprecated` | When removing or renaming a public API. Must stay for ≥ 2 minor releases before removal. |
+
+**Rules:**
+- Apply to the class or function definition, not to the import in `__init__.py`
+- `@deprecated` always requires both `since` (the version string, e.g. `"0.19"`) and `replacement` (the name users should switch to), unless there is no replacement
+- The deprecation window is 2 minor versions: deprecated in `0.X` → earliest removal in `0.X+2`
+- Check `obj.__stability__` programmatically; values are `"stable"`, `"beta"`, `"deprecated"`
+- Full policy: `docs/DEPRECATION_POLICY.md`
+
 ## Key Conventions
 
 ### Code Style
@@ -216,6 +249,10 @@ When implementing a new feature, ALWAYS complete ALL of these steps:
 - [ ] Integrate with `agent/core.py` if it affects the agent loop
 - [ ] Update `agent/config.py` with new config options
 - [ ] Update `src/selectools/__init__.py` with new public exports
+- [ ] **Apply stability markers** to every new public class/function (see `## Stability Markers` above):
+  - New features in their first release → `@beta`
+  - Core stable APIs → `@stable`
+  - Anything replacing an old API → add `@deprecated(since=..., replacement=...)` to the old one
 - [ ] Run `black` and `isort` on all new/modified files
 - [ ] Run `mypy src/` to check types
 - [ ] Run `flake8 src/` to check linting
