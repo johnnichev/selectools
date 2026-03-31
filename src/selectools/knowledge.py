@@ -19,11 +19,14 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 
+from .stability import stable
+
 # ======================================================================
 # KnowledgeEntry — structured entry for the new store-based API
 # ======================================================================
 
 
+@stable
 @dataclass
 class KnowledgeEntry:
     """A single piece of knowledge stored by the agent.
@@ -66,6 +69,7 @@ class KnowledgeEntry:
 # ======================================================================
 
 
+@stable
 @runtime_checkable
 class KnowledgeStore(Protocol):
     """Protocol for knowledge storage backends.
@@ -113,6 +117,7 @@ class KnowledgeStore(Protocol):
 # ======================================================================
 
 
+@stable
 class FileKnowledgeStore:
     """File-based knowledge store (backward-compatible with the original KnowledgeMemory).
 
@@ -279,6 +284,7 @@ class FileKnowledgeStore:
 # ======================================================================
 
 
+@stable
 class SQLiteKnowledgeStore:
     """SQLite-backed knowledge store for production single-process use.
 
@@ -442,6 +448,7 @@ class SQLiteKnowledgeStore:
 # ======================================================================
 
 
+@stable
 class KnowledgeMemory:
     """Maintains cross-session knowledge with daily logs and persistent facts.
 

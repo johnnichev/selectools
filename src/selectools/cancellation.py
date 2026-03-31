@@ -10,8 +10,10 @@ from __future__ import annotations
 import threading
 
 from .exceptions import CancellationError
+from .stability import stable
 
 
+@stable
 class CancellationToken:
     """Thread-safe signal for cancelling an agent run.
 

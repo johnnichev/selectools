@@ -13,7 +13,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol
 
+from selectools.stability import stable
 
+
+@stable
 class Role(str, Enum):
     """
     Enumeration of conversation roles for messages.
@@ -41,6 +44,7 @@ def _encode_image(image_path: str) -> str:
     return base64.b64encode(data).decode("utf-8")
 
 
+@stable
 @dataclass
 class Message:
     """
@@ -153,6 +157,7 @@ class Message:
         return msg
 
 
+@stable
 @dataclass
 class ToolCall:
     """
@@ -179,6 +184,7 @@ class ToolCall:
     thought_signature: Optional[str] = None
 
 
+@stable
 @dataclass
 class AgentResult:
     """

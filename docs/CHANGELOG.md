@@ -5,6 +5,29 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.3] - 2026-03-31
+
+### Added
+
+#### Stability Markers Applied to All Public APIs
+
+Every public class and function exported from `selectools` now carries a stability marker:
+
+**`@stable`** (API frozen — breaking changes require a major version bump):
+`Role`, `Message`, `ToolCall`, `AgentResult`, `StepType`, `TraceStep`, `AgentTrace`, `Agent`, `AgentConfig`, `AgentObserver`, `AsyncAgentObserver`, `LoggingObserver`, `ConversationMemory`, `Tool`, `ToolParameter`, `ToolRegistry`, `tool`, `ToolPolicy`, `PolicyDecision`, `PolicyResult`, `OpenAIProvider`, `AnthropicProvider`, `GeminiProvider`, `OllamaProvider`, `FallbackProvider`, `TestCase`, `CaseResult`, `CaseVerdict`, `EvalSuite`, `EvalReport`, `AuditLogger`, `PrivacyLevel`, `CancellationToken`, `InMemoryCache`, `Cache`, `CacheKeyBuilder`, `CacheStats`, `SessionStore`, `JsonFileSessionStore`, `SQLiteSessionStore`, `KnowledgeMemory`, `KnowledgeEntry`, `KnowledgeStore`, `FileKnowledgeStore`, `SQLiteKnowledgeStore`, `Guardrail`, `GuardrailAction`, `GuardrailResult`, `GuardrailsPipeline`, `PIIGuardrail`, `ToxicityGuardrail`, `TopicGuardrail`, `FormatGuardrail`, `LengthGuardrail`, `TokenEstimate`, `estimate_tokens`, `estimate_run_tokens`, `AgentUsage`, `UsageStats`, `AgentAnalytics`, `Entity`, `EntityMemory`, `KnowledgeGraphMemory`
+
+**`@beta`** (API may change in a minor release):
+`trace_to_html`, `SimpleStepObserver`, `LocalProvider`, `RedisSessionStore`, `AgentGraph`, `SupervisorAgent`, `GraphState`, `MergePolicy`, `ContextMode`, `InterruptRequest`, `Scatter`, `CheckpointStore`, `InMemoryCheckpointStore`, `FileCheckpointStore`, `SQLiteCheckpointStore`, `PostgresCheckpointStore`, `Pipeline`, `Step`, `StepResult`, `step`, `parallel`, `branch`, `retry`, `cache_step`, `PlanAndExecuteAgent`, `ReflectiveAgent`, `DebateAgent`, `TeamLeadAgent`, `compose`
+
+Introspect programmatically:
+```python
+from selectools import Agent, AgentGraph
+print(Agent.__stability__)      # "stable"
+print(AgentGraph.__stability__) # "beta"
+```
+
+**Tests:** 3135 | **Examples:** 75 | **Models:** 152
+
 ## [0.19.2] - 2026-03-31
 
 ### Added

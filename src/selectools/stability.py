@@ -33,16 +33,38 @@ _F = TypeVar("_F", bound=Callable[..., Any])
 _C = TypeVar("_C", bound=type)
 
 
+@overload
+def stable(obj: _C) -> _C: ...
+
+
+@overload
+def stable(obj: _F) -> _F: ...
+
+
 def stable(obj: Union[_F, _C]) -> Union[_F, _C]:
     """Set stability marker to 'stable' (API is frozen)."""
     obj.__stability__ = "stable"  # type: ignore[union-attr]
     return obj
 
 
+stable.__stability__ = "stable"  # type: ignore[attr-defined]
+
+
+@overload
+def beta(obj: _C) -> _C: ...
+
+
+@overload
+def beta(obj: _F) -> _F: ...
+
+
 def beta(obj: Union[_F, _C]) -> Union[_F, _C]:
     """Set stability marker to 'beta' (API may change in minor releases)."""
     obj.__stability__ = "beta"  # type: ignore[union-attr]
     return obj
+
+
+beta.__stability__ = "stable"  # type: ignore[attr-defined]
 
 
 def deprecated(
@@ -107,5 +129,7 @@ def deprecated(
 
     return decorator  # type: ignore[return-value]
 
+
+deprecated.__stability__ = "stable"  # type: ignore[attr-defined]
 
 __all__ = ["stable", "beta", "deprecated"]

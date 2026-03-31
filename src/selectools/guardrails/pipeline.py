@@ -12,11 +12,14 @@ import logging
 from dataclasses import dataclass, field
 from typing import List, Optional
 
+from selectools.stability import stable
+
 from .base import Guardrail, GuardrailAction, GuardrailError, GuardrailResult
 
 logger = logging.getLogger("selectools.guardrails")
 
 
+@stable
 @dataclass
 class GuardrailsPipeline:
     """Ordered pipeline of input and output guardrails.

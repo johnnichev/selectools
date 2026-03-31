@@ -7,7 +7,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from .stability import stable
 
+
+@stable
 @dataclass
 class UsageStats:
     """
@@ -39,6 +42,7 @@ class UsageStats:
             self.total_tokens = self.prompt_tokens + self.completion_tokens
 
 
+@stable
 @dataclass
 class AgentUsage:
     """

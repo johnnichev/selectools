@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 from ..orchestration.graph import GraphResult
 from ..orchestration.state import GraphState
 from ..orchestration.supervisor import _safe_json_parse
+from ..stability import beta
 from ..trace import AgentTrace
 from ..types import Message, Role
 from ..usage import UsageStats
@@ -63,6 +64,7 @@ Respond with ONLY a JSON array of revised remaining steps:
 """
 
 
+@beta
 class PlanAndExecuteAgent:
     """Planner generates a structured plan; executor agents handle each step.
 

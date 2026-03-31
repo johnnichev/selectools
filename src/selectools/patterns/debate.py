@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from ..cancellation import CancellationToken
     from ..observer import AgentObserver
 
+from ..stability import beta
 from ..types import Message, Role
 
 
@@ -39,6 +40,7 @@ class DebateResult:
         return len(self.rounds)
 
 
+@beta
 class DebateAgent:
     """Multi-agent debate: agents argue → judge synthesizes conclusion.
 

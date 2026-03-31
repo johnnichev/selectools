@@ -24,6 +24,7 @@ from typing import (
     cast,
 )
 
+from ..stability import stable
 from ..types import Message, ToolCall
 from .base import Provider, ProviderError
 
@@ -43,6 +44,7 @@ def _is_retriable(exc: Exception) -> bool:
     return any(s in msg for s in _RETRIABLE_SUBSTRINGS) or bool(_RETRIABLE_STATUS_CODES.search(msg))
 
 
+@stable
 class FallbackProvider:
     """Wraps multiple providers with automatic failover.
 

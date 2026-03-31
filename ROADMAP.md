@@ -55,6 +55,10 @@ Security audit → Stability markers (@stable/@beta/@deprecated) → Deprecation
 → Property-based tests (Hypothesis) → Concurrency smoke suite → 5 production simulations
 → 3135 tests, 75 examples
 
+v0.19.3 ✅ Stability Markers Applied to All Public APIs
+@stable on 60+ core symbols → @beta on 30+ orchestration/pipeline/patterns symbols
+→ Full stability introspection via .__stability__ on every exported class and function
+
 v0.20.0 🟡 Visual Agent Builder
 Zero-install web UI → Drag-drop graph builder → YAML/Python export → Live test execution
 
@@ -183,6 +187,29 @@ Focus: Production readiness and developer trust signals before the Visual Agent 
 | **Thread-safety smoke suite**         | ✅      | High   | Medium |
 | **Production simulations** (5 new)    | ✅      | High   | Medium |
 
+
+---
+
+## v0.19.3: Stability Markers Applied ✅
+
+Focus: Apply `@stable` and `@beta` markers to every public symbol in the library, completing the stability annotation work started in v0.19.2.
+
+### Stable APIs (60+ symbols)
+
+Core types, providers, agent, memory, tools, evals, guardrails, sessions, knowledge, cache, cancellation, token estimation, analytics, audit — all marked `@stable`. Breaking changes to these require a major version bump.
+
+### Beta APIs (30+ symbols)
+
+Orchestration (`AgentGraph`, `SupervisorAgent`), pipelines (`Pipeline`, `@step`, `parallel`, `branch`), patterns (`PlanAndExecuteAgent`, `ReflectiveAgent`, `DebateAgent`, `TeamLeadAgent`), and composition (`compose`) — marked `@beta`. These may change in a minor release.
+
+### Introspection
+
+```python
+from selectools import Agent, AgentGraph, PlanAndExecuteAgent
+print(Agent.__stability__)              # "stable"
+print(AgentGraph.__stability__)         # "beta"
+print(PlanAndExecuteAgent.__stability__)  # "beta"
+```
 
 ---
 

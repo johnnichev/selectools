@@ -13,13 +13,17 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+from selectools.stability import stable
 
+
+@stable
 class PolicyDecision(str, Enum):
     ALLOW = "allow"
     REVIEW = "review"
     DENY = "deny"
 
 
+@stable
 @dataclass
 class PolicyResult:
     """Outcome of evaluating a tool call against the policy."""
@@ -29,6 +33,7 @@ class PolicyResult:
     matched_rule: str = ""
 
 
+@stable
 @dataclass
 class ToolPolicy:
     """Declarative allow / review / deny rules for tool execution.

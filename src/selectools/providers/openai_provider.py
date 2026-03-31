@@ -15,6 +15,7 @@ from ..env import load_default_env
 from ..exceptions import ProviderConfigurationError
 from ..models import OpenAI as OpenAIModels
 from ..pricing import calculate_cost
+from ..stability import stable
 from ._openai_compat import _OpenAICompatibleBase
 from .base import ProviderError
 
@@ -33,6 +34,7 @@ def _uses_max_completion_tokens(model: str) -> bool:
     return any(model.startswith(p) for p in _MAX_COMPLETION_TOKENS_PREFIXES)
 
 
+@stable
 class OpenAIProvider(_OpenAICompatibleBase):
     """Adapter that speaks to OpenAI's Chat Completions API."""
 

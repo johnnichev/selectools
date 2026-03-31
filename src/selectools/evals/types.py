@@ -6,7 +6,10 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
+from selectools.stability import stable
 
+
+@stable
 class CaseVerdict(str, Enum):
     """Verdict for a single evaluated test case."""
 
@@ -16,6 +19,7 @@ class CaseVerdict(str, Enum):
     SKIP = "skip"
 
 
+@stable
 @dataclass
 class TestCase:
     """A single test case for agent evaluation.
@@ -125,6 +129,7 @@ class EvalFailure:
     message: str
 
 
+@stable
 @dataclass
 class CaseResult:
     """Result of evaluating a single TestCase."""

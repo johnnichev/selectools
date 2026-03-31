@@ -11,9 +11,12 @@ import re
 import unicodedata
 from typing import List, Optional
 
+from selectools.stability import stable
+
 from .base import Guardrail, GuardrailAction, GuardrailResult
 
 
+@stable
 class TopicGuardrail(Guardrail):
     """Reject content that mentions denied topics.
 

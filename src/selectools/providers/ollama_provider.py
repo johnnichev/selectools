@@ -9,11 +9,13 @@ import uuid
 from typing import Any, Dict
 
 from ..models import Ollama as OllamaModels
+from ..stability import stable
 from ..types import ToolCall
 from ._openai_compat import _OpenAICompatibleBase
 from .base import ProviderError
 
 
+@stable
 class OllamaProvider(_OpenAICompatibleBase):
     """
     Adapter for Ollama local models using OpenAI-compatible API.

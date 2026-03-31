@@ -14,9 +14,11 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from .stability import stable
 from .types import Message, Role
 
 
+@stable
 @dataclass
 class Entity:
     """A named entity extracted from conversation.
@@ -69,6 +71,7 @@ _EXTRACTION_PROMPT = (
 )
 
 
+@stable
 class EntityMemory:
     """Maintains a registry of entities mentioned in conversation.
 

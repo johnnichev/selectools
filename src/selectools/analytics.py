@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict
 
+from .stability import stable
+
 
 @dataclass
 class ToolMetrics:
@@ -81,6 +83,7 @@ class ToolMetrics:
         }
 
 
+@stable
 class AgentAnalytics:
     """
     Analytics tracker for agent tool usage.

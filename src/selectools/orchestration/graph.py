@@ -37,6 +37,7 @@ from typing import (
 )
 
 from ..exceptions import GraphExecutionError
+from ..stability import beta
 from ..trace import AgentTrace, StepType, TraceStep
 from ..types import AgentResult, Message, Role
 from ..usage import UsageStats
@@ -164,6 +165,7 @@ def _merge_usage(base: UsageStats, added: Any) -> UsageStats:
     )
 
 
+@beta
 class AgentGraph:
     """Directed graph of agent nodes with routing, parallelism, and HITL support.
 

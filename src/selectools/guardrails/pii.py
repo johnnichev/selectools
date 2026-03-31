@@ -11,6 +11,8 @@ import re
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
+from selectools.stability import stable
+
 from .base import Guardrail, GuardrailAction, GuardrailResult
 
 _BUILTIN_PATTERNS: Dict[str, re.Pattern[str]] = {
@@ -34,6 +36,7 @@ class PIIMatch:
     end: int
 
 
+@stable
 class PIIGuardrail(Guardrail):
     """Detect (and optionally redact) PII in content.
 

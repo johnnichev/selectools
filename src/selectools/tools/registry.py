@@ -7,10 +7,12 @@ from __future__ import annotations
 import warnings
 from typing import Any, Callable, Dict, List, Optional
 
+from ..stability import stable
 from .base import ParamMetadata, Tool
 from .decorators import tool
 
 
+@stable
 class ToolRegistry:
     """
     Central registry for managing a collection of tools.

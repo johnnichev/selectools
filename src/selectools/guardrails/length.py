@@ -9,9 +9,12 @@ from __future__ import annotations
 import re
 from typing import Optional
 
+from selectools.stability import stable
+
 from .base import Guardrail, GuardrailAction, GuardrailResult
 
 
+@stable
 class LengthGuardrail(Guardrail):
     """Enforce content length constraints.
 

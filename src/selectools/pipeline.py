@@ -36,6 +36,8 @@ from dataclasses import dataclass, field
 from functools import wraps
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
+from selectools.stability import beta
+
 
 def _filter_kwargs(fn: Callable, kwargs: Dict[str, Any]) -> Dict[str, Any]:
     """Return only the kwargs that *fn* accepts.
@@ -94,6 +96,7 @@ def _get_type_hints(fn: Callable) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+@beta
 @dataclass
 class StepResult:
     """Result of a single step or pipeline execution.
@@ -109,6 +112,7 @@ class StepResult:
     steps_run: int = 0
 
 
+@beta
 class Step:
     """A callable wrapper around a plain function with composition support.
 
@@ -167,6 +171,7 @@ class Step:
         return f"Step({self.name!r})"
 
 
+@beta
 def step(
     fn: Optional[Callable] = None,
     *,
@@ -215,6 +220,7 @@ def _ensure_step(fn: Any) -> Step:
 # ---------------------------------------------------------------------------
 
 
+@beta
 class Pipeline:
     """A sequence of steps executed in order.
 
@@ -522,6 +528,7 @@ class Pipeline:
 # ---------------------------------------------------------------------------
 
 
+@beta
 def parallel(*steps_or_fns: Union[Step, Callable]) -> Step:
     """Run multiple steps in parallel on the same input, return dict of results.
 
@@ -571,6 +578,7 @@ def parallel(*steps_or_fns: Union[Step, Callable]) -> Step:
 # ---------------------------------------------------------------------------
 
 
+@beta
 def branch(
     router: Optional[Callable] = None,
     **named_steps: Union[Step, Callable],
@@ -629,6 +637,7 @@ def branch(
 # ---------------------------------------------------------------------------
 
 
+@beta
 def retry(step_or_fn: Union[Step, Callable], attempts: int = 3) -> Step:
     """Wrap a step with retry logic.
 
@@ -644,6 +653,7 @@ def retry(step_or_fn: Union[Step, Callable], attempts: int = 3) -> Step:
     return Step(wrapped.fn, name=wrapped.name, retry=attempts, on_error="raise")
 
 
+@beta
 def cache_step(
     step_or_fn: Union[Step, Callable],
     ttl: int = 300,

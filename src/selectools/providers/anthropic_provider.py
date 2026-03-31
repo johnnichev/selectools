@@ -17,11 +17,13 @@ from ..env import load_default_env
 from ..exceptions import ProviderConfigurationError
 from ..models import Anthropic as AnthropicModels
 from ..pricing import calculate_cost
+from ..stability import stable
 from ..types import Message, Role, ToolCall
 from ..usage import UsageStats
 from .base import Provider, ProviderError
 
 
+@stable
 class AnthropicProvider(Provider):
     """Anthropic Messages API adapter."""
 

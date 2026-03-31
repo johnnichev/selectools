@@ -10,9 +10,12 @@ from __future__ import annotations
 import json
 from typing import List, Optional
 
+from selectools.stability import stable
+
 from .base import Guardrail, GuardrailAction, GuardrailResult
 
 
+@stable
 class FormatGuardrail(Guardrail):
     """Validate that content matches expected format constraints.
 
