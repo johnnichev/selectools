@@ -87,10 +87,12 @@
           <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">Gemini</span>
           <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">Ollama</span>
           <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">152 Models</span>
-          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">39 Evaluators</span>
-          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">2529 Tests</span>
+          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">50 Evaluators</span>
+          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">3135 Tests</span>
           <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">Multi-Agent</span>
           <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">Composable Pipelines</span>
+          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">4 Agent Patterns</span>
+          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">SBOM + Security Audit</span>
         </div>
       </div>
     </div>
@@ -311,7 +313,7 @@ result = agent.run(<span class="text-green-400">"Find our refund policy"</span>)
         </div>
         <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition">
           <div class="text-2xl mb-3">&#128202;</div>
-          <h3 class="font-semibold mb-1">39 Evaluators</h3>
+          <h3 class="font-semibold mb-1">50 Evaluators</h3>
           <p class="text-sm text-slate-400">Built-in agent testing: tool use, correctness, safety, LLM-as-judge, regression detection</p>
         </div>
         <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-cyan/50 transition col-span-2">
@@ -324,6 +326,16 @@ result = agent.run(<span class="text-green-400">"Find our refund policy"</span>)
           <h3 class="font-semibold mb-1">Composable Pipelines</h3>
           <p class="text-sm text-slate-400"><code class="text-brand-cyan text-xs">Pipeline</code> + <code class="text-brand-cyan text-xs">@step</code> + <code class="text-brand-cyan text-xs">|</code> operator + <code class="text-brand-cyan text-xs">parallel()</code> + <code class="text-brand-cyan text-xs">branch()</code> &mdash; chain agents, tools, and transforms with plain Python. Also: <code class="text-brand-cyan text-xs">AgentGraph.chain(a, b, c).run(prompt)</code> for one-line multi-agent pipelines.</p>
         </div>
+        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-cyan/50 transition col-span-2">
+          <div class="text-2xl mb-3">&#129504;</div>
+          <h3 class="font-semibold mb-1">4 Advanced Agent Patterns</h3>
+          <p class="text-sm text-slate-400"><code class="text-brand-cyan text-xs">PlanAndExecuteAgent</code> — LLM plans subtasks, agents execute. <code class="text-brand-cyan text-xs">ReflectiveAgent</code> — self-critique loop until quality threshold. <code class="text-brand-cyan text-xs">DebateAgent</code> — two agents argue + judge synthesizes. <code class="text-brand-cyan text-xs">TeamLeadAgent</code> — lead coordinates specialists with load balancing.</p>
+        </div>
+        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition col-span-2">
+          <div class="text-2xl mb-3">&#128274;</div>
+          <h3 class="font-semibold mb-1">Enterprise Ready</h3>
+          <p class="text-sm text-slate-400">Security audit published (41 nosec annotations reviewed). SBOM (CycloneDX 1.6). <code class="text-brand-cyan text-xs">@stable</code>/<code class="text-brand-cyan text-xs">@beta</code>/<code class="text-brand-cyan text-xs">@deprecated</code> stability markers. Formal deprecation policy (2-version window). Compatibility matrix: Python 3.9–3.13.</p>
+        </div>
       </div>
     </div>
   </section>
@@ -332,7 +344,7 @@ result = agent.run(<span class="text-green-400">"Find our refund policy"</span>)
   <section class="py-20 px-6 border-t border-slate-800" id="eval">
     <div class="max-w-6xl mx-auto">
       <h2 class="text-3xl font-bold mb-4 text-center">Built-in Agent Evaluation</h2>
-      <p class="text-slate-400 text-center mb-14 max-w-2xl mx-auto">The only agent framework with a built-in eval suite. No separate install, no SaaS account, no external dependencies. 39 evaluators out of the box.</p>
+      <p class="text-slate-400 text-center mb-14 max-w-2xl mx-auto">The only agent framework with a built-in eval suite. No separate install, no SaaS account, no external dependencies. 50 evaluators out of the box.</p>
       <div class="grid lg:grid-cols-2 gap-8">
         <div class="fade-in">
           <div class="code-block rounded-xl border border-slate-700 overflow-hidden">
@@ -369,7 +381,7 @@ report.<span class="text-yellow-300">to_html</span>(<span class="text-green-400"
         </div>
         <div class="fade-in flex flex-col justify-center gap-4">
           <div class="code-block rounded-lg p-5 border border-slate-700">
-            <h3 class="text-sm font-semibold text-brand-cyan mb-3">21 Deterministic Evaluators</h3>
+            <h3 class="text-sm font-semibold text-brand-cyan mb-3">30 Deterministic Evaluators</h3>
             <div class="flex flex-wrap gap-2 text-xs">
               <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">ToolUse</span>
               <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">ToolOrder</span>
@@ -389,10 +401,14 @@ report.<span class="text-yellow-300">to_html</span>(<span class="text-green-400"
               <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Refusal</span>
               <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Sentiment</span>
               <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Custom</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Readability</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">AgentTrajectory</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">ToolEfficiency</span>
+              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">SemanticSimilarity</span>
             </div>
           </div>
           <div class="code-block rounded-lg p-5 border border-slate-700">
-            <h3 class="text-sm font-semibold text-brand-cyan mb-3">18 LLM-as-Judge Evaluators</h3>
+            <h3 class="text-sm font-semibold text-brand-cyan mb-3">20 LLM-as-Judge Evaluators</h3>
             <div class="flex flex-wrap gap-2 text-xs">
               <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Correctness</span>
               <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Relevance</span>
@@ -410,6 +426,8 @@ report.<span class="text-yellow-300">to_html</span>(<span class="text-green-400"
               <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Bias</span>
               <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Summary</span>
               <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Custom Rubric</span>
+              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">FactConsistency</span>
+              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">StepReasoning</span>
             </div>
           </div>
           <div class="code-block rounded-lg p-5 border border-slate-700">
@@ -465,7 +483,7 @@ report.<span class="text-yellow-300">to_html</span>(<span class="text-green-400"
             </tr>
             <tr class="comparison-row border-b border-slate-700/50">
               <td class="px-4 py-3 text-slate-300">Agent evaluation</td>
-              <td class="px-4 py-3 text-green-400">Built-in (39 evaluators)</td>
+              <td class="px-4 py-3 text-green-400">Built-in (50 evaluators)</td>
               <td class="px-4 py-3 text-slate-500">LangSmith (paid)</td>
               <td class="px-4 py-3 text-slate-500">Not built-in</td>
             </tr>
@@ -541,6 +559,18 @@ report.<span class="text-yellow-300">to_html</span>(<span class="text-green-400"
               <td class="px-4 py-3 text-slate-500">LangSmith (paid)</td>
               <td class="px-4 py-3 text-slate-500">Not built-in</td>
             </tr>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-4 py-3 text-slate-300">Enterprise signals</td>
+              <td class="px-4 py-3 text-green-400">SBOM + security audit + stability markers</td>
+              <td class="px-4 py-3 text-slate-500">Not built-in</td>
+              <td class="px-4 py-3 text-slate-500">Not built-in</td>
+            </tr>
+            <tr class="comparison-row border-b border-slate-700/50">
+              <td class="px-4 py-3 text-slate-300">Advanced agent patterns</td>
+              <td class="px-4 py-3 text-green-400">4 built-in (Plan, Reflect, Debate, TeamLead)</td>
+              <td class="px-4 py-3 text-slate-500">DIY</td>
+              <td class="px-4 py-3 text-yellow-400">Role-based agents</td>
+            </tr>
             <tr class="comparison-row">
               <td class="px-4 py-3 text-slate-300">Community</td>
               <td class="px-4 py-3 text-yellow-400">Growing</td>
@@ -564,7 +594,7 @@ report.<span class="text-yellow-300">to_html</span>(<span class="text-green-400"
           <div class="text-xs text-slate-600 mt-1">per agent call (measured)</div>
         </div>
         <div class="fade-in code-block rounded-xl p-6 border border-slate-700 text-center">
-          <div class="text-3xl font-bold text-brand-cyan mb-1">2566</div>
+          <div class="text-3xl font-bold text-brand-cyan mb-1">3135</div>
           <div class="text-sm text-slate-400">tests passing</div>
           <div class="text-xs text-slate-600 mt-1">40 real API evals</div>
         </div>
@@ -597,7 +627,7 @@ report.<span class="text-yellow-300">to_html</span>(<span class="text-green-400"
             </tr>
             <tr class="comparison-row border-b border-slate-700/50">
               <td class="px-4 py-3 text-slate-300">Evaluators</td>
-              <td class="px-4 py-3 text-green-400">39</td>
+              <td class="px-4 py-3 text-green-400">50</td>
               <td class="px-4 py-3 text-green-400">50+</td>
               <td class="px-4 py-3 text-slate-500">~20</td>
               <td class="px-4 py-3 text-slate-500">~8</td>
@@ -694,7 +724,7 @@ report.<span class="text-yellow-300">to_html</span>(<span class="text-green-400"
       <div class="flex flex-wrap justify-center gap-4">
         <a href="QUICKSTART/" class="bg-brand-blue hover:bg-blue-600 text-white font-semibold px-8 py-3 rounded-lg transition">Quickstart Guide</a>
         <a href="https://github.com/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb" class="border border-slate-700 hover:border-slate-500 text-slate-300 font-semibold px-8 py-3 rounded-lg transition">Interactive Notebook</a>
-        <a href="https://github.com/johnnichev/selectools/tree/main/examples" class="border border-slate-700 hover:border-slate-500 text-slate-300 font-semibold px-8 py-3 rounded-lg transition">61 Examples</a>
+        <a href="https://github.com/johnnichev/selectools/tree/main/examples" class="border border-slate-700 hover:border-slate-500 text-slate-300 font-semibold px-8 py-3 rounded-lg transition">75 Examples</a>
       </div>
     </div>
   </section>
@@ -704,7 +734,7 @@ report.<span class="text-yellow-300">to_html</span>(<span class="text-green-400"
     <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
       <div class="text-center md:text-left">
         <p class="text-slate-400 text-sm">An open-source project from <a href="https://nichevlabs.com" class="text-brand-cyan hover:underline">NichevLabs</a>.</p>
-        <p class="text-slate-500 text-xs mt-1">Apache-2.0 &middot; Python 3.9+ &middot; v0.18.0</p>
+        <p class="text-slate-500 text-xs mt-1">Apache-2.0 &middot; Python 3.9+ &middot; v0.19.2</p>
       </div>
       <div class="flex items-center gap-6 text-sm text-slate-400">
         <a href="https://github.com/johnnichev/selectools" class="hover:text-white transition">GitHub</a>
