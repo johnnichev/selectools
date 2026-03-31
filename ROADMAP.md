@@ -51,7 +51,9 @@ PlanAndExecute → ReflectiveAgent → Debate → TeamLead → 50+ evaluators
 
 v0.19.2 ✅ Enterprise Hardening
 Security audit → Stability markers (@stable/@beta/@deprecated) → Deprecation policy
-→ trace_to_html() waterfall viewer → 2949 tests
+→ Compatibility matrix → trace_to_html() waterfall viewer → SBOM
+→ Property-based tests (Hypothesis) → Concurrency smoke suite → 5 production simulations
+→ 3135 tests, 75 examples
 
 v0.20.0 🟡 Visual Agent Builder
 Zero-install web UI → Drag-drop graph builder → YAML/Python export → Live test execution
@@ -153,20 +155,28 @@ result = agent.run("Investigate and fix the billing discrepancy")
 
 ---
 
-## v0.19.2: Enterprise Hardening + Polish & Community 🟡
+## v0.19.2: Enterprise Hardening ✅
 
-Focus: Production readiness, community growth, and developer trust signals. This is the "make it trustworthy" release before the big Visual Agent Builder announcement in v0.20.0.
+Focus: Production readiness and developer trust signals before the Visual Agent Builder in v0.20.0.
 
 ### Enterprise Hardening
 
 | Feature                                                            | Status | Impact | Effort |
 | ------------------------------------------------------------------ | ------ | ------ | ------ |
-| **Security audit** (Snyk + bandit + OWASP review)                  | 🟡     | High   | Medium |
-| **Stability markers** (`__stability__ = "stable"/"beta"/"alpha"`)  | 🟡     | Medium | Small  |
-| **Deprecation policy** (2-version warning before removal)          | 🟡     | Medium | Small  |
-| **Compatibility matrix** (Python 3.9-3.13 + provider SDK versions) | 🟡     | Medium | Small  |
-| **SBOM generation** for compliance teams                           | 🟡     | Low    | Small  |
-| **Enhanced trace viewer** (interactive HTML)                       | 🟡     | High   | Medium |
+| **Security audit** (bandit + manual nosec review)                  | ✅     | High   | Medium |
+| **Stability markers** (`@stable`, `@beta`, `@deprecated`)          | ✅     | Medium | Small  |
+| **Deprecation policy** (2-version window, `docs/DEPRECATION_POLICY.md`) | ✅ | Medium | Small  |
+| **Compatibility matrix** (Python × provider SDK × optional deps)   | ✅     | Medium | Small  |
+| **SBOM** (`sbom.json` via CycloneDX, published in repo)            | ✅     | Low    | Small  |
+| **Enhanced trace viewer** (`trace_to_html()` waterfall HTML)       | ✅     | High   | Medium |
+
+### Quality Infrastructure
+
+| Feature                                    | Status | Impact | Effort |
+| ------------------------------------------ | ------ | ------ | ------ |
+| **Property-based tests** (Hypothesis)      | ✅     | High   | Medium |
+| **Thread-safety smoke suite**              | ✅     | High   | Medium |
+| **Production simulations** (5 new)         | ✅     | High   | Medium |
 
 ---
 

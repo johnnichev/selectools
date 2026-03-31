@@ -4,6 +4,7 @@
 **Audit date:** 2026-03-30
 **Tool:** [Bandit](https://bandit.readthedocs.io/) 1.7 + manual review of all `# nosec` annotations
 **Result:** Zero findings requiring remediation. All suppressed warnings are justified.
+**SBOM:** [`sbom.json`](https://github.com/johnnichev/selectools/blob/main/sbom.json) — CycloneDX 1.6, 4 core production dependencies
 
 To report a vulnerability, see [Vulnerability Reporting](#vulnerability-reporting) below.
 

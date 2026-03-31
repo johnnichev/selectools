@@ -43,6 +43,13 @@ Path("trace.html").write_text(trace_to_html(result.trace))
 
 Features: color-coded step types, proportional duration bars, expandable detail rows (model, tokens, cost, tool args/result, error), XSS-safe HTML escaping. Exported from `selectools` directly.
 
+#### SBOM (`sbom.json`)
+
+CycloneDX 1.6 Software Bill of Materials published at `sbom.json` in the repository root.
+Lists all four core production dependencies (openai, anthropic, google-genai, numpy) with
+resolved versions. Useful for compliance teams and supply-chain auditing. Referenced from
+`docs/SECURITY.md`.
+
 #### Compatibility Matrix (`docs/COMPATIBILITY.md`)
 
 Published compatibility matrix covering Python 3.9–3.13, all five supported OS/platform combinations,
