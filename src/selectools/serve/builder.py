@@ -289,9 +289,33 @@ select option { background: var(--surface); }
 .edge-lbl { fill: #64748b; font-family: ui-monospace,monospace; font-size: 10px; }
 .edge-lbl-bg { fill: var(--bg); }
 .preview { pointer-events: none; fill: none; stroke: var(--blue); stroke-width: 2; stroke-dasharray: 6,3; opacity: 0.65; }
+
+/* Code panel resize handle */
+.code-resize-handle {
+  height: 6px;
+  cursor: ns-resize;
+  background: transparent;
+  flex-shrink: 0;
+  transition: background 0.12s;
+}
+.code-resize-handle:hover, .code-resize-handle.active { background: rgba(34,211,238,0.18); }
+
+/* Node error state */
+.node-error .body { stroke: #f97316 !important; filter: drop-shadow(0 0 6px rgba(249,115,22,0.6)); }
 </style>
 </head>
 <body>
+
+<datalist id="condition-presets">
+  <option value="approved">
+  <option value="rejected">
+  <option value="needs_revision">
+  <option value="continue">
+  <option value="done">
+  <option value="error">
+  <option value="retry">
+  <option value="human_review">
+</datalist>
 
 <header>
   <span class="logo">selectools</span>
@@ -373,6 +397,7 @@ select option { background: var(--surface); }
 
 <!-- Code panel -->
 <div class="code-panel">
+  <div class="code-resize-handle" id="resizeHandle"></div>
   <div class="code-tabs">
     <span class="code-tab active" id="tab-python" onclick="switchTab('python')">Python</span>
     <span class="code-tab" id="tab-yaml" onclick="switchTab('yaml')">YAML</span>
@@ -387,6 +412,33 @@ select option { background: var(--surface); }
 <script>
 // ─── Constants ────────────────────────────────────────────────────────────
 const NW = 164, NH = 70, PR = 6;
+
+// ─── Model registry (grouped by provider) ────────────────────────────────
+const MODELS = {
+  openai: [
+    'gpt-4o','gpt-4o-mini','gpt-4.1','gpt-4.1-mini','gpt-4.1-nano',
+    'gpt-5','gpt-5-mini','gpt-5-nano','gpt-5-pro','chatgpt-4o-latest',
+    'o1','o1-mini','o1-pro','o3','o3-mini','o3-pro','o4-mini',
+    'gpt-4-turbo','gpt-4','gpt-3.5-turbo',
+    'gpt-4o-2024-11-20','gpt-4o-2024-08-06','gpt-4o-mini-2024-07-18',
+  ],
+  anthropic: [
+    'claude-sonnet-4-6','claude-opus-4-6','claude-haiku-4-5',
+    'claude-3-7-sonnet-latest','claude-3-5-sonnet-latest','claude-3-5-haiku-latest',
+    'claude-opus-4','claude-sonnet-4','claude-3-opus','claude-3-haiku',
+  ],
+  gemini: [
+    'gemini-2.5-pro','gemini-2.5-flash','gemini-2.5-flash-lite',
+    'gemini-2.0-flash','gemini-2.0-flash-lite',
+    'gemini-1.5-pro','gemini-1.5-flash',
+    'gemma-3','gemma-3n',
+  ],
+  ollama: [
+    'llama3.2','llama3.1','llama3','llama2',
+    'mistral','mixtral','gemma','phi',
+    'qwen','codellama','neural-chat','vicuna',
+  ],
+};
 
 // ─── State ────────────────────────────────────────────────────────────────
 let nodes = [], edges = [], sel = null;
@@ -591,9 +643,9 @@ function showNodeProps(id) {
     body.appendChild(p);
   } else {
     addField(body, 'Name', 'text', n.name, v => { n.name = v; render(); });
-    addField(body, 'Provider', 'select', n.provider, v => { n.provider = v; render(); },
+    addField(body, 'Provider', 'select', n.provider, v => { n.provider = v; rebuildModelOptions(n); render(); },
       ['openai', 'anthropic', 'gemini', 'ollama']);
-    addField(body, 'Model', 'text', n.model, v => { n.model = v; render(); });
+    addModelField(body, n);
     addField(body, 'System Prompt', 'textarea', n.system_prompt, v => { n.system_prompt = v; updateCode(); });
     addField(body, 'Tools (comma-sep)', 'text', n.tools, v => { n.tools = v; updateCode(); });
   }
@@ -609,7 +661,7 @@ function showEdgeProps(id) {
   document.getElementById('propsEmpty').style.display = 'none';
   const body = document.getElementById('propsBody');
   body.style.display = 'flex'; body.innerHTML = '';
-  addField(body, 'Condition Label', 'text', e.label, v => { e.label = v; render(); });
+  addDatalistField(body, 'Condition Label', e.label, v => { e.label = v; render(); });
   const hint = document.createElement('p');
   hint.style.cssText = 'color:var(--muted);font-size:11px;line-height:1.5;padding:2px 0';
   hint.textContent = 'Leave blank for unconditional. Add a label (e.g. "approved") for conditional routing.';
@@ -640,6 +692,55 @@ function addField(parent, label, type, value, onChange, opts) {
   inp.addEventListener('input', () => onChange(inp.value));
   inp.addEventListener('change', () => onChange(inp.value));
   div.appendChild(inp); parent.appendChild(div);
+}
+
+function addDatalistField(parent, label, value, onChange) {
+  const div = document.createElement('div'); div.className = 'field';
+  const lbl = document.createElement('label'); lbl.textContent = label;
+  div.appendChild(lbl);
+  const inp = document.createElement('input');
+  inp.type = 'text'; inp.setAttribute('list', 'condition-presets');
+  inp.value = value; inp.placeholder = 'blank = unconditional';
+  inp.addEventListener('input', () => onChange(inp.value));
+  inp.addEventListener('change', () => onChange(inp.value));
+  div.appendChild(inp); parent.appendChild(div);
+}
+
+function rebuildModelOptions(n) {
+  const sel = document.getElementById('modelSel');
+  const searchEl = document.getElementById('modelSearch');
+  if (!sel) return;
+  const q = (searchEl ? searchEl.value : '').toLowerCase();
+  const list = MODELS[n.provider] || [];
+  sel.innerHTML = '';
+  for (const m of list) {
+    if (q && !m.toLowerCase().includes(q)) continue;
+    const opt = document.createElement('option');
+    opt.value = m; opt.textContent = m;
+    if (m === n.model) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  if (!sel.value && sel.options.length) {
+    sel.value = sel.options[0].value;
+    n.model = sel.value;
+  }
+}
+
+function addModelField(parent, n) {
+  const div = document.createElement('div'); div.className = 'field';
+  const lbl = document.createElement('label'); lbl.textContent = 'Model';
+  div.appendChild(lbl);
+  const search = document.createElement('input');
+  search.id = 'modelSearch'; search.type = 'text'; search.placeholder = 'Filter models\u2026';
+  search.style.cssText = 'margin-bottom:3px';
+  div.appendChild(search);
+  const sel = document.createElement('select');
+  sel.id = 'modelSel'; sel.size = 5; sel.style.cssText = 'height:80px';
+  div.appendChild(sel);
+  parent.appendChild(div);
+  rebuildModelOptions(n);
+  search.addEventListener('input', () => rebuildModelOptions(n));
+  sel.addEventListener('change', () => { n.model = sel.value; render(); });
 }
 
 // ─── Keyboard ────────────────────────────────────────────────────────────
@@ -869,6 +970,25 @@ function loadExample() {
 
   deselect();
 }
+
+// ─── Code panel resize ────────────────────────────────────────────────────
+(function() {
+  let resizing = false, startY = 0, startH = 0;
+  const panel = document.querySelector('.code-panel');
+  const handle = document.getElementById('resizeHandle');
+  handle.addEventListener('mousedown', e => {
+    resizing = true; startY = e.clientY; startH = panel.offsetHeight;
+    handle.classList.add('active'); e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!resizing) return;
+    const delta = startY - e.clientY;
+    panel.style.height = Math.max(60, Math.min(window.innerHeight * 0.75, startH + delta)) + 'px';
+  });
+  document.addEventListener('mouseup', () => {
+    resizing = false; handle.classList.remove('active');
+  });
+})();
 
 // ─── Init ─────────────────────────────────────────────────────────────────
 loadExample();
