@@ -754,7 +754,7 @@ function genPython() {
   }
 
   for (const [fid, conds] of Object.entries(condMap)) {
-    const mapping = conds.map(c => `        "${c.lbl}": ${c.tid}`).join(',\n');
+    const mapping = conds.map(c => `        "${c.lbl}": ${c.tid}`).join(',\\n');
     L.push(`graph.add_conditional_edge(`);
     L.push(`    "${fid}",`);
     L.push(`    lambda state: state.data.get("route", "${conds[0].lbl}"),`);
@@ -767,7 +767,7 @@ function genPython() {
 
   L.push('result = graph.run("Your task here")');
   L.push('print(result.content)');
-  return L.join('\n');
+  return L.join('\\n');
 }
 
 function genYaml() {
@@ -806,7 +806,7 @@ function genYaml() {
     L.push(`    to: ${tid}`);
     if (e.label) L.push(`    condition: "${e.label}"`);
   }
-  return L.join('\n');
+  return L.join('\\n');
 }
 
 // ─── Actions ──────────────────────────────────────────────────────────────
