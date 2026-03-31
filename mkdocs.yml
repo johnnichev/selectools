@@ -154,6 +154,7 @@ nav:
   - Reference:
     - Stability Markers: modules/STABILITY.md
     - Deprecation Policy: DEPRECATION_POLICY.md
+    - Compatibility Matrix: COMPATIBILITY.md
     - Parser: modules/PARSER.md
     - Prompt: modules/PROMPT.md
     - Release Guide: RELEASE_GUIDE.md

@@ -43,6 +43,13 @@ Path("trace.html").write_text(trace_to_html(result.trace))
 
 Features: color-coded step types, proportional duration bars, expandable detail rows (model, tokens, cost, tool args/result, error), XSS-safe HTML escaping. Exported from `selectools` directly.
 
+#### Compatibility Matrix (`docs/COMPATIBILITY.md`)
+
+Published compatibility matrix covering Python 3.9–3.13, all five supported OS/platform combinations,
+core and optional dependency version ranges (openai, anthropic, google-genai, numpy, chromadb,
+pinecone-client, mcp, psycopg2-binary, etc.), and provider SDK compatibility notes. Added to the
+Reference section of the docs site.
+
 #### Deprecation Policy (`docs/DEPRECATION_POLICY.md`)
 
 Formal deprecation window: any API deprecated in `v0.X` will not be removed before `v0.X+2`. Documents how to surface `DeprecationWarning` in tests, how to introspect stability programmatically, and what is covered by the policy.
