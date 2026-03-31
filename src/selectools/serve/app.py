@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from ..agent.core import Agent
 
 from .. import __version__
+from .builder import BUILDER_HTML
 from .models import HealthResponse, InvokeResponse
 from .playground import PLAYGROUND_HTML
 
@@ -42,10 +43,12 @@ class AgentRouter:
         agent: "Agent",
         prefix: str = "",
         enable_playground: bool = True,
+        enable_builder: bool = False,
     ) -> None:
         self.agent = agent
         self.prefix = prefix.rstrip("/")
         self.enable_playground = enable_playground
+        self.enable_builder = enable_builder
 
     def handle_invoke(self, body: Dict[str, Any]) -> Dict[str, Any]:
         """Handle POST /invoke."""
@@ -133,6 +136,7 @@ def create_app(
     agent: "Agent",
     prefix: str = "",
     playground: bool = True,
+    builder: bool = False,
     host: str = "0.0.0.0",  # nosec B104
     port: int = 8000,
 ) -> "AgentServer":
@@ -140,10 +144,12 @@ def create_app(
 
     Usage::
 
-        app = create_app(agent, playground=True)
+        app = create_app(agent, playground=True, builder=True)
         app.serve(port=8000)  # Blocking
     """
-    return AgentServer(agent, prefix=prefix, playground=playground, host=host, port=port)
+    return AgentServer(
+        agent, prefix=prefix, playground=playground, builder=builder, host=host, port=port
+    )
 
 
 class AgentServer:
@@ -158,10 +164,13 @@ class AgentServer:
         agent: "Agent",
         prefix: str = "",
         playground: bool = True,
+        builder: bool = False,
         host: str = "0.0.0.0",  # nosec B104
         port: int = 8000,
     ) -> None:
-        self.router = AgentRouter(agent, prefix=prefix, enable_playground=playground)
+        self.router = AgentRouter(
+            agent, prefix=prefix, enable_playground=playground, enable_builder=builder
+        )
         self.host = host
         self.port = port
 
@@ -177,6 +186,10 @@ class AgentServer:
                     self._json_response(router.handle_health())
                 elif path == f"{router.prefix}/schema" or path == "/schema":
                     self._json_response(router.handle_schema())
+                elif (
+                    path == f"{router.prefix}/builder" or path == "/builder"
+                ) and router.enable_builder:
+                    self._html_response(BUILDER_HTML)
                 elif (
                     path == f"{router.prefix}/playground" or path == "/playground" or path == "/"
                 ) and router.enable_playground:
@@ -242,6 +255,74 @@ class AgentServer:
         print(f"  GET  /schema   — tool schemas")
         if router.enable_playground:
             print(f"  GET  /playground — chat UI")
+        if router.enable_builder:
+            print(f"  GET  /builder    — visual agent builder")
+        print(f"\nPress Ctrl+C to stop.")
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            print("\nShutting down...")
+            server.shutdown()
+
+
+class BuilderServer:
+    """Standalone visual builder server — no agent required.
+
+    Usage::
+
+        from selectools.serve.app import BuilderServer
+        BuilderServer(port=8080).serve()
+
+    Or via CLI::
+
+        selectools serve --builder
+    """
+
+    def __init__(
+        self,
+        host: str = "0.0.0.0",  # nosec B104
+        port: int = 8000,
+    ) -> None:
+        self.host = host
+        self.port = port
+
+    def serve(self, port: Optional[int] = None) -> None:
+        """Start the builder-only HTTP server (blocking)."""
+        actual_port = port or self.port
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:  # noqa: N802
+                path = urlparse(self.path).path.rstrip("/")
+                if path in ("/builder", ""):
+                    self._html(BUILDER_HTML)
+                elif path == "/health":
+                    self._json({"status": "ok", "mode": "builder"})
+                else:
+                    self._json({"error": "not found"}, 404)
+
+            def do_OPTIONS(self) -> None:  # noqa: N802
+                self.send_response(200)
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+
+            def _json(self, data: Dict[str, Any], status: int = 200) -> None:
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(json.dumps(data).encode())
+
+            def _html(self, html: str) -> None:
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(html.encode("utf-8"))
+
+            def log_message(self, format: str, *args: Any) -> None:  # type: ignore[override]
+                pass
+
+        server = HTTPServer((self.host, actual_port), Handler)
+        print(f"Visual agent builder at http://{self.host}:{actual_port}/builder")
         print(f"\nPress Ctrl+C to stop.")
         try:
             server.serve_forever()

@@ -24,6 +24,25 @@ result = AgentGraph.chain(planner, writer, reviewer).run("Write a blog post")
 # selectools serve agent.yaml
 ```
 
+## What's New in v0.20
+
+### v0.20.0 — Visual Agent Builder
+
+The first AI agent framework to ship a visual graph builder in a single `pip install`. No React. No build step. No CDN.
+
+```bash
+pip install selectools
+selectools serve --builder
+# → open http://localhost:8000/builder
+```
+
+- Drag START, END, and Agent nodes onto the canvas
+- Click ports to connect agents with edges
+- Add condition labels to edges (e.g. `"approved"`) for conditional routing
+- Edit provider, model, and system prompt in the properties panel
+- Generated Python and YAML update live in the code panel
+- Export or copy to clipboard with one click
+
 ## What's New in v0.19
 
 ### v0.19.3 — Stability Markers Applied to All Public APIs
