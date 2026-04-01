@@ -1179,9 +1179,7 @@ def _smart_route(
     return available[0] if available else candidates[0]
 
 
-def _estimate_run_cost(
-    nodes_data: List[Dict[str, Any]], edges_data: List[Dict[str, Any]], input_text: str
-) -> Dict[str, Any]:
+def _estimate_run_cost(nodes_data: List[Dict[str, Any]], input_text: str) -> Dict[str, Any]:
     """Estimate total tokens and cost for a graph run."""
     total_tokens = 0
     total_cost = 0.0
@@ -1339,7 +1337,7 @@ class BuilderServer:
                         self.send_response(302)
                         self.send_header(
                             "Set-Cookie",
-                            f"builder_session={login}:{session_val}; HttpOnly; SameSite=Strict; Path=/",
+                            f"builder_session={login}:{role}:{session_val}; HttpOnly; SameSite=Strict; Path=/",
                         )
                         self.send_header("Location", "/builder")
                         self.end_headers()
@@ -1414,9 +1412,16 @@ class BuilderServer:
 
                 if path == "/estimate-run-cost":
                     nodes_d = body.get("nodes", [])
-                    edges_d = body.get("edges", [])
                     input_t = body.get("input", "")
-                    self._json(_estimate_run_cost(nodes_d, edges_d, input_t))
+                    self._json(_estimate_run_cost(nodes_d, input_t))
+                    return
+
+                if path == "/smart-route":
+                    prompt_t = body.get("prompt", "")
+                    sys_t = body.get("system_prompt", "")
+                    avail = body.get("available_providers") or None
+                    budget = body.get("budget_usd") or None
+                    self._json({"model": _smart_route(prompt_t, sys_t, avail, budget)})
                     return
 
                 if path == "/watch-file":
