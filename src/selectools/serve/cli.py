@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from typing import Any
 
 
 def main() -> None:
@@ -31,9 +32,7 @@ def main() -> None:
         help="Path to YAML config file or template name (optional with --builder)",
     )
     serve_parser.add_argument("--port", type=int, default=8000, help="Port (default: 8000)")
-    serve_parser.add_argument(
-        "--host", default="0.0.0.0", help="Host (default: 0.0.0.0)"  # nosec B104
-    )
+    serve_parser.add_argument("--host", default="0.0.0.0", help="Host (default: 0.0.0.0)")
     serve_parser.add_argument("--no-playground", action="store_true", help="Disable playground UI")
     serve_parser.add_argument(
         "--builder", action="store_true", help="Enable visual agent builder UI at /builder"
@@ -191,7 +190,7 @@ def _cmd_doctor() -> None:
     print("\nDiagnosis complete.")
 
 
-def _auto_provider():  # type: ignore[return]
+def _auto_provider() -> Any:  # type: ignore[return]
     """Try to create a provider from available API keys."""
     if os.getenv("OPENAI_API_KEY"):
         from ..providers.openai_provider import OpenAIProvider

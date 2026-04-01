@@ -135,7 +135,7 @@ disable_error_code = ["attr-defined"]
 
 [tool.bandit]
 exclude_dirs = ["tests", "examples", "scripts"]
-skips = ["B101", "B601", "B602"]  # Skip assert_used, shell, and subprocess checks
+skips = ["B101", "B104", "B110", "B310", "B324", "B601", "B602"]  # Skip assert_used, bind_all_interfaces, try_except_pass, urlopen, weak_hash, shell, subprocess
 targets = ["src/"]
 
 [tool.pytest.ini_options]

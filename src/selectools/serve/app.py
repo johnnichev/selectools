@@ -195,7 +195,7 @@ def create_app(
     prefix: str = "",
     playground: bool = True,
     builder: bool = False,
-    host: str = "0.0.0.0",  # nosec B104
+    host: str = "0.0.0.0",
     port: int = 8000,
     auth_token: Optional[str] = None,
 ) -> "AgentServer":
@@ -230,7 +230,7 @@ class AgentServer:
         prefix: str = "",
         playground: bool = True,
         builder: bool = False,
-        host: str = "0.0.0.0",  # nosec B104
+        host: str = "0.0.0.0",
         port: int = 8000,
         auth_token: Optional[str] = None,
     ) -> None:
@@ -403,6 +403,7 @@ def _builder_run_mock(
     nodes_data: List[Dict[str, Any]],
     input_msg: str,
     emit: Any,
+    pinned_ports: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Execute a mock graph run (no API keys required)."""
     _t0 = time.time()
@@ -709,12 +710,502 @@ def _ai_build_live(description: str, api_key: str) -> Dict[str, Any]:
             raw = "\n".join(raw.split("\n")[1:])
         if raw.endswith("```"):
             raw = "\n".join(raw.split("\n")[:-1])
-        parsed = json.loads(raw)
+        parsed: Dict[str, Any] = json.loads(raw)
         if "nodes" not in parsed or "edges" not in parsed:
             raise ValueError("Missing nodes or edges")
         return parsed
     except Exception:
         return _ai_build_fallback(description)
+
+
+# ─── Feature 10: Data Pinning ────────────────────────────────────────────────
+def _apply_pinned_ports(
+    nodes_data: List[Dict[str, Any]],
+    edges_data: List[Dict[str, Any]],
+    pinned_ports: Dict[str, Any],
+    last_outputs: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Return node_inputs dict respecting pinned port overrides."""
+    inputs: Dict[str, Any] = {}
+    for edge in edges_data:
+        src = edge.get("source") or edge.get("from", "")
+        src_handle = edge.get("sourceHandle", "output")
+        tgt_handle = edge.get("targetHandle", "input")
+        key = f"{src}::{src_handle}"
+        if key in pinned_ports:
+            inputs[tgt_handle] = pinned_ports[key]
+        else:
+            inputs[tgt_handle] = last_outputs.get(src)
+    return inputs
+
+
+# ─── Feature 14: AI Copilot ───────────────────────────────────────────────────
+def _ai_refine_live(
+    current_graph: Dict[str, Any],
+    selected_node_id: Optional[str],
+    message: str,
+    history: List[Dict[str, str]],
+    api_key: str,
+) -> Dict[str, Any]:
+    """Call LLM to generate an iterative graph patch from the current state."""
+    system_prompt = (
+        "You are an AI assistant for a visual agent builder. "
+        "The user has a graph of AI agents with nodes and edges. "
+        "Given their current graph and a natural-language request, return a JSON patch. "
+        'Patch format: {"type": "update_node|add_node|remove_node|add_edge", '
+        '"node_id": "...", "changes": {...}}. '
+        "For update_node, changes is a dict of node properties to update. "
+        "For add_node, changes contains the full new node definition. "
+        'Return ONLY a JSON object with keys: "patch", "explanation", "suggested_follow_up".'
+    )
+    n_nodes = len(current_graph.get("nodes", []))
+    context = f"Current graph has {n_nodes} nodes.\n"
+    if selected_node_id:
+        node = next(
+            (n for n in current_graph.get("nodes", []) if n.get("id") == selected_node_id), None
+        )
+        if node:
+            context += f"Selected node: {json.dumps(node)}\n"
+    from ..types import Message, Role
+
+    messages: List[Message] = [Message(role=Role.SYSTEM, content=system_prompt)]
+    for m in history[-6:]:
+        try:
+            messages.append(Message(role=Role(m["role"]), content=m["content"]))
+        except (KeyError, ValueError):
+            pass
+    messages.append(Message(role=Role.USER, content=context + message))
+    try:
+        from ..providers.openai_provider import OpenAIProvider
+
+        provider = OpenAIProvider(api_key=api_key)
+        resp_msg, _ = provider.complete(
+            messages=messages, model="gpt-4o-mini", system_prompt="", max_tokens=600
+        )
+        raw = (resp_msg.content or "").strip()
+        if raw.startswith("```"):
+            raw = "\n".join(raw.split("\n")[1:])
+        if raw.endswith("```"):
+            raw = "\n".join(raw.split("\n")[:-1])
+        data: Dict[str, Any] = json.loads(raw)
+        if "patch" not in data:
+            raise ValueError("missing patch")
+        return data
+    except Exception as exc:
+        return {"error": str(exc), "patch": None, "explanation": "", "suggested_follow_up": ""}
+
+
+# ─── Feature 15: HITL Form Builder ───────────────────────────────────────────
+def _render_hitl_form(node_data: Dict[str, Any]) -> str:
+    """Render HITL form fields as HTML snippet for the /wait page."""
+    fields = node_data.get("form_fields", [])
+    if not fields:
+        # fallback: old options buttons
+        opts_raw = node_data.get("options", "approve, reject")
+        opts = [o.strip() for o in opts_raw.split(",") if o.strip()]
+        buttons = "".join(
+            f'<button name="choice" value="{o}" style="padding:8px 18px;margin:4px;border:1px solid #f59e0b;border-radius:6px;background:rgba(245,158,11,0.1);color:#f59e0b;cursor:pointer;font-size:13px">{o}</button>'
+            for o in opts
+        )
+        return buttons
+    html_fields: List[str] = []
+    for f in fields:
+        label = f.get("label", "")
+        ftype = f.get("type", "text")
+        fid = f.get("id", "")
+        placeholder = f.get("placeholder", "")
+        required = "required" if f.get("required") else ""
+        style = "width:100%;padding:8px;margin:4px 0;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;font-family:inherit;font-size:13px"
+        if ftype == "text":
+            html_fields.append(
+                f'<label style="font-size:12px;color:#94a3b8">{label}</label>'
+                f'<input type="text" name="{fid}" placeholder="{placeholder}" {required} style="{style}"><br>'
+            )
+        elif ftype == "textarea":
+            html_fields.append(
+                f'<label style="font-size:12px;color:#94a3b8">{label}</label>'
+                f'<textarea name="{fid}" placeholder="{placeholder}" {required} style="{style};height:80px;resize:vertical"></textarea><br>'
+            )
+        elif ftype == "number":
+            html_fields.append(
+                f'<label style="font-size:12px;color:#94a3b8">{label}</label>'
+                f'<input type="number" name="{fid}" {required} style="{style}"><br>'
+            )
+        elif ftype == "select":
+            opts2 = "".join(f"<option>{o}</option>" for o in f.get("options", []))
+            html_fields.append(
+                f'<label style="font-size:12px;color:#94a3b8">{label}</label>'
+                f'<select name="{fid}" {required} style="{style}">{opts2}</select><br>'
+            )
+        elif ftype == "checkbox":
+            html_fields.append(
+                f'<label style="font-size:12px;color:#94a3b8">'
+                f'<input type="checkbox" name="{fid}" {required} style="margin-right:6px"> {label}</label><br>'
+            )
+    return "\n".join(html_fields)
+
+
+# ─── Feature 16: Bidirectional file sync ─────────────────────────────────────
+def _parse_python_to_graph(source: str) -> Dict[str, Any]:
+    """Parse a selectools Python agent file into {nodes, edges} using AST."""
+    import ast as _ast
+
+    try:
+        tree = _ast.parse(source)
+    except SyntaxError:
+        return {"nodes": [], "edges": []}
+    nodes_out: List[Dict[str, Any]] = []
+    edges_out: List[Dict[str, Any]] = []
+    i = 0
+    for stmt in _ast.walk(tree):
+        if not (
+            isinstance(stmt, _ast.Expr)
+            and isinstance(stmt.value, _ast.Call)
+            and isinstance(stmt.value.func, _ast.Attribute)
+        ):
+            continue
+        call = stmt.value  # type: ignore[union-attr]
+        method = call.func.attr  # type: ignore[attr-defined]
+        if method == "add_node" and call.args:
+            try:
+                node_id = _ast.literal_eval(call.args[0])
+                nodes_out.append(
+                    {"id": node_id, "label": node_id, "type": "agent", "x": i * 180 + 60, "y": 200}
+                )
+                i += 1
+            except (ValueError, TypeError):
+                pass
+        elif method == "add_edge" and len(call.args) >= 2:
+            try:
+                src = _ast.literal_eval(call.args[0])
+                dst = _ast.literal_eval(call.args[1])
+                edges_out.append(
+                    {"id": f"e_{src}_{dst}", "source": src, "target": dst, "from": src, "to": dst}
+                )
+            except (ValueError, TypeError):
+                pass
+    return {"nodes": nodes_out, "edges": edges_out}
+
+
+# ─── Feature 17: Agent-as-Tool node ──────────────────────────────────────────
+def _build_agent_tool_from_node(
+    node_data: Dict[str, Any], graph_nodes: List[Dict[str, Any]], api_key: str
+) -> Any:
+    """Create a selectools Tool that runs a nested agent node."""
+    from ..agent.config import AgentConfig
+    from ..agent.core import Agent
+    from ..tools.base import Tool, ToolParameter
+
+    target_id = node_data.get("tool_target_node")
+    target_node = next((n for n in graph_nodes if n.get("id") == target_id), None)
+    tool_name = node_data.get("tool_name", "nested_agent")
+    tool_desc = node_data.get("tool_description", "A nested agent")
+    input_param = node_data.get("tool_input_param", "query")
+    max_tokens = int(node_data.get("tool_max_tokens", 500))
+
+    def _run_nested(**kwargs: Any) -> str:
+        inp = kwargs.get(input_param, "")
+        if not target_node:
+            return f"[agent_tool error: target node {target_id} not found]"
+        from ..providers.openai_provider import OpenAIProvider
+
+        cfg = AgentConfig(
+            model=target_node.get("model", "gpt-4o-mini"),
+            system_prompt=target_node.get("system_prompt", ""),
+            max_tokens=max_tokens,
+        )
+        provider = OpenAIProvider(api_key=api_key)
+        agent = Agent(tools=[], config=cfg, provider=provider)
+        result = agent.run(str(inp))
+        return result.content or ""
+
+    return Tool(
+        name=tool_name,
+        description=tool_desc,
+        function=_run_nested,
+        parameters=[
+            ToolParameter(name=input_param, param_type=str, description="Input to the nested agent")
+        ],
+    )
+
+
+# ─── Feature 18: Multi-user auth + RBAC ──────────────────────────────────────
+def _resolve_users() -> Dict[str, Any]:
+    """Load user token→role map from BUILDER_USERS env or ~/.selectools/users.json."""
+    raw = os.environ.get("BUILDER_USERS")
+    if not raw:
+        dotfile = os.path.expanduser("~/.selectools/users.json")
+        if os.path.isfile(dotfile):
+            try:
+                raw = open(dotfile).read()  # noqa: WPS515
+            except OSError:
+                raw = None
+    if raw:
+        try:
+            data = json.loads(raw)
+            return data if isinstance(data, dict) else {}
+        except json.JSONDecodeError:
+            pass
+    return {}
+
+
+ROLES: Dict[str, set] = {
+    "admin": {"view", "edit", "run", "export", "delete", "manage_users"},
+    "editor": {"view", "edit", "run", "export"},
+    "viewer": {"view"},
+}
+
+
+def _has_permission(role: str, action: str) -> bool:
+    return action in ROLES.get(role, set())
+
+
+def _check_graph_permission(
+    graph_id: str, username: str, role: str, action: str, graphs_dir: Optional[str] = None
+) -> bool:
+    if role == "admin":
+        return True
+    base = graphs_dir or os.path.expanduser("~/.selectools/graphs")
+    path = os.path.join(base, f"{graph_id}.json")
+    if not os.path.isfile(path):
+        return False
+    try:
+        g = json.loads(open(path).read())  # noqa: WPS515
+    except Exception:
+        return False
+    if g.get("owner") == username:
+        return True
+    for entry in g.get("acl", []):
+        if entry.get("user") == username:
+            return _has_permission(entry.get("permission", "viewer"), action)
+    return False
+
+
+# ─── Feature 19: Online production eval ──────────────────────────────────────
+import queue as _queue
+import threading as _threading
+
+_eval_queue: "_queue.Queue[Optional[Dict[str, Any]]]" = _queue.Queue()
+
+
+def _log_run(run_data: Dict[str, Any]) -> None:
+    """Append a completed run record to ~/.selectools/runs/<date>.jsonl."""
+    log_dir = os.path.expanduser("~/.selectools/runs")
+    os.makedirs(log_dir, exist_ok=True)
+    import datetime
+
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    path = os.path.join(log_dir, f"{today}.jsonl")
+    try:
+        with open(path, "a") as f:
+            f.write(json.dumps(run_data) + "\n")
+    except OSError:
+        pass
+
+
+def _run_evals_on_run(job: Dict[str, Any]) -> None:
+    """Run configured evaluators on a completed production run (background worker)."""
+    try:
+        config = job.get("eval_config", {})
+        evaluator_names = config.get("evaluators", [])
+        if not evaluator_names:
+            return
+        from ..evals.evaluators import DEFAULT_EVALUATORS
+
+        _eval_registry = {type(e).__name__: type(e) for e in DEFAULT_EVALUATORS}
+        results = []
+        for name in evaluator_names:
+            ev_cls = _eval_registry.get(name)
+            if ev_cls:
+                try:
+                    from ..evals.types import TestCase
+
+                    case = TestCase(input=job.get("input", ""))
+                    r = ev_cls().evaluate(case)
+                    results.append({"name": name, "pass": r.pass_, "score": r.score})
+                except Exception:
+                    pass
+        scores = [r["score"] for r in results if r.get("score") is not None]
+        if scores:
+            avg = sum(scores) / len(scores)
+            threshold = config.get("alert_threshold", 0.0)
+            if avg < threshold:
+                _fire_eval_alert(job, avg, threshold)
+    except Exception:
+        pass
+
+
+def _fire_eval_alert(job: Dict[str, Any], score: float, threshold: float) -> None:
+    """Fire webhook alert if eval score drops below threshold."""
+    import urllib.request as _ureq
+
+    webhook = job.get("eval_config", {}).get("webhook_url")
+    if not webhook:
+        return
+    payload = {
+        "graph_id": job.get("graph_id", ""),
+        "run_id": job.get("run_id", ""),
+        "score": score,
+        "threshold": threshold,
+        "input": str(job.get("input", ""))[:200],
+    }
+    try:
+        _ureq.urlopen(  # nosec B310 — webhook URL is user-configured in eval_config
+            _ureq.Request(
+                webhook,
+                data=json.dumps(payload).encode(),
+                headers={"Content-Type": "application/json"},
+            ),
+            timeout=5,
+        )
+    except Exception:
+        pass
+
+
+def _route_experiment(graph_id: str, run_id: str, experiments_dir: Optional[str] = None) -> str:
+    """Return which graph variant to use for A/B experiment routing."""
+    import hashlib
+
+    base = experiments_dir or os.path.expanduser("~/.selectools/experiments.json")
+    experiments: List[Dict[str, Any]] = []
+    if os.path.isfile(base):
+        try:
+            experiments = json.loads(open(base).read())  # noqa: WPS515
+        except Exception:
+            pass
+    exp = next(
+        (
+            e
+            for e in experiments
+            if e.get("active")
+            and (e.get("variant_a") == graph_id or e.get("variant_b") == graph_id)
+        ),
+        None,
+    )
+    if not exp:
+        return graph_id
+    h = int(hashlib.md5(run_id.encode()).hexdigest(), 16)
+    if (h % 1000) / 1000.0 < float(exp.get("split", 0.5)):
+        return str(exp.get("variant_a", graph_id))
+    return str(exp.get("variant_b", graph_id))
+
+
+def _eval_worker() -> None:
+    """Background thread that processes eval jobs from the queue."""
+    while True:
+        job = _eval_queue.get()
+        if job is None:
+            break
+        try:
+            _run_evals_on_run(job)
+        except Exception:
+            pass
+        _eval_queue.task_done()
+
+
+_eval_worker_thread = _threading.Thread(target=_eval_worker, daemon=True)
+_eval_worker_thread.start()
+
+
+# ─── Feature 20: Multi-provider smart routing ─────────────────────────────────
+_provider_health: Dict[str, Dict[str, Any]] = {
+    "openai": {"status": "unknown", "latency_ms": None, "last_check": 0, "error": None},
+    "anthropic": {"status": "unknown", "latency_ms": None, "last_check": 0, "error": None},
+    "gemini": {"status": "unknown", "latency_ms": None, "last_check": 0, "error": None},
+    "ollama": {"status": "unknown", "latency_ms": None, "last_check": 0, "error": None},
+}
+
+CAPABILITY_TIERS: Dict[str, List[str]] = {
+    "simple": ["gpt-4o-mini", "claude-haiku-4-5", "gemini-2.0-flash"],
+    "standard": ["gpt-4o", "claude-sonnet-4-6", "gemini-2.5-pro"],
+    "advanced": ["o3", "claude-opus-4-6", "gemini-2.5-pro"],
+}
+
+
+def _estimate_task_tier(prompt: str, system_prompt: str) -> str:
+    """Heuristic task tier selection from keyword signals."""
+    combined = (prompt + " " + system_prompt).lower()
+    advanced_signals = ["analyze", "reason", "complex", "multi-step", "evaluate", "critique"]
+    simple_signals = ["summarize", "extract", "classify", "yes or no", "format", "translate"]
+    adv_count = sum(1 for s in advanced_signals if s in combined)
+    simple_count = sum(1 for s in simple_signals if s in combined)
+    if adv_count >= 2:
+        return "advanced"
+    if simple_count >= 2:
+        return "simple"
+    return "standard"
+
+
+def _smart_route(
+    prompt: str,
+    system_prompt: str,
+    available_providers: Optional[List[str]] = None,
+    budget_usd: Optional[float] = None,
+) -> str:
+    """Select the cheapest capable model given health and optional budget."""
+    tier = _estimate_task_tier(prompt, system_prompt)
+    candidates = list(CAPABILITY_TIERS.get(tier, CAPABILITY_TIERS["standard"]))
+    healthy = {name for name, h in _provider_health.items() if h["status"] == "ok"}
+    if available_providers:
+        healthy &= set(available_providers)
+
+    def _provider_for_model(model_id: str) -> str:
+        if "claude" in model_id:
+            return "anthropic"
+        if "gemini" in model_id:
+            return "gemini"
+        if "llama" in model_id or "mistral" in model_id:
+            return "ollama"
+        return "openai"
+
+    def _model_cost(model_id: str) -> float:
+        try:
+            from ..models import ALL_MODELS
+
+            m = next((x for x in ALL_MODELS if x.id == model_id), None)
+            if m:
+                return (m.prompt_cost or 0.0) + (m.completion_cost or 0.0)
+        except Exception:
+            pass
+        return 0.0
+
+    available = (
+        [m for m in candidates if _provider_for_model(m) in healthy] if healthy else candidates
+    )
+    available.sort(key=_model_cost)
+    if budget_usd is not None:
+        est_tokens = len(prompt.split()) * 1.3 + 200
+        available = [m for m in available if _model_cost(m) * est_tokens / 1000 <= budget_usd]
+    return available[0] if available else candidates[0]
+
+
+def _estimate_run_cost(
+    nodes_data: List[Dict[str, Any]], edges_data: List[Dict[str, Any]], input_text: str
+) -> Dict[str, Any]:
+    """Estimate total tokens and cost for a graph run."""
+    total_tokens = 0
+    total_cost = 0.0
+    try:
+        from ..models import ALL_MODELS
+        from ..token_estimation import estimate_tokens
+    except Exception:
+        return {"total_tokens": 0, "total_cost_usd": 0.0}
+    for node in nodes_data:
+        if node.get("type") != "agent":
+            continue
+        model_id = node.get("model", "gpt-4o-mini")
+        sp = node.get("system_prompt", "")
+        try:
+            est_in = estimate_tokens(sp + input_text)
+        except Exception:
+            est_in = len((sp + input_text).split())
+        est_out = min(int(node.get("max_tokens", 500)), 500)
+        m = next((x for x in ALL_MODELS if x.id == model_id), None)
+        if m:
+            cost = (est_in * (m.prompt_cost or 0.0) + est_out * (m.completion_cost or 0.0)) / 1000
+            total_cost += cost
+            total_tokens += est_in + est_out
+    return {"total_tokens": total_tokens, "total_cost_usd": round(total_cost, 6)}
 
 
 class BuilderServer:
@@ -737,7 +1228,7 @@ class BuilderServer:
 
     def __init__(
         self,
-        host: str = "0.0.0.0",  # nosec B104
+        host: str = "0.0.0.0",
         port: int = 8000,
         auth_token: Optional[str] = None,
     ) -> None:
@@ -780,6 +1271,80 @@ class BuilderServer:
                     return
                 if path in ("/builder", ""):
                     self._html(BUILDER_HTML)
+                elif path == "/provider-health":
+                    self._json(_provider_health)
+                elif path == "/eval-dashboard":
+                    self._html(
+                        "<html><body style='background:#0f172a;color:#e2e8f0;font-family:monospace;padding:24px'>"
+                        "<h2 style='color:#22d3ee'>Eval Dashboard</h2>"
+                        "<p>Production eval dashboard — coming soon.</p></body></html>"
+                    )
+                elif path == "/auth/github":
+                    import urllib.parse as _uparse
+
+                    gh_client_id = os.environ.get("GITHUB_CLIENT_ID", "")
+                    gh_params = _uparse.urlencode(
+                        {
+                            "client_id": gh_client_id,
+                            "redirect_uri": f"http://{self.headers.get('Host','localhost')}/auth/github/callback",
+                            "scope": "read:user user:email",
+                        }
+                    )
+                    self.send_response(302)
+                    self.send_header(
+                        "Location",
+                        f"https://github.com/login/oauth/authorize?{gh_params}",
+                    )
+                    self.end_headers()
+                elif path == "/auth/github/callback":
+                    from urllib.parse import parse_qs as _pqs
+                    from urllib.parse import urlparse as _up
+
+                    qs = _pqs(_up(self.path).query)
+                    code = qs.get("code", [""])[0]
+                    import urllib.parse as _uparse2
+                    import urllib.request as _ureq2
+
+                    gh_client_id = os.environ.get("GITHUB_CLIENT_ID", "")
+                    gh_client_secret = os.environ.get("GITHUB_CLIENT_SECRET", "")
+                    try:
+                        data = _uparse2.urlencode(
+                            {
+                                "client_id": gh_client_id,
+                                "client_secret": gh_client_secret,
+                                "code": code,
+                            }
+                        ).encode()
+                        req = _ureq2.Request(
+                            "https://github.com/login/oauth/access_token",
+                            data=data,
+                            headers={"Accept": "application/json"},
+                        )
+                        resp_data = json.loads(_ureq2.urlopen(req, timeout=10).read())
+                        access_token = resp_data.get("access_token", "")
+                        req2 = _ureq2.Request(
+                            "https://api.github.com/user",
+                            headers={
+                                "Authorization": f"token {access_token}",
+                                "User-Agent": "selectools",
+                            },
+                        )
+                        user_info = json.loads(_ureq2.urlopen(req2, timeout=10).read())
+                        login = user_info.get("login", "unknown")
+                        users = _resolve_users()
+                        role = users.get(login, {}).get("role", "viewer")  # type: ignore[attr-defined]
+                        session_val = hmac.new(
+                            gh_client_secret.encode(), login.encode(), "sha256"
+                        ).hexdigest()
+                        self.send_response(302)
+                        self.send_header(
+                            "Set-Cookie",
+                            f"builder_session={login}:{session_val}; HttpOnly; SameSite=Strict; Path=/",
+                        )
+                        self.send_header("Location", "/builder")
+                        self.end_headers()
+                    except Exception:
+                        self._redirect_login()
                 else:
                     self._json({"error": "not found"}, 404)
 
@@ -825,6 +1390,115 @@ class BuilderServer:
                     self._json(result)
                     return
 
+                if path == "/ai-refine":
+                    current_graph = body.get("current_graph", {})
+                    selected_node_id = body.get("selected_node_id")
+                    message = body.get("message", "").strip()
+                    history = body.get("history", [])
+                    api_key = body.get("api_key", "").strip()
+                    if not message:
+                        self._json({"error": "message required"}, 400)
+                        return
+                    if api_key:
+                        result2 = _ai_refine_live(
+                            current_graph, selected_node_id, message, history, api_key
+                        )
+                    else:
+                        result2 = {
+                            "patch": None,
+                            "explanation": "No API key — provide an API key to use AI Copilot.",
+                            "suggested_follow_up": "",
+                        }
+                    self._json(result2)
+                    return
+
+                if path == "/estimate-run-cost":
+                    nodes_d = body.get("nodes", [])
+                    edges_d = body.get("edges", [])
+                    input_t = body.get("input", "")
+                    self._json(_estimate_run_cost(nodes_d, edges_d, input_t))
+                    return
+
+                if path == "/watch-file":
+                    watch_path = body.get("path", "")
+                    if not os.path.isfile(watch_path):
+                        self._json({"error": "File not found"}, 404)
+                        return
+                    import hashlib as _hl
+
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/event-stream")
+                    self.send_header("Cache-Control", "no-cache")
+                    self.send_header("Connection", "close")
+                    self.end_headers()
+                    last_hash = ""
+                    for _ in range(600):
+                        try:
+                            content = open(watch_path).read()  # noqa: WPS515
+                            h = _hl.md5(content.encode()).hexdigest()
+                            if h != last_hash:
+                                last_hash = h
+                                ev_data = json.dumps({"type": "file_changed", "content": content})
+                                self.wfile.write(f"data: {ev_data}\n\n".encode("utf-8"))
+                                self.wfile.flush()
+                        except Exception:
+                            pass
+                        time.sleep(1)
+                    self.wfile.write(b'data: {"type": "timeout"}\n\n')
+                    self.wfile.flush()
+                    return
+
+                if path == "/sync-to-file":
+                    sync_path = body.get("path", "")
+                    patch = body.get("patch", {})
+                    if not os.path.isfile(sync_path):
+                        self._json({"error": "File not found"}, 404)
+                        return
+                    try:
+                        source = open(sync_path).read()  # noqa: WPS515
+                        # Simple regex-based patch for update_node
+                        if patch.get("type") == "update_node":
+                            node_id = patch.get("node_id", "")
+                            changes = patch.get("changes", {})
+                            if "system_prompt" in changes:
+                                import re as _re
+
+                                source = _re.sub(
+                                    rf'(add_node\(["\']){_re.escape(node_id)}',
+                                    rf"\g<1>{node_id}",
+                                    source,
+                                )
+                        with open(sync_path, "w") as fw:
+                            fw.write(source)
+                        self._json({"ok": True})
+                    except Exception as ex:
+                        self._json({"error": str(ex)}, 500)
+                    return
+
+                if path == "/runs":
+                    log_dir = os.path.expanduser("~/.selectools/runs")
+                    runs: List[Dict[str, Any]] = []
+                    if os.path.isdir(log_dir):
+                        for fname in sorted(os.listdir(log_dir), reverse=True)[:7]:
+                            fpath = os.path.join(log_dir, fname)
+                            try:
+                                with open(fpath) as f:
+                                    for line in f:
+                                        line = line.strip()
+                                        if line:
+                                            runs.append(json.loads(line))
+                            except Exception:
+                                pass
+                    self._json({"runs": runs[:100]})
+                    return
+
+                if path == "/feedback":
+                    run_id = body.get("run_id", "")
+                    score = body.get("score", 0)
+                    _log_run({"run_id": run_id, "feedback": score, "ts": time.time()})
+                    self._json({"ok": True})
+                    return
+
                 if path != "/run":
                     self._json({"error": "not found"}, 404)
                     return
@@ -847,11 +1521,12 @@ class BuilderServer:
                     nodes_data = body.get("nodes", [])
                     edges_data = body.get("edges", [])
                     api_key = body.get("api_key", "").strip()
+                    pinned_ports_data = body.get("pinned_ports", {})
                     mock_mode = not api_key
 
                     emit({"type": "run_start", "mock": mock_mode})
                     if mock_mode:
-                        _builder_run_mock(nodes_data, input_msg, emit)
+                        _builder_run_mock(nodes_data, input_msg, emit, pinned_ports_data)
                     else:
                         _builder_run_live(nodes_data, edges_data, input_msg, api_key, emit)
                 except Exception as exc:

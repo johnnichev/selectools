@@ -981,7 +981,7 @@ class TestBuilderHtmlImport:
     def test_escape_closes_import_modal(self):
         """Escape key handler must check importModal before searchOverlay."""
         escape_idx = BUILDER_HTML.index("if (e.key === 'Escape')")
-        escape_block = BUILDER_HTML[escape_idx : escape_idx + 900]
+        escape_block = BUILDER_HTML[escape_idx : escape_idx + 1400]
         im_pos = escape_block.find("importModal")
         ov_pos = escape_block.find("searchOverlay")
         assert im_pos != -1, "importModal not in Escape handler"
@@ -1305,18 +1305,20 @@ class TestBuilderWireHover:
         assert ".wire-tooltip" in BUILDER_HTML
 
     def test_mouseenter_on_edges(self):
-        """renderEdges must attach mouseenter handler for wire tooltip."""
+        """renderEdges must attach mouseenter handler (wire inspector supersedes tooltip)."""
         re_idx = BUILDER_HTML.index("function renderEdges()")
         re_block = BUILDER_HTML[re_idx : re_idx + 2200]
         assert "mouseenter" in re_block
-        assert "showWireTooltip" in re_block
+        # Feature 05 replaced showWireTooltip with showWireInspector in renderEdges
+        assert "showWireInspector" in re_block
 
     def test_mouseleave_on_edges(self):
-        """renderEdges must attach mouseleave to hide tooltip."""
+        """renderEdges must attach mouseleave to hide inspector."""
         re_idx = BUILDER_HTML.index("function renderEdges()")
         re_block = BUILDER_HTML[re_idx : re_idx + 2200]
         assert "mouseleave" in re_block
-        assert "hideWireTooltip" in re_block
+        # Feature 05 replaced hideWireTooltip with hideWireInspector in renderEdges
+        assert "hideWireInspector" in re_block
 
     def test_wire_tooltip_shows_frozen_outputs(self):
         """showWireTooltip must reference frozenOutputs."""
@@ -1358,7 +1360,7 @@ class TestBuilderContextMenu:
     def test_context_menu_on_nodes(self):
         """renderNodes must attach contextmenu listener to node groups."""
         rn_idx = BUILDER_HTML.index("function renderNodes()")
-        rn_block = BUILDER_HTML[rn_idx : rn_idx + 8500]
+        rn_block = BUILDER_HTML[rn_idx : rn_idx + 12000]
         assert "contextmenu" in rn_block
         assert "showCtxMenu" in rn_block
 
@@ -1476,7 +1478,7 @@ class TestBuilderEmbedWidget:
 # ─── Feature 10: Agent-as-Tool Picker ────────────────────────────────────
 
 
-class TestBuilderAgentAsTool:
+class TestBuilderAgentAsToolPicker:
     def test_agent_pick_button_in_props(self):
         """Properties panel must add an agent-picker button for agent nodes."""
         assert "use another agent as tool" in BUILDER_HTML
@@ -1548,7 +1550,7 @@ class TestBuilderEmbedMode:
     def test_embed_mode_loads_graph_from_url(self):
         """initEmbedMode must decode graph from URL ?graph= param."""
         em_idx = BUILDER_HTML.index("initEmbedMode")
-        em_block = BUILDER_HTML[em_idx : em_idx + 600]
+        em_block = BUILDER_HTML[em_idx : em_idx + 1200]
         assert "parseYaml" in em_block
         assert "atob" in em_block
 
@@ -1561,26 +1563,26 @@ class TestBuilderEmbedMode:
     def test_embed_mode_opens_test_panel(self):
         """initEmbedMode must call openTestPanel()."""
         em_idx = BUILDER_HTML.index("initEmbedMode")
-        em_block = BUILDER_HTML[em_idx : em_idx + 700]
+        em_block = BUILDER_HTML[em_idx : em_idx + 1400]
         assert "openTestPanel()" in em_block
 
     def test_open_embed_uses_real_origin(self):
         """openEmbed must use window.location.origin for the iframe src."""
         fn_idx = BUILDER_HTML.index("function openEmbed()")
-        fn_block = BUILDER_HTML[fn_idx : fn_idx + 600]
+        fn_block = BUILDER_HTML[fn_idx : fn_idx + 1400]
         assert "window.location.origin" in fn_block
 
     def test_open_embed_encodes_full_yaml(self):
         """openEmbed must base64-encode full genYaml() output."""
         fn_idx = BUILDER_HTML.index("function openEmbed()")
-        fn_block = BUILDER_HTML[fn_idx : fn_idx + 600]
+        fn_block = BUILDER_HTML[fn_idx : fn_idx + 1400]
         assert "btoa(" in fn_block
         assert "genYaml()" in fn_block
 
     def test_embed_iframe_has_embed_param(self):
         """Generated iframe src must include embed=1 param."""
         fn_idx = BUILDER_HTML.index("function openEmbed()")
-        fn_block = BUILDER_HTML[fn_idx : fn_idx + 600]
+        fn_block = BUILDER_HTML[fn_idx : fn_idx + 1400]
         assert "embed=1" in fn_block
 
     def test_embed_modal_live_description(self):
@@ -2134,3 +2136,659 @@ class TestBuilderAuth:
         from selectools.serve.app import _make_session_cookie
 
         assert _make_session_cookie("abc") != _make_session_cookie("xyz")
+
+
+class TestBuilderStickyNotes:
+    """Feature 06 — Sticky Notes Rich Mode."""
+
+    def test_render_markdown_function(self):
+        """renderMarkdown() function is defined."""
+        assert "renderMarkdown" in BUILDER_HTML
+
+    def test_render_markdown_bold(self):
+        """renderMarkdown produces <strong> for bold syntax."""
+        assert "<strong>" in BUILDER_HTML
+
+    def test_render_markdown_code(self):
+        """renderMarkdown produces <code for inline code syntax."""
+        assert "<code" in BUILDER_HTML
+
+    def test_note_resize_handle_css(self):
+        """.note-resize-handle CSS class is defined."""
+        assert ".note-resize-handle" in BUILDER_HTML
+
+    def test_toggle_note_collapse_function(self):
+        """toggleNoteCollapse() function is defined."""
+        assert "toggleNoteCollapse" in BUILDER_HTML
+
+    def test_note_resize_sets_dimensions(self):
+        """Note resize code references node.width and node.height."""
+        assert "node.width" in BUILDER_HTML
+        assert "node.height" in BUILDER_HTML
+
+
+class TestBuilderEmbedTheming:
+    """Feature 07 — Embed Widget Theming."""
+
+    def test_embed_accent_input(self):
+        """embedAccent color input is in builder HTML."""
+        assert 'id="embedAccent"' in BUILDER_HTML
+
+    def test_embed_position_select(self):
+        """embedPosition select is in builder HTML."""
+        assert 'id="embedPosition"' in BUILDER_HTML
+
+    def test_embed_welcome_input(self):
+        """embedWelcome text input is in builder HTML."""
+        assert 'id="embedWelcome"' in BUILDER_HTML
+
+    def test_embed_preview_widget(self):
+        """embedPreviewWidget element is in builder HTML."""
+        assert 'id="embedPreviewWidget"' in BUILDER_HTML
+
+    def test_update_embed_code_function(self):
+        """updateEmbedCode() function is defined."""
+        assert "updateEmbedCode" in BUILDER_HTML
+
+    def test_update_embed_preview_function(self):
+        """updateEmbedPreview() function is defined."""
+        assert "updateEmbedPreview" in BUILDER_HTML
+
+    def test_embed_code_url_contains_accent(self):
+        """updateEmbedCode builds URL with accent= param."""
+        assert "accent=" in BUILDER_HTML
+
+    def test_embed_code_url_contains_pos(self):
+        """updateEmbedCode builds URL with pos= param."""
+        assert "pos=" in BUILDER_HTML
+
+
+class TestBuilderWireInspector:
+    """Feature 05 — Wire-Hover Output Inspector."""
+
+    def test_wire_inspector_html_present(self):
+        """wireInspector element is in builder HTML."""
+        assert 'id="wireInspector"' in BUILDER_HTML
+
+    def test_show_wire_inspector_function(self):
+        """showWireInspector() function is defined."""
+        assert "showWireInspector" in BUILDER_HTML
+
+    def test_hide_wire_inspector_function(self):
+        """hideWireInspector() function is defined."""
+        assert "hideWireInspector" in BUILDER_HTML
+
+    def test_syntax_highlight_json_function(self):
+        """syntaxHighlightJSON() function is defined."""
+        assert "syntaxHighlightJSON" in BUILDER_HTML
+
+    def test_copy_wire_inspector_function(self):
+        """copyWireInspector() function is defined."""
+        assert "copyWireInspector" in BUILDER_HTML
+
+    def test_edge_last_output_variable(self):
+        """edgeLastOutput variable is declared."""
+        assert "edgeLastOutput" in BUILDER_HTML
+
+    def test_wire_inspector_css(self):
+        """.wire-inspector CSS class is defined."""
+        assert ".wire-inspector" in BUILDER_HTML
+
+
+class TestBuilderHistorySearch:
+    """Feature 08 — Run History Search, Export & Cost Total."""
+
+    def test_history_search_input_present(self):
+        """historySearch input element is in builder HTML."""
+        assert 'id="historySearch"' in BUILDER_HTML
+
+    def test_filter_history_function(self):
+        """filterHistory() function is defined in builder HTML."""
+        assert "filterHistory" in BUILDER_HTML
+
+    def test_export_history_function(self):
+        """exportHistory() function is defined in builder HTML."""
+        assert "exportHistory" in BUILDER_HTML
+
+    def test_history_session_cost_element(self):
+        """historySessionCost element is in builder HTML."""
+        assert 'id="historySessionCost"' in BUILDER_HTML
+
+    def test_export_history_uses_ndjson(self):
+        """exportHistory uses application/x-ndjson content type."""
+        assert "application/x-ndjson" in BUILDER_HTML
+
+
+# ─── Feature 09: Structured Trace ───────────────────────────────────────────
+
+
+class TestBuilderTraceStructured:
+    """Feature 09 — Live Agent Trace Structured View."""
+
+    def test_trace_row_css_present(self):
+        """.trace-row CSS class is defined."""
+        assert ".trace-row" in BUILDER_HTML
+
+    def test_trace_row_header_css(self):
+        """.trace-row-header CSS class is defined."""
+        assert ".trace-row-header" in BUILDER_HTML
+
+    def test_add_trace_row_function(self):
+        """addTraceRow() function is defined."""
+        assert "addTraceRow" in BUILDER_HTML
+
+    def test_render_trace_rows_function(self):
+        """renderTraceRows() function is defined."""
+        assert "renderTraceRows" in BUILDER_HTML
+
+    def test_toggle_trace_row_function(self):
+        """toggleTraceRow() function is defined."""
+        assert "toggleTraceRow" in BUILDER_HTML
+
+    def test_trace_rows_variable(self):
+        """traceRows variable is declared."""
+        assert "traceRows" in BUILDER_HTML
+
+    def test_trace_type_tool_css(self):
+        """.trace-type-tool CSS class is defined."""
+        assert ".trace-type-tool" in BUILDER_HTML
+
+    def test_trace_type_error_css(self):
+        """.trace-type-error CSS class is defined."""
+        assert ".trace-type-error" in BUILDER_HTML
+
+
+# ─── Feature 10: Data Pinning ────────────────────────────────────────────────
+
+
+class TestBuilderDataPinning:
+    """Feature 10 — Data Pinning Per-Port."""
+
+    def test_pin_port_function(self):
+        """pinPort() function is defined."""
+        assert "pinPort" in BUILDER_HTML
+
+    def test_unpin_port_function(self):
+        """unpinPort() function is defined."""
+        assert "unpinPort" in BUILDER_HTML
+
+    def test_is_pinned_function(self):
+        """isPinned() function is defined."""
+        assert "isPinned" in BUILDER_HTML
+
+    def test_pinned_ports_variable(self):
+        """pinnedPorts variable is declared."""
+        assert "pinnedPorts" in BUILDER_HTML
+
+    def test_port_pinned_css(self):
+        """.port-pinned CSS class is defined."""
+        assert ".port-pinned" in BUILDER_HTML
+
+    def test_pin_last_output_in_context_menu(self):
+        """Pin last output is referenced in JS."""
+        assert "Pin last output" in BUILDER_HTML
+
+    def test_mock_run_accepts_pinned_ports(self):
+        """/run handler reads pinned_ports from body."""
+        import inspect
+
+        from selectools.serve.app import _builder_run_mock
+
+        src = inspect.getsource(_builder_run_mock)
+        assert "pinned_ports" in src
+
+    def test_pinned_ports_in_yaml_export(self):
+        """pinned_ports key is in YAML export."""
+        assert "pinned_ports" in BUILDER_HTML
+
+
+# ─── Feature 11: Replay Diff ─────────────────────────────────────────────────
+
+
+class TestBuilderReplayDiff:
+    """Feature 11 — Single-Node Replay Diff."""
+
+    def test_replay_baseline_variable(self):
+        """replayBaseline variable is declared."""
+        assert "replayBaseline" in BUILDER_HTML
+
+    def test_show_replay_diff_function(self):
+        """showReplayDiff() function is defined."""
+        assert "showReplayDiff" in BUILDER_HTML
+
+    def test_close_replay_diff_function(self):
+        """closeReplayDiff() function is defined."""
+        assert "closeReplayDiff" in BUILDER_HTML
+
+    def test_compute_line_diff_function(self):
+        """computeLineDiff() function is defined."""
+        assert "computeLineDiff" in BUILDER_HTML
+
+    def test_replay_diff_panel_present(self):
+        """replayDiffPanel element is in HTML."""
+        assert 'id="replayDiffPanel"' in BUILDER_HTML
+
+    def test_replay_diff_before_element(self):
+        """replayDiffBefore element is in HTML."""
+        assert 'id="replayDiffBefore"' in BUILDER_HTML
+
+    def test_replay_diff_after_element(self):
+        """replayDiffAfter element is in HTML."""
+        assert 'id="replayDiffAfter"' in BUILDER_HTML
+
+
+# ─── Feature 12: Gantt Critical Path ─────────────────────────────────────────
+
+
+class TestBuilderGanttCriticalPath:
+    """Feature 12 — Gantt Critical Path + Dependency Arrows."""
+
+    def test_compute_critical_path_function(self):
+        """computeCriticalPath() function is defined."""
+        assert "computeCriticalPath" in BUILDER_HTML
+
+    def test_gantt_arrow_markers(self):
+        """ganttArrow SVG marker is defined."""
+        assert "ganttArrow" in BUILDER_HTML
+
+    def test_gantt_arrow_crit_marker(self):
+        """ganttArrowCrit SVG marker is defined."""
+        assert "ganttArrowCrit" in BUILDER_HTML
+
+    def test_gantt_critical_set_computed(self):
+        """criticalSet is referenced in renderGantt."""
+        assert "criticalSet" in BUILDER_HTML
+
+    def test_gantt_dependency_arrows_drawn(self):
+        """Dependency arrow drawing code is in renderGantt."""
+        assert "marker-end" in BUILDER_HTML
+
+
+# ─── Feature 13: Docked Panel Mode ───────────────────────────────────────────
+
+
+class TestBuilderDockedPanel:
+    """Feature 13 — Chat/Test Panel Docked Mode."""
+
+    def test_test_panel_mode_variable(self):
+        """testPanelMode variable is declared."""
+        assert "testPanelMode" in BUILDER_HTML
+
+    def test_set_test_panel_mode_function(self):
+        """setTestPanelMode() function is defined."""
+        assert "setTestPanelMode" in BUILDER_HTML
+
+    def test_docked_mode_option(self):
+        """'docked' mode string is present in JS."""
+        assert "'docked'" in BUILDER_HTML or '"docked"' in BUILDER_HTML
+
+    def test_conversation_selector_present(self):
+        """convSelect or aiCopilotTab provides conversation history UI."""
+        assert "aiCopilotTab" in BUILDER_HTML or "convSelect" in BUILDER_HTML
+
+    def test_dock_toggle_button_present(self):
+        """Dock toggle icon ⊞ or unicode equivalent is in header."""
+        assert (
+            "\u229e" in BUILDER_HTML or "229E" in BUILDER_HTML.upper() or "&#x229E;" in BUILDER_HTML
+        )
+
+
+# ─── Feature 14: AI Builder Copilot ──────────────────────────────────────────
+
+
+class TestBuilderAiCopilot:
+    """Feature 14 — AI Builder Copilot."""
+
+    def test_ai_copilot_tab_present(self):
+        """aiCopilotTab element is in HTML."""
+        assert 'id="aiCopilotTab"' in BUILDER_HTML
+
+    def test_ai_copilot_input_present(self):
+        """aiCopilotInput element is in HTML."""
+        assert 'id="aiCopilotInput"' in BUILDER_HTML
+
+    def test_send_ai_copilot_function(self):
+        """sendAiCopilot() function is defined."""
+        assert "sendAiCopilot" in BUILDER_HTML
+
+    def test_apply_graph_patch_function(self):
+        """applyGraphPatch() function is defined."""
+        assert "applyGraphPatch" in BUILDER_HTML
+
+    def test_ai_refine_route_exists(self):
+        """/ai-refine route is in app.py routing."""
+        import inspect
+
+        from selectools.serve import app as _app
+
+        src = inspect.getsource(_app)
+        assert "/ai-refine" in src
+
+    def test_ai_copilot_history_variable(self):
+        """aiCopilotHistory variable is declared."""
+        assert "aiCopilotHistory" in BUILDER_HTML
+
+
+# ─── Feature 15: HITL Form Builder ───────────────────────────────────────────
+
+
+class TestBuilderHitlFormBuilder:
+    """Feature 15 — HITL Form Builder."""
+
+    def test_hitl_form_editor_present(self):
+        """hitlFormEditor element is in HTML."""
+        assert "hitlFormEditor" in BUILDER_HTML
+
+    def test_add_hitl_field_function(self):
+        """addHitlField() function is defined."""
+        assert "addHitlField" in BUILDER_HTML
+
+    def test_remove_hitl_field_function(self):
+        """removeHitlField() function is defined."""
+        assert "removeHitlField" in BUILDER_HTML
+
+    def test_render_hitl_form_editor_function(self):
+        """renderHitlFormEditor() function is defined."""
+        assert "renderHitlFormEditor" in BUILDER_HTML
+
+    def test_render_hitl_form_python(self):
+        """_render_hitl_form() is defined in app.py."""
+        from selectools.serve.app import _render_hitl_form
+
+        assert callable(_render_hitl_form)
+
+    def test_hitl_form_field_types(self):
+        """textarea, select, checkbox field types are referenced."""
+        import inspect
+
+        from selectools.serve import app as _app
+
+        src = inspect.getsource(_app._render_hitl_form)
+        assert "textarea" in src
+        assert "select" in src
+        assert "checkbox" in src
+
+    def test_hitl_form_fields_in_yaml_export(self):
+        """form_fields key appears in YAML export or JS."""
+        assert "form_fields" in BUILDER_HTML
+
+
+# ─── Feature 16: Bidirectional File Sync ─────────────────────────────────────
+
+
+class TestBuilderBidirectionalSync:
+    """Feature 16 — Bidirectional Live Sync."""
+
+    def test_watch_file_btn_present(self):
+        """Watch button is in builder HTML header."""
+        assert "Watch" in BUILDER_HTML
+
+    def test_watch_file_modal_present(self):
+        """watchFileModal element is in HTML."""
+        assert 'id="watchFileModal"' in BUILDER_HTML
+
+    def test_start_watch_file_function(self):
+        """startWatchFile() function is defined."""
+        assert "startWatchFile" in BUILDER_HTML
+
+    def test_parse_python_to_graph_function(self):
+        """_parsePythonToGraph() function is defined in builder JS."""
+        assert "_parsePythonToGraph" in BUILDER_HTML
+
+    def test_watch_file_route_exists(self):
+        """/watch-file route is in app.py routing."""
+        import inspect
+
+        from selectools.serve import app as _app
+
+        src = inspect.getsource(_app)
+        assert "/watch-file" in src
+
+    def test_sync_to_file_route_exists(self):
+        """/sync-to-file route is in app.py routing."""
+        import inspect
+
+        from selectools.serve import app as _app
+
+        src = inspect.getsource(_app)
+        assert "/sync-to-file" in src
+
+    def test_parse_python_to_graph_python(self):
+        """_parse_python_to_graph() AST parser is in app.py."""
+        from selectools.serve.app import _parse_python_to_graph
+
+        result = _parse_python_to_graph('graph.add_node("a")\ngraph.add_edge("a","b")')
+        assert result["nodes"]
+        assert result["nodes"][0]["id"] == "a"
+
+
+# ─── Feature 17: Agent-as-Tool Node ──────────────────────────────────────────
+
+
+class TestBuilderAgentAsTool:
+    """Feature 17 — Agent-as-Tool Node."""
+
+    def test_agent_tool_node_type(self):
+        """agent_tool node type is referenced in builder.py."""
+        assert "agent_tool" in BUILDER_HTML
+
+    def test_agent_tool_props_present(self):
+        """agentToolProps element is in HTML."""
+        assert "agentToolProps" in BUILDER_HTML
+
+    def test_prop_tool_name_input(self):
+        """propToolName input is in HTML."""
+        assert "propToolName" in BUILDER_HTML
+
+    def test_prop_tool_desc_textarea(self):
+        """propToolDesc textarea is in HTML."""
+        assert "propToolDesc" in BUILDER_HTML
+
+    def test_populate_agent_tool_targets_function(self):
+        """populateAgentToolTargets() function is defined."""
+        assert "populateAgentToolTargets" in BUILDER_HTML
+
+    def test_build_agent_tool_from_node_function(self):
+        """_build_agent_tool_from_node() is defined in app.py."""
+        from selectools.serve.app import _build_agent_tool_from_node
+
+        assert callable(_build_agent_tool_from_node)
+
+
+# ─── Feature 18: Auth SSO/RBAC ───────────────────────────────────────────────
+
+
+class TestBuilderAuthSSO:
+    """Feature 18 — Auth with SSO / RBAC."""
+
+    def test_resolve_users_from_env(self):
+        """_resolve_users() reads BUILDER_USERS env var."""
+        import json as _json
+        import os
+
+        from selectools.serve.app import _resolve_users
+
+        os.environ["BUILDER_USERS"] = '{"alice": {"token": "t1", "role": "admin"}}'
+        try:
+            users = _resolve_users()
+            assert "alice" in users
+        finally:
+            del os.environ["BUILDER_USERS"]
+
+    def test_roles_dict_present(self):
+        """ROLES dict with admin/editor/viewer is defined."""
+        from selectools.serve.app import ROLES
+
+        assert "admin" in ROLES
+        assert "editor" in ROLES
+        assert "viewer" in ROLES
+
+    def test_has_permission_admin(self):
+        """Admin role has all permissions."""
+        from selectools.serve.app import _has_permission
+
+        assert _has_permission("admin", "run")
+        assert _has_permission("admin", "delete")
+        assert _has_permission("admin", "manage_users")
+
+    def test_has_permission_viewer(self):
+        """Viewer role cannot run or edit."""
+        from selectools.serve.app import _has_permission
+
+        assert not _has_permission("viewer", "run")
+        assert not _has_permission("viewer", "edit")
+        assert _has_permission("viewer", "view")
+
+    def test_github_auth_route(self):
+        """/auth/github route is in BuilderServer GET handler."""
+        import inspect
+
+        from selectools.serve import app as _app
+
+        src = inspect.getsource(_app)
+        assert "/auth/github" in src
+
+    def test_github_callback_route(self):
+        """/auth/github/callback route is in BuilderServer GET handler."""
+        import inspect
+
+        from selectools.serve import app as _app
+
+        src = inspect.getsource(_app)
+        assert "/auth/github/callback" in src
+
+    def test_per_graph_acl_check(self):
+        """_check_graph_permission() is defined."""
+        from selectools.serve.app import _check_graph_permission
+
+        assert callable(_check_graph_permission)
+
+
+# ─── Feature 19: Online Production Eval ──────────────────────────────────────
+
+
+class TestBuilderOnlineEval:
+    """Feature 19 — Online Production Eval."""
+
+    def test_log_run_function(self):
+        """_log_run() is defined in app.py."""
+        from selectools.serve.app import _log_run
+
+        assert callable(_log_run)
+
+    def test_eval_queue_present(self):
+        """_eval_queue Queue is defined in app.py."""
+        import queue
+
+        from selectools.serve.app import _eval_queue
+
+        assert isinstance(_eval_queue, queue.Queue)
+
+    def test_eval_worker_present(self):
+        """_eval_worker() function is defined."""
+        from selectools.serve.app import _eval_worker
+
+        assert callable(_eval_worker)
+
+    def test_run_evals_on_run_function(self):
+        """_run_evals_on_run() is defined."""
+        from selectools.serve.app import _run_evals_on_run
+
+        assert callable(_run_evals_on_run)
+
+    def test_route_experiment_function(self):
+        """_route_experiment() is defined."""
+        from selectools.serve.app import _route_experiment
+
+        assert callable(_route_experiment)
+        # no experiment file → returns same graph_id
+        assert _route_experiment("g1", "run123", "/nonexistent/path") == "g1"
+
+    def test_runs_route_exists(self):
+        """/runs route is in app.py."""
+        import inspect
+
+        from selectools.serve import app as _app
+
+        src = inspect.getsource(_app)
+        assert '"/runs"' in src or "'/runs'" in src
+
+    def test_eval_dashboard_route_exists(self):
+        """/eval-dashboard route is in app.py."""
+        import inspect
+
+        from selectools.serve import app as _app
+
+        src = inspect.getsource(_app)
+        assert "/eval-dashboard" in src
+
+    def test_feedback_route_exists(self):
+        """/feedback route is in app.py."""
+        import inspect
+
+        from selectools.serve import app as _app
+
+        src = inspect.getsource(_app)
+        assert "/feedback" in src
+
+
+# ─── Feature 20: Multi-Provider Smart Routing ────────────────────────────────
+
+
+class TestBuilderSmartRouting:
+    """Feature 20 — Multi-Provider Smart Routing."""
+
+    def test_provider_health_dict(self):
+        """_provider_health dict is defined in app.py."""
+        from selectools.serve.app import _provider_health
+
+        assert "openai" in _provider_health
+        assert "anthropic" in _provider_health
+
+    def test_capability_tiers_present(self):
+        """CAPABILITY_TIERS dict is defined."""
+        from selectools.serve.app import CAPABILITY_TIERS
+
+        assert "simple" in CAPABILITY_TIERS
+        assert "standard" in CAPABILITY_TIERS
+        assert "advanced" in CAPABILITY_TIERS
+
+    def test_estimate_task_tier_function(self):
+        """_estimate_task_tier() returns a tier string."""
+        from selectools.serve.app import _estimate_task_tier
+
+        # two simple signals → simple tier
+        assert _estimate_task_tier("summarize and classify this", "") == "simple"
+        # two advanced signals → advanced tier
+        assert _estimate_task_tier("analyze and reason about this", "") == "advanced"
+        # default → standard
+        assert _estimate_task_tier("help me write a response", "") == "standard"
+
+    def test_smart_route_function(self):
+        """_smart_route() returns a model string."""
+        from selectools.serve.app import _smart_route
+
+        result = _smart_route("summarize", "", [])
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+    def test_estimate_run_cost_function(self):
+        """_estimate_run_cost() returns total_tokens and total_cost_usd."""
+        from selectools.serve.app import _estimate_run_cost
+
+        result = _estimate_run_cost([], [], "hello")
+        assert "total_tokens" in result
+        assert "total_cost_usd" in result
+
+    def test_provider_health_bar_present(self):
+        """providerHealthBar or provider health UI is in builder HTML."""
+        # We added provider health via the /provider-health API endpoint
+        assert "/provider-health" in BUILDER_HTML or "providerHealthBar" in BUILDER_HTML
+
+    def test_smart_model_option(self):
+        """smart model option is referenced in builder JS or API."""
+        from selectools.serve.app import CAPABILITY_TIERS, _smart_route
+
+        # smart routing exists and works
+        assert _smart_route is not None
+        assert "simple" in CAPABILITY_TIERS

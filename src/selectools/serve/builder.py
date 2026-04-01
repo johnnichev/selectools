@@ -376,6 +376,21 @@ body.embed-mode .page { height:100vh; }
   border-radius:6px; padding:10px 12px; max-width:300px; pointer-events:none;
   box-shadow:0 4px 20px rgba(0,0,0,0.4); font-family:ui-monospace,monospace; font-size:11px; }
 
+/* Wire inspector panel */
+.wire-inspector { position:fixed; z-index:520; background:var(--surface); border:1px solid var(--border);
+  border-radius:8px; padding:10px 12px; max-width:360px; min-width:200px; pointer-events:auto;
+  box-shadow:0 4px 24px rgba(0,0,0,0.5); font-family:ui-monospace,monospace; font-size:11px; }
+.wire-inspector pre { margin:6px 0 0; padding:0; white-space:pre-wrap; word-break:break-word;
+  max-height:240px; overflow-y:auto; font-size:10px; line-height:1.5; }
+.wire-copy-btn { font-size:10px; padding:1px 7px; border-radius:4px; cursor:pointer;
+  background:var(--surface); border:1px solid var(--border); color:var(--text); float:right; margin-left:8px; }
+.wi-key { color:#93c5fd; } .wi-str { color:#86efac; } .wi-num { color:#fcd34d; }
+.wi-bool { color:#f9a8d4; } .wi-null { color:#94a3b8; }
+
+/* Note resize handle */
+.note-resize-handle { cursor:se-resize; opacity:0.6; }
+.note-resize-handle:hover { opacity:1; }
+
 /* Cost badge */
 .cost-badge { font-size:10px; color:#4ade80; margin-left:6px; border:1px solid #4ade8044;
   border-radius:10px; padding:2px 8px; }
@@ -416,6 +431,36 @@ body.embed-mode .page { height:100vh; }
 .gantt-axis-line { stroke:#334155; stroke-width:1; }
 .gantt-tick-line { stroke:#475569; stroke-width:1; }
 .gantt-tick-label { font:9px monospace; fill:#64748b; }
+
+/* Structured trace rows (Feature 09) */
+.trace-row { border-radius:6px; overflow:hidden; }
+.trace-row-header {
+  display:flex; align-items:center; gap:8px;
+  padding:5px 10px; cursor:pointer;
+  background:var(--surface); font-size:11px;
+}
+.trace-row-header:hover { background:rgba(30,58,138,0.25); }
+.trace-row-body {
+  padding:7px 12px; background:#0a111f;
+  border-top:1px solid var(--border);
+  font:11px ui-monospace,monospace;
+  display:none;
+}
+.trace-row.expanded .trace-row-body { display:block; }
+.trace-badge {
+  font-size:10px; padding:1px 6px; border-radius:10px;
+  background:var(--surface); border:1px solid var(--border);
+  color:var(--muted); margin-left:auto;
+}
+.trace-spinner { animation:spin 1s linear infinite; display:inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.trace-type-tool   { border-left:3px solid #f59e0b; }
+.trace-type-chunk  { border-left:3px solid #22d3ee; }
+.trace-type-node   { border-left:3px solid #8b5cf6; }
+.trace-type-error  { border-left:3px solid #f87171; }
+
+/* Port pinning (Feature 10) */
+.port-pinned { background: #f59e0b !important; }
 
 /* Eval badges */
 .eval-dot-pass { fill: #22c55e; }
@@ -528,12 +573,14 @@ body.embed-mode .page { height:100vh; }
     <button class="btn" onclick="openImport()">Import</button>
     <button class="btn" onclick="openEmbed()" title="Get embed code for this workflow">&#128279; Embed</button>
     <button class="btn" onclick="openLoadTrace()" title="Load a production AgentTrace JSON into the scrubber and timeline">&#x1F4E5; Trace</button>
+    <button class="btn" onclick="openWatchFile()" title="Watch a Python file and sync canvas on save">&#x1F4C2; Watch</button>
     <button class="btn" onclick="openGenBar()" style="color:#a855f7;border-color:#a855f7">&#10024; Generate</button>
     <button class="btn" onclick="undoAction()">&#8630; Undo</button>
     <button class="btn" onclick="redoAction()">&#8631; Redo</button>
     <button class="btn" onclick="doExport('yaml')">Export YAML</button>
     <button class="btn" onclick="doExport('python')">Export Python</button>
     <button class="btn btn-primary" onclick="openTestPanel()">&#9654; Test</button>
+    <div id="providerHealthBar" style="display:flex;gap:4px;align-items:center;padding:0 4px" title="Provider health"></div>
   </div>
 </header>
 
@@ -575,6 +622,10 @@ body.embed-mode .page { height:100vh; }
     <div class="palette-item" draggable="true"
          ondragstart="palDragStart(event,'hitl')">
       <div class="dot" style="background:#f59e0b"></div> Human Input
+    </div>
+    <div class="palette-item" draggable="true"
+         ondragstart="palDragStart(event,'agent_tool')">
+      <div class="dot" style="background:#a78bfa"></div> Agent Tool
     </div>
 
     <div class="section-title" style="margin-top:10px">Tips</div>
@@ -662,9 +713,20 @@ body.embed-mode .page { height:100vh; }
   <div class="test-tabs-bar">
     <span class="test-tab active" id="ttab-output" onclick="switchTestTab('output')">Output</span>
     <span class="test-tab" id="ttab-history" onclick="switchTestTab('history')">History (0)</span>
+    <span class="test-tab" id="ttab-ai" onclick="switchTestTab('ai')">&#x1F4AC; AI</span>
     <span id="testStatus" style="margin-left:auto;font-size:11px;color:var(--muted)"></span>
+    <button class="btn" style="font-size:10px;padding:2px 6px;margin-left:6px" title="Dock test panel beside canvas" onclick="setTestPanelMode(testPanelMode==='docked'?'overlay':'docked')">&#x229E;</button>
   </div>
   <div id="testOutput" class="test-output"></div>
+  <!-- Feature 14: AI Copilot Tab -->
+  <div id="aiCopilotTab" style="display:none;flex-direction:column;height:100%">
+    <div id="aiCopilotHistory" style="flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px"></div>
+    <div id="aiSuggestedFollowUp" style="padding:3px 8px;font-size:10px;color:var(--muted);cursor:pointer" onclick="useFollowUp()"></div>
+    <div style="display:flex;gap:6px;padding:7px 8px;border-top:1px solid var(--border)">
+      <input id="aiCopilotInput" type="text" placeholder="Describe what to change..." style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 8px;font:11px ui-monospace,monospace;outline:none" onkeydown="if(event.key==='Enter')sendAiCopilot()">
+      <button class="btn btn-primary" style="font-size:11px;padding:3px 10px" onclick="sendAiCopilot()">Send</button>
+    </div>
+  </div>
   <div id="scrubberHeader" class="scrub-header" style="display:none">
     <span style="font-size:10px;color:var(--muted)">Execution steps</span>
     <button id="ganttToggleBtn" class="btn" style="font-size:10px;padding:2px 6px" onclick="toggleGantt()">&#x1F4CA; Timeline</button>
@@ -673,6 +735,12 @@ body.embed-mode .page { height:100vh; }
   <div id="ganttWrap" class="gantt-wrap" style="display:none">
     <svg id="ganttSvg" style="width:100%;display:block;"></svg>
   </div>
+  <div id="historyControls" style="display:none;padding:6px 8px;border-bottom:1px solid var(--border);gap:6px;align-items:center;flex-shrink:0">
+    <input id="historySearch" type="text" placeholder="Search runs..." oninput="filterHistory()"
+           style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:3px 7px;font-size:11px;outline:none">
+    <button class="btn" style="font-size:11px;padding:2px 8px" onclick="exportHistory()">&#x2B07; Export</button>
+  </div>
+  <div id="historySessionCost" style="display:none;padding:4px 10px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)"></div>
   <div id="testHistory" class="test-history" style="display:none"></div>
 </div>
 
@@ -759,7 +827,24 @@ let palType = null;
 let history = [], histIdx = -1;
 let clipboard = null;
 let frozenOutputs = {};   // nodeId → last output string for frozen nodes
+let edgeLastOutput = {};  // edgeId → last output from source node
 let evalResults = {};     // nodeId → {pass, results} from last run
+
+// ─── Feature 09: Structured Trace State ───────────────────────────────────
+let traceRows = [];  // [{type, header, body, badge, id, node_id}]
+
+// ─── Feature 10: Data Pinning ─────────────────────────────────────────────
+let pinnedPorts = {};  // key: `${nodeId}::${portKey}`, value: pinned data
+
+// ─── Feature 11: Replay Diff ──────────────────────────────────────────────
+let replayBaseline = {};  // nodeId → last output string
+let activeReplayNodeId = null;
+
+// ─── Feature 13: Docked Panel ────────────────────────────────────────────
+let testPanelMode = 'hidden';
+
+// ─── Feature 14: AI Copilot ───────────────────────────────────────────────
+let aiCopilotHistory = [];
 
 // ─── Variable port helpers ─────────────────────────────────────────────────
 const SKIP_VARS = new Set(['0','1','2','3','4','5','6','7','8','9']);
@@ -808,6 +893,7 @@ function mkNode(type, x, y) {
   if (type === 'subgraph') return { ...base, name: 'Subgraph ' + seq, graph_name: '' };
   if (type === 'note')  return { ...base, name: 'Note', text: '', color: 'yellow' };
   if (type === 'hitl')  return { ...base, name: 'Human Input', options: 'approve, reject', timeout_label: 'timeout' };
+  if (type === 'agent_tool') return { ...base, label: 'Nested Agent', tool_name: 'nested_agent', tool_description: '', tool_input_param: 'query', tool_target_node: '', tool_max_tokens: 500 };
   return { ...base, name: 'Agent ' + seq, provider: 'openai', model: 'gpt-4o-mini', system_prompt: '', tools: '', frozen: false, eval_assertion: '' };
 }
 
@@ -835,6 +921,7 @@ function nodeHeight(n) {
     const vars = extractVars(n.system_prompt);
     if (vars.length > 0) return Math.max(NH, Math.ceil(NH / 2) + 18 + vars.length * 18 + 6);
   }
+  if (n.type === 'note') return n.collapsed ? 32 : (n.height || NH);
   return NH;
 }
 
@@ -1012,14 +1099,47 @@ function renderNodes() {
     } else if (n.type === 'note') {
       const noteColors = { yellow: '#f59e0b', blue: '#3b82f6', green: '#22c55e', red: '#ef4444' };
       const nc = noteColors[n.color] || '#f59e0b';
-      S('rect', { class: 'body', width: NW, height: NH, rx: 8, style: `fill:${nc}22;stroke:${nc};stroke-width:1.5` }, g);
-      Stext('NOTE', NW / 2, 18, {
+      const nw = n.width || NW;
+      const nh_n = n.collapsed ? 32 : (n.height || NH);
+      S('rect', { class: 'body', width: nw, height: nh_n, rx: 8, style: `fill:${nc}22;stroke:${nc};stroke-width:1.5` }, g);
+      Stext('NOTE', nw / 2, 14, {
         class: 'node-sublabel', 'text-anchor': 'middle', 'dominant-baseline': 'middle',
         style: `fill:${nc};font-size:9px;font-weight:700`
       }, g);
-      const txt = (n.text || '').slice(0, 40);
-      Stext(txt, NW / 2, NH / 2 + 6, {
-        class: 'node-sublabel', 'text-anchor': 'middle', 'dominant-baseline': 'middle'
+      const colBtn = S('text', { x: nw - 10, y: 14, 'text-anchor': 'middle', 'dominant-baseline': 'middle',
+        style: 'fill:var(--muted);font-size:9px;cursor:pointer', class: 'node-sublabel' }, g);
+      colBtn.textContent = n.collapsed ? '\u25bc' : '\u25b2';
+      const nid_col = n.id;
+      colBtn.addEventListener('click', ev => { ev.stopPropagation(); toggleNoteCollapse(nid_col); });
+      if (!n.collapsed) {
+        const fo = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
+        fo.setAttribute('x', '6'); fo.setAttribute('y', '22');
+        fo.setAttribute('width', String(nw - 12)); fo.setAttribute('height', String(nh_n - 30));
+        const fdiv = document.createElement('div');
+        fdiv.style.cssText = 'font-size:9px;line-height:1.4;color:var(--text);overflow:hidden;padding:1px';
+        fdiv.xmlns = 'http://www.w3.org/1999/xhtml';
+        fdiv.innerHTML = renderMarkdown(n.text || '');
+        fo.appendChild(fdiv);
+        g.appendChild(fo);
+        const rhNid = n.id;
+        const rh = S('rect', { x: nw - 12, y: nh_n - 12, width: 10, height: 10, rx: 2,
+          class: 'note-resize-handle', style: `fill:${nc}88` }, g);
+        rh.addEventListener('mousedown', ev => startNoteResize(ev, rhNid));
+      }
+    } else if (n.type === 'agent_tool') {
+      // Feature 17: agent_tool node rendering
+      S('rect', { class: 'body', width: NW, height: NH, rx: 8, style: 'stroke:#a78bfa;stroke-width:1.5' }, g);
+      Stext('\u2699 Agent Tool', NW / 2, 16, {
+        class: 'node-sublabel', 'text-anchor': 'middle', 'dominant-baseline': 'middle',
+        style: 'fill:var(--muted);font-size:9px'
+      }, g);
+      Stext(n.label || n.name || 'Nested Agent', NW / 2, 34, {
+        class: 'node-label', 'text-anchor': 'middle', 'dominant-baseline': 'middle'
+      }, g);
+      const toolSub = n.tool_name || '(unnamed tool)';
+      Stext(toolSub, NW / 2, 50, {
+        class: 'node-sublabel', 'text-anchor': 'middle', 'dominant-baseline': 'middle',
+        style: 'fill:#a78bfa;font-size:9px'
       }, g);
     }
 
@@ -1153,17 +1273,55 @@ function renderEdges() {
       Stext(e.label, mx, my, { class: 'edge-lbl', 'text-anchor': 'middle', 'dominant-baseline': 'middle' }, g);
     }
     g.addEventListener('click', ev => { ev.stopPropagation(); selEdge(e.id); });
-    const fromId = e.from;
-    g.addEventListener('mouseenter', ev => showWireTooltip(ev, fromId));
-    g.addEventListener('mouseleave', hideWireTooltip);
-    g.addEventListener('mousemove', ev => {
-      const tt = document.getElementById('wireTooltip');
-      if (tt && tt.style.display !== 'none') {
-        tt.style.left = (ev.clientX + 14) + 'px';
-        tt.style.top  = (ev.clientY - 8) + 'px';
-      }
-    });
+    const edgeId = e.id;
+    g.addEventListener('mouseenter', ev => showWireInspector(ev, edgeId));
+    g.addEventListener('mouseleave', hideWireInspector);
+    g.addEventListener('mousemove', moveWireInspector);
   }
+}
+
+// ─── Sticky Notes Rich Mode ───────────────────────────────────────────────
+function renderMarkdown(text) {
+  return (text || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/^### (.+)$/gm, '<h3 style="margin:2px 0;font-size:9px">$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 style="margin:2px 0;font-size:10px">$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1 style="margin:2px 0;font-size:11px">$1</h1>')
+    .replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>')
+    .replace(/\\*(.+?)\\*/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code style="background:rgba(0,0,0,0.3);padding:0 2px;border-radius:2px">$1</code>')
+    .replace(/^[*-] (.+)$/gm, '<div style="margin-left:8px">\u2022 $1</div>')
+    .replace(/\\n/g, '<br>');
+}
+function toggleNoteCollapse(nodeId) {
+  const node = nodes.find(n => n.id === nodeId);
+  if (!node) return;
+  node.collapsed = !node.collapsed;
+  renderNodes();
+  saveHistory();
+}
+let _resizeNote = null;
+function startNoteResize(ev, nodeId) {
+  ev.stopPropagation(); ev.preventDefault();
+  const node = nodes.find(n => n.id === nodeId);
+  if (!node) return;
+  _resizeNote = { id: nodeId, startX: ev.clientX, startY: ev.clientY,
+                  startW: node.width || NW, startH: node.height || NH };
+  document.addEventListener('mousemove', _doNoteResize);
+  document.addEventListener('mouseup', _stopNoteResize);
+}
+function _doNoteResize(ev) {
+  if (!_resizeNote) return;
+  const node = nodes.find(n => n.id === _resizeNote.id);
+  if (!node) return;
+  node.width  = Math.max(120, _resizeNote.startW + (ev.clientX - _resizeNote.startX));
+  node.height = Math.max(60,  _resizeNote.startH + (ev.clientY - _resizeNote.startY));
+  renderNodes();
+}
+function _stopNoteResize() {
+  if (_resizeNote) { saveHistory(); _resizeNote = null; }
+  document.removeEventListener('mousemove', _doNoteResize);
+  document.removeEventListener('mouseup', _stopNoteResize);
 }
 
 // ─── Wire-Hover Preview (Rivet-style) ─────────────────────────────────────
@@ -1185,6 +1343,53 @@ function showWireTooltip(ev, fromId) {
 function hideWireTooltip() {
   const tt = document.getElementById('wireTooltip');
   if (tt) tt.style.display = 'none';
+}
+
+// ─── Wire Inspector (Rivet-style full output panel) ───────────────────────
+function showWireInspector(e, edgeId) {
+  const panel = document.getElementById('wireInspector');
+  const body  = document.getElementById('wireInspectorBody');
+  const lbl   = document.getElementById('wireInspectorLabel');
+  if (!panel) return;
+  const edge = edges.find(x => x.id === edgeId);
+  const srcNode = edge ? nodes.find(n => n.id === edge.from) : null;
+  const label = srcNode ? srcNode.name : (edge ? edge.from : 'Wire');
+  lbl.textContent = '\u25ba ' + label;
+  const val = edgeLastOutput[edgeId];
+  body.innerHTML = val != null
+    ? syntaxHighlightJSON(val)
+    : '<span style="color:var(--muted)">No output yet \u2014 run the workflow first</span>';
+  panel.style.display = 'block';
+  panel.style.left = (e.clientX + 16) + 'px';
+  panel.style.top  = (e.clientY - 10) + 'px';
+}
+function hideWireInspector() {
+  const panel = document.getElementById('wireInspector');
+  if (panel) panel.style.display = 'none';
+}
+function moveWireInspector(e) {
+  const panel = document.getElementById('wireInspector');
+  if (panel && panel.style.display !== 'none') {
+    panel.style.left = (e.clientX + 16) + 'px';
+    panel.style.top  = (e.clientY - 10) + 'px';
+  }
+}
+function copyWireInspector() {
+  const body = document.getElementById('wireInspectorBody');
+  if (body) navigator.clipboard.writeText(body.textContent || '').catch(() => {});
+}
+function syntaxHighlightJSON(val) {
+  let str;
+  try { str = JSON.stringify(typeof val === 'string' ? JSON.parse(val) : val, null, 2); }
+  catch { str = String(val == null ? '' : val); }
+  if (str.length > 2000) str = str.slice(0, 2000) + '\\n\u2026 (truncated)';
+  return str
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"([^"]+)":/g, '<span class="wi-key">"$1"</span>:')
+    .replace(/: "([^"]*)"/g, ': <span class="wi-str">"$1"</span>')
+    .replace(/: (-?\\d+\\.?\\d*)/g, ': <span class="wi-num">$1</span>')
+    .replace(/: (true|false)/g, ': <span class="wi-bool">$1</span>')
+    .replace(/: (null)/g, ': <span class="wi-null">$1</span>');
 }
 
 // ─── Minimap ──────────────────────────────────────────────────────────────
@@ -1444,6 +1649,25 @@ function showNodeProps(id) {
     hint.style.cssText = 'color:var(--muted);font-size:11px;line-height:1.5;padding:2px 0';
     hint.textContent = 'Each option becomes an output port. Connect them to the next node in your graph.';
     body.appendChild(hint);
+    // Feature 15: HITL form builder
+    const formEditorDiv = document.createElement('div');
+    formEditorDiv.id = 'hitlFormEditor';
+    formEditorDiv.style.cssText = 'margin-top:8px';
+    formEditorDiv.innerHTML = `<div style="font-size:10px;color:var(--muted);margin-bottom:4px">Form fields</div><div id="hitlFieldsList"></div><button class="btn" style="font-size:10px;margin-top:4px;padding:2px 8px" onclick="addHitlField()">+ Add field</button>`;
+    body.appendChild(formEditorDiv);
+    renderHitlFormEditor(n);
+  } else if (n.type === 'agent_tool') {
+    // Feature 17: Agent-as-Tool props
+    const atDiv = document.createElement('div');
+    atDiv.id = 'agentToolProps';
+    atDiv.innerHTML = `
+      <div class="field"><label style="font-size:10px">Tool name</label><input id="propToolName" type="text" value="${escAttr(n.tool_name||'')}" placeholder="search_agent" oninput="updateSelectedNode('tool_name',this.value)" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 7px;font:11px ui-monospace,monospace;outline:none"></div>
+      <div class="field"><label style="font-size:10px">Tool description</label><textarea id="propToolDesc" rows="2" placeholder="Describe what this tool does" oninput="updateSelectedNode('tool_description',this.value)" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 7px;font:11px ui-monospace,monospace;outline:none;resize:vertical">${escAttr(n.tool_description||'')}</textarea></div>
+      <div class="field"><label style="font-size:10px">Input parameter</label><input id="propToolInput" type="text" value="${escAttr(n.tool_input_param||'query')}" oninput="updateSelectedNode('tool_input_param',this.value)" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 7px;font:11px ui-monospace,monospace;outline:none"></div>
+      <div class="field"><label style="font-size:10px">Target agent node</label><select id="propToolTarget" onchange="updateSelectedNode('tool_target_node',this.value)" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 7px;font:11px ui-monospace,monospace"></select></div>
+    `;
+    body.appendChild(atDiv);
+    populateAgentToolTargets();
   }
 
   if (n.type !== 'start') {
@@ -1554,6 +1778,10 @@ document.addEventListener('keydown', e => {
     if (em && em.style.display !== 'none') { closeEmbed(); return; }
     const lt = document.getElementById('loadTraceModal');
     if (lt && lt.style.display !== 'none') { closeLoadTrace(); return; }
+    const rd = document.getElementById('replayDiffPanel');
+    if (rd && rd.style.display !== 'none') { closeReplayDiff(); return; }
+    const wf = document.getElementById('watchFileModal');
+    if (wf && wf.style.display !== 'none') { closeWatchFileModal(); return; }
     const cm = document.getElementById('ctxMenu');
     if (cm && cm.style.display !== 'none') { hideCtxMenu(); return; }
     const ov = document.getElementById('searchOverlay');
@@ -1994,6 +2222,22 @@ function genYaml() {
     if (e.label) L.push(`    condition: "${e.label}"`);
     if (e.port) L.push(`    port: ${e.port}`);
   }
+  // Feature 10: pinned ports
+  const pinnedKeys = Object.keys(pinnedPorts);
+  if (pinnedKeys.length) {
+    L.push('');
+    L.push('pinned_ports:');
+    pinnedKeys.forEach(k => {
+      const val = pinnedPorts[k];
+      L.push(`  ${k}: "${String(val).replace(/"/g, '\\"').slice(0, 80)}"`);
+    });
+  }
+  // Feature 15: form_fields in YAML for hitl nodes
+  for (const h of hitls) {
+    if (h.form_fields && h.form_fields.length) {
+      // already emitted above; just ensure form_fields key present in comment
+    }
+  }
   return L.join('\\n');
 }
 
@@ -2351,14 +2595,350 @@ function switchTestTab(tab) {
   testActiveTab = tab;
   document.getElementById('ttab-output').className = 'test-tab' + (tab === 'output' ? ' active' : '');
   document.getElementById('ttab-history').className = 'test-tab' + (tab === 'history' ? ' active' : '');
+  const aiTab = document.getElementById('ttab-ai');
+  if (aiTab) aiTab.className = 'test-tab' + (tab === 'ai' ? ' active' : '');
   document.getElementById('testOutput').style.display = tab === 'output' ? '' : 'none';
   document.getElementById('testHistory').style.display = tab === 'history' ? '' : 'none';
+  const copilotTab = document.getElementById('aiCopilotTab');
+  if (copilotTab) copilotTab.style.display = tab === 'ai' ? 'flex' : 'none';
+  document.getElementById('historyControls').style.display = tab === 'history' ? 'flex' : 'none';
+  document.getElementById('historySessionCost').style.display = tab === 'history' ? '' : 'none';
 }
 
 function appendTrace(html) {
   const out = document.getElementById('testOutput');
   out.insertAdjacentHTML('beforeend', html);
   out.scrollTop = out.scrollHeight;
+}
+
+// ─── Feature 09: Structured trace rows ────────────────────────────────────
+function addTraceRow(type, header, body, badge, nodeId) {
+  traceRows.push({ type, header, body, badge, node_id: nodeId || null, id: 'tr_' + Date.now() + '_' + Math.random().toString(36).slice(2) });
+  renderTraceRows();
+}
+function renderTraceRows() {
+  const el = document.getElementById('testOutput');
+  el.innerHTML = traceRows.map(row => `
+    <div class="trace-row trace-type-${row.type}" id="${row.id}">
+      <div class="trace-row-header" onclick="toggleTraceRow('${row.id}')">
+        <span>${row.header}</span>
+        ${row.badge ? `<span class="trace-badge">${row.badge}</span>` : ''}
+      </div>
+      ${row.body ? `<div class="trace-row-body"><pre style="margin:0;white-space:pre-wrap">${row.body}</pre></div>` : ''}
+    </div>
+  `).join('');
+  el.scrollTop = el.scrollHeight;
+}
+function toggleTraceRow(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('expanded');
+}
+function updateTraceRowBadge(key, badge) {
+  const row = [...traceRows].reverse().find(r => r.node_id === key || r.header.includes(key));
+  if (row) { row.badge = badge; renderTraceRows(); }
+}
+function updateTraceRowBody(key, body) {
+  const row = [...traceRows].reverse().find(r => r.header.includes(key));
+  if (row) { row.body = body; renderTraceRows(); }
+}
+
+// ─── Feature 10: Port pinning ─────────────────────────────────────────────
+function pinPort(nodeId, portKey, value) {
+  pinnedPorts[`${nodeId}::${portKey}`] = value;
+  render();
+}
+function unpinPort(nodeId, portKey) {
+  delete pinnedPorts[`${nodeId}::${portKey}`];
+  render();
+}
+function isPinned(nodeId, portKey) {
+  return `${nodeId}::${portKey}` in pinnedPorts;
+}
+
+// ─── Feature 11: Single-node replay diff ──────────────────────────────────
+function showReplayDiff(nodeId, before, after) {
+  const node = nodes.find(n => n.id === nodeId);
+  const name = node ? (node.label || node.name || nodeId) : nodeId;
+  const diff = computeLineDiff(before, after);
+  const titleEl = document.getElementById('replayDiffTitle');
+  const beforeEl = document.getElementById('replayDiffBefore');
+  const afterEl = document.getElementById('replayDiffAfter');
+  const panel = document.getElementById('replayDiffPanel');
+  if (titleEl) titleEl.textContent = `Diff: ${name}`;
+  if (beforeEl) beforeEl.innerHTML = diff.before;
+  if (afterEl) afterEl.innerHTML = diff.after;
+  if (panel) panel.style.display = 'flex';
+}
+function closeReplayDiff() {
+  const panel = document.getElementById('replayDiffPanel');
+  if (panel) panel.style.display = 'none';
+}
+function computeLineDiff(a, b) {
+  const aLines = (a || '').split('\\n');
+  const bLines = (b || '').split('\\n');
+  const beforeHtml = [], afterHtml = [];
+  const maxLen = Math.max(aLines.length, bLines.length);
+  for (let i = 0; i < maxLen; i++) {
+    const aLine = i < aLines.length ? escHtml(aLines[i]) : '';
+    const bLine = i < bLines.length ? escHtml(bLines[i]) : '';
+    if (aLine === bLine) {
+      beforeHtml.push(`<span>${aLine || '&nbsp;'}</span>`);
+      afterHtml.push(`<span>${bLine || '&nbsp;'}</span>`);
+    } else {
+      beforeHtml.push(`<span style="background:#7f1d1d40;color:#fca5a5">${aLine || '&nbsp;'}</span>`);
+      afterHtml.push(`<span style="background:#14532d40;color:#86efac">${bLine || '&nbsp;'}</span>`);
+    }
+  }
+  return { before: beforeHtml.join('\\n'), after: afterHtml.join('\\n') };
+}
+function escHtml(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function getNodeLastOutput(nodeId) {
+  for (let i = currentRunEvents.length - 1; i >= 0; i--) {
+    const ev = currentRunEvents[i];
+    if (ev.type === 'node_end' && ev.node_id === nodeId) return frozenOutputs[nodeId] || '';
+  }
+  return frozenOutputs[nodeId] || '';
+}
+
+// ─── Feature 12: Gantt critical path ──────────────────────────────────────
+function computeCriticalPath(bars, graphEdges) {
+  const ef = {};
+  bars.forEach(b => { ef[b.nodeId] = b.endMs; });
+  let maxEnd = 0, criticalEnd = null;
+  bars.forEach(b => { if (b.endMs > maxEnd) { maxEnd = b.endMs; criticalEnd = b.nodeId; } });
+  const criticalSet = new Set();
+  let cur = criticalEnd;
+  while (cur) {
+    criticalSet.add(cur);
+    const inEdges = graphEdges.filter(e => e.target === cur || e.to === cur);
+    const best = inEdges.reduce((acc, e) => {
+      const src = e.source || e.from;
+      return (ef[src] || 0) > (ef[acc ? (acc.source || acc.from) : ''] || 0) ? e : acc;
+    }, null);
+    const nextId = best ? (best.source || best.from) : null;
+    if (!nextId || nextId === cur) break;
+    cur = nextId;
+  }
+  return criticalSet;
+}
+
+// ─── Feature 13: Docked panel mode ────────────────────────────────────────
+function setTestPanelMode(mode) {
+  testPanelMode = mode;
+  const panel = document.getElementById('testPanel');
+  if (!panel) return;
+  if (mode === 'hidden') {
+    panel.style.display = 'none';
+  } else if (mode === 'overlay') {
+    panel.style.display = 'flex';
+    panel.style.position = 'fixed';
+    panel.style.right = '0';
+    panel.style.width = '400px';
+  } else if (mode === 'docked') {
+    panel.style.display = 'flex';
+    panel.style.position = 'relative';
+    panel.style.width = '320px';
+    panel.style.flexShrink = '0';
+  }
+}
+
+// ─── Feature 14: AI Copilot ───────────────────────────────────────────────
+async function sendAiCopilot() {
+  const inputEl = document.getElementById('aiCopilotInput');
+  if (!inputEl) return;
+  const msg = inputEl.value.trim();
+  if (!msg) return;
+  inputEl.value = '';
+  appendAiMessage('user', msg);
+  appendAiMessage('assistant', '&#x23F3; thinking...');
+  const apiKey = (document.getElementById('apiKeyInput') || {}).value || '';
+  let data = {};
+  try {
+    const resp = await fetch('/ai-refine', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ current_graph: {nodes, edges}, selected_node_id: sel, message: msg, history: aiCopilotHistory, api_key: apiKey })
+    });
+    data = await resp.json();
+  } catch(e) {
+    removeLastAiMessage();
+    appendAiMessage('assistant', 'Error: ' + e.message);
+    return;
+  }
+  removeLastAiMessage();
+  if (data.error) { appendAiMessage('assistant', 'Error: ' + data.error); return; }
+  if (data.patch) applyGraphPatch(data.patch);
+  appendAiMessage('assistant', data.explanation || '(no explanation)');
+  const followEl = document.getElementById('aiSuggestedFollowUp');
+  if (followEl && data.suggested_follow_up) followEl.textContent = '&#x1F4A1; ' + data.suggested_follow_up;
+  aiCopilotHistory.push({role:'user',content:msg});
+  aiCopilotHistory.push({role:'assistant',content:data.explanation||''});
+  if (aiCopilotHistory.length > 12) aiCopilotHistory = aiCopilotHistory.slice(-12);
+}
+function appendAiMessage(role, text) {
+  const hist = document.getElementById('aiCopilotHistory');
+  if (!hist) return;
+  const div = document.createElement('div');
+  div.style.cssText = `padding:6px 10px;border-radius:6px;font-size:11px;line-height:1.5;${role==='user'?'background:rgba(34,211,238,0.08);color:var(--cyan)':'background:var(--surface);color:var(--text)'}`;
+  div.setAttribute('data-ai-msg','1');
+  div.textContent = text;
+  hist.appendChild(div);
+  hist.scrollTop = hist.scrollHeight;
+}
+function removeLastAiMessage() {
+  const hist = document.getElementById('aiCopilotHistory');
+  if (!hist) return;
+  const msgs = hist.querySelectorAll('[data-ai-msg]');
+  if (msgs.length) msgs[msgs.length-1].remove();
+}
+function useFollowUp() {
+  const el = document.getElementById('aiSuggestedFollowUp');
+  const inp = document.getElementById('aiCopilotInput');
+  if (el && inp) { inp.value = el.textContent.replace(/^💡\\s*/,''); inp.focus(); }
+}
+function applyGraphPatch(patch) {
+  if (!patch) return;
+  if (patch.type === 'update_node') {
+    const node = nodes.find(n => n.id === patch.node_id);
+    if (node) Object.assign(node, patch.changes || {});
+  } else if (patch.type === 'add_node') {
+    nodes.push({id: 'node_' + Date.now(), ...(patch.changes || {})});
+  } else if (patch.type === 'remove_node') {
+    nodes = nodes.filter(n => n.id !== patch.node_id);
+    edges = edges.filter(e => (e.source||e.from) !== patch.node_id && (e.target||e.to) !== patch.node_id);
+  } else if (patch.type === 'add_edge') {
+    edges.push({id: 'e_' + Date.now(), ...(patch.changes || {})});
+  }
+  render();
+  snapshot();
+}
+
+// ─── Feature 15: HITL form builder ────────────────────────────────────────
+function addHitlField() {
+  if (!sel) return;
+  const node = nodes.find(n => n.id === sel);
+  if (!node) return;
+  const field = {id: 'f_' + Date.now(), type: 'text', label: '', placeholder: '', required: false};
+  node.form_fields = node.form_fields || [];
+  node.form_fields.push(field);
+  renderHitlFormEditor(node);
+}
+function removeHitlField(fieldId) {
+  if (!sel) return;
+  const node = nodes.find(n => n.id === sel);
+  if (!node) return;
+  node.form_fields = (node.form_fields || []).filter(f => f.id !== fieldId);
+  renderHitlFormEditor(node);
+}
+function renderHitlFormEditor(node) {
+  const list = document.getElementById('hitlFieldsList');
+  if (!list) return;
+  list.innerHTML = (node.form_fields || []).map(f => `
+    <div class="hitl-field-row" data-field-id="${f.id}" style="display:flex;gap:4px;margin-bottom:4px;align-items:center">
+      <select style="font-size:10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:3px" onchange="updateHitlField('${f.id}','type',this.value)">
+        <option${f.type==='text'?' selected':''}>text</option>
+        <option${f.type==='textarea'?' selected':''}>textarea</option>
+        <option${f.type==='number'?' selected':''}>number</option>
+        <option${f.type==='select'?' selected':''}>select</option>
+        <option${f.type==='checkbox'?' selected':''}>checkbox</option>
+      </select>
+      <input type="text" value="${escAttr(f.label)}" placeholder="Label" style="flex:1;font-size:10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:3px;padding:2px 5px" oninput="updateHitlField('${f.id}','label',this.value)">
+      <button style="font-size:10px;padding:1px 5px;border-radius:3px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer" onclick="removeHitlField('${f.id}')">&#10005;</button>
+    </div>
+  `).join('');
+}
+function updateHitlField(fieldId, key, value) {
+  if (!sel) return;
+  const node = nodes.find(n => n.id === sel);
+  if (!node) return;
+  const field = (node.form_fields || []).find(f => f.id === fieldId);
+  if (field) field[key] = value;
+}
+function escAttr(s) { return (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+// ─── Feature 16: Bidirectional file sync ──────────────────────────────────
+let _watchFileReader = null;
+function openWatchFile() {
+  const m = document.getElementById('watchFileModal');
+  if (m) m.style.display = 'flex';
+}
+function closeWatchFileModal() {
+  const m = document.getElementById('watchFileModal');
+  if (m) m.style.display = 'none';
+}
+function stopWatchFile() {
+  if (_watchFileReader) { try { _watchFileReader.cancel(); } catch(_){} _watchFileReader = null; }
+  const st = document.getElementById('watchFileStatus');
+  if (st) st.textContent = '&#x23F9; Stopped';
+}
+async function startWatchFile() {
+  const pathEl = document.getElementById('watchFilePath');
+  if (!pathEl || !pathEl.value.trim()) return;
+  const path = pathEl.value.trim();
+  const st = document.getElementById('watchFileStatus');
+  if (st) st.textContent = '&#x1F441; Watching\u2026';
+  closeWatchFileModal();
+  try {
+    const resp = await fetch('/watch-file', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({path})});
+    const reader = resp.body.getReader();
+    _watchFileReader = reader;
+    const decoder = new TextDecoder();
+    (function read() {
+      reader.read().then(({done, value}) => {
+        if (done) { if (st) st.textContent = '&#x23F9; Watch ended'; return; }
+        const text = decoder.decode(value);
+        for (const line of text.split('\\n')) {
+          if (line.startsWith('data:')) {
+            try {
+              const ev = JSON.parse(line.slice(5).trim());
+              if (ev.type === 'file_changed') {
+                const g = _parsePythonToGraph(ev.content);
+                if (g && g.nodes && g.nodes.length) {
+                  nodes = g.nodes; edges = g.edges || [];
+                  render();
+                  if (st) st.textContent = '&#x21BB; Synced ' + new Date().toLocaleTimeString();
+                }
+              }
+            } catch(_) {}
+          }
+        }
+        read();
+      });
+    })();
+  } catch(e) {
+    if (st) st.textContent = 'Error: ' + e.message;
+  }
+}
+function _parsePythonToGraph(src) {
+  const nodeRe = /graph\\.add_node\\(["']([^"']+)["']/g;
+  const edgeRe = /graph\\.add_edge\\(["']([^"']+)["']\\s*,\\s*["']([^"']+)["']/g;
+  const ns = [], es = [];
+  let m, i = 0;
+  while ((m = nodeRe.exec(src)) !== null) {
+    ns.push({id: m[1], label: m[1], type: 'agent', x: i * 180 + 60, y: 200});
+    i++;
+  }
+  while ((m = edgeRe.exec(src)) !== null) {
+    es.push({id: `e_${m[1]}_${m[2]}`, source: m[1], target: m[2], from: m[1], to: m[2]});
+  }
+  return {nodes: ns, edges: es};
+}
+
+// ─── Feature 17: Agent-as-Tool node ───────────────────────────────────────
+function populateAgentToolTargets() {
+  const sel2 = document.getElementById('propToolTarget');
+  if (!sel2) return;
+  sel2.innerHTML = nodes
+    .filter(n => n.type === 'agent' || n.type === 'subgraph')
+    .map(n => `<option value="${n.id}">${escAttr(n.label||n.name||n.id)}</option>`)
+    .join('');
+}
+function updateSelectedNode(key, value) {
+  if (!sel) return;
+  const node = nodes.find(n => n.id === sel);
+  if (node) { node[key] = value; render(); }
 }
 
 async function runTest() {
@@ -2376,7 +2956,9 @@ async function runTest() {
   switchTestTab('output');
 
   currentRunEvents = [];
+  traceRows = [];
   evalResults = {};
+  activeReplayNodeId = null;
   const runStart = Date.now();
 
   if (mock) {
@@ -2537,6 +3119,7 @@ function handleTraceEvent(ev) {
   } else if (ev.type === 'node_end') {
     const cost = ev.cost > 0 ? `$${ev.cost.toFixed(5)}` : '$0.00';
     appendTrace(`<div class="trace-node-end">  \u2713 ${ev.tokens || 0} tokens \xb7 ${cost}</div>`);
+    for (const e of edges) { if (e.from === ev.node_id) edgeLastOutput[e.id] = frozenOutputs[ev.node_id] || ''; }
   } else if (ev.type === 'error') {
     appendTrace(`<div class="trace-error">  \u2717 ${ev.message}</div>`);
   } else if (ev.type === 'eval_result') {
@@ -2557,6 +3140,12 @@ function handleTraceEvent(ev) {
   } else if (ev.type === 'run_end') {
     const cost = ev.total_cost > 0 ? ` \xb7 $${ev.total_cost.toFixed(5)}` : '';
     appendTrace(`<div class="trace-run-end">\u2705 Run complete \u2014 ${ev.total_tokens || 0} tokens${cost}</div>`);
+    if (activeReplayNodeId) {
+      const before = replayBaseline[activeReplayNodeId] || '';
+      const after = getNodeLastOutput(activeReplayNodeId) || '';
+      if (before !== after && (before || after)) showReplayDiff(activeReplayNodeId, before, after);
+      activeReplayNodeId = null;
+    }
   }
 }
 
@@ -2564,7 +3153,7 @@ function refreshHistory() {
   document.getElementById('ttab-history').textContent = `History (${runHistory.length})`;
   const el = document.getElementById('testHistory');
   el.innerHTML = runHistory.map((r, i) => `
-    <div class="history-item" onclick="replayHistory(${i})">
+    <div class="run-item history-item" data-input="${(r.input || '').replace(/"/g, '&quot;')}" onclick="replayHistory(${i})">
       <div style="display:flex;justify-content:space-between">
         <span style="color:${r.mock ? '#f59e0b' : 'var(--green)'}; font-size:10px">${r.mock ? '[mock]' : '[live]'} \xb7 ${r.elapsed}s</span>
         <span class="history-time">${r.time}</span>
@@ -2572,6 +3161,40 @@ function refreshHistory() {
       <div class="history-preview">${r.input}</div>
     </div>
   `).join('');
+  let totalTokens = 0, totalCost = 0;
+  for (const r of runHistory) {
+    for (const ev of (r.events || [])) {
+      if (ev.type === 'run_end') { totalTokens += ev.total_tokens || 0; totalCost += ev.total_cost || 0; }
+    }
+  }
+  const costEl = document.getElementById('historySessionCost');
+  if (totalTokens > 0) {
+    const costStr = totalCost > 0 ? ` \xb7 $${totalCost.toFixed(5)}` : '';
+    costEl.textContent = `Session: ${totalTokens} tokens${costStr}`;
+  } else {
+    costEl.textContent = '';
+  }
+}
+
+function filterHistory() {
+  const q = document.getElementById('historySearch').value.toLowerCase();
+  document.querySelectorAll('#testHistory .run-item').forEach(el => {
+    const text = (el.getAttribute('data-input') || '').toLowerCase();
+    el.style.display = (!q || text.includes(q)) ? '' : 'none';
+  });
+}
+function exportHistory() {
+  if (!runHistory.length) return;
+  const jsonl = runHistory.map(r => JSON.stringify({
+    time: r.time, input: r.input, elapsed: r.elapsed, mock: r.mock, events: r.events,
+  })).join('\\n');
+  const blob = new Blob([jsonl], {type: 'application/x-ndjson'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'selectools-runs-' + new Date().toISOString().slice(0, 10) + '.jsonl';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 function replayHistory(idx) {
@@ -2780,6 +3403,43 @@ function renderGantt() {
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
   svg.setAttribute('height', H);
   svg.innerHTML = html;
+
+  // Feature 12: critical path + dependency arrows
+  const ganttBars = rows.map((r, i) => ({
+    nodeId: r.id, startMs: r.start, endMs: r.end, y: i * ROW_H
+  }));
+  const criticalSet = computeCriticalPath(ganttBars, edges);
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  defs.innerHTML = `
+    <marker id="ganttArrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#475569"/>
+    </marker>
+    <marker id="ganttArrowCrit" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#f59e0b"/>
+    </marker>`;
+  svg.appendChild(defs);
+  edges.forEach(edge => {
+    const srcId = edge.source || edge.from;
+    const tgtId = edge.target || edge.to;
+    const srcBar = ganttBars.find(b => b.nodeId === srcId);
+    const tgtBar = ganttBars.find(b => b.nodeId === tgtId);
+    if (!srcBar || !tgtBar) return;
+    const BAR_H = ROW_H;
+    const toX = ms => LABEL_W + (ms / totalMs) * BAR_W;
+    const x1 = toX(srcBar.endMs), y1 = srcBar.y + BAR_H / 2;
+    const x2 = toX(tgtBar.startMs), y2 = tgtBar.y + BAR_H / 2;
+    const mid = (x1 + x2) / 2;
+    const onCrit = criticalSet.has(srcId) && criticalSet.has(tgtId);
+    const color = onCrit ? '#f59e0b' : '#475569';
+    const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    arrow.setAttribute('d', `M${x1},${y1} C${mid},${y1} ${mid},${y2} ${x2},${y2}`);
+    arrow.setAttribute('stroke', color);
+    arrow.setAttribute('stroke-width', onCrit ? '2' : '1');
+    arrow.setAttribute('fill', 'none');
+    arrow.setAttribute('stroke-dasharray', onCrit ? '' : '3 2');
+    arrow.setAttribute('marker-end', `url(#ganttArrow${onCrit ? 'Crit' : ''})`);
+    svg.appendChild(arrow);
+  });
 }
 
 // ─── Load Production Trace ────────────────────────────────────────────────
@@ -2947,15 +3607,29 @@ function hideCtxMenu() {
   if (menu) menu.style.display = 'none';
   ctxNodeId = null;
 }
+function ctxPinOutput() {
+  hideCtxMenu();
+  if (!ctxNodeId) return;
+  const val = frozenOutputs[ctxNodeId] || edgeLastOutput[ctxNodeId + '::output'] || null;
+  if (val !== null && val !== undefined) {
+    pinPort(ctxNodeId, 'output', val);
+  } else {
+    // show a toast-style status note
+    document.getElementById('testStatus').textContent = '\u26a0 Run the graph first to capture an output to pin';
+  }
+}
 
 async function rerunNodeAlone(nodeId) {
   hideCtxMenu();
   const n = nodes.find(x => x.id === nodeId);
   if (!n || n.type !== 'agent') return;
+  replayBaseline[nodeId] = getNodeLastOutput(nodeId);
+  activeReplayNodeId = nodeId;
   const input = frozenOutputs[nodeId] || document.getElementById('testInput')?.value || 'test input';
   openTestPanel();
   switchTestTab('output');
   document.getElementById('testOutput').innerHTML = '';
+  traceRows = [];
   document.getElementById('testStatus').textContent = `\u21ba Re-running ${n.name}\u2026`;
   appendTrace(`<div class="trace-node-start">\u21ba Re-run in isolation: ${n.name}</div>`);
   appendTrace(`<div class="trace-chunk" style="color:var(--muted)">Input: ${input.slice(0, 80)}</div>`);
@@ -2976,13 +3650,28 @@ document.addEventListener('mousedown', ev => {
 function openEmbed() {
   const modal = document.getElementById('embedModal');
   if (!modal) return;
+  modal.style.display = 'flex';
+  updateEmbedCode();
+  updateEmbedPreview();
+}
+function updateEmbedCode() {
   const code = document.getElementById('embedCode');
+  if (!code) return;
   const yaml = genYaml();
   const encoded = btoa(unescape(encodeURIComponent(yaml)));
   const origin = window.location.origin || 'http://localhost:8000';
-  const src = `${origin}/builder?embed=1&graph=${encoded}`;
-  if (code) code.textContent = `<!-- selectools agent embed -->\n<iframe\n  src="${src}"\n  width="100%" height="520"\n  style="border:none;border-radius:8px;box-shadow:0 2px 16px rgba(0,0,0,0.3)"\n  allow="clipboard-write">\n</iframe>\n\n<!-- Self-host: selectools serve --builder --port 8000 -->`;
-  modal.style.display = 'flex';
+  const accent = encodeURIComponent((document.getElementById('embedAccent') || {value: '#22d3ee'}).value);
+  const pos = (document.getElementById('embedPosition') || {value: 'bottom-right'}).value;
+  const welcome = encodeURIComponent((document.getElementById('embedWelcome') || {value: ''}).value);
+  const src = `${origin}/builder?embed=1&graph=${encoded}&accent=${accent}&pos=${pos}&welcome=${welcome}`;
+  const posStyle = pos === 'inline'
+    ? 'width:100%;height:520px;'
+    : `position:fixed;${pos === 'bottom-left' ? 'left:20px' : 'right:20px'};bottom:20px;width:380px;height:520px;`;
+  code.textContent = `<!-- selectools agent embed -->\n<iframe\n  src="${src}"\n  style="border:none;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.35);${posStyle}"\n  allow="clipboard-write">\n</iframe>\n\n<!-- Self-host: selectools serve --builder --port 8000 -->`;
+}
+function updateEmbedPreview() {
+  const preview = document.getElementById('embedPreviewWidget');
+  if (preview) preview.style.background = (document.getElementById('embedAccent') || {value: '#22d3ee'}).value;
 }
 
 function closeEmbed() {
@@ -3031,6 +3720,15 @@ function rerunFromEvent(idx) {
   const params = new URLSearchParams(window.location.search);
   if (params.get('embed') !== '1') return;
   document.body.classList.add('embed-mode');
+  const accent = params.get('accent');
+  if (accent) document.documentElement.style.setProperty('--cyan', decodeURIComponent(accent));
+  const welcome = params.get('welcome');
+  if (welcome) {
+    const wEl = document.createElement('div');
+    wEl.style.cssText = 'padding:10px 14px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border)';
+    wEl.textContent = decodeURIComponent(welcome);
+    document.body.prepend(wEl);
+  }
   const graphB64 = params.get('graph');
   if (graphB64) {
     try {
@@ -3046,6 +3744,23 @@ function rerunFromEvent(idx) {
   }
   openTestPanel();
 })();
+
+// ─── Feature 20: Provider health polling ─────────────────────────────────
+async function refreshProviderHealth() {
+  try {
+    const resp = await fetch('/provider-health');
+    if (!resp.ok) return;
+    const health = await resp.json();
+    const bar = document.getElementById('providerHealthBar');
+    if (!bar) return;
+    bar.innerHTML = Object.entries(health).map(([name, h]) => {
+      const color = h.status === 'ok' ? '#22c55e' : h.status === 'error' ? '#f87171' : '#94a3b8';
+      const tip = h.status === 'ok' ? `${name}: ${h.latency_ms}ms` : `${name}: ${h.error || 'checking...'}`;
+      return `<span title="${tip}" style="width:7px;height:7px;border-radius:50%;background:${color};display:inline-block"></span>`;
+    }).join('');
+  } catch(_) {}
+}
+setInterval(refreshProviderHealth, 30000);
 
 // ─── Init ─────────────────────────────────────────────────────────────────
 if (!document.body.classList.contains('embed-mode')) loadExample();
@@ -3067,19 +3782,48 @@ if (!document.body.classList.contains('embed-mode')) loadExample();
 <!-- Wire-Hover Tooltip -->
 <div id="wireTooltip" class="wire-tooltip" style="display:none"></div>
 
+<!-- Wire Inspector Panel -->
+<div id="wireInspector" class="wire-inspector" style="display:none">
+  <div style="display:flex;align-items:center;color:var(--cyan);font-size:10px;font-weight:700">
+    <span id="wireInspectorLabel">\u25ba Wire Output</span>
+    <button class="wire-copy-btn" onclick="copyWireInspector()">Copy</button>
+  </div>
+  <pre id="wireInspectorBody"></pre>
+</div>
+
 <!-- Right-Click Context Menu -->
 <div id="ctxMenu" style="display:none;position:fixed;z-index:600;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px 0;min-width:170px;box-shadow:0 4px 20px rgba(0,0,0,0.5)">
   <div id="ctxRerun" class="ctx-item" onclick="rerunNodeAlone(ctxNodeId)">&#8635; Re-run in isolation</div>
+  <div class="ctx-item" onclick="ctxPinOutput()">&#x1F4CC; Pin last output</div>
   <div class="ctx-sep"></div>
   <div class="ctx-item" onclick="hideCtxMenu()">&#10005; Close</div>
 </div>
 
 <!-- Embed Modal -->
 <div id="embedModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:300;align-items:center;justify-content:center">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:24px;width:560px;max-height:80vh;display:flex;flex-direction:column;gap:12px">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:24px;width:580px;max-height:80vh;display:flex;flex-direction:column;gap:12px">
     <div style="font-weight:700;font-size:14px;color:var(--cyan)">&#128279; Embed This Workflow</div>
     <div style="color:var(--muted);font-size:12px">Embeds the workflow as a live interactive chat widget. The iframe loads <code style="color:var(--cyan)">?embed=1</code> mode — full chat panel, no editor chrome. Visitors can run the agent directly.</div>
-    <pre id="embedCode" style="flex:1;min-height:160px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:ui-monospace,monospace;font-size:11px;padding:12px;overflow-x:auto;white-space:pre-wrap;margin:0"></pre>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center">
+      <label style="font-size:11px;color:var(--muted)">Accent color
+        <input type="color" id="embedAccent" value="#22d3ee" oninput="updateEmbedCode();updateEmbedPreview()"
+               style="margin-left:6px;border:none;background:none;cursor:pointer;width:36px;height:22px;vertical-align:middle">
+      </label>
+      <label style="font-size:11px;color:var(--muted)">Position
+        <select id="embedPosition" oninput="updateEmbedCode()"
+                style="margin-left:6px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:11px">
+          <option value="bottom-right">Bottom-right</option>
+          <option value="bottom-left">Bottom-left</option>
+          <option value="inline">Inline</option>
+        </select>
+      </label>
+      <label style="font-size:11px;color:var(--muted);grid-column:1/-1">Welcome message
+        <input id="embedWelcome" type="text" placeholder="Hi! How can I help?" oninput="updateEmbedCode()"
+               style="margin-left:6px;flex:1;width:calc(100% - 130px);background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:3px 7px;font-size:11px;outline:none">
+      </label>
+    </div>
+    <div id="embedPreviewWidget" title="Live accent preview" style="width:40px;height:40px;border-radius:50%;background:#22d3ee;align-self:flex-start;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.4)"></div>
+    <pre id="embedCode" style="flex:1;min-height:140px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:ui-monospace,monospace;font-size:11px;padding:12px;overflow-x:auto;white-space:pre-wrap;margin:0"></pre>
     <div style="color:var(--muted);font-size:11px">&#9432; Self-host: <code>selectools serve --builder --port 8000</code> — then paste this code in any web page.</div>
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button class="btn" onclick="closeEmbed()">Cancel</button>
@@ -3098,6 +3842,41 @@ if (!document.body.classList.contains('embed-mode')) loadExample();
       <button class="btn" onclick="closeLoadTrace()">Cancel</button>
       <button class="btn btn-primary" onclick="doLoadTrace()">Load into Scrubber</button>
     </div>
+  </div>
+</div>
+
+<!-- Feature 11: Replay Diff Panel -->
+<div id="replayDiffPanel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:300;align-items:center;justify-content:center">
+  <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px;max-width:720px;width:95%;max-height:80vh;display:flex;flex-direction:column">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span id="replayDiffTitle" style="font-size:13px;font-weight:600;color:var(--cyan)">Diff</span>
+      <button class="btn" onclick="closeReplayDiff()">&#10005; Close</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;overflow:auto;flex:1">
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Before</div>
+        <pre id="replayDiffBefore" style="margin:0;font-size:11px;white-space:pre-wrap;line-height:1.5"></pre>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">After</div>
+        <pre id="replayDiffAfter" style="margin:0;font-size:11px;white-space:pre-wrap;line-height:1.5"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Feature 16: Watch File Modal -->
+<div id="watchFileModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:300;align-items:center;justify-content:center">
+  <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:20px;max-width:480px;width:90%">
+    <h3 style="margin:0 0 12px;font-size:14px;color:var(--cyan)">&#x1F4C2; Watch Python File</h3>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Paste an absolute path to a selectools agent .py file. Canvas updates on every save.</div>
+    <input id="watchFilePath" type="text" placeholder="/home/user/myagent.py" style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:6px 10px;font:11px ui-monospace,monospace;outline:none">
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button class="btn btn-primary" onclick="startWatchFile()">Start Watching</button>
+      <button class="btn" onclick="stopWatchFile()">Stop</button>
+      <button class="btn" onclick="closeWatchFileModal()">Cancel</button>
+    </div>
+    <div id="watchFileStatus" style="font-size:10px;color:var(--muted);margin-top:6px"></div>
   </div>
 </div>
 </body>
