@@ -143,6 +143,9 @@ testpaths = ["tests"]
 pythonpath = ["src", "."]
 asyncio_mode = "strict"
 addopts = "-v"
+filterwarnings = [
+    "ignore:urllib3 v2 only supports OpenSSL",
+]
 python_files = ["test_*.py", "sim_*.py"]
 markers = [
     "e2e: mark test as end-to-end (requires real API keys, use --run-e2e to run)",
