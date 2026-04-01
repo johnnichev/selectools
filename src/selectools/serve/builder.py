@@ -1762,6 +1762,48 @@ function addModelField(parent, n) {
   rebuildModelOptions(n);
   search.addEventListener('input', () => rebuildModelOptions(n));
   selEl.addEventListener('change', () => { n.model = selEl.value; render(); });
+  // Benchmark button
+  const bmRow = document.createElement('div');
+  bmRow.style.cssText = 'display:flex;gap:6px;align-items:center;margin-top:4px';
+  const bmBtn = document.createElement('button');
+  bmBtn.className = 'btn'; bmBtn.textContent = '🧪 Benchmark';
+  bmBtn.title = 'Run eval cases against candidate models and pick cheapest that passes threshold';
+  bmBtn.onclick = () => benchmarkModel(n);
+  bmRow.appendChild(bmBtn);
+  const bmRes = document.createElement('span');
+  bmRes.id = 'evalRouteResult';
+  bmRes.style.cssText = 'font-size:10px;color:#94a3b8;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+  bmRow.appendChild(bmRes);
+  div.appendChild(bmRow);
+}
+
+async function benchmarkModel(n) {
+  const res = document.getElementById('evalRouteResult');
+  if (res) { res.textContent = 'Benchmarking\u2026'; res.style.color = '#f59e0b'; }
+  const cases = (n.eval_cases || []);
+  const apiKey = document.getElementById('apiKeyInput') ? document.getElementById('apiKeyInput').value : '';
+  try {
+    const resp = await fetch('/eval-route', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        prompt: document.getElementById('testInput') ? document.getElementById('testInput').value : '',
+        system_prompt: n.system_prompt || '',
+        eval_cases: cases,
+        threshold: 0.7,
+        api_key: apiKey
+      })
+    });
+    const data = await resp.json();
+    if (data.model) {
+      n.model = data.model;
+      rebuildModelOptions(n);
+      const method = data.method === 'eval-validated' ? '\u2705 eval' : data.method === 'heuristic' ? '🧠 heuristic' : '\u26A0\uFE0F best-avail';
+      const scoreStr = Object.entries(data.scores || {}).map(([m,s]) => m.split('/').pop() + ':' + (s*100).toFixed(0) + '%').join(' ');
+      if (res) { res.textContent = method + ' \u2192 ' + data.model + (scoreStr ? ' | ' + scoreStr : ''); res.style.color = '#22d3ee'; }
+    }
+  } catch(e) {
+    if (res) { res.textContent = 'Error: ' + e.message; res.style.color = '#f87171'; }
+  }
 }
 
 // ─── Keyboard ────────────────────────────────────────────────────────────

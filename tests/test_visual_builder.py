@@ -2776,7 +2776,7 @@ class TestBuilderSmartRouting:
         """_estimate_run_cost() returns total_tokens and total_cost_usd."""
         from selectools.serve.app import _estimate_run_cost
 
-        result = _estimate_run_cost([], [], "hello")
+        result = _estimate_run_cost([], "hello")
         assert "total_tokens" in result
         assert "total_cost_usd" in result
 
@@ -2792,3 +2792,83 @@ class TestBuilderSmartRouting:
         # smart routing exists and works
         assert _smart_route is not None
         assert "simple" in CAPABILITY_TIERS
+
+
+# ─── Feature 20 (gap close): Eval-validated routing ──────────────────────────
+
+
+class TestBuilderEvalRoute:
+    """Eval-validated smart routing — closes the ⭐ gap for Feature 20."""
+
+    def test_make_provider_function(self):
+        """_make_provider() is defined and callable."""
+        from selectools.serve.app import _make_provider
+
+        assert callable(_make_provider)
+
+    def test_run_eval_sample_function(self):
+        """_run_eval_sample() is defined and callable."""
+        from selectools.serve.app import _run_eval_sample
+
+        assert callable(_run_eval_sample)
+
+    def test_eval_route_function(self):
+        """_eval_route() is defined and callable."""
+        from selectools.serve.app import _eval_route
+
+        assert callable(_eval_route)
+
+    def test_eval_route_no_cases_falls_back_to_heuristic(self):
+        """_eval_route() with no eval_cases returns heuristic method."""
+        from selectools.serve.app import _eval_route
+
+        result = _eval_route("summarize this", "", [], api_key="")
+        assert result["method"] == "heuristic"
+        assert isinstance(result["model"], str)
+        assert result["model"]
+
+    def test_eval_route_no_api_key_falls_back_to_heuristic(self):
+        """_eval_route() with no api_key returns heuristic method."""
+        from selectools.serve.app import _eval_route
+
+        cases = [{"input": "hello", "expect_contains": "hi"}]
+        result = _eval_route("hello", "", cases, api_key="")
+        assert result["method"] == "heuristic"
+
+    def test_eval_route_result_structure(self):
+        """_eval_route() result always has model, scores, method keys."""
+        from selectools.serve.app import _eval_route
+
+        result = _eval_route("test", "", [])
+        assert "model" in result
+        assert "scores" in result
+        assert "method" in result
+
+    def test_eval_route_endpoint_exists(self):
+        """/eval-route POST endpoint is in app.py."""
+        import inspect
+
+        from selectools.serve import app as _app
+
+        src = inspect.getsource(_app)
+        assert "/eval-route" in src
+
+    def test_benchmark_button_present(self):
+        """Benchmark button is in builder HTML."""
+        assert "benchmarkModel" in BUILDER_HTML or "Benchmark" in BUILDER_HTML
+
+    def test_eval_route_result_element(self):
+        """evalRouteResult element is in builder HTML."""
+        assert "evalRouteResult" in BUILDER_HTML
+
+    def test_benchmark_model_function(self):
+        """benchmarkModel() JS function is defined."""
+        assert "function benchmarkModel(" in BUILDER_HTML
+
+    def test_eval_route_calls_smart_route_fallback(self):
+        """_eval_route() without cases delegates to _smart_route."""
+        from selectools.serve.app import _eval_route, _smart_route
+
+        heuristic = _smart_route("hello world", "", None, None)
+        result = _eval_route("hello world", "", [], api_key="")
+        assert result["model"] == heuristic

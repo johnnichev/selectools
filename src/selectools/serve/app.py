@@ -1179,6 +1179,129 @@ def _smart_route(
     return available[0] if available else candidates[0]
 
 
+def _make_provider(model_id: str, api_key: str) -> Any:
+    """Instantiate the correct provider for model_id."""
+    if "claude" in model_id:
+        from ..providers.anthropic_provider import AnthropicProvider
+
+        return AnthropicProvider(api_key=api_key)
+    if "gemini" in model_id:
+        from ..providers.gemini_provider import GeminiProvider
+
+        return GeminiProvider(api_key=api_key)
+    if "llama" in model_id or "mistral" in model_id:
+        from ..providers.ollama_provider import OllamaProvider
+
+        return OllamaProvider()
+    from ..providers.openai_provider import OpenAIProvider
+
+    return OpenAIProvider(api_key=api_key)
+
+
+def _run_eval_sample(
+    model_id: str,
+    system_prompt: str,
+    cases: List[Dict[str, Any]],
+    api_key: str,
+) -> float:
+    """Run up to 3 eval cases against model_id; return accuracy [0.0, 1.0]."""
+    from ..types import Message, Role
+
+    sample = cases[:3]
+    if not sample:
+        return 1.0
+    passed = 0
+    for case in sample:
+        inp = str(case.get("input", ""))
+        expected = str(case.get("expected_output") or case.get("expect_contains") or "")
+        try:
+            provider = _make_provider(model_id, api_key)
+            msgs = [Message(role=Role.USER, content=inp)]
+            resp, _ = provider.complete(
+                messages=msgs, model=model_id, system_prompt=system_prompt, max_tokens=200
+            )
+            output = (resp.content or "").strip().lower()
+            if not expected or expected.lower() in output:
+                passed += 1
+        except Exception:
+            pass
+    return round(passed / len(sample), 2)
+
+
+def _eval_route(
+    prompt: str,
+    system_prompt: str,
+    eval_cases: List[Dict[str, Any]],
+    threshold: float = 0.7,
+    budget_usd: Optional[float] = None,
+    api_key: str = "",
+) -> Dict[str, Any]:
+    """Return cheapest model in tier that passes eval_cases at threshold.
+
+    Evaluates candidates cheapest-first (satisficing) to minimise latency.
+    Falls back to heuristic _smart_route if no API key or no eval cases.
+    """
+    if not eval_cases or not api_key:
+        return {
+            "model": _smart_route(prompt, system_prompt, None, budget_usd),
+            "scores": {},
+            "method": "heuristic",
+        }
+    tier = _estimate_task_tier(prompt, system_prompt)
+    candidates = list(CAPABILITY_TIERS.get(tier, CAPABILITY_TIERS["standard"]))
+    healthy = {name for name, h in _provider_health.items() if h["status"] == "ok"}
+
+    def _prov(mid: str) -> str:
+        if "claude" in mid:
+            return "anthropic"
+        if "gemini" in mid:
+            return "gemini"
+        if "llama" in mid or "mistral" in mid:
+            return "ollama"
+        return "openai"
+
+    def _cost(mid: str) -> float:
+        try:
+            from ..models import ALL_MODELS
+
+            m = next((x for x in ALL_MODELS if x.id == mid), None)
+            if m:
+                return (m.prompt_cost or 0.0) + (m.completion_cost or 0.0)
+        except Exception:
+            pass
+        return 0.0
+
+    available = [m for m in candidates if _prov(m) in healthy] if healthy else list(candidates)
+    available.sort(key=_cost)
+    scores: Dict[str, float] = {}
+    for model_id in available:
+        if budget_usd is not None:
+            if _cost(model_id) * (len(prompt.split()) * 1.3 + 200) / 1000 > budget_usd:
+                continue
+        score = _run_eval_sample(model_id, system_prompt, eval_cases, api_key)
+        scores[model_id] = score
+        if score >= threshold:
+            return {
+                "model": model_id,
+                "scores": scores,
+                "method": "eval-validated",
+                "threshold": threshold,
+                "tier": tier,
+            }
+    best = (
+        max(scores, key=lambda m: scores[m])
+        if scores
+        else (available[0] if available else candidates[0])
+    )
+    return {
+        "model": best,
+        "scores": scores,
+        "method": "best-available",
+        "threshold": threshold,
+        "tier": tier,
+    }
+
+
 def _estimate_run_cost(nodes_data: List[Dict[str, Any]], input_text: str) -> Dict[str, Any]:
     """Estimate total tokens and cost for a graph run."""
     total_tokens = 0
@@ -1422,6 +1545,19 @@ class BuilderServer:
                     avail = body.get("available_providers") or None
                     budget = body.get("budget_usd") or None
                     self._json({"model": _smart_route(prompt_t, sys_t, avail, budget)})
+                    return
+
+                if path == "/eval-route":
+                    self._json(
+                        _eval_route(
+                            prompt=body.get("prompt", ""),
+                            system_prompt=body.get("system_prompt", ""),
+                            eval_cases=body.get("eval_cases", []),
+                            threshold=float(body.get("threshold", 0.7)),
+                            budget_usd=body.get("budget_usd") or None,
+                            api_key=body.get("api_key", ""),
+                        )
+                    )
                     return
 
                 if path == "/watch-file":
