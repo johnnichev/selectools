@@ -481,4 +481,32 @@ function toggleDetail(id) {{
 </html>"""
 
 
-__all__ = ["TraceStep", "AgentTrace", "StepType", "trace_to_html"]
+def trace_to_json(trace: "AgentTrace") -> str:
+    """Serialize an AgentTrace to a JSON string for loading into the visual builder.
+
+    Paste the output into the builder's "📥 Trace" panel to replay a real
+    production run in the scrubber and Gantt timeline::
+
+        from selectools import trace_to_json
+        print(trace_to_json(result.trace))  # copy and paste into builder
+
+    Args:
+        trace: The ``AgentTrace`` to serialize.
+
+    Returns:
+        A JSON string that the visual builder can consume.
+    """
+    import dataclasses
+    import json
+
+    def _default(obj: Any) -> Any:
+        if hasattr(obj, "value"):  # enum → string value
+            return obj.value
+        if dataclasses.is_dataclass(obj):
+            return dataclasses.asdict(obj)  # type: ignore[call-overload]
+        return str(obj)
+
+    return json.dumps(dataclasses.asdict(trace), default=_default)  # type: ignore[arg-type]
+
+
+__all__ = ["TraceStep", "AgentTrace", "StepType", "trace_to_html", "trace_to_json"]

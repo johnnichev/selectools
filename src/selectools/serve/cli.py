@@ -38,6 +38,15 @@ def main() -> None:
     serve_parser.add_argument(
         "--builder", action="store_true", help="Enable visual agent builder UI at /builder"
     )
+    serve_parser.add_argument(
+        "--auth-token",
+        default=None,
+        dest="auth_token",
+        help=(
+            "Protect the builder/playground with a token. "
+            "Also reads BUILDER_AUTH_TOKEN env var or ~/.selectools/auth_token file."
+        ),
+    )
 
     # doctor
     subparsers.add_parser("doctor", help="Diagnose API keys, deps, and config")
@@ -55,10 +64,11 @@ def main() -> None:
 def _cmd_serve(args: argparse.Namespace) -> None:
     """Start the agent server."""
     from ..templates import from_yaml, list_templates, load_template
-    from .app import create_app
+    from .app import _resolve_auth_token, create_app
 
     config_path = args.config
     enable_builder = getattr(args, "builder", False)
+    auth_token = _resolve_auth_token(getattr(args, "auth_token", None))
 
     # Builder-only mode: no agent config required
     if config_path is None:
@@ -69,7 +79,7 @@ def _cmd_serve(args: argparse.Namespace) -> None:
             sys.exit(1)
         from .app import BuilderServer
 
-        srv = BuilderServer(host=args.host, port=args.port)
+        srv = BuilderServer(host=args.host, port=args.port, auth_token=auth_token)
         srv.serve()
         return
     elif config_path in list_templates():
@@ -95,6 +105,7 @@ def _cmd_serve(args: argparse.Namespace) -> None:
         builder=enable_builder,
         host=args.host,
         port=args.port,
+        auth_token=auth_token,
     )
     app.serve()
 
