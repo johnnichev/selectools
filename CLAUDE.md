@@ -103,7 +103,7 @@ src/selectools/
 │   └── supervisor.py        # SupervisorAgent with 4 strategies
 ├── pipeline.py              # Pipeline, Step, StepResult, @step, parallel(), branch() — composable pipelines (v0.18.0)
 
-tests/                       # 3135 tests (unit, integration, regression, E2E)
+tests/                       # 3344 tests (unit, integration, regression, E2E)
 ├── agent/                   # Agent core tests
 ├── providers/               # Provider-specific tests
 ├── rag/                     # RAG pipeline tests
