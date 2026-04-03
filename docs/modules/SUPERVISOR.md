@@ -7,6 +7,51 @@ tags:
 
 # SupervisorAgent Module
 
+**Import:** `from selectools.orchestration import SupervisorAgent`
+
+**Stability:** beta
+
+```python title="supervisor_quickstart.py"
+from selectools import Agent, AgentConfig, SupervisorAgent, tool
+from selectools.providers.stubs import LocalProvider
+
+@tool(description="No-op tool")
+def noop(x: str) -> str:
+    return x
+
+provider = LocalProvider()
+
+researcher = Agent(
+    tools=[noop],
+    provider=provider,
+    config=AgentConfig(max_iterations=1),
+    system_prompt="You are a researcher.",
+)
+writer = Agent(
+    tools=[noop],
+    provider=provider,
+    config=AgentConfig(max_iterations=1),
+    system_prompt="You are a writer.",
+)
+
+supervisor = SupervisorAgent(
+    agents={"researcher": researcher, "writer": writer},
+    provider=provider,
+    strategy="round_robin",
+    max_rounds=2,
+)
+
+result = supervisor.run("Write a short blog post about AI safety")
+print(result.content[:200])
+print(f"Steps: {result.steps}")
+```
+
+!!! tip "See Also"
+    - [Orchestration](ORCHESTRATION.md) - Low-level AgentGraph engine
+    - [Patterns](PATTERNS.md) - PlanAndExecute, Reflective, Debate, TeamLead patterns
+
+---
+
 **Added in:** v0.18.0
 **File:** `src/selectools/orchestration/supervisor.py`
 **Classes:** `SupervisorAgent`, `SupervisorStrategy`, `ModelSplit`
@@ -531,3 +576,11 @@ See [examples/60_supervisor_agent.py](https://github.com/johnnichev/selectools/b
 ---
 
 **Next Steps:** Learn about building custom graphs in the [AgentGraph Module](ORCHESTRATION.md).
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 60 | [`60_supervisor_agent.py`](https://github.com/johnnichev/selectools/blob/main/examples/60_supervisor_agent.py) | All four supervisor strategies with mock agents |

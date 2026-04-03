@@ -8,6 +8,44 @@ tags:
 
 # Streaming and Performance Module
 
+**Import:** `from selectools import Agent`
+
+**Stability:** stable
+
+```python title="streaming_quickstart.py"
+import asyncio
+from selectools import Agent, AgentConfig, Message, Role, tool
+from selectools.providers.stubs import LocalProvider
+
+@tool(description="Search the web")
+def search(query: str) -> str:
+    return f"Results for '{query}': Python is a popular programming language."
+
+provider = LocalProvider()
+agent = Agent(
+    tools=[search],
+    provider=provider,
+    config=AgentConfig(max_iterations=2),
+)
+
+
+async def main():
+    async for item in agent.astream(
+        [Message(role=Role.USER, content="Search for Python tutorials")]
+    ):
+        # item is either StreamChunk (text) or AgentResult (final)
+        print(type(item).__name__, getattr(item, "content", "")[:80])
+
+
+asyncio.run(main())
+```
+
+!!! tip "See Also"
+    - [Agent](AGENT.md) - Agent lifecycle, hooks, and configuration
+    - [Providers](PROVIDERS.md) - Provider implementations and streaming support
+
+---
+
 **Directory:** `src/selectools/agent/`
 **Key Types:** `StreamChunk`, `AgentResult` (from `selectools.types`)
 
@@ -588,3 +626,12 @@ Use `result.tool_calls` and `result.iterations` for logging and monitoring.
 ---
 
 **Next Steps:** Enable streaming with `agent.astream()` and optimize tool-heavy workflows with `parallel_tool_execution=True`.
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 07 | [`07_streaming_tools.py`](https://github.com/johnnichev/selectools/blob/main/examples/07_streaming_tools.py) | Token-level async streaming with tool call support |
+| 08 | [`08_streaming_parallel.py`](https://github.com/johnnichev/selectools/blob/main/examples/08_streaming_parallel.py) | Streaming with parallel tool execution |

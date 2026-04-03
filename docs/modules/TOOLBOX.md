@@ -7,6 +7,42 @@ tags:
 
 # Toolbox: 24 Pre-Built Tools
 
+**Import:** `from selectools.toolbox import get_all_tools`
+
+**Stability:** stable
+
+```python title="toolbox_quickstart.py"
+from selectools import Agent, AgentConfig, Message, Role
+from selectools.providers.stubs import LocalProvider
+from selectools.toolbox import get_all_tools, get_tools_by_category
+
+# Load all 24 pre-built tools across 5 categories
+all_tools = get_all_tools()
+print(f"Loaded {len(all_tools)} tools")
+
+# Or load by category: file, web, data, datetime, text
+text_tools = get_tools_by_category("text")
+data_tools = get_tools_by_category("data")
+
+provider = LocalProvider()
+agent = Agent(
+    tools=text_tools + data_tools,
+    provider=provider,
+    config=AgentConfig(max_iterations=3),
+)
+
+result = agent.run([
+    Message(role=Role.USER, content="Count the words in 'Hello world from selectools'")
+])
+print(result.content)
+```
+
+!!! tip "See Also"
+    - [Tools](TOOLS.md) - Creating custom tools with the `@tool` decorator
+    - [Dynamic Tools](DYNAMIC_TOOLS.md) - Loading tools from files and directories at runtime
+
+---
+
 **Added in:** v0.12.0
 
 The toolbox provides **24 ready-to-use tools** across 5 categories that you can give to an agent immediately — no implementation needed.
@@ -236,3 +272,12 @@ agent = Agent(
 - [examples/03_toolbox.py](https://github.com/johnnichev/selectools/blob/main/examples/03_toolbox.py) — Working demo of all categories
 - [TOOLS.md](TOOLS.md) — Creating your own tools with `@tool`
 - [DYNAMIC_TOOLS.md](DYNAMIC_TOOLS.md) — Loading tools from files/directories at runtime
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 03 | [`03_toolbox.py`](https://github.com/johnnichev/selectools/blob/main/examples/03_toolbox.py) | Working demo of all 24 pre-built tools across 5 categories |
+| 13 | [`13_dynamic_tools.py`](https://github.com/johnnichev/selectools/blob/main/examples/13_dynamic_tools.py) | Loading tools dynamically from files and directories |

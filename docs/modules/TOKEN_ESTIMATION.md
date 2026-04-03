@@ -7,6 +7,28 @@ tags:
 
 # Token Estimation
 
+**Import:** `from selectools.token_estimation import estimate_tokens`
+**Stability:** beta
+
+```python title="estimation_demo.py"
+from selectools import estimate_tokens, estimate_run_tokens
+
+tokens = estimate_tokens("Hello, how can I help you today?")
+print(f"~{tokens} tokens")
+
+estimate = estimate_run_tokens(
+    messages=[],
+    tools=[],
+    system_prompt="You are a helpful assistant.",
+    model="gpt-4o",
+)
+print(f"Total: {estimate.total_tokens}, Remaining: {estimate.remaining_tokens}")
+```
+
+!!! tip "See Also"
+    - [Token Budget](BUDGET.md) -- enforce limits during execution
+    - [Models & Pricing](MODELS.md) -- model registry with context windows
+
 **Added in:** v0.17.4
 **File:** `src/selectools/token_estimation.py`
 **Functions:** `estimate_tokens`, `estimate_run_tokens`
@@ -88,3 +110,11 @@ result = agent.run(message)
 - [Token Budget](BUDGET.md) — enforce limits during execution
 - [Usage & Cost Tracking](USAGE.md) — actual token counts after execution
 - [Models & Pricing](MODELS.md) — model registry with context windows
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 47 | [`47_token_estimation.py`](https://github.com/johnnichev/selectools/blob/main/examples/47_token_estimation.py) | Pre-run token and cost estimation |
+| 43 | [`43_token_budget.py`](https://github.com/johnnichev/selectools/blob/main/examples/43_token_budget.py) | Token budget enforcement |
+| 05 | [`05_cost_tracking.py`](https://github.com/johnnichev/selectools/blob/main/examples/05_cost_tracking.py) | Usage and cost tracking |

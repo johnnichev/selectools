@@ -8,6 +8,34 @@ tags:
 
 # Hybrid Search Module
 
+**Import:** `from selectools.rag import HybridSearcher`
+**Stability:** stable
+
+```python title="hybrid_search_quick.py"
+from selectools.rag import BM25, Document, HybridSearcher, InMemoryVectorStore
+
+# HybridSearcher combines BM25 keyword search with vector similarity.
+# This example uses BM25 standalone (no embedding provider needed).
+bm25 = BM25()
+docs = [
+    Document(text="GDPR requires data protection by design.", metadata={"source": "legal"}),
+    Document(text="Python is a popular programming language.", metadata={"source": "intro"}),
+    Document(text="EU data regulation compliance guide.", metadata={"source": "eu"}),
+]
+bm25.index_documents(docs)
+
+results = bm25.search("GDPR compliance", top_k=2)
+for r in results:
+    print(f"Score: {r.score:.4f} | {r.document.text[:60]}")
+```
+
+!!! tip "See Also"
+    - [RAG](RAG.md) - Full RAG pipeline with document loading and search
+    - [Vector Stores](VECTOR_STORES.md) - Backend storage for semantic search
+    - [Embeddings](EMBEDDINGS.md) - Embedding providers used by the vector side
+
+---
+
 **Directory:** `src/selectools/rag/`
 **Files:** `bm25.py`, `hybrid.py`, `tools.py`, `reranker.py`
 
@@ -686,3 +714,14 @@ results = searcher.search(
 ---
 
 **Next Steps:** Integrate hybrid search into your RAG pipeline by following the [RAG Module](RAG.md) and swapping `RAGTool` for `HybridSearchTool` when exact term recall matters.
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 14 | [`14_rag_basic.py`](https://github.com/johnnichev/selectools/blob/main/examples/14_rag_basic.py) | Basic RAG pipeline with vector search |
+| 15 | [`15_semantic_search.py`](https://github.com/johnnichev/selectools/blob/main/examples/15_semantic_search.py) | Semantic search with embedding providers |
+| 18 | [`18_hybrid_search.py`](https://github.com/johnnichev/selectools/blob/main/examples/18_hybrid_search.py) | Hybrid BM25 + vector search with fusion |
+| 16 | [`16_rag_advanced.py`](https://github.com/johnnichev/selectools/blob/main/examples/16_rag_advanced.py) | Advanced RAG with chunking and reranking |

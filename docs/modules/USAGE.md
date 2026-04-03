@@ -7,6 +7,39 @@ tags:
 
 # Usage Tracking Module
 
+**Import:** `from selectools.usage import UsageStats`
+
+**Stability:** stable
+
+```python title="usage_quickstart.py"
+from selectools import Agent, AgentConfig, Message, Role, tool
+from selectools.providers.stubs import LocalProvider
+
+@tool(description="Search for information")
+def search(query: str) -> str:
+    return f"Found results for: {query}"
+
+provider = LocalProvider()
+agent = Agent(
+    tools=[search],
+    provider=provider,
+    config=AgentConfig(max_iterations=2),
+)
+
+result = agent.run([Message(role=Role.USER, content="Search for Python tutorials")])
+
+# Usage is tracked automatically
+print(f"Total tokens: {agent.total_tokens:,}")
+print(f"Total cost:   ${agent.total_cost:.6f}")
+print(agent.get_usage_summary())
+```
+
+!!! tip "See Also"
+    - [Models](MODELS.md) - 152-model registry with pricing data
+    - [Budget](BUDGET.md) - Token and cost budget limits
+
+---
+
 **Files:** `src/selectools/usage.py`, `src/selectools/analytics.py`, `src/selectools/pricing.py`
 **Classes:** `UsageStats`, `AgentUsage`, `AgentAnalytics`, `ToolMetrics`
 
@@ -627,3 +660,11 @@ print(agent.usage)
 ---
 
 **Next Steps:** Learn about the RAG system in the [RAG Module](RAG.md).
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 05 | [`05_cost_tracking.py`](https://github.com/johnnichev/selectools/blob/main/examples/05_cost_tracking.py) | Per-call and per-session cost tracking with usage summaries |

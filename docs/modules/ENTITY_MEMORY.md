@@ -7,6 +7,38 @@ tags:
 
 # Entity Memory Module
 
+**Import:** `from selectools.entity_memory import EntityMemory`
+**Stability:** beta
+
+```python title="entity_memory_quick.py"
+from selectools.entity_memory import EntityMemory, Entity
+
+# EntityMemory without a provider -- manual entity management (no API key needed)
+em = EntityMemory(max_entities=50)
+
+em.update([
+    Entity(name="Alice", entity_type="person", attributes={"role": "engineer", "company": "Acme Corp"}),
+    Entity(name="Acme Corp", entity_type="organization", attributes={"location": "Seattle"}),
+])
+
+# Look up a tracked entity
+alice = em.get_entity("Alice")
+print(f"{alice.name} ({alice.entity_type}): {alice.attributes}")
+
+# Build context for system prompt injection
+context = em.build_context()
+print(context)
+# [Known Entities]
+# - Alice (person): role=engineer, company=Acme Corp
+# - Acme Corp (organization): location=Seattle
+```
+
+!!! tip "See Also"
+    - [Memory](MEMORY.md) - Conversation memory that entity memory extends
+    - [Knowledge Graph](KNOWLEDGE_GRAPH.md) - Relationship tracking between entities
+
+---
+
 **Added in:** v0.16.0
 **File:** `src/selectools/entity_memory.py`
 **Classes:** `Entity`, `EntityMemory`
@@ -537,3 +569,13 @@ def test_serialization_roundtrip():
 ---
 
 **Next Steps:** Learn about relationship tracking in the [Knowledge Graph Module](KNOWLEDGE_GRAPH.md).
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 35 | [`35_entity_memory.py`](https://github.com/johnnichev/selectools/blob/main/examples/35_entity_memory.py) | LLM-powered entity extraction and tracking |
+| 20 | [`20_customer_support_bot.py`](https://github.com/johnnichev/selectools/blob/main/examples/20_customer_support_bot.py) | Production bot with entity awareness |
+| 36 | [`36_knowledge_graph.py`](https://github.com/johnnichev/selectools/blob/main/examples/36_knowledge_graph.py) | Knowledge graph (entity complement) |

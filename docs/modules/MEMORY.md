@@ -7,6 +7,43 @@ tags:
 
 # Memory Module
 
+**Import:** `from selectools import ConversationMemory`
+
+**Stability:** stable
+
+```python title="memory_quickstart.py"
+from selectools import Agent, AgentConfig, ConversationMemory, Message, Role, tool
+from selectools.providers.stubs import LocalProvider
+
+@tool(description="Look up a fact")
+def lookup(query: str) -> str:
+    return f"The answer to '{query}' is 42."
+
+memory = ConversationMemory(max_messages=20)
+provider = LocalProvider()
+
+agent = Agent(
+    tools=[lookup],
+    provider=provider,
+    memory=memory,
+    config=AgentConfig(max_iterations=1),
+)
+
+# Turn 1 — agent remembers this
+agent.run([Message(role=Role.USER, content="My name is Alice")])
+
+# Turn 2 — context preserved via memory
+result = agent.run([Message(role=Role.USER, content="What is my name?")])
+print(result.content)
+print(f"Messages in memory: {len(memory.get_history())}")
+```
+
+!!! tip "See Also"
+    - [Sessions](SESSIONS.md) - Persistent session storage with JSON, SQLite, and Redis backends
+    - [Entity Memory](ENTITY_MEMORY.md) - LLM-based named entity extraction and context injection
+
+---
+
 **File:** `src/selectools/memory.py`
 **Classes:** `ConversationMemory`
 
@@ -499,3 +536,13 @@ Potential improvements (see [Roadmap](https://github.com/johnnichev/selectools/b
 ---
 
 **Next Steps:** Learn about usage tracking in the [Usage Module](USAGE.md).
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 04 | [`04_conversation_memory.py`](https://github.com/johnnichev/selectools/blob/main/examples/04_conversation_memory.py) | Multi-turn conversation with sliding window memory |
+| 20 | [`20_customer_support_bot.py`](https://github.com/johnnichev/selectools/blob/main/examples/20_customer_support_bot.py) | Full customer support bot with memory, guardrails, and tools |
+| 34 | [`34_summarize_on_trim.py`](https://github.com/johnnichev/selectools/blob/main/examples/34_summarize_on_trim.py) | Summarize-on-trim to preserve context when memory overflows |

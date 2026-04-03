@@ -7,6 +7,31 @@ tags:
 
 # Parser Module
 
+**Import:** `from selectools.parser import ToolCallParser`
+**Stability:** stable
+
+```python title="parser_quick.py"
+from selectools.parser import ToolCallParser
+
+parser = ToolCallParser()
+
+# Parse a standard tool call from LLM output
+result = parser.parse("""
+I'll search for that information.
+
+TOOL_CALL
+{"tool_name": "search", "parameters": {"query": "Python tutorials"}}
+""")
+
+assert result.tool_call is not None
+print(f"Tool: {result.tool_call.tool_name}")
+print(f"Params: {result.tool_call.parameters}")
+```
+
+!!! tip "See Also"
+    - [Agent Module](AGENT.md) -- how the agent uses parsed tool calls
+    - [Tools Module](TOOLS.md) -- tool definition and schema generation
+
 **File:** `src/selectools/parser.py`
 **Classes:** `ToolCallParser`, `ParseResult`
 
@@ -697,6 +722,15 @@ Potential improvements (not currently implemented):
 3. **Structured Output Mode**: Use provider-specific structured output APIs
 4. **Error Reporting**: Detailed parsing failure reasons
 5. **Alternative Formats**: XML, YAML support
+
+---
+
+## Related Examples
+
+| # | File | Description |
+|---|------|-------------|
+| 23 | [`23_structured_output.py`](https://github.com/johnnichev/selectools/blob/main/examples/23_structured_output.py) | Structured output vs text parsing |
+| 24 | [`24_traces_and_reasoning.py`](https://github.com/johnnichev/selectools/blob/main/examples/24_traces_and_reasoning.py) | Inspect tool call parsing in traces |
 
 ---
 

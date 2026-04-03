@@ -311,4 +311,16 @@ The CLI prefers **Starlette + uvicorn** when installed (`pip install selectools[
 
 ## Example scripts
 
-- `examples/76_builder_serve.py` — start the builder programmatically
+- `examples/76_visual_builder.py` -- start the builder programmatically
+
+---
+
+## Related Examples
+
+| # | File | Description |
+|---|------|-------------|
+| 76 | [`76_visual_builder.py`](https://github.com/johnnichev/selectools/blob/main/examples/76_visual_builder.py) | Start the visual builder programmatically |
+
+!!! tip "See Also"
+    - [Serve Module](SERVE.md) -- HTTP API server that hosts the builder
+    - [Templates Module](TEMPLATES.md) -- YAML config and pre-built agent templates

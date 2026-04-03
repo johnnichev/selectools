@@ -7,6 +7,30 @@ tags:
 
 # Reasoning Strategies
 
+**Import:** `from selectools import AgentConfig`
+**Stability:** beta
+
+```python title="reasoning_demo.py"
+from selectools import Agent, AgentConfig, LocalProvider, tool
+
+@tool(description="Look up a fact")
+def lookup(topic: str) -> str:
+    return f"Fact about {topic}: it is interesting."
+
+agent = Agent(
+    tools=[lookup],
+    provider=LocalProvider(),
+    config=AgentConfig(reasoning_strategy="react"),
+)
+result = agent.run("What is the capital of France?")
+print(result.content)
+print(result.reasoning)
+```
+
+!!! tip "See Also"
+    - [Agent](AGENT.md) -- main agent configuration
+    - [Patterns](PATTERNS.md) -- advanced agent patterns (PlanAndExecute, Reflective, Debate)
+
 **Added in:** v0.17.6
 **File:** `src/selectools/prompt.py`, `src/selectools/agent/config.py`
 **Exports:** `REASONING_STRATEGIES`
@@ -97,3 +121,11 @@ agent = Agent(tools=[...], prompt_builder=pb)
 
 - [Agent](AGENT.md) — main agent configuration
 - [Prompt](PROMPT.md) — prompt builder internals
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 50 | [`50_reasoning_strategies.py`](https://github.com/johnnichev/selectools/blob/main/examples/50_reasoning_strategies.py) | ReAct, CoT, and Plan-Then-Act demos |
+| 24 | [`24_traces_and_reasoning.py`](https://github.com/johnnichev/selectools/blob/main/examples/24_traces_and_reasoning.py) | Traces and reasoning output |
+| 70 | [`70_plan_and_execute.py`](https://github.com/johnnichev/selectools/blob/main/examples/70_plan_and_execute.py) | PlanAndExecuteAgent pattern |

@@ -7,6 +7,35 @@ tags:
 
 # Prompt Compression
 
+**Import:** `from selectools import AgentConfig`
+**Stability:** beta
+
+```python title="prompt_compression_demo.py"
+from selectools import Agent, AgentConfig, LocalProvider, tool
+from selectools.memory import ConversationMemory
+
+@tool(description="Look up a topic")
+def lookup(topic: str) -> str:
+    return f"Info about {topic}"
+
+agent = Agent(
+    tools=[lookup],
+    provider=LocalProvider(),
+    memory=ConversationMemory(max_messages=100),
+    config=AgentConfig(
+        compress_context=True,
+        compress_threshold=0.75,
+        compress_keep_recent=4,
+    ),
+)
+result = agent.run("Tell me about Python")
+print(result.content)
+```
+
+!!! tip "See Also"
+    - [Memory](MEMORY.md) -- conversation memory and sliding window
+    - [Agent](AGENT.md) -- main agent configuration
+
 **Added in:** v0.17.7
 **Files:** `src/selectools/agent/config.py`, `src/selectools/agent/_memory_manager.py`, `src/selectools/trace.py`, `src/selectools/observer.py`
 
@@ -138,3 +167,11 @@ If the summarisation LLM call raises an exception, compression is **silently ski
 ## Example
 
 See [`examples/53_prompt_compression.py`](https://github.com/johnnichev/selectools/blob/main/examples/53_prompt_compression.py) for a runnable demo including observer integration and the trace step structure.
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 53 | [`53_prompt_compression.py`](https://github.com/johnnichev/selectools/blob/main/examples/53_prompt_compression.py) | Prompt compression with observer integration |
+| 04 | [`04_conversation_memory.py`](https://github.com/johnnichev/selectools/blob/main/examples/04_conversation_memory.py) | Conversation memory basics |
+| 34 | [`34_summarize_on_trim.py`](https://github.com/johnnichev/selectools/blob/main/examples/34_summarize_on_trim.py) | Summarize-on-trim memory management |

@@ -7,6 +7,27 @@ tags:
 
 # Templates Module
 
+**Import:** `from selectools.templates import load_template`
+**Stability:** beta
+
+```python title="templates_quick.py"
+from selectools.templates import load_template, list_templates
+from selectools.providers.stubs import LocalProvider
+
+# List available templates
+print(list_templates())
+# ['code_reviewer', 'customer_support', 'data_analyst', 'rag_chatbot', 'research_assistant']
+
+# Load a template
+agent = load_template("customer_support", provider=LocalProvider())
+result = agent.run("I need help resetting my password")
+print(result.content)
+```
+
+!!! tip "See Also"
+    - [Serve Module](SERVE.md) -- deploy template-based agents as HTTP APIs
+    - [Agent Module](AGENT.md) -- the `Agent` class and `AgentConfig`
+
 **Added in:** v0.19.0
 **Package:** `src/selectools/templates/`
 **Functions:** `from_yaml()`, `from_dict()`, `load_template()`, `list_templates()`
@@ -547,8 +568,17 @@ Returns: `List[str]` -- sorted list of available template names.
 
 | Example | File | Description |
 |---|---|---|
-| 64 | [`64_yaml_config.py`](https://github.com/johnnichev/selectools/blob/main/examples/64_yaml_config.py) | Load an agent from YAML config |
-| 65 | [`65_templates.py`](https://github.com/johnnichev/selectools/blob/main/examples/65_templates.py) | Use all 5 built-in templates |
+| 62 | [`62_yaml_config.py`](https://github.com/johnnichev/selectools/blob/main/examples/62_yaml_config.py) | Load an agent from YAML config |
+| 63 | [`63_agent_templates.py`](https://github.com/johnnichev/selectools/blob/main/examples/63_agent_templates.py) | Use all 5 built-in templates |
+
+---
+
+## Related Examples
+
+| # | File | Description |
+|---|------|-------------|
+| 62 | [`62_yaml_config.py`](https://github.com/johnnichev/selectools/blob/main/examples/62_yaml_config.py) | Load an agent from a YAML config file |
+| 63 | [`63_agent_templates.py`](https://github.com/johnnichev/selectools/blob/main/examples/63_agent_templates.py) | Use all 5 built-in agent templates |
 
 ---
 

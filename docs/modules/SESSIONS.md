@@ -7,6 +7,44 @@ tags:
 
 # Sessions Module
 
+**Import:** `from selectools.sessions import JsonFileSessionStore`
+**Stability:** stable
+
+```python title="sessions_quick.py"
+import tempfile
+from selectools import Agent, AgentConfig, LocalProvider, ConversationMemory, Message, Role
+from selectools.sessions import JsonFileSessionStore
+
+with tempfile.TemporaryDirectory() as tmpdir:
+    store = JsonFileSessionStore(directory=tmpdir)
+
+    # First run -- auto-saves after completion
+    agent = Agent(
+        tools=[],
+        provider=LocalProvider(),
+        memory=ConversationMemory(max_messages=50),
+        config=AgentConfig(session_store=store, session_id="demo-001"),
+    )
+    result = agent.run([Message(role=Role.USER, content="My name is Alice.")])
+    print(f"Session saved: {store.exists('demo-001')}")  # True
+
+    # Second run -- auto-loads previous history
+    agent2 = Agent(
+        tools=[],
+        provider=LocalProvider(),
+        memory=ConversationMemory(max_messages=50),
+        config=AgentConfig(session_store=store, session_id="demo-001"),
+    )
+    history = agent2.memory.get_history()
+    print(f"Restored {len(history)} messages from session")
+```
+
+!!! tip "See Also"
+    - [Memory](MEMORY.md) - Conversation memory that sessions persist
+    - [Entity Memory](ENTITY_MEMORY.md) - Entity tracking across sessions
+
+---
+
 **Added in:** v0.16.0
 **File:** `src/selectools/sessions.py`
 **Classes:** `SessionStore`, `JsonFileSessionStore`, `SQLiteSessionStore`, `RedisSessionStore`
@@ -520,3 +558,13 @@ def test_agent_with_sessions():
 ---
 
 **Next Steps:** Learn about entity tracking in the [Entity Memory Module](ENTITY_MEMORY.md).
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 33 | [`33_persistent_sessions.py`](https://github.com/johnnichev/selectools/blob/main/examples/33_persistent_sessions.py) | Persistent sessions with JSON and SQLite |
+| 20 | [`20_customer_support_bot.py`](https://github.com/johnnichev/selectools/blob/main/examples/20_customer_support_bot.py) | Production bot with session persistence |
+| 04 | [`04_conversation_memory.py`](https://github.com/johnnichev/selectools/blob/main/examples/04_conversation_memory.py) | Conversation memory (sessions persist this) |

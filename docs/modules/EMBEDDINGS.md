@@ -7,6 +7,31 @@ tags:
 
 # Embeddings Module
 
+**Import:** `from selectools.embeddings import OpenAIEmbeddings`
+**Stability:** stable
+
+```python title="embeddings_quick.py"
+from selectools.embeddings import OpenAIEmbeddingProvider
+
+# OpenAIEmbeddingProvider converts text to dense vectors for semantic search.
+# Requires OPENAI_API_KEY. For a free alternative, use GeminiEmbeddingProvider.
+embedder = OpenAIEmbeddingProvider()
+
+embedding = embedder.embed_text("Hello, world!")
+print(f"Dimension: {embedder.dimension}")  # 1536
+print(f"First 5 values: {embedding[:5]}")
+
+# Batch embedding is more efficient than one-at-a-time
+batch = embedder.embed_texts(["Python programming", "JavaScript coding"])
+print(f"Batch size: {len(batch)}")
+```
+
+!!! tip "See Also"
+    - [RAG](RAG.md) - Using embeddings within the full RAG pipeline
+    - [Vector Stores](VECTOR_STORES.md) - Storing and searching embeddings
+
+---
+
 **Directory:** `src/selectools/embeddings/`
 **Files:** `provider.py`, `openai.py`, `anthropic.py`, `gemini.py`, `cohere.py`
 
@@ -518,3 +543,13 @@ def embed_in_batches(embedder, texts, batch_size=100):
 ---
 
 **Next Steps:** Learn about vector storage in the [Vector Stores Module](VECTOR_STORES.md).
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 15 | [`15_semantic_search.py`](https://github.com/johnnichev/selectools/blob/main/examples/15_semantic_search.py) | Semantic search using embedding providers |
+| 14 | [`14_rag_basic.py`](https://github.com/johnnichev/selectools/blob/main/examples/14_rag_basic.py) | Basic RAG pipeline with embeddings |
+| 17 | [`17_rag_multi_provider.py`](https://github.com/johnnichev/selectools/blob/main/examples/17_rag_multi_provider.py) | RAG with multiple embedding providers |

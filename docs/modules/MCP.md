@@ -7,6 +7,29 @@ tags:
 
 # MCP Integration
 
+**Import:** `from selectools.mcp import MCPClient`
+**Stability:** beta
+
+```python title="mcp_quick.py"
+from selectools import Agent, AgentConfig
+from selectools.providers.stubs import LocalProvider
+from selectools.mcp import mcp_tools, MCPServerConfig
+
+# Connect to an MCP server and use its tools
+with mcp_tools(MCPServerConfig(command="python", args=["server.py"])) as tools:
+    agent = Agent(
+        tools=tools,
+        provider=LocalProvider(),
+        config=AgentConfig(model="gpt-4o-mini"),
+    )
+    result = agent.run("Search for Python tutorials")
+    print(result.content)
+```
+
+!!! tip "See Also"
+    - [Tools Module](TOOLS.md) -- custom tool creation with `@tool`
+    - [Agent Module](AGENT.md) -- the `Agent` class that consumes MCP tools
+
 **Added in:** v0.17.1
 
 Connect to any MCP-compatible tool server and expose selectools tools as MCP servers. Requires `pip install selectools[mcp]`.
@@ -246,3 +269,12 @@ print(report.accuracy)
 | `MCPError` | Base MCP exception |
 | `MCPConnectionError` | Connection failure |
 | `MCPToolError` | Tool call failure |
+
+---
+
+## Related Examples
+
+| # | File | Description |
+|---|------|-------------|
+| 41 | [`41_mcp_client.py`](https://github.com/johnnichev/selectools/blob/main/examples/41_mcp_client.py) | Connect to an MCP server and use its tools |
+| 42 | [`42_mcp_server.py`](https://github.com/johnnichev/selectools/blob/main/examples/42_mcp_server.py) | Expose selectools tools as an MCP server |

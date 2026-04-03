@@ -7,6 +7,49 @@ tags:
 
 # Advanced Agent Patterns
 
+**Import:** `from selectools.patterns import PlanAndExecuteAgent`
+
+**Stability:** beta
+
+```python title="patterns_quickstart.py"
+from selectools import Agent, AgentConfig, tool
+from selectools.providers.stubs import LocalProvider
+from selectools.patterns import ReflectiveAgent
+
+@tool(description="No-op tool")
+def noop(x: str) -> str:
+    return x
+
+provider = LocalProvider()
+
+# Actor drafts content, critic evaluates and requests revisions
+actor = Agent(
+    tools=[noop],
+    provider=provider,
+    config=AgentConfig(max_iterations=1),
+    system_prompt="You are a technical writer.",
+)
+critic = Agent(
+    tools=[noop],
+    provider=provider,
+    config=AgentConfig(max_iterations=1),
+    system_prompt="You are an editor. Say 'approved' when satisfied.",
+)
+
+agent = ReflectiveAgent(actor=actor, critic=critic, max_reflections=2)
+result = agent.run("Explain what a vector database is in two sentences")
+
+print(f"Final draft: {result.final_draft[:200]}")
+print(f"Approved: {result.approved}")
+print(f"Rounds: {result.total_rounds}")
+```
+
+!!! tip "See Also"
+    - [Orchestration](ORCHESTRATION.md) - AgentGraph routing, parallel execution, and HITL
+    - [Supervisor](SUPERVISOR.md) - SupervisorAgent with 4 built-in strategies
+
+---
+
 **Added in:** v0.19.1
 **Module:** `src/selectools/patterns/`
 **Import:** `from selectools.patterns import ...`  or  `from selectools import ...`
@@ -335,3 +378,14 @@ Need to decompose a large task across a team?
 - [Supervisor](SUPERVISOR.md) — `SupervisorAgent` with 4 built-in strategies
 - [Pipeline](PIPELINE.md) — Composable pipelines with `@step` and `|` operator
 - **Examples**: `70_plan_and_execute.py`, `71_reflective_agent.py`, `72_debate_agent.py`, `73_team_lead_agent.py`
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 70 | [`70_plan_and_execute.py`](https://github.com/johnnichev/selectools/blob/main/examples/70_plan_and_execute.py) | PlanAndExecuteAgent with planner and specialist executors |
+| 71 | [`71_reflective_agent.py`](https://github.com/johnnichev/selectools/blob/main/examples/71_reflective_agent.py) | ReflectiveAgent with actor-critic revision loop |
+| 72 | [`72_debate_agent.py`](https://github.com/johnnichev/selectools/blob/main/examples/72_debate_agent.py) | DebateAgent with multiple perspectives and judge synthesis |
+| 73 | [`73_team_lead_agent.py`](https://github.com/johnnichev/selectools/blob/main/examples/73_team_lead_agent.py) | TeamLeadAgent with dynamic delegation strategy |

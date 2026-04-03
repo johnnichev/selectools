@@ -7,6 +7,43 @@ tags:
 
 # Audit Logging
 
+**Import:** `from selectools.audit import AuditLogger`
+**Stability:** stable
+
+```python title="audit_quick.py"
+import tempfile
+from selectools import Agent, AgentConfig, LocalProvider, tool
+from selectools.audit import AuditLogger, PrivacyLevel
+
+@tool()
+def greet(name: str) -> str:
+    """Say hello."""
+    return f"Hello, {name}!"
+
+with tempfile.TemporaryDirectory() as tmpdir:
+    audit = AuditLogger(
+        log_dir=tmpdir,
+        privacy=PrivacyLevel.KEYS_ONLY,
+        daily_rotation=True,
+    )
+
+    agent = Agent(
+        tools=[greet],
+        provider=LocalProvider(),
+        config=AgentConfig(observers=[audit]),
+    )
+
+    result = agent.run("Greet Alice")
+    print(result.content)
+    # Check tmpdir for the generated JSONL audit file
+```
+
+!!! tip "See Also"
+    - [Guardrails](GUARDRAILS.md) - Input/output validation pipeline
+    - [Security](SECURITY.md) - Tool output screening and coherence checking
+
+---
+
 **Added in:** v0.15.0
 
 `AuditLogger` provides a JSONL append-only audit trail for every agent action. It records tool calls, LLM responses, policy decisions, and errors — all with configurable privacy controls and daily file rotation.
@@ -153,3 +190,13 @@ agent = Agent(
 | `PrivacyLevel.KEYS_ONLY` | Redact values to `"<redacted>"` |
 | `PrivacyLevel.HASHED` | SHA-256 hash of values |
 | `PrivacyLevel.NONE` | Omit tool_args entirely |
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 30 | [`30_audit_logging.py`](https://github.com/johnnichev/selectools/blob/main/examples/30_audit_logging.py) | JSONL audit logging with privacy levels |
+| 20 | [`20_customer_support_bot.py`](https://github.com/johnnichev/selectools/blob/main/examples/20_customer_support_bot.py) | Production bot with audit and security |
+| 31 | [`31_tool_output_screening.py`](https://github.com/johnnichev/selectools/blob/main/examples/31_tool_output_screening.py) | Tool output screening (security companion) |

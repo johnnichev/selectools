@@ -7,6 +7,28 @@ tags:
 
 # Serve Module
 
+**Import:** `from selectools.serve.app import create_app`
+**Stability:** beta
+
+```python title="serve_quick.py"
+from selectools import Agent, tool
+from selectools.providers.stubs import LocalProvider
+from selectools.serve.app import create_app
+
+@tool(description="Greet a user by name")
+def greet(name: str) -> str:
+    return f"Hello, {name}!"
+
+agent = Agent(tools=[greet], provider=LocalProvider())
+app = create_app(agent, playground=True)
+app.serve(port=8000)
+```
+
+!!! tip "See Also"
+    - [Visual Agent Builder](builder.md) -- drag-drop graph editor served at `/builder`
+    - [Templates Module](TEMPLATES.md) -- YAML config and pre-built agent templates
+    - [Agent Module](AGENT.md) -- the `Agent` class that powers the server
+
 **Added in:** v0.19.0
 **Package:** `src/selectools/serve/`
 **Classes:** `AgentRouter`, `AgentServer`
@@ -534,8 +556,18 @@ Returns an `AgentServer` instance. Call `.serve()` to start (blocking).
 
 | Example | File | Description |
 |---|---|---|
-| 62 | [`62_serve_agent.py`](https://github.com/johnnichev/selectools/blob/main/examples/62_serve_agent.py) | Serve an agent with the built-in server |
-| 63 | [`63_serve_fastapi.py`](https://github.com/johnnichev/selectools/blob/main/examples/63_serve_fastapi.py) | Embed AgentRouter in FastAPI |
+| 64 | [`64_selectools_serve.py`](https://github.com/johnnichev/selectools/blob/main/examples/64_selectools_serve.py) | Serve an agent with the built-in server |
+| 62 | [`62_yaml_config.py`](https://github.com/johnnichev/selectools/blob/main/examples/62_yaml_config.py) | Load an agent from YAML config |
+
+---
+
+## Related Examples
+
+| # | File | Description |
+|---|------|-------------|
+| 64 | [`64_selectools_serve.py`](https://github.com/johnnichev/selectools/blob/main/examples/64_selectools_serve.py) | Serve an agent with the built-in HTTP server |
+| 62 | [`62_yaml_config.py`](https://github.com/johnnichev/selectools/blob/main/examples/62_yaml_config.py) | Load an agent from YAML and serve it |
+| 63 | [`63_agent_templates.py`](https://github.com/johnnichev/selectools/blob/main/examples/63_agent_templates.py) | Use built-in templates with the serve module |
 
 ---
 

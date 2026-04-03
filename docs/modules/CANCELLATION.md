@@ -7,6 +7,32 @@ tags:
 
 # Agent Cancellation
 
+**Import:** `from selectools.cancellation import CancellationToken`
+**Stability:** beta
+
+```python title="cancellation_demo.py"
+from selectools import Agent, AgentConfig, LocalProvider, CancellationToken, tool
+
+@tool(description="Simulate a long task")
+def slow_task(query: str) -> str:
+    return f"Result for: {query}"
+
+token = CancellationToken()
+agent = Agent(
+    tools=[slow_task],
+    provider=LocalProvider(),
+    config=AgentConfig(cancellation_token=token),
+)
+# Cancel from another thread or after a condition
+# token.cancel()
+result = agent.run("Run a long research task")
+print(result.content)
+```
+
+!!! tip "See Also"
+    - [Token Budget](BUDGET.md) -- cost-based stopping
+    - [Agent](AGENT.md) -- main agent configuration and runtime
+
 **Added in:** v0.17.3
 **File:** `src/selectools/cancellation.py`
 **Classes:** `CancellationToken`
@@ -103,3 +129,11 @@ result3 = agent.run("task 3")  # completes normally
 
 - [Token Budget](BUDGET.md) — cost-based stopping
 - [Agent](AGENT.md) — `AgentConfig` reference
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 44 | [`44_cancellation.py`](https://github.com/johnnichev/selectools/blob/main/examples/44_cancellation.py) | Cooperative cancellation with CancellationToken |
+| 43 | [`43_token_budget.py`](https://github.com/johnnichev/selectools/blob/main/examples/43_token_budget.py) | Budget-based stopping |
+| 06 | [`06_async_agent.py`](https://github.com/johnnichev/selectools/blob/main/examples/06_async_agent.py) | Async agent execution |

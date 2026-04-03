@@ -7,6 +7,37 @@ tags:
 
 # Stability Markers
 
+**Import:** `from selectools.stability import stable, beta, deprecated`
+**Stability:** stable
+
+```python title="stability_quick.py"
+from selectools.stability import stable, beta, deprecated
+
+@stable
+class ProductionAPI:
+    """This API is frozen -- breaking changes require a major version."""
+    pass
+
+@beta
+class ExperimentalFeature:
+    """May change in the next minor release."""
+    pass
+
+@deprecated(since="0.19", replacement="ProductionAPI")
+class LegacyAPI:
+    """Emits DeprecationWarning on instantiation."""
+    pass
+
+# Introspect stability at runtime
+print(ProductionAPI.__stability__)       # "stable"
+print(ExperimentalFeature.__stability__) # "beta"
+print(LegacyAPI.__stability__)           # "deprecated"
+```
+
+!!! tip "See Also"
+    - [Agent Module](AGENT.md) -- public APIs that carry stability markers
+    - [Deprecation Policy](../DEPRECATION_POLICY.md) -- full deprecation window rules
+
 **Added in:** v0.19.2
 **File:** `src/selectools/stability.py`
 **Exports:** `stable`, `beta`, `deprecated`
@@ -127,6 +158,12 @@ filterwarnings = ["error::DeprecationWarning"]
 Any API deprecated in `v0.X` will not be removed before `v0.X+2`.
 
 See [Deprecation Policy](../DEPRECATION_POLICY.md) for the full policy.
+
+## Related Examples
+
+| # | File | Description |
+|---|------|-------------|
+| 75 | [`75_stability_markers.py`](https://github.com/johnnichev/selectools/blob/main/examples/75_stability_markers.py) | Apply and introspect stability markers |
 
 ## See Also
 

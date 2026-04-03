@@ -7,6 +7,31 @@ tags:
 
 # Error Handling & Exceptions
 
+**Import:** `from selectools.exceptions import SelectoolsError`
+**Stability:** stable
+
+```python title="exceptions_quick.py"
+from selectools import Agent, SelectoolsError, tool
+from selectools.providers.stubs import LocalProvider
+
+@tool(description="Divide two numbers")
+def divide(a: float, b: float) -> str:
+    if b == 0:
+        raise ValueError("Cannot divide by zero")
+    return str(a / b)
+
+agent = Agent(tools=[divide], provider=LocalProvider())
+
+try:
+    result = agent.run("Divide 10 by 0")
+except SelectoolsError as e:
+    print(f"Caught: {e}")
+```
+
+!!! tip "See Also"
+    - [Agent Module](AGENT.md) -- the agent loop that raises and handles these errors
+    - [Tools Module](TOOLS.md) -- `ToolValidationError` and `ToolExecutionError` details
+
 All selectools exceptions inherit from `SelectoolsError`, so you can catch everything with a single handler or be specific.
 
 ---
@@ -253,6 +278,15 @@ except GuardrailError as e:
 except ProviderError:
     print("LLM provider failed after all retries")
 ```
+
+---
+
+## Related Examples
+
+| # | File | Description |
+|---|------|-------------|
+| 29 | [`29_guardrails.py`](https://github.com/johnnichev/selectools/blob/main/examples/29_guardrails.py) | Guardrail error handling patterns |
+| 25 | [`25_provider_fallback.py`](https://github.com/johnnichev/selectools/blob/main/examples/25_provider_fallback.py) | Provider error recovery with fallbacks |
 
 ---
 

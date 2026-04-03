@@ -7,6 +7,32 @@ tags:
 
 # Trace Store Module
 
+**Import:** `from selectools.trace import trace_to_html`
+**Stability:** stable
+
+```python title="trace_quick.py"
+from selectools import Agent, tool
+from selectools.providers.stubs import LocalProvider
+from selectools.trace import trace_to_html
+
+@tool(description="Add two numbers")
+def add(a: int, b: int) -> str:
+    return str(a + b)
+
+agent = Agent(tools=[add], provider=LocalProvider())
+result = agent.run("What is 2 + 3?")
+
+# Render the execution trace as an interactive HTML waterfall
+html = trace_to_html(result.trace)
+with open("trace.html", "w") as f:
+    f.write(html)
+print(f"Trace saved with {len(result.trace.steps)} steps")
+```
+
+!!! tip "See Also"
+    - [Agent Module](AGENT.md) -- the `Agent` class that produces traces, and observer events
+    - [Serve Module](SERVE.md) -- deploy agents with automatic trace persistence
+
 **Added in:** v0.19.0
 **Package:** `src/selectools/observe/`
 **Protocol:** `TraceStore`
@@ -496,6 +522,16 @@ class RedisTraceStore:
 | Example | File | Description |
 |---|---|---|
 | 69 | [`69_trace_store.py`](https://github.com/johnnichev/selectools/blob/main/examples/69_trace_store.py) | Save, query, and export traces with all 3 backends |
+
+---
+
+## Related Examples
+
+| # | File | Description |
+|---|------|-------------|
+| 74 | [`74_trace_to_html.py`](https://github.com/johnnichev/selectools/blob/main/examples/74_trace_to_html.py) | Render traces as interactive HTML waterfalls |
+| 69 | [`69_trace_store.py`](https://github.com/johnnichev/selectools/blob/main/examples/69_trace_store.py) | Save, query, and export traces with all 3 backends |
+| 24 | [`24_traces_and_reasoning.py`](https://github.com/johnnichev/selectools/blob/main/examples/24_traces_and_reasoning.py) | Inspect agent traces and reasoning |
 
 ---
 

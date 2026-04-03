@@ -7,6 +7,30 @@ tags:
 
 # Semantic Cache
 
+**Import:** `from selectools.cache import InMemoryCache`
+**Stability:** beta
+
+```python title="semantic_cache_demo.py"
+from selectools import Agent, AgentConfig, LocalProvider, InMemoryCache, tool
+
+@tool(description="Answer a question")
+def answer(question: str) -> str:
+    return f"Answer to: {question}"
+
+# InMemoryCache for exact-match caching (SemanticCache for fuzzy matching)
+agent = Agent(
+    tools=[answer],
+    provider=LocalProvider(),
+    config=AgentConfig(cache=InMemoryCache(max_size=500, default_ttl=3600)),
+)
+result = agent.run("What is the weather in NYC?")
+print(result.content)
+```
+
+!!! tip "See Also"
+    - [Tool Caching](TOOL_CACHING.md) -- per-tool result caching with TTL
+    - [Agent](AGENT.md) -- cache configuration on AgentConfig
+
 **Added in:** v0.17.7
 **File:** `src/selectools/cache_semantic.py`
 
@@ -165,3 +189,11 @@ for step in result.trace.steps:
 ## Example
 
 See [`examples/52_semantic_cache.py`](https://github.com/johnnichev/selectools/blob/main/examples/52_semantic_cache.py) for a runnable demo using a mock embedding provider.
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 52 | [`52_semantic_cache.py`](https://github.com/johnnichev/selectools/blob/main/examples/52_semantic_cache.py) | Semantic similarity caching demo |
+| 09 | [`09_caching.py`](https://github.com/johnnichev/selectools/blob/main/examples/09_caching.py) | LLM response caching with InMemoryCache |
+| 51 | [`51_tool_result_caching.py`](https://github.com/johnnichev/selectools/blob/main/examples/51_tool_result_caching.py) | Per-tool result caching |

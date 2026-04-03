@@ -7,6 +7,46 @@ tags:
 
 # Guardrails Engine
 
+**Import:** `from selectools.guardrails import GuardrailsPipeline`
+
+**Stability:** stable
+
+```python title="guardrails_quickstart.py"
+from selectools import Agent, AgentConfig, Message, Role, tool
+from selectools.providers.stubs import LocalProvider
+from selectools.guardrails import GuardrailsPipeline, PIIGuardrail, TopicGuardrail
+
+@tool(description="Look up a customer by email")
+def lookup_customer(email: str) -> str:
+    return f"Customer found: Jane Doe ({email})"
+
+# PII redaction + topic blocking
+guardrails = GuardrailsPipeline(
+    input=[
+        PIIGuardrail(action="rewrite"),
+        TopicGuardrail(deny=["politics", "religion"]),
+    ],
+    output=[],
+)
+
+provider = LocalProvider()
+agent = Agent(
+    tools=[lookup_customer],
+    provider=provider,
+    config=AgentConfig(guardrails=guardrails, max_iterations=1),
+)
+
+# PII is automatically redacted before reaching the LLM
+result = agent.run([Message(role=Role.USER, content="Look up user@example.com")])
+print(result.content)
+```
+
+!!! tip "See Also"
+    - [Security](SECURITY.md) - Tool output screening and prompt injection detection
+    - [Audit](AUDIT.md) - JSONL audit logging with privacy levels
+
+---
+
 **Added in:** v0.15.0
 
 Guardrails validate content **before** (input) and **after** (output) every LLM call. They catch unsafe inputs, redact PII, enforce output formats, and block toxic content — all without changing your application code.
@@ -319,3 +359,12 @@ for step in result.trace:
 | `ToxicityGuardrail(threshold=0.0)` | Keyword-based toxicity scoring |
 | `FormatGuardrail(require_json=True)` | JSON/length format validation |
 | `LengthGuardrail(max_chars=..., max_words=...)` | Content length enforcement |
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 20 | [`20_customer_support_bot.py`](https://github.com/johnnichev/selectools/blob/main/examples/20_customer_support_bot.py) | Customer support bot with guardrails, PII redaction, and memory |
+| 29 | [`29_guardrails.py`](https://github.com/johnnichev/selectools/blob/main/examples/29_guardrails.py) | Complete guardrails demo with topic blocking, PII, and toxicity |

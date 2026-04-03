@@ -7,6 +7,35 @@ tags:
 
 # Vector Stores Module
 
+**Import:** `from selectools.rag import InMemoryVectorStore`
+**Stability:** stable
+
+```python title="vector_store_quick.py"
+from selectools.rag import InMemoryVectorStore, Document
+
+# InMemoryVectorStore with pre-computed embeddings (no API key needed).
+store = InMemoryVectorStore()
+
+# Add documents with dummy 3-dimensional embeddings
+docs = [
+    Document(text="Python is great for AI", metadata={"topic": "programming"}),
+    Document(text="JavaScript powers the web", metadata={"topic": "programming"}),
+]
+embeddings = [[0.9, 0.1, 0.0], [0.1, 0.8, 0.1]]
+store.add_documents(docs, embeddings=embeddings)
+
+# Search with a query embedding
+results = store.search(query_embedding=[0.85, 0.15, 0.0], top_k=2)
+for r in results:
+    print(f"Score: {r.score:.3f} | {r.document.text}")
+```
+
+!!! tip "See Also"
+    - [RAG](RAG.md) - End-to-end RAG pipeline using vector stores
+    - [Embeddings](EMBEDDINGS.md) - Generating real embeddings for vector stores
+
+---
+
 **Directory:** `src/selectools/rag/stores/`
 **Files:** `memory.py`, `sqlite.py`, `chroma.py`, `pinecone.py`
 
@@ -592,3 +621,14 @@ os.environ["PINECONE_ENVIRONMENT"] = "your-env"
 ---
 
 **Next Steps:** Understand the model registry in the [Models Module](MODELS.md).
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 14 | [`14_rag_basic.py`](https://github.com/johnnichev/selectools/blob/main/examples/14_rag_basic.py) | Basic RAG with in-memory vector store |
+| 15 | [`15_semantic_search.py`](https://github.com/johnnichev/selectools/blob/main/examples/15_semantic_search.py) | Semantic search across vector stores |
+| 16 | [`16_rag_advanced.py`](https://github.com/johnnichev/selectools/blob/main/examples/16_rag_advanced.py) | Advanced RAG with SQLite vector store |
+| 18 | [`18_hybrid_search.py`](https://github.com/johnnichev/selectools/blob/main/examples/18_hybrid_search.py) | Hybrid search combining BM25 + vector |

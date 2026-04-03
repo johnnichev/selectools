@@ -7,6 +7,42 @@ tags:
 
 # Knowledge Module
 
+**Import:** `from selectools.knowledge import KnowledgeMemory`
+**Stability:** beta
+
+```python title="knowledge_quick.py"
+import tempfile
+from selectools.knowledge import KnowledgeMemory
+
+# KnowledgeMemory stores long-term facts on disk (no API key needed)
+with tempfile.TemporaryDirectory() as tmpdir:
+    km = KnowledgeMemory(storage_dir=tmpdir, max_log_days=30)
+
+    # Store persistent and transient knowledge
+    km.remember("Preferred language: Python", category="preferences", persistent=True)
+    km.remember("Working on Project Atlas today", category="context", persistent=False)
+
+    # Build context for system prompt injection
+    context = km.build_context()
+    print(context)
+    # [Long-term Memory]
+    # ## preferences
+    # - Preferred language: Python
+    #
+    # [Recent Memory]
+    # - [...] (context) Working on Project Atlas today
+
+    # Persistent facts survive log pruning
+    facts = km.get_persistent_facts()
+    print(f"Persistent categories: {list(facts.keys())}")
+```
+
+!!! tip "See Also"
+    - [Knowledge Graph](KNOWLEDGE_GRAPH.md) - Relationship tracking between entities
+    - [Entity Memory](ENTITY_MEMORY.md) - LLM-powered entity extraction and tracking
+
+---
+
 **Added in:** v0.16.0 (enhanced in v0.17.4)
 **File:** `src/selectools/knowledge.py`, `knowledge_store_redis.py`, `knowledge_store_supabase.py`
 **Classes:** `KnowledgeMemory`, `KnowledgeEntry`, `KnowledgeStore`, `FileKnowledgeStore`, `SQLiteKnowledgeStore`, `RedisKnowledgeStore`, `SupabaseKnowledgeStore`
@@ -644,3 +680,14 @@ def test_remember_tool_registration():
 ---
 
 **Next Steps:** See how all memory types work together in the [Architecture doc](../ARCHITECTURE.md).
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 37 | [`37_knowledge_memory.py`](https://github.com/johnnichev/selectools/blob/main/examples/37_knowledge_memory.py) | Long-term knowledge memory with daily logs |
+| 20 | [`20_customer_support_bot.py`](https://github.com/johnnichev/selectools/blob/main/examples/20_customer_support_bot.py) | Production bot with knowledge persistence |
+| 36 | [`36_knowledge_graph.py`](https://github.com/johnnichev/selectools/blob/main/examples/36_knowledge_graph.py) | Knowledge graph (relationship tracking) |
+| 35 | [`35_entity_memory.py`](https://github.com/johnnichev/selectools/blob/main/examples/35_entity_memory.py) | Entity memory (attribute tracking) |

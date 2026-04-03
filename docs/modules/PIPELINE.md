@@ -7,6 +7,42 @@ tags:
 
 # Pipeline Module
 
+**Import:** `from selectools.pipeline import Pipeline, step`
+
+**Stability:** beta
+
+```python title="pipeline_quickstart.py"
+from selectools.pipeline import Pipeline, step
+
+@step
+def clean(text: str) -> str:
+    """Strip whitespace and normalize."""
+    return text.strip().lower()
+
+@step
+def word_count(text: str) -> str:
+    """Count words in the text."""
+    count = len(text.split())
+    return f"'{text}' contains {count} words."
+
+# Compose steps with the | operator
+pipeline = clean | word_count
+
+result = pipeline.run("  Hello World from Selectools  ")
+print(result.output)     # "'hello world from selectools' contains 4 words."
+print(result.steps_run)  # 2
+
+# Inspect the per-step trace
+for entry in result.trace:
+    print(f"  {entry['step']}: {entry['status']} ({entry['duration_ms']:.1f}ms)")
+```
+
+!!! tip "See Also"
+    - [Orchestration](ORCHESTRATION.md) - AgentGraph for multi-agent graph workflows
+    - [Agent](AGENT.md) - The Agent class that powers individual steps
+
+---
+
 **Added in:** v0.18.0 (type-safe contracts, `retry()`, `cache_step()` added in v0.18.x)
 **Package:** `src/selectools/pipeline.py`
 **Classes:** `Pipeline`, `Step`, `StepResult`
@@ -639,3 +675,12 @@ Returns: `Step`
 ---
 
 **Next Steps:** Learn about multi-agent orchestration in the [Orchestration Module](ORCHESTRATION.md).
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 66 | [`66_streaming_pipeline.py`](https://github.com/johnnichev/selectools/blob/main/examples/66_streaming_pipeline.py) | Streaming pipeline with the `@step` decorator and `\|` operator |
+| 67 | [`67_type_safe_pipeline.py`](https://github.com/johnnichev/selectools/blob/main/examples/67_type_safe_pipeline.py) | Type-safe step contracts with `parallel()` and `branch()` |

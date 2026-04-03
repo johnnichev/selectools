@@ -7,6 +7,41 @@ tags:
 
 # Knowledge Graph Module
 
+**Import:** `from selectools.knowledge_graph import KnowledgeGraphMemory`
+**Stability:** beta
+
+```python title="knowledge_graph_quick.py"
+from selectools.knowledge_graph import KnowledgeGraphMemory, InMemoryTripleStore, Triple
+
+# Build a knowledge graph without an LLM provider (no API key needed)
+store = InMemoryTripleStore()
+kg = KnowledgeGraphMemory(store=store, max_context_triples=20)
+
+kg.update([
+    Triple(subject="Alice", relation="works_at", object="Acme Corp", confidence=0.95),
+    Triple(subject="Acme Corp", relation="located_in", object="Seattle", confidence=0.90),
+    Triple(subject="Alice", relation="manages", object="Project Atlas", confidence=0.85),
+])
+
+# Query by subject
+for t in store.query(subject="Alice"):
+    print(f"  {t.subject} --{t.relation}--> {t.object}")
+
+# Build context for system prompt injection
+context = kg.build_context()
+print(context)
+# [Known Relationships]
+# - Alice works_at Acme Corp (0.95)
+# - Acme Corp located_in Seattle (0.90)
+# - Alice manages Project Atlas (0.85)
+```
+
+!!! tip "See Also"
+    - [Entity Memory](ENTITY_MEMORY.md) - Entity attribute tracking (complements the graph)
+    - [Knowledge](KNOWLEDGE.md) - Cross-session long-term knowledge memory
+
+---
+
 **Added in:** v0.16.0
 **File:** `src/selectools/knowledge_graph.py`
 **Classes:** `Triple`, `TripleStore`, `InMemoryTripleStore`, `SQLiteTripleStore`, `KnowledgeGraphMemory`
@@ -678,3 +713,14 @@ def test_confidence_filtering():
 ---
 
 **Next Steps:** Learn about cross-session knowledge in the [Knowledge Module](KNOWLEDGE.md).
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 36 | [`36_knowledge_graph.py`](https://github.com/johnnichev/selectools/blob/main/examples/36_knowledge_graph.py) | Knowledge graph with triple extraction |
+| 20 | [`20_customer_support_bot.py`](https://github.com/johnnichev/selectools/blob/main/examples/20_customer_support_bot.py) | Production bot with knowledge context |
+| 35 | [`35_entity_memory.py`](https://github.com/johnnichev/selectools/blob/main/examples/35_entity_memory.py) | Entity memory (graph complement) |
+| 37 | [`37_knowledge_memory.py`](https://github.com/johnnichev/selectools/blob/main/examples/37_knowledge_memory.py) | Long-term knowledge memory |

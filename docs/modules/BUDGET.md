@@ -7,6 +7,33 @@ tags:
 
 # Token Budget & Cost Limits
 
+**Import:** `from selectools import AgentConfig`
+**Stability:** beta
+
+```python title="budget_demo.py"
+from selectools import Agent, AgentConfig, LocalProvider, tool
+
+@tool(description="Count words in text")
+def word_count(text: str) -> str:
+    return f"Word count: {len(text.split())}"
+
+agent = Agent(
+    tools=[word_count],
+    provider=LocalProvider(),
+    config=AgentConfig(
+        max_total_tokens=50000,
+        max_cost_usd=0.25,
+    ),
+)
+result = agent.run("Count words in 'hello world'")
+print(result.content)
+```
+
+!!! tip "See Also"
+    - [Cancellation](CANCELLATION.md) -- cooperative agent stopping
+    - [Token Estimation](TOKEN_ESTIMATION.md) -- pre-run token and cost estimates
+    - [Usage & Cost Tracking](USAGE.md) -- actual token counts after execution
+
 **Added in:** v0.17.3
 **File:** `src/selectools/agent/config.py`, `src/selectools/agent/core.py`
 
@@ -86,3 +113,11 @@ If both `max_iterations` and `max_total_tokens` are set, whichever limit is hit 
 
 - [Usage & Cost Tracking](USAGE.md) — per-call and per-run token/cost tracking
 - [Agent](AGENT.md) — `AgentConfig` reference
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 05 | [`05_cost_tracking.py`](https://github.com/johnnichev/selectools/blob/main/examples/05_cost_tracking.py) | Token and cost tracking per run |
+| 43 | [`43_token_budget.py`](https://github.com/johnnichev/selectools/blob/main/examples/43_token_budget.py) | Token budget enforcement demo |
+| 47 | [`47_token_estimation.py`](https://github.com/johnnichev/selectools/blob/main/examples/47_token_estimation.py) | Pre-run token estimation |

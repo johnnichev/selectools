@@ -7,6 +7,41 @@ tags:
 
 # Providers Module
 
+**Import:** `from selectools.providers import OpenAIProvider`
+
+**Stability:** stable
+
+```python title="providers_quickstart.py"
+from selectools import Agent, AgentConfig, Message, Role, tool
+from selectools.providers.stubs import LocalProvider
+
+@tool(description="Get the weather for a city")
+def get_weather(city: str) -> str:
+    return f"The weather in {city} is sunny, 22C."
+
+# LocalProvider requires no API key — perfect for testing
+provider = LocalProvider()
+
+agent = Agent(
+    tools=[get_weather],
+    provider=provider,
+    config=AgentConfig(max_iterations=2),
+)
+
+result = agent.run([Message(role=Role.USER, content="What is the weather in Tokyo?")])
+print(result.content)
+
+# In production, swap to a real provider with one line:
+# from selectools.providers import OpenAIProvider
+# provider = OpenAIProvider()  # uses OPENAI_API_KEY env var
+```
+
+!!! tip "See Also"
+    - [Models](MODELS.md) - 152-model registry with pricing data
+    - [Usage](USAGE.md) - Automatic token counting and cost tracking
+
+---
+
 **Directory:** `src/selectools/providers/`
 **Files:** `base.py`, `openai_provider.py`, `anthropic_provider.py`, `gemini_provider.py`, `ollama_provider.py`, `fallback.py`
 
@@ -807,3 +842,13 @@ The provider falls through to the next on:
 ---
 
 **Next Steps:** Learn about usage tracking in the [Usage Module](USAGE.md).
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 01 | [`01_hello_world.py`](https://github.com/johnnichev/selectools/blob/main/examples/01_hello_world.py) | Minimal agent with a single provider |
+| 17 | [`17_rag_multi_provider.py`](https://github.com/johnnichev/selectools/blob/main/examples/17_rag_multi_provider.py) | RAG across multiple provider backends |
+| 25 | [`25_provider_fallback.py`](https://github.com/johnnichev/selectools/blob/main/examples/25_provider_fallback.py) | FallbackProvider with circuit breaker failover |

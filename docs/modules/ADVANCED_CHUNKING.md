@@ -7,6 +7,36 @@ tags:
 
 # Advanced Chunking
 
+**Import:** `from selectools.rag import SemanticChunker`
+**Stability:** stable
+
+```python title="chunking_quick.py"
+from selectools.rag import RecursiveTextSplitter, Document
+
+# RecursiveTextSplitter splits at natural boundaries (no API key needed).
+# For SemanticChunker, an EmbeddingProvider is required.
+splitter = RecursiveTextSplitter(chunk_size=80, chunk_overlap=20)
+
+doc = Document(
+    text=(
+        "Selectools is an AI agent framework. "
+        "It supports OpenAI, Anthropic, Gemini, and Ollama. "
+        "RAG pipelines include chunking, embedding, and search."
+    ),
+    metadata={"source": "readme.md"},
+)
+
+chunks = splitter.split_documents([doc])
+for i, chunk in enumerate(chunks):
+    print(f"Chunk {i}: {chunk.text[:70]}...")
+```
+
+!!! tip "See Also"
+    - [RAG](RAG.md) - Full RAG pipeline integrating chunkers with search
+    - [Embeddings](EMBEDDINGS.md) - Embedding providers for SemanticChunker
+
+---
+
 **Directory:** `src/selectools/rag/`
 **Source:** `chunking.py`
 
@@ -565,3 +595,13 @@ chunker = SemanticChunker(embedder)
 ---
 
 **Next Steps:** Integrate advanced chunking into your pipeline via [RAG Module](RAG.md).
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 19 | [`19_advanced_chunking.py`](https://github.com/johnnichev/selectools/blob/main/examples/19_advanced_chunking.py) | Semantic and contextual chunking strategies |
+| 16 | [`16_rag_advanced.py`](https://github.com/johnnichev/selectools/blob/main/examples/16_rag_advanced.py) | Advanced RAG pipeline with chunking |
+| 14 | [`14_rag_basic.py`](https://github.com/johnnichev/selectools/blob/main/examples/14_rag_basic.py) | Basic RAG pipeline for comparison |

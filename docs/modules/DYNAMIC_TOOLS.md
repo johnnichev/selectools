@@ -7,6 +7,33 @@ tags:
 
 # Dynamic Tools Module
 
+**Import:** `from selectools.tools import ToolLoader`
+**Stability:** stable
+
+```python title="dynamic_tools_demo.py"
+from selectools import Agent, LocalProvider, tool
+from selectools.tools import ToolLoader
+
+@tool(description="Greet a user")
+def greet(name: str) -> str:
+    return f"Hello, {name}!"
+
+agent = Agent(tools=[greet], provider=LocalProvider())
+
+# Add a new tool at runtime
+@tool(description="Say goodbye")
+def farewell(name: str) -> str:
+    return f"Goodbye, {name}!"
+
+agent.add_tool(farewell)
+result = agent.run("Greet Alice")
+print(result.content)
+```
+
+!!! tip "See Also"
+    - [Tools](TOOLS.md) -- tool definition and `@tool` decorator
+    - [Toolbox](TOOLBOX.md) -- 24 pre-built tools for common tasks
+
 **File:** `src/selectools/tools/loader.py`, `src/selectools/agent/core.py`
 **Classes:** `ToolLoader` (loader), `Agent` (dynamic tool methods)
 **Imports:** `ToolLoader`, `Tool`, `tool` from `selectools.tools`; `Agent`, `AgentConfig` from `selectools`
@@ -642,3 +669,12 @@ python -c "import importlib.util; spec = importlib.util.spec_from_file_location(
 ---
 
 **Next Steps:** Define tools with the `@tool` decorator as described in the [Tools Module](TOOLS.md).
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 13 | [`13_dynamic_tools.py`](https://github.com/johnnichev/selectools/blob/main/examples/13_dynamic_tools.py) | Dynamic tool loading and hot-reload |
+| 03 | [`03_toolbox.py`](https://github.com/johnnichev/selectools/blob/main/examples/03_toolbox.py) | Pre-built toolbox usage |
+| 27 | [`27_tool_policy.py`](https://github.com/johnnichev/selectools/blob/main/examples/27_tool_policy.py) | Tool policy (allow/review/deny) |
+| 65 | [`65_tool_composition.py`](https://github.com/johnnichev/selectools/blob/main/examples/65_tool_composition.py) | Tool composition with `@compose` |

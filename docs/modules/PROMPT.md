@@ -7,6 +7,33 @@ tags:
 
 # Prompt Module
 
+**Import:** `from selectools.prompt import PromptBuilder`
+**Stability:** stable
+
+```python title="prompt_quick.py"
+from selectools import Tool, ToolParameter
+from selectools.prompt import PromptBuilder
+
+# Create a tool
+search = Tool(
+    name="search",
+    description="Search the web for information",
+    parameters=[
+        ToolParameter(name="query", param_type=str, description="Search query", required=True)
+    ],
+    function=lambda query: f"Results for: {query}",
+)
+
+# Build the system prompt
+builder = PromptBuilder()
+prompt = builder.build([search])
+print(prompt[:200])
+```
+
+!!! tip "See Also"
+    - [Agent Module](AGENT.md) -- how agents use system prompts
+    - [Tools Module](TOOLS.md) -- tool schema generation
+
 **File:** `src/selectools/prompt.py`
 **Classes:** `PromptBuilder`
 **Constants:** `DEFAULT_SYSTEM_INSTRUCTIONS`
@@ -405,6 +432,15 @@ The system prompt is static for the agent's lifetime.
 Can't show/hide tools based on conversation state.
 
 **Workaround:** Create specialized agents for different contexts.
+
+---
+
+## Related Examples
+
+| # | File | Description |
+|---|------|-------------|
+| 01 | [`01_hello_world.py`](https://github.com/johnnichev/selectools/blob/main/examples/01_hello_world.py) | Basic agent setup with default prompt building |
+| 20 | [`20_customer_support_bot.py`](https://github.com/johnnichev/selectools/blob/main/examples/20_customer_support_bot.py) | Custom system prompt for a support agent |
 
 ---
 

@@ -7,6 +7,29 @@ tags:
 
 # Conversation Branching
 
+**Import:** `from selectools.memory import ConversationMemory`
+**Stability:** beta
+
+```python title="branching_demo.py"
+from selectools.memory import ConversationMemory
+from selectools import Message, Role
+
+memory = ConversationMemory(max_messages=50)
+memory.add(Message(role=Role.USER, content="Discuss architecture options."))
+memory.add(Message(role=Role.ASSISTANT, content="Option A is microservices..."))
+
+# Fork the conversation
+branch = memory.branch()
+branch.add(Message(role=Role.USER, content="What about a monolith?"))
+
+print(f"Original: {len(memory)} messages")  # 2
+print(f"Branch:   {len(branch)} messages")  # 3
+```
+
+!!! tip "See Also"
+    - [Memory](MEMORY.md) -- conversation memory and sliding window
+    - [Sessions](SESSIONS.md) -- persistent session storage backends
+
 **Added in:** v0.17.7
 **Files:** `src/selectools/memory.py`, `src/selectools/sessions.py`
 
@@ -150,3 +173,11 @@ except ValueError as exc:
 ## Example
 
 See [`examples/54_conversation_branching.py`](https://github.com/johnnichev/selectools/blob/main/examples/54_conversation_branching.py) for a runnable demo covering `ConversationMemory.branch()`, `JsonFileSessionStore.branch()`, and `SQLiteSessionStore.branch()`.
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 54 | [`54_conversation_branching.py`](https://github.com/johnnichev/selectools/blob/main/examples/54_conversation_branching.py) | Branching with memory and session stores |
+| 33 | [`33_persistent_sessions.py`](https://github.com/johnnichev/selectools/blob/main/examples/33_persistent_sessions.py) | Persistent session storage |
+| 04 | [`04_conversation_memory.py`](https://github.com/johnnichev/selectools/blob/main/examples/04_conversation_memory.py) | Conversation memory basics |

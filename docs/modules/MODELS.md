@@ -8,6 +8,34 @@ tags:
 
 # Models Module
 
+**Import:** `from selectools.models import OpenAI`
+
+**Stability:** stable
+
+```python title="models_quickstart.py"
+from selectools.models import OpenAI, Anthropic, Gemini, ALL_MODELS, MODELS_BY_ID
+
+# Type-safe model constants with IDE autocomplete
+model = OpenAI.GPT_4O_MINI
+print(f"Model:   {model.id}")
+print(f"Cost:    ${model.prompt_cost} / ${model.completion_cost} per 1M tokens")
+print(f"Context: {model.context_window:,} tokens")
+
+# Compare providers at a glance
+for m in [OpenAI.GPT_4O_MINI, Anthropic.HAIKU_3_5_20241022, Gemini.FLASH_2_0]:
+    print(f"  {m.id:30s}  ${m.prompt_cost:>6.2f} in / ${m.completion_cost:>6.2f} out")
+
+# O(1) lookup by model ID string
+info = MODELS_BY_ID["gpt-4o-mini"]
+print(f"\nRegistry has {len(ALL_MODELS)} models total")
+```
+
+!!! tip "See Also"
+    - [Providers](PROVIDERS.md) - Using models with provider adapters
+    - [Usage](USAGE.md) - Automatic cost tracking per call and per session
+
+---
+
 **File:** `src/selectools/models.py`
 **Classes:** `ModelInfo`
 **Constants:** `ALL_MODELS`, `MODELS_BY_ID`, `OpenAI`, `Anthropic`, `Gemini`, `Ollama`, `Cohere`
@@ -698,3 +726,11 @@ class OpenAI:
 ---
 
 **Congratulations!** You've completed the selectools implementation documentation. Return to [ARCHITECTURE.md](../ARCHITECTURE.md) for the system overview.
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 05 | [`05_cost_tracking.py`](https://github.com/johnnichev/selectools/blob/main/examples/05_cost_tracking.py) | Token counting and cost tracking using the model registry |

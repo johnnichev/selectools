@@ -7,6 +7,29 @@ tags:
 
 # Tool Result Caching
 
+**Import:** `from selectools import AgentConfig`
+**Stability:** beta
+
+```python title="tool_caching_demo.py"
+from selectools import Agent, AgentConfig, LocalProvider, InMemoryCache, tool
+
+@tool(description="Expensive API call", cacheable=True, cache_ttl=60)
+def fetch_data(query: str) -> str:
+    return f"Data for: {query}"
+
+agent = Agent(
+    tools=[fetch_data],
+    provider=LocalProvider(),
+    config=AgentConfig(cache=InMemoryCache()),
+)
+result = agent.run("Fetch data for sales Q4")
+print(result.content)
+```
+
+!!! tip "See Also"
+    - [Semantic Cache](SEMANTIC_CACHE.md) -- embedding-based response caching
+    - [Agent](AGENT.md) -- cache configuration on AgentConfig
+
 **Added in:** v0.17.6
 **Files:** `src/selectools/tools/base.py`, `src/selectools/tools/decorators.py`, `src/selectools/agent/_tool_executor.py`
 
@@ -93,3 +116,11 @@ for step in result.trace.steps:
 
 - [Tools](TOOLS.md) — tool definition and decorator
 - [Agent](AGENT.md) — cache configuration
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 51 | [`51_tool_result_caching.py`](https://github.com/johnnichev/selectools/blob/main/examples/51_tool_result_caching.py) | Tool result caching with TTL |
+| 09 | [`09_caching.py`](https://github.com/johnnichev/selectools/blob/main/examples/09_caching.py) | LLM response caching |
+| 52 | [`52_semantic_cache.py`](https://github.com/johnnichev/selectools/blob/main/examples/52_semantic_cache.py) | Semantic similarity caching |
