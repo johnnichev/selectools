@@ -146,7 +146,12 @@ def screen_output(
     patterns = list(_DEFAULT_INJECTION_PATTERNS)
     if extra_patterns:
         for pat in extra_patterns:
-            patterns.append(re.compile(pat, re.IGNORECASE))
+            try:
+                compiled = re.compile(pat, re.IGNORECASE)
+                compiled.search("a" * 100)  # nosec B105 — ReDoS smoke test
+                patterns.append(compiled)
+            except re.error as exc:
+                raise ValueError(f"Invalid extra screening pattern: {exc}") from exc
 
     normalized = _normalize_for_screening(content)
 

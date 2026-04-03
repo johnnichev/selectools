@@ -141,6 +141,9 @@ class ToolLoader:
 
         tools: List[Tool] = []
         for py_file in sorted(dir_path.glob(pattern)):
+            # Security: prevent symlink traversal outside the plugin directory
+            if not py_file.resolve().is_relative_to(dir_path):
+                continue
             if py_file.name.startswith("_"):
                 continue
             if py_file.name in exclude_set:

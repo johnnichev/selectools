@@ -22,21 +22,35 @@ _SCORE_OVER_10 = re.compile(r"(\d+(?:\.\d+)?)\s*/\s*10\b")
 _VERDICT_PATTERN = re.compile(r"\b(PASS|FAIL)\b")
 
 
+def _strip_fenced_content(text: str) -> str:
+    """Remove fenced user content blocks to prevent score injection."""
+    while _FENCE_START in text and _FENCE_END in text:
+        start = text.index(_FENCE_START)
+        end = text.index(_FENCE_END) + len(_FENCE_END)
+        text = text[:start] + text[end:]
+    return text
+
+
 def _extract_score(text: str) -> Optional[float]:
     """Extract a numeric score from LLM judge output.
+
+    Uses the LAST match (not first) to prevent injection from echoed user
+    content. Strips fenced user content blocks before extraction. Clamps
+    result to [0, 10] range.
 
     Tries in order:
     1. "Score: X" / "Rating: X" prefix
     2. "X/10" fraction format (e.g. "I'd give this 7/10")
     3. PASS/FAIL verdict
     """
-    m = _SCORE_PATTERN.search(text)
-    if m:
-        return float(m.group(1))
-    m = _SCORE_OVER_10.search(text)
-    if m:
-        return float(m.group(1))
-    m = _VERDICT_PATTERN.search(text)
+    clean = _strip_fenced_content(text)
+    matches = _SCORE_PATTERN.findall(clean)
+    if matches:
+        return max(0.0, min(10.0, float(matches[-1])))
+    matches = _SCORE_OVER_10.findall(clean)
+    if matches:
+        return max(0.0, min(10.0, float(matches[-1])))
+    m = _VERDICT_PATTERN.search(clean)
     if m:
         return 1.0 if m.group(1) == "PASS" else 0.0
     return None

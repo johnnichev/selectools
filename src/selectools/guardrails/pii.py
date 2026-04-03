@@ -71,7 +71,13 @@ class PIIGuardrail(Guardrail):
 
         if custom_patterns:
             for name, pat in custom_patterns.items():
-                patterns[name] = re.compile(pat)
+                try:
+                    compiled = re.compile(pat, re.IGNORECASE)
+                    # Safety check: test against a short string to catch catastrophic backtracking
+                    compiled.search("a" * 100)  # nosec B105 — ReDoS smoke test
+                    patterns[name] = compiled
+                except re.error as exc:
+                    raise ValueError(f"Invalid custom PII pattern '{name}': {exc}") from exc
 
         self._patterns = patterns
 
