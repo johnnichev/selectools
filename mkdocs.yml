@@ -87,7 +87,7 @@ markdown_extensions:
 nav:
   - Get Started:
     - Quickstart: QUICKSTART.md
-    - Coming from LangChain: MIGRATION.md
+    - Migration Guides: MIGRATION.md
     - Cookbook: COOKBOOK.md
     - API Keys: KEYS.md
     - Architecture: ARCHITECTURE.md

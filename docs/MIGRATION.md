@@ -1,6 +1,12 @@
-# Coming from LangChain / LangGraph
+# Migration Guides
 
-Side-by-side migration guide. Every example shows the LangChain way and the selectools equivalent.
+Side-by-side comparisons with LangChain, CrewAI, AutoGen, and LlamaIndex. Every example shows the other framework's way and the selectools equivalent.
+
+**Jump to:** [LangChain](#tool-calling) | [CrewAI](#coming-from-crewai) | [AutoGen](#coming-from-autogen) | [LlamaIndex](#coming-from-llamaindex)
+
+---
+
+# Coming from LangChain / LangGraph
 
 ---
 
@@ -200,7 +206,7 @@ report = suite.run()
 report.to_html("report.html")
 ```
 
-**What's different:** 39 evaluators built into the library. No paid service, no separate install.
+**What's different:** 50 evaluators built into the library. No paid service, no separate install.
 
 ---
 
@@ -246,3 +252,213 @@ Automatic per-call cost tracking across 152 models with built-in pricing data.
 - **LangGraph Platform** — managed deployment with cron, webhooks, SSO
 
 If you need a managed platform or 50+ integrations today, LangChain is the safer bet. If you want a library that stays out of your way and includes everything in one package, give selectools a try.
+
+---
+---
+
+# Coming from CrewAI
+
+CrewAI uses role-based agents with a Crew coordinator. Selectools uses graph-based orchestration where any agent can route to any other.
+
+---
+
+## Agent Definition
+
+**CrewAI:**
+```python
+from crewai import Agent, Task, Crew
+
+researcher = Agent(
+    role="Researcher",
+    goal="Find accurate information",
+    backstory="You are an expert researcher...",
+    llm="gpt-4o",
+)
+writer = Agent(
+    role="Writer",
+    goal="Write clear content",
+    backstory="You are a skilled writer...",
+    llm="gpt-4o",
+)
+
+task1 = Task(description="Research AI trends", agent=researcher)
+task2 = Task(description="Write a report", agent=writer)
+
+crew = Crew(agents=[researcher, writer], tasks=[task1, task2])
+result = crew.kickoff()
+```
+
+**selectools:**
+```python
+from selectools import Agent, AgentConfig, AgentGraph
+from selectools.providers import OpenAIProvider
+
+provider = OpenAIProvider()
+researcher = Agent(
+    tools=[search],
+    provider=provider,
+    config=AgentConfig(model="gpt-4o", system_prompt="You are an expert researcher."),
+)
+writer = Agent(
+    tools=[],
+    provider=provider,
+    config=AgentConfig(model="gpt-4o", system_prompt="You are a skilled writer."),
+)
+
+graph = AgentGraph()
+graph.add_node("researcher", researcher)
+graph.add_node("writer", writer)
+graph.add_edge("START", "researcher")
+graph.add_edge("researcher", "writer")
+graph.add_edge("writer", "END")
+result = graph.run("Research AI trends and write a report")
+```
+
+**What's different:** No `role`/`goal`/`backstory` boilerplate. System prompts are plain strings. Graphs give you conditional routing, parallel execution, and HITL that CrewAI's sequential task model doesn't support.
+
+---
+
+## What CrewAI Does Better (honest)
+
+- **Simpler mental model** for sequential task chains (no graph concepts)
+- **Role-based prompting** is automatic (role/goal/backstory templating)
+- **Enterprise plan** includes hosted orchestration
+
+---
+---
+
+# Coming from AutoGen
+
+AutoGen uses conversational agents that chat with each other. Selectools uses directed graphs with explicit routing.
+
+---
+
+## Multi-Agent Chat
+
+**AutoGen:**
+```python
+from autogen import AssistantAgent, UserProxyAgent
+
+assistant = AssistantAgent("assistant", llm_config={"model": "gpt-4o"})
+user_proxy = UserProxyAgent("user", code_execution_config={"work_dir": "coding"})
+
+user_proxy.initiate_chat(assistant, message="Write a Python script")
+```
+
+**selectools:**
+```python
+from selectools import Agent, AgentConfig
+from selectools.providers import OpenAIProvider
+
+agent = Agent(
+    tools=[],
+    provider=OpenAIProvider(),
+    config=AgentConfig(model="gpt-4o"),
+)
+result = agent.run("Write a Python script")
+print(result.content)
+```
+
+**What's different:** selectools doesn't use agent-to-agent chat. Instead, you compose agents into graphs where data flows through explicit edges. This is more predictable than open-ended conversations between agents.
+
+---
+
+## Group Chat (AutoGen) vs AgentGraph (selectools)
+
+**AutoGen:**
+```python
+from autogen import GroupChat, GroupChatManager
+
+group = GroupChat(agents=[agent1, agent2, agent3], messages=[], max_round=10)
+manager = GroupChatManager(groupchat=group, llm_config=config)
+user_proxy.initiate_chat(manager, message="Solve this problem")
+```
+
+**selectools:**
+```python
+from selectools.orchestration import SupervisorAgent
+
+supervisor = SupervisorAgent(
+    agents={"researcher": agent1, "writer": agent2, "reviewer": agent3},
+    strategy="dynamic",  # LLM picks the best agent each step
+    provider=provider,
+)
+result = supervisor.run("Solve this problem")
+```
+
+**What's different:** `SupervisorAgent` gives you 4 coordination strategies (plan_and_execute, round_robin, dynamic, magentic) instead of AutoGen's single group chat model. The LLM router in `dynamic` mode is similar to AutoGen's speaker selection but with explicit control.
+
+---
+
+## What AutoGen Does Better (honest)
+
+- **Code execution** is built in (Docker sandboxes)
+- **Agent-to-agent conversation** is natural for brainstorming/debate scenarios
+- **Microsoft ecosystem** integration
+
+---
+---
+
+# Coming from LlamaIndex
+
+LlamaIndex focuses on data indexing and retrieval. Selectools has a built-in RAG pipeline but also covers agent orchestration, evals, and deployment.
+
+---
+
+## RAG Pipeline
+
+**LlamaIndex:**
+```python
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
+
+documents = SimpleDirectoryReader("data").load_data()
+index = VectorStoreIndex.from_documents(documents)
+query_engine = index.as_query_engine()
+response = query_engine.query("What is the refund policy?")
+```
+
+**selectools:**
+```python
+from selectools.rag import DocumentLoader, TextSplitter, InMemoryVectorStore
+from selectools.embeddings import OpenAIEmbeddings
+
+docs = DocumentLoader.from_directory("data")
+chunks = TextSplitter(chunk_size=500).split_documents(docs)
+store = InMemoryVectorStore(embeddings=OpenAIEmbeddings())
+store.add_documents(chunks)
+
+results = store.search("What is the refund policy?", top_k=5)
+```
+
+**What's different:** selectools exposes every step (chunking, embedding, retrieval, reranking) as a composable piece. You can swap BM25 for vector search, add a reranker, or use hybrid search with RRF fusion. LlamaIndex's `VectorStoreIndex` hides these choices.
+
+---
+
+## Hybrid Search
+
+**LlamaIndex:** Requires `BM25Retriever` + `QueryFusionRetriever` with manual setup.
+
+**selectools:**
+```python
+from selectools.rag import HybridSearcher, BM25Index
+
+searcher = HybridSearcher(
+    vector_store=store,
+    bm25_index=BM25Index(chunks),
+    alpha=0.5,  # balance between BM25 and vector
+)
+results = searcher.search("refund policy", top_k=10)
+```
+
+**What's different:** Hybrid search is a first-class feature, not an afterthought. Built-in RRF fusion and cross-encoder reranking.
+
+---
+
+## What LlamaIndex Does Better (honest)
+
+- **Data connectors** for 100+ sources (Notion, Google Drive, Slack, databases)
+- **Advanced indexing** (tree, keyword, knowledge graph indexes)
+- **Mature RAG ecosystem** with years of optimization
+- **LlamaParse** for complex document parsing (tables, PDFs)
+
+If your primary need is sophisticated document retrieval with many data sources, LlamaIndex is purpose-built for that. If you need agents + RAG + evals + deployment in one package, selectools combines all of these.
