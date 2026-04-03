@@ -52,10 +52,17 @@ theme:
 
 plugins:
   - search
+  - tags
   - git-revision-date-localized:
       type: date
       enable_creation_date: true
       fallback_to_build_date: true
+  - glightbox:
+      touchNavigation: true
+      loop: false
+      zoomable: true
+  - minify:
+      minify_html: true
 
 not_in_nav: |
   README.md

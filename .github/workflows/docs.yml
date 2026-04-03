@@ -26,7 +26,7 @@ jobs:
           cache: "pip"
 
       - name: Install MkDocs and plugins
-        run: pip install mkdocs-material mkdocs-git-revision-date-localized-plugin
+        run: pip install mkdocs-material mkdocs-git-revision-date-localized-plugin mkdocs-glightbox mkdocs-minify-plugin
 
       - name: Copy root files into docs
         run: |
