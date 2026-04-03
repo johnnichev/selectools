@@ -2,34 +2,6 @@
 
 Side-by-side comparisons with LangChain, CrewAI, AutoGen, and LlamaIndex. Every example shows the other framework's way and the selectools equivalent.
 
-## Table of Contents
-
-### LangChain / LangGraph
-- [Tool Calling](#tool-calling)
-- [Multi-Agent Graph](#multi-agent-graph)
-- [Conditional Routing](#conditional-routing)
-- [Human-in-the-Loop](#human-in-the-loop)
-- [Streaming](#streaming)
-- [Composable Pipelines](#composable-pipelines)
-- [Evaluation](#evaluation)
-- [Deployment](#deployment)
-- [Cost Tracking](#cost-tracking)
-- [What LangChain Does Better](#what-langchain-does-better-honest)
-
-### CrewAI
-- [Agent Definition](#agent-definition)
-- [What CrewAI Does Better](#what-crewai-does-better-honest)
-
-### AutoGen
-- [Multi-Agent Chat](#multi-agent-chat)
-- [Group Chat vs AgentGraph](#group-chat-autogen-vs-agentgraph-selectools)
-- [What AutoGen Does Better](#what-autogen-does-better-honest)
-
-### LlamaIndex
-- [RAG Pipeline](#rag-pipeline)
-- [Hybrid Search](#hybrid-search)
-- [What LlamaIndex Does Better](#what-llamaindex-does-better-honest)
-
 ---
 
 # Coming from LangChain / LangGraph
