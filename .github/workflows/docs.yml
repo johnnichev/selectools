@@ -40,6 +40,7 @@ jobs:
         run: |
           cp landing/index.html site/index.html
           cp landing/eval-report-preview.html site/eval-report-preview.html 2>/dev/null || true
+          cp landing/trace-preview.html site/trace-preview.html 2>/dev/null || true
 
       - name: Install selectools (for builder assembly)
         run: pip install -e .

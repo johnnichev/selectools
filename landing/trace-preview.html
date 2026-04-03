@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Trace — 77dc04c183ef487b…</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f172a; color: #e2e8f0; font-family: 'JetBrains Mono', 'Fira Code', monospace;
+          font-size: 13px; padding: 24px; }
+  h1 { font-size: 16px; font-weight: 600; color: #f8fafc; margin-bottom: 4px; }
+  .meta { color: #64748b; font-size: 12px; margin-bottom: 24px; }
+  .stat { display: inline-block; margin-right: 24px; }
+  .stat b { color: #e2e8f0; }
+  table { width: 100%; border-collapse: collapse; }
+  tr:hover td { background: #1a2744; }
+  td { padding: 7px 4px; border-bottom: 1px solid #1e293b; vertical-align: middle; }
+  code { background: #1e293b; padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+</style>
+</head>
+<body>
+<h1>Agent Trace</h1>
+<div class="meta">
+  <span class="stat"><b>run:</b> 77dc04c183ef487b…</span>
+  <span class="stat"><b>steps:</b> 5</span>
+  <span class="stat"><b>total:</b> 365.0ms</span>
+  <span class="stat"><b>llm:</b> 340.0ms (93%)</span>
+  <span class="stat"><b>tools:</b> 23.0ms (6%)</span>
+</div>
+<table>
+  <thead>
+    <tr>
+      <th style="color:#475569;text-align:right;padding-right:12px">#</th>
+      <th style="color:#475569;text-align:left">type</th>
+      <th style="color:#475569;padding:0 12px">duration</th>
+      <th style="color:#475569;text-align:right;padding-right:12px">ms</th>
+      <th style="color:#475569;text-align:left">label</th>
+    </tr>
+  </thead>
+  <tbody>
+
+      <tr onclick="toggleDetail('d0')" style="cursor:pointer">
+        <td style="color:#94a3b8;width:32px;text-align:right;padding-right:12px">1</td>
+        <td style="width:160px">
+          <span style="background:#3b82f6;color:#0f172a;font-size:11px;font-weight:600;
+                       padding:2px 7px;border-radius:4px">llm_call</span>
+        </td>
+        <td style="width:200px;padding:0 12px">
+          <div style="background:#1e3a5f;border-radius:3px;height:10px;width:100%">
+            <div style="background:#3b82f6;border-radius:3px;height:10px;width:71.7%"></div>
+          </div>
+        </td>
+        <td style="color:#94a3b8;width:70px;text-align:right;padding-right:12px">
+          142.0ms
+        </td>
+        <td style="color:#e2e8f0">llm_call</td>
+      </tr>
+      <tr id="d0" style="display:none">
+        <td colspan="5" style="padding:8px 16px 12px 44px;color:#94a3b8;
+                               font-size:12px;background:#0f2035;border-bottom:1px solid #1e3a5f">
+          <b>model:</b> gpt-4.1-mini<br><b>prompt tokens:</b> 320<br><b>completion tokens:</b> 85<br><b>cost:</b> $0.000400<br><b>reasoning:</b> User asked about refund policy
+        </td>
+      </tr>
+
+      <tr onclick="toggleDetail('d1')" style="cursor:pointer">
+        <td style="color:#94a3b8;width:32px;text-align:right;padding-right:12px">2</td>
+        <td style="width:160px">
+          <span style="background:#a78bfa;color:#0f172a;font-size:11px;font-weight:600;
+                       padding:2px 7px;border-radius:4px">tool_selection</span>
+        </td>
+        <td style="width:200px;padding:0 12px">
+          <div style="background:#1e3a5f;border-radius:3px;height:10px;width:100%">
+            <div style="background:#a78bfa;border-radius:3px;height:10px;width:0.0%"></div>
+          </div>
+        </td>
+        <td style="color:#94a3b8;width:70px;text-align:right;padding-right:12px">
+          0.0ms
+        </td>
+        <td style="color:#e2e8f0">tool_selection</td>
+      </tr>
+      <tr id="d1" style="display:none">
+        <td colspan="5" style="padding:8px 16px 12px 44px;color:#94a3b8;
+                               font-size:12px;background:#0f2035;border-bottom:1px solid #1e3a5f">
+          <b>tool:</b> search_docs<br><b>args:</b> <code>{&quot;query&quot;: &quot;refund policy&quot;}</code><br><b>reasoning:</b> Need to search knowledge base for refund information
+        </td>
+      </tr>
+
+      <tr onclick="toggleDetail('d2')" style="cursor:pointer">
+        <td style="color:#94a3b8;width:32px;text-align:right;padding-right:12px">3</td>
+        <td style="width:160px">
+          <span style="background:#8b5cf6;color:#0f172a;font-size:11px;font-weight:600;
+                       padding:2px 7px;border-radius:4px">tool_execution</span>
+        </td>
+        <td style="width:200px;padding:0 12px">
+          <div style="background:#1e3a5f;border-radius:3px;height:10px;width:100%">
+            <div style="background:#8b5cf6;border-radius:3px;height:10px;width:11.6%"></div>
+          </div>
+        </td>
+        <td style="color:#94a3b8;width:70px;text-align:right;padding-right:12px">
+          23.0ms
+        </td>
+        <td style="color:#e2e8f0">tool_execution</td>
+      </tr>
+      <tr id="d2" style="display:none">
+        <td colspan="5" style="padding:8px 16px 12px 44px;color:#94a3b8;
+                               font-size:12px;background:#0f2035;border-bottom:1px solid #1e3a5f">
+          <b>tool:</b> search_docs<br><b>result:</b> <code>Our refund policy allows returns within 30 days of purchase.</code>
+        </td>
+      </tr>
+
+      <tr onclick="toggleDetail('d3')" style="cursor:pointer">
+        <td style="color:#94a3b8;width:32px;text-align:right;padding-right:12px">4</td>
+        <td style="width:160px">
+          <span style="background:#fbbf24;color:#0f172a;font-size:11px;font-weight:600;
+                       padding:2px 7px;border-radius:4px">guardrail</span>
+        </td>
+        <td style="width:200px;padding:0 12px">
+          <div style="background:#1e3a5f;border-radius:3px;height:10px;width:100%">
+            <div style="background:#fbbf24;border-radius:3px;height:10px;width:1.0%"></div>
+          </div>
+        </td>
+        <td style="color:#94a3b8;width:70px;text-align:right;padding-right:12px">
+          2.0ms
+        </td>
+        <td style="color:#e2e8f0">PIIGuardrail: redacted 1 email address</td>
+      </tr>
+      <tr id="d3" style="display:none">
+        <td colspan="5" style="padding:8px 16px 12px 44px;color:#94a3b8;
+                               font-size:12px;background:#0f2035;border-bottom:1px solid #1e3a5f">
+          <b>summary:</b> PIIGuardrail: redacted 1 email address
+        </td>
+      </tr>
+
+      <tr onclick="toggleDetail('d4')" style="cursor:pointer">
+        <td style="color:#94a3b8;width:32px;text-align:right;padding-right:12px">5</td>
+        <td style="width:160px">
+          <span style="background:#3b82f6;color:#0f172a;font-size:11px;font-weight:600;
+                       padding:2px 7px;border-radius:4px">llm_call</span>
+        </td>
+        <td style="width:200px;padding:0 12px">
+          <div style="background:#1e3a5f;border-radius:3px;height:10px;width:100%">
+            <div style="background:#3b82f6;border-radius:3px;height:10px;width:100.0%"></div>
+          </div>
+        </td>
+        <td style="color:#94a3b8;width:70px;text-align:right;padding-right:12px">
+          198.0ms
+        </td>
+        <td style="color:#e2e8f0">llm_call</td>
+      </tr>
+      <tr id="d4" style="display:none">
+        <td colspan="5" style="padding:8px 16px 12px 44px;color:#94a3b8;
+                               font-size:12px;background:#0f2035;border-bottom:1px solid #1e3a5f">
+          <b>model:</b> gpt-4.1-mini<br><b>prompt tokens:</b> 480<br><b>completion tokens:</b> 120<br><b>cost:</b> $0.000800
+        </td>
+      </tr>
+  </tbody>
+</table>
+<script>
+function toggleDetail(id) {
+  var el = document.getElementById(id);
+  el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
+}
+</script>
+</body>
+</html>
