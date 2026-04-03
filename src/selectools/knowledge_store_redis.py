@@ -9,10 +9,13 @@ Requires the ``redis`` package::
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from .knowledge import KnowledgeEntry
+
+_logger = logging.getLogger(__name__)
 
 
 class RedisKnowledgeStore:
@@ -86,28 +89,36 @@ class RedisKnowledgeStore:
 
     def save(self, entry: KnowledgeEntry) -> str:
         """Save or update an entry.  Returns the entry ID."""
-        key = self._entry_key(entry.id)
+        try:
+            key = self._entry_key(entry.id)
 
-        # Read old category before pipeline (reduces TOCTOU window)
-        existing_raw: Optional[str] = self._client.hget(key, "category")
+            # Read old category before pipeline (reduces TOCTOU window)
+            existing_raw: Optional[str] = self._client.hget(key, "category")
 
-        pipe = self._client.pipeline()
-        if existing_raw is not None and existing_raw != entry.category:
-            pipe.srem(self._category_key(existing_raw), entry.id)
-        pipe.hset(key, mapping=self._entry_to_dict(entry))
-        pipe.zadd(self._importance_key(), {entry.id: entry.importance})
-        pipe.sadd(self._category_key(entry.category), entry.id)
-        pipe.sadd(self._all_ids_key(), entry.id)
-        pipe.execute()
+            pipe = self._client.pipeline()
+            if existing_raw is not None and existing_raw != entry.category:
+                pipe.srem(self._category_key(existing_raw), entry.id)
+            pipe.hset(key, mapping=self._entry_to_dict(entry))
+            pipe.zadd(self._importance_key(), {entry.id: entry.importance})
+            pipe.sadd(self._category_key(entry.category), entry.id)
+            pipe.sadd(self._all_ids_key(), entry.id)
+            pipe.execute()
 
-        return entry.id
+            return entry.id
+        except Exception as exc:
+            _logger.warning("RedisKnowledgeStore.save failed: %s", exc)
+            return entry.id
 
     def get(self, entry_id: str) -> Optional[KnowledgeEntry]:
         """Retrieve a single entry by ID."""
-        data: Dict[str, str] = self._client.hgetall(self._entry_key(entry_id))
-        if not data:
+        try:
+            data: Dict[str, str] = self._client.hgetall(self._entry_key(entry_id))
+            if not data:
+                return None
+            return self._dict_to_entry(data)
+        except Exception as exc:
+            _logger.warning("RedisKnowledgeStore.get failed: %s", exc)
             return None
-        return self._dict_to_entry(data)
 
     def query(
         self,
@@ -117,50 +128,60 @@ class RedisKnowledgeStore:
         limit: int = 50,
     ) -> List[KnowledgeEntry]:
         """Query entries with optional filters, ordered by importance descending."""
-        if category is not None:
-            candidate_ids: List[str] = list(self._client.smembers(self._category_key(category)))
-        else:
-            # Use sorted set to get IDs by importance descending
-            candidate_ids = self._client.zrevrangebyscore(
-                self._importance_key(), "+inf", str(min_importance)
-            )
+        try:
+            if category is not None:
+                candidate_ids: List[str] = list(self._client.smembers(self._category_key(category)))
+            else:
+                # Use sorted set to get IDs by importance descending
+                candidate_ids = self._client.zrevrangebyscore(
+                    self._importance_key(), "+inf", str(min_importance)
+                )
 
-        # Normalize naive since to UTC-aware to match stored entry datetimes.
-        since_aware: Optional[datetime] = None
-        if since is not None:
-            since_aware = since if since.tzinfo is not None else since.replace(tzinfo=timezone.utc)
+            # Normalize naive since to UTC-aware to match stored entry datetimes.
+            since_aware: Optional[datetime] = None
+            if since is not None:
+                since_aware = (
+                    since if since.tzinfo is not None else since.replace(tzinfo=timezone.utc)
+                )
 
-        entries: List[KnowledgeEntry] = []
-        for eid in candidate_ids:
-            entry = self.get(eid)
-            if entry is None:
-                continue
-            if entry.is_expired:
-                continue
-            if entry.importance < min_importance:
-                continue
-            if since_aware is not None and entry.created_at < since_aware:
-                continue
-            entries.append(entry)
+            entries: List[KnowledgeEntry] = []
+            for eid in candidate_ids:
+                entry = self.get(eid)
+                if entry is None:
+                    continue
+                if entry.is_expired:
+                    continue
+                if entry.importance < min_importance:
+                    continue
+                if since_aware is not None and entry.created_at < since_aware:
+                    continue
+                entries.append(entry)
 
-        entries.sort(key=lambda e: e.importance, reverse=True)
-        return entries[:limit]
+            entries.sort(key=lambda e: e.importance, reverse=True)
+            return entries[:limit]
+        except Exception as exc:
+            _logger.warning("RedisKnowledgeStore.query failed: %s", exc)
+            return []
 
     def delete(self, entry_id: str) -> bool:
         """Delete an entry.  Returns True if it existed."""
-        key = self._entry_key(entry_id)
-        data: Dict[str, str] = self._client.hgetall(key)
-        if not data:
-            return False
+        try:
+            key = self._entry_key(entry_id)
+            data: Dict[str, str] = self._client.hgetall(key)
+            if not data:
+                return False
 
-        category = data.get("category", "general")
-        pipe = self._client.pipeline()
-        pipe.delete(key)
-        pipe.zrem(self._importance_key(), entry_id)
-        pipe.srem(self._category_key(category), entry_id)
-        pipe.srem(self._all_ids_key(), entry_id)
-        pipe.execute()
-        return True
+            category = data.get("category", "general")
+            pipe = self._client.pipeline()
+            pipe.delete(key)
+            pipe.zrem(self._importance_key(), entry_id)
+            pipe.srem(self._category_key(category), entry_id)
+            pipe.srem(self._all_ids_key(), entry_id)
+            pipe.execute()
+            return True
+        except Exception as exc:
+            _logger.warning("RedisKnowledgeStore.delete failed: %s", exc)
+            return False
 
     def count(self) -> int:
         """Total entries.
@@ -168,8 +189,12 @@ class RedisKnowledgeStore:
         May include stale entries not yet pruned.
         Call ``prune()`` for an accurate count.
         """
-        result: int = self._client.scard(self._all_ids_key())
-        return result
+        try:
+            result: int = self._client.scard(self._all_ids_key())
+            return result
+        except Exception as exc:
+            _logger.warning("RedisKnowledgeStore.count failed: %s", exc)
+            return 0
 
     def prune(
         self,
@@ -177,35 +202,39 @@ class RedisKnowledgeStore:
         min_importance: float = 0.0,
     ) -> int:
         """Remove expired and low-importance non-persistent entries.  Returns count removed."""
-        all_ids: List[str] = list(self._client.smembers(self._all_ids_key()))
-        now = datetime.now(timezone.utc)
-        cutoff = now - timedelta(days=max_age_days) if max_age_days else None
-        removed = 0
+        try:
+            all_ids: List[str] = list(self._client.smembers(self._all_ids_key()))
+            now = datetime.now(timezone.utc)
+            cutoff = now - timedelta(days=max_age_days) if max_age_days else None
+            removed = 0
 
-        for eid in all_ids:
-            entry = self.get(eid)
-            if entry is None:
-                continue
-            if entry.persistent:
-                continue
+            for eid in all_ids:
+                entry = self.get(eid)
+                if entry is None:
+                    continue
+                if entry.persistent:
+                    continue
 
-            should_remove = False
+                should_remove = False
 
-            # Expired by TTL
-            if entry.is_expired:
-                should_remove = True
-            # Older than max_age_days
-            elif cutoff is not None and entry.created_at < cutoff:
-                should_remove = True
-            # Below minimum importance
-            elif min_importance > 0 and entry.importance < min_importance:
-                should_remove = True
+                # Expired by TTL
+                if entry.is_expired:
+                    should_remove = True
+                # Older than max_age_days
+                elif cutoff is not None and entry.created_at < cutoff:
+                    should_remove = True
+                # Below minimum importance
+                elif min_importance > 0 and entry.importance < min_importance:
+                    should_remove = True
 
-            if should_remove:
-                self.delete(eid)
-                removed += 1
+                if should_remove:
+                    self.delete(eid)
+                    removed += 1
 
-        return removed
+            return removed
+        except Exception as exc:
+            _logger.warning("RedisKnowledgeStore.prune failed: %s", exc)
+            return 0
 
 
 __all__ = ["RedisKnowledgeStore"]

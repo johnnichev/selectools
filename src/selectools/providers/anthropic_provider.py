@@ -313,6 +313,41 @@ class AnthropicProvider(Provider):
         if system_converted:
             formatted = system_converted + formatted
 
+        # Merge consecutive same-role messages (required by Anthropic API).
+        # When the assistant triggers multiple parallel tool calls, each TOOL
+        # message becomes a separate {"role": "user", "content": [tool_result]}
+        # entry.  Anthropic rejects consecutive same-role messages, so we must
+        # collapse them into a single message with a combined content list.
+        merged: List[dict] = []
+        for msg in formatted:
+            if merged and merged[-1]["role"] == msg["role"]:
+                prev_content = merged[-1]["content"]
+                curr_content = msg["content"]
+                if isinstance(prev_content, list) and isinstance(curr_content, list):
+                    merged[-1]["content"] = prev_content + curr_content
+                elif isinstance(prev_content, str) and isinstance(curr_content, str):
+                    merged[-1]["content"] = prev_content + "\n" + curr_content
+                elif isinstance(prev_content, list):
+                    if isinstance(curr_content, str):
+                        merged[-1]["content"] = prev_content + [
+                            {"type": "text", "text": curr_content}
+                        ]
+                    else:
+                        merged[-1]["content"] = prev_content + list(curr_content)
+                else:
+                    if isinstance(curr_content, list):
+                        merged[-1]["content"] = [{"type": "text", "text": prev_content}] + list(
+                            curr_content
+                        )
+                    else:
+                        merged[-1]["content"] = [
+                            {"type": "text", "text": prev_content},
+                            {"type": "text", "text": curr_content},
+                        ]
+            else:
+                merged.append(msg)
+        formatted = merged
+
         return formatted
 
     def _map_tool_to_anthropic(self, tool: Tool) -> Dict[str, Any]:

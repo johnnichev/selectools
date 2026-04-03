@@ -162,7 +162,7 @@ class TestRedisSessionStoreSaveLoad:
         store = _make_redis_store(fake)
         store.save("s1", _memory_with_messages("v1"))
 
-        meta_key = "selectools:session:s1:meta"
+        meta_key = "selectools:session:__meta__s1"
         first_meta = json.loads(fake.get(meta_key))
         first_created = first_meta["created_at"]
 
@@ -250,7 +250,7 @@ class TestRedisSessionStoreDeleteListExists:
         store.save("s1", _memory_with_messages("Hello"))
         store.delete("s1")
         assert "selectools:session:s1" not in fake._store
-        assert "selectools:session:s1:meta" not in fake._store
+        assert "selectools:session:__meta__s1" not in fake._store
 
     def test_exists_true(self) -> None:
         fake = FakeRedis()
@@ -297,7 +297,7 @@ class TestRedisSessionStoreDeleteListExists:
         store = _make_redis_store(fake)
         store.save("s1", _memory_with_messages("ok"))
         # Corrupt the meta key
-        fake._store["selectools:session:s1:meta"] = "not json{{"
+        fake._store["selectools:session:__meta__s1"] = "not json{{"
 
         sessions = store.list()
         assert len(sessions) == 0
@@ -307,7 +307,7 @@ class TestRedisSessionStoreDeleteListExists:
         store = _make_redis_store(fake, prefix="myapp:")
         store.save("s1", _memory_with_messages("Hello"))
         assert "myapp:s1" in fake._store
-        assert "myapp:s1:meta" in fake._store
+        assert "myapp:__meta__s1" in fake._store
 
 
 # ======================================================================
@@ -333,7 +333,7 @@ class TestRedisSessionStoreEdgeCases:
         fake = FakeRedis()
         store = _make_redis_store(fake)
         # Place corrupt meta
-        fake._store["selectools:session:s1:meta"] = "not valid json"
+        fake._store["selectools:session:__meta__s1"] = "not valid json"
         store.save("s1", _memory_with_messages("Hello"))
 
         loaded = store.load("s1")
@@ -346,7 +346,7 @@ class TestRedisSessionStoreEdgeCases:
         store = _make_redis_store(fake)
         store.save("s1", _memory_with_messages("Hello"))
         # Simulate race: meta key in scan but value deleted
-        fake._store["selectools:session:s1:meta"] = None  # type: ignore[assignment]
+        fake._store["selectools:session:__meta__s1"] = None  # type: ignore[assignment]
 
         # Should not crash
         sessions = store.list()

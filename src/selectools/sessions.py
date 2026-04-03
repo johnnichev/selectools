@@ -401,11 +401,25 @@ class RedisSessionStore:
         self._prefix = prefix
         self._default_ttl = default_ttl
 
+    @staticmethod
+    def _validate_session_id(session_id: str) -> None:
+        """Reject session IDs that could cause key collisions or other problems."""
+        if not session_id:
+            raise ValueError("session_id must not be empty")
+        if "\x00" in session_id:
+            raise ValueError(f"session_id must not contain null bytes: {session_id!r}")
+        if len(session_id) > 512:
+            raise ValueError(
+                f"session_id too long ({len(session_id)} chars, max 512): {session_id!r}"
+            )
+
     def _key(self, session_id: str) -> str:
+        self._validate_session_id(session_id)
         return f"{self._prefix}{session_id}"
 
     def _meta_key(self, session_id: str) -> str:
-        return f"{self._prefix}{session_id}:meta"
+        self._validate_session_id(session_id)
+        return f"{self._prefix}__meta__{session_id}"
 
     # -- public API --------------------------------------------------------
 
@@ -451,7 +465,7 @@ class RedisSessionStore:
         results: List[SessionMetadata] = []
         seen_ids: set = set()
         cursor: int = 0
-        pattern = f"{self._prefix}*:meta"
+        pattern = f"{self._prefix}__meta__*"
         while True:
             cursor, keys = self._client.scan(cursor=cursor, match=pattern, count=100)
             for meta_key in keys:
