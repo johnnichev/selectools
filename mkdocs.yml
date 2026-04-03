@@ -151,6 +151,7 @@ extra_css:
 
 extra_javascript:
   - javascripts/copy-markdown.js
+  - javascripts/fix-logo-link.js
 
 extra:
   social:
