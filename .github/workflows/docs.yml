@@ -52,6 +52,11 @@ jobs:
           print('Builder HTML:', len(BUILDER_HTML), 'chars → site/builder/index.html')
           "
 
+      - name: Build examples gallery
+        run: |
+          mkdir -p site/examples
+          python3 scripts/build_examples_gallery.py > site/examples/index.html
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4
         with:

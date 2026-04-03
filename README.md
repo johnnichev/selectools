@@ -26,9 +26,13 @@ result = AgentGraph.chain(planner, writer, reviewer).run("Write a blog post")
 
 ## What's New in v0.20
 
-### v0.20.0 — Visual Agent Builder
+### v0.20.1 — Visual Agent Builder + GitHub Pages
 
 The first AI agent framework to ship a visual graph builder in a single `pip install`. No React. No build step. No CDN.
+
+**[Try the builder in your browser →](https://johnnichev.github.io/selectools/builder/)** — no install required.
+
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb) [![Examples Gallery](https://img.shields.io/badge/examples-76_scripts-22d3ee)](https://johnnichev.github.io/selectools/examples/)
 
 ```bash
 pip install selectools
