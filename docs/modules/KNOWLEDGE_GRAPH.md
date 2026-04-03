@@ -1,3 +1,10 @@
+---
+description: "Knowledge graph memory with triple extraction and relationship storage"
+tags:
+  - memory
+  - knowledge-graph
+---
+
 # Knowledge Graph Module
 
 **Added in:** v0.16.0

@@ -1,3 +1,10 @@
+---
+description: "@tool decorator, Tool class, ToolLoader, and ToolRegistry for defining agent capabilities"
+tags:
+  - core
+  - tools
+---
+
 # Tools Module
 
 **Import:** `from selectools import Tool, tool, ToolParameter, ToolRegistry`

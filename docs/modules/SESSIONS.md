@@ -1,3 +1,10 @@
+---
+description: "Session persistence with JSON, SQLite, and Redis backends"
+tags:
+  - memory
+  - persistence
+---
+
 # Sessions Module
 
 **Added in:** v0.16.0

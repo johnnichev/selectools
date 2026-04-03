@@ -1,3 +1,11 @@
+---
+description: "Agent class: the central orchestrator for tool calling, streaming, and structured output"
+tags:
+  - core
+  - agent
+  - tool-calling
+---
+
 # Agent Module
 
 **Import:** `from selectools import Agent, AgentConfig`
@@ -836,18 +844,14 @@ response2 = agent.run([Message(role=Role.USER, content="What's my name?")])
 
 **Flow:**
 
-```
-run() called
-    │
-    ├─→ memory.get_history()  # Load previous messages
-    ├─→ Append new messages
-    ├─→ memory.add_many(new_messages)
-    │
-    ├─→ Execute loop
-    │
-    ├─→ memory.add(final_response)  # Save response
-    │
-    └─→ Return
+```mermaid
+graph TD
+    A["run() called"] --> B["memory.get_history()"]
+    B --> C["Append new messages"]
+    C --> D["memory.add_many(new_messages)"]
+    D --> E["Execute loop"]
+    E --> F["memory.add(final_response)"]
+    F --> G["Return"]
 ```
 
 ### Without Memory
@@ -1115,19 +1119,13 @@ The agent supports **pluggable response caching** to avoid redundant LLM calls. 
 
 ### Architecture
 
-```
-Agent._call_provider()
-    │
-    ├─→ CacheKeyBuilder.build(model, prompt, messages, tools, temperature)
-    │     → SHA-256 hex digest (deterministic)
-    │
-    ├─→ cache.get(key)
-    │     ├── HIT  → return cached (Message, UsageStats), fire on_llm_end hook
-    │     └── MISS → continue to provider call
-    │
-    ├─→ provider.complete(...)
-    │
-    └─→ cache.set(key, (response_msg, usage_stats))
+```mermaid
+flowchart TD
+    A["Agent._call_provider()"] --> B["CacheKeyBuilder.build()\nSHA-256 hex digest"]
+    B --> C{"cache.get(key)"}
+    C -- HIT --> D["Return cached response\nfire on_llm_end hook"]
+    C -- MISS --> E["provider.complete(...)"]
+    E --> F["cache.set(key, response)"]
 ```
 
 ### Cache Protocol

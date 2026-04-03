@@ -1,3 +1,10 @@
+---
+description: "ConversationMemory with sliding window, tool-pair trimming, and summarize-on-trim"
+tags:
+  - core
+  - memory
+---
+
 # Memory Module
 
 **File:** `src/selectools/memory.py`

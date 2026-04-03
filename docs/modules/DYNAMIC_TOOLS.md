@@ -1,3 +1,10 @@
+---
+description: "ToolLoader for runtime plugin discovery from directories, files, and modules"
+tags:
+  - tools
+  - plugins
+---
+
 # Dynamic Tools Module
 
 **File:** `src/selectools/tools/loader.py`, `src/selectools/agent/core.py`

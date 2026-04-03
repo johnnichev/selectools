@@ -1,3 +1,10 @@
+---
+description: "LLM-based entity extraction from conversations with automatic updates"
+tags:
+  - memory
+  - entities
+---
+
 # Entity Memory Module
 
 **Added in:** v0.16.0

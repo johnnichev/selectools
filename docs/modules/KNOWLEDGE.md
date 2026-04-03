@@ -1,3 +1,10 @@
+---
+description: "KnowledgeMemory for storing and retrieving structured knowledge entries"
+tags:
+  - memory
+  - knowledge
+---
+
 # Knowledge Module
 
 **Added in:** v0.16.0 (enhanced in v0.17.4)

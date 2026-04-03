@@ -1,3 +1,10 @@
+---
+description: "Provider protocol for OpenAI, Anthropic, Gemini, Ollama with FallbackProvider"
+tags:
+  - core
+  - providers
+---
+
 # Providers Module
 
 **Directory:** `src/selectools/providers/`

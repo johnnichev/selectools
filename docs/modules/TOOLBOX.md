@@ -1,3 +1,10 @@
+---
+description: "24 pre-built tools for file I/O, web requests, data processing, datetime, and text"
+tags:
+  - tools
+  - built-in
+---
+
 # Toolbox: 24 Pre-Built Tools
 
 **Added in:** v0.12.0

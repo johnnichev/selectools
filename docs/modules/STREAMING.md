@@ -1,3 +1,11 @@
+---
+description: "Token-level async streaming with astream(), tool call support, and provider fallbacks"
+tags:
+  - core
+  - streaming
+  - async
+---
+
 # Streaming and Performance Module
 
 **Directory:** `src/selectools/agent/`
