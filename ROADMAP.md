@@ -53,7 +53,7 @@ v0.19.2 ✅ Enterprise Hardening
 Security audit → Stability markers (@stable/@beta/@deprecated) → Deprecation policy
 → Compatibility matrix → trace_to_html() waterfall viewer → SBOM
 → Property-based tests (Hypothesis) → Concurrency smoke suite → 5 production simulations
-→ 3135 tests, 75 examples
+→ 3,344 tests, 76 examples
 
 v0.19.3 ✅ Stability Markers Applied to All Public APIs
 @stable on 60+ core symbols → @beta on 30+ orchestration/pipeline/patterns symbols
@@ -280,12 +280,33 @@ A web-based UI for designing, testing, and exporting agent configurations. Zero-
 
 | Feature                                    | Status | Impact | Effort |
 | ------------------------------------------ | ------ | ------ | ------ |
-| **Graph canvas (drag-drop nodes + edges)** | 🟡     | High   | Large  |
-| **Node configuration panel**               | 🟡     | High   | Medium |
-| **YAML export/import**                     | 🟡     | High   | Small  |
-| **Python code export**                     | 🟡     | Medium | Small  |
-| **Live test execution**                    | 🟡     | High   | Medium |
-| **Self-contained HTML (no build step)**    | 🟡     | High   | Medium |
+| **Graph canvas (drag-drop nodes + edges)** | ✅     | High   | Large  |
+| **Node configuration panel**               | ✅     | High   | Medium |
+| **YAML export/import**                     | ✅     | High   | Small  |
+| **Python code export**                     | ✅     | Medium | Small  |
+| **Live test execution**                    | ✅     | High   | Medium |
+| **Self-contained HTML (no build step)**    | ✅     | High   | Medium |
+
+
+---
+
+## v0.20.1: Builder Polish + Starlette + GitHub Pages ✅
+
+UI polish (20 features), `_static/` architecture split, Starlette ASGI app, serverless mode (client-side AI/runs), GitHub Pages deployment, design system.
+
+- Visual builder live at: https://johnnichev.github.io/selectools/builder/
+- Examples gallery: https://johnnichev.github.io/selectools/examples/
+- 3,344 tests, 76 examples, 50 evaluators, 152 models
+
+| Feature                                      | Status | Impact | Effort |
+| -------------------------------------------- | ------ | ------ | ------ |
+| **UI polish (20 features)**                  | ✅     | High   | Medium |
+| **_static/ architecture split**              | ✅     | Medium | Small  |
+| **Starlette ASGI app**                       | ✅     | High   | Medium |
+| **Serverless mode (client-side AI/runs)**    | ✅     | High   | Medium |
+| **GitHub Pages deployment**                  | ✅     | High   | Small  |
+| **Design system**                            | ✅     | Medium | Small  |
+| **Eval badges on builder nodes**             | ✅     | Medium | Small  |
 
 
 ---
