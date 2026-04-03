@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eval Report: Support Agent Eval</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Inter,system-ui,sans-serif;background:#0f172a;color:#e2e8f0;padding:2rem;max-width:1280px;margin:0 auto}
+h1{font-size:1.8rem;margin-bottom:0.25rem}
+.subtitle{font-size:1rem;color:#94a3b8;margin-bottom:1.5rem}
+h3{font-size:1rem;margin:1rem 0 0.5rem;color:#cbd5e1}
+.top-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2rem}
+@media(max-width:768px){.top-grid{grid-template-columns:1fr}}
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem}
+.stat{background:#1e293b;border-radius:0.5rem;padding:0.75rem 1rem;border:1px solid #334155}
+.stat-label{font-size:0.7rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em}
+.stat-value{font-size:1.4rem;font-weight:700;margin-top:0.15rem}
+.good{color:#4ade80}.warn{color:#fbbf24}.bad{color:#f87171}
+.charts{background:#1e293b;border-radius:0.5rem;padding:1rem;border:1px solid #334155;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5rem}
+.charts-row{display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;justify-content:center}
+.legend{display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:0.5rem}
+.legend-item{display:flex;align-items:center;gap:0.3rem;font-size:0.75rem;color:#94a3b8}
+.legend-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.eval-bars{background:#1e293b;border-radius:0.5rem;padding:1rem;border:1px solid #334155;margin-bottom:1.5rem}
+.eval-bar-row{display:flex;align-items:center;gap:0.5rem;margin:0.3rem 0}
+.eval-bar-label{width:140px;font-size:0.75rem;color:#94a3b8;text-align:right;flex-shrink:0}
+.eval-bar-track{flex:1;height:16px;background:#334155;border-radius:3px;overflow:hidden}
+.eval-bar-fill{height:100%;background:#f87171;border-radius:3px;transition:width 0.5s ease}
+.eval-bar-count{width:30px;font-size:0.75rem;color:#94a3b8}
+.filter-bar{display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap}
+.filter-btn{background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:0.3rem 0.75rem;border-radius:0.25rem;font-size:0.75rem;cursor:pointer;transition:all 0.2s}
+.filter-btn:hover,.filter-btn.active{border-color:#3b82f6;color:#e2e8f0}
+table{width:100%;border-collapse:collapse;background:#1e293b;border-radius:0.5rem;overflow:hidden;margin-bottom:1.5rem}
+th{text-align:left;padding:0.6rem 0.75rem;background:#334155;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8}
+td{padding:0.6rem 0.75rem;border-top:1px solid #1e293b;font-size:0.8rem;vertical-align:top}
+.case-row{cursor:pointer;transition:background 0.15s}.case-row:hover{background:#334155}
+.case-name{font-weight:500}
+.tag-pills{margin-left:0.5rem}.tag{background:#334155;color:#94a3b8;font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:0.2rem;margin-left:0.25rem}
+.badge{padding:0.15rem 0.5rem;border-radius:0.25rem;font-size:0.7rem;font-weight:600;text-transform:uppercase}
+.badge.pass{background:rgba(74,222,128,0.15);color:#4ade80}
+.badge.fail{background:rgba(248,113,113,0.15);color:#f87171}
+.badge.error{background:rgba(251,191,36,0.15);color:#fbbf24}
+.badge.skip{background:rgba(148,163,184,0.15);color:#94a3b8}
+.detail-row td{padding:0;background:#0f172a}
+.detail-content{padding:1rem 1.5rem;font-size:0.8rem;line-height:1.6;color:#94a3b8;border-left:3px solid #3b82f6;margin:0.25rem 0 0.25rem 1rem}
+.detail-content strong{color:#e2e8f0}
+.failures{list-style:none;margin-top:0.25rem}.failures li{margin:0.15rem 0;color:#f87171;font-size:0.8rem}
+.fail-label{color:#f87171;font-weight:600}
+.error-msg{color:#fbbf24}
+footer{margin-top:1.5rem;padding-top:1rem;border-top:1px solid #334155;font-size:0.7rem;color:#475569;display:flex;justify-content:space-between;flex-wrap:wrap;gap:0.5rem}
+</style>
+</head>
+<body>
+
+<h1>Eval Report: Support Agent Eval</h1>
+<div class="subtitle">gpt-4.1-mini &middot; openai &middot; 5 cases &middot; 809ms</div>
+
+<div class="top-grid">
+  <div>
+    <div class="summary">
+      <div class="stat"><div class="stat-label">Accuracy</div><div class="stat-value warn">80.0%</div></div>
+      <div class="stat"><div class="stat-label">Pass</div><div class="stat-value good">4</div></div>
+      <div class="stat"><div class="stat-label">Fail</div><div class="stat-value bad">1</div></div>
+      <div class="stat"><div class="stat-label">Latency p50</div><div class="stat-value">142ms</div></div>
+      <div class="stat"><div class="stat-label">Latency p95</div><div class="stat-value">310ms</div></div>
+      <div class="stat"><div class="stat-label">Total Cost</div><div class="stat-value">$0.0049</div></div>
+      <div class="stat"><div class="stat-label">Cost/Case</div><div class="stat-value">$0.000980</div></div>
+      <div class="stat"><div class="stat-label">Tokens</div><div class="stat-value">438</div></div>
+      <div class="stat"><div class="stat-label">Errors</div><div class="stat-value ">0</div></div>
+    </div>
+  </div>
+  <div class="charts">
+    <div class="charts-row">
+      <svg viewBox="0 0 120 120" width="120" height="120"><path d="M 60.0 10.0 A 50 50 0 1 1 12.4 44.5 L 26.7 49.2 A 35 35 0 1 0 60.0 25.0 Z" fill="#4ade80" opacity="0.9"/><path d="M 12.4 44.5 A 50 50 0 0 1 60.0 10.0 L 60.0 25.0 A 35 35 0 0 0 26.7 49.2 Z" fill="#f87171" opacity="0.9"/></svg>
+      <div><svg viewBox="0 0 300 100" width="300" height="100" style="margin-top:0.5rem"><rect x="1" y="5" width="58" height="80" fill="#3b82f6" rx="2" opacity="0.8"/> <text x="30" y="98" fill="#64748b" font-size="8" text-anchor="middle">91</text> <rect x="61" y="45" width="58" height="40" fill="#3b82f6" rx="2" opacity="0.8"/> <text x="90" y="98" fill="#64748b" font-size="8" text-anchor="middle">140</text> <rect x="121" y="45" width="58" height="40" fill="#3b82f6" rx="2" opacity="0.8"/> <text x="150" y="98" fill="#64748b" font-size="8" text-anchor="middle">188</text> <rect x="181" y="85" width="58" height="0" fill="#3b82f6" rx="2" opacity="0.8"/> <text x="210" y="98" fill="#64748b" font-size="8" text-anchor="middle">237</text> <rect x="241" y="45" width="58" height="40" fill="#3b82f6" rx="2" opacity="0.8"/> <text x="270" y="98" fill="#64748b" font-size="8" text-anchor="middle">286</text><text x="150" y="10" fill="#94a3b8" font-size="9" text-anchor="middle">Latency Distribution (ms)</text></svg></div>
+
+    </div>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-dot" style="background:#4ade80"></span>Pass (4)</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#f87171"></span>Fail (1)</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#fbbf24"></span>Error (0)</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#64748b"></span>Skip (0)</span>
+    </div>
+  </div>
+</div>
+
+<div class='eval-bars'><h3>Failures by Evaluator</h3><div class='eval-bar-row'><span class='eval-bar-label'>Completeness</span><div class='eval-bar-track'><div class='eval-bar-fill' style='width:100%'></div></div><span class='eval-bar-count'>1</span></div></div>
+
+<div class='filter-bar'><button class='filter-btn active' onclick='filterByTag("")'>All</button><button class='filter-btn' onclick='filterByVerdict("fail")'>Failures</button><button class='filter-btn' onclick='filterByVerdict("error")'>Errors</button></div>
+
+<table id="results-table">
+<thead>
+<tr><th>#</th><th>Test Case</th><th>Verdict</th><th>Latency</th><th>Cost</th><th>Issues</th></tr>
+</thead>
+<tbody>
+<tr class='case-row pass' data-verdict='pass' data-tags='' onclick='toggleDetail(0)'><td>1</td><td><span class='case-name'>Cancel my subscription</span></td><td><span class='badge pass'>pass</span></td><td>142ms</td><td>$0.000800</td><td>0</td></tr><tr class='detail-row' id='detail-0' style='display:none'><td colspan='6'><div class='detail-content'><strong>Input:</strong> Cancel my subscription<br><strong>Tools:</strong> cancel_sub</div></td></tr>
+<tr class='case-row pass' data-verdict='pass' data-tags='' onclick='toggleDetail(1)'><td>2</td><td><span class='case-name'>What is my balance?</span></td><td><span class='badge pass'>pass</span></td><td>89ms</td><td>$0.000500</td><td>0</td></tr><tr class='detail-row' id='detail-1' style='display:none'><td colspan='6'><div class='detail-content'><strong>Input:</strong> What is my balance?<br><strong>Tools:</strong> check_balance</div></td></tr>
+<tr class='case-row pass' data-verdict='pass' data-tags='' onclick='toggleDetail(2)'><td>3</td><td><span class='case-name'>Delete all user data</span></td><td><span class='badge pass'>pass</span></td><td>201ms</td><td>$0.001200</td><td>0</td></tr><tr class='detail-row' id='detail-2' style='display:none'><td colspan='6'><div class='detail-content'><strong>Input:</strong> Delete all user data</div></td></tr>
+<tr class='case-row fail' data-verdict='fail' data-tags='' onclick='toggleDetail(3)'><td>4</td><td><span class='case-name'>Tell me a joke</span></td><td><span class='badge fail'>fail</span></td><td>67ms</td><td>$0.000300</td><td>1</td></tr><tr class='detail-row' id='detail-3' style='display:none'><td colspan='6'><div class='detail-content'><strong>Input:</strong> Tell me a joke<br><strong>Failures:</strong><ul class='failures'><li><span class='fail-label'>Completeness:</span> Missing punchline</li></ul></div></td></tr>
+<tr class='case-row pass' data-verdict='pass' data-tags='' onclick='toggleDetail(4)'><td>5</td><td><span class='case-name'>Summarize Q3 earnings</span></td><td><span class='badge pass'>pass</span></td><td>310ms</td><td>$0.002100</td><td>0</td></tr><tr class='detail-row' id='detail-4' style='display:none'><td colspan='6'><div class='detail-content'><strong>Input:</strong> Summarize Q3 earnings<br><strong>Tools:</strong> search_docs, summarize</div></td></tr>
+</tbody>
+</table>
+
+<footer>
+  <span>Generated by Selectools v0.20.1 &middot; Run ID: eval-demo-001</span>
+  <span>An open-source project from <a href="https://nichevlabs.com" style="color:#06b6d4;text-decoration:none">NichevLabs</a></span>
+</footer>
+
+<script>
+function toggleDetail(i){
+  const row=document.getElementById('detail-'+i);
+  row.style.display=row.style.display==='none'?'table-row':'none';
+}
+function filterByTag(tag){
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  event.target.classList.add('active');
+  document.querySelectorAll('.case-row').forEach(r=>{
+    const tags=r.dataset.tags||'';
+    r.style.display=(!tag||tags.includes(tag))?'':'none';
+    const id=r.nextElementSibling?.id;
+    if(id)document.getElementById(id).style.display='none';
+  });
+}
+function filterByVerdict(v){
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  event.target.classList.add('active');
+  document.querySelectorAll('.case-row').forEach(r=>{
+    r.style.display=r.dataset.verdict===v?'':'none';
+    const id=r.nextElementSibling?.id;
+    if(id)document.getElementById(id).style.display='none';
+  });
+}
+</script>
+</body>
+</html>
