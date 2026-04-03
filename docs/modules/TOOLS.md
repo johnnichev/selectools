@@ -207,50 +207,20 @@ The LLM uses this to understand:
 
 ### Validation Flow
 
-```
-LLM Response → Parser → Tool Call
-                            │
-                            ▼
-                    ┌───────────────┐
-                    │ Tool.validate()│
-                    └───────┬────────┘
-                            │
-              ┌─────────────┴─────────────┐
-              │                           │
-              ▼                           ▼
-    ┌──────────────────┐      ┌──────────────────┐
-    │ Check for extra  │      │ Check for missing│
-    │ parameters       │      │ required params  │
-    └────────┬─────────┘      └────────┬─────────┘
-             │                         │
-             ▼                         ▼
-    ┌──────────────────┐      ┌──────────────────┐
-    │ Suggest typo     │      │ List required    │
-    │ corrections      │      │ parameters       │
-    └──────────────────┘      └──────────────────┘
-                            │
-              ┌─────────────┴─────────────┐
-              │                           │
-              ▼                           ▼
-    ┌──────────────────┐      ┌──────────────────┐
-    │ Validate types   │      │ Check enum       │
-    │ (str, int, etc.) │      │ constraints      │
-    └────────┬─────────┘      └────────┬─────────┘
-             │                         │
-             └─────────────┬───────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │  Valid params?  │
-                  └────────┬────────┘
-                           │
-              ┌────────────┴────────────┐
-              │                         │
-         Yes  ▼                    No   ▼
-    ┌──────────────┐       ┌─────────────────────┐
-    │   Execute    │       │ Raise Validation    │
-    │   Tool       │       │ Error               │
-    └──────────────┘       └─────────────────────┘
+```mermaid
+flowchart TD
+    A["LLM Response"] --> B["Parser"] --> C["Tool Call"]
+    C --> D["Tool.validate()"]
+    D --> E["Check for extra parameters"]
+    D --> F["Check for missing required params"]
+    E --> G["Suggest typo corrections"]
+    F --> H["List required parameters"]
+    G --> I["Validate types (str, int, etc.)"]
+    H --> J["Check enum constraints"]
+    I --> K{"Valid params?"}
+    J --> K
+    K -- Yes --> L["Execute Tool"]
+    K -- No --> M["Raise Validation Error"]
 ```
 
 ### Implementation
@@ -667,19 +637,16 @@ agent = Agent(tools=[process_file], provider=provider, config=config)
 
 ### Execution Flow
 
-```
-Tool.execute() called
-    │
-    ├─→ Function returns Generator
-    │
-    ├─→ Iterate over generator
-    │
-    ├─→ For each chunk:
-    │   ├─→ Convert to string
-    │   ├─→ Append to accumulator
-    │   └─→ Call chunk_callback(chunk)
-    │
-    └─→ Return accumulated string
+```mermaid
+graph TD
+    A["Tool.execute() called"] --> B["Function returns Generator"]
+    B --> C["Iterate over generator"]
+    C --> D["For each chunk"]
+    D --> D1["Convert to string"]
+    D1 --> D2["Append to accumulator"]
+    D2 --> D3["Call chunk_callback(chunk)"]
+    D3 --> D
+    C --> E["Return accumulated string"]
 ```
 
 ### Use Cases

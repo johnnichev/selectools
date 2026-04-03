@@ -40,18 +40,21 @@ Auth token priority: `--auth-token` flag → `BUILDER_AUTH_TOKEN` env var → `~
 
 ## Interface overview
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  selectools  builder   File ▼   ✨ AI   Export ▼   ▶ Run   ?  │  ← Header
-├──────────┬──────────────────────────────────────┬───────────────┤
-│          │                                      │               │
-│ Add      │           Canvas                     │  Properties   │
-│ Nodes    │    (drag nodes, click ports          │  (click a     │
-│          │     to connect)                      │   node)       │
-│ [Tips]   │                                      │               │
-├──────────┴──────────────────────────────────────┴───────────────┤
-│  Python │ YAML                                      ▲ Code      │  ← Code panel
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph Header["Header: selectools builder | File | AI | Export | Run | ?"]
+        direction LR
+    end
+    subgraph Main["Main Area"]
+        direction LR
+        Left["Left Panel\nAdd Nodes\nTips"]
+        Center["Canvas\nDrag nodes, click\nports to connect"]
+        Right["Properties\nClick a node\nto edit"]
+    end
+    subgraph Code["Code Panel: Python | YAML"]
+        direction LR
+    end
+    Header --- Main --- Code
 ```
 
 - **Left panel** — drag node types onto the canvas

@@ -122,90 +122,22 @@ from .analytics import AgentAnalytics  # Optional
 
 ### State Machine Diagram
 
-```
-                    ┌─────────────┐
-                    │    START    │
-                    └──────┬──────┘
-                           │
-                           ▼
-              ┌────────────────────────┐
-              │  Load Message History  │
-              │  (from memory if set)  │
-              └────────────┬───────────┘
-                           │
-                           ▼
-         ┌─────────────────────────────────┐
-         │  ITERATION LOOP                 │
-         │  (max_iterations times)         │
-         └─────────────┬───────────────────┘
-                       │
-      ┌────────────────┴────────────────┐
-      │                                 │
-      ▼                                 ▼
-┌──────────────┐              ┌──────────────────┐
-│ Build Prompt │              │  Call Hook:      │
-│ with Tools   │              │  on_iteration_   │
-└──────┬───────┘              │  start           │
-       │                      └──────────────────┘
-       ▼
-┌──────────────────┐
-│ Call LLM Provider│
-│ (with retries)   │
-└──────┬───────────┘
-       │
-       ▼
-┌──────────────────┐
-│  Parse Response  │
-│  (ToolCallParser)│
-└──────┬───────────┘
-       │
-       ├─────────┐ No tool call?
-       │         │
-       │         ▼
-       │    ┌────────────────┐
-       │    │ Return Final   │
-       │    │ Response to    │
-       │    │ User           │
-       │    └────────────────┘
-       │
-       │ Yes, tool call
-       ▼
-┌──────────────────┐
-│ Validate Tool    │
-│ Name & Params    │
-└──────┬───────────┘
-       │
-       ├─────────┐ Invalid?
-       │         │
-       │         ▼
-       │    ┌────────────────┐
-       │    │ Append Error   │
-       │    │ Message        │
-       │    └────┬───────────┘
-       │         │
-       │         └──────┐
-       │                │
-       │ Valid          │
-       ▼                │
-┌──────────────────┐   │
-│ Execute Tool     │   │
-│ (with timeout)   │   │
-└──────┬───────────┘   │
-       │                │
-       ├─────────┐      │
-       │         │      │
-       │ Success │ Fail │
-       ▼         ▼      │
-┌──────────────────┐   │
-│ Append Result    │   │
-│ to History       │   │
-└──────┬───────────┘   │
-       │                │
-       └────────────────┘
-       │
-       ▼
-   Loop continues
-   (next iteration)
+```mermaid
+flowchart TD
+    START([START]) --> LOAD["Load Message History\n(from memory if set)"]
+    LOAD --> LOOP["Iteration Loop\n(max_iterations times)"]
+    LOOP --> HOOK["on_iteration_start hook"]
+    LOOP --> BUILD["Build Prompt with Tools"]
+    BUILD --> LLM["Call LLM Provider\n(with retries)"]
+    LLM --> PARSE["Parse Response\n(ToolCallParser)"]
+    PARSE --> TC{Tool call?}
+    TC -- No --> RETURN["Return Final Response"]
+    TC -- Yes --> VALIDATE{"Valid tool\n& params?"}
+    VALIDATE -- Invalid --> ERR["Append Error Message"]
+    ERR --> LOOP
+    VALIDATE -- Valid --> EXEC["Execute Tool\n(with timeout)"]
+    EXEC --> APPEND["Append Result to History"]
+    APPEND --> LOOP
 ```
 
 ### Execution Flow
@@ -315,62 +247,11 @@ The loop exits when:
 
 The agent doesn't directly "decide" - it relies on the LLM to make the decision based on the system prompt and conversation context.
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│ System Prompt (built by PromptBuilder)                      │
-├──────────────────────────────────────────────────────────────┤
-│                                                              │
-│ You are an assistant that can call tools when helpful.      │
-│                                                              │
-│ Tool call contract:                                          │
-│ - Emit TOOL_CALL with JSON: {"tool_name": "<name>",         │
-│                              "parameters": {...}}            │
-│ - Include every required parameter                           │
-│ - Wait for tool results before giving a final answer        │
-│                                                              │
-│ Available tools (JSON schema):                               │
-│                                                              │
-│ {                                                            │
-│   "name": "search",                                          │
-│   "description": "Search the web for information",           │
-│   "parameters": {                                            │
-│     "type": "object",                                        │
-│     "properties": {                                          │
-│       "query": {"type": "string", "description": "..."}      │
-│     },                                                       │
-│     "required": ["query"]                                    │
-│   }                                                          │
-│ }                                                            │
-│                                                              │
-│ [... more tools ...]                                         │
-└──────────────────────────────────────────────────────────────┘
-         │
-         ▼
-┌──────────────────────────────────────────────────────────────┐
-│ Conversation History                                         │
-├──────────────────────────────────────────────────────────────┤
-│ USER: Search for Python tutorials                            │
-└──────────────────────────────────────────────────────────────┘
-         │
-         ▼
-┌──────────────────────────────────────────────────────────────┐
-│ LLM (GPT-4o, Claude, Gemini, etc.)                          │
-│ - Reads system prompt (knows about available tools)         │
-│ - Analyzes user request                                      │
-│ - Decides if a tool is needed                                │
-│ - Generates TOOL_CALL if appropriate                         │
-└──────────────────────────────────────────────────────────────┘
-         │
-         ▼
-┌──────────────────────────────────────────────────────────────┐
-│ LLM Response                                                 │
-├──────────────────────────────────────────────────────────────┤
-│ TOOL_CALL                                                    │
-│ {                                                            │
-│   "tool_name": "search",                                     │
-│   "parameters": {"query": "Python tutorials"}               │
-│ }                                                            │
-└──────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    A["System Prompt (PromptBuilder)\nTool call contract + tool JSON schemas"] --> C["LLM\nGPT-4o / Claude / Gemini / etc."]
+    B["Conversation History\nUSER: Search for Python tutorials"] --> C
+    C --> D["LLM Response\nTOOL_CALL: search\nparams: query = 'Python tutorials'"]
 ```
 
 ### Validation Flow
@@ -540,43 +421,18 @@ config = AgentConfig(
 
 ### Retry Logic Flow
 
-```
-Provider Call
-    │
-    ▼
-┌─────────────┐
-│  Attempt 1  │
-└─────┬───────┘
-      │
-      ├─────── Success? ──→ Return
-      │
-      │ Failure (ProviderError)
-      ▼
-  Is rate limit?
-      │
-      ├── Yes ──→ Sleep(rate_limit_cooldown * attempt)
-      │
-      └── No
-      │
-      ▼
-  Sleep(retry_backoff * attempt)
-      │
-      ▼
-┌─────────────┐
-│  Attempt 2  │
-└─────┬───────┘
-      │
-      ├─────── Success? ──→ Return
-      │
-      │ Failure
-      ▼
-  [Repeat up to max_retries]
-      │
-      ▼
-  Final Failure
-      │
-      ▼
-  Return error message
+```mermaid
+flowchart TD
+    A["Provider Call"] --> B["Attempt N"]
+    B --> C{Success?}
+    C -- Yes --> D["Return response"]
+    C -- No --> E{Rate limit error?}
+    E -- Yes --> F["Sleep(rate_limit_cooldown * attempt)"]
+    E -- No --> G["Sleep(retry_backoff * attempt)"]
+    F --> G
+    G --> H{Retries remaining?}
+    H -- Yes --> B
+    H -- No --> I["Return error message"]
 ```
 
 ### Implementation

@@ -119,28 +119,26 @@ Providers implement `astream()` yielding `Union[str, ToolCall]`:
 - **Text deltas** — Raw `str` chunks (token-by-token)
 - **Tool calls** — Complete `ToolCall` objects when ready (native function calling)
 
-```
-Provider.astream()
-    │
-    ├──► yield "Hello"       (str)
-    ├──► yield " "           (str)
-    ├──► yield "world"       (str)
-    ├──► yield ToolCall(...) (when tool invocation complete)
-    └──► yield "!"           (str)
+```mermaid
+graph LR
+    P["Provider.astream()"] --> A["yield 'Hello' (str)"]
+    P --> B["yield ' ' (str)"]
+    P --> C["yield 'world' (str)"]
+    P --> D["yield ToolCall(...) (tool invocation)"]
+    P --> E["yield '!' (str)"]
 ```
 
 ### Fallback Chain
 
 When a provider does not support streaming:
 
-```
-astream() requested
-    │
-    ├──► Provider has astream()?  ──► Use it
-    │
-    ├──► Provider has acomplete()? ──► Call it, yield full response as single StreamChunk
-    │
-    └──► Otherwise ──► Run complete() in ThreadPoolExecutor (sync in async wrapper)
+```mermaid
+flowchart TD
+    A["astream() requested"] --> B{"Provider has astream()?"}
+    B -- Yes --> C["Use it"]
+    B -- No --> D{"Provider has acomplete()?"}
+    D -- Yes --> E["Call it, yield full response\nas single StreamChunk"]
+    D -- No --> F["Run complete() in\nThreadPoolExecutor"]
 ```
 
 ### Tool Call Accumulation and Multi-Iteration
@@ -150,23 +148,18 @@ astream() requested
 3. **Continue**: Results are appended to history; streaming continues with the next LLM call.
 4. **Final result**: When the LLM produces a final text response with no tool calls, `AgentResult` is yielded.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     astream() Flow                               │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Iteration 1:                                                    │
-│    StreamChunk("Searching...")                                   │
-│    StreamChunk(tool_calls=[ToolCall(search, {"query": "..."})])  │
-│    [Tools executed]                                              │
-│                                                                  │
-│  Iteration 2 (streaming continues):                              │
-│    StreamChunk("Here are the results:")                          │
-│    StreamChunk("  - Result 1")                                   │
-│    ...                                                           │
-│    AgentResult(message=..., iterations=2, tool_calls=[...])      │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph Iteration1["Iteration 1"]
+        A1["StreamChunk('Searching...')"] --> A2["StreamChunk(tool_calls=[...])"]
+        A2 --> A3["Tools executed"]
+    end
+    subgraph Iteration2["Iteration 2"]
+        B1["StreamChunk('Here are the results:')"] --> B2["StreamChunk('- Result 1')"]
+        B2 --> B3["..."]
+        B3 --> B4["AgentResult(iterations=2, tool_calls=[...])"]
+    end
+    Iteration1 --> Iteration2
 ```
 
 ---

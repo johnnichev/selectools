@@ -150,24 +150,17 @@ response2 = agent.run([
 
 ### Flow
 
-```
-run() called
-    │
-    ├─→ memory.get_history()
-    │   └─→ Returns previous messages
-    │
-    ├─→ Append new user messages
-    │
-    ├─→ memory.add_many(new_messages)
-    │
-    ├─→ Execute agent loop
-    │   ├─→ LLM sees full history
-    │   ├─→ Tool calls append to history
-    │   └─→ memory.add() for each message
-    │
-    ├─→ memory.add(final_response)
-    │
-    └─→ Return response
+```mermaid
+graph TD
+    A["run() called"] --> B["memory.get_history()"]
+    B --> C["Append new user messages"]
+    C --> D["memory.add_many(new_messages)"]
+    D --> E["Execute agent loop"]
+    E --> F["memory.add(final_response)"]
+    F --> G["Return response"]
+    E -.-> E1["LLM sees full history"]
+    E -.-> E2["Tool calls append to history"]
+    E -.-> E3["memory.add() for each message"]
 ```
 
 ### Without Memory
@@ -306,20 +299,16 @@ agent = Agent(
 
 ### How It Works
 
-```
-Messages exceed max_messages
-    │
-    ├─→ _enforce_limits() trims oldest messages
-    ├─→ Trimmed messages stored in _last_trimmed
-    │
-    ├─→ Agent detects _last_trimmed is non-empty
-    ├─→ Sends trimmed messages to summarize_provider
-    ├─→ Provider returns 2-3 sentence summary
-    │
-    ├─→ Summary stored in memory.summary
-    ├─→ on_memory_summarize observer event fired
-    │
-    └─→ On next turn, summary injected as [Conversation Summary] in system prompt
+```mermaid
+graph TD
+    A["Messages exceed max_messages"] --> B["_enforce_limits() trims oldest"]
+    B --> C["Trimmed messages stored in _last_trimmed"]
+    C --> D["Agent detects _last_trimmed is non-empty"]
+    D --> E["Send trimmed messages to summarize_provider"]
+    E --> F["Provider returns 2-3 sentence summary"]
+    F --> G["Summary stored in memory.summary"]
+    G --> H["on_memory_summarize observer event fired"]
+    H --> I["Next turn: summary injected as\n[Conversation Summary] in system prompt"]
 ```
 
 ### Key Properties

@@ -83,122 +83,14 @@ DocumentLoader → TextSplitter → EmbeddingProvider → VectorStore → RAGToo
 
 ### Complete Flow Diagram
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ STAGE 1: DOCUMENT INGESTION                                    │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Documents (Files/PDFs/Text)                                    │
-│          │                                                      │
-│          ▼                                                      │
-│  ┌──────────────────┐                                          │
-│  │ DocumentLoader   │                                          │
-│  │ • from_file()    │                                          │
-│  │ • from_directory()│                                          │
-│  │ • from_pdf()     │                                          │
-│  └────────┬─────────┘                                          │
-│           │                                                      │
-│           ▼                                                      │
-│  [Document, Document, ...]                                      │
-└─────────────────────────────────────────────────────────────────┘
-           │
-           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ STAGE 2: CHUNKING                                              │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌──────────────────────────────────┐                          │
-│  │ TextSplitter / RecursiveTextSplitter │                      │
-│  │ • chunk_size=1000                 │                          │
-│  │ • chunk_overlap=200              │                          │
-│  │ • Respect boundaries             │                          │
-│  └────────┬─────────────────────────┘                          │
-│           │                                                      │
-│           ▼                                                      │
-│  [Chunk1, Chunk2, Chunk3, ...]                                  │
-│  (with metadata: source, page, chunk_index)                     │
-└─────────────────────────────────────────────────────────────────┘
-           │
-           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ STAGE 3: EMBEDDING                                             │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌──────────────────────────────────┐                          │
-│  │ EmbeddingProvider                │                          │
-│  │ • OpenAI / Anthropic / Gemini   │                          │
-│  │ • embed_texts(chunks)            │                          │
-│  └────────┬─────────────────────────┘                          │
-│           │                                                      │
-│           ▼                                                      │
-│  [[0.1, 0.2, ...], [0.3, 0.4, ...], ...]                       │
-│  (vector embeddings)                                            │
-└─────────────────────────────────────────────────────────────────┘
-           │
-           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ STAGE 4: STORAGE                                               │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌──────────────────────────────────┐                          │
-│  │ VectorStore                      │                          │
-│  │ • Memory / SQLite / Chroma       │                          │
-│  │ • add_documents(chunks, embeddings)│                        │
-│  └──────────────────────────────────┘                          │
-│           │                                                      │
-│           ▼                                                      │
-│  Vector Database                                                │
-│  [chunk_id → (embedding, text, metadata)]                      │
-└─────────────────────────────────────────────────────────────────┘
-           │
-           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ STAGE 5: QUERY & RETRIEVAL                                     │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  User Question: "What are the main features?"                   │
-│           │                                                      │
-│           ▼                                                      │
-│  ┌──────────────────────────────────┐                          │
-│  │ EmbeddingProvider.embed_query()  │                          │
-│  └────────┬─────────────────────────┘                          │
-│           │                                                      │
-│           ▼                                                      │
-│  Query Embedding: [0.5, 0.6, ...]                              │
-│           │                                                      │
-│           ▼                                                      │
-│  ┌──────────────────────────────────┐                          │
-│  │ VectorStore.search()             │                          │
-│  │ • Cosine similarity              │                          │
-│  │ • top_k=3                        │                          │
-│  └────────┬─────────────────────────┘                          │
-│           │                                                      │
-│           ▼                                                      │
-│  [SearchResult(doc, score), ...]                                │
-│  Top 3 most similar chunks                                      │
-└─────────────────────────────────────────────────────────────────┘
-           │
-           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ STAGE 6: GENERATION                                            │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  RAGTool formats results:                                       │
-│  ┌─────────────────────────────────────────────────────────┐  │
-│  │ [Source 1: file.txt, Relevance: 0.89]                   │  │
-│  │ Main features include...                                 │  │
-│  │                                                           │  │
-│  │ [Source 2: docs.pdf (page 3), Relevance: 0.85]          │  │
-│  │ Additional features are...                               │  │
-│  └─────────────────────────────────────────────────────────┘  │
-│           │                                                      │
-│           ▼                                                      │
-│  Agent receives context                                         │
-│  LLM generates answer using retrieved information               │
-│           │                                                      │
-│           ▼                                                      │
-│  Final Response with citations                                  │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    A["Stage 1: Ingestion\nDocumentLoader\nfrom_file / from_directory / from_pdf"] --> B["Stage 2: Chunking\nTextSplitter / RecursiveTextSplitter\nchunk_size, chunk_overlap"]
+    B --> C["Stage 3: Embedding\nEmbeddingProvider\nOpenAI / Anthropic / Gemini"]
+    C --> D["Stage 4: Storage\nVectorStore\nMemory / SQLite / Chroma"]
+    Q["User Question"] --> E["Stage 5: Query & Retrieval\nembed_query() + VectorStore.search()\ncosine similarity, top_k"]
+    D --> E
+    E --> F["Stage 6: Generation\nRAGTool formats results with sources\nLLM generates answer with citations"]
 ```
 
 ---
