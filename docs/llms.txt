@@ -1,14 +1,10 @@
 # Selectools
 
-> Selectools is a production-ready Python library for building AI agents with tool calling, RAG, and multi-agent orchestration. Supports OpenAI, Anthropic, Gemini, and Ollama.
+> Selectools is a production-ready Python library for building AI agents with tool calling, RAG, and multi-agent orchestration. One pip install. No DSL. Supports OpenAI, Anthropic, Gemini, Ollama. v0.20.1, 3344 tests, Apache-2.0.
 
-## Install
+Selectools uses a single `Agent` class with native tool calling — no chains, no expression language, no complex abstractions. It includes built-in features that require separate paid services in other frameworks: 50 evaluators, hybrid RAG search, guardrails, audit logging, multi-agent orchestration, and a visual drag-drop builder.
 
-```
-pip install selectools
-```
-
-## Quick Start
+Install: `pip install selectools`
 
 ```python
 from selectools import Agent, tool
@@ -21,61 +17,65 @@ def search(query: str) -> str:
 
 agent = Agent(tools=[search], provider=OpenAIProvider())
 result = agent.run("Find our refund policy")
-# result.content — the response
-# result.trace   — execution timeline
-# result.usage   — token counts and cost
+# result.content — the response text
+# result.trace   — structured execution timeline
+# result.usage   — token counts and dollar cost
 ```
 
-## Key Features
+## Getting Started
 
-- **5 Providers**: OpenAI, Anthropic, Gemini, Ollama + FallbackProvider with circuit breaker
-- **152 Models**: Built-in pricing data for all providers
-- **Tool Calling**: @tool decorator, 24 pre-built tools, tool policies, coherence checking
-- **RAG**: BM25 + vector hybrid search, RRF fusion, cross-encoder reranking, 4 vector store backends
-- **Multi-Agent**: AgentGraph for directed graphs, SupervisorAgent (4 strategies), HITL, parallel execution
-- **Composable Pipelines**: Pipeline + @step + | operator + parallel() + branch()
-- **50 Evaluators**: Deterministic + LLM-as-judge, A/B testing, regression detection, HTML reports
-- **Guardrails**: PII redaction, toxicity, topic blocking, prompt injection screening (15 patterns)
-- **Memory**: ConversationMemory, EntityMemory, KnowledgeGraphMemory, session persistence
-- **Audit Logging**: JSONL with 4 privacy levels, daily rotation
-- **Visual Builder**: Drag-drop graph editor, runs in browser, exports Python/YAML
-- **Advanced Patterns**: PlanAndExecuteAgent, ReflectiveAgent, DebateAgent, TeamLeadAgent
-- **Enterprise**: Security audit published, SBOM, @stable/@beta/@deprecated markers
+- [Quickstart](https://johnnichev.github.io/selectools/QUICKSTART/): 5-minute setup guide with first agent
+- [Migration Guide](https://johnnichev.github.io/selectools/MIGRATION/): Coming from LangChain
+- [Architecture](https://johnnichev.github.io/selectools/ARCHITECTURE/): System design overview
+- [Visual Builder](https://johnnichev.github.io/selectools/builder/): Drag-drop graph editor in the browser (zero install)
 
-## Documentation
+## Core API
 
-- Quickstart: https://johnnichev.github.io/selectools/QUICKSTART/
-- API Reference: https://johnnichev.github.io/selectools/modules/AGENT/
-- Architecture: https://johnnichev.github.io/selectools/ARCHITECTURE/
-- Visual Builder: https://johnnichev.github.io/selectools/builder/
-- Examples (76): https://johnnichev.github.io/selectools/examples/
-- GitHub: https://github.com/johnnichev/selectools
-- PyPI: https://pypi.org/project/selectools/
+- [Agent](https://johnnichev.github.io/selectools/modules/AGENT/): Agent class, AgentConfig, AgentResult — the central orchestrator
+- [Tools](https://johnnichev.github.io/selectools/modules/TOOLS/): @tool decorator, Tool class, ToolLoader, ToolRegistry
+- [Toolbox](https://johnnichev.github.io/selectools/modules/TOOLBOX/): 24 pre-built tools (file, web, data, datetime, text)
+- [Memory](https://johnnichev.github.io/selectools/modules/MEMORY/): ConversationMemory with sliding window and summarize-on-trim
+- [Streaming](https://johnnichev.github.io/selectools/modules/STREAMING/): Token-level astream() with tool call support
 
-## Module Index
+## RAG
 
-- Agent Core: https://johnnichev.github.io/selectools/modules/AGENT/
-- Tools: https://johnnichev.github.io/selectools/modules/TOOLS/
-- RAG: https://johnnichev.github.io/selectools/modules/RAG/
-- Memory: https://johnnichev.github.io/selectools/modules/MEMORY/
-- Guardrails: https://johnnichev.github.io/selectools/modules/GUARDRAILS/
-- Evals: https://johnnichev.github.io/selectools/modules/EVALS/
-- Orchestration: https://johnnichev.github.io/selectools/modules/ORCHESTRATION/
-- Pipelines: https://johnnichev.github.io/selectools/modules/PIPELINE/
-- Patterns: https://johnnichev.github.io/selectools/modules/PATTERNS/
-- Streaming: https://johnnichev.github.io/selectools/modules/STREAMING/
-- Sessions: https://johnnichev.github.io/selectools/modules/SESSIONS/
-- Audit: https://johnnichev.github.io/selectools/modules/AUDIT/
-- Security: https://johnnichev.github.io/selectools/modules/SECURITY/
-- Models: https://johnnichev.github.io/selectools/modules/MODELS/
-- Builder: https://johnnichev.github.io/selectools/modules/builder/
+- [RAG Pipeline](https://johnnichev.github.io/selectools/modules/RAG/): Document loading, chunking, retrieval
+- [Hybrid Search](https://johnnichev.github.io/selectools/modules/HYBRID_SEARCH/): BM25 + vector fusion with RRF
+- [Embeddings](https://johnnichev.github.io/selectools/modules/EMBEDDINGS/): OpenAI, Anthropic, Gemini, Cohere embedding providers
+- [Vector Stores](https://johnnichev.github.io/selectools/modules/VECTOR_STORES/): Memory, SQLite, Chroma, Pinecone backends
 
-## Stats
+## Providers
 
-- Version: 0.20.1
-- Tests: 3344
-- Examples: 76
-- Models: 152
-- Evaluators: 50
-- Python: 3.9–3.13
-- License: Apache-2.0
+- [Providers](https://johnnichev.github.io/selectools/modules/PROVIDERS/): OpenAI, Anthropic, Gemini, Ollama + FallbackProvider
+- [Models](https://johnnichev.github.io/selectools/modules/MODELS/): 152 models with built-in pricing data
+
+## Multi-Agent
+
+- [Orchestration](https://johnnichev.github.io/selectools/modules/ORCHESTRATION/): AgentGraph engine with routing, parallel, checkpoints
+- [Supervisor](https://johnnichev.github.io/selectools/modules/SUPERVISOR/): SupervisorAgent with 4 coordination strategies
+- [Pipeline](https://johnnichev.github.io/selectools/modules/PIPELINE/): Composable pipelines with @step + | + parallel() + branch()
+- [Patterns](https://johnnichev.github.io/selectools/modules/PATTERNS/): PlanAndExecute, Reflective, Debate, TeamLead agents
+
+## Security
+
+- [Guardrails](https://johnnichev.github.io/selectools/modules/GUARDRAILS/): PII redaction, toxicity, topic blocking, format validation
+- [Audit](https://johnnichev.github.io/selectools/modules/AUDIT/): JSONL audit logging with 4 privacy levels
+- [Security](https://johnnichev.github.io/selectools/modules/SECURITY/): Prompt injection screening (15 patterns)
+
+## Evaluation
+
+- [Evals](https://johnnichev.github.io/selectools/modules/EVALS/): 50 evaluators, EvalSuite, A/B testing, regression detection, HTML reports
+
+## Optional
+
+- [Sessions](https://johnnichev.github.io/selectools/modules/SESSIONS/): JSON, SQLite, Redis session backends
+- [Entity Memory](https://johnnichev.github.io/selectools/modules/ENTITY_MEMORY/): LLM-based entity extraction
+- [Knowledge Graph](https://johnnichev.github.io/selectools/modules/KNOWLEDGE_GRAPH/): Triple extraction and storage
+- [MCP](https://johnnichev.github.io/selectools/modules/MCP/): Model Context Protocol client/server
+- [Semantic Cache](https://johnnichev.github.io/selectools/modules/SEMANTIC_CACHE/): Embedding-based response caching
+- [Reasoning Strategies](https://johnnichev.github.io/selectools/modules/REASONING_STRATEGIES/): ReAct, CoT, Plan-Then-Act
+- [Builder Docs](https://johnnichev.github.io/selectools/modules/builder/): Visual builder reference
+- [Templates](https://johnnichev.github.io/selectools/modules/TEMPLATES/): YAML agent configuration
+- [Stability Markers](https://johnnichev.github.io/selectools/modules/STABILITY/): @stable, @beta, @deprecated
+- [Changelog](https://johnnichev.github.io/selectools/CHANGELOG/): Release history
+- [Examples Gallery](https://johnnichev.github.io/selectools/examples/): 76 runnable scripts with categories
