@@ -1,5 +1,39 @@
 # Tools Module
 
+**Import:** `from selectools import Tool, tool, ToolParameter, ToolRegistry`
+**Stability:** <span class="badge-stable">stable</span>
+**Since:** v0.13.0
+
+```python title="tool_basics.py"
+from selectools import Agent, AgentConfig, tool
+from selectools.providers.stubs import LocalProvider
+
+@tool()
+def get_weather(location: str) -> str:
+    """Get current weather for a city."""
+    return f"Weather in {location}: 22C, sunny"
+
+@tool()
+def add(a: int, b: int) -> str:
+    """Add two numbers together."""
+    return str(a + b)
+
+agent = Agent(
+    tools=[get_weather, add],
+    provider=LocalProvider(),
+    config=AgentConfig(model="gpt-4o"),
+)
+result = agent.run("What is the weather in Paris?")
+print(result.content)
+```
+
+!!! tip "See Also"
+    - [Agent](AGENT.md) -- how agents use tools in the execution loop
+    - [Dynamic Tools](DYNAMIC_TOOLS.md) -- ToolLoader, hot-reload, plugin systems
+    - [Toolbox](TOOLBOX.md) -- 24 pre-built tools (file, web, data, datetime, text)
+
+---
+
 **File:** `src/selectools/tools.py`
 **Classes:** `Tool`, `ToolParameter`, `ToolRegistry`
 **Decorators:** `@tool`
@@ -989,6 +1023,18 @@ def log_message(msg: str) -> str:
     print(msg)
     return f"Logged: {msg}"
 ```
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 02 | [`02_search_weather.py`](https://github.com/johnnichev/selectools/blob/main/examples/02_search_weather.py) | Custom search and weather tools |
+| 07 | [`07_streaming_tools.py`](https://github.com/johnnichev/selectools/blob/main/examples/07_streaming_tools.py) | Streaming tool output with generators |
+| 13 | [`13_dynamic_tools.py`](https://github.com/johnnichev/selectools/blob/main/examples/13_dynamic_tools.py) | ToolLoader for dynamic loading and hot-reload |
+| 27 | [`27_tool_policy.py`](https://github.com/johnnichev/selectools/blob/main/examples/27_tool_policy.py) | Allow/review/deny rules with ToolPolicy |
+| 38 | [`38_terminal_tools.py`](https://github.com/johnnichev/selectools/blob/main/examples/38_terminal_tools.py) | Terminal tools that stop the agent loop |
 
 ---
 

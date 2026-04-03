@@ -8,13 +8,6 @@ edit_uri: edit/main/docs/
 theme:
   name: material
   palette:
-    - media: "(prefers-color-scheme: light)"
-      scheme: default
-      primary: custom
-      accent: custom
-      toggle:
-        icon: material/brightness-7
-        name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
       primary: custom
@@ -22,6 +15,13 @@ theme:
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
   features:
     - navigation.instant
     - navigation.instant.progress
@@ -47,7 +47,7 @@ theme:
       danger: fontawesome/solid/skull-crossbones
       example: fontawesome/solid/flask
   font:
-    text: Inter
+    text: Plus Jakarta Sans
     code: JetBrains Mono
 
 plugins:
@@ -85,7 +85,7 @@ markdown_extensions:
       custom_checkbox: true
 
 nav:
-  - Getting Started:
+  - Get Started:
     - Quickstart: QUICKSTART.md
     - Coming from LangChain: MIGRATION.md
     - Cookbook: COOKBOOK.md
@@ -99,10 +99,26 @@ nav:
     - Streaming: modules/STREAMING.md
     - Memory: modules/MEMORY.md
     - Sessions: modules/SESSIONS.md
+    - Providers: modules/PROVIDERS.md
+    - Models & Pricing: modules/MODELS.md
+    - Usage & Cost: modules/USAGE.md
+  - Features:
+    - RAG Pipeline: modules/RAG.md
+    - Hybrid Search: modules/HYBRID_SEARCH.md
+    - Chunking: modules/ADVANCED_CHUNKING.md
+    - Embeddings: modules/EMBEDDINGS.md
+    - Vector Stores: modules/VECTOR_STORES.md
+    - Guardrails: modules/GUARDRAILS.md
+    - Eval Framework: modules/EVALS.md
+    - Orchestration: modules/ORCHESTRATION.md
+    - Supervisor: modules/SUPERVISOR.md
+    - Pipelines: modules/PIPELINE.md
+    - Patterns: modules/PATTERNS.md
+  - Advanced:
     - Entity Memory: modules/ENTITY_MEMORY.md
     - Knowledge Graph: modules/KNOWLEDGE_GRAPH.md
     - Knowledge Memory: modules/KNOWLEDGE.md
-  - Runtime Controls:
+    - MCP Client/Server: modules/MCP.md
     - Token Budget: modules/BUDGET.md
     - Cancellation: modules/CANCELLATION.md
     - Token Estimation: modules/TOKEN_ESTIMATION.md
@@ -112,56 +128,29 @@ nav:
     - Semantic Cache: modules/SEMANTIC_CACHE.md
     - Prompt Compression: modules/PROMPT_COMPRESSION.md
     - Conversation Branching: modules/CONVERSATION_BRANCHING.md
-  - Providers:
-    - Overview: modules/PROVIDERS.md
-    - Models & Pricing: modules/MODELS.md
-    - Usage & Cost Tracking: modules/USAGE.md
-  - RAG:
-    - RAG Pipeline: modules/RAG.md
-    - Hybrid Search: modules/HYBRID_SEARCH.md
-    - Advanced Chunking: modules/ADVANCED_CHUNKING.md
-    - Embeddings: modules/EMBEDDINGS.md
-    - Vector Stores: modules/VECTOR_STORES.md
-  - Evaluation:
-    - Eval Framework: modules/EVALS.md
-  - Multi-Agent:
-    - Orchestration: modules/ORCHESTRATION.md
-    - Supervisor: modules/SUPERVISOR.md
-    - Patterns: modules/PATTERNS.md
-  - Composition:
-    - Pipelines: modules/PIPELINE.md
-  - Deployment:
+  - Deploy:
     - Visual Builder: modules/builder.md
     - Serve & Deploy: modules/SERVE.md
     - Agent Templates: modules/TEMPLATES.md
-  - Observability:
-    - Trace Store: modules/TRACE_STORE.md
-  - Integration:
-    - MCP Client/Server: modules/MCP.md
-  - Security:
-    - Security Audit: SECURITY.md
-    - Guardrails: modules/GUARDRAILS.md
-    - Audit Logging: modules/AUDIT.md
-    - Screening & Coherence: modules/SECURITY.md
-    - Error Handling: modules/EXCEPTIONS.md
-  - Architecture Decisions:
-    - Protocol over ABC: decisions/001-protocol-over-abc.md
-    - Observer Replaces Hooks: decisions/002-observer-replaces-hooks.md
-    - Literal to Enum: decisions/003-literal-to-enum.md
-    - Provider Base Class: decisions/004-provider-base-class.md
-    - Agent Decomposition: decisions/005-agent-decomposition.md
-    - Agent Config Future: decisions/006-agent-config-future.md
   - Reference:
+    - Security Audit: SECURITY.md
+    - Audit Logging: modules/AUDIT.md
+    - Screening: modules/SECURITY.md
+    - Error Handling: modules/EXCEPTIONS.md
+    - Trace Store: modules/TRACE_STORE.md
     - Stability Markers: modules/STABILITY.md
-    - Deprecation Policy: DEPRECATION_POLICY.md
-    - Compatibility Matrix: COMPATIBILITY.md
-    - Parser: modules/PARSER.md
-    - Prompt: modules/PROMPT.md
-    - Release Guide: RELEASE_GUIDE.md
     - Changelog: CHANGELOG.md
+    - Architecture Decisions:
+      - Protocol over ABC: decisions/001-protocol-over-abc.md
+      - Observer Replaces Hooks: decisions/002-observer-replaces-hooks.md
+      - Literal to Enum: decisions/003-literal-to-enum.md
+      - Provider Base Class: decisions/004-provider-base-class.md
 
 extra_css:
   - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/copy-markdown.js
 
 extra:
   social:

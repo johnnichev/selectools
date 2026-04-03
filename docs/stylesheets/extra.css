@@ -1,72 +1,131 @@
-/* Selectools brand colors — Electric Blue + Cyan */
+/* Selectools brand — matches landing page */
 
 :root,
 [data-md-color-scheme="default"] {
-  --md-primary-fg-color: #1a56db;
-  --md-primary-fg-color--light: #3b82f6;
-  --md-primary-fg-color--dark: #1e40af;
-  --md-accent-fg-color: #06b6d4;
-  --md-accent-fg-color--transparent: rgba(6, 182, 212, 0.1);
-  --md-typeset-a-color: #1a56db;
+  --md-primary-fg-color: #1e293b;
+  --md-primary-fg-color--light: #334155;
+  --md-primary-fg-color--dark: #0f172a;
+  --md-accent-fg-color: #0891b2;
+  --md-accent-fg-color--transparent: rgba(8, 145, 178, 0.1);
+  --md-typeset-a-color: #0891b2;
 }
 
 [data-md-color-scheme="slate"] {
-  --md-primary-fg-color: #3b82f6;
-  --md-primary-fg-color--light: #60a5fa;
-  --md-primary-fg-color--dark: #2563eb;
+  --md-default-bg-color: #0f172a;
+  --md-default-bg-color--light: #1e293b;
+  --md-default-bg-color--lighter: #273548;
+  --md-default-bg-color--lightest: #334155;
+  --md-primary-fg-color: #1e293b;
+  --md-primary-fg-color--light: #334155;
+  --md-primary-fg-color--dark: #0f172a;
   --md-accent-fg-color: #22d3ee;
   --md-accent-fg-color--transparent: rgba(34, 211, 238, 0.1);
-  --md-typeset-a-color: #60a5fa;
+  --md-typeset-a-color: #22d3ee;
+  --md-code-bg-color: #1e293b;
+  --md-code-fg-color: #e2e8f0;
 }
 
 /* Header */
 .md-header {
   background: var(--md-primary-fg-color);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
 }
-
-.md-header__title {
-  font-weight: 700;
-}
+.md-header__title { font-weight: 700; }
 
 /* Tabs */
 .md-tabs {
   background: var(--md-primary-fg-color--dark);
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+/* Better code blocks */
+.md-typeset code {
+  border-radius: 4px;
+  font-size: 0.82em;
+}
+.md-typeset pre {
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Admonition refinements */
+.md-typeset .admonition {
+  border-radius: 8px;
+  border-width: 1px;
+  border-left-width: 4px;
 }
 
 /* Cards */
 .md-typeset .grid.cards > ul > li {
   border: 1px solid var(--md-default-fg-color--lightest);
-  border-radius: 0.5rem;
+  border-radius: 8px;
   padding: 1rem 1.2rem;
-  transition: border-color 200ms, box-shadow 200ms;
 }
 
-.md-typeset .grid.cards > ul > li:hover {
-  border-color: var(--md-accent-fg-color);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+/* Headings */
+.md-typeset h1 {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.md-typeset h2 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-top: 2em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
 }
 
-.md-typeset .grid.cards > ul > li > :first-child {
-  margin-top: 0;
-}
-
-/* Admonitions */
-.md-typeset .admonition.abstract > .admonition-title::before,
-.md-typeset details.abstract > summary::before {
-  content: "";
-}
-
-/* Code blocks */
-.md-typeset code {
-  border-radius: 0.25rem;
-}
-
-/* Nav sidebar active item */
-.md-nav__link--active {
-  font-weight: 600;
-}
-
-/* Footer */
+/* Footer nav links */
 .md-footer {
-  background: var(--md-primary-fg-color--dark);
+  background: var(--md-primary-fg-color);
+}
+
+/* Copy Markdown button */
+.copy-md-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 50;
+  background: var(--md-accent-fg-color);
+  color: #0f172a;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.copy-md-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+}
+.copy-md-btn:active { transform: scale(0.97); }
+
+/* Stability badges in headings */
+.badge-stable {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 100px;
+  background: rgba(34,197,94,0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34,197,94,0.3);
+  vertical-align: middle;
+  margin-left: 8px;
+}
+.badge-beta {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 100px;
+  background: rgba(245,158,11,0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245,158,11,0.3);
+  vertical-align: middle;
+  margin-left: 8px;
 }

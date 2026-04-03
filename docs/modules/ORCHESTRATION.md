@@ -1,5 +1,62 @@
 # Orchestration Module
 
+**Import:** `from selectools import AgentGraph, GraphState, GraphNode`
+**Stability:** <span class="badge-beta">beta</span>
+**Since:** v0.18.0
+
+```python title="multi_agent_pipeline.py"
+from selectools import Agent, AgentConfig, AgentGraph
+from selectools.providers.stubs import LocalProvider
+
+# Create specialized agents
+researcher = Agent(
+    tools=[],
+    provider=LocalProvider(),
+    config=AgentConfig(model="gpt-4o", system_prompt="You are a researcher."),
+)
+writer = Agent(
+    tools=[],
+    provider=LocalProvider(),
+    config=AgentConfig(model="gpt-4o", system_prompt="You are a writer."),
+)
+reviewer = Agent(
+    tools=[],
+    provider=LocalProvider(),
+    config=AgentConfig(model="gpt-4o", system_prompt="You are an editor."),
+)
+
+# Build graph: researcher -> writer -> reviewer
+graph = AgentGraph()
+graph.add_node("researcher", researcher)
+graph.add_node("writer", writer)
+graph.add_node("reviewer", reviewer)
+graph.add_edge("researcher", "writer")
+graph.add_edge("writer", "reviewer")
+graph.add_edge("reviewer", AgentGraph.END)
+graph.set_entry("researcher")
+
+result = graph.run("Write a blog post about AI agents")
+print(result.content)
+print(f"Steps: {result.steps}, Cost: ${result.total_usage.cost_usd:.4f}")
+```
+
+```mermaid
+graph LR
+    S[START] --> R[Researcher]
+    R --> W[Writer]
+    W --> Rev[Reviewer]
+    Rev -->|approved| E[END]
+    Rev -->|revise| W
+```
+
+!!! tip "See Also"
+    - [Agent](AGENT.md) -- the Agent class that powers each graph node
+    - [Supervisor](SUPERVISOR.md) -- high-level multi-agent coordination
+    - [Pipeline](PIPELINE.md) -- composable pipelines with @step and | operator
+    - [Sessions](SESSIONS.md) -- persistent session storage (complementary to checkpointing)
+
+---
+
 **Added in:** v0.18.0
 **Package:** `src/selectools/orchestration/`
 **Classes:** `AgentGraph`, `GraphState`, `GraphNode`, `GraphResult`, `SupervisorAgent`
@@ -1039,6 +1096,18 @@ print(f"Total cost: ${result.total_usage.cost_usd:.4f}")
 | 59 | [`59_agent_graph_checkpointing.py`](https://github.com/johnnichev/selectools/blob/main/examples/59_agent_graph_checkpointing.py) | Checkpointing with all three backends |
 | 60 | [`60_supervisor_agent.py`](https://github.com/johnnichev/selectools/blob/main/examples/60_supervisor_agent.py) | SupervisorAgent with four strategies |
 | 61 | [`61_agent_graph_subgraph.py`](https://github.com/johnnichev/selectools/blob/main/examples/61_agent_graph_subgraph.py) | Nested subgraph composition |
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 55 | [`55_agent_graph_linear.py`](https://github.com/johnnichev/selectools/blob/main/examples/55_agent_graph_linear.py) | Linear 3-node pipeline (planner, writer, reviewer) |
+| 56 | [`56_agent_graph_parallel.py`](https://github.com/johnnichev/selectools/blob/main/examples/56_agent_graph_parallel.py) | Parallel fan-out with MergePolicy |
+| 57 | [`57_agent_graph_conditional.py`](https://github.com/johnnichev/selectools/blob/main/examples/57_agent_graph_conditional.py) | Conditional routing based on state |
+| 58 | [`58_agent_graph_hitl.py`](https://github.com/johnnichev/selectools/blob/main/examples/58_agent_graph_hitl.py) | Human-in-the-loop with generator nodes |
+| 60 | [`60_supervisor_agent.py`](https://github.com/johnnichev/selectools/blob/main/examples/60_supervisor_agent.py) | SupervisorAgent with four strategies |
 
 ---
 

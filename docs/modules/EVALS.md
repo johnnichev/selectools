@@ -1,5 +1,42 @@
 # Eval Framework
 
+**Import:** `from selectools.evals import EvalSuite, TestCase, EvalReport`
+**Stability:** <span class="badge-stable">stable</span>
+**Since:** v0.17.0
+
+```python title="eval_basics.py"
+from selectools import Agent, AgentConfig, tool
+from selectools.providers.stubs import LocalProvider
+from selectools.evals import EvalSuite, TestCase
+
+@tool()
+def cancel_subscription(user_id: str) -> str:
+    """Cancel a user subscription."""
+    return f"Subscription cancelled for {user_id}"
+
+agent = Agent(
+    tools=[cancel_subscription],
+    provider=LocalProvider(),
+    config=AgentConfig(model="gpt-4o"),
+)
+
+suite = EvalSuite(agent=agent, cases=[
+    TestCase(input="Cancel my account", expect_tool="cancel_subscription"),
+    TestCase(input="Help me cancel", expect_contains="cancel"),
+])
+report = suite.run()
+print(f"Accuracy: {report.accuracy:.0%}")
+print(f"Pass: {report.pass_count}, Fail: {report.fail_count}")
+```
+
+!!! tip "See Also"
+    - [Agent](AGENT.md) -- the Agent class evaluated by EvalSuite
+    - [Guardrails](GUARDRAILS.md) -- input/output validation pipeline
+    - [Usage](USAGE.md) -- token and cost tracking for eval budgets
+    - [Stability](STABILITY.md) -- @stable, @beta, @deprecated markers
+
+---
+
 **Added in:** v0.17.0
 
 Built-in agent evaluation with 39 evaluators, regression detection, and CI integration. No separate install, no SaaS account, no external dependencies.
@@ -336,3 +373,13 @@ def test_agent_accuracy(agent):
 | `report.to_html(path)` | Interactive HTML report |
 | `report.to_junit_xml(path)` | JUnit XML for CI |
 | `report.to_json(path)` | Machine-readable JSON |
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 39 | [`39_eval_framework.py`](https://github.com/johnnichev/selectools/blob/main/examples/39_eval_framework.py) | Basic eval suite with TestCase assertions |
+| 40 | [`40_eval_advanced.py`](https://github.com/johnnichev/selectools/blob/main/examples/40_eval_advanced.py) | LLM-as-judge, regression detection, HTML reports |
+| 74 | [`74_trace_to_html.py`](https://github.com/johnnichev/selectools/blob/main/examples/74_trace_to_html.py) | Visualize agent traces as interactive HTML |

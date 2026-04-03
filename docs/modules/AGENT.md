@@ -1,5 +1,36 @@
 # Agent Module
 
+**Import:** `from selectools import Agent, AgentConfig`
+**Stability:** <span class="badge-stable">stable</span>
+**Since:** v0.13.0
+
+```python title="basic_agent.py"
+from selectools import Agent, AgentConfig, tool
+from selectools.providers.stubs import LocalProvider
+
+@tool()
+def search(query: str) -> str:
+    """Search for information."""
+    return f"Results for: {query}"
+
+agent = Agent(
+    tools=[search],
+    provider=LocalProvider(),
+    config=AgentConfig(model="gpt-4o"),
+)
+result = agent.run("Find Python tutorials")
+print(result.content)   # Agent response
+print(result.usage)     # Token counts + cost
+```
+
+!!! tip "See Also"
+    - [Tools](TOOLS.md) -- @tool decorator and tool system
+    - [Streaming](STREAMING.md) -- token-level async streaming
+    - [Memory](MEMORY.md) -- conversation history management
+    - [Providers](PROVIDERS.md) -- OpenAI, Anthropic, Gemini, Ollama adapters
+
+---
+
 **File:** `src/selectools/agent/core.py`
 **Classes:** `Agent`, `AgentConfig`
 
@@ -1967,6 +1998,18 @@ def divide(a: float, b: float) -> str:
         raise ValueError("Cannot divide by zero")
     return str(a / b)
 ```
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 01 | [`01_hello_world.py`](https://github.com/johnnichev/selectools/blob/main/examples/01_hello_world.py) | Your first agent with LocalProvider |
+| 06 | [`06_async_agent.py`](https://github.com/johnnichev/selectools/blob/main/examples/06_async_agent.py) | Async agent with arun() |
+| 24 | [`24_traces_and_reasoning.py`](https://github.com/johnnichev/selectools/blob/main/examples/24_traces_and_reasoning.py) | Execution traces and reasoning visibility |
+| 25 | [`25_provider_fallback.py`](https://github.com/johnnichev/selectools/blob/main/examples/25_provider_fallback.py) | FallbackProvider with circuit breaker |
+| 26 | [`26_batch_processing.py`](https://github.com/johnnichev/selectools/blob/main/examples/26_batch_processing.py) | Concurrent multi-prompt batch execution |
 
 ---
 

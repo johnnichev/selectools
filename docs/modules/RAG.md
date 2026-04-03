@@ -1,5 +1,49 @@
 # RAG System
 
+**Import:** `from selectools.rag import RAGAgent, DocumentLoader, VectorStore, TextSplitter`
+**Stability:** <span class="badge-stable">stable</span>
+**Since:** v0.14.0
+
+```python title="rag_basic.py"
+from selectools import Agent, AgentConfig, tool
+from selectools.providers.stubs import LocalProvider
+from selectools.rag import DocumentLoader, TextSplitter
+
+# Load and chunk documents
+docs = DocumentLoader.from_text(
+    "Selectools supports OpenAI, Anthropic, Gemini, and Ollama providers. "
+    "It provides RAG, tool calling, guardrails, and multi-agent orchestration.",
+    metadata={"source": "overview.txt"},
+)
+splitter = TextSplitter(chunk_size=500, chunk_overlap=50)
+chunks = splitter.split_documents(docs)
+print(f"Loaded {len(chunks)} chunks from {len(docs)} documents")
+
+# In production, embed chunks into a VectorStore and use RAGAgent:
+# store = VectorStore.create("memory", embedder=embedder)
+# store.add_documents(chunks)
+# agent = RAGAgent.from_documents(docs, provider=provider, vector_store=store)
+```
+
+```mermaid
+graph LR
+    D[Documents] --> C[Chunker]
+    C --> E[Embedder]
+    E --> V[Vector Store]
+    Q[Query] --> H[Hybrid Search]
+    V --> H
+    H --> RR[Reranker]
+    RR --> A[Agent]
+```
+
+!!! tip "See Also"
+    - [Embeddings](EMBEDDINGS.md) -- OpenAI, Anthropic, Gemini, Cohere embedding providers
+    - [Vector Stores](VECTOR_STORES.md) -- Memory, SQLite, Chroma, Pinecone backends
+    - [Advanced Chunking](ADVANCED_CHUNKING.md) -- semantic and contextual chunking
+    - [Hybrid Search](HYBRID_SEARCH.md) -- BM25 + vector fusion with reranking
+
+---
+
 **Directory:** `src/selectools/rag/`
 **Files:** `__init__.py`, `vector_store.py`, `loaders.py`, `chunking.py`, `tools.py`
 
@@ -655,6 +699,18 @@ embedder = OpenAIEmbeddingProvider(model="text-embedding-3-large")
 # Fix: Use cheaper or free model
 embedder = GeminiEmbeddingProvider()  # FREE
 ```
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 14 | [`14_rag_basic.py`](https://github.com/johnnichev/selectools/blob/main/examples/14_rag_basic.py) | Basic RAG pipeline with document loading |
+| 15 | [`15_semantic_search.py`](https://github.com/johnnichev/selectools/blob/main/examples/15_semantic_search.py) | Semantic search over embedded documents |
+| 16 | [`16_rag_advanced.py`](https://github.com/johnnichev/selectools/blob/main/examples/16_rag_advanced.py) | Advanced RAG with chunking and score thresholds |
+| 18 | [`18_hybrid_search.py`](https://github.com/johnnichev/selectools/blob/main/examples/18_hybrid_search.py) | BM25 + vector hybrid search with reranking |
+| 19 | [`19_advanced_chunking.py`](https://github.com/johnnichev/selectools/blob/main/examples/19_advanced_chunking.py) | Semantic and contextual chunking strategies |
 
 ---
 
