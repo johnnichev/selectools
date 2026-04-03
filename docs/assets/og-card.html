@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Selectools OG Card</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #1a1a2e;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    .og-card {
+      width: 1200px;
+      height: 630px;
+      background: #0f172a;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 72px 80px;
+    }
+
+    /* Dot grid pattern */
+    .og-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(148, 163, 184, 0.12) 1px, transparent 1px);
+      background-size: 24px 24px;
+      z-index: 0;
+    }
+
+    /* Cyan radial gradient wash */
+    .og-card::after {
+      content: '';
+      position: absolute;
+      top: -120px;
+      left: -120px;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(34, 211, 238, 0.15) 0%, rgba(34, 211, 238, 0.05) 40%, transparent 70%);
+      z-index: 0;
+    }
+
+    .content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 16px;
+    }
+
+    .python-logo {
+      width: 52px;
+      height: 52px;
+      flex-shrink: 0;
+    }
+
+    .title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 800;
+      font-size: 60px;
+      color: #ffffff;
+      letter-spacing: -1.5px;
+      line-height: 1.1;
+    }
+
+    .tagline {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 400;
+      font-size: 28px;
+      color: #94a3b8;
+      margin-top: 12px;
+      margin-bottom: 40px;
+    }
+
+    .code-snippet {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      color: #e2e8f0;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(148, 163, 184, 0.15);
+      border-radius: 8px;
+      padding: 16px 24px;
+      display: inline-block;
+      margin-bottom: 40px;
+    }
+
+    .code-snippet .keyword { color: #c084fc; }
+    .code-snippet .func { color: #22d3ee; }
+    .code-snippet .bracket { color: #94a3b8; }
+    .code-snippet .dots { color: #64748b; }
+
+    .stats-bar {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 16px;
+      color: #22d3ee;
+      letter-spacing: 0.5px;
+    }
+
+    .stats-bar .separator {
+      color: #334155;
+      margin: 0 6px;
+    }
+
+    .bottom-row {
+      position: absolute;
+      bottom: 36px;
+      right: 80px;
+      z-index: 1;
+    }
+
+    .attribution {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 14px;
+      color: #475569;
+      letter-spacing: 0.3px;
+    }
+  </style>
+</head>
+<body>
+  <div class="og-card">
+    <div class="content">
+      <div class="logo-row">
+        <!-- Python logo (simplified) -->
+        <svg class="python-logo" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="pyBlue" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#387EB8"/>
+              <stop offset="100%" stop-color="#366994"/>
+            </linearGradient>
+            <linearGradient id="pyYellow" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#FFC331"/>
+              <stop offset="100%" stop-color="#FFD43B"/>
+            </linearGradient>
+          </defs>
+          <path d="M31.5 2C18.5 2 19.5 7.8 19.5 7.8L19.52 13.8H32V15.5H12.5S2 14.2 2 31.5S11 48 11 48H16.5V41.8S16.2 33 25.2 33H38.3S46.5 33.1 46.5 25.2V9.3S47.7 2 31.5 2ZM24.5 7.5A3 3 0 1 1 24.5 13.5A3 3 0 0 1 24.5 7.5Z" fill="url(#pyBlue)"/>
+          <path d="M32.5 62C45.5 62 44.5 56.2 44.5 56.2L44.48 50.2H32V48.5H51.5S62 49.8 62 32.5S53 16 53 16H47.5V22.2S47.8 31 38.8 31H25.7S17.5 30.9 17.5 38.8V54.7S16.3 62 32.5 62ZM39.5 56.5A3 3 0 1 1 39.5 50.5A3 3 0 0 1 39.5 56.5Z" fill="url(#pyYellow)"/>
+        </svg>
+        <span class="title">selectools</span>
+      </div>
+
+      <div class="tagline">AI agents that are just Python.</div>
+
+      <div class="code-snippet">
+        <span class="keyword">from</span> selectools <span class="keyword">import</span> <span class="func">Agent</span>, <span class="func">tool</span><br><br>
+        agent = <span class="func">Agent</span><span class="bracket">(</span>tools=<span class="bracket">[</span><span class="dots">...</span><span class="bracket">]</span><span class="bracket">)</span>
+      </div>
+
+      <div class="stats-bar">
+        152 Models<span class="separator">&middot;</span>3344 Tests<span class="separator">&middot;</span>50 Evaluators<span class="separator">&middot;</span>4 Providers
+      </div>
+    </div>
+
+    <div class="bottom-row">
+      <span class="attribution">Open Source from NichevLabs</span>
+    </div>
+  </div>
+</body>
+</html>

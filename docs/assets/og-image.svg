@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <!-- Dot grid pattern -->
+    <pattern id="dotGrid" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="12" cy="12" r="1" fill="rgba(148,163,184,0.12)"/>
+    </pattern>
+    <!-- Cyan radial gradient wash -->
+    <radialGradient id="cyanWash" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse"
+                    gradientTransform="translate(180,180) scale(500)">
+      <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.15"/>
+      <stop offset="40%" stop-color="#22d3ee" stop-opacity="0.05"/>
+      <stop offset="70%" stop-color="#22d3ee" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Python logo gradients -->
+    <linearGradient id="pyBlue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#387EB8"/>
+      <stop offset="100%" stop-color="#366994"/>
+    </linearGradient>
+    <linearGradient id="pyYellow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFC331"/>
+      <stop offset="100%" stop-color="#FFD43B"/>
+    </linearGradient>
+    <!-- Code background -->
+    <rect id="codeBg" width="460" height="76" rx="8" ry="8"/>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#0f172a"/>
+
+  <!-- Dot grid -->
+  <rect width="1200" height="630" fill="url(#dotGrid)"/>
+
+  <!-- Cyan wash -->
+  <circle cx="180" cy="180" r="500" fill="url(#cyanWash)"/>
+
+  <!-- Python logo (simplified, positioned at left) -->
+  <g transform="translate(80,218) scale(0.8)">
+    <path d="M31.5 2C18.5 2 19.5 7.8 19.5 7.8L19.52 13.8H32V15.5H12.5S2 14.2 2 31.5S11 48 11 48H16.5V41.8S16.2 33 25.2 33H38.3S46.5 33.1 46.5 25.2V9.3S47.7 2 31.5 2ZM24.5 7.5A3 3 0 1 1 24.5 13.5A3 3 0 0 1 24.5 7.5Z" fill="url(#pyBlue)"/>
+    <path d="M32.5 62C45.5 62 44.5 56.2 44.5 56.2L44.48 50.2H32V48.5H51.5S62 49.8 62 32.5S53 16 53 16H47.5V22.2S47.8 31 38.8 31H25.7S17.5 30.9 17.5 38.8V54.7S16.3 62 32.5 62ZM39.5 56.5A3 3 0 1 1 39.5 50.5A3 3 0 0 1 39.5 56.5Z" fill="url(#pyYellow)"/>
+  </g>
+
+  <!-- Title: "selectools" -->
+  <text x="138" y="270" font-family="'Plus Jakarta Sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+        font-weight="800" font-size="60" fill="#ffffff" letter-spacing="-1.5">selectools</text>
+
+  <!-- Tagline -->
+  <text x="80" y="318" font-family="'Plus Jakarta Sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+        font-weight="400" font-size="28" fill="#94a3b8">AI agents that are just Python.</text>
+
+  <!-- Code snippet background -->
+  <rect x="80" y="348" width="460" height="76" rx="8" ry="8"
+        fill="rgba(30,41,59,0.8)" stroke="rgba(148,163,184,0.15)" stroke-width="1"/>
+
+  <!-- Code line 1: from selectools import Agent, tool -->
+  <text x="104" y="378" font-family="'JetBrains Mono', 'Fira Code', 'Consolas', monospace" font-size="14">
+    <tspan fill="#c084fc">from</tspan><tspan fill="#e2e8f0"> selectools </tspan><tspan fill="#c084fc">import</tspan><tspan fill="#22d3ee"> Agent</tspan><tspan fill="#e2e8f0">, </tspan><tspan fill="#22d3ee">tool</tspan>
+  </text>
+
+  <!-- Code line 2: agent = Agent(tools=[...]) -->
+  <text x="104" y="408" font-family="'JetBrains Mono', 'Fira Code', 'Consolas', monospace" font-size="14">
+    <tspan fill="#e2e8f0">agent = </tspan><tspan fill="#22d3ee">Agent</tspan><tspan fill="#94a3b8">(</tspan><tspan fill="#e2e8f0">tools=</tspan><tspan fill="#94a3b8">[</tspan><tspan fill="#64748b">...</tspan><tspan fill="#94a3b8">])</tspan>
+  </text>
+
+  <!-- Stats bar -->
+  <text x="80" y="480" font-family="'JetBrains Mono', 'Fira Code', 'Consolas', monospace" font-size="16" letter-spacing="0.5">
+    <tspan fill="#22d3ee">152 Models</tspan><tspan fill="#334155" dx="6">&middot;</tspan><tspan fill="#22d3ee" dx="6">3344 Tests</tspan><tspan fill="#334155" dx="6">&middot;</tspan><tspan fill="#22d3ee" dx="6">50 Evaluators</tspan><tspan fill="#334155" dx="6">&middot;</tspan><tspan fill="#22d3ee" dx="6">4 Providers</tspan>
+  </text>
+
+  <!-- Attribution -->
+  <text x="1120" y="598" font-family="'Plus Jakarta Sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+        font-weight="400" font-size="14" fill="#475569" text-anchor="end" letter-spacing="0.3">Open Source from NichevLabs</text>
+</svg>
