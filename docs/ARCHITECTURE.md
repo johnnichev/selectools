@@ -6,38 +6,18 @@
 ## System Overview
 
 ```mermaid
-graph TD
-    A[User Prompt] --> B[Agent]
-    B --> C{Single or Multi?}
-    C -->|Single| D[Tool Calling Loop]
-    C -->|Multi| E[AgentGraph]
-    E --> F[Node: Agent A]
-    E --> G[Node: Agent B]
-    E --> H[Node: Agent C]
-    F --> I[Routing]
-    G --> I
-    H --> I
-    I --> J{More nodes?}
-    J -->|Yes| E
-    J -->|No| K[GraphResult]
+graph LR
+    Prompt([User Prompt]) --> Agent
+    Agent -->|single| Result([AgentResult])
+    Agent -->|multi| Graph[AgentGraph]
+    Graph --> Result
+    Result --> Pipeline["Pipeline (@step)"]
+    Pipeline --> Serve["selectools serve"]
 
-    D --> L[AgentResult]
-    L --> M[Pipeline]
-    M --> N["@step | @step | @step"]
-    K --> M
-
-    M --> O[Serve]
-    O --> P["POST /invoke"]
-    O --> Q["POST /stream SSE"]
-    O --> R["GET /playground"]
-    O --> S["GET /builder"]
-    S --> T["Self-contained HTML"]
-
-    style B fill:#3b82f6,color:#fff
-    style E fill:#06b6d4,color:#fff
-    style M fill:#8b5cf6,color:#fff
-    style O fill:#10b981,color:#fff
-    style S fill:#f59e0b,color:#fff
+    style Agent fill:#3b82f6,color:#fff
+    style Graph fill:#06b6d4,color:#fff
+    style Pipeline fill:#8b5cf6,color:#fff
+    style Serve fill:#10b981,color:#fff
 ```
 
 **The flow:** User prompt → Agent (single or graph) → Pipeline composition → Serve as HTTP API or Visual Builder.
@@ -103,83 +83,22 @@ Selectools is a production-ready Python framework for building AI agents with to
 
 ```mermaid
 graph TD
-    subgraph User["USER APPLICATION"]
-        UA([User Code])
-    end
+    User([User Code]) --> Agent["Agent (core.py)"]
+    Agent --> Providers["Providers\nOpenAI · Anthropic · Gemini · Ollama"]
+    Agent --> Tools["Tools\n@tool · 24 built-in · ToolLoader"]
+    Agent --> Safety["Safety\nGuardrails · Audit · Screening"]
+    Agent --> Memory["Memory\nConversation · Entity · KG"]
+    Agent --> Trace["Trace + Observer\n27 step types · 45 events"]
+    Agent --> RAG["RAG\nHybrid search · Reranking"]
+    Agent --> Orchestration["Orchestration\nAgentGraph · Supervisor"]
+    Orchestration --> Agent
 
-    subgraph AgentLayer["AGENT LAYER"]
-        Core["Agent Loop<br/>agent/core.py"]
-        PB["PromptBuilder<br/>prompt.py"]
-        TCP["ToolCallParser<br/>parser.py"]
-        Mem["ConversationMemory<br/>memory.py"]
-        Core --> PB
-        Core --> TCP
-        Core --> Mem
-    end
-
-    subgraph Providers["PROVIDER LAYER"]
-        OAI["OpenAI"]
-        ANT["Anthropic"]
-        GEM["Gemini"]
-        OLL["Ollama"]
-        FB["FallbackProvider<br/>circuit breaker + failover"]
-        Proto["Provider Protocol<br/>complete / stream / acomplete / astream"]
-        OAI --> FB
-        ANT --> FB
-        GEM --> FB
-        OLL --> FB
-        FB --> Proto
-    end
-
-    subgraph Tools["TOOL SYSTEM"]
-        Tool["Tool + @tool decorator"]
-        TR["ToolRegistry"]
-        TL["ToolLoader"]
-    end
-
-    subgraph RAG["RAG SYSTEM"]
-        DL["DocumentLoader"]
-        TS["TextSplitter"]
-        EP["EmbeddingProvider"]
-        VS["VectorStore"]
-        RT["RAGTool"]
-        DL --> TS --> EP --> VS --> RT
-    end
-
-    subgraph Safety["SAFETY + OBSERVABILITY"]
-        Guard["Guardrails Pipeline"]
-        Audit["Audit Logger"]
-        Screen["Output Screening"]
-        Coh["Coherence Check"]
-        Obs["AgentObserver"]
-        Trace["AgentTrace"]
-    end
-
-    subgraph Support["SUPPORT SYSTEMS"]
-        Usage["Usage Tracking"]
-        Pricing["Pricing"]
-        Models["Model Registry"]
-        Analytics["Analytics"]
-        Cache["Cache LRU+TTL / Redis"]
-    end
-
-    UA --> Core
-    Core --> Proto
-    Core --> Tool
-    Core --> RT
-    Core --> Guard
-    Core --> Audit
-    Core --> Screen
-    Core --> Coh
-    Core --> Obs
-    Core --> Trace
-    Core --> Cache
-    Core --> Usage
-
-    style Core fill:#3b82f6,color:#fff
-    style FB fill:#06b6d4,color:#fff
-    style Guard fill:#ef4444,color:#fff
+    style Agent fill:#3b82f6,color:#fff
+    style Providers fill:#06b6d4,color:#fff
+    style Safety fill:#ef4444,color:#fff
     style Trace fill:#8b5cf6,color:#fff
+    style RAG fill:#f59e0b,color:#fff
+    style Orchestration fill:#22c55e,color:#fff
 ```
 
 **Agent responsibilities:** Iterative tool-calling loop, structured output parsing, execution traces, reasoning extraction, error handling with retries, observer notifications, parallel tool execution, batch processing, response caching, input/output guardrails, tool output screening, coherence checking, audit logging, session persistence, and memory context injection (entity, KG, knowledge).
@@ -406,54 +325,32 @@ Single source of truth for 152 models:
 
 ```mermaid
 flowchart TD
-    A([User Message]) --> B[Load History<br/>Memory.get_history]
-    B --> C[Build Prompt<br/>PromptBuilder.build]
-    C --> D{Cache Hit?}
-    D -->|Yes| K
-    D -->|No| E[LLM Request<br/>Provider.complete]
-    E --> F[Cache Response<br/>Cache.set]
-    F --> G[Parse Response<br/>ToolCallParser.parse]
-    G --> H{Tool Call?}
-    H -->|No| J{Structured<br/>Output?}
-    H -->|Yes| I[Policy Check<br/>allow / review / deny]
-    I --> I2[Execute Tool<br/>validate + run]
-    I2 --> I3[Record TraceStep<br/>Append messages]
-    I3 --> D
-    J -->|Yes| J2[Validate JSON<br/>parse_and_validate]
-    J2 -->|Invalid| E
-    J2 -->|Valid| K
-    J -->|No| K[Build AgentResult<br/>trace + reasoning + parsed]
-    K --> L([Return to User])
+    A([User Message]) --> B[Build Prompt]
+    B --> C{Cache?}
+    C -->|hit| G
+    C -->|miss| D[LLM Call]
+    D --> E{Tool Call?}
+    E -->|yes| F[Execute Tool + Trace]
+    F --> B
+    E -->|no| G([AgentResult])
 
     style A fill:#10b981,color:#fff
-    style E fill:#3b82f6,color:#fff
-    style I fill:#ef4444,color:#fff
-    style L fill:#10b981,color:#fff
+    style D fill:#3b82f6,color:#fff
+    style F fill:#ef4444,color:#fff
+    style G fill:#10b981,color:#fff
 ```
 
 ### RAG-Enhanced Flow
 
 ```mermaid
-flowchart TD
-    subgraph Setup["First-Time Ingestion"]
-        S1["DocumentLoader.from_directory"] --> S2["TextSplitter.split_documents"]
-        S2 --> S3["EmbeddingProvider.embed_texts"]
-        S3 --> S4["VectorStore.add_documents"]
-    end
+flowchart LR
+    Docs[Documents] --> Chunk[Chunker] --> Embed[Embedder] --> Store[Vector Store]
+    Query([Query]) --> Search[Hybrid Search\nBM25 + Vector]
+    Store --> Search --> Rerank[Reranker] --> Agent([Agent])
 
-    A([User Question]) --> B[Agent receives question]
-    B --> C[LLM decides to use RAGTool]
-    C --> D["EmbeddingProvider.embed_query"]
-    D --> E["VectorStore.search<br/>top_k matches + scores"]
-    E --> F[Format results with citations]
-    F --> G[LLM generates answer<br/>using retrieved context]
-    G --> H([Return to User])
-
-    S4 -.->|indexed| E
-
-    style A fill:#10b981,color:#fff
-    style H fill:#10b981,color:#fff
-    style Setup fill:#f0f9ff,stroke:#3b82f6
+    style Query fill:#10b981,color:#fff
+    style Agent fill:#3b82f6,color:#fff
+    style Search fill:#f59e0b,color:#fff
 ```
 
 ---
@@ -461,46 +358,24 @@ flowchart TD
 ## Module Dependencies
 
 ```mermaid
-graph TD
-    Init["__init__.py<br/>Public API"] --> AgentCore["agent/core.py"]
-    Init --> ToolsMod["tools/"]
-    Init --> ProvMod["providers/"]
-    Init --> RagMod["rag/"]
-    Init --> EmbMod["embeddings/"]
-    Init --> EvalsMod["evals/"]
-    Init --> OrchMod["orchestration/"]
-    Init --> ServeMod["serve/"]
-    Init --> ModelsMod["models.py"]
+graph LR
+    API["__init__.py"] --> Agent["agent/"]
+    API --> Tools["tools/"]
+    API --> Providers["providers/"]
+    API --> RAG["rag/"]
+    API --> Evals["evals/"]
 
-    AgentCore --> Types["types.py"]
-    AgentCore --> ToolsMod
-    AgentCore --> Prompt["prompt.py"]
-    AgentCore --> Parser["parser.py"]
-    AgentCore --> Structured["structured.py"]
-    AgentCore --> TraceMod["trace.py"]
-    AgentCore --> Policy["policy.py"]
-    AgentCore --> ProvMod
-    AgentCore --> Memory["memory.py"]
-    AgentCore --> Usage["usage.py"]
-    AgentCore --> Observer["observer.py"]
-    AgentCore --> Cache["cache.py"]
-    AgentCore --> Sessions["sessions.py"]
-    AgentCore --> EntityMem["entity_memory.py"]
-    AgentCore --> KGMem["knowledge_graph.py"]
-    AgentCore --> Knowledge["knowledge.py"]
-    AgentCore --> Guard["guardrails/"]
-    AgentCore --> Security["security.py"]
+    Agent --> Providers
+    Agent --> Tools
+    Agent --> RAG
+    Evals --> Agent
+    Orchestration["orchestration/"] --> Agent
+    Serve["serve/"] --> Orchestration
 
-    ProvMod --> Types
-    RagMod --> EmbMod
-    EvalsMod --> AgentCore
-    OrchMod --> AgentCore
-    ServeMod --> AgentCore
-
-    style Init fill:#3b82f6,color:#fff
-    style AgentCore fill:#06b6d4,color:#fff
-    style OrchMod fill:#8b5cf6,color:#fff
-    style ServeMod fill:#10b981,color:#fff
+    style API fill:#3b82f6,color:#fff
+    style Agent fill:#06b6d4,color:#fff
+    style Orchestration fill:#8b5cf6,color:#fff
+    style Serve fill:#10b981,color:#fff
 ```
 
 **Module breakdown:**
@@ -847,33 +722,19 @@ The orchestration layer (v0.18.0) enables composing multiple agents into directe
 ### Architecture
 
 ```mermaid
-graph TD
-    subgraph Graph["AgentGraph"]
-        GS["GraphState<br/>messages, data, history, metadata, errors"]
-        GN["GraphNode<br/>wraps Agent or callable"]
-        R{Routing}
-        R -->|static| SE["add_edge"]
-        R -->|conditional| CE["add_conditional_edge"]
-        R -->|scatter| SC["Scatter fan-out"]
-        PG["ParallelGroupNode<br/>asyncio.gather + MergePolicy"]
-        SG["SubgraphNode<br/>nested graph"]
-        CP["CheckpointStore<br/>InMemory / File / SQLite"]
-        CP --> HITL["HITL: InterruptRequest<br/>checkpoint + resume"]
-        LD["Loop/Stall Detection<br/>state hash tracking"]
-    end
+graph LR
+    Start([START]) --> A[Agent A]
+    A --> B[Agent B]
+    B --> C{Router}
+    C -->|approved| End([END])
+    C -->|revise| A
 
-    subgraph Supervisor["SupervisorAgent"]
-        PE["plan_and_execute"]
-        RR["round_robin"]
-        DY["dynamic"]
-        MG["magentic"]
-    end
-
-    Supervisor --> Graph
-
-    style Graph fill:#f0f9ff,stroke:#06b6d4
-    style Supervisor fill:#faf5ff,stroke:#8b5cf6
+    style Start fill:#22c55e,color:#fff
+    style End fill:#ef4444,color:#fff
+    style C fill:#f59e0b,color:#fff
 ```
+
+Key components: `GraphState` (shared state), `GraphNode` (wraps any Agent or callable), routing (static, conditional, scatter fan-out), `ParallelGroupNode` (asyncio.gather + MergePolicy), `CheckpointStore` (InMemory / File / SQLite), HITL via `yield InterruptRequest()`. `SupervisorAgent` adds 4 strategies: plan_and_execute, round_robin, dynamic, magentic.
 
 ### Key Design Decisions
 
@@ -926,24 +787,15 @@ The serve layer (v0.19.0+) provides HTTP deployment and a visual builder for age
 ### Architecture
 
 ```mermaid
-graph TD
-    CLI(["selectools serve"]) --> App["Starlette ASGI App<br/>_starlette_app.py"]
-    CLI --> Builder["selectools serve --builder"]
-
-    App --> Invoke["POST /invoke"]
-    App --> Stream["POST /stream SSE"]
-    App --> Play["GET /playground<br/>playground.py"]
-    App --> BuilderRoute["GET /builder"]
-
-    BuilderRoute --> BPy["builder.py<br/>18-line HTML assembler"]
-    BPy --> Static["_static/<br/>builder.html + builder.css + builder.js"]
-
-    YAML["YAML Config"] --> App
-    Templates["templates/<br/>5 agent templates"] --> App
+graph LR
+    CLI(["selectools serve"]) --> App["Starlette App"]
+    App --> API["/invoke + /stream"]
+    App --> UI["/playground + /builder"]
+    UI --> Static["_static/ HTML+CSS+JS"]
 
     style CLI fill:#10b981,color:#fff
     style App fill:#3b82f6,color:#fff
-    style BuilderRoute fill:#f59e0b,color:#fff
+    style UI fill:#f59e0b,color:#fff
 ```
 
 ### Serve Module Structure
