@@ -508,6 +508,16 @@
     .cmp-table .mid { color: var(--amber); }
     .cmp-table .cap { color: var(--text); }
 
+    /* ── Builder Compare Details ───────────────────────────────────── */
+    details.builder-compare { margin-top: 28px; }
+    details.builder-compare summary {
+      cursor: pointer;
+      list-style: none;
+    }
+    details.builder-compare summary::-webkit-details-marker { display: none; }
+    details.builder-compare summary::marker { display: none; content: ""; }
+    details.builder-compare .code-frame { margin-top: 16px; }
+
     /* ── Result Boxes ──────────────────────────────────────────────── */
     .result-box {
       background: var(--surface);
@@ -817,6 +827,29 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
       <a href="modules/builder/" class="btn btn-ghost">Builder Docs</a>
       <a href="examples/" class="btn btn-ghost">76 Example Scripts</a>
     </div>
+    <details class="builder-compare">
+      <summary class="btn btn-ghost">See how the builder compares</summary>
+      <div class="code-frame" style="overflow-x:auto">
+        <table class="cmp-table">
+          <thead>
+            <tr><th class="cap">Feature</th><th>selectools</th><th>LangGraph Studio</th><th>n8n</th><th>Flowise</th><th>Dify</th><th>Rivet</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="cap">Price</td><td class="yes">Free, forever</td><td class="no">Paid (LangSmith)</td><td class="mid">&euro;20/mo cloud</td><td class="yes">Free self-host</td><td class="yes">Free self-host</td><td class="yes">Free</td></tr>
+            <tr><td class="cap">Install</td><td class="yes"><code style="font-size:11px">pip install</code></td><td class="mid">macOS desktop app</td><td class="no">Docker</td><td class="no">Docker</td><td class="no">Docker</td><td class="mid">Desktop app</td></tr>
+            <tr><td class="cap">Self-hosted</td><td class="yes">Yes</td><td class="no">No (desktop only)</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="no">No</td></tr>
+            <tr><td class="cap">No CDN/build step</td><td class="yes">Yes</td><td class="mid">N/A</td><td class="no">No (React)</td><td class="no">No (React)</td><td class="no">No (React)</td><td class="no">No (Electron)</td></tr>
+            <tr><td class="cap">Code export (Python)</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td class="cap">Code export (YAML)</td><td class="yes">Yes</td><td class="no">No</td><td class="mid">JSON only</td><td class="mid">JSON only</td><td class="mid">YAML</td><td class="no">No</td></tr>
+            <tr><td class="cap">AI generation</td><td class="yes">Yes (NL to graph)</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td class="cap">Live test from browser</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+            <tr><td class="cap">Runs on GitHub Pages</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td class="cap">Per-node cost preview</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td class="cap">Built-in evals</td><td class="yes">50 evaluators</td><td class="mid">LangSmith (paid)</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
   </div>
 </section>
 
