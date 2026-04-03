@@ -404,3 +404,72 @@ class TestRedisSessionStoreEdgeCases:
         ids = [s.session_id for s in sessions]
         assert len(ids) == len(set(ids)), f"Duplicate session IDs in list(): {ids}"
         assert set(ids) == {"s1", "s2"}
+
+
+# ======================================================================
+# Key collision regression tests
+# ======================================================================
+
+
+class TestRedisKeyCollisionFix:
+    """Regression tests for the Redis session key collision fix."""
+
+    def test_meta_key_uses_different_separator(self) -> None:
+        """_meta_key must not collide with _key for IDs ending in :meta."""
+        store = RedisSessionStore.__new__(RedisSessionStore)
+        store._prefix = "selectools:session:"
+        # These must produce DIFFERENT Redis keys
+        data_key = store._key("test:meta")
+        meta_key = store._meta_key("test")
+        assert data_key != meta_key
+
+    def test_session_id_rejects_null_bytes(self) -> None:
+        """Session IDs with null bytes must be rejected."""
+        store = RedisSessionStore.__new__(RedisSessionStore)
+        store._prefix = "selectools:session:"
+        with pytest.raises(ValueError):
+            store._key("bad\x00id")
+
+    def test_session_id_rejects_empty(self) -> None:
+        """Empty session IDs must be rejected."""
+        store = RedisSessionStore.__new__(RedisSessionStore)
+        store._prefix = "selectools:session:"
+        with pytest.raises(ValueError):
+            store._key("")
+
+    def test_meta_key_and_data_key_distinct_for_dunder_meta_id(self) -> None:
+        """Even if a session ID is '__meta__X', the data and meta keys must differ."""
+        store = RedisSessionStore.__new__(RedisSessionStore)
+        store._prefix = "selectools:session:"
+        data_key = store._key("__meta__X")
+        meta_key = store._meta_key("__meta__X")
+        assert data_key != meta_key
+
+    def test_session_id_rejects_too_long(self) -> None:
+        """Session IDs longer than 512 characters must be rejected."""
+        store = RedisSessionStore.__new__(RedisSessionStore)
+        store._prefix = "selectools:session:"
+        with pytest.raises(ValueError, match="too long"):
+            store._key("x" * 513)
+
+    def test_round_trip_with_colon_in_session_id(self) -> None:
+        """Save/load must work correctly when session ID contains colons."""
+        fake = FakeRedis()
+        store = _make_redis_store(fake)
+        mem = _memory_with_messages("Hello")
+        store.save("ns:user:123", mem)
+
+        loaded = store.load("ns:user:123")
+        assert loaded is not None
+        assert loaded.get_history()[0].content == "Hello"
+
+    def test_list_with_colon_session_ids(self) -> None:
+        """list() must correctly enumerate sessions whose IDs contain colons."""
+        fake = FakeRedis()
+        store = _make_redis_store(fake)
+        store.save("a:b", _memory_with_messages("X"))
+        store.save("c:d", _memory_with_messages("Y"))
+
+        sessions = store.list()
+        ids = {s.session_id for s in sessions}
+        assert ids == {"a:b", "c:d"}
