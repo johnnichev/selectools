@@ -4,12 +4,101 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Selectools — Production-Ready AI Agents in Plain Python</title>
-  <meta name="description" content="Multi-agent orchestration, RAG, tool calling, evals, and a visual builder — in one pip install. No DSL. No vendor lock-in. Open source from NichevLabs." />
-  <meta property="og:title" content="Selectools — AI Agents That Are Just Python" />
-  <meta property="og:description" content="Multi-agent graphs, 50 built-in evaluators, visual builder, hybrid RAG. Supports OpenAI, Anthropic, Gemini, Ollama." />
+  <meta name="description" content="Selectools is a Python library for building production-ready AI agents with tool calling, RAG, and multi-agent orchestration. 152 models, 50 evaluators, visual builder. Supports OpenAI, Anthropic, Gemini, Ollama. Free and open source." />
+  <link rel="canonical" href="https://johnnichev.github.io/selectools/" />
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
+  <meta name="keywords" content="python ai agent, tool calling, rag, hybrid search, openai, anthropic, gemini, ollama, ai agent framework, llm tools, python llm, multi-agent, agent graph, langchain alternative" />
+  <meta name="author" content="NichevLabs" />
+  <meta property="og:title" content="Selectools — Python AI Agent Framework" />
+  <meta property="og:description" content="Multi-agent graphs, 50 built-in evaluators, visual builder, hybrid RAG. One pip install. No DSL. Free." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://johnnichev.github.io/selectools/" />
+  <meta property="og:site_name" content="Selectools" />
+  <meta property="og:locale" content="en_US" />
   <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Selectools — AI Agents That Are Just Python" />
+  <meta name="twitter:description" content="Multi-agent orchestration, RAG, 50 evaluators, visual builder — one pip install. OpenAI, Anthropic, Gemini, Ollama." />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Selectools",
+    "alternateName": "selectools",
+    "description": "Production-ready Python library for building AI agents with tool calling, RAG, and multi-agent orchestration. Supports OpenAI, Anthropic, Gemini, and Ollama.",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Any",
+    "programmingLanguage": "Python",
+    "url": "https://johnnichev.github.io/selectools/",
+    "downloadUrl": "https://pypi.org/project/selectools/",
+    "softwareVersion": "0.20.1",
+    "license": "https://opensource.org/licenses/Apache-2.0",
+    "author": {
+      "@type": "Organization",
+      "name": "NichevLabs",
+      "url": "https://nichevlabs.com"
+    },
+    "codeRepository": "https://github.com/johnnichev/selectools",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "featureList": [
+      "Multi-provider LLM support (OpenAI, Anthropic, Gemini, Ollama)",
+      "Tool calling with 24 pre-built tools",
+      "Hybrid RAG search (BM25 + vector + reranking)",
+      "Multi-agent orchestration with AgentGraph",
+      "50 built-in evaluators for agent testing",
+      "Enterprise security: guardrails, audit logging, PII redaction",
+      "Visual drag-and-drop agent builder",
+      "Composable pipelines with @step decorator"
+    ]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What is Selectools?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Selectools is an open-source Python library for building production-ready AI agents with tool calling, RAG (retrieval-augmented generation), and multi-agent orchestration. It supports OpenAI, Anthropic, Gemini, and Ollama providers with a single unified API. Install with: pip install selectools."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How is Selectools different from LangChain?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Selectools uses a single Agent class with native tool calling — no chains, no expression language, no complex abstractions. It includes built-in features that require separate paid services in LangChain: 50 evaluators, hybrid RAG search, guardrails, audit logging, multi-agent orchestration, and a visual builder. One pip install, everything included, free."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What LLM providers does Selectools support?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Selectools supports 5 LLM providers: OpenAI (GPT-4, GPT-5, o-series), Anthropic (Claude), Google Gemini, Ollama (local models), and a FallbackProvider for automatic failover with circuit breaker. It includes pricing data for 152 models across all providers."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does Selectools have a visual builder?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. Selectools ships a drag-and-drop visual agent builder that runs in the browser with zero installation. Design multi-agent workflows, test with real APIs, and export runnable Python or YAML. Try it at: https://johnnichev.github.io/selectools/builder/"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How do I install Selectools?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Install with pip: pip install selectools. For optional features: pip install selectools[serve] for the visual builder with Starlette, pip install selectools[rag] for Chroma/Pinecone vector stores."
+        }
+      }
+    ]
+  }
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -551,6 +640,48 @@
   </div>
 </div>
 
+<!-- ─── What is Selectools ──────────────────────────────────────────── -->
+<section class="section" id="what">
+  <div class="wrap">
+    <span class="section-label">What is selectools?</span>
+    <h2 class="mb-6">A Python framework for production AI agents.</h2>
+    <div class="grid-2 gap-12" style="align-items:start">
+      <div class="reveal">
+        <p style="color:var(--text-dim);font-size:16px;line-height:1.8;margin-bottom:20px">
+          Selectools is an open-source Python library that gives you everything you need to build, test, and deploy AI agents &mdash; multi-agent graphs, tool calling, RAG with hybrid search, 50 evaluators, guardrails, audit logging, and a visual builder &mdash; in a single <code style="color:var(--cyan)">pip install</code>.
+        </p>
+        <p style="color:var(--text-dim);font-size:16px;line-height:1.8">
+          Unlike LangChain, there&rsquo;s no expression language to learn, no separate packages to install, and no paid SaaS for traces or evals. Unlike CrewAI, you get full graph orchestration, not just role-based agents. Your code stays plain Python &mdash; readable, debuggable, yours.
+        </p>
+      </div>
+      <div class="reveal reveal-d1">
+        <div class="code-frame code-frame-accent">
+          <div class="code-bar">
+            <div class="code-dot" style="background:rgba(239,68,68,0.8)"></div>
+            <div class="code-dot" style="background:rgba(250,204,21,0.8)"></div>
+            <div class="code-dot" style="background:rgba(34,197,94,0.8)"></div>
+            <span class="code-bar-label">hello.py</span>
+          </div>
+          <div class="code-body"><span class="kw">from</span> <span class="cls">selectools</span> <span class="kw">import</span> Agent, tool
+<span class="kw">from</span> <span class="cls">selectools.providers</span> <span class="kw">import</span> OpenAIProvider
+
+<span class="kw">@tool</span>()
+<span class="kw">def</span> <span class="fn">search</span>(query: <span class="cls">str</span>) -> <span class="cls">str</span>:
+    <span class="str">"""Search the knowledge base."""</span>
+    <span class="kw">return</span> db.search(query)
+
+agent = <span class="fn">Agent</span>(
+    tools=[search],
+    provider=<span class="fn">OpenAIProvider</span>(),
+)
+result = agent.<span class="fn">run</span>(<span class="str">"Find our refund policy"</span>)
+<span class="cmt"># result.content, result.trace, result.usage</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ─── Code Comparison ────────────────────────────────────────────── -->
 <section class="section">
   <div class="wrap">
@@ -971,6 +1102,63 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
     <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:24px">
       <a href="https://colab.research.google.com/github/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb" class="btn btn-ghost">Open in Colab</a>
       <a href="https://github.com/johnnichev/selectools" class="btn btn-ghost">Star on GitHub</a>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FAQ ────────────────────────────────────────────────────────── -->
+<section class="section" id="faq">
+  <div class="wrap">
+    <div class="text-center mb-14">
+      <span class="section-label">FAQ</span>
+      <h2>Frequently asked questions</h2>
+    </div>
+    <div style="max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:2px">
+      <details class="card reveal" style="cursor:pointer;padding:0">
+        <summary style="padding:18px 24px;font-weight:600;font-size:14px;color:#fff;list-style:none;display:flex;justify-content:space-between;align-items:center">
+          What is Selectools?
+          <span style="color:var(--text-faint);font-size:12px;flex-shrink:0;margin-left:16px">&#9660;</span>
+        </summary>
+        <div style="padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7">
+          Selectools is an open-source Python library for building production-ready AI agents with tool calling, RAG (retrieval-augmented generation), and multi-agent orchestration. It supports OpenAI, Anthropic, Gemini, and Ollama providers with a single unified API. Install with: <code style="color:var(--cyan)">pip install selectools</code>.
+        </div>
+      </details>
+      <details class="card reveal reveal-d1" style="cursor:pointer;padding:0">
+        <summary style="padding:18px 24px;font-weight:600;font-size:14px;color:#fff;list-style:none;display:flex;justify-content:space-between;align-items:center">
+          How is Selectools different from LangChain?
+          <span style="color:var(--text-faint);font-size:12px;flex-shrink:0;margin-left:16px">&#9660;</span>
+        </summary>
+        <div style="padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7">
+          Selectools uses a single <code>Agent</code> class with native tool calling &mdash; no chains, no expression language, no complex abstractions. It includes built-in features that require separate paid services in LangChain: 50 evaluators (vs LangSmith at $39/seat/mo), hybrid RAG search, guardrails, audit logging, multi-agent orchestration, and a visual builder. One <code style="color:var(--cyan)">pip install</code>, everything included, free.
+        </div>
+      </details>
+      <details class="card reveal reveal-d2" style="cursor:pointer;padding:0">
+        <summary style="padding:18px 24px;font-weight:600;font-size:14px;color:#fff;list-style:none;display:flex;justify-content:space-between;align-items:center">
+          What LLM providers does Selectools support?
+          <span style="color:var(--text-faint);font-size:12px;flex-shrink:0;margin-left:16px">&#9660;</span>
+        </summary>
+        <div style="padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7">
+          Five providers: OpenAI (GPT-4, GPT-5, o-series), Anthropic (Claude), Google Gemini, Ollama (local models), and a FallbackProvider for automatic failover with circuit breaker. Includes pricing data for 152 models. For testing without any API key, use the built-in <code>LocalProvider</code>.
+        </div>
+      </details>
+      <details class="card reveal reveal-d3" style="cursor:pointer;padding:0">
+        <summary style="padding:18px 24px;font-weight:600;font-size:14px;color:#fff;list-style:none;display:flex;justify-content:space-between;align-items:center">
+          Does Selectools have a visual builder?
+          <span style="color:var(--text-faint);font-size:12px;flex-shrink:0;margin-left:16px">&#9660;</span>
+        </summary>
+        <div style="padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7">
+          Yes. Selectools ships a drag-and-drop visual agent builder that runs in the browser with zero installation. Design multi-agent workflows, test with mock or real APIs, and export runnable Python or YAML. <a href="builder/" style="color:var(--cyan)">Try it now &rarr;</a>
+        </div>
+      </details>
+      <details class="card reveal" style="cursor:pointer;padding:0">
+        <summary style="padding:18px 24px;font-weight:600;font-size:14px;color:#fff;list-style:none;display:flex;justify-content:space-between;align-items:center">
+          How do I install Selectools?
+          <span style="color:var(--text-faint);font-size:12px;flex-shrink:0;margin-left:16px">&#9660;</span>
+        </summary>
+        <div style="padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7">
+          <code style="color:var(--cyan)">pip install selectools</code>. For the visual builder with Starlette server: <code style="color:var(--cyan)">pip install selectools[serve]</code>. For Chroma/Pinecone vector stores: <code style="color:var(--cyan)">pip install selectools[rag]</code>. Requires Python 3.9+.
+        </div>
+      </details>
     </div>
   </div>
 </section>

@@ -1,0 +1,81 @@
+# Selectools
+
+> Selectools is a production-ready Python library for building AI agents with tool calling, RAG, and multi-agent orchestration. Supports OpenAI, Anthropic, Gemini, and Ollama.
+
+## Install
+
+```
+pip install selectools
+```
+
+## Quick Start
+
+```python
+from selectools import Agent, tool
+from selectools.providers import OpenAIProvider
+
+@tool()
+def search(query: str) -> str:
+    """Search the knowledge base."""
+    return db.search(query)
+
+agent = Agent(tools=[search], provider=OpenAIProvider())
+result = agent.run("Find our refund policy")
+# result.content — the response
+# result.trace   — execution timeline
+# result.usage   — token counts and cost
+```
+
+## Key Features
+
+- **5 Providers**: OpenAI, Anthropic, Gemini, Ollama + FallbackProvider with circuit breaker
+- **152 Models**: Built-in pricing data for all providers
+- **Tool Calling**: @tool decorator, 24 pre-built tools, tool policies, coherence checking
+- **RAG**: BM25 + vector hybrid search, RRF fusion, cross-encoder reranking, 4 vector store backends
+- **Multi-Agent**: AgentGraph for directed graphs, SupervisorAgent (4 strategies), HITL, parallel execution
+- **Composable Pipelines**: Pipeline + @step + | operator + parallel() + branch()
+- **50 Evaluators**: Deterministic + LLM-as-judge, A/B testing, regression detection, HTML reports
+- **Guardrails**: PII redaction, toxicity, topic blocking, prompt injection screening (15 patterns)
+- **Memory**: ConversationMemory, EntityMemory, KnowledgeGraphMemory, session persistence
+- **Audit Logging**: JSONL with 4 privacy levels, daily rotation
+- **Visual Builder**: Drag-drop graph editor, runs in browser, exports Python/YAML
+- **Advanced Patterns**: PlanAndExecuteAgent, ReflectiveAgent, DebateAgent, TeamLeadAgent
+- **Enterprise**: Security audit published, SBOM, @stable/@beta/@deprecated markers
+
+## Documentation
+
+- Quickstart: https://johnnichev.github.io/selectools/QUICKSTART/
+- API Reference: https://johnnichev.github.io/selectools/modules/AGENT/
+- Architecture: https://johnnichev.github.io/selectools/ARCHITECTURE/
+- Visual Builder: https://johnnichev.github.io/selectools/builder/
+- Examples (76): https://johnnichev.github.io/selectools/examples/
+- GitHub: https://github.com/johnnichev/selectools
+- PyPI: https://pypi.org/project/selectools/
+
+## Module Index
+
+- Agent Core: https://johnnichev.github.io/selectools/modules/AGENT/
+- Tools: https://johnnichev.github.io/selectools/modules/TOOLS/
+- RAG: https://johnnichev.github.io/selectools/modules/RAG/
+- Memory: https://johnnichev.github.io/selectools/modules/MEMORY/
+- Guardrails: https://johnnichev.github.io/selectools/modules/GUARDRAILS/
+- Evals: https://johnnichev.github.io/selectools/modules/EVALS/
+- Orchestration: https://johnnichev.github.io/selectools/modules/ORCHESTRATION/
+- Pipelines: https://johnnichev.github.io/selectools/modules/PIPELINE/
+- Patterns: https://johnnichev.github.io/selectools/modules/PATTERNS/
+- Streaming: https://johnnichev.github.io/selectools/modules/STREAMING/
+- Sessions: https://johnnichev.github.io/selectools/modules/SESSIONS/
+- Audit: https://johnnichev.github.io/selectools/modules/AUDIT/
+- Security: https://johnnichev.github.io/selectools/modules/SECURITY/
+- Models: https://johnnichev.github.io/selectools/modules/MODELS/
+- Builder: https://johnnichev.github.io/selectools/modules/builder/
+
+## Stats
+
+- Version: 0.20.1
+- Tests: 3344
+- Examples: 76
+- Models: 152
+- Evaluators: 50
+- Python: 3.9–3.13
+- License: Apache-2.0
