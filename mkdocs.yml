@@ -85,7 +85,6 @@ markdown_extensions:
       custom_checkbox: true
 
 nav:
-  - Overview: index.md
   - Getting Started:
     - Quickstart: QUICKSTART.md
     - Coming from LangChain: MIGRATION.md

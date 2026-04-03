@@ -196,12 +196,42 @@
       box-shadow: 0 0 0 1px rgba(34,211,238,0.06), 0 8px 32px rgba(0,0,0,0.25);
     }
     .card-icon {
-      font-size: 24px;
-      margin-bottom: 14px;
-      display: block;
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 16px;
+      flex-shrink: 0;
     }
-    .card h3 { margin-bottom: 8px; color: #fff; }
-    .card p { color: var(--text-dim); font-size: 14px; line-height: 1.65; }
+    .card-icon svg { width: 20px; height: 20px; }
+    .card h3 { margin-bottom: 8px; color: #fff; font-size: 15px; }
+    .card p { color: var(--text-dim); font-size: 13.5px; line-height: 1.65; }
+    .card-link { font-size: 12px; color: var(--cyan); margin-top: 10px; display: inline-block; opacity: 0.7; transition: opacity 0.15s; }
+    .card-link:hover { opacity: 1; }
+
+    /* Accent card variants */
+    .card-cyan .card-icon { background: rgba(34,211,238,0.12); }
+    .card-cyan .card-icon svg { stroke: #22d3ee; }
+    .card-cyan { border-top: 2px solid rgba(34,211,238,0.35); }
+
+    .card-green .card-icon { background: rgba(34,197,94,0.12); }
+    .card-green .card-icon svg { stroke: #22c55e; }
+    .card-green { border-top: 2px solid rgba(34,197,94,0.35); }
+
+    .card-purple .card-icon { background: rgba(168,85,247,0.12); }
+    .card-purple .card-icon svg { stroke: #a855f7; }
+    .card-purple { border-top: 2px solid rgba(168,85,247,0.35); }
+
+    .card-amber .card-icon { background: rgba(245,158,11,0.12); }
+    .card-amber .card-icon svg { stroke: #f59e0b; }
+    .card-amber { border-top: 2px solid rgba(245,158,11,0.35); }
+
+    .card-blue .card-icon { background: rgba(59,130,246,0.12); }
+    .card-blue .card-icon svg { stroke: #3b82f6; }
+    .card-blue { border-top: 2px solid rgba(59,130,246,0.35); }
+
+    .card-red .card-icon { background: rgba(239,68,68,0.12); }
+    .card-red .card-icon svg { stroke: #ef4444; }
+    .card-red { border-top: 2px solid rgba(239,68,68,0.35); }
 
     /* ── Buttons ───────────────────────────────────────────────────── */
     .btn {
@@ -797,20 +827,23 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
     <h2 class="mb-4">Three problems every agent team hits.</h2>
     <p class="section-desc mb-14">And how Selectools solves them out of the box. No paid debugger. No SaaS account. No bolt-on libraries.</p>
     <div class="grid-3 gap-8">
-      <div class="card reveal">
-        <span class="card-icon">&#128269;</span>
-        <h3>&ldquo;I can&rsquo;t see what my agent is doing&rdquo;</h3>
-        <p>Every <code style="color:var(--cyan)">run()</code> returns <code style="color:var(--cyan)">result.trace</code> + <code style="color:var(--cyan)">result.reasoning</code>: a structured timeline of every LLM call, tool pick, and execution. Free, local, always on.</p>
+      <div class="card card-cyan reveal">
+        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M2 12h4l3-9 4 18 3-9h6"/></svg></div>
+        <h3>Can't see what your agent is doing?</h3>
+        <p>Every <code style="color:var(--cyan)">run()</code> returns <code style="color:var(--cyan)">result.trace</code> + <code style="color:var(--cyan)">result.reasoning</code>. Structured timeline of every LLM call, tool pick, and execution. Free, local, always on.</p>
+        <a href="modules/AGENT/" class="card-link">Agent docs &rarr;</a>
       </div>
-      <div class="card reveal reveal-d1">
-        <span class="card-icon">&#128737;</span>
-        <h3>&ldquo;No guardrails until prod breaks&rdquo;</h3>
+      <div class="card card-red reveal reveal-d1">
+        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <h3>No guardrails until prod breaks?</h3>
         <p>Built-in PII redaction, topic blocking, toxicity detection, and prompt injection screening with 15 patterns. Plus LLM-based coherence checking.</p>
+        <a href="modules/GUARDRAILS/" class="card-link">Guardrails docs &rarr;</a>
       </div>
-      <div class="card reveal reveal-d2">
-        <span class="card-icon">&#128176;</span>
-        <h3>&ldquo;I don&rsquo;t know what my agents cost&rdquo;</h3>
-        <p><code style="color:var(--cyan)">result.usage.total_cost</code>: automatic per-call token counts and dollar costs across all providers. 152 models with built-in pricing.</p>
+      <div class="card card-green reveal reveal-d2">
+        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
+        <h3>Don't know what your agents cost?</h3>
+        <p><code style="color:var(--cyan)">result.usage.total_cost</code> gives you automatic per-call token counts and dollar costs across all providers. 152 models with built-in pricing.</p>
+        <a href="modules/USAGE/" class="card-link">Usage tracking docs &rarr;</a>
       </div>
     </div>
   </div>
@@ -897,35 +930,67 @@ result = agent.<span class="fn">run</span>(<span class="str">"Find our refund po
       <p class="section-desc center">No langchain-core. No separate eval SDK. No paid debugger. <code>pip install selectools</code> gives you all of this, tested across Python 3.9 to 3.13.</p>
     </div>
     <div class="grid-4 gap-8">
-      <div class="card reveal"><span class="card-icon">&#128202;</span><h3>50 Evaluators</h3><p>Test tool use, correctness, safety, LLM-as-judge, regression detection. Free. No SaaS.</p></div>
-      <div class="card reveal reveal-d1"><span class="card-icon">&#128737;</span><h3>Guardrails</h3><p>PII redaction, toxicity, topic blocking, prompt injection screening with 15 patterns.</p></div>
-      <div class="card reveal reveal-d2"><span class="card-icon">&#128270;</span><h3>Hybrid RAG</h3><p>BM25 + vector search with RRF fusion and cross-encoder reranking. 4 store backends.</p></div>
-      <div class="card reveal reveal-d3"><span class="card-icon">&#128176;</span><h3>Cost Tracking</h3><p>Automatic per-call token counts and dollar costs. 152 models with built-in pricing data.</p></div>
-      <div class="card reveal"><span class="card-icon">&#9889;</span><h3>Auto-Failover</h3><p>OpenAI, Anthropic, Gemini, Ollama. Circuit breaker with health checks. Falls over, not down.</p></div>
-      <div class="card reveal reveal-d1"><span class="card-icon">&#128203;</span><h3>Audit Logging</h3><p>JSONL trail with 4 privacy levels and daily rotation. Compliance-ready out of the box.</p></div>
-      <div class="card reveal reveal-d2"><span class="card-icon">&#128024;</span><h3>Memory + Knowledge</h3><p>Conversation memory, entity extraction, knowledge graph. Session persistence (JSON, SQLite, Redis).</p></div>
-      <div class="card reveal reveal-d3"><span class="card-icon">&#128295;</span><h3>24 Built-in Tools</h3><p>File I/O, web requests, data transforms, datetime, text processing. Ready to use.</p></div>
+      <div class="card card-blue reveal">
+        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div>
+        <h3>50 Evaluators</h3>
+        <p>Test tool use, correctness, safety, LLM-as-judge, regression detection. <strong>Free. No SaaS.</strong></p>
+      </div>
+      <div class="card card-red reveal reveal-d1">
+        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <h3>Guardrails</h3>
+        <p>PII redaction, toxicity, topic blocking, prompt injection screening with <strong>15 patterns</strong>.</p>
+      </div>
+      <div class="card card-purple reveal reveal-d2">
+        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></div>
+        <h3>Hybrid RAG</h3>
+        <p>BM25 + vector search with RRF fusion and cross-encoder reranking. <strong>4 store backends.</strong></p>
+      </div>
+      <div class="card card-green reveal reveal-d3">
+        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
+        <h3>Cost Tracking</h3>
+        <p>Automatic per-call token counts and dollar costs. <strong>152 models</strong> with built-in pricing data.</p>
+      </div>
+      <div class="card card-amber reveal">
+        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+        <h3>Auto-Failover</h3>
+        <p>OpenAI, Anthropic, Gemini, Ollama. <strong>Circuit breaker</strong> with health checks.</p>
+      </div>
+      <div class="card card-cyan reveal reveal-d1">
+        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></div>
+        <h3>Audit Logging</h3>
+        <p>JSONL trail with <strong>4 privacy levels</strong> and daily rotation. Compliance-ready.</p>
+      </div>
+      <div class="card card-purple reveal reveal-d2">
+        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a10 10 0 00-6.88 17.23l1.15 1.51A2 2 0 008 22h8a2 2 0 001.73-1.26l1.15-1.51A10 10 0 0012 2z"/><path d="M12 18v-6M8 14h8"/></svg></div>
+        <h3>Memory + Knowledge</h3>
+        <p>Conversation memory, entity extraction, knowledge graph. <strong>3 session backends.</strong></p>
+      </div>
+      <div class="card card-amber reveal reveal-d3">
+        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg></div>
+        <h3>24 Built-in Tools</h3>
+        <p>File I/O, web requests, data transforms, datetime, text processing. Ready to use.</p>
+      </div>
     </div>
     <div class="grid-2 gap-8 mt-16">
-      <div class="card reveal">
-        <span class="card-icon">&#129302;</span>
+      <div class="card card-cyan reveal">
+        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg></div>
         <h3>Multi-Agent Orchestration</h3>
-        <p>AgentGraph for directed agent graphs with plain Python routing. 4 SupervisorAgent strategies. HITL resumes at yield point. Parallel execution, checkpointing, subgraph composition.</p>
+        <p>AgentGraph for directed agent graphs with plain Python routing. <strong>4 SupervisorAgent strategies.</strong> HITL resumes at yield point. Parallel execution, checkpointing, subgraph composition.</p>
       </div>
-      <div class="card reveal reveal-d1">
-        <span class="card-icon">&#128640;</span>
+      <div class="card card-blue reveal reveal-d1">
+        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/></svg></div>
         <h3>Composable Pipelines</h3>
-        <p><code style="color:var(--cyan)">Pipeline</code> + <code style="color:var(--cyan)">@step</code> + <code style="color:var(--cyan)">|</code> operator + <code style="color:var(--cyan)">parallel()</code> + <code style="color:var(--cyan)">branch()</code>. Chain agents, tools, and transforms with plain Python.</p>
+        <p><code style="color:var(--cyan)">Pipeline</code> + <code style="color:var(--cyan)">@step</code> + <code style="color:var(--cyan)">|</code> + <code style="color:var(--cyan)">parallel()</code> + <code style="color:var(--cyan)">branch()</code>. Chain agents, tools, and transforms.</p>
       </div>
-      <div class="card reveal">
-        <span class="card-icon">&#129504;</span>
+      <div class="card card-purple reveal">
+        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg></div>
         <h3>4 Advanced Agent Patterns</h3>
-        <p><code style="color:var(--cyan)">PlanAndExecuteAgent</code>, <code style="color:var(--cyan)">ReflectiveAgent</code>, <code style="color:var(--cyan)">DebateAgent</code>, <code style="color:var(--cyan)">TeamLeadAgent</code>. High-level coordination built on AgentGraph.</p>
+        <p><code style="color:var(--cyan)">PlanAndExecute</code>, <code style="color:var(--cyan)">Reflective</code>, <code style="color:var(--cyan)">Debate</code>, <code style="color:var(--cyan)">TeamLead</code>. High-level coordination built on AgentGraph.</p>
       </div>
-      <div class="card reveal reveal-d1">
-        <span class="card-icon">&#128274;</span>
+      <div class="card card-green reveal reveal-d1">
+        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div>
         <h3>Enterprise Ready</h3>
-        <p>Security audit published. SBOM (CycloneDX). <code style="color:var(--cyan)">@stable</code>/<code style="color:var(--cyan)">@beta</code>/<code style="color:var(--cyan)">@deprecated</code> markers. Deprecation policy. Python 3.9 to 3.13.</p>
+        <p>Security audit published. SBOM (CycloneDX). <code style="color:var(--cyan)">@stable</code>/<code style="color:var(--cyan)">@beta</code>/<code style="color:var(--cyan)">@deprecated</code> markers. Python 3.9 to 3.13.</p>
       </div>
     </div>
   </div>
@@ -1073,17 +1138,20 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
       <h2>Built for teams shipping agents to production.</h2>
     </div>
     <div class="grid-3 gap-8">
-      <div class="card reveal">
-        <h3 style="color:var(--cyan);margin-bottom:10px">ML / AI Engineers</h3>
-        <p>You need to know what your agent did, why, and how much it cost. On every single call. Not just during debugging. In production. Automatically.</p>
+      <div class="card card-cyan reveal">
+        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+        <h3>ML / AI Engineers</h3>
+        <p>You need to know what your agent did, why, and how much it cost. On every call. Not just while debugging. <strong>In production. Automatically.</strong></p>
       </div>
-      <div class="card reveal reveal-d1">
-        <h3 style="color:var(--cyan);margin-bottom:10px">Regulated Industries</h3>
-        <p>Your compliance team will ask &ldquo;where are the audit logs?&rdquo; and &ldquo;how do you prevent PII leakage?&rdquo; You&rsquo;ll have the answer before they ask.</p>
+      <div class="card card-red reveal reveal-d1">
+        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <h3>Regulated Industries</h3>
+        <p>Your compliance team will ask "where are the audit logs?" and "how do you prevent PII leakage?" <strong>You'll have the answer before they ask.</strong></p>
       </div>
-      <div class="card reveal reveal-d2">
-        <h3 style="color:var(--cyan);margin-bottom:10px">Teams Outgrowing LangChain</h3>
-        <p>You&rsquo;re paying $39/seat/mo for LangSmith to see what your agents are doing. We ship that, plus 50 evaluators, for free, locally, in one package.</p>
+      <div class="card card-amber reveal reveal-d2">
+        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg></div>
+        <h3>Teams Outgrowing LangChain</h3>
+        <p>You're paying $39/seat/mo for LangSmith to see what your agents are doing. <strong>We ship that, plus 50 evaluators, for free.</strong></p>
       </div>
     </div>
   </div>
@@ -1116,7 +1184,7 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
       </div>
     </div>
     <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:24px">
-      <a href="https://colab.research.google.com/github/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb" class="btn btn-ghost">Open in Colab</a>
+      <a href="https://colab.research.google.com/github/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb" class="btn btn-ghost" target="_blank" rel="noopener">Open in Colab</a>
       <a href="https://github.com/johnnichev/selectools" class="btn btn-ghost">Star on GitHub</a>
     </div>
   </div>
