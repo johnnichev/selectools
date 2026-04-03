@@ -95,6 +95,38 @@
           "@type": "Answer",
           "text": "Install with pip: pip install selectools. For optional features: pip install selectools[serve] for the visual builder with Starlette, pip install selectools[rag] for Chroma/Pinecone vector stores."
         }
+      },
+      {
+        "@type": "Question",
+        "name": "Does Selectools support streaming?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. astream() provides token-level async streaming with native tool call support. Tool calls are yielded as structured ToolCall objects alongside text chunks."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does Selectools support RAG?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. Selectools includes a full RAG pipeline with BM25 keyword search + vector semantic search, reciprocal rank fusion, cross-encoder reranking, and 4 vector store backends (memory, SQLite, Chroma, Pinecone)."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does Selectools support multi-agent orchestration?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. AgentGraph supports directed graph orchestration with routing, parallel execution (3 merge policies), and checkpointing. SupervisorAgent provides 4 strategies. Higher-level patterns include PlanAndExecute, Reflective, Debate, and TeamLead agents."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is Selectools production-ready?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. 3,344 tests, published security audit, SBOM (CycloneDX), formal deprecation policy, @stable/@beta markers on every public API, compatibility matrix for Python 3.9-3.13. Apache-2.0 licensed."
+        }
       }
     ]
   }
@@ -1197,23 +1229,23 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
     <h2 class="mb-6">Three paths. Pick yours.</h2>
     <p class="section-desc center mb-14">No API key needed for the builder or examples. Add one when you&rsquo;re ready to go live.</p>
     <div class="grid-3 gap-8">
-      <div class="card reveal text-center" style="padding:28px">
-        <div style="font-size:32px;margin-bottom:12px">&#127912;</div>
-        <h3 style="margin-bottom:8px">Visual Builder</h3>
-        <p style="margin-bottom:16px">Design in the browser. Export Python. No install.</p>
-        <a href="builder/" class="btn btn-cyan" style="width:100%">Open Builder &rarr;</a>
+      <div class="card card-cyan reveal" style="padding:28px;display:flex;flex-direction:column;align-items:center;text-align:center">
+        <div class="card-icon" style="margin-bottom:14px"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+        <h3 style="margin-bottom:6px">Visual Builder</h3>
+        <p style="flex:1">Design in the browser. Export Python. No install needed.</p>
+        <a href="builder/" class="btn btn-cyan" style="width:100%;margin-top:16px">Open Builder &rarr;</a>
       </div>
-      <div class="card reveal reveal-d1 text-center" style="padding:28px">
-        <div style="font-size:32px;margin-bottom:12px">&#128187;</div>
-        <h3 style="margin-bottom:8px">Code First</h3>
-        <p style="margin-bottom:16px"><code style="color:var(--cyan)">pip install selectools</code> and write Python.</p>
-        <a href="QUICKSTART/" class="btn btn-primary" style="width:100%">Quickstart Guide</a>
+      <div class="card card-blue reveal reveal-d1" style="padding:28px;display:flex;flex-direction:column;align-items:center;text-align:center">
+        <div class="card-icon" style="margin-bottom:14px"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg></div>
+        <h3 style="margin-bottom:6px">Code First</h3>
+        <p style="flex:1"><code style="color:var(--cyan)">pip install selectools</code> and write Python.</p>
+        <a href="QUICKSTART/" class="btn btn-primary" style="width:100%;margin-top:16px">Quickstart Guide</a>
       </div>
-      <div class="card reveal reveal-d2 text-center" style="padding:28px">
-        <div style="font-size:32px;margin-bottom:12px">&#128214;</div>
-        <h3 style="margin-bottom:8px">Learn by Example</h3>
-        <p style="margin-bottom:16px">76 scripts. 34 work offline. Browse, copy, run.</p>
-        <a href="examples/" class="btn btn-ghost" style="width:100%">Example Gallery</a>
+      <div class="card card-purple reveal reveal-d2" style="padding:28px;display:flex;flex-direction:column;align-items:center;text-align:center">
+        <div class="card-icon" style="margin-bottom:14px"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg></div>
+        <h3 style="margin-bottom:6px">Learn by Example</h3>
+        <p style="flex:1">76 scripts. 34 work offline. Browse, copy, run.</p>
+        <a href="examples/" class="btn btn-ghost" style="width:100%;margin-top:16px">Example Gallery</a>
       </div>
     </div>
     <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:24px">
@@ -1274,6 +1306,51 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
         </summary>
         <div style="padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7">
           <code style="color:var(--cyan)">pip install selectools</code>. For the visual builder with Starlette server: <code style="color:var(--cyan)">pip install selectools[serve]</code>. For Chroma/Pinecone vector stores: <code style="color:var(--cyan)">pip install selectools[rag]</code>. Requires Python 3.9+.
+        </div>
+      </details>
+      <details class="card reveal reveal-d1" style="cursor:pointer;padding:0">
+        <summary style="padding:18px 24px;font-weight:600;font-size:14px;color:#fff;list-style:none;display:flex;justify-content:space-between;align-items:center">
+          Does Selectools support streaming?
+          <span style="color:var(--text-faint);font-size:12px;flex-shrink:0;margin-left:16px">&#9660;</span>
+        </summary>
+        <div style="padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7">
+          Yes. <code style="color:var(--cyan)">astream()</code> provides token-level async streaming with native tool call support. Tool calls are yielded as structured <code>ToolCall</code> objects alongside text chunks, not mixed into the text stream.
+        </div>
+      </details>
+      <details class="card reveal reveal-d2" style="cursor:pointer;padding:0">
+        <summary style="padding:18px 24px;font-weight:600;font-size:14px;color:#fff;list-style:none;display:flex;justify-content:space-between;align-items:center">
+          Does Selectools support RAG?
+          <span style="color:var(--text-faint);font-size:12px;flex-shrink:0;margin-left:16px">&#9660;</span>
+        </summary>
+        <div style="padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7">
+          Yes. The built-in RAG pipeline includes BM25 keyword search + vector semantic search, reciprocal rank fusion (RRF), cross-encoder reranking, semantic and contextual chunking, and 4 vector store backends (memory, SQLite, Chroma, Pinecone).
+        </div>
+      </details>
+      <details class="card reveal reveal-d3" style="cursor:pointer;padding:0">
+        <summary style="padding:18px 24px;font-weight:600;font-size:14px;color:#fff;list-style:none;display:flex;justify-content:space-between;align-items:center">
+          Can I use Selectools with local models?
+          <span style="color:var(--text-faint);font-size:12px;flex-shrink:0;margin-left:16px">&#9660;</span>
+        </summary>
+        <div style="padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7">
+          Yes. Use the <code style="color:var(--cyan)">OllamaProvider</code> to run agents with any Ollama-compatible local model (Llama, Mistral, Gemma, etc.). For testing without any API or model, use the built-in <code style="color:var(--cyan)">LocalProvider</code> stub.
+        </div>
+      </details>
+      <details class="card reveal" style="cursor:pointer;padding:0">
+        <summary style="padding:18px 24px;font-weight:600;font-size:14px;color:#fff;list-style:none;display:flex;justify-content:space-between;align-items:center">
+          Does Selectools support multi-agent orchestration?
+          <span style="color:var(--text-faint);font-size:12px;flex-shrink:0;margin-left:16px">&#9660;</span>
+        </summary>
+        <div style="padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7">
+          Yes. <code style="color:var(--cyan)">AgentGraph</code> supports directed graph orchestration with conditional routing, parallel fan-out (3 merge policies), and checkpoint-backed state. <code style="color:var(--cyan)">SupervisorAgent</code> provides 4 coordination strategies: plan-and-execute, round-robin, dynamic routing, and magentic-one. Higher-level patterns include PlanAndExecute, Reflective, Debate, and TeamLead agents.
+        </div>
+      </details>
+      <details class="card reveal reveal-d1" style="cursor:pointer;padding:0">
+        <summary style="padding:18px 24px;font-weight:600;font-size:14px;color:#fff;list-style:none;display:flex;justify-content:space-between;align-items:center">
+          Is Selectools production-ready?
+          <span style="color:var(--text-faint);font-size:12px;flex-shrink:0;margin-left:16px">&#9660;</span>
+        </summary>
+        <div style="padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7">
+          Yes. 3,344 tests (including 40 real API evaluations), published security audit, SBOM (CycloneDX 1.6), formal deprecation policy, <code style="color:var(--cyan)">@stable</code>/<code style="color:var(--cyan)">@beta</code> markers on every public API, and a compatibility matrix covering Python 3.9 to 3.13. Apache-2.0 licensed.
         </div>
       </details>
     </div>
