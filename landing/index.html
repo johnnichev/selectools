@@ -3,771 +3,980 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Selectools — Production-Ready AI Agents by NichevLabs</title>
-  <meta name="description" content="Production-ready Python framework for AI agents with built-in guardrails, audit logging, cost tracking, and hybrid RAG. Open source from NichevLabs." />
-  <meta property="og:title" content="Selectools — Production-Ready AI Agents" />
-  <meta property="og:description" content="Built-in guardrails, audit logging, cost tracking, and hybrid RAG. Supports OpenAI, Anthropic, Gemini, Ollama." />
+  <title>Selectools — Production-Ready AI Agents in Plain Python</title>
+  <meta name="description" content="Multi-agent orchestration, RAG, tool calling, evals, and a visual builder — in one pip install. No DSL. No vendor lock-in. Open source from NichevLabs." />
+  <meta property="og:title" content="Selectools — AI Agents That Are Just Python" />
+  <meta property="og:description" content="Multi-agent graphs, 50 built-in evaluators, visual builder, hybrid RAG. Supports OpenAI, Anthropic, Gemini, Ollama." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://johnnichev.github.io/selectools/" />
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Inter', 'system-ui', 'sans-serif'],
-            mono: ['JetBrains Mono', 'monospace'],
-          },
-          colors: {
-            brand: { blue: '#3b82f6', cyan: '#06b6d4', dark: '#0f172a', card: '#1e293b' },
-          },
-        },
-      },
-    };
-  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
-    html { scroll-behavior: smooth; }
-    .fade-in { opacity: 0; transform: translateY(20px); transition: opacity 0.6s ease, transform 0.6s ease; }
-    .fade-in.visible { opacity: 1; transform: translateY(0); }
-    .code-block { background: #1e293b; }
-    .pill { background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); }
-    .copy-btn:active { transform: scale(0.95); }
-    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-    .cursor-blink { animation: blink 1s step-end infinite; }
-    .comparison-row:nth-child(even) { background: rgba(30, 41, 59, 0.5); }
+    /* ── Reset & Variables ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface-2: #273548;
+      --border: #334155;
+      --text: #e2e8f0;
+      --text-dim: #94a3b8;
+      --text-faint: #64748b;
+      --cyan: #22d3ee;
+      --blue: #3b82f6;
+      --green: #22c55e;
+      --red: #ef4444;
+      --purple: #a855f7;
+      --amber: #f59e0b;
+      --font-ui: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', monospace;
+      --grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.018'/%3E%3C/svg%3E");
+      --max-w: 1120px;
+      --ease: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-ui);
+      font-size: 15px;
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    /* ── Typography ────────────────────────────────────────────────── */
+    h1, h2, h3, h4 { font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; }
+    h1 { font-size: clamp(2.4rem, 5vw, 3.5rem); }
+    h2 { font-size: clamp(1.6rem, 3vw, 2.2rem); }
+    h3 { font-size: 1.1rem; }
+    a { color: inherit; text-decoration: none; }
+    code { font-family: var(--font-mono); font-size: 0.88em; }
+
+    .section-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 12px;
+      display: block;
+    }
+    .section-desc {
+      color: var(--text-dim);
+      font-size: 16px;
+      max-width: 560px;
+      line-height: 1.7;
+    }
+    .section-desc.center { margin: 0 auto; text-align: center; }
+
+    /* ── Layout ────────────────────────────────────────────────────── */
+    .wrap { max-width: var(--max-w); margin: 0 auto; padding: 0 24px; }
+    .section { padding: 100px 0; }
+    .section + .section { border-top: 1px solid var(--border); }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+    .text-center { text-align: center; }
+
+    @media (max-width: 900px) {
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+      .hide-mobile { display: none; }
+    }
+    @media (max-width: 640px) {
+      .section { padding: 64px 0; }
+      .wrap { padding: 0 16px; }
+    }
+
+    /* ── Card ──────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      background-image: var(--grain);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .card:hover {
+      border-color: rgba(34,211,238,0.25);
+      box-shadow: 0 0 0 1px rgba(34,211,238,0.06), 0 8px 32px rgba(0,0,0,0.25);
+    }
+    .card-icon {
+      font-size: 24px;
+      margin-bottom: 14px;
+      display: block;
+    }
+    .card h3 { margin-bottom: 8px; color: #fff; }
+    .card p { color: var(--text-dim); font-size: 14px; line-height: 1.65; }
+
+    /* ── Buttons ───────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-family: var(--font-ui);
+      font-weight: 600;
+      font-size: 14px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .btn-primary {
+      background: var(--blue);
+      color: #fff;
+      border-color: var(--blue);
+    }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text);
+      border-color: var(--border);
+    }
+    .btn-ghost:hover { border-color: var(--text-dim); color: #fff; }
+    .btn-cyan {
+      background: rgba(34,211,238,0.1);
+      color: var(--cyan);
+      border-color: rgba(34,211,238,0.3);
+    }
+    .btn-cyan:hover { background: rgba(34,211,238,0.18); border-color: var(--cyan); }
+    .btn-pip {
+      background: var(--surface);
+      color: var(--cyan);
+      border-color: var(--border);
+      font-family: var(--font-mono);
+      font-weight: 400;
+      font-size: 13px;
+      padding: 12px 20px;
+    }
+    .btn-pip:hover { border-color: var(--cyan); }
+    .btn-pip:active { transform: scale(0.97); }
+    .btn-pip svg { flex-shrink: 0; }
+
+    /* ── Nav ───────────────────────────────────────────────────────── */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: rgba(15,23,42,0.82);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      height: 56px;
+    }
+    nav .wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 100%;
+    }
+    .nav-logo {
+      font-weight: 800;
+      font-size: 17px;
+      color: #fff;
+      letter-spacing: -0.03em;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+    .nav-links a { transition: color 0.15s; }
+    .nav-links a:hover { color: #fff; }
+    .nav-links .gh-link {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    /* ── Hero ──────────────────────────────────────────────────────── */
+    .hero {
+      padding: 140px 0 100px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 30% 20%, rgba(34,211,238,0.04) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 50% at 70% 80%, rgba(59,130,246,0.03) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        radial-gradient(circle, rgba(51,65,85,0.35) 1px, transparent 1px);
+      background-size: 28px 28px;
+      pointer-events: none;
+      mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 20%, transparent 80%);
+      -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 20%, transparent 80%);
+    }
+    .hero .wrap { position: relative; z-index: 1; }
+    .hero-content { max-width: 640px; }
+    .hero h1 { margin-bottom: 20px; }
+    .hero h1 .grad {
+      background: linear-gradient(135deg, var(--cyan) 0%, var(--blue) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-sub {
+      color: var(--text-dim);
+      font-size: 17px;
+      line-height: 1.75;
+      margin-bottom: 36px;
+      max-width: 540px;
+    }
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 40px;
+    }
+    .hero-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .pill {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-dim);
+      background: rgba(51,65,85,0.35);
+      border: 1px solid var(--border);
+      padding: 4px 12px;
+      border-radius: 100px;
+      white-space: nowrap;
+    }
+    .pill-cyan { color: var(--cyan); border-color: rgba(34,211,238,0.2); background: rgba(34,211,238,0.06); }
+
+    /* ── Status Bar ────────────────────────────────────────────────── */
+    .status-bar {
+      background: var(--surface);
+      background-image: var(--grain);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 0;
+      overflow: hidden;
+    }
+    .status-items {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      flex-wrap: wrap;
+      font-family: var(--font-mono);
+      font-size: 13px;
+    }
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-dim);
+    }
+    .status-val { color: var(--cyan); font-weight: 500; }
+
+    /* ── Code Block ────────────────────────────────────────────────── */
+    .code-frame {
+      background: var(--surface);
+      background-image: var(--grain);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .code-bar {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .code-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .code-bar-label {
+      margin-left: 8px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+    }
+    .code-body {
+      padding: 24px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.7;
+      overflow-x: auto;
+      white-space: pre;
+    }
+    .code-body .kw { color: #c084fc; }
+    .code-body .fn { color: #fbbf24; }
+    .code-body .str { color: #86efac; }
+    .code-body .cls { color: #7dd3fc; }
+    .code-body .cmt { color: var(--text-faint); }
+    .code-body .num { color: #fb923c; }
+    .code-body .bool { color: #fb923c; }
+    .code-dim { opacity: 0.45; }
+
+    .code-frame-accent { border-color: rgba(34,211,238,0.25); }
+    .code-frame-accent .code-bar { border-bottom-color: rgba(34,211,238,0.15); }
+    .code-frame-accent .code-bar-label { color: var(--cyan); }
+
+    /* ── Builder Section ───────────────────────────────────────────── */
+    .builder-frame {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--surface);
+      box-shadow: 0 0 0 1px rgba(34,211,238,0.05), 0 20px 60px rgba(0,0,0,0.4);
+    }
+    .builder-frame iframe {
+      width: 100%;
+      height: 520px;
+      border: none;
+      display: block;
+    }
+    .builder-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--cyan);
+      background: rgba(34,211,238,0.08);
+      border: 1px solid rgba(34,211,238,0.2);
+      border-radius: 100px;
+      padding: 5px 14px;
+    }
+    .builder-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+
+    /* ── Comparison Table ──────────────────────────────────────────── */
+    .cmp-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .cmp-table th {
+      text-align: left;
+      padding: 12px 16px;
+      font-weight: 600;
+      color: var(--text-dim);
+      border-bottom: 1px solid var(--border);
+    }
+    .cmp-table th:nth-child(2) { color: var(--cyan); }
+    .cmp-table td {
+      padding: 10px 16px;
+      border-bottom: 1px solid rgba(51,65,85,0.4);
+      color: var(--text-dim);
+    }
+    .cmp-table tr:last-child td { border-bottom: none; }
+    .cmp-table tr:nth-child(even) td { background: rgba(15,23,42,0.4); }
+    .cmp-table .yes { color: var(--green); }
+    .cmp-table .no { color: var(--text-faint); }
+    .cmp-table .mid { color: var(--amber); }
+    .cmp-table .cap { color: var(--text); }
+
+    /* ── Result Boxes ──────────────────────────────────────────────── */
+    .result-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 18px;
+    }
+    .result-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+      margin-bottom: 4px;
+    }
+    .result-val { font-size: 14px; color: var(--text); }
+
+    /* ── Eval Tags ─────────────────────────────────────────────────── */
+    .tag-group { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: rgba(51,65,85,0.4);
+      color: var(--text-dim);
+    }
+    .tag-blue { background: rgba(59,130,246,0.1); color: #93c5fd; }
+
+    /* ── Fade-in Animation ─────────────────────────────────────────── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
+    }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+    .reveal-d1 { transition-delay: 0.08s; }
+    .reveal-d2 { transition-delay: 0.16s; }
+    .reveal-d3 { transition-delay: 0.24s; }
+    .reveal-d4 { transition-delay: 0.32s; }
+
+    /* ── Misc ──────────────────────────────────────────────────────── */
+    .trace-flow {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+    .trace-step {
+      padding: 4px 10px;
+      border-radius: 6px;
+    }
+    .trace-arrow { color: var(--text-faint); }
+
+    .check-list { list-style: none; }
+    .check-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 6px 0;
+      font-size: 14px;
+      color: var(--text);
+    }
+    .check-list li::before {
+      content: '\2713';
+      color: var(--green);
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .footer {
+      padding: 40px 0;
+      border-top: 1px solid var(--border);
+      font-size: 13px;
+      color: var(--text-faint);
+    }
+    .footer .wrap {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .footer-links { display: flex; gap: 24px; }
+    .footer-links a:hover { color: var(--text); }
+
+    /* ── Utility ───────────────────────────────────────────────────── */
+    .mb-4 { margin-bottom: 16px; }
+    .mb-6 { margin-bottom: 24px; }
+    .mb-10 { margin-bottom: 40px; }
+    .mb-14 { margin-bottom: 56px; }
+    .mt-16 { margin-top: 64px; }
+    .gap-8 { gap: 32px; }
+    .gap-12 { gap: 48px; }
   </style>
 </head>
-<body class="bg-brand-dark text-slate-50 font-sans antialiased">
+<body>
 
-  <!-- Nav -->
-  <nav class="fixed top-0 w-full z-50 bg-brand-dark/80 backdrop-blur-md border-b border-slate-800">
-    <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-      <a href="#" class="text-xl font-bold text-white">selectools</a>
-      <div class="hidden md:flex items-center gap-8 text-sm text-slate-400">
-        <a href="#features" class="hover:text-white transition">Features</a>
-        <a href="#compare" class="hover:text-white transition">vs. LangChain</a>
-        <a href="#get-started" class="hover:text-white transition">Get Started</a>
-        <a href="QUICKSTART/" class="hover:text-white transition">Docs</a>
-        <a href="https://github.com/johnnichev/selectools" class="hover:text-white transition flex items-center gap-1">
-          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-          GitHub
-        </a>
+<!-- ─── Nav ────────────────────────────────────────────────────────── -->
+<nav>
+  <div class="wrap">
+    <a href="#" class="nav-logo">selectools</a>
+    <div class="nav-links hide-mobile">
+      <a href="#builder">Builder</a>
+      <a href="#features">Features</a>
+      <a href="#compare">Compare</a>
+      <a href="#get-started">Get Started</a>
+      <a href="QUICKSTART/">Docs</a>
+      <a href="https://github.com/johnnichev/selectools" class="gh-link">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        GitHub
+      </a>
+    </div>
+  </div>
+</nav>
+
+<!-- ─── Hero ───────────────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="wrap">
+    <div class="hero-content">
+      <span class="section-label" style="margin-bottom:16px">Open Source from NichevLabs</span>
+      <h1>Build AI agents that are <span class="grad">just Python.</span></h1>
+      <p class="hero-sub">
+        Multi-agent orchestration, RAG, tool calling, evals, and a visual builder &mdash; in one <code>pip install</code>. No DSL. No vendor lock-in.
+      </p>
+      <div class="hero-actions">
+        <button onclick="copyPip()" class="btn btn-pip" id="pipBtn">
+          <span>pip install selectools</span>
+          <svg id="copy-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          <svg id="check-icon" width="16" height="16" fill="none" stroke="#22c55e" stroke-width="2" viewBox="0 0 24 24" style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
+        </button>
+        <a href="builder/" class="btn btn-cyan">Try the Builder &rarr;</a>
+        <a href="QUICKSTART/" class="btn btn-primary">Read the Docs</a>
+      </div>
+      <div class="hero-pills">
+        <span class="pill pill-cyan">OpenAI</span>
+        <span class="pill pill-cyan">Anthropic</span>
+        <span class="pill pill-cyan">Gemini</span>
+        <span class="pill pill-cyan">Ollama</span>
+        <span class="pill">Multi-Agent Graphs</span>
+        <span class="pill">50 Evaluators</span>
+        <span class="pill">Composable Pipelines</span>
+        <span class="pill">Visual Builder</span>
       </div>
     </div>
-  </nav>
+  </div>
+</section>
 
-  <!-- Hero -->
-  <section class="pt-32 pb-20 px-6">
-    <div class="max-w-6xl mx-auto">
-      <div class="max-w-3xl">
-        <p class="text-brand-cyan text-sm font-medium tracking-wider uppercase mb-4">Open source from NichevLabs</p>
-        <h1 class="text-5xl md:text-6xl font-extrabold leading-tight mb-6">
-          Multi-Agent Orchestration
-          <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-brand-cyan">in Plain Python</span>
-        </h1>
-        <p class="text-xl text-slate-400 mb-10 leading-relaxed">
-          Build agent graphs. Compose pipelines with <code class="text-brand-cyan">|</code>. Deploy with one command. No DSL, no compile step, no paid debugger. Built-in guardrails, eval framework, and cost tracking. Works with OpenAI, Anthropic, Gemini, and Ollama.
-        </p>
-        <div class="flex flex-wrap gap-4 items-center mb-10">
-          <button onclick="copyPip()" class="copy-btn code-block text-brand-cyan font-mono text-sm px-5 py-3 rounded-lg border border-slate-700 hover:border-brand-cyan transition flex items-center gap-3">
-            <span>pip install selectools</span>
-            <svg id="copy-icon" class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-            <svg id="check-icon" class="w-4 h-4 text-green-400 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-          </button>
-          <a href="QUICKSTART/" class="bg-brand-blue hover:bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg transition">Read the Docs</a>
-          <a href="https://github.com/johnnichev/selectools" class="border border-slate-700 hover:border-slate-500 text-slate-300 font-semibold px-6 py-3 rounded-lg transition">GitHub</a>
-        </div>
-        <div class="flex flex-wrap gap-3">
-          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">OpenAI</span>
-          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">Anthropic</span>
-          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">Gemini</span>
-          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">Ollama</span>
-          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">152 Models</span>
-          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">50 Evaluators</span>
-          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">3135 Tests</span>
-          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">Multi-Agent</span>
-          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">Composable Pipelines</span>
-          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">4 Agent Patterns</span>
-          <span class="pill text-brand-blue text-xs font-medium px-3 py-1 rounded-full">SBOM + Security Audit</span>
-        </div>
-      </div>
-    </div>
-  </section>
+<!-- ─── Status Bar ─────────────────────────────────────────────────── -->
+<div class="status-bar">
+  <div class="status-items">
+    <div class="status-item"><span class="status-val">152</span> models</div>
+    <div class="status-item"><span class="status-val">3344</span> tests</div>
+    <div class="status-item"><span class="status-val">76</span> examples</div>
+    <div class="status-item"><span class="status-val">50</span> evaluators</div>
+    <div class="status-item"><span class="status-val">4</span> providers</div>
+    <div class="status-item"><span class="status-val">v0.20.1</span></div>
+  </div>
+</div>
 
-  <!-- Side-by-side: LangGraph vs Selectools -->
-  <section class="py-20 px-6 border-t border-slate-800">
-    <div class="max-w-6xl mx-auto">
-      <h2 class="text-3xl font-bold mb-4 text-center">See the Difference</h2>
-      <p class="text-slate-400 text-center mb-14 max-w-2xl mx-auto">The same 3-agent pipeline. One framework wraps it in a DSL. The other stays out of your way.</p>
-      <div class="grid lg:grid-cols-2 gap-6">
-        <div class="fade-in">
-          <div class="code-block rounded-xl border border-slate-700 overflow-hidden">
-            <div class="flex items-center gap-2 px-4 py-3 border-b border-slate-700">
-              <div class="w-3 h-3 rounded-full bg-red-500/30"></div>
-              <div class="w-3 h-3 rounded-full bg-yellow-500/30"></div>
-              <div class="w-3 h-3 rounded-full bg-green-500/30"></div>
-              <span class="ml-2 text-xs text-slate-500 font-mono">LangGraph &mdash; 25 lines</span>
-            </div>
-            <pre class="p-6 text-xs font-mono leading-relaxed overflow-x-auto text-slate-500"><code><span class="text-purple-400/60">from</span> langgraph.graph <span class="text-purple-400/60">import</span> StateGraph, START, END
-<span class="text-purple-400/60">from</span> typing_extensions <span class="text-purple-400/60">import</span> TypedDict
+<!-- ─── Code Comparison ────────────────────────────────────────────── -->
+<section class="section">
+  <div class="wrap">
+    <span class="section-label">See the difference</span>
+    <h2 class="mb-4">The same pipeline. Less ceremony.</h2>
+    <p class="section-desc mb-14">A 3-agent workflow: planner &rarr; writer &rarr; reviewer. One framework wraps it in a DSL. The other stays out of your way.</p>
+    <div class="grid-2 gap-8">
+      <div class="reveal">
+        <div class="code-frame">
+          <div class="code-bar">
+            <div class="code-dot" style="background:rgba(239,68,68,0.35)"></div>
+            <div class="code-dot" style="background:rgba(250,204,21,0.35)"></div>
+            <div class="code-dot" style="background:rgba(34,197,94,0.35)"></div>
+            <span class="code-bar-label">LangGraph &mdash; 25 lines</span>
+          </div>
+          <div class="code-body code-dim"><span class="kw">from</span> langgraph.graph <span class="kw">import</span> StateGraph, START, END
+<span class="kw">from</span> typing_extensions <span class="kw">import</span> TypedDict
 
-<span class="text-purple-400/60">class</span> <span class="text-blue-300/60">State</span>(TypedDict):
+<span class="kw">class</span> <span class="cls">State</span>(TypedDict):
     text: str
 
-<span class="text-purple-400/60">def</span> <span class="text-yellow-300/60">planner</span>(state): <span class="text-purple-400/60">return</span> {<span class="text-green-400/60">"text"</span>: <span class="text-green-400/60">"planned"</span>}
-<span class="text-purple-400/60">def</span> <span class="text-yellow-300/60">writer</span>(state): <span class="text-purple-400/60">return</span> {<span class="text-green-400/60">"text"</span>: <span class="text-green-400/60">"written"</span>}
-<span class="text-purple-400/60">def</span> <span class="text-yellow-300/60">reviewer</span>(state): <span class="text-purple-400/60">return</span> {<span class="text-green-400/60">"text"</span>: <span class="text-green-400/60">"reviewed"</span>}
+<span class="kw">def</span> <span class="fn">planner</span>(state): <span class="kw">return</span> {<span class="str">"text"</span>: <span class="str">"planned"</span>}
+<span class="kw">def</span> <span class="fn">writer</span>(state): <span class="kw">return</span> {<span class="str">"text"</span>: <span class="str">"written"</span>}
+<span class="kw">def</span> <span class="fn">reviewer</span>(state): <span class="kw">return</span> {<span class="str">"text"</span>: <span class="str">"reviewed"</span>}
 
 g = StateGraph(State)
-g.add_node(<span class="text-green-400/60">"planner"</span>, planner)
-g.add_node(<span class="text-green-400/60">"writer"</span>, writer)
-g.add_node(<span class="text-green-400/60">"reviewer"</span>, reviewer)
-g.add_edge(START, <span class="text-green-400/60">"planner"</span>)
-g.add_edge(<span class="text-green-400/60">"planner"</span>, <span class="text-green-400/60">"writer"</span>)
-g.add_edge(<span class="text-green-400/60">"writer"</span>, <span class="text-green-400/60">"reviewer"</span>)
-g.add_edge(<span class="text-green-400/60">"reviewer"</span>, END)
-app = g.<span class="text-yellow-300/60">compile</span>()
-result = app.<span class="text-yellow-300/60">invoke</span>({<span class="text-green-400/60">"text"</span>: <span class="text-green-400/60">"prompt"</span>})</code></pre>
-          </div>
-        </div>
-        <div class="fade-in">
-          <div class="code-block rounded-xl border border-brand-cyan/30 overflow-hidden">
-            <div class="flex items-center gap-2 px-4 py-3 border-b border-brand-cyan/20">
-              <div class="w-3 h-3 rounded-full bg-red-500/80"></div>
-              <div class="w-3 h-3 rounded-full bg-yellow-500/80"></div>
-              <div class="w-3 h-3 rounded-full bg-green-500/80"></div>
-              <span class="ml-2 text-xs text-brand-cyan font-mono">selectools &mdash; 1 line</span>
-            </div>
-            <pre class="p-6 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="text-purple-400">from</span> <span class="text-blue-300">selectools</span> <span class="text-purple-400">import</span> AgentGraph
-
-result = <span class="text-yellow-300">AgentGraph</span>.<span class="text-yellow-300">chain</span>(planner, writer, reviewer).<span class="text-yellow-300">run</span>(<span class="text-green-400">"prompt"</span>)</code></pre>
-            <div class="px-6 pb-6 pt-2 space-y-3">
-              <div class="flex items-start gap-3">
-                <span class="text-green-400 text-sm mt-0.5">&#10003;</span>
-                <span class="text-sm text-slate-300">Plain Python &mdash; no StateGraph, no TypedDict, no compile()</span>
-              </div>
-              <div class="flex items-start gap-3">
-                <span class="text-green-400 text-sm mt-0.5">&#10003;</span>
-                <span class="text-sm text-slate-300">HITL resumes at yield point &mdash; doesn't restart your node</span>
-              </div>
-              <div class="flex items-start gap-3">
-                <span class="text-green-400 text-sm mt-0.5">&#10003;</span>
-                <span class="text-sm text-slate-300">Zero extra deps &mdash; no langchain-core required</span>
-              </div>
-              <div class="flex items-start gap-3">
-                <span class="text-green-400 text-sm mt-0.5">&#10003;</span>
-                <span class="text-sm text-slate-300">Deploy: <code class="text-brand-cyan text-xs">selectools serve agent.yaml</code></span>
-              </div>
-            </div>
-          </div>
+g.add_node(<span class="str">"planner"</span>, planner)
+g.add_node(<span class="str">"writer"</span>, writer)
+g.add_node(<span class="str">"reviewer"</span>, reviewer)
+g.add_edge(START, <span class="str">"planner"</span>)
+g.add_edge(<span class="str">"planner"</span>, <span class="str">"writer"</span>)
+g.add_edge(<span class="str">"writer"</span>, <span class="str">"reviewer"</span>)
+g.add_edge(<span class="str">"reviewer"</span>, END)
+app = g.<span class="fn">compile</span>()
+result = app.<span class="fn">invoke</span>({<span class="str">"text"</span>: <span class="str">"prompt"</span>})</div>
         </div>
       </div>
-    </div>
-  </section>
+      <div class="reveal reveal-d1">
+        <div class="code-frame code-frame-accent">
+          <div class="code-bar">
+            <div class="code-dot" style="background:rgba(239,68,68,0.8)"></div>
+            <div class="code-dot" style="background:rgba(250,204,21,0.8)"></div>
+            <div class="code-dot" style="background:rgba(34,197,94,0.8)"></div>
+            <span class="code-bar-label">selectools &mdash; 1 line</span>
+          </div>
+          <div class="code-body"><span class="kw">from</span> <span class="cls">selectools</span> <span class="kw">import</span> AgentGraph
 
-  <!-- Pain → Solution -->
-  <section class="py-20 px-6 border-t border-slate-800" id="why">
-    <div class="max-w-6xl mx-auto">
-      <h2 class="text-3xl font-bold mb-4 text-center">Why Selectools?</h2>
-      <p class="text-slate-400 text-center mb-14 max-w-2xl mx-auto">Three problems every team building AI agents hits — and how Selectools solves them out of the box.</p>
-      <div class="grid md:grid-cols-3 gap-8">
-        <div class="fade-in code-block rounded-xl p-8 border border-slate-700">
-          <div class="text-3xl mb-4">&#128269;</div>
-          <h3 class="text-lg font-semibold mb-2 text-white">"I can't see what my agent is doing"</h3>
-          <p class="text-slate-400 text-sm leading-relaxed">Every <code class="text-brand-cyan">run()</code> returns <code class="text-brand-cyan">result.trace</code> + <code class="text-brand-cyan">result.reasoning</code> — a structured timeline of every LLM call, tool pick, and execution. No paid SaaS required.</p>
+result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planner, writer, reviewer).<span class="fn">run</span>(<span class="str">"prompt"</span>)</div>
         </div>
-        <div class="fade-in code-block rounded-xl p-8 border border-slate-700">
-          <div class="text-3xl mb-4">&#128737;</div>
-          <h3 class="text-lg font-semibold mb-2 text-white">"No guardrails until something breaks in prod"</h3>
-          <p class="text-slate-400 text-sm leading-relaxed">Built-in PII redaction, topic blocking, toxicity detection, and prompt injection screening with 15 patterns. Plus LLM-based coherence checking.</p>
-        </div>
-        <div class="fade-in code-block rounded-xl p-8 border border-slate-700">
-          <div class="text-3xl mb-4">&#128176;</div>
-          <h3 class="text-lg font-semibold mb-2 text-white">"I don't know what my agents cost"</h3>
-          <p class="text-slate-400 text-sm leading-relaxed"><code class="text-brand-cyan">result.usage.total_cost</code> — automatic per-call token counts and dollar costs across all providers. 152 models with built-in pricing data.</p>
-        </div>
+        <ul class="check-list" style="margin-top:20px">
+          <li>Plain Python &mdash; no StateGraph, no TypedDict, no compile()</li>
+          <li>HITL resumes at yield point &mdash; doesn't restart your node</li>
+          <li>Zero extra deps &mdash; no langchain-core required</li>
+          <li>Deploy: <code style="color:var(--cyan)">selectools serve agent.yaml</code></li>
+        </ul>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- Code Showcase -->
-  <section class="py-20 px-6 border-t border-slate-800">
-    <div class="max-w-6xl mx-auto">
-      <h2 class="text-3xl font-bold mb-4 text-center">5 Lines to a Production Agent</h2>
-      <p class="text-slate-400 text-center mb-14 max-w-2xl mx-auto">Guardrails, audit logging, and injection defense — configured, not bolted on.</p>
-      <div class="grid lg:grid-cols-2 gap-8">
-        <div class="fade-in">
-          <div class="code-block rounded-xl border border-slate-700 overflow-hidden">
-            <div class="flex items-center gap-2 px-4 py-3 border-b border-slate-700">
-              <div class="w-3 h-3 rounded-full bg-red-500/80"></div>
-              <div class="w-3 h-3 rounded-full bg-yellow-500/80"></div>
-              <div class="w-3 h-3 rounded-full bg-green-500/80"></div>
-              <span class="ml-2 text-xs text-slate-500 font-mono">agent.py</span>
-            </div>
-            <pre class="p-6 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="text-purple-400">from</span> <span class="text-blue-300">selectools</span> <span class="text-purple-400">import</span> Agent, AgentConfig, tool
-<span class="text-purple-400">from</span> <span class="text-blue-300">selectools.providers</span> <span class="text-purple-400">import</span> OpenAIProvider
-<span class="text-purple-400">from</span> <span class="text-blue-300">selectools.guardrails</span> <span class="text-purple-400">import</span> GuardrailsPipeline, PIIGuardrail
-<span class="text-purple-400">from</span> <span class="text-blue-300">selectools.audit</span> <span class="text-purple-400">import</span> AuditLogger, PrivacyLevel
+<!-- ─── Visual Builder ─────────────────────────────────────────────── -->
+<section class="section" id="builder">
+  <div class="wrap">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:40px">
+      <div>
+        <span class="section-label">Visual Agent Builder</span>
+        <h2 class="mb-4">Design workflows in the browser.</h2>
+        <p class="section-desc">Drag-and-drop agent graph editor &mdash; no install, no signup, no CDN. Export runnable Python or YAML. Runs from <code>pip install</code> or directly on GitHub Pages.</p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;margin-top:4px">
+        <span class="builder-badge"><span class="dot"></span> Live &mdash; no server required</span>
+      </div>
+    </div>
+    <div class="reveal">
+      <div class="builder-frame">
+        <iframe src="builder/" loading="lazy" title="Selectools Visual Agent Builder" sandbox="allow-scripts allow-same-origin"></iframe>
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap">
+      <a href="builder/" class="btn btn-cyan">Open Full Builder &rarr;</a>
+      <a href="modules/builder/" class="btn btn-ghost">Builder Docs</a>
+    </div>
+  </div>
+</section>
 
-<span class="text-green-400">@tool</span>
-<span class="text-purple-400">def</span> <span class="text-yellow-300">search_docs</span>(query: <span class="text-blue-300">str</span>) -> <span class="text-blue-300">str</span>:
-    <span class="text-green-400">"""Search the knowledge base."""</span>
-    <span class="text-purple-400">return</span> db.search(query)
+<!-- ─── Why Selectools ─────────────────────────────────────────────── -->
+<section class="section" id="why">
+  <div class="wrap">
+    <span class="section-label">Why selectools?</span>
+    <h2 class="mb-4">Three problems every agent team hits.</h2>
+    <p class="section-desc mb-14">And how Selectools solves them out of the box &mdash; no paid debugger, no SaaS account, no bolt-on libraries.</p>
+    <div class="grid-3 gap-8">
+      <div class="card reveal">
+        <span class="card-icon">&#128269;</span>
+        <h3>&ldquo;I can&rsquo;t see what my agent is doing&rdquo;</h3>
+        <p>Every <code style="color:var(--cyan)">run()</code> returns <code style="color:var(--cyan)">result.trace</code> + <code style="color:var(--cyan)">result.reasoning</code> &mdash; a structured timeline of every LLM call, tool pick, and execution. Free, local, always on.</p>
+      </div>
+      <div class="card reveal reveal-d1">
+        <span class="card-icon">&#128737;</span>
+        <h3>&ldquo;No guardrails until prod breaks&rdquo;</h3>
+        <p>Built-in PII redaction, topic blocking, toxicity detection, and prompt injection screening with 15 patterns. Plus LLM-based coherence checking.</p>
+      </div>
+      <div class="card reveal reveal-d2">
+        <span class="card-icon">&#128176;</span>
+        <h3>&ldquo;I don&rsquo;t know what my agents cost&rdquo;</h3>
+        <p><code style="color:var(--cyan)">result.usage.total_cost</code> &mdash; automatic per-call token counts and dollar costs across all providers. 152 models with built-in pricing.</p>
+      </div>
+    </div>
+  </div>
+</section>
 
-agent = Agent(
-    provider=<span class="text-yellow-300">OpenAIProvider</span>(),
+<!-- ─── Code Showcase ──────────────────────────────────────────────── -->
+<section class="section">
+  <div class="wrap">
+    <span class="section-label">Production-ready</span>
+    <h2 class="mb-4">5 lines to a guarded agent.</h2>
+    <p class="section-desc mb-14">Guardrails, audit logging, and injection defense &mdash; configured, not bolted on.</p>
+    <div class="grid-2 gap-8">
+      <div class="reveal">
+        <div class="code-frame code-frame-accent">
+          <div class="code-bar">
+            <div class="code-dot" style="background:rgba(239,68,68,0.8)"></div>
+            <div class="code-dot" style="background:rgba(250,204,21,0.8)"></div>
+            <div class="code-dot" style="background:rgba(34,197,94,0.8)"></div>
+            <span class="code-bar-label">agent.py</span>
+          </div>
+          <div class="code-body"><span class="kw">from</span> <span class="cls">selectools</span> <span class="kw">import</span> Agent, AgentConfig, tool
+<span class="kw">from</span> <span class="cls">selectools.providers</span> <span class="kw">import</span> OpenAIProvider
+<span class="kw">from</span> <span class="cls">selectools.guardrails</span> <span class="kw">import</span> GuardrailsPipeline, PIIGuardrail
+<span class="kw">from</span> <span class="cls">selectools.audit</span> <span class="kw">import</span> AuditLogger, PrivacyLevel
+
+<span class="kw">@tool</span>()
+<span class="kw">def</span> <span class="fn">search_docs</span>(query: <span class="cls">str</span>) -> <span class="cls">str</span>:
+    <span class="str">"""Search the knowledge base."""</span>
+    <span class="kw">return</span> db.search(query)
+
+agent = <span class="fn">Agent</span>(
     tools=[search_docs],
-    config=<span class="text-yellow-300">AgentConfig</span>(
-        model=<span class="text-green-400">"gpt-4.1-mini"</span>,
-        guardrails=<span class="text-yellow-300">GuardrailsPipeline</span>(
-            input=[<span class="text-yellow-300">PIIGuardrail</span>(action=<span class="text-green-400">"redact"</span>)],
+    provider=<span class="fn">OpenAIProvider</span>(),
+    config=<span class="fn">AgentConfig</span>(
+        model=<span class="str">"gpt-4.1-mini"</span>,
+        guardrails=<span class="fn">GuardrailsPipeline</span>(
+            input=[<span class="fn">PIIGuardrail</span>(action=<span class="str">"redact"</span>)],
         ),
-        screen_tool_output=<span class="text-orange-400">True</span>,
-        coherence_check=<span class="text-orange-400">True</span>,
-        audit=<span class="text-yellow-300">AuditLogger</span>(
-            path=<span class="text-green-400">"./audit"</span>,
-            privacy=PrivacyLevel.HASH,
-        ),
+        screen_tool_output=<span class="bool">True</span>,
+        coherence_check=<span class="bool">True</span>,
+        audit=<span class="fn">AuditLogger</span>(path=<span class="str">"./audit"</span>, privacy=PrivacyLevel.HASH),
     ),
 )
 
-result = agent.run(<span class="text-green-400">"Find our refund policy"</span>)</code></pre>
+result = agent.<span class="fn">run</span>(<span class="str">"Find our refund policy"</span>)</div>
+        </div>
+      </div>
+      <div class="reveal reveal-d1" style="display:flex;flex-direction:column;justify-content:center;gap:12px">
+        <div class="result-box">
+          <div class="result-label">result.content</div>
+          <div class="result-val">&ldquo;Our refund policy allows returns within 30 days...&rdquo;</div>
+        </div>
+        <div class="result-box">
+          <div class="result-label">result.reasoning</div>
+          <div class="result-val">&ldquo;User asked about refund policy &rarr; search_docs is the right tool&rdquo;</div>
+        </div>
+        <div class="result-box">
+          <div class="result-label">result.trace</div>
+          <div class="trace-flow">
+            <span class="trace-step" style="background:rgba(59,130,246,0.15);color:#93c5fd">llm_call</span>
+            <span class="trace-arrow">&rarr;</span>
+            <span class="trace-step" style="background:rgba(168,85,247,0.15);color:#c4b5fd">tool_selection</span>
+            <span class="trace-arrow">&rarr;</span>
+            <span class="trace-step" style="background:rgba(34,197,94,0.15);color:#86efac">tool_execution</span>
+            <span class="trace-arrow">&rarr;</span>
+            <span class="trace-step" style="background:rgba(59,130,246,0.15);color:#93c5fd">llm_call</span>
           </div>
         </div>
-        <div class="fade-in flex flex-col justify-center">
-          <div class="space-y-5">
-            <div class="code-block rounded-lg p-4 border border-slate-700">
-              <p class="text-xs text-slate-500 font-mono mb-1">result.content</p>
-              <p class="text-sm text-slate-300">"Our refund policy allows returns within 30 days..."</p>
-            </div>
-            <div class="code-block rounded-lg p-4 border border-slate-700">
-              <p class="text-xs text-slate-500 font-mono mb-1">result.reasoning</p>
-              <p class="text-sm text-slate-300">"User asked about refund policy &rarr; search_docs is the right tool"</p>
-            </div>
-            <div class="code-block rounded-lg p-4 border border-slate-700">
-              <p class="text-xs text-slate-500 font-mono mb-1">result.trace</p>
-              <div class="flex gap-2 text-xs font-mono mt-1">
-                <span class="bg-blue-500/20 text-blue-300 px-2 py-1 rounded">llm_call</span>
-                <span class="text-slate-600">&rarr;</span>
-                <span class="bg-purple-500/20 text-purple-300 px-2 py-1 rounded">tool_selection</span>
-                <span class="text-slate-600">&rarr;</span>
-                <span class="bg-green-500/20 text-green-300 px-2 py-1 rounded">tool_execution</span>
-                <span class="text-slate-600">&rarr;</span>
-                <span class="bg-blue-500/20 text-blue-300 px-2 py-1 rounded">llm_call</span>
-              </div>
-            </div>
-            <div class="code-block rounded-lg p-4 border border-slate-700">
-              <p class="text-xs text-slate-500 font-mono mb-1">result.usage</p>
-              <p class="text-sm text-slate-300">847 tokens &middot; <span class="text-green-400">$0.0012</span></p>
-            </div>
-          </div>
+        <div class="result-box">
+          <div class="result-label">result.usage</div>
+          <div class="result-val">847 tokens &middot; <span style="color:var(--green)">$0.0012</span></div>
         </div>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- Features Grid -->
-  <section class="py-20 px-6 border-t border-slate-800" id="features">
-    <div class="max-w-6xl mx-auto">
-      <h2 class="text-3xl font-bold mb-4 text-center">What's Included</h2>
-      <p class="text-slate-400 text-center mb-14 max-w-2xl mx-auto">Everything you need for production AI agents — in one package.</p>
-      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition">
-          <div class="text-2xl mb-3">&#9889;</div>
-          <h3 class="font-semibold mb-1">5 Providers</h3>
-          <p class="text-sm text-slate-400">OpenAI, Anthropic, Gemini, Ollama + auto-failover with circuit breaker</p>
-        </div>
-        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition">
-          <div class="text-2xl mb-3">&#127919;</div>
-          <h3 class="font-semibold mb-1">152 Models</h3>
-          <p class="text-sm text-slate-400">Type-safe constants with built-in pricing data for all providers</p>
-        </div>
-        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition">
-          <div class="text-2xl mb-3">&#128270;</div>
-          <h3 class="font-semibold mb-1">Hybrid RAG</h3>
-          <p class="text-sm text-slate-400">BM25 + vector search with RRF fusion and cross-encoder reranking</p>
-        </div>
-        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition">
-          <div class="text-2xl mb-3">&#128737;</div>
-          <h3 class="font-semibold mb-1">Guardrails</h3>
-          <p class="text-sm text-slate-400">PII redaction, toxicity, topic blocking, format and length validation</p>
-        </div>
-        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition">
-          <div class="text-2xl mb-3">&#128203;</div>
-          <h3 class="font-semibold mb-1">Audit Logging</h3>
-          <p class="text-sm text-slate-400">JSONL trail with 4 privacy levels and daily rotation</p>
-        </div>
-        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition">
-          <div class="text-2xl mb-3">&#128024;</div>
-          <h3 class="font-semibold mb-1">Entity Memory</h3>
-          <p class="text-sm text-slate-400">Auto-extract entities + knowledge graph with SQLite storage</p>
-        </div>
-        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition">
-          <div class="text-2xl mb-3">&#128295;</div>
-          <h3 class="font-semibold mb-1">24 Built-in Tools</h3>
-          <p class="text-sm text-slate-400">Files, web, data, datetime, text — ready to use out of the box</p>
-        </div>
-        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition">
-          <div class="text-2xl mb-3">&#128202;</div>
-          <h3 class="font-semibold mb-1">50 Evaluators</h3>
-          <p class="text-sm text-slate-400">Built-in agent testing: tool use, correctness, safety, LLM-as-judge, regression detection</p>
-        </div>
-        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-cyan/50 transition col-span-2">
-          <div class="text-2xl mb-3">&#129302;</div>
-          <h3 class="font-semibold mb-1">Multi-Agent Orchestration</h3>
-          <p class="text-sm text-slate-400">AgentGraph for directed agent graphs with plain Python routing. 4 SupervisorAgent strategies. HITL resumes at yield point (not node restart). Parallel execution, checkpointing, subgraph composition.</p>
-        </div>
-        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition col-span-2">
-          <div class="text-2xl mb-3">&#128640;</div>
-          <h3 class="font-semibold mb-1">Composable Pipelines</h3>
-          <p class="text-sm text-slate-400"><code class="text-brand-cyan text-xs">Pipeline</code> + <code class="text-brand-cyan text-xs">@step</code> + <code class="text-brand-cyan text-xs">|</code> operator + <code class="text-brand-cyan text-xs">parallel()</code> + <code class="text-brand-cyan text-xs">branch()</code> &mdash; chain agents, tools, and transforms with plain Python. Also: <code class="text-brand-cyan text-xs">AgentGraph.chain(a, b, c).run(prompt)</code> for one-line multi-agent pipelines.</p>
-        </div>
-        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-cyan/50 transition col-span-2">
-          <div class="text-2xl mb-3">&#129504;</div>
-          <h3 class="font-semibold mb-1">4 Advanced Agent Patterns</h3>
-          <p class="text-sm text-slate-400"><code class="text-brand-cyan text-xs">PlanAndExecuteAgent</code> — LLM plans subtasks, agents execute. <code class="text-brand-cyan text-xs">ReflectiveAgent</code> — self-critique loop until quality threshold. <code class="text-brand-cyan text-xs">DebateAgent</code> — two agents argue + judge synthesizes. <code class="text-brand-cyan text-xs">TeamLeadAgent</code> — lead coordinates specialists with load balancing.</p>
-        </div>
-        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 hover:border-brand-blue/50 transition col-span-2">
-          <div class="text-2xl mb-3">&#128274;</div>
-          <h3 class="font-semibold mb-1">Enterprise Ready</h3>
-          <p class="text-sm text-slate-400">Security audit published (41 nosec annotations reviewed). SBOM (CycloneDX 1.6). <code class="text-brand-cyan text-xs">@stable</code>/<code class="text-brand-cyan text-xs">@beta</code>/<code class="text-brand-cyan text-xs">@deprecated</code> stability markers. Formal deprecation policy (2-version window). Compatibility matrix: Python 3.9–3.13.</p>
-        </div>
+<!-- ─── Features Grid ──────────────────────────────────────────────── -->
+<section class="section" id="features">
+  <div class="wrap">
+    <div class="text-center mb-14">
+      <span class="section-label">What&rsquo;s included</span>
+      <h2 class="mb-4">Everything you need. One package.</h2>
+      <p class="section-desc center">No langchain-core, no separate eval SDK, no paid debugger. <code>pip install selectools</code> gives you all of this.</p>
+    </div>
+    <div class="grid-4 gap-8">
+      <div class="card reveal"><span class="card-icon">&#9889;</span><h3>5 Providers</h3><p>OpenAI, Anthropic, Gemini, Ollama + auto-failover with circuit breaker</p></div>
+      <div class="card reveal reveal-d1"><span class="card-icon">&#127919;</span><h3>152 Models</h3><p>Type-safe constants with built-in pricing data for all providers</p></div>
+      <div class="card reveal reveal-d2"><span class="card-icon">&#128270;</span><h3>Hybrid RAG</h3><p>BM25 + vector search with RRF fusion and cross-encoder reranking</p></div>
+      <div class="card reveal reveal-d3"><span class="card-icon">&#128737;</span><h3>Guardrails</h3><p>PII redaction, toxicity, topic blocking, format and length validation</p></div>
+      <div class="card reveal"><span class="card-icon">&#128203;</span><h3>Audit Logging</h3><p>JSONL trail with 4 privacy levels and daily rotation</p></div>
+      <div class="card reveal reveal-d1"><span class="card-icon">&#128024;</span><h3>Entity Memory</h3><p>Auto-extract entities + knowledge graph with SQLite storage</p></div>
+      <div class="card reveal reveal-d2"><span class="card-icon">&#128295;</span><h3>24 Built-in Tools</h3><p>Files, web, data, datetime, text &mdash; ready to use out of the box</p></div>
+      <div class="card reveal reveal-d3"><span class="card-icon">&#128202;</span><h3>50 Evaluators</h3><p>Agent testing: tool use, correctness, safety, LLM-as-judge, regression</p></div>
+    </div>
+    <div class="grid-2 gap-8 mt-16">
+      <div class="card reveal">
+        <span class="card-icon">&#129302;</span>
+        <h3>Multi-Agent Orchestration</h3>
+        <p>AgentGraph for directed agent graphs with plain Python routing. 4 SupervisorAgent strategies. HITL resumes at yield point. Parallel execution, checkpointing, subgraph composition.</p>
+      </div>
+      <div class="card reveal reveal-d1">
+        <span class="card-icon">&#128640;</span>
+        <h3>Composable Pipelines</h3>
+        <p><code style="color:var(--cyan)">Pipeline</code> + <code style="color:var(--cyan)">@step</code> + <code style="color:var(--cyan)">|</code> operator + <code style="color:var(--cyan)">parallel()</code> + <code style="color:var(--cyan)">branch()</code> &mdash; chain agents, tools, and transforms with plain Python.</p>
+      </div>
+      <div class="card reveal">
+        <span class="card-icon">&#129504;</span>
+        <h3>4 Advanced Agent Patterns</h3>
+        <p><code style="color:var(--cyan)">PlanAndExecuteAgent</code>, <code style="color:var(--cyan)">ReflectiveAgent</code>, <code style="color:var(--cyan)">DebateAgent</code>, <code style="color:var(--cyan)">TeamLeadAgent</code> &mdash; high-level coordination built on AgentGraph.</p>
+      </div>
+      <div class="card reveal reveal-d1">
+        <span class="card-icon">&#128274;</span>
+        <h3>Enterprise Ready</h3>
+        <p>Security audit published. SBOM (CycloneDX). <code style="color:var(--cyan)">@stable</code>/<code style="color:var(--cyan)">@beta</code>/<code style="color:var(--cyan)">@deprecated</code> markers. Deprecation policy. Python 3.9&ndash;3.13.</p>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- Eval Framework -->
-  <section class="py-20 px-6 border-t border-slate-800" id="eval">
-    <div class="max-w-6xl mx-auto">
-      <h2 class="text-3xl font-bold mb-4 text-center">Built-in Agent Evaluation</h2>
-      <p class="text-slate-400 text-center mb-14 max-w-2xl mx-auto">The only agent framework with a built-in eval suite. No separate install, no SaaS account, no external dependencies. 50 evaluators out of the box.</p>
-      <div class="grid lg:grid-cols-2 gap-8">
-        <div class="fade-in">
-          <div class="code-block rounded-xl border border-slate-700 overflow-hidden">
-            <div class="flex items-center gap-2 px-4 py-3 border-b border-slate-700">
-              <div class="w-3 h-3 rounded-full bg-red-500/80"></div>
-              <div class="w-3 h-3 rounded-full bg-yellow-500/80"></div>
-              <div class="w-3 h-3 rounded-full bg-green-500/80"></div>
-              <span class="ml-2 text-xs text-slate-500 font-mono">test_agent.py</span>
-            </div>
-            <pre class="p-6 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="text-purple-400">from</span> <span class="text-blue-300">selectools.evals</span> <span class="text-purple-400">import</span> EvalSuite, TestCase
+<!-- ─── Eval Framework ─────────────────────────────────────────────── -->
+<section class="section" id="eval">
+  <div class="wrap">
+    <span class="section-label">Built-in evaluation</span>
+    <h2 class="mb-4">Test your agents. Not just your code.</h2>
+    <p class="section-desc mb-14">The only agent framework with a built-in eval suite. No separate install, no SaaS account. 50 evaluators out of the box.</p>
+    <div class="grid-2 gap-8">
+      <div class="reveal">
+        <div class="code-frame code-frame-accent">
+          <div class="code-bar">
+            <div class="code-dot" style="background:rgba(239,68,68,0.8)"></div>
+            <div class="code-dot" style="background:rgba(250,204,21,0.8)"></div>
+            <div class="code-dot" style="background:rgba(34,197,94,0.8)"></div>
+            <span class="code-bar-label">test_agent.py</span>
+          </div>
+          <div class="code-body"><span class="kw">from</span> <span class="cls">selectools.evals</span> <span class="kw">import</span> EvalSuite, TestCase
 
-suite = <span class="text-yellow-300">EvalSuite</span>(agent=agent, cases=[
-    <span class="text-yellow-300">TestCase</span>(
-        input=<span class="text-green-400">"Cancel my subscription"</span>,
-        expect_tool=<span class="text-green-400">"cancel_sub"</span>,
-        expect_contains=<span class="text-green-400">"cancelled"</span>,
-        expect_no_pii=<span class="text-orange-400">True</span>,
-    ),
-    <span class="text-yellow-300">TestCase</span>(
-        input=<span class="text-green-400">"What's my balance?"</span>,
-        expect_tool=<span class="text-green-400">"check_balance"</span>,
-        expect_latency_ms_lte=<span class="text-orange-400">500</span>,
-        expect_cost_usd_lte=<span class="text-orange-400">0.01</span>,
+suite = <span class="fn">EvalSuite</span>(agent=agent, cases=[
+    <span class="fn">TestCase</span>(
+        input=<span class="str">"Cancel my subscription"</span>,
+        expect_tool=<span class="str">"cancel_sub"</span>,
+        expect_contains=<span class="str">"cancelled"</span>,
+        expect_no_pii=<span class="bool">True</span>,
     ),
 ])
 
-report = suite.<span class="text-yellow-300">run</span>()
-<span class="text-purple-400">print</span>(report.accuracy)     <span class="text-slate-500"># 1.0</span>
-<span class="text-purple-400">print</span>(report.latency_p50)  <span class="text-slate-500"># 142ms</span>
-<span class="text-purple-400">print</span>(report.total_cost)   <span class="text-slate-500"># $0.002</span>
-
-report.<span class="text-yellow-300">to_html</span>(<span class="text-green-400">"report.html"</span>)</code></pre>
+report = suite.<span class="fn">run</span>()
+report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
+<span class="cmt"># report.accuracy → 1.0</span>
+<span class="cmt"># report.latency_p50 → 142ms</span>
+<span class="cmt"># report.total_cost → $0.002</span></div>
+        </div>
+      </div>
+      <div class="reveal reveal-d1" style="display:flex;flex-direction:column;gap:16px;justify-content:center">
+        <div class="card" style="padding:20px">
+          <h3 style="font-size:13px;color:var(--cyan);margin-bottom:10px">30 Deterministic Evaluators</h3>
+          <div class="tag-group">
+            <span class="tag">ToolUse</span><span class="tag">ToolOrder</span><span class="tag">Contains</span><span class="tag">Output</span><span class="tag">Structured</span><span class="tag">JSON</span><span class="tag">Python</span><span class="tag">SQL</span><span class="tag">PII</span><span class="tag">Injection</span><span class="tag">Sentiment</span><span class="tag">Readability</span><span class="tag">AgentTrajectory</span><span class="tag">ToolEfficiency</span><span class="tag">SemanticSimilarity</span>
           </div>
         </div>
-        <div class="fade-in flex flex-col justify-center gap-4">
-          <div class="code-block rounded-lg p-5 border border-slate-700">
-            <h3 class="text-sm font-semibold text-brand-cyan mb-3">30 Deterministic Evaluators</h3>
-            <div class="flex flex-wrap gap-2 text-xs">
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">ToolUse</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">ToolOrder</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Contains</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Output</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Structured</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Performance</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">JSON</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Python</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">SQL</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">URLs</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Markdown</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Length</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Words</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">PII</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Injection</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Refusal</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Sentiment</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Custom</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Readability</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">AgentTrajectory</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">ToolEfficiency</span>
-              <span class="bg-slate-700/50 text-slate-300 px-2 py-1 rounded">SemanticSimilarity</span>
-            </div>
+        <div class="card" style="padding:20px">
+          <h3 style="font-size:13px;color:var(--cyan);margin-bottom:10px">20 LLM-as-Judge Evaluators</h3>
+          <div class="tag-group">
+            <span class="tag tag-blue">Correctness</span><span class="tag tag-blue">Relevance</span><span class="tag tag-blue">Faithfulness</span><span class="tag tag-blue">Hallucination</span><span class="tag tag-blue">Toxicity</span><span class="tag tag-blue">Safety</span><span class="tag tag-blue">Coherence</span><span class="tag tag-blue">Completeness</span><span class="tag tag-blue">Conciseness</span><span class="tag tag-blue">Bias</span><span class="tag tag-blue">FactConsistency</span>
           </div>
-          <div class="code-block rounded-lg p-5 border border-slate-700">
-            <h3 class="text-sm font-semibold text-brand-cyan mb-3">20 LLM-as-Judge Evaluators</h3>
-            <div class="flex flex-wrap gap-2 text-xs">
-              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Correctness</span>
-              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Relevance</span>
-              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Faithfulness</span>
-              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Hallucination</span>
-              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Toxicity</span>
-              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Safety</span>
-              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Coherence</span>
-              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Completeness</span>
-              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Conciseness</span>
-              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Grammar</span>
-              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Tone</span>
-              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">ContextRecall</span>
-              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">ContextPrecision</span>
-              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Bias</span>
-              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Summary</span>
-              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">Custom Rubric</span>
-              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">FactConsistency</span>
-              <span class="bg-blue-500/10 text-blue-300 px-2 py-1 rounded">StepReasoning</span>
-            </div>
-          </div>
-          <div class="code-block rounded-lg p-5 border border-slate-700">
-            <h3 class="text-sm font-semibold text-brand-cyan mb-3">Infrastructure</h3>
-            <div class="text-xs text-slate-400 space-y-1">
-              <div>Interactive HTML report with charts and filtering</div>
-              <div>JUnit XML for CI (GitHub Actions, Jenkins)</div>
-              <div>Regression detection with baseline comparison</div>
-              <div>Dataset loading from JSON/YAML files</div>
-              <div>GitHub Action with automatic PR comments</div>
-            </div>
-          </div>
+        </div>
+        <div class="card" style="padding:20px">
+          <h3 style="font-size:13px;color:var(--cyan);margin-bottom:10px">Infrastructure</h3>
+          <ul class="check-list" style="font-size:13px">
+            <li>Interactive HTML report with charts</li>
+            <li>JUnit XML for CI (GitHub Actions, Jenkins)</li>
+            <li>Regression detection with baseline comparison</li>
+            <li>A/B testing with PairwiseEval</li>
+          </ul>
         </div>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- Comparison Tables -->
-  <section class="py-20 px-6 border-t border-slate-800" id="compare">
-    <div class="max-w-5xl mx-auto">
-      <h2 class="text-3xl font-bold mb-4 text-center">How We Compare</h2>
-      <p class="text-slate-400 text-center mb-14 max-w-2xl mx-auto">Choose LangChain for ecosystem breadth. Choose Selectools when multi-agent orchestration, compliance, observability, and evaluation aren't optional.</p>
-
-      <h3 class="text-xl font-semibold mb-4 text-center">Agent Framework Comparison</h3>
-      <div class="code-block rounded-xl border border-slate-700 overflow-hidden overflow-x-auto mb-12">
-        <table class="w-full text-sm" style="min-width:700px">
+<!-- ─── Comparison ─────────────────────────────────────────────────── -->
+<section class="section" id="compare">
+  <div class="wrap">
+    <div class="text-center mb-14">
+      <span class="section-label">How we compare</span>
+      <h2 class="mb-4">Choose the right tool.</h2>
+      <p class="section-desc center">Choose LangChain for ecosystem breadth. Choose Selectools when orchestration, compliance, and evaluation aren&rsquo;t optional.</p>
+    </div>
+    <div class="reveal">
+      <div class="code-frame" style="overflow-x:auto">
+        <table class="cmp-table">
           <thead>
-            <tr class="border-b border-slate-700 text-left">
-              <th class="px-4 py-3 font-semibold text-slate-300">Capability</th>
-              <th class="px-4 py-3 font-semibold text-brand-cyan">Selectools</th>
-              <th class="px-4 py-3 font-semibold text-slate-400">LangChain</th>
-              <th class="px-4 py-3 font-semibold text-slate-400">CrewAI</th>
-            </tr>
+            <tr><th class="cap">Capability</th><th>Selectools</th><th>LangChain</th><th>CrewAI</th></tr>
           </thead>
           <tbody>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">Execution traces</td>
-              <td class="px-4 py-3 text-green-400">Built-in</td>
-              <td class="px-4 py-3 text-slate-500">LangSmith (paid)</td>
-              <td class="px-4 py-3 text-slate-500">Limited logging</td>
-            </tr>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">Guardrails</td>
-              <td class="px-4 py-3 text-green-400">Built-in (5 types)</td>
-              <td class="px-4 py-3 text-slate-500">NeMo (separate)</td>
-              <td class="px-4 py-3 text-slate-500">Not built-in</td>
-            </tr>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">Audit logging</td>
-              <td class="px-4 py-3 text-green-400">Built-in (4 privacy levels)</td>
-              <td class="px-4 py-3 text-slate-500">DIY</td>
-              <td class="px-4 py-3 text-slate-500">Not built-in</td>
-            </tr>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">Agent evaluation</td>
-              <td class="px-4 py-3 text-green-400">Built-in (50 evaluators)</td>
-              <td class="px-4 py-3 text-slate-500">LangSmith (paid)</td>
-              <td class="px-4 py-3 text-slate-500">Not built-in</td>
-            </tr>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">Cost tracking</td>
-              <td class="px-4 py-3 text-green-400">Automatic per-call</td>
-              <td class="px-4 py-3 text-slate-500">Manual</td>
-              <td class="px-4 py-3 text-slate-500">Not built-in</td>
-            </tr>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">Injection defense</td>
-              <td class="px-4 py-3 text-green-400">15 patterns + coherence</td>
-              <td class="px-4 py-3 text-slate-500">Not included</td>
-              <td class="px-4 py-3 text-slate-500">Not included</td>
-            </tr>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">Setup</td>
-              <td class="px-4 py-3 text-green-400">1 package</td>
-              <td class="px-4 py-3 text-slate-500">5+ packages</td>
-              <td class="px-4 py-3 text-green-400">1 package</td>
-            </tr>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">Multi-agent</td>
-              <td class="px-4 py-3 text-green-400">AgentGraph + Supervisor</td>
-              <td class="px-4 py-3 text-green-400">LangGraph</td>
-              <td class="px-4 py-3 text-green-400">Core feature</td>
-            </tr>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">HITL resume</td>
-              <td class="px-4 py-3 text-green-400">Exact yield point</td>
-              <td class="px-4 py-3 text-yellow-400">Restarts entire node</td>
-              <td class="px-4 py-3 text-slate-500">Not built-in</td>
-            </tr>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">Composable pipelines</td>
-              <td class="px-4 py-3 text-green-400">@step + | + parallel + branch</td>
-              <td class="px-4 py-3 text-yellow-400">LCEL (complex)</td>
-              <td class="px-4 py-3 text-slate-500">Not built-in</td>
-            </tr>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">Checkpointing</td>
-              <td class="px-4 py-3 text-green-400">3 backends (Memory, File, SQLite)</td>
-              <td class="px-4 py-3 text-green-400">SQLite, Postgres</td>
-              <td class="px-4 py-3 text-slate-500">Limited</td>
-            </tr>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">Parallel execution</td>
-              <td class="px-4 py-3 text-green-400">3 merge policies + custom</td>
-              <td class="px-4 py-3 text-green-400">Fan-out + Send API</td>
-              <td class="px-4 py-3 text-yellow-400">Per-task async only</td>
-            </tr>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">Zero extra dependencies</td>
-              <td class="px-4 py-3 text-green-400">Pure Python orchestration</td>
-              <td class="px-4 py-3 text-slate-500">langchain-core required</td>
-              <td class="px-4 py-3 text-slate-500">chromadb bundled</td>
-            </tr>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">Deployment CLI</td>
-              <td class="px-4 py-3 text-green-400"><code class="text-xs">selectools serve</code></td>
-              <td class="px-4 py-3 text-slate-500">LangServe (separate)</td>
-              <td class="px-4 py-3 text-slate-500">Enterprise only</td>
-            </tr>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">Agent templates</td>
-              <td class="px-4 py-3 text-green-400">5 built-in + YAML config</td>
-              <td class="px-4 py-3 text-slate-500">Not built-in</td>
-              <td class="px-4 py-3 text-slate-500">Not built-in</td>
-            </tr>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">Trace persistence</td>
-              <td class="px-4 py-3 text-green-400">3 backends (free)</td>
-              <td class="px-4 py-3 text-slate-500">LangSmith (paid)</td>
-              <td class="px-4 py-3 text-slate-500">Not built-in</td>
-            </tr>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">Enterprise signals</td>
-              <td class="px-4 py-3 text-green-400">SBOM + security audit + stability markers</td>
-              <td class="px-4 py-3 text-slate-500">Not built-in</td>
-              <td class="px-4 py-3 text-slate-500">Not built-in</td>
-            </tr>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">Advanced agent patterns</td>
-              <td class="px-4 py-3 text-green-400">4 built-in (Plan, Reflect, Debate, TeamLead)</td>
-              <td class="px-4 py-3 text-slate-500">DIY</td>
-              <td class="px-4 py-3 text-yellow-400">Role-based agents</td>
-            </tr>
-            <tr class="comparison-row">
-              <td class="px-4 py-3 text-slate-300">Community</td>
-              <td class="px-4 py-3 text-yellow-400">Growing</td>
-              <td class="px-4 py-3 text-green-400">Massive</td>
-              <td class="px-4 py-3 text-green-400">Large</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Benchmark Numbers -->
-      <div class="grid sm:grid-cols-4 gap-6 mt-16 mb-16">
-        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 text-center">
-          <div class="text-3xl font-bold text-brand-cyan mb-1">1 line</div>
-          <div class="text-sm text-slate-400">3-agent pipeline</div>
-          <div class="text-xs text-slate-600 mt-1">vs 25 lines (LangGraph)</div>
-        </div>
-        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 text-center">
-          <div class="text-3xl font-bold text-brand-cyan mb-1">&lt;0.5ms</div>
-          <div class="text-sm text-slate-400">framework overhead</div>
-          <div class="text-xs text-slate-600 mt-1">per agent call (measured)</div>
-        </div>
-        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 text-center">
-          <div class="text-3xl font-bold text-brand-cyan mb-1">3135</div>
-          <div class="text-sm text-slate-400">tests passing</div>
-          <div class="text-xs text-slate-600 mt-1">40 real API evals</div>
-        </div>
-        <div class="fade-in code-block rounded-xl p-6 border border-slate-700 text-center">
-          <div class="text-3xl font-bold text-brand-cyan mb-1">$0.03</div>
-          <div class="text-sm text-slate-400">per eval run</div>
-          <div class="text-xs text-slate-600 mt-1">40 tests, 3 providers</div>
-        </div>
-      </div>
-
-      <h3 class="text-xl font-semibold mb-4 mt-12 text-center">Eval Framework Comparison</h3>
-      <div class="code-block rounded-xl border border-slate-700 overflow-hidden overflow-x-auto">
-        <table class="w-full text-sm" style="min-width:700px">
-          <thead>
-            <tr class="border-b border-slate-700 text-left">
-              <th class="px-4 py-3 font-semibold text-slate-300">Capability</th>
-              <th class="px-4 py-3 font-semibold text-brand-cyan">Selectools</th>
-              <th class="px-4 py-3 font-semibold text-slate-400">DeepEval</th>
-              <th class="px-4 py-3 font-semibold text-slate-400">Promptfoo</th>
-              <th class="px-4 py-3 font-semibold text-slate-400">LangSmith</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">Install</td>
-              <td class="px-4 py-3 text-green-400">Built-in</td>
-              <td class="px-4 py-3 text-slate-500">Separate pip</td>
-              <td class="px-4 py-3 text-slate-500">Node.js CLI</td>
-              <td class="px-4 py-3 text-slate-500">pip + account</td>
-            </tr>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">Evaluators</td>
-              <td class="px-4 py-3 text-green-400">50</td>
-              <td class="px-4 py-3 text-green-400">50+</td>
-              <td class="px-4 py-3 text-slate-500">~20</td>
-              <td class="px-4 py-3 text-slate-500">~8</td>
-            </tr>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">A/B testing</td>
-              <td class="px-4 py-3 text-green-400">PairwiseEval</td>
-              <td class="px-4 py-3 text-slate-500">No</td>
-              <td class="px-4 py-3 text-slate-500">Side-by-side</td>
-              <td class="px-4 py-3 text-slate-500">Experiments</td>
-            </tr>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">Snapshot testing</td>
-              <td class="px-4 py-3 text-green-400">SnapshotStore</td>
-              <td class="px-4 py-3 text-slate-500">No</td>
-              <td class="px-4 py-3 text-slate-500">No</td>
-              <td class="px-4 py-3 text-slate-500">No</td>
-            </tr>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">Regression detection</td>
-              <td class="px-4 py-3 text-green-400">Local (JSON)</td>
-              <td class="px-4 py-3 text-slate-500">Cloud only</td>
-              <td class="px-4 py-3 text-green-400">CLI + GitHub</td>
-              <td class="px-4 py-3 text-slate-500">SaaS only</td>
-            </tr>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">HTML report</td>
-              <td class="px-4 py-3 text-green-400">Interactive (charts)</td>
-              <td class="px-4 py-3 text-slate-500">Cloud only</td>
-              <td class="px-4 py-3 text-green-400">Self-contained</td>
-              <td class="px-4 py-3 text-slate-500">SaaS UI</td>
-            </tr>
-            <tr class="comparison-row border-b border-slate-700/50">
-              <td class="px-4 py-3 text-slate-300">Works offline</td>
-              <td class="px-4 py-3 text-green-400">Yes</td>
-              <td class="px-4 py-3 text-slate-500">Partial</td>
-              <td class="px-4 py-3 text-green-400">Yes</td>
-              <td class="px-4 py-3 text-slate-500">No</td>
-            </tr>
-            <tr class="comparison-row">
-              <td class="px-4 py-3 text-slate-300">Price</td>
-              <td class="px-4 py-3 text-green-400">Free</td>
-              <td class="px-4 py-3 text-green-400">Free + SaaS</td>
-              <td class="px-4 py-3 text-green-400">Free</td>
-              <td class="px-4 py-3 text-slate-500">$39/seat/mo</td>
-            </tr>
+            <tr><td class="cap">Execution traces</td><td class="yes">Built-in</td><td class="no">LangSmith (paid)</td><td class="no">Limited logging</td></tr>
+            <tr><td class="cap">Guardrails</td><td class="yes">Built-in (5 types)</td><td class="no">NeMo (separate)</td><td class="no">Not built-in</td></tr>
+            <tr><td class="cap">Agent evaluation</td><td class="yes">Built-in (50 evals)</td><td class="no">LangSmith (paid)</td><td class="no">Not built-in</td></tr>
+            <tr><td class="cap">Cost tracking</td><td class="yes">Automatic per-call</td><td class="no">Manual</td><td class="no">Not built-in</td></tr>
+            <tr><td class="cap">Injection defense</td><td class="yes">15 patterns + coherence</td><td class="no">Not included</td><td class="no">Not included</td></tr>
+            <tr><td class="cap">Visual builder</td><td class="yes">Built-in + GitHub Pages</td><td class="no">LangGraph Studio (paid)</td><td class="no">Not built-in</td></tr>
+            <tr><td class="cap">Multi-agent</td><td class="yes">AgentGraph + Supervisor</td><td class="yes">LangGraph</td><td class="yes">Core feature</td></tr>
+            <tr><td class="cap">HITL resume</td><td class="yes">Exact yield point</td><td class="mid">Restarts node</td><td class="no">Not built-in</td></tr>
+            <tr><td class="cap">Composable pipelines</td><td class="yes">@step + | + parallel</td><td class="mid">LCEL (complex)</td><td class="no">Not built-in</td></tr>
+            <tr><td class="cap">Setup</td><td class="yes">1 package</td><td class="no">5+ packages</td><td class="yes">1 package</td></tr>
+            <tr><td class="cap">Deploy CLI</td><td class="yes"><code style="font-size:11px">selectools serve</code></td><td class="no">LangServe (separate)</td><td class="no">Enterprise only</td></tr>
+            <tr><td class="cap">Enterprise signals</td><td class="yes">SBOM + audit + markers</td><td class="no">Not built-in</td><td class="no">Not built-in</td></tr>
+            <tr><td class="cap">Community</td><td class="mid">Growing</td><td class="yes">Massive</td><td class="yes">Large</td></tr>
           </tbody>
         </table>
       </div>
     </div>
-  </section>
 
-  <!-- Who It's For -->
-  <section class="py-20 px-6 border-t border-slate-800">
-    <div class="max-w-6xl mx-auto">
-      <h2 class="text-3xl font-bold mb-14 text-center">Who It's For</h2>
-      <div class="grid md:grid-cols-3 gap-8">
-        <div class="fade-in code-block rounded-xl p-8 border border-slate-700">
-          <h3 class="text-lg font-semibold mb-3 text-brand-cyan">ML / AI Engineers</h3>
-          <p class="text-slate-400 text-sm leading-relaxed">You're building agents at work and need observability, cost control, and audit trails. Not another prototype framework.</p>
-        </div>
-        <div class="fade-in code-block rounded-xl p-8 border border-slate-700">
-          <h3 class="text-lg font-semibold mb-3 text-brand-cyan">Regulated Industries</h3>
-          <p class="text-slate-400 text-sm leading-relaxed">Fintech, healthtech, edtech. Your compliance team will ask about guardrails and audit logs. Have the answer ready.</p>
-        </div>
-        <div class="fade-in code-block rounded-xl p-8 border border-slate-700">
-          <h3 class="text-lg font-semibold mb-3 text-brand-cyan">Teams Outgrowing LangChain</h3>
-          <p class="text-slate-400 text-sm leading-relaxed">You've hit the ceiling on LangChain's observability and want traces, reasoning, and cost tracking without paying for LangSmith.</p>
-        </div>
+    <div class="grid-4 gap-8 mt-16">
+      <div class="card reveal text-center" style="padding:24px">
+        <div style="font-size:28px;font-weight:800;color:var(--cyan);margin-bottom:4px">1 line</div>
+        <div style="font-size:13px;color:var(--text-dim)">3-agent pipeline</div>
+        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">vs 25 lines (LangGraph)</div>
+      </div>
+      <div class="card reveal reveal-d1 text-center" style="padding:24px">
+        <div style="font-size:28px;font-weight:800;color:var(--cyan);margin-bottom:4px">&lt;0.5ms</div>
+        <div style="font-size:13px;color:var(--text-dim)">framework overhead</div>
+        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">per agent call (measured)</div>
+      </div>
+      <div class="card reveal reveal-d2 text-center" style="padding:24px">
+        <div style="font-size:28px;font-weight:800;color:var(--cyan);margin-bottom:4px">3344</div>
+        <div style="font-size:13px;color:var(--text-dim)">tests passing</div>
+        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">40 real API evals</div>
+      </div>
+      <div class="card reveal reveal-d3 text-center" style="padding:24px">
+        <div style="font-size:28px;font-weight:800;color:var(--cyan);margin-bottom:4px">$0.03</div>
+        <div style="font-size:13px;color:var(--text-dim)">per eval run</div>
+        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">40 tests, 3 providers</div>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- Get Started -->
-  <section class="py-20 px-6 border-t border-slate-800" id="get-started">
-    <div class="max-w-3xl mx-auto text-center">
-      <h2 class="text-3xl font-bold mb-6">Get Started in 60 Seconds</h2>
-      <div class="code-block rounded-xl p-8 border border-slate-700 text-left font-mono text-sm space-y-4 mb-10">
-        <div>
-          <span class="text-slate-500">1.</span>
-          <span class="text-slate-400"> Install:</span>
-          <span class="text-brand-cyan ml-4">pip install selectools</span>
-        </div>
-        <div>
-          <span class="text-slate-500">2.</span>
-          <span class="text-slate-400"> Add your provider API key to a <code class="text-brand-cyan">.env</code> file (OpenAI, Anthropic, Gemini, or Ollama)</span>
-        </div>
-        <div>
-          <span class="text-slate-500">3.</span>
-          <span class="text-slate-400"> Run the example above — or start with the
-            <a href="QUICKSTART/" class="text-brand-blue hover:underline">Quickstart guide</a></span>
-        </div>
+<!-- ─── Who It's For ───────────────────────────────────────────────── -->
+<section class="section">
+  <div class="wrap">
+    <div class="text-center mb-14">
+      <span class="section-label">Who it&rsquo;s for</span>
+      <h2>Built for teams shipping agents to production.</h2>
+    </div>
+    <div class="grid-3 gap-8">
+      <div class="card reveal">
+        <h3 style="color:var(--cyan);margin-bottom:10px">ML / AI Engineers</h3>
+        <p>You&rsquo;re building agents at work and need observability, cost control, and audit trails. Not another prototype framework.</p>
       </div>
-      <div class="flex flex-wrap justify-center gap-4">
-        <a href="QUICKSTART/" class="bg-brand-blue hover:bg-blue-600 text-white font-semibold px-8 py-3 rounded-lg transition">Quickstart Guide</a>
-        <a href="https://github.com/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb" class="border border-slate-700 hover:border-slate-500 text-slate-300 font-semibold px-8 py-3 rounded-lg transition">Interactive Notebook</a>
-        <a href="https://github.com/johnnichev/selectools/tree/main/examples" class="border border-slate-700 hover:border-slate-500 text-slate-300 font-semibold px-8 py-3 rounded-lg transition">75 Examples</a>
+      <div class="card reveal reveal-d1">
+        <h3 style="color:var(--cyan);margin-bottom:10px">Regulated Industries</h3>
+        <p>Fintech, healthtech, edtech. Your compliance team will ask about guardrails and audit logs. Have the answer ready.</p>
+      </div>
+      <div class="card reveal reveal-d2">
+        <h3 style="color:var(--cyan);margin-bottom:10px">Teams Outgrowing LangChain</h3>
+        <p>You&rsquo;ve hit the ceiling on observability and want traces, reasoning, and cost tracking without paying for LangSmith.</p>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- Footer -->
-  <footer class="py-12 px-6 border-t border-slate-800">
-    <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-      <div class="text-center md:text-left">
-        <p class="text-slate-400 text-sm">An open-source project from <a href="https://nichevlabs.com" class="text-brand-cyan hover:underline">NichevLabs</a>.</p>
-        <p class="text-slate-500 text-xs mt-1">Apache-2.0 &middot; Python 3.9+ &middot; v0.19.2</p>
-      </div>
-      <div class="flex items-center gap-6 text-sm text-slate-400">
-        <a href="https://github.com/johnnichev/selectools" class="hover:text-white transition">GitHub</a>
-        <a href="https://pypi.org/project/selectools/" class="hover:text-white transition">PyPI</a>
-        <a href="QUICKSTART/" class="hover:text-white transition">Docs</a>
-        <a href="https://github.com/johnnichev/selectools/blob/main/CHANGELOG.md" class="hover:text-white transition">Changelog</a>
+<!-- ─── Get Started ────────────────────────────────────────────────── -->
+<section class="section" id="get-started">
+  <div class="wrap text-center">
+    <span class="section-label">Get started</span>
+    <h2 class="mb-10">60 seconds to your first agent.</h2>
+    <div class="reveal" style="max-width:560px;margin:0 auto">
+      <div class="code-frame code-frame-accent">
+        <div class="code-body" style="font-size:14px;line-height:2.2">
+<span class="cmt"># 1. Install</span>
+<span class="fn">pip install</span> selectools
+
+<span class="cmt"># 2. Set your API key</span>
+<span class="kw">export</span> OPENAI_API_KEY=<span class="str">"sk-..."</span>
+
+<span class="cmt"># 3. Run the builder</span>
+<span class="fn">selectools serve</span> --builder</div>
       </div>
     </div>
-  </footer>
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:32px">
+      <a href="QUICKSTART/" class="btn btn-primary">Quickstart Guide</a>
+      <a href="builder/" class="btn btn-cyan">Try the Builder</a>
+      <a href="https://github.com/johnnichev/selectools/tree/main/examples" class="btn btn-ghost">76 Examples</a>
+      <a href="https://github.com/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb" class="btn btn-ghost">Interactive Notebook</a>
+    </div>
+  </div>
+</section>
 
-  <script>
-    // Copy pip install
-    function copyPip() {
-      navigator.clipboard.writeText('pip install selectools');
-      document.getElementById('copy-icon').classList.add('hidden');
-      document.getElementById('check-icon').classList.remove('hidden');
-      setTimeout(() => {
-        document.getElementById('copy-icon').classList.remove('hidden');
-        document.getElementById('check-icon').classList.add('hidden');
-      }, 2000);
-    }
+<!-- ─── Footer ─────────────────────────────────────────────────────── -->
+<footer class="footer">
+  <div class="wrap">
+    <div>
+      An open-source project from <a href="https://nichevlabs.com" style="color:var(--cyan)">NichevLabs</a>.
+      <span style="margin-left:8px;color:var(--text-faint)">Apache-2.0 &middot; Python 3.9+ &middot; v0.20.1</span>
+    </div>
+    <div class="footer-links">
+      <a href="https://github.com/johnnichev/selectools">GitHub</a>
+      <a href="https://pypi.org/project/selectools/">PyPI</a>
+      <a href="QUICKSTART/">Docs</a>
+      <a href="https://github.com/johnnichev/selectools/blob/main/CHANGELOG.md">Changelog</a>
+    </div>
+  </div>
+</footer>
 
-    // Fade-in on scroll
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('visible');
-        }
-      });
-    }, { threshold: 0.1 });
+<script>
+function copyPip() {
+  navigator.clipboard.writeText('pip install selectools');
+  document.getElementById('copy-icon').style.display = 'none';
+  document.getElementById('check-icon').style.display = '';
+  setTimeout(() => {
+    document.getElementById('copy-icon').style.display = '';
+    document.getElementById('check-icon').style.display = 'none';
+  }, 2000);
+}
 
-    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
-  </script>
-
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.08 });
+document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+</script>
 </body>
 </html>
