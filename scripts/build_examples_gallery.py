@@ -20,6 +20,47 @@ EXAMPLES_DIR = os.path.join(os.path.dirname(__file__), "..", "examples")
 REPO_URL = "https://github.com/johnnichev/selectools"
 BUILDER_URL = "builder/"
 
+# Map categories to documentation pages
+CAT_DOCS = {
+    "agent": "modules/AGENT/",
+    "audit": "modules/AUDIT/",
+    "caching": "modules/SEMANTIC_CACHE/",
+    "config": "modules/TEMPLATES/",
+    "deployment": "modules/builder/",
+    "evals": "modules/EVALS/",
+    "guardrails": "modules/GUARDRAILS/",
+    "memory": "modules/MEMORY/",
+    "multi-agent": "modules/ORCHESTRATION/",
+    "observability": "modules/TRACE_STORE/",
+    "patterns": "modules/PATTERNS/",
+    "pipeline": "modules/PIPELINE/",
+    "rag": "modules/RAG/",
+    "sessions": "modules/SESSIONS/",
+    "streaming": "modules/STREAMING/",
+    "structured": "modules/AGENT/",
+    "tools": "modules/TOOLS/",
+}
+
+CAT_ICONS = {
+    "agent": "&#9889;",
+    "audit": "&#128203;",
+    "caching": "&#128230;",
+    "config": "&#9881;",
+    "deployment": "&#128640;",
+    "evals": "&#128202;",
+    "guardrails": "&#128737;",
+    "memory": "&#128024;",
+    "multi-agent": "&#129302;",
+    "observability": "&#128269;",
+    "patterns": "&#129504;",
+    "pipeline": "&#128295;",
+    "rag": "&#128270;",
+    "sessions": "&#128190;",
+    "streaming": "&#9889;",
+    "structured": "&#128196;",
+    "tools": "&#128295;",
+}
+
 
 def extract_metadata(path: str) -> dict:
     """Extract title, description, categories, and source from an example file."""
@@ -133,11 +174,12 @@ def build_gallery(examples: list[dict]) -> str:
     total = len(examples)
     no_key = sum(1 for e in examples if not e["needs_key"])
 
-    cat_btns = [f'<button class="cat-btn active" data-cat="all">All ({total})</button>']
+    cat_btns = [f'<button class="cb on" data-cat="all">All ({total})</button>']
     for c in all_cats:
         n = sum(1 for e in examples if c in e["categories"])
+        icon = CAT_ICONS.get(c, "")
         label = c.replace("-", " ").title()
-        cat_btns.append(f'<button class="cat-btn" data-cat="{c}">{label} ({n})</button>')
+        cat_btns.append(f'<button class="cb" data-cat="{c}">{icon} {label} ({n})</button>')
 
     # Build a JSON object of raw sources for lazy rendering
     sources_dict = {ex["file"]: ex["source"] for ex in examples}
@@ -146,9 +188,15 @@ def build_gallery(examples: list[dict]) -> str:
     cards = []
     for ex in examples:
         cats_str = " ".join(ex["categories"])
-        cats_html = "".join(
-            f'<span class="ec1">{c.replace("-"," ").title()}</span>' for c in ex["categories"]
-        )
+        # Category tags link to their doc pages
+        cat_parts = []
+        for c in ex["categories"]:
+            label = c.replace("-", " ").title()
+            if c in CAT_DOCS:
+                cat_parts.append(f'<a href="../{CAT_DOCS[c]}" class="ec1">{label}</a>')
+            else:
+                cat_parts.append(f'<span class="ec1">{label}</span>')
+        cats_html = "".join(cat_parts)
         key_badge = (
             '<span class="ek">API Key</span>'
             if ex["needs_key"]
@@ -157,6 +205,12 @@ def build_gallery(examples: list[dict]) -> str:
         graph_btn = ""
         if ex["has_graph"]:
             graph_btn = f'<a href="../{BUILDER_URL}" class="eab ebu">Open in Builder</a>'
+        # Doc link — use first category with a doc page
+        doc_btn = ""
+        for c in ex["categories"]:
+            if c in CAT_DOCS:
+                doc_btn = f'<a href="../{CAT_DOCS[c]}" class="eab">Docs</a>'
+                break
 
         cards.append(
             f'<div class="ec" data-cats="{cats_str}" '
@@ -172,7 +226,7 @@ def build_gallery(examples: list[dict]) -> str:
             f'<div class="ea">'
             f'<button class="eab" onclick="cpSrc(this)">Copy</button>'
             f'<a href="{REPO_URL}/blob/main/examples/{ex["file"]}" class="eab" '
-            f'target="_blank">GitHub</a>{graph_btn}</div>'
+            f'target="_blank">GitHub</a>{doc_btn}{graph_btn}</div>'
             f'<pre class="ep"></pre>'
             f"</div></div>"
         )
@@ -202,8 +256,8 @@ nav .w{{max-width:960px;margin:0 auto;padding:0 20px;display:flex;align-items:ce
 .si{{flex:1;background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:10px 14px;color:var(--tx);font-family:var(--font);font-size:14px;outline:none}}
 .si:focus{{border-color:var(--cy);box-shadow:0 0 0 2px rgba(34,211,238,0.12)}}.si::placeholder{{color:var(--ft)}}
 .cr{{display:flex;flex-wrap:wrap;gap:6px}}
-.cb{{font-family:var(--font);font-size:12px;font-weight:500;padding:5px 12px;border-radius:100px;border:1px solid var(--bd);background:transparent;color:var(--dm);cursor:pointer;transition:all .15s}}
-.cb:hover{{border-color:var(--dm);color:var(--tx)}}.cb.on{{background:rgba(34,211,238,0.1);border-color:rgba(34,211,238,0.3);color:var(--cy)}}
+.cb{{font-family:var(--font);font-size:12px;font-weight:500;padding:6px 14px;border-radius:100px;border:1px solid rgba(51,65,85,0.6);background:rgba(30,41,59,0.7);color:var(--dm);cursor:pointer;transition:all .15s;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}}
+.cb:hover{{background:rgba(51,65,85,0.5);border-color:var(--dm);color:var(--tx)}}.cb.on{{background:rgba(34,211,238,0.12);border-color:rgba(34,211,238,0.35);color:var(--cy);box-shadow:0 0 12px rgba(34,211,238,0.08)}}
 .rc{{font-family:var(--mono);font-size:11px;color:var(--ft);padding:2px 0}}
 .el{{max-width:960px;margin:0 auto;padding:0 20px 60px;display:flex;flex-direction:column;gap:2px}}
 .ec{{border:1px solid var(--bd);border-radius:8px;overflow:hidden;background:var(--sf);background-image:var(--gr);transition:border-color .15s}}
@@ -218,7 +272,8 @@ nav .w{{max-width:960px;margin:0 auto;padding:0 20px;display:flex;align-items:ce
 .eln{{font-family:var(--mono);font-size:10px;color:var(--ft)}}
 .ev{{font-size:10px;color:var(--ft);transition:transform .2s}}.ec.op .ev{{transform:rotate(180deg)}}
 .eb{{padding:0 18px 18px}}.eg{{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}}
-.ec1{{font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(59,130,246,0.1);color:#93c5fd}}
+.ec1{{font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(59,130,246,0.1);color:#93c5fd;text-decoration:none;transition:background .12s}}
+a.ec1:hover{{background:rgba(59,130,246,0.2);color:#bfdbfe}}
 .ea{{display:flex;gap:8px;margin-bottom:12px}}
 .eab{{font-family:var(--font);font-size:12px;font-weight:500;padding:5px 12px;border-radius:6px;border:1px solid var(--bd);background:transparent;color:var(--tx);cursor:pointer;text-decoration:none;transition:all .12s;display:inline-block}}
 .eab:hover{{border-color:var(--dm);color:#fff}}
