@@ -1685,7 +1685,8 @@ async function doGenerate() {
   const btn = document.getElementById('genBtn');
   btn.textContent = 'Generating…'; btn.disabled = true;
   try {
-    const apiKey = document.getElementById('apiKeyInput')?.value?.trim() || '';
+    const apiKey = document.getElementById('genApiKey')?.value?.trim()
+                || document.getElementById('apiKeyInput')?.value?.trim() || '';
     let data;
     if (serverless) {
       data = apiKey ? await _clientAiBuildLive(desc, apiKey) : _clientAiBuildFallback(desc);

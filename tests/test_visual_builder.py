@@ -1016,7 +1016,7 @@ class TestBuilderHtmlAiBuild:
     def test_auto_layout_reused(self):
         """doGenerate must reuse autoLayout() for positioning."""
         gen_idx = BUILDER_HTML.index("async function doGenerate()")
-        gen_body = BUILDER_HTML[gen_idx : gen_idx + 900]
+        gen_body = BUILDER_HTML[gen_idx : gen_idx + 1100]
         assert "autoLayout(" in gen_body
 
     def test_node_entering_css(self):

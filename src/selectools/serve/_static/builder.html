@@ -47,11 +47,13 @@
         <div class="tmpl-item tmpl-indent" onclick="loadTemplate('multi_model_panel')">Multi-Model Panel</div>
         <div class="tmpl-item tmpl-indent" onclick="loadTemplate('chain_of_thought')">Chain of Thought</div>
         <div class="tmpl-divider"></div>
+        <div class="tmpl-divider"></div>
+        <div class="tmpl-item" onclick="openGenBar();closeMenus()" style="color:#a855f7">&#10024; Generate with AI&#8230;</div>
         <div class="tmpl-item" onclick="openImport();closeMenus()">Import YAML / Python&#8230;</div>
         <div class="tmpl-item" onclick="openWatchFile();closeMenus()">&#x1F4C2; Watch File&#8230;</div>
       </div>
     </div>
-    <button id="headerGenBtn" class="btn" onclick="openGenBar()" title="Generate a workflow from a plain-English description" style="color:#a855f7;border-color:rgba(168,85,247,0.4)">&#10024; Generate</button>
+    <button id="headerGenBtn" class="btn" onclick="openGenBar()" title="Generate a workflow from a plain-English description" style="color:#a855f7;border-color:rgba(168,85,247,0.4);display:none">&#10024; Generate</button>
     <div class="tmpl-wrap">
       <button class="btn" onclick="toggleExportMenu(event)" title="Export as Python or YAML · Get embed code · Load production trace">Export &#9660;</button>
       <div class="tmpl-menu" id="exportMenu">
@@ -67,8 +69,9 @@
   </div>
 </header>
 
-<div id="genBar" class="gen-bar" style="display:none"
+<div id="genBar" class="gen-bar" style="display:none">
   <input id="genInput" type="text" autocomplete="off" placeholder="Describe your agent workflow&#8230;" style="flex:1; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:inherit; font-size:12px; padding:5px 10px" />
+  <input id="genApiKey" type="password" autocomplete="off" placeholder="API key (optional)" title="OpenAI API key for AI generation. Leave blank for template mode." style="width:180px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:inherit; font-size:11px; padding:5px 10px" />
   <button id="genBtn" class="btn btn-primary" onclick="doGenerate()">Generate</button>
   <button class="btn" onclick="closeGenBar()">&#10005;</button>
 </div>
