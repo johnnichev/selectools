@@ -596,6 +596,42 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
 
         return response_text, tool_calls_to_execute, reasoning_text
 
+    async def _aprocess_response(
+        self,
+        ctx: "_RunContext",
+        response_msg: Message,
+    ) -> tuple:
+        """Async version of _process_response — uses async output guardrails."""
+        response_text = response_msg.content or ""
+        response_text = await self._arun_output_guardrails(response_text, ctx.trace)
+        response_msg.content = response_text
+
+        tool_calls_to_execute: List[ToolCall] = []
+        if response_msg.tool_calls:
+            tool_calls_to_execute = response_msg.tool_calls
+        elif ctx.response_format is None:
+            parse_result = self.parser.parse(response_text)
+            if parse_result.tool_call:
+                tool_calls_to_execute.append(parse_result.tool_call)
+
+        reasoning_text = self._extract_reasoning(response_msg, tool_calls_to_execute)
+        if reasoning_text:
+            ctx.reasoning_history.append(reasoning_text)
+
+        if tool_calls_to_execute:
+            for tc in tool_calls_to_execute:
+                ctx.trace.add(
+                    TraceStep(
+                        type=StepType.TOOL_SELECTION,
+                        tool_name=tc.tool_name,
+                        tool_args=tc.parameters,
+                        reasoning=reasoning_text,
+                        summary=f"Selected {tc.tool_name}",
+                    )
+                )
+
+        return response_text, tool_calls_to_execute, reasoning_text
+
     def _run_input_guardrails(self, content: str, trace: Optional[AgentTrace] = None) -> str:
         """Run input guardrails on user content.  Returns (possibly rewritten) content."""
         if not self.config.guardrails or not self.config.guardrails.input:
@@ -1282,9 +1318,9 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     tool_calls=current_tool_calls or None,
                 )
 
-                # Use _process_response for output guardrails, parsing, reasoning
-                response_text, tool_calls_to_execute, reasoning_text = self._process_response(
-                    ctx, response_msg
+                # Use async _process_response for non-blocking output guardrails
+                response_text, tool_calls_to_execute, reasoning_text = (
+                    await self._aprocess_response(ctx, response_msg)
                 )
 
                 if not tool_calls_to_execute:
@@ -1553,8 +1589,8 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 response_msg = await self._acall_provider(
                     stream_handler=stream_handler, trace=ctx.trace, run_id=ctx.run_id
                 )
-                response_text, tool_calls_to_execute, reasoning_text = self._process_response(
-                    ctx, response_msg
+                response_text, tool_calls_to_execute, reasoning_text = (
+                    await self._aprocess_response(ctx, response_msg)
                 )
 
                 if not tool_calls_to_execute:

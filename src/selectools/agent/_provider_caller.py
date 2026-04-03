@@ -444,6 +444,14 @@ class _ProviderCallerMixin:
                         exc,
                         backoff,
                     )
+                    await self._anotify_observers(
+                        "on_llm_retry",
+                        run_id,
+                        attempts,
+                        self.config.max_retries,
+                        exc,
+                        backoff,
+                    )
                 if backoff > 0:
                     await asyncio.sleep(backoff)
 
