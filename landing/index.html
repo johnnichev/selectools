@@ -603,7 +603,7 @@
       <span class="section-label" style="margin-bottom:16px">Open Source from NichevLabs</span>
       <h1>AI agents that are <span class="grad">just Python.</span></h1>
       <p class="hero-sub">
-        Multi-agent graphs, tool calling, RAG, 50 evaluators, and a drag-drop visual builder &mdash; all in one <code>pip install</code>. No DSL to learn. No SaaS to pay for. No vendor to depend on.
+        Multi-agent graphs, tool calling, RAG, 50 evaluators, and a drag-drop visual builder. All in one <code>pip install</code>. No DSL to learn. No SaaS to pay for. No vendor to depend on.
       </p>
       <div class="hero-actions">
         <button onclick="copyPip()" class="btn btn-pip" id="pipBtn">
@@ -648,10 +648,10 @@
     <div class="grid-2 gap-12" style="align-items:start">
       <div class="reveal">
         <p style="color:var(--text-dim);font-size:16px;line-height:1.8;margin-bottom:20px">
-          Selectools is an open-source Python library that gives you everything you need to build, test, and deploy AI agents &mdash; multi-agent graphs, tool calling, RAG with hybrid search, 50 evaluators, guardrails, audit logging, and a visual builder &mdash; in a single <code style="color:var(--cyan)">pip install</code>.
+          Selectools is an open-source Python library that gives you everything you need to build, test, and deploy AI agents: multi-agent graphs, tool calling, RAG with hybrid search, 50 evaluators, guardrails, audit logging, and a visual builder. All in a single <code style="color:var(--cyan)">pip install</code>.
         </p>
         <p style="color:var(--text-dim);font-size:16px;line-height:1.8">
-          Unlike LangChain, there&rsquo;s no expression language to learn, no separate packages to install, and no paid SaaS for traces or evals. Unlike CrewAI, you get full graph orchestration, not just role-based agents. Your code stays plain Python &mdash; readable, debuggable, yours.
+          Unlike LangChain, there&rsquo;s no expression language to learn, no separate packages to install, and no paid SaaS for traces or evals. Unlike CrewAI, you get full graph orchestration, not just role-based agents. Your code stays plain Python. Readable, debuggable, yours.
         </p>
       </div>
       <div class="reveal reveal-d1">
@@ -695,7 +695,7 @@ result = agent.<span class="fn">run</span>(<span class="str">"Find our refund po
             <div class="code-dot" style="background:rgba(239,68,68,0.35)"></div>
             <div class="code-dot" style="background:rgba(250,204,21,0.35)"></div>
             <div class="code-dot" style="background:rgba(34,197,94,0.35)"></div>
-            <span class="code-bar-label">LangGraph &mdash; 25 lines</span>
+            <span class="code-bar-label">LangGraph &middot; 25 lines</span>
           </div>
           <div class="code-body code-dim"><span class="kw">from</span> langgraph.graph <span class="kw">import</span> StateGraph, START, END
 <span class="kw">from</span> typing_extensions <span class="kw">import</span> TypedDict
@@ -725,16 +725,16 @@ result = app.<span class="fn">invoke</span>({<span class="str">"text"</span>: <s
             <div class="code-dot" style="background:rgba(239,68,68,0.8)"></div>
             <div class="code-dot" style="background:rgba(250,204,21,0.8)"></div>
             <div class="code-dot" style="background:rgba(34,197,94,0.8)"></div>
-            <span class="code-bar-label">selectools &mdash; 1 line</span>
+            <span class="code-bar-label">selectools &middot; 1 line</span>
           </div>
           <div class="code-body"><span class="kw">from</span> <span class="cls">selectools</span> <span class="kw">import</span> AgentGraph
 
 result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planner, writer, reviewer).<span class="fn">run</span>(<span class="str">"prompt"</span>)</div>
         </div>
         <ul class="check-list" style="margin-top:20px">
-          <li>Plain Python &mdash; no StateGraph, no TypedDict, no compile()</li>
-          <li>HITL resumes at yield point &mdash; doesn't restart your node</li>
-          <li>Zero extra deps &mdash; no langchain-core required</li>
+          <li>Plain Python. No StateGraph, no TypedDict, no compile()</li>
+          <li>HITL resumes at yield point, not by restarting the node</li>
+          <li>Zero extra deps. No langchain-core required</li>
           <li>Deploy: <code style="color:var(--cyan)">selectools serve agent.yaml</code></li>
         </ul>
       </div>
@@ -752,7 +752,7 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
         <p class="section-desc">The only open-source agent builder that runs in the browser with zero installation. Drag nodes, connect agents, test with real APIs, export runnable Python. 49KB gzipped. No signup. No CDN. No Electron.</p>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;margin-top:4px">
-        <span class="builder-badge"><span class="dot"></span> Live &mdash; no server required</span>
+        <span class="builder-badge"><span class="dot"></span> Live &middot; no server required</span>
       </div>
     </div>
     <div class="reveal">
@@ -795,12 +795,12 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
   <div class="wrap">
     <span class="section-label">Why selectools?</span>
     <h2 class="mb-4">Three problems every agent team hits.</h2>
-    <p class="section-desc mb-14">And how Selectools solves them out of the box &mdash; no paid debugger, no SaaS account, no bolt-on libraries.</p>
+    <p class="section-desc mb-14">And how Selectools solves them out of the box. No paid debugger. No SaaS account. No bolt-on libraries.</p>
     <div class="grid-3 gap-8">
       <div class="card reveal">
         <span class="card-icon">&#128269;</span>
         <h3>&ldquo;I can&rsquo;t see what my agent is doing&rdquo;</h3>
-        <p>Every <code style="color:var(--cyan)">run()</code> returns <code style="color:var(--cyan)">result.trace</code> + <code style="color:var(--cyan)">result.reasoning</code> &mdash; a structured timeline of every LLM call, tool pick, and execution. Free, local, always on.</p>
+        <p>Every <code style="color:var(--cyan)">run()</code> returns <code style="color:var(--cyan)">result.trace</code> + <code style="color:var(--cyan)">result.reasoning</code>: a structured timeline of every LLM call, tool pick, and execution. Free, local, always on.</p>
       </div>
       <div class="card reveal reveal-d1">
         <span class="card-icon">&#128737;</span>
@@ -810,7 +810,7 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
       <div class="card reveal reveal-d2">
         <span class="card-icon">&#128176;</span>
         <h3>&ldquo;I don&rsquo;t know what my agents cost&rdquo;</h3>
-        <p><code style="color:var(--cyan)">result.usage.total_cost</code> &mdash; automatic per-call token counts and dollar costs across all providers. 152 models with built-in pricing.</p>
+        <p><code style="color:var(--cyan)">result.usage.total_cost</code>: automatic per-call token counts and dollar costs across all providers. 152 models with built-in pricing.</p>
       </div>
     </div>
   </div>
@@ -821,7 +821,7 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
   <div class="wrap">
     <span class="section-label">Production-ready</span>
     <h2 class="mb-4">Guardrails in the constructor, not an afterthought.</h2>
-    <p class="section-desc mb-14">PII redaction, audit logging, and injection defense &mdash; configured in one <code style="color:var(--cyan)">AgentConfig</code>, not bolted on with separate packages.</p>
+    <p class="section-desc mb-14">PII redaction, audit logging, and injection defense, configured in one <code style="color:var(--cyan)">AgentConfig</code>, not bolted on with separate packages.</p>
     <div class="grid-2 gap-8">
       <div class="reveal">
         <div class="code-frame code-frame-accent">
@@ -894,17 +894,17 @@ result = agent.<span class="fn">run</span>(<span class="str">"Find our refund po
     <div class="text-center mb-14">
       <span class="section-label">What&rsquo;s included</span>
       <h2 class="mb-4">One install. Everything built in.</h2>
-      <p class="section-desc center">No langchain-core. No separate eval SDK. No paid debugger. <code>pip install selectools</code> gives you all of this &mdash; tested across Python 3.9&ndash;3.13.</p>
+      <p class="section-desc center">No langchain-core. No separate eval SDK. No paid debugger. <code>pip install selectools</code> gives you all of this, tested across Python 3.9 to 3.13.</p>
     </div>
     <div class="grid-4 gap-8">
-      <div class="card reveal"><span class="card-icon">&#9889;</span><h3>5 Providers</h3><p>OpenAI, Anthropic, Gemini, Ollama + auto-failover with circuit breaker</p></div>
-      <div class="card reveal reveal-d1"><span class="card-icon">&#127919;</span><h3>152 Models</h3><p>Type-safe constants with built-in pricing data for all providers</p></div>
-      <div class="card reveal reveal-d2"><span class="card-icon">&#128270;</span><h3>Hybrid RAG</h3><p>BM25 + vector search with RRF fusion and cross-encoder reranking</p></div>
-      <div class="card reveal reveal-d3"><span class="card-icon">&#128737;</span><h3>Guardrails</h3><p>PII redaction, toxicity, topic blocking, format and length validation</p></div>
-      <div class="card reveal"><span class="card-icon">&#128203;</span><h3>Audit Logging</h3><p>JSONL trail with 4 privacy levels and daily rotation</p></div>
-      <div class="card reveal reveal-d1"><span class="card-icon">&#128024;</span><h3>Entity Memory</h3><p>Auto-extract entities + knowledge graph with SQLite storage</p></div>
-      <div class="card reveal reveal-d2"><span class="card-icon">&#128295;</span><h3>24 Built-in Tools</h3><p>Files, web, data, datetime, text &mdash; ready to use out of the box</p></div>
-      <div class="card reveal reveal-d3"><span class="card-icon">&#128202;</span><h3>50 Evaluators</h3><p>Agent testing: tool use, correctness, safety, LLM-as-judge, regression</p></div>
+      <div class="card reveal"><span class="card-icon">&#128202;</span><h3>50 Evaluators</h3><p>Test tool use, correctness, safety, LLM-as-judge, regression detection. Free. No SaaS.</p></div>
+      <div class="card reveal reveal-d1"><span class="card-icon">&#128737;</span><h3>Guardrails</h3><p>PII redaction, toxicity, topic blocking, prompt injection screening with 15 patterns.</p></div>
+      <div class="card reveal reveal-d2"><span class="card-icon">&#128270;</span><h3>Hybrid RAG</h3><p>BM25 + vector search with RRF fusion and cross-encoder reranking. 4 store backends.</p></div>
+      <div class="card reveal reveal-d3"><span class="card-icon">&#128176;</span><h3>Cost Tracking</h3><p>Automatic per-call token counts and dollar costs. 152 models with built-in pricing data.</p></div>
+      <div class="card reveal"><span class="card-icon">&#9889;</span><h3>Auto-Failover</h3><p>OpenAI, Anthropic, Gemini, Ollama. Circuit breaker with health checks. Falls over, not down.</p></div>
+      <div class="card reveal reveal-d1"><span class="card-icon">&#128203;</span><h3>Audit Logging</h3><p>JSONL trail with 4 privacy levels and daily rotation. Compliance-ready out of the box.</p></div>
+      <div class="card reveal reveal-d2"><span class="card-icon">&#128024;</span><h3>Memory + Knowledge</h3><p>Conversation memory, entity extraction, knowledge graph. Session persistence (JSON, SQLite, Redis).</p></div>
+      <div class="card reveal reveal-d3"><span class="card-icon">&#128295;</span><h3>24 Built-in Tools</h3><p>File I/O, web requests, data transforms, datetime, text processing. Ready to use.</p></div>
     </div>
     <div class="grid-2 gap-8 mt-16">
       <div class="card reveal">
@@ -915,17 +915,17 @@ result = agent.<span class="fn">run</span>(<span class="str">"Find our refund po
       <div class="card reveal reveal-d1">
         <span class="card-icon">&#128640;</span>
         <h3>Composable Pipelines</h3>
-        <p><code style="color:var(--cyan)">Pipeline</code> + <code style="color:var(--cyan)">@step</code> + <code style="color:var(--cyan)">|</code> operator + <code style="color:var(--cyan)">parallel()</code> + <code style="color:var(--cyan)">branch()</code> &mdash; chain agents, tools, and transforms with plain Python.</p>
+        <p><code style="color:var(--cyan)">Pipeline</code> + <code style="color:var(--cyan)">@step</code> + <code style="color:var(--cyan)">|</code> operator + <code style="color:var(--cyan)">parallel()</code> + <code style="color:var(--cyan)">branch()</code>. Chain agents, tools, and transforms with plain Python.</p>
       </div>
       <div class="card reveal">
         <span class="card-icon">&#129504;</span>
         <h3>4 Advanced Agent Patterns</h3>
-        <p><code style="color:var(--cyan)">PlanAndExecuteAgent</code>, <code style="color:var(--cyan)">ReflectiveAgent</code>, <code style="color:var(--cyan)">DebateAgent</code>, <code style="color:var(--cyan)">TeamLeadAgent</code> &mdash; high-level coordination built on AgentGraph.</p>
+        <p><code style="color:var(--cyan)">PlanAndExecuteAgent</code>, <code style="color:var(--cyan)">ReflectiveAgent</code>, <code style="color:var(--cyan)">DebateAgent</code>, <code style="color:var(--cyan)">TeamLeadAgent</code>. High-level coordination built on AgentGraph.</p>
       </div>
       <div class="card reveal reveal-d1">
         <span class="card-icon">&#128274;</span>
         <h3>Enterprise Ready</h3>
-        <p>Security audit published. SBOM (CycloneDX). <code style="color:var(--cyan)">@stable</code>/<code style="color:var(--cyan)">@beta</code>/<code style="color:var(--cyan)">@deprecated</code> markers. Deprecation policy. Python 3.9&ndash;3.13.</p>
+        <p>Security audit published. SBOM (CycloneDX). <code style="color:var(--cyan)">@stable</code>/<code style="color:var(--cyan)">@beta</code>/<code style="color:var(--cyan)">@deprecated</code> markers. Deprecation policy. Python 3.9 to 3.13.</p>
       </div>
     </div>
   </div>
@@ -936,7 +936,7 @@ result = agent.<span class="fn">run</span>(<span class="str">"Find our refund po
   <div class="wrap">
     <span class="section-label">Built-in evaluation</span>
     <h2 class="mb-4">Test your agents. Not just your code.</h2>
-    <p class="section-desc mb-14">LangSmith charges $39/seat/mo for agent evaluation. DeepEval requires a separate install. Selectools ships 50 evaluators &mdash; free, local, built in.</p>
+    <p class="section-desc mb-14">LangSmith charges $39/seat/mo for agent evaluation. DeepEval requires a separate install. Selectools ships 50 evaluators. Free, local, built in.</p>
     <div class="grid-2 gap-8">
       <div class="reveal">
         <div class="code-frame code-frame-accent">
@@ -997,7 +997,7 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
     <div class="text-center mb-14">
       <span class="section-label">How we compare</span>
       <h2 class="mb-4">What you get vs. what you pay for elsewhere.</h2>
-      <p class="section-desc center">LangChain has the ecosystem. We have everything it charges extra for &mdash; traces, evals, guardrails, builder &mdash; included and free.</p>
+      <p class="section-desc center">LangChain has the ecosystem. We have everything it charges extra for (traces, evals, guardrails, builder) included and free.</p>
     </div>
     <div class="reveal">
       <div class="code-frame" style="overflow-x:auto">
@@ -1059,7 +1059,7 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
     <div class="grid-3 gap-8">
       <div class="card reveal">
         <h3 style="color:var(--cyan);margin-bottom:10px">ML / AI Engineers</h3>
-        <p>You need to know what your agent did, why, and how much it cost &mdash; on every single call. Not just during debugging. In production. Automatically.</p>
+        <p>You need to know what your agent did, why, and how much it cost. On every single call. Not just during debugging. In production. Automatically.</p>
       </div>
       <div class="card reveal reveal-d1">
         <h3 style="color:var(--cyan);margin-bottom:10px">Regulated Industries</h3>
@@ -1067,7 +1067,7 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
       </div>
       <div class="card reveal reveal-d2">
         <h3 style="color:var(--cyan);margin-bottom:10px">Teams Outgrowing LangChain</h3>
-        <p>You&rsquo;re paying $39/seat/mo for LangSmith to see what your agents are doing. We ship that &mdash; and 50 evaluators &mdash; for free, locally, in one package.</p>
+        <p>You&rsquo;re paying $39/seat/mo for LangSmith to see what your agents are doing. We ship that, plus 50 evaluators, for free, locally, in one package.</p>
       </div>
     </div>
   </div>
@@ -1129,7 +1129,7 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
           <span style="color:var(--text-faint);font-size:12px;flex-shrink:0;margin-left:16px">&#9660;</span>
         </summary>
         <div style="padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7">
-          Selectools uses a single <code>Agent</code> class with native tool calling &mdash; no chains, no expression language, no complex abstractions. It includes built-in features that require separate paid services in LangChain: 50 evaluators (vs LangSmith at $39/seat/mo), hybrid RAG search, guardrails, audit logging, multi-agent orchestration, and a visual builder. One <code style="color:var(--cyan)">pip install</code>, everything included, free.
+          Selectools uses a single <code>Agent</code> class with native tool calling. No chains, no expression language, no complex abstractions. It includes built-in features that require separate paid services in LangChain: 50 evaluators (vs LangSmith at $39/seat/mo), hybrid RAG search, guardrails, audit logging, multi-agent orchestration, and a visual builder. One <code style="color:var(--cyan)">pip install</code>, everything included, free.
         </div>
       </details>
       <details class="card reveal reveal-d2" style="cursor:pointer;padding:0">
