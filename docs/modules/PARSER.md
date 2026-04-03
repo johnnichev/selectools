@@ -122,50 +122,14 @@ TOOL_CALL
 
 ### Multi-Stage Extraction
 
+```mermaid
+graph TD
+    A["LLM Response Text"] --> B["Stage 1: Find Candidate Blocks"]
+    B --> C["Stage 2: Clean & Normalize"]
+    C --> D["Stage 3: JSON Parsing"]
+    D --> E["Stage 4: Field Extraction"]
+    E --> F["ParseResult"]
 ```
-
-LLM Response Text
-│
-▼
-┌────────────────────────────────┐
-│ Stage 1: Find Candidate Blocks│
-├────────────────────────────────┤
-│ • Search for TOOL_CALL marker │
-│ • Extract fenced code blocks │
-│ • Find balanced JSON objects │
-└────────────┬───────────────────┘
-│
-▼
-┌────────────────────────────────┐
-│ Stage 2: Clean & Normalize │
-├────────────────────────────────┤
-│ • Strip markers and fences │
-│ • Remove extra whitespace │
-│ • Normalize quotes │
-└────────────┬───────────────────┘
-│
-▼
-┌────────────────────────────────┐
-│ Stage 3: JSON Parsing │
-├────────────────────────────────┤
-│ • Try direct parsing │
-│ • Try with quote normalization │
-│ • Try with newline handling │
-└────────────┬───────────────────┘
-│
-▼
-┌────────────────────────────────┐
-│ Stage 4: Field Extraction │
-├────────────────────────────────┤
-│ • Extract tool_name/tool/name │
-│ • Extract parameters/params │
-│ • Validate presence │
-└────────────┬───────────────────┘
-│
-▼
-ParseResult
-
-````
 
 ### Implementation Flow
 

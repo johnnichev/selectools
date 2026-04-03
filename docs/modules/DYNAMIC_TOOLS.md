@@ -49,47 +49,11 @@ Agent         # add_tool, add_tools, remove_tool, replace_tool — all rebuild s
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        Plugin Directory / File / Module                      │
-│                                                                              │
-│   plugins/                    my_tools.py              myapp.tools.search     │
-│   ├── search.py              @tool def search(...)    @tool def search(...)  │
-│   ├── weather.py             @tool def weather(...)                         │
-│   └── _internal.py           (skipped)                                       │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      │ ToolLoader.from_directory()
-                                      │ ToolLoader.from_file()
-                                      │ ToolLoader.from_module()
-                                      │ ToolLoader.reload_file()
-                                      │ ToolLoader.reload_module()
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              ToolLoader                                       │
-│                                                                              │
-│   Returns: List[Tool]                                                         │
-│   - Imports as _selectools_dynamic_.<name> (files)                           │
-│   - Skips _*.py by default                                                   │
-│   - Collects module-level Tool instances (@tool-decorated functions)        │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      │ agent.add_tools(tools)
-                                      │ agent.add_tool(tool)
-                                      │ agent.replace_tool(tool)
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              Agent                                            │
-│                                                                              │
-│   - Updates self.tools, self._tools_by_name                                  │
-│   - Rebuilds system prompt: self._system_prompt = prompt_builder.build()     │
-│   - Next LLM call sees new tool schemas immediately                          │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              LLM Sees New Tools                               │
-└─────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    A["Plugin Source<br/>Directory / File / Module"] -->|"ToolLoader.from_directory()<br/>from_file() / from_module()"| B["ToolLoader<br/>Returns List of Tool"]
+    B -->|"agent.add_tools()<br/>add_tool() / replace_tool()"| C["Agent<br/>Updates tools, rebuilds system prompt"]
+    C --> D["LLM Sees New Tools"]
 ```
 
 ---

@@ -107,52 +107,16 @@ SemanticChunker splits documents at **topic boundaries** by comparing consecutiv
 
 ### Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ SEMANTIC CHUNKER FLOW                                                       │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  Text Input                                                                 │
-│       │                                                                     │
-│       ▼                                                                     │
-│  ┌──────────────────┐                                                      │
-│  │ Sentence Split   │  _split_into_sentences(text)                          │
-│  │ (regex heuristic)│  Handles abbreviations, decimals                     │
-│  └────────┬─────────┘                                                      │
-│           │                                                                 │
-│           ▼                                                                 │
-│  [Sent1, Sent2, Sent3, ...]                                                 │
-│           │                                                                 │
-│           ▼                                                                 │
-│  ┌──────────────────┐                                                      │
-│  │ Embed            │  embedder.embed_texts(sentences)                      │
-│  │ (EmbeddingProvider)                                                      │
-│  └────────┬─────────┘                                                      │
-│           │                                                                 │
-│           ▼                                                                 │
-│  [[0.1, 0.2, ...], [0.3, 0.4, ...], ...]                                   │
-│           │                                                                 │
-│           ▼                                                                 │
-│  ┌──────────────────┐                                                      │
-│  │ Similarity Check  │  _cosine_similarity(emb[i-1], emb[i])                 │
-│  │ (pure Python)     │  No numpy required                                    │
-│  └────────┬─────────┘                                                      │
-│           │                                                                 │
-│           ▼                                                                 │
-│  sim >= threshold? → Keep in group                                          │
-│  sim <  threshold? → Split (if >= min_chunk_sentences)                        │
-│  len(group) >= max? → Force split                                            │
-│           │                                                                 │
-│           ▼                                                                 │
-│  ┌──────────────────┐                                                      │
-│  │ Group            │  Join sentences per chunk                              │
-│  └────────┬─────────┘                                                      │
-│           │                                                                 │
-│           ▼                                                                 │
-│  [Chunk1, Chunk2, Chunk3, ...]                                              │
-│  metadata: chunker="semantic", chunk, total_chunks                           │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    A["Text Input"] --> B["Sentence Split (regex heuristic)"]
+    B --> C["Embed (EmbeddingProvider)"]
+    C --> D["Similarity Check (cosine)"]
+    D -->|"sim >= threshold"| E["Keep in group"]
+    D -->|"sim < threshold"| F["Split into new chunk"]
+    E --> G["Group sentences per chunk"]
+    F --> G
+    G --> H["Output Chunks with metadata"]
 ```
 
 ### Constructor
@@ -378,32 +342,13 @@ enriched = chunker.split_documents(docs)
 # Result: semantic boundaries + contextual enrichment
 ```
 
-```
-┌────────────────────────────────────────────────────────────┐
-│ COMPOSABILITY                                                │
-├────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Document                                                   │
-│       │                                                     │
-│       ▼                                                     │
-│  SemanticChunker.split_documents()                          │
-│       │                                                     │
-│       ▼                                                     │
-│  [Chunk1, Chunk2, Chunk3]  (topic boundaries)               │
-│       │                                                     │
-│       ▼                                                     │
-│  ContextualChunker (for each chunk)                          │
-│       │                                                     │
-│       ├─ LLM: "Chunk1 in context of full doc"                │
-│       ├─ LLM: "Chunk2 in context of full doc"                │
-│       └─ LLM: "Chunk3 in context of full doc"                │
-│       │                                                     │
-│       ▼                                                     │
-│  [Context] <desc1>\n\nChunk1                                 │
-│  [Context] <desc2>\n\nChunk2                                 │
-│  [Context] <desc3>\n\nChunk3                                 │
-│                                                             │
-└────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    A["Document"] --> B["SemanticChunker.split_documents()"]
+    B --> C["Chunks (topic boundaries)"]
+    C --> D["ContextualChunker (per chunk)"]
+    D --> E["LLM adds context from full doc"]
+    E --> F["Enriched Chunks with context prefix"]
 ```
 
 ---

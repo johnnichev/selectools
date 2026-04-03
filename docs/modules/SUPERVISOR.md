@@ -81,24 +81,13 @@ The supervisor LLM generates a structured JSON plan, then executes each step seq
 
 **Flow:**
 
-```
-User prompt
-    |
-    v
-Supervisor LLM generates plan:
-[
-  {"agent": "researcher", "task": "research AI safety techniques"},
-  {"agent": "writer", "task": "write a summary based on the research"}
-]
-    |
-    v
-Step 1: researcher agent executes --> output stored in state
-    |
-    v
-Step 2: writer agent receives researcher output --> final output
-    |
-    v
-GraphResult returned
+```mermaid
+graph TD
+    A["User Prompt"] --> B["Supervisor LLM generates plan"]
+    B --> C["Step 1: researcher executes"]
+    C --> D["Output stored in state"]
+    D --> E["Step 2: writer receives output"]
+    E --> F["GraphResult returned"]
 ```
 
 **Usage:**

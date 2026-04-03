@@ -6,13 +6,13 @@ All selectools exceptions inherit from `SelectoolsError`, so you can catch every
 
 ## Exception Hierarchy
 
-```
-SelectoolsError                     # Base — catch-all for any selectools error
-├── ToolValidationError             # Bad tool parameters (type mismatch, missing required)
-├── ToolExecutionError              # Tool function raised an exception
-├── ProviderConfigurationError      # Missing API key or bad provider setup
-├── MemoryLimitExceededError        # Message count or token limit hit
-└── GraphExecutionError             # A graph execution node failed (v0.17.0 pre-work)
+```mermaid
+graph TD
+    A["SelectoolsError<br/>Base catch-all"] --> B["ToolValidationError"]
+    A --> C["ToolExecutionError"]
+    A --> D["ProviderConfigurationError"]
+    A --> E["MemoryLimitExceededError"]
+    A --> F["GraphExecutionError"]
 ```
 
 All exceptions include **PyTorch-style error messages** with clear explanations and fix suggestions.

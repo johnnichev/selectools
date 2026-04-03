@@ -73,51 +73,16 @@ from selectools.rag import (
 
 ### Flow Diagram
 
-```
-                                    ┌─────────────────────────────────────────┐
-                                    │              USER QUERY                   │
-                                    │         "GDPR compliance requirements"   │
-                                    └──────────────────┬───────────────────────┘
-                                                       │
-                          ┌────────────────────────────┼────────────────────────────┐
-                          │                            │                            │
-                          ▼                            │                            ▼
-              ┌───────────────────────┐                │                ┌───────────────────────┐
-              │   Vector Store        │                │                │   BM25 Index          │
-              │   (Semantic Search)   │                │                │   (Keyword Search)    │
-              │   • embed_query()     │                │                │   • tokenize()        │
-              │   • cosine similarity │                │                │   • Okapi BM25 score  │
-              └───────────┬───────────┘                │                └───────────┬───────────┘
-                          │                            │                            │
-                          │   vector_top_k             │             keyword_top_k   │
-                          ▼                            │                            ▼
-              ┌───────────────────────┐                │                ┌───────────────────────┐
-              │ Vector Results        │                │                │ Keyword Results       │
-              │ [SearchResult, ...]   │                │                │ [SearchResult, ...]   │
-              └───────────┬───────────┘                │                └───────────┬───────────┘
-                          │                            │                            │
-                          └────────────────────────────┼────────────────────────────┘
-                                                       │
-                                                       ▼
-                                    ┌─────────────────────────────────────────┐
-                                    │           FUSION                        │
-                                    │   RRF or Weighted Linear Combination    │
-                                    │   • Deduplicate documents                │
-                                    │   • Combine scores                       │
-                                    └──────────────────┬──────────────────────┘
-                                                       │
-                                                       ▼
-                                    ┌─────────────────────────────────────────┐
-                                    │   RERANKER (Optional)                   │
-                                    │   Cohere / Jina cross-encoder           │
-                                    │   Re-score fused candidates             │
-                                    └──────────────────┬──────────────────────┘
-                                                       │
-                                                       ▼
-                                    ┌─────────────────────────────────────────┐
-                                    │   FINAL RESULTS                         │
-                                    │   [SearchResult, ...] sorted by score   │
-                                    └─────────────────────────────────────────┘
+```mermaid
+graph TD
+    A["User Query"] --> B["Vector Store (Semantic Search)"]
+    A --> C["BM25 Index (Keyword Search)"]
+    B -->|vector_top_k| D["Vector Results"]
+    C -->|keyword_top_k| E["Keyword Results"]
+    D --> F["Fusion (RRF / Weighted Linear)"]
+    E --> F
+    F --> G["Reranker (Optional)"]
+    G --> H["Final Results"]
 ```
 
 ---

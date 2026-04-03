@@ -305,23 +305,15 @@ Documents:       <1k      <10k     <100k    <1M      1M+
 
 ### Recommendation Flow
 
-```
-Are you prototyping?
-└─ Yes → Memory Store
-
-Do you need persistence?
-└─ No → Memory Store
-└─ Yes ↓
-
-How many documents?
-├─ <100k → SQLite Store
-├─ 100k-1M → Chroma Store
-└─ >1M → Pinecone Store
-
-Is this production?
-└─ Yes, high-traffic → Pinecone Store
-└─ Yes, low-traffic → SQLite or Chroma
-└─ No → Any
+```mermaid
+flowchart TD
+    A{"Prototyping?"} -->|Yes| B["Memory Store"]
+    A -->|No| C{"Need persistence?"}
+    C -->|No| B
+    C -->|Yes| D{"How many documents?"}
+    D -->|"< 100k"| E["SQLite Store"]
+    D -->|"100k - 1M"| F["Chroma Store"]
+    D -->|"> 1M"| G["Pinecone Store"]
 ```
 
 ---

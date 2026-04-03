@@ -30,28 +30,10 @@ This system prompt is **critical** - it's how the LLM learns what tools exist an
 
 ### Components
 
-```
-┌─────────────────────────────────────────────┐
-│  BASE INSTRUCTIONS                          │
-│  • Tool calling contract                    │
-│  • JSON format specification                │
-│  • Usage guidelines                         │
-└─────────────────────────────────────────────┘
-                    │
-                    ▼
-┌─────────────────────────────────────────────┐
-│  TOOL SCHEMAS                               │
-│  • Tool 1: name, description, parameters    │
-│  • Tool 2: name, description, parameters    │
-│  • ...                                      │
-└─────────────────────────────────────────────┘
-                    │
-                    ▼
-┌─────────────────────────────────────────────┐
-│  USAGE INSTRUCTIONS                         │
-│  • When to use tools                        │
-│  • When to answer directly                  │
-└─────────────────────────────────────────────┘
+```mermaid
+graph TD
+    A["Base Instructions<br/>Tool calling contract, JSON format, guidelines"] --> B["Tool Schemas<br/>name, description, parameters per tool"]
+    B --> C["Usage Instructions<br/>When to use tools vs answer directly"]
 ```
 
 ### Full Example

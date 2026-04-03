@@ -270,40 +270,27 @@ agent = Agent(
 
 When both `session_store` and `session_id` are set, the agent attempts to load the session during initialization:
 
-```
-Agent.__init__()
-    |
-    +-- session_store.exists(session_id)?
-    |   |
-    |   +-- Yes: session_store.load(session_id)
-    |   |        +-- Restore memory from saved messages
-    |   |        +-- Fire on_session_load observer event
-    |   |
-    |   +-- No: Start with empty memory
-    |
-    +-- Continue initialization
+```mermaid
+flowchart TD
+    A["Agent.__init__()"] --> B{"session_store.exists(session_id)?"}
+    B -->|Yes| C["Load session & restore memory"]
+    C --> D["Fire on_session_load event"]
+    B -->|No| E["Start with empty memory"]
+    D --> F["Continue initialization"]
+    E --> F
 ```
 
 ### Auto-Save After Run
 
 After each `run()`, `arun()`, or `astream()` completes, the agent saves the current state:
 
-```
-run() / arun() / astream()
-    |
-    +-- Execute agent loop
-    |
-    +-- Produce AgentResult
-    |
-    +-- session_store.save(session_id, {
-    |       "messages": memory.get_history(),
-    |       "metadata": config.session_metadata,
-    |       "updated_at": now(),
-    |   })
-    |
-    +-- Fire on_session_save observer event
-    |
-    +-- Return AgentResult
+```mermaid
+graph TD
+    A["run() / arun() / astream()"] --> B["Execute agent loop"]
+    B --> C["Produce AgentResult"]
+    C --> D["session_store.save(session_id, ...)"]
+    D --> E["Fire on_session_save event"]
+    E --> F["Return AgentResult"]
 ```
 
 ### Session Metadata
@@ -368,15 +355,12 @@ class SessionWatcher(AgentObserver):
 
 ### Recommendation Flow
 
-```
-Are you prototyping?
-+-- Yes --> JsonFileSessionStore
-
-Single process, local deployment?
-+-- Yes --> SQLiteSessionStore
-
-Multiple processes or machines?
-+-- Yes --> RedisSessionStore
+```mermaid
+flowchart TD
+    A{"Prototyping?"} -->|Yes| B["JsonFileSessionStore"]
+    A -->|No| C{"Single process, local?"}
+    C -->|Yes| D["SQLiteSessionStore"]
+    C -->|No| E["RedisSessionStore"]
 ```
 
 ---
