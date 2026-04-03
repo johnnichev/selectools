@@ -1,7 +1,7 @@
 # Selectools Architecture
 
-**Version:** 0.19.0
-**Last Updated:** March 2026
+**Version:** 0.20.1
+**Last Updated:** April 2026
 
 ## System Overview
 
@@ -28,16 +28,19 @@ graph TD
 
     M --> O[Serve]
     O --> P["POST /invoke"]
-    O --> Q["POST /stream (SSE)"]
+    O --> Q["POST /stream SSE"]
     O --> R["GET /playground"]
+    O --> S["GET /builder"]
+    S --> T["Self-contained HTML"]
 
     style B fill:#3b82f6,color:#fff
     style E fill:#06b6d4,color:#fff
     style M fill:#8b5cf6,color:#fff
     style O fill:#10b981,color:#fff
+    style S fill:#f59e0b,color:#fff
 ```
 
-**The flow:** User prompt → Agent (single or graph) → Pipeline composition → Serve as HTTP API.
+**The flow:** User prompt → Agent (single or graph) → Pipeline composition → Serve as HTTP API or Visual Builder.
 
 ## Table of Contents
 
@@ -49,6 +52,8 @@ graph TD
 6. [Design Principles](#design-principles)
 7. [RAG Integration](#rag-integration)
 8. [Multi-Agent Orchestration](#multi-agent-orchestration)
+9. [Composable Pipelines](#composable-pipelines)
+10. [Serve and Deploy](#serve-and-deploy)
 
 ---
 
@@ -84,123 +89,100 @@ Selectools is a production-ready Python framework for building AI agents with to
 - **Knowledge Graph**: Relationship triple extraction and keyword-based querying
 - **Cross-Session Knowledge**: Daily logs + persistent facts with auto-registered `remember` tool
 - **Multi-Agent Orchestration**: Compose agents into directed graphs with routing, parallel execution, checkpointing, and human-in-the-loop support
+- **Agent Patterns**: PlanAndExecuteAgent, ReflectiveAgent, DebateAgent, TeamLeadAgent
+- **Composable Pipelines**: `Pipeline` + `@step` + `|` operator + `parallel()` + `branch()`
+- **Eval Framework**: 50 evaluators (29 deterministic + 21 LLM-as-judge), A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing, live dashboard
+- **MCP Support**: MCPClient, MCPServer, MultiMCPClient with circuit breaker
+- **Serve and Deploy**: `selectools serve` with FastAPI/Starlette, YAML config, playground, Visual Agent Builder
+- **Visual Builder**: Drag-drop AgentGraph UI with YAML/Python export, serverless mode for GitHub Pages deployment
+- **Stability Markers**: `@stable`, `@beta`, `@deprecated(since, replacement)` on all public APIs
 
 ---
 
 ## System Architecture
 
+```mermaid
+graph TD
+    subgraph User["USER APPLICATION"]
+        UA([User Code])
+    end
+
+    subgraph AgentLayer["AGENT LAYER"]
+        Core["Agent Loop<br/>agent/core.py"]
+        PB["PromptBuilder<br/>prompt.py"]
+        TCP["ToolCallParser<br/>parser.py"]
+        Mem["ConversationMemory<br/>memory.py"]
+        Core --> PB
+        Core --> TCP
+        Core --> Mem
+    end
+
+    subgraph Providers["PROVIDER LAYER"]
+        OAI["OpenAI"]
+        ANT["Anthropic"]
+        GEM["Gemini"]
+        OLL["Ollama"]
+        FB["FallbackProvider<br/>circuit breaker + failover"]
+        Proto["Provider Protocol<br/>complete / stream / acomplete / astream"]
+        OAI --> FB
+        ANT --> FB
+        GEM --> FB
+        OLL --> FB
+        FB --> Proto
+    end
+
+    subgraph Tools["TOOL SYSTEM"]
+        Tool["Tool + @tool decorator"]
+        TR["ToolRegistry"]
+        TL["ToolLoader"]
+    end
+
+    subgraph RAG["RAG SYSTEM"]
+        DL["DocumentLoader"]
+        TS["TextSplitter"]
+        EP["EmbeddingProvider"]
+        VS["VectorStore"]
+        RT["RAGTool"]
+        DL --> TS --> EP --> VS --> RT
+    end
+
+    subgraph Safety["SAFETY + OBSERVABILITY"]
+        Guard["Guardrails Pipeline"]
+        Audit["Audit Logger"]
+        Screen["Output Screening"]
+        Coh["Coherence Check"]
+        Obs["AgentObserver"]
+        Trace["AgentTrace"]
+    end
+
+    subgraph Support["SUPPORT SYSTEMS"]
+        Usage["Usage Tracking"]
+        Pricing["Pricing"]
+        Models["Model Registry"]
+        Analytics["Analytics"]
+        Cache["Cache LRU+TTL / Redis"]
+    end
+
+    UA --> Core
+    Core --> Proto
+    Core --> Tool
+    Core --> RT
+    Core --> Guard
+    Core --> Audit
+    Core --> Screen
+    Core --> Coh
+    Core --> Obs
+    Core --> Trace
+    Core --> Cache
+    Core --> Usage
+
+    style Core fill:#3b82f6,color:#fff
+    style FB fill:#06b6d4,color:#fff
+    style Guard fill:#ef4444,color:#fff
+    style Trace fill:#8b5cf6,color:#fff
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                            USER APPLICATION                              │
-└────────────────────────────────┬────────────────────────────────────────┘
-                                 │
-                                 ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                              AGENT                                       │
-│  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │  Agent Loop (agent/core.py)                                      │  │
-│  │  • Iterative execution                                           │  │
-│  │  • Tool call detection & policy enforcement                      │  │
-│  │  • Structured output parsing & validation                        │  │
-│  │  • Execution traces (AgentTrace)                                 │  │
-│  │  • Reasoning extraction                                          │  │
-│  │  • Error handling & retries                                      │  │
-│  │  • AgentObserver + AsyncAgentObserver (hooks deprecated)          │  │
-│  │  • Parallel tool execution                                       │  │
-│  │  • Batch processing (batch/abatch)                               │  │
-│  │  • Response caching (LRU+TTL)                                    │  │
-│  │  • Input/output guardrails (guardrails/)                         │  │
-│  │  • Tool output screening (security.py)                           │  │
-│  │  • Coherence checking (coherence.py)                             │  │
-│  │  • Audit logging (audit.py)                                      │  │
-│  │  • Session persistence (sessions.py)                             │  │
-│  │  • Memory context injection (entity, KG, knowledge)              │  │
-│  └─────────┬────────────────────────┬──────────────────┬────────────┘  │
-│            │                        │                  │               │
-│            ▼                        ▼                  ▼               │
-│  ┌─────────────────┐    ┌──────────────────┐  ┌──────────────────┐   │
-│  │  PromptBuilder  │    │  ToolCallParser  │  │  ConversationMemory│  │
-│  │  (prompt.py)    │    │  (parser.py)     │  │  (memory.py)     │   │
-│  │  • System prompt│    │  • JSON parsing  │  │  • History mgmt  │   │
-│  │  • Tool schemas │    │  • Error recovery│  │  • Sliding window│   │
-│  └─────────────────┘    └──────────────────┘  └──────────────────┘   │
-└────────────────────────────────┬────────────────────────────────────────┘
-                                 │
-                                 ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         PROVIDER LAYER                                   │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌───────────┐  │
-│  │   OpenAI     │  │  Anthropic   │  │    Gemini    │  │   Ollama  │  │
-│  │   Provider   │  │   Provider   │  │   Provider   │  │  Provider │  │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └─────┬─────┘  │
-│         │                 │                  │                │         │
-│         └─────────────┬───┴──────────────────┴────────────────┘         │
-│                       ▼                                                 │
-│         ┌─────────────────────────────┐                                │
-│         │  FallbackProvider           │                                │
-│         │  • Priority ordering        │                                │
-│         │  • Circuit breaker          │                                │
-│         │  • Auto-failover            │                                │
-│         └─────────────────────────────┘                                │
-│         │                 │                  │                │         │
-│         └─────────────────┴──────────────────┴────────────────┘         │
-│                                 │                                        │
-│                     ┌───────────▼───────────┐                           │
-│                     │   Provider Protocol   │                           │
-│                     │   (base.py)           │                           │
-│                     │   • complete()        │                           │
-│                     │   • stream()          │                           │
-│                     │   • acomplete()       │                           │
-│                     │   • astream()         │                           │
-│                     └───────────────────────┘                           │
-└─────────────────────────────────────────────────────────────────────────┘
-                                 │
-                ┌────────────────┴────────────────┐
-                ▼                                 ▼
-┌─────────────────────────────┐   ┌─────────────────────────────────────┐
-│      TOOL SYSTEM            │   │         RAG SYSTEM                  │
-│  ┌──────────────────────┐   │   │  ┌──────────────────────────────┐ │
-│  │  Tool (tools.py)     │   │   │  │  DocumentLoader              │ │
-│  │  • Definition        │   │   │  │  • from_file()               │ │
-│  │  • Validation        │   │   │  │  • from_directory()          │ │
-│  │  • Execution         │   │   │  │  • from_pdf()                │ │
-│  │  • Streaming support │   │   │  └────────┬─────────────────────┘ │
-│  └──────────────────────┘   │   │           ▼                        │
-│  ┌──────────────────────┐   │   │  ┌──────────────────────────────┐ │
-│  │  @tool decorator     │   │   │  │  TextSplitter / Recursive    │ │
-│  │  • Auto schema       │   │   │  │  • Chunking strategies       │ │
-│  │  • Type inference    │   │   │  └────────┬─────────────────────┘ │
-│  └──────────────────────┘   │   │           ▼                        │
-│  ┌──────────────────────┐   │   │  ┌──────────────────────────────┐ │
-│  │  ToolRegistry        │   │   │  │  EmbeddingProvider          │ │
-│  │  • Organization      │   │   │  │  • OpenAI / Anthropic       │ │
-│  │  • Discovery         │   │   │  │  • Gemini / Cohere          │ │
-│  └──────────────────────┘   │   │  └────────┬─────────────────────┘ │
-└─────────────────────────────┘   │           ▼                        │
-                                  │  ┌──────────────────────────────┐ │
-                                  │  │  VectorStore                 │ │
-                                  │  │  • Memory / SQLite           │ │
-                                  │  │  • Chroma / Pinecone         │ │
-                                  │  └────────┬─────────────────────┘ │
-                                  │           ▼                        │
-                                  │  ┌──────────────────────────────┐ │
-                                  │  │  RAGTool                     │ │
-                                  │  │  • search_knowledge_base()   │ │
-                                  │  └──────────────────────────────┘ │
-                                  └─────────────────────────────────────┘
-                                                 │
-                                                 ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                      SUPPORT SYSTEMS                                     │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌───────────┐  │
-│  │   Usage      │  │  Analytics   │  │   Pricing    │  │   Models  │  │
-│  │   Tracking   │  │  (analytics) │  │  (pricing)   │  │ (registry)│  │
-│  │   (usage.py) │  │  • Metrics   │  │  • Cost calc │  │  • 152    │  │
-│  │   • Tokens   │  │  • Patterns  │  │  • Per model │  │   models  │  │
-│  │   • Cost     │  │  • Success   │  │              │  │           │  │
-│  └──────────────┘  └──────────────┘  └──────────────┘  └───────────┘  │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+
+**Agent responsibilities:** Iterative tool-calling loop, structured output parsing, execution traces, reasoning extraction, error handling with retries, observer notifications, parallel tool execution, batch processing, response caching, input/output guardrails, tool output screening, coherence checking, audit logging, session persistence, and memory context injection (entity, KG, knowledge).
 
 ---
 
@@ -239,7 +221,8 @@ The **Agent** is the orchestrator that manages the iterative loop of:
 **Internal structure**: The Agent class is composed from 4 mixins for maintainability:
 `_ToolExecutorMixin` (tool pipeline), `_ProviderCallerMixin` (LLM calls),
 `_LifecycleMixin` (observer notification), `_MemoryManagerMixin` (memory/session/entity).
-All public methods remain on `Agent`.
+All public methods remain on `Agent`. Configuration is split across `config.py` (AgentConfig)
+and `config_groups.py` (grouped config helpers).
 
 ### 2. Tools (`tools.py`)
 
@@ -371,7 +354,7 @@ Enforces typed responses from LLMs:
 
 Structured timeline of every agent execution:
 
-- 27 `TraceStep` types including `llm_call`, `tool_selection`, `tool_execution`, `cache_hit`, `error`, `structured_retry`, `session_load`, `session_save`, `memory_summarize`, `entity_extraction`, `kg_extraction`, plus 10 graph-specific types (`graph_node_start`, `graph_node_end`, `graph_routing`, etc.)
+- 26 `TraceStep` types including `llm_call`, `tool_selection`, `tool_execution`, `cache_hit`, `error`, `structured_retry`, `session_load`, `session_save`, `memory_summarize`, `entity_extraction`, `kg_extraction`, plus 10 graph-specific types (`graph_node_start`, `graph_node_end`, `graph_routing`, etc.)
 - Captures timestamps, durations, input/output summaries, token usage
 - `AgentTrace` container with `.to_dict()`, `.to_json()`, `.timeline()`, `.filter()`
 - Always populated on `result.trace` — zero cost when not accessed
@@ -398,7 +381,7 @@ Resilient provider orchestration:
 
 Class-based lifecycle observability:
 
-- 44 event methods with `run_id` correlation for concurrent requests
+- 45 event methods with `run_id` correlation for concurrent requests
 - `call_id` for matching parallel tool start/end pairs
 - `AsyncAgentObserver` provides async equivalents of all observer events
 - Built-in `LoggingObserver` for structured JSON log output
@@ -421,189 +404,113 @@ Single source of truth for 152 models:
 
 ### Standard Tool-Calling Flow
 
-```
-1. User Message
-   │
-   ├─→ Agent receives message(s)
-   │
-2. Conversation History
-   │
-   ├─→ Memory.get_history() [if enabled]
-   ├─→ Append new messages
-   │
-3. Prompt Building
-   │
-   ├─→ PromptBuilder.build(tools)
-   ├─→ System prompt with tool schemas
-   │
-4. Cache Lookup [if cache configured]
-   │
-   ├─→ CacheKeyBuilder.build(model, prompt, messages, tools, temperature)
-   ├─→ Cache.get(key) → hit? Return cached (Message, UsageStats)
-   │
-5. LLM Request [on cache miss]
-   │
-   ├─→ Provider.complete(model, prompt, messages)
-   ├─→ [OpenAI / Anthropic / Gemini / Ollama]
-   ├─→ Cache.set(key, response) [store for future hits]
-   │
-6. Response Parsing
-   │
-   ├─→ ToolCallParser.parse(response_text)
-   ├─→ Extract: tool_name, parameters
-   │
-7. Tool Policy Check [if tool call detected]
-   │
-   ├─→ ToolPolicy.evaluate(tool_name, tool_args) → allow/review/deny
-   ├─→ If deny → return error message to LLM, skip execution
-   ├─→ If review → invoke confirm_action callback → approve/deny
-   │
-8. Tool Execution [if allowed]
-   │
-   ├─→ Tool.validate(parameters)
-   ├─→ Tool.execute(parameters, injected_kwargs)
-   ├─→ Parallel execution if multiple tools (asyncio.gather / ThreadPoolExecutor)
-   ├─→ Handle timeout, errors, streaming
-   ├─→ Record TraceStep (tool_execution) with duration
-   │
-9. Feedback Loop [if tool executed]
-   │
-   ├─→ Append ASSISTANT message (tool call)
-   ├─→ Append TOOL message (result)
-   ├─→ Return to step 4 (next iteration)
-   │
-10. Structured Output Validation [if response_format set]
-   │
-   ├─→ extract_json(response_text) → parse_and_validate(json, schema)
-   ├─→ If valid → result.parsed = typed object
-   ├─→ If invalid → retry with error feedback to LLM
-   │
-11. Final Response [no tool call]
-   │
-   ├─→ Memory.add(response) [if enabled]
-   ├─→ Populate result.trace, result.reasoning, result.parsed
-   ├─→ Return AgentResult to user
+```mermaid
+flowchart TD
+    A([User Message]) --> B[Load History<br/>Memory.get_history]
+    B --> C[Build Prompt<br/>PromptBuilder.build]
+    C --> D{Cache Hit?}
+    D -->|Yes| K
+    D -->|No| E[LLM Request<br/>Provider.complete]
+    E --> F[Cache Response<br/>Cache.set]
+    F --> G[Parse Response<br/>ToolCallParser.parse]
+    G --> H{Tool Call?}
+    H -->|No| J{Structured<br/>Output?}
+    H -->|Yes| I[Policy Check<br/>allow / review / deny]
+    I --> I2[Execute Tool<br/>validate + run]
+    I2 --> I3[Record TraceStep<br/>Append messages]
+    I3 --> D
+    J -->|Yes| J2[Validate JSON<br/>parse_and_validate]
+    J2 -->|Invalid| E
+    J2 -->|Valid| K
+    J -->|No| K[Build AgentResult<br/>trace + reasoning + parsed]
+    K --> L([Return to User])
+
+    style A fill:#10b981,color:#fff
+    style E fill:#3b82f6,color:#fff
+    style I fill:#ef4444,color:#fff
+    style L fill:#10b981,color:#fff
 ```
 
 ### RAG-Enhanced Flow
 
-```
-1. User Question
-   │
-2. [First Time Setup]
-   │
-   ├─→ DocumentLoader.from_directory("./docs")
-   ├─→ TextSplitter.split_documents(docs)
-   ├─→ EmbeddingProvider.embed_texts(chunks)
-   ├─→ VectorStore.add_documents(chunks, embeddings)
-   │
-3. Query Processing
-   │
-   ├─→ Agent receives question
-   ├─→ LLM decides to use RAGTool
-   │
-4. Knowledge Base Search
-   │
-   ├─→ EmbeddingProvider.embed_query(question)
-   ├─→ VectorStore.search(query_embedding, top_k=3)
-   ├─→ Return top matches with scores
-   │
-5. Context Integration
-   │
-   ├─→ Format results with source citations
-   ├─→ Return to Agent as tool result
-   │
-6. Response Generation
-   │
-   ├─→ LLM generates answer using retrieved context
-   ├─→ Return to user
+```mermaid
+flowchart TD
+    subgraph Setup["First-Time Ingestion"]
+        S1["DocumentLoader.from_directory"] --> S2["TextSplitter.split_documents"]
+        S2 --> S3["EmbeddingProvider.embed_texts"]
+        S3 --> S4["VectorStore.add_documents"]
+    end
+
+    A([User Question]) --> B[Agent receives question]
+    B --> C[LLM decides to use RAGTool]
+    C --> D["EmbeddingProvider.embed_query"]
+    D --> E["VectorStore.search<br/>top_k matches + scores"]
+    E --> F[Format results with citations]
+    F --> G[LLM generates answer<br/>using retrieved context]
+    G --> H([Return to User])
+
+    S4 -.->|indexed| E
+
+    style A fill:#10b981,color:#fff
+    style H fill:#10b981,color:#fff
+    style Setup fill:#f0f9ff,stroke:#3b82f6
 ```
 
 ---
 
 ## Module Dependencies
 
+```mermaid
+graph TD
+    Init["__init__.py<br/>Public API"] --> AgentCore["agent/core.py"]
+    Init --> ToolsMod["tools/"]
+    Init --> ProvMod["providers/"]
+    Init --> RagMod["rag/"]
+    Init --> EmbMod["embeddings/"]
+    Init --> EvalsMod["evals/"]
+    Init --> OrchMod["orchestration/"]
+    Init --> ServeMod["serve/"]
+    Init --> ModelsMod["models.py"]
+
+    AgentCore --> Types["types.py"]
+    AgentCore --> ToolsMod
+    AgentCore --> Prompt["prompt.py"]
+    AgentCore --> Parser["parser.py"]
+    AgentCore --> Structured["structured.py"]
+    AgentCore --> TraceMod["trace.py"]
+    AgentCore --> Policy["policy.py"]
+    AgentCore --> ProvMod
+    AgentCore --> Memory["memory.py"]
+    AgentCore --> Usage["usage.py"]
+    AgentCore --> Observer["observer.py"]
+    AgentCore --> Cache["cache.py"]
+    AgentCore --> Sessions["sessions.py"]
+    AgentCore --> EntityMem["entity_memory.py"]
+    AgentCore --> KGMem["knowledge_graph.py"]
+    AgentCore --> Knowledge["knowledge.py"]
+    AgentCore --> Guard["guardrails/"]
+    AgentCore --> Security["security.py"]
+
+    ProvMod --> Types
+    RagMod --> EmbMod
+    EvalsMod --> AgentCore
+    OrchMod --> AgentCore
+    ServeMod --> AgentCore
+
+    style Init fill:#3b82f6,color:#fff
+    style AgentCore fill:#06b6d4,color:#fff
+    style OrchMod fill:#8b5cf6,color:#fff
+    style ServeMod fill:#10b981,color:#fff
 ```
-┌────────────────┐
-│   __init__.py  │  (Public API)
-└────────┬───────┘
-         │
-         ├─→ agent/core.py
-         │    ├─→ types.py (Message, Role, ToolCall, AgentResult)
-         │    ├─→ tools.py (Tool)
-         │    ├─→ prompt.py (PromptBuilder)
-         │    ├─→ parser.py (ToolCallParser)
-         │    ├─→ structured.py (parse_and_validate, extract_json)
-         │    ├─→ trace.py (AgentTrace, TraceStep)
-         │    ├─→ policy.py (ToolPolicy, PolicyDecision, PolicyResult)
-         │    ├─→ providers/base.py (Provider)
-         │    ├─→ providers/fallback.py (FallbackProvider)
-         │    ├─→ memory.py (ConversationMemory)
-         │    ├─→ usage.py (AgentUsage, UsageStats)
-         │    ├─→ analytics.py (AgentAnalytics)
-         │    ├─→ observer.py (AgentObserver, LoggingObserver)
-         │    ├─→ cache.py (Cache, InMemoryCache, CacheKeyBuilder)
-         │    ├─→ sessions.py (SessionStore, JsonFile/SQLite/Redis)
-         │    ├─→ entity_memory.py (EntityMemory)
-         │    ├─→ knowledge_graph.py (KnowledgeGraphMemory)
-         │    └─→ knowledge.py (KnowledgeMemory)
-         │
-         ├─→ cache.py (core caching)
-         │    └─→ types.py, tools.py, usage.py
-         │
-         ├─→ cache_redis.py (distributed caching, optional)
-         │    └─→ cache.py (CacheStats)
-         │
-         ├─→ tools.py
-         │    ├─→ types.py
-         │    └─→ exceptions.py
-         │
-         ├─→ providers/
-         │    ├─→ base.py (Provider protocol)
-         │    ├─→ openai_provider.py
-         │    ├─→ anthropic_provider.py
-         │    ├─→ gemini_provider.py
-         │    ├─→ ollama_provider.py
-         │    │    └─→ types.py, usage.py, pricing.py
-         │    └─→ fallback.py (FallbackProvider)
-         │         └─→ base.py, types.py
-         │
-         ├─→ rag/
-         │    ├─→ vector_store.py (Document, SearchResult, VectorStore)
-         │    ├─→ loaders.py (DocumentLoader)
-         │    ├─→ chunking.py (TextSplitter, RecursiveTextSplitter)
-         │    ├─→ tools.py (RAGTool, SemanticSearchTool)
-         │    └─→ __init__.py (RAGAgent)
-         │         └─→ agent.py, tools.py
-         │
-         ├─→ embeddings/
-         │    ├─→ provider.py (EmbeddingProvider protocol)
-         │    ├─→ openai.py
-         │    ├─→ anthropic.py
-         │    ├─→ gemini.py
-         │    └─→ cohere.py
-         │
-         ├─→ pricing.py
-         │    └─→ models.py
-         │
-         ├─→ evals/
-         │    ├─→ suite.py (EvalSuite — orchestration)
-         │    │    └─→ agent/core.py (Agent._clone_for_isolation)
-         │    ├─→ evaluators.py (12 deterministic evaluators)
-         │    ├─→ llm_evaluators.py (10 LLM-as-judge evaluators)
-         │    │    └─→ providers/base.py (Provider.complete)
-         │    ├─→ report.py (EvalReport — stats, export)
-         │    ├─→ pairwise.py (PairwiseEval — A/B comparison)
-         │    ├─→ snapshot.py (SnapshotStore — Jest-style)
-         │    ├─→ regression.py (BaselineStore)
-         │    ├─→ generator.py (synthetic test case generation)
-         │    ├─→ badge.py (SVG badge generation)
-         │    ├─→ html.py (interactive HTML report)
-         │    ├─→ junit.py (JUnit XML for CI)
-         │    └─→ serve.py (live browser dashboard)
-         │
-         └─→ models.py (Model registry)
-```
+
+**Module breakdown:**
+
+- **agent/core.py** depends on: types, tools, prompt, parser, structured, trace, policy, providers, memory, usage, observer, cache, sessions, entity_memory, knowledge_graph, knowledge, guardrails, security
+- **providers/** each depend on: types, usage, pricing, and their SDK
+- **rag/** depends on: embeddings, types
+- **evals/** depends on: agent (for `_clone_for_isolation`), types, providers
+- **orchestration/** depends on: agent, types, trace, observer
+- **serve/** depends on: agent, orchestration, pipeline, templates
 
 ### Import Guidelines
 
@@ -688,7 +595,7 @@ Single source of truth for 152 models:
 
 **Problem:** Black box behavior makes debugging hard.
 
-**Solution:** `AgentObserver` protocol (44 lifecycle events including 13 graph events, `run_id` correlation):
+**Solution:** `AgentObserver` protocol (45 lifecycle events including 13 graph events, `run_id` correlation):
 
 - `on_run_start/end`, `on_iteration_start/end`
 - `on_tool_start/end/error/chunk`
@@ -749,8 +656,17 @@ Legacy hooks (`AgentConfig(hooks={...})`) are deprecated. Use `AgentConfig(obser
 
 The RAG system is designed as a composable pipeline:
 
-```
-Documents → Loader → Chunker → Embedder → VectorStore → RAGTool → Agent
+```mermaid
+graph LR
+    A["Documents"] --> B["Loader"]
+    B --> C["Chunker"]
+    C --> D["Embedder"]
+    D --> E["VectorStore"]
+    E --> F["RAGTool"]
+    F --> G["Agent"]
+
+    style A fill:#f0f9ff,stroke:#3b82f6
+    style G fill:#3b82f6,color:#fff
 ```
 
 Each component can be used independently or combined via `RAGAgent` high-level API.
@@ -800,10 +716,11 @@ Total cost = LLM cost + Embedding cost
 ### Adding a New Provider
 
 1. Implement the `Provider` protocol in `providers/`
-2. Define `complete()` and `stream()` methods
+2. Define `complete()`, `stream()`, `acomplete()`, and `astream()` methods
 3. Handle message formatting in `_format_messages()`
 4. Map roles and content appropriately
 5. Extract usage stats and calculate cost
+6. Pass the `tools` parameter to all methods (including streaming)
 
 ### Adding a New Vector Store
 
@@ -929,25 +846,33 @@ The orchestration layer (v0.18.0) enables composing multiple agents into directe
 
 ### Architecture
 
-```
-AgentGraph
-  ├── GraphState (shared context: messages, data, history, metadata, errors)
-  ├── GraphNode (wraps Agent or callable with ContextMode + transforms)
-  ├── Routing
-  │   ├── Static edges (add_edge)
-  │   ├── Conditional edges (add_conditional_edge + router function)
-  │   └── Scatter (dynamic parallel fan-out)
-  ├── ParallelGroupNode (asyncio.gather with MergePolicy)
-  ├── SubgraphNode (nested graph with input_map/output_map)
-  ├── CheckpointStore (InMemory, File, SQLite)
-  │   └── HITL: InterruptRequest → checkpoint → resume at yield point
-  └── Loop/Stall Detection (state hash tracking)
+```mermaid
+graph TD
+    subgraph Graph["AgentGraph"]
+        GS["GraphState<br/>messages, data, history, metadata, errors"]
+        GN["GraphNode<br/>wraps Agent or callable"]
+        R{Routing}
+        R -->|static| SE["add_edge"]
+        R -->|conditional| CE["add_conditional_edge"]
+        R -->|scatter| SC["Scatter fan-out"]
+        PG["ParallelGroupNode<br/>asyncio.gather + MergePolicy"]
+        SG["SubgraphNode<br/>nested graph"]
+        CP["CheckpointStore<br/>InMemory / File / SQLite"]
+        CP --> HITL["HITL: InterruptRequest<br/>checkpoint + resume"]
+        LD["Loop/Stall Detection<br/>state hash tracking"]
+    end
 
-SupervisorAgent (high-level wrapper)
-  ├── plan_and_execute (LLM generates JSON plan → sequential AgentGraph)
-  ├── round_robin (agents take turns, completion check)
-  ├── dynamic (LLM router selects agent per step)
-  └── magentic (Task Ledger + Progress Ledger + auto-replan)
+    subgraph Supervisor["SupervisorAgent"]
+        PE["plan_and_execute"]
+        RR["round_robin"]
+        DY["dynamic"]
+        MG["magentic"]
+    end
+
+    Supervisor --> Graph
+
+    style Graph fill:#f0f9ff,stroke:#06b6d4
+    style Supervisor fill:#faf5ff,stroke:#8b5cf6
 ```
 
 ### Key Design Decisions
@@ -966,6 +891,94 @@ Graph execution produces 10 new `StepType` values (`graph_node_start`, `graph_no
 
 ---
 
+## Composable Pipelines
+
+The pipeline system (v0.18.0) enables composing processing steps with the `|` operator:
+
+```mermaid
+graph LR
+    A(["Input"]) --> S1["@step A"]
+    S1 --> S2["@step B"]
+    S2 --> S3["@step C"]
+    S3 --> B(["Output"])
+
+    style A fill:#10b981,color:#fff
+    style B fill:#10b981,color:#fff
+```
+
+**Key features:**
+
+- **`@step` decorator**: Define typed pipeline steps with input/output contracts
+- **`|` operator**: Chain steps with `step_a | step_b | step_c`
+- **`parallel()`**: Execute independent steps concurrently
+- **`branch()`**: Conditional routing based on step output
+- **`StepResult`**: Each step returns a typed result with metadata
+- **Type-safe contracts**: Input/output types are checked at composition time
+
+Pipelines compose with both `AgentResult` and `GraphResult`, enabling workflows like: Agent -> Pipeline -> Serve.
+
+---
+
+## Serve and Deploy
+
+The serve layer (v0.19.0+) provides HTTP deployment and a visual builder for agent graphs.
+
+### Architecture
+
+```mermaid
+graph TD
+    CLI(["selectools serve"]) --> App["Starlette ASGI App<br/>_starlette_app.py"]
+    CLI --> Builder["selectools serve --builder"]
+
+    App --> Invoke["POST /invoke"]
+    App --> Stream["POST /stream SSE"]
+    App --> Play["GET /playground<br/>playground.py"]
+    App --> BuilderRoute["GET /builder"]
+
+    BuilderRoute --> BPy["builder.py<br/>18-line HTML assembler"]
+    BPy --> Static["_static/<br/>builder.html + builder.css + builder.js"]
+
+    YAML["YAML Config"] --> App
+    Templates["templates/<br/>5 agent templates"] --> App
+
+    style CLI fill:#10b981,color:#fff
+    style App fill:#3b82f6,color:#fff
+    style BuilderRoute fill:#f59e0b,color:#fff
+```
+
+### Serve Module Structure
+
+| File | Purpose |
+|------|---------|
+| `cli.py` | CLI entry point (`selectools serve` command) |
+| `app.py` | FastAPI/Starlette app factory and route registration |
+| `_starlette_app.py` | Starlette ASGI application (411 lines) |
+| `models.py` | Pydantic request/response models |
+| `playground.py` | Interactive playground HTML endpoint |
+| `builder.py` | 18-line assembler that inlines CSS/JS into self-contained HTML |
+| `_static/` | Builder source files: `builder.html`, `builder.css`, `builder.js` |
+
+### Visual Agent Builder
+
+The builder (`selectools serve --builder`) provides a drag-drop UI for constructing `AgentGraph` workflows:
+
+- **Serverless mode**: The builder is a self-contained HTML file with all CSS and JS inlined. It can be deployed to GitHub Pages or any static host with zero backend.
+- **Export formats**: YAML config and Python code generation
+- **Live test**: Execute graphs directly from the builder UI
+- **Node types**: Agent nodes, parallel groups, subgraph nodes, conditional routing
+
+### Templates
+
+Five built-in agent templates in `templates/`:
+
+- `code_reviewer.py` — Code review agent
+- `customer_support.py` — Customer support agent
+- `data_analyst.py` — Data analysis agent
+- `rag_chatbot.py` — RAG-powered chatbot
+- `research_assistant.py` — Research assistant agent
+
+---
+
 ## Further Reading
 
 - [Agent Module](modules/AGENT.md) - Detailed agent loop documentation
@@ -973,6 +986,7 @@ Graph execution produces 10 new `StepType` values (`graph_node_start`, `graph_no
 - [RAG System](modules/RAG.md) - Complete RAG pipeline
 - [Providers](modules/PROVIDERS.md) - Provider implementations
 - [Model Registry](modules/MODELS.md) - Model metadata system
+- [Builder Module](modules/builder.md) - Visual Agent Builder
 
 ---
 
