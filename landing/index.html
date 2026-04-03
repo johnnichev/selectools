@@ -512,9 +512,9 @@
   <div class="wrap">
     <div class="hero-content">
       <span class="section-label" style="margin-bottom:16px">Open Source from NichevLabs</span>
-      <h1>Build AI agents that are <span class="grad">just Python.</span></h1>
+      <h1>AI agents that are <span class="grad">just Python.</span></h1>
       <p class="hero-sub">
-        Multi-agent orchestration, RAG, tool calling, evals, and a visual builder &mdash; in one <code>pip install</code>. No DSL. No vendor lock-in.
+        Multi-agent graphs, tool calling, RAG, 50 evaluators, and a drag-drop visual builder &mdash; all in one <code>pip install</code>. No DSL to learn. No SaaS to pay for. No vendor to depend on.
       </p>
       <div class="hero-actions">
         <button onclick="copyPip()" class="btn btn-pip" id="pipBtn">
@@ -618,7 +618,7 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
       <div>
         <span class="section-label">Visual Agent Builder</span>
         <h2 class="mb-4">Design workflows in the browser.</h2>
-        <p class="section-desc">Drag-and-drop agent graph editor &mdash; no install, no signup, no CDN. Export runnable Python or YAML. Runs from <code>pip install</code> or directly on GitHub Pages.</p>
+        <p class="section-desc">The only open-source agent builder that runs in the browser with zero installation. Drag nodes, connect agents, test with real APIs, export runnable Python. 49KB gzipped. No signup. No CDN. No Electron.</p>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;margin-top:4px">
         <span class="builder-badge"><span class="dot"></span> Live &mdash; no server required</span>
@@ -629,9 +629,32 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
         <iframe src="builder/" loading="lazy" title="Selectools Visual Agent Builder" sandbox="allow-scripts allow-same-origin"></iframe>
       </div>
     </div>
+    <div class="grid-4 gap-8" style="margin-top:32px">
+      <div class="card reveal text-center" style="padding:20px">
+        <div style="font-size:26px;font-weight:800;color:var(--cyan);margin-bottom:4px">49KB</div>
+        <div style="font-size:12px;color:var(--text-dim)">gzipped over the wire</div>
+        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">self-contained, no CDN</div>
+      </div>
+      <div class="card reveal reveal-d1 text-center" style="padding:20px">
+        <div style="font-size:26px;font-weight:800;color:var(--cyan);margin-bottom:4px">0 deps</div>
+        <div style="font-size:12px;color:var(--text-dim)">no React, no build step</div>
+        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">single HTML file</div>
+      </div>
+      <div class="card reveal reveal-d2 text-center" style="padding:20px">
+        <div style="font-size:26px;font-weight:800;color:var(--cyan);margin-bottom:4px">8 nodes</div>
+        <div style="font-size:12px;color:var(--text-dim)">agent, loop, HITL, subgraph&hellip;</div>
+        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">7 built-in templates</div>
+      </div>
+      <div class="card reveal reveal-d3 text-center" style="padding:20px">
+        <div style="font-size:26px;font-weight:800;color:var(--cyan);margin-bottom:4px">$0</div>
+        <div style="font-size:12px;color:var(--text-dim)">free, forever</div>
+        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">vs LangGraph Studio (paid)</div>
+      </div>
+    </div>
     <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap">
       <a href="builder/" class="btn btn-cyan">Open Full Builder &rarr;</a>
       <a href="modules/builder/" class="btn btn-ghost">Builder Docs</a>
+      <a href="examples/" class="btn btn-ghost">76 Example Scripts</a>
     </div>
   </div>
 </section>
@@ -739,8 +762,8 @@ result = agent.<span class="fn">run</span>(<span class="str">"Find our refund po
   <div class="wrap">
     <div class="text-center mb-14">
       <span class="section-label">What&rsquo;s included</span>
-      <h2 class="mb-4">Everything you need. One package.</h2>
-      <p class="section-desc center">No langchain-core, no separate eval SDK, no paid debugger. <code>pip install selectools</code> gives you all of this.</p>
+      <h2 class="mb-4">One install. Everything built in.</h2>
+      <p class="section-desc center">No langchain-core. No separate eval SDK. No paid debugger. <code>pip install selectools</code> gives you all of this &mdash; tested across Python 3.9&ndash;3.13.</p>
     </div>
     <div class="grid-4 gap-8">
       <div class="card reveal"><span class="card-icon">&#9889;</span><h3>5 Providers</h3><p>OpenAI, Anthropic, Gemini, Ollama + auto-failover with circuit breaker</p></div>
@@ -782,7 +805,7 @@ result = agent.<span class="fn">run</span>(<span class="str">"Find our refund po
   <div class="wrap">
     <span class="section-label">Built-in evaluation</span>
     <h2 class="mb-4">Test your agents. Not just your code.</h2>
-    <p class="section-desc mb-14">The only agent framework with a built-in eval suite. No separate install, no SaaS account. 50 evaluators out of the box.</p>
+    <p class="section-desc mb-14">LangSmith charges $39/seat/mo for agent evaluation. DeepEval requires a separate install. Selectools ships 50 evaluators &mdash; free, local, built in.</p>
     <div class="grid-2 gap-8">
       <div class="reveal">
         <div class="code-frame code-frame-accent">
@@ -842,8 +865,8 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
   <div class="wrap">
     <div class="text-center mb-14">
       <span class="section-label">How we compare</span>
-      <h2 class="mb-4">Choose the right tool.</h2>
-      <p class="section-desc center">Choose LangChain for ecosystem breadth. Choose Selectools when orchestration, compliance, and evaluation aren&rsquo;t optional.</p>
+      <h2 class="mb-4">What you get vs. what you pay for elsewhere.</h2>
+      <p class="section-desc center">LangChain has the ecosystem. We have everything it charges extra for &mdash; traces, evals, guardrails, builder &mdash; included and free.</p>
     </div>
     <div class="reveal">
       <div class="code-frame" style="overflow-x:auto">
@@ -905,15 +928,15 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
     <div class="grid-3 gap-8">
       <div class="card reveal">
         <h3 style="color:var(--cyan);margin-bottom:10px">ML / AI Engineers</h3>
-        <p>You&rsquo;re building agents at work and need observability, cost control, and audit trails. Not another prototype framework.</p>
+        <p>You need to know what your agent did, why, and how much it cost &mdash; on every single call. Not just during debugging. In production. Automatically.</p>
       </div>
       <div class="card reveal reveal-d1">
         <h3 style="color:var(--cyan);margin-bottom:10px">Regulated Industries</h3>
-        <p>Fintech, healthtech, edtech. Your compliance team will ask about guardrails and audit logs. Have the answer ready.</p>
+        <p>Your compliance team will ask &ldquo;where are the audit logs?&rdquo; and &ldquo;how do you prevent PII leakage?&rdquo; You&rsquo;ll have the answer before they ask.</p>
       </div>
       <div class="card reveal reveal-d2">
         <h3 style="color:var(--cyan);margin-bottom:10px">Teams Outgrowing LangChain</h3>
-        <p>You&rsquo;ve hit the ceiling on observability and want traces, reasoning, and cost tracking without paying for LangSmith.</p>
+        <p>You&rsquo;re paying $39/seat/mo for LangSmith to see what your agents are doing. We ship that &mdash; and 50 evaluators &mdash; for free, locally, in one package.</p>
       </div>
     </div>
   </div>
@@ -923,25 +946,31 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
 <section class="section" id="get-started">
   <div class="wrap text-center">
     <span class="section-label">Get started</span>
-    <h2 class="mb-10">60 seconds to your first agent.</h2>
-    <div class="reveal" style="max-width:560px;margin:0 auto">
-      <div class="code-frame code-frame-accent">
-        <div class="code-body" style="font-size:14px;line-height:2.2">
-<span class="cmt"># 1. Install</span>
-<span class="fn">pip install</span> selectools
-
-<span class="cmt"># 2. Set your API key</span>
-<span class="kw">export</span> OPENAI_API_KEY=<span class="str">"sk-..."</span>
-
-<span class="cmt"># 3. Run the builder</span>
-<span class="fn">selectools serve</span> --builder</div>
+    <h2 class="mb-6">Three paths. Pick yours.</h2>
+    <p class="section-desc center mb-14">No API key needed for the builder or examples. Add one when you&rsquo;re ready to go live.</p>
+    <div class="grid-3 gap-8">
+      <div class="card reveal text-center" style="padding:28px">
+        <div style="font-size:32px;margin-bottom:12px">&#127912;</div>
+        <h3 style="margin-bottom:8px">Visual Builder</h3>
+        <p style="margin-bottom:16px">Design in the browser. Export Python. No install.</p>
+        <a href="builder/" class="btn btn-cyan" style="width:100%">Open Builder &rarr;</a>
+      </div>
+      <div class="card reveal reveal-d1 text-center" style="padding:28px">
+        <div style="font-size:32px;margin-bottom:12px">&#128187;</div>
+        <h3 style="margin-bottom:8px">Code First</h3>
+        <p style="margin-bottom:16px"><code style="color:var(--cyan)">pip install selectools</code> and write Python.</p>
+        <a href="QUICKSTART/" class="btn btn-primary" style="width:100%">Quickstart Guide</a>
+      </div>
+      <div class="card reveal reveal-d2 text-center" style="padding:28px">
+        <div style="font-size:32px;margin-bottom:12px">&#128214;</div>
+        <h3 style="margin-bottom:8px">Learn by Example</h3>
+        <p style="margin-bottom:16px">76 scripts. 34 work offline. Browse, copy, run.</p>
+        <a href="examples/" class="btn btn-ghost" style="width:100%">Example Gallery</a>
       </div>
     </div>
-    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:32px">
-      <a href="QUICKSTART/" class="btn btn-primary">Quickstart Guide</a>
-      <a href="builder/" class="btn btn-cyan">Try the Builder</a>
-      <a href="examples/" class="btn btn-ghost">76 Examples</a>
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:24px">
       <a href="https://colab.research.google.com/github/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb" class="btn btn-ghost">Open in Colab</a>
+      <a href="https://github.com/johnnichev/selectools" class="btn btn-ghost">Star on GitHub</a>
     </div>
   </div>
 </section>
