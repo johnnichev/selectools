@@ -1,3 +1,10 @@
+---
+description: "Thread-safe cooperative cancellation with CancellationToken"
+tags:
+  - runtime
+  - cancellation
+---
+
 # Agent Cancellation
 
 **Added in:** v0.17.3

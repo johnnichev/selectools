@@ -1,3 +1,10 @@
+---
+description: "Cache tool results to avoid redundant executions"
+tags:
+  - runtime
+  - caching
+---
+
 # Tool Result Caching
 
 **Added in:** v0.17.6

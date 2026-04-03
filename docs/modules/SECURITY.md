@@ -1,3 +1,10 @@
+---
+description: "Prompt injection screening with 15 detection patterns and coherence checking"
+tags:
+  - security
+  - injection
+---
+
 # Security: Tool Output Screening & Coherence Checking
 
 **Added in:** v0.15.0

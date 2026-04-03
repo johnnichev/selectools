@@ -1,3 +1,10 @@
+---
+description: "SelectoolsError hierarchy and error handling patterns"
+tags:
+  - core
+  - errors
+---
+
 # Error Handling & Exceptions
 
 All selectools exceptions inherit from `SelectoolsError`, so you can catch everything with a single handler or be specific.

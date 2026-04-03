@@ -1,3 +1,10 @@
+---
+description: "YAML agent configuration and 5 built-in agent templates"
+tags:
+  - deployment
+  - config
+---
+
 # Templates Module
 
 **Added in:** v0.19.0

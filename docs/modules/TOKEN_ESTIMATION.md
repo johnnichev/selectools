@@ -1,3 +1,10 @@
+---
+description: "Pre-run token and cost estimation without calling the LLM"
+tags:
+  - runtime
+  - estimation
+---
+
 # Token Estimation
 
 **Added in:** v0.17.4

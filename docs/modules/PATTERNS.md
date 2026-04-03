@@ -1,3 +1,10 @@
+---
+description: "PlanAndExecute, Reflective, Debate, TeamLead agent coordination patterns"
+tags:
+  - multi-agent
+  - patterns
+---
+
 # Advanced Agent Patterns
 
 **Added in:** v0.19.1

@@ -1,3 +1,10 @@
+---
+description: "AgentGraph for directed multi-agent graphs with routing, parallel, HITL, checkpoints"
+tags:
+  - multi-agent
+  - orchestration
+---
+
 # Orchestration Module
 
 **Import:** `from selectools import AgentGraph, GraphState, GraphNode`

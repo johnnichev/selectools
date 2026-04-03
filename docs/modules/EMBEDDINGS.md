@@ -1,3 +1,10 @@
+---
+description: "Embedding providers for OpenAI, Anthropic, Gemini, and Cohere"
+tags:
+  - rag
+  - embeddings
+---
+
 # Embeddings Module
 
 **Directory:** `src/selectools/embeddings/`

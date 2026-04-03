@@ -1,3 +1,10 @@
+---
+description: "ToolCallParser: JSON extraction from LLM responses with error recovery"
+tags:
+  - core
+  - parsing
+---
+
 # Parser Module
 
 **File:** `src/selectools/parser.py`

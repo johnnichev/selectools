@@ -1,3 +1,10 @@
+---
+description: "Embedding-based response caching for semantically similar queries"
+tags:
+  - caching
+  - semantic
+---
+
 # Semantic Cache
 
 **Added in:** v0.17.7

@@ -1,3 +1,10 @@
+---
+description: "ReAct, Chain-of-Thought, and Plan-Then-Act reasoning modes"
+tags:
+  - runtime
+  - reasoning
+---
+
 # Reasoning Strategies
 
 **Added in:** v0.17.6

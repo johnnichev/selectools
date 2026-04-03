@@ -1,3 +1,10 @@
+---
+description: "Model Context Protocol client and server for tool interop"
+tags:
+  - integration
+  - mcp
+---
+
 # MCP Integration
 
 **Added in:** v0.17.1

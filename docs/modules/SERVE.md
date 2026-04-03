@@ -1,3 +1,10 @@
+---
+description: "selectools serve: HTTP API + playground + builder deployment"
+tags:
+  - deployment
+  - serve
+---
+
 # Serve Module
 
 **Added in:** v0.19.0

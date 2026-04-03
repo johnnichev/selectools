@@ -1,3 +1,10 @@
+---
+description: "JSONL audit logging with 4 privacy levels and daily file rotation"
+tags:
+  - security
+  - audit
+---
+
 # Audit Logging
 
 **Added in:** v0.15.0

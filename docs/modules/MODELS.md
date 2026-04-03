@@ -1,3 +1,11 @@
+---
+description: "152-model registry with built-in pricing data across all providers"
+tags:
+  - providers
+  - models
+  - pricing
+---
+
 # Models Module
 
 **File:** `src/selectools/models.py`

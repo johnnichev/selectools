@@ -1,3 +1,10 @@
+---
+description: "Semantic and contextual chunking strategies for RAG documents"
+tags:
+  - rag
+  - chunking
+---
+
 # Advanced Chunking
 
 **Directory:** `src/selectools/rag/`

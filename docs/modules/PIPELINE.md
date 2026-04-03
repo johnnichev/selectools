@@ -1,3 +1,10 @@
+---
+description: "Composable pipelines with @step, | operator, parallel(), and branch()"
+tags:
+  - composition
+  - pipelines
+---
+
 # Pipeline Module
 
 **Added in:** v0.18.0 (type-safe contracts, `retry()`, `cache_step()` added in v0.18.x)

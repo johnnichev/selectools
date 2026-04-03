@@ -1,3 +1,10 @@
+---
+description: "@stable, @beta, @deprecated markers for public API lifecycle"
+tags:
+  - api
+  - stability
+---
+
 # Stability Markers
 
 **Added in:** v0.19.2

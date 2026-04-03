@@ -1,3 +1,10 @@
+---
+description: "Runtime model switching based on task complexity"
+tags:
+  - runtime
+  - models
+---
+
 # Model Switching Per Iteration
 
 **Added in:** v0.17.4

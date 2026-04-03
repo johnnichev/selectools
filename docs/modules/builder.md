@@ -1,3 +1,10 @@
+---
+description: "Visual drag-drop agent builder: design workflows, test, export Python/YAML"
+tags:
+  - deployment
+  - builder
+---
+
 # Visual Agent Builder
 
 The selectools builder is a drag-and-drop graph editor that runs entirely from `pip install selectools` — no separate server, no CDN, no build step.

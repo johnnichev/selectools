@@ -1,3 +1,10 @@
+---
+description: "RAG pipeline: document loading, chunking, embedding, hybrid search, and reranking"
+tags:
+  - rag
+  - search
+---
+
 # RAG System
 
 **Import:** `from selectools.rag import RAGAgent, DocumentLoader, VectorStore, TextSplitter`

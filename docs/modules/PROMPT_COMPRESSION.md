@@ -1,3 +1,10 @@
+---
+description: "Automatic prompt compression to fit within context windows"
+tags:
+  - runtime
+  - compression
+---
+
 # Prompt Compression
 
 **Added in:** v0.17.7

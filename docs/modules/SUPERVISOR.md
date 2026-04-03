@@ -1,3 +1,10 @@
+---
+description: "SupervisorAgent with 4 strategies: plan-and-execute, round-robin, dynamic, magentic"
+tags:
+  - multi-agent
+  - supervisor
+---
+
 # SupervisorAgent Module
 
 **Added in:** v0.18.0

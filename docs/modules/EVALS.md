@@ -1,3 +1,10 @@
+---
+description: "50 evaluators: deterministic + LLM-as-judge, A/B testing, regression, HTML reports"
+tags:
+  - evals
+  - testing
+---
+
 # Eval Framework
 
 **Import:** `from selectools.evals import EvalSuite, TestCase, EvalReport`

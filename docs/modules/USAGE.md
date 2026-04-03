@@ -1,3 +1,10 @@
+---
+description: "Automatic token counting and cost tracking per call and per session"
+tags:
+  - providers
+  - cost-tracking
+---
+
 # Usage Tracking Module
 
 **Files:** `src/selectools/usage.py`, `src/selectools/analytics.py`, `src/selectools/pricing.py`

@@ -1,3 +1,10 @@
+---
+description: "PromptBuilder: system prompt generation with tool schemas"
+tags:
+  - core
+  - prompts
+---
+
 # Prompt Module
 
 **File:** `src/selectools/prompt.py`

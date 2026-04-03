@@ -1,3 +1,11 @@
+---
+description: "BM25 + vector hybrid search with reciprocal rank fusion"
+tags:
+  - rag
+  - search
+  - hybrid
+---
+
 # Hybrid Search Module
 
 **Directory:** `src/selectools/rag/`

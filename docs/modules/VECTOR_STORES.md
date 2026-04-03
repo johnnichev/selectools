@@ -1,3 +1,10 @@
+---
+description: "Vector store backends: InMemory, SQLite, Chroma, and Pinecone"
+tags:
+  - rag
+  - vector-stores
+---
+
 # Vector Stores Module
 
 **Directory:** `src/selectools/rag/stores/`

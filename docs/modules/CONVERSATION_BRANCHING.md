@@ -1,3 +1,10 @@
+---
+description: "Fork conversation history for A/B exploration and checkpointing"
+tags:
+  - memory
+  - branching
+---
+
 # Conversation Branching
 
 **Added in:** v0.17.7

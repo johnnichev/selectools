@@ -1,3 +1,10 @@
+---
+description: "AgentTrace persistence and trace_to_html() waterfall viewer"
+tags:
+  - observability
+  - traces
+---
+
 # Trace Store Module
 
 **Added in:** v0.19.0

@@ -1,3 +1,10 @@
+---
+description: "Input/output validation: PII redaction, toxicity, topic blocking, format checks"
+tags:
+  - security
+  - guardrails
+---
+
 # Guardrails Engine
 
 **Added in:** v0.15.0

@@ -1,3 +1,10 @@
+---
+description: "Token and cost budgets with automatic agent stopping"
+tags:
+  - runtime
+  - budget
+---
+
 # Token Budget & Cost Limits
 
 **Added in:** v0.17.3
