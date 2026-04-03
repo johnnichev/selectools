@@ -63,6 +63,10 @@ v0.20.0 ✅ Visual Agent Builder
 Zero-install web UI → Drag-drop graph builder → YAML/Python export
 → Self-contained HTML (no React, no CDN) → One command: selectools serve --builder
 
+v0.20.1 ✅ Builder Polish + Starlette + GitHub Pages
+UI polish (20 features) → _static/ architecture split → Starlette ASGI app
+→ Serverless mode (client-side AI/runs) → GitHub Pages deployment → Design system
+
 v0.21.0 🟡 Connector Expansion
 AWS Bedrock → Azure OpenAI → FAISS → Qdrant
 → CSV/JSON/HTML/URL loaders → GitHub/DB toolbox
@@ -214,7 +218,7 @@ print(PlanAndExecuteAgent.__stability__)  # "beta"
 
 ---
 
-## v0.20.0: Visual Agent Builder 🟡
+## v0.20.0: Visual Agent Builder ✅
 
 The headline feature: a zero-install web UI for designing, testing, and exporting agent configurations. Served by `selectools serve --builder` — no separate app, no subscription, no desktop install required.
 

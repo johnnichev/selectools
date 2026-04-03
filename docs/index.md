@@ -143,11 +143,12 @@ print(result.reasoning)       # Why the agent chose get_weather
 | **Semantic Cache** | `SemanticCache` — embedding-based cache hits for paraphrased queries via cosine similarity |
 | **Prompt Compression** | Proactive context-window management — summarises old messages when fill-rate exceeds threshold |
 | **Conversation Branching** | `memory.branch()` and `store.branch()` — fork history for A/B exploration and checkpointing |
+| **Visual Agent Builder** | Drag-and-drop graph editor — runs from `pip install`, no CDN, exports runnable Python. [Try it online →](https://johnnichev.github.io/selectools/builder/) or [run locally](modules/builder.md) |
 | **Multi-Agent Orchestration** | `AgentGraph` for directed graphs, `SupervisorAgent` with 4 strategies, HITL via generator nodes, parallel execution, 3 checkpoint backends |
 | **Advanced Agent Patterns** | `PlanAndExecuteAgent`, `ReflectiveAgent`, `DebateAgent`, `TeamLeadAgent` — high-level coordination patterns built on AgentGraph |
 | **Composable Pipelines** | `Pipeline` + `@step` + `|` operator + `parallel()` + `branch()` — chain agents, tools, and transforms with plain Python |
 | **Eval Framework** | 50 built-in evaluators, A/B testing, regression detection, HTML reports, JUnit XML |
-| **3135 Tests** | Unit, integration, regression, and E2E |
+| **3344 Tests** | Unit, integration, regression, and E2E |
 
 ---
 
@@ -234,7 +235,7 @@ Multi-Agent layer (optional):
 [:fontawesome-brands-python: PyPI Package](https://pypi.org/project/selectools/){ .md-button }
 [:fontawesome-brands-github: GitHub Repository](https://github.com/johnnichev/selectools){ .md-button }
 [:material-notebook: Getting Started Notebook](https://github.com/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb){ .md-button }
-[:material-code-tags: 75 Example Scripts](https://github.com/johnnichev/selectools/tree/main/examples){ .md-button }
+[:material-code-tags: 76 Example Scripts](https://github.com/johnnichev/selectools/tree/main/examples){ .md-button }
 
 ---
 

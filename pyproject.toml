@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "selectools"
-version = "0.20.0"
+version = "0.20.1"
 description = "Production-ready AI agents with tool calling, structured output, execution traces, and RAG. Provider-agnostic (OpenAI, Anthropic, Gemini, Ollama) with fallback chains, batch processing, tool policies, streaming, caching, and cost tracking."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -72,6 +72,8 @@ postgres = [
 ]
 serve = [
     "pyyaml>=6.0.0",
+    "starlette>=0.27.0",
+    "uvicorn[standard]>=0.24.0",
 ]
 
 [project.scripts]
@@ -82,6 +84,9 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"selectools.serve" = ["_static/*.html", "_static/*.css", "_static/*.js"]
 
 [tool.black]
 line-length = 100
