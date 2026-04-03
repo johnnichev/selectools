@@ -33,6 +33,11 @@ def main() -> None:
     )
     serve_parser.add_argument("--port", type=int, default=8000, help="Port (default: 8000)")
     serve_parser.add_argument("--host", default="0.0.0.0", help="Host (default: 0.0.0.0)")
+    serve_parser.add_argument(
+        "--reload",
+        action="store_true",
+        help="Auto-restart on source file changes (development). Requires: pip install watchfiles",
+    )
     serve_parser.add_argument("--no-playground", action="store_true", help="Disable playground UI")
     serve_parser.add_argument(
         "--builder", action="store_true", help="Enable visual agent builder UI at /builder"
@@ -62,6 +67,10 @@ def main() -> None:
 
 def _cmd_serve(args: argparse.Namespace) -> None:
     """Start the agent server."""
+    if getattr(args, "reload", False):
+        _serve_with_reload()
+        return
+
     from ..templates import from_yaml, list_templates, load_template
     from .app import _resolve_auth_token, create_app
 
@@ -76,10 +85,7 @@ def _cmd_serve(args: argparse.Namespace) -> None:
             print("  selectools serve agent.yaml")
             print("  selectools serve --builder")
             sys.exit(1)
-        from .app import BuilderServer
-
-        srv = BuilderServer(host=args.host, port=args.port, auth_token=auth_token)
-        srv.serve()
+        _serve_builder(args.host, args.port, auth_token)
         return
     elif config_path in list_templates():
         provider = _auto_provider()
@@ -107,6 +113,58 @@ def _cmd_serve(args: argparse.Namespace) -> None:
         auth_token=auth_token,
     )
     app.serve()
+
+
+def _serve_builder(host: str, port: int, auth_token: Any) -> None:
+    """Start the builder server, preferring Starlette+uvicorn when available."""
+    try:
+        import uvicorn
+
+        from ._starlette_app import create_builder_app
+
+        print(f"Visual agent builder at http://{host}:{port}/builder  (Starlette/uvicorn)")
+        print("Press Ctrl+C to stop.")
+        uvicorn.run(create_builder_app(auth_token=auth_token), host=host, port=port)
+    except ImportError:
+        # Fall back to stdlib HTTP server when starlette/uvicorn not installed
+        from .app import BuilderServer
+
+        srv = BuilderServer(host=host, port=port, auth_token=auth_token)
+        srv.serve()
+
+
+def _serve_with_reload() -> None:
+    """Restart the server whenever a .py file in selectools/serve/ changes."""
+    try:
+        from watchfiles import watch
+    except ImportError:
+        print("Hot reload requires watchfiles:  pip install watchfiles")
+        sys.exit(1)
+
+    import subprocess  # nosec B404 — used only for self-restarting the selectools CLI
+    from pathlib import Path
+
+    watch_dir = Path(__file__).parent  # selectools/serve/
+    cmd = [c for c in sys.argv if c != "--reload"]
+
+    print(f"[reload] watching {watch_dir}")
+    print(f"[reload] {' '.join(cmd)}\n")
+
+    proc = subprocess.Popen(cmd)  # nosec B603 — cmd is reconstructed from sys.argv
+    try:
+        for _ in watch(
+            str(watch_dir),
+            watch_filter=lambda _c, p: p.endswith((".py", ".html", ".css", ".js")),
+        ):
+            print("\n[reload] change detected — restarting…")
+            proc.terminate()
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+            proc = subprocess.Popen(cmd)  # nosec B603
+    except KeyboardInterrupt:
+        proc.terminate()
 
 
 def _cmd_doctor() -> None:

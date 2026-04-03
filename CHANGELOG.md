@@ -5,6 +5,60 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.1] - 2026-04-03
+
+### Added
+
+#### Builder UI Polish & UX
+- **Decluttered header**: Consolidated 13 buttons into File/Export dropdown menus
+- **Node elevation**: Per-type colored glows via CSS `--glow` custom properties (8 node types)
+- **Zoom controls**: `+`, `−`, reset, zoom label; mouse wheel zoom toward cursor; `Space`+drag pan
+- **Help modal**: 7-section reference (quick start, node types, connections, header, testing, shortcuts, auth)
+- **Custom confirm dialogs**: Replaced `window.confirm()` with styled async modal
+- **Right-side test drawer**: Converted 240px bottom strip to full-height resizable right-side drawer
+- **Generate button UX**: Hides when genBar opens; input height normalized to match buttons
+
+#### Architecture Refactor
+- **Split builder.py into `_static/` source files**: `builder.css` (23K), `builder.js` (137K), `builder.html` template — real files with IDE syntax highlighting, linting, and formatting support
+- **Starlette ASGI app** (`_starlette_app.py`): All 19 builder routes ported as proper async handlers with `CORSMiddleware`, `StreamingResponse` for SSE, `backdrop-filter` blur modals
+- **CLI prefers Starlette+uvicorn** when available, falls back to stdlib `BaseHTTPRequestHandler`
+- **Hot reload**: `--reload` flag now watches `.py`, `.html`, `.css`, `.js` files via `watchfiles`
+- **Package data**: `_static/*.{html,css,js}` included in wheels via `pyproject.toml`
+
+#### Serverless Mode (GitHub Pages)
+- **Zero-server builder**: Detects missing backend via `/health` check; enables client-side mode
+- **Client-side AI generation**: `_clientAiBuildFallback()` keyword matching + `_clientAiBuildLive()` direct OpenAI API calls from browser
+- **Client-side live runs**: `_clientRunLive()` streams OpenAI completions directly, with eval checks and token/cost tracking
+- **GitHub Pages deployment**: `docs.yml` workflow builds builder HTML to `site/builder/index.html`
+- **Hosted badge**: Shows "builder · hosted" when running without a server
+- **Server-only features disabled gracefully**: File watch, AI copilot, eval routing show messages instead of failing
+
+#### Frontend Design System
+- **Dual font system**: Plus Jakarta Sans for UI chrome, monospace for code/trace output
+- **CSS design tokens**: `--font-ui`, `--font-mono`, `--text-xs`–`--text-xl` type scale, `--sp-1`–`--sp-6` spacing scale
+- **Surface texture**: SVG `feTurbulence` noise grain at 2% opacity on header, palette, properties, test drawer, modals
+- **Canvas atmosphere**: Subtle cyan radial gradient wash at top of canvas
+- **Modal animations**: `@keyframes modalFadeIn` + `modalSlideUp` with `backdrop-filter: blur(8px)`
+- **Drawer animation**: `@keyframes drawerSlideIn` for test panel entrance
+- **Focus-visible**: 2px cyan outline on all interactive elements for keyboard navigation
+- **ARIA roles**: `role="dialog"` + `aria-modal` on all 6 modals; `role="tablist"` + `role="tab"` on code and test tabs
+
+### Changed
+- `starlette>=0.27.0` and `uvicorn[standard]>=0.24.0` added to `[serve]` optional dependencies
+- `builder.py` reduced from 4,281 lines to 17 lines (thin loader from `_static/` files)
+- `docs.yml` workflow installs selectools and builds builder HTML alongside MkDocs docs
+- Properties sidebar widened from 216px to 260px
+- GenBar input font-size reduced from 13px to 12px to match button height
+
+### Fixed
+- **Code panel toggle after resize**: `toggleCodePanel()` now uses `offsetHeight` detection instead of CSS class, fixing the inline-style-overrides-class conflict
+- **Generate button stays visible**: Header Generate button now hides when genBar input is open
+
+### Stats
+- **3,344 tests** (394 builder tests, 2,950 core tests)
+- **76 examples**
+- **152 models**
+
 ## [0.20.0] - 2026-03-31
 
 ### Added

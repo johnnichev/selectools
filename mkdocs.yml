@@ -132,6 +132,7 @@ nav:
   - Composition:
     - Pipelines: modules/PIPELINE.md
   - Deployment:
+    - Visual Builder: modules/builder.md
     - Serve & Deploy: modules/SERVE.md
     - Agent Templates: modules/TEMPLATES.md
   - Observability:

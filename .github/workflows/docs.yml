@@ -39,6 +39,19 @@ jobs:
       - name: Replace root with landing page
         run: cp landing/index.html site/index.html
 
+      - name: Install selectools (for builder assembly)
+        run: pip install -e .
+
+      - name: Build static builder HTML
+        run: |
+          mkdir -p site/builder
+          python3 -c "
+          from selectools.serve.builder import BUILDER_HTML
+          with open('site/builder/index.html', 'w', encoding='utf-8') as f:
+              f.write(BUILDER_HTML)
+          print('Builder HTML:', len(BUILDER_HTML), 'chars → site/builder/index.html')
+          "
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4
         with:

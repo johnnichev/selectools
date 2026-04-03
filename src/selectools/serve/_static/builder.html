@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>selectools — Agent Builder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>{{CSS}}</style>
+</head>
+<body>
+
+<datalist id="condition-presets">
+  <option value="approved">
+  <option value="rejected">
+  <option value="needs_revision">
+  <option value="continue">
+  <option value="done">
+  <option value="error">
+  <option value="retry">
+  <option value="human_review">
+  <option value="revise">
+  <option value="body">
+  <option value="exit">
+</datalist>
+
+<header>
+  <span class="logo">selectools</span>
+  <span class="badge">builder</span>
+  <span class="version">v0.20.1</span>
+  <span id="costBadge" class="cost-badge" title="Estimated cost per workflow run based on 500 in / 200 out tokens per agent node"></span>
+  <div class="header-sep"></div>
+  <div class="header-actions">
+    <div class="tmpl-wrap">
+      <button class="btn" onclick="toggleFileMenu(event)" title="New workflow · Load examples · Templates · Import · Watch file">File &#9660;</button>
+      <div class="tmpl-menu" id="fileMenu">
+        <div class="tmpl-item" onclick="onClear();closeMenus()">New (Clear)</div>
+        <div class="tmpl-item" onclick="loadExample();closeMenus()">Load Example</div>
+        <div class="tmpl-divider"></div>
+        <div class="tmpl-section">Templates</div>
+        <div class="tmpl-item tmpl-indent" onclick="loadTemplate('simple_chatbot')">Simple Chatbot</div>
+        <div class="tmpl-item tmpl-indent" onclick="loadTemplate('researcher_writer')">Researcher + Writer</div>
+        <div class="tmpl-item tmpl-indent" onclick="loadTemplate('rag_pipeline')">RAG Pipeline</div>
+        <div class="tmpl-item tmpl-indent" onclick="loadTemplate('reviewer_loop')">Reviewer Loop</div>
+        <div class="tmpl-item tmpl-indent" onclick="loadTemplate('hitl_approval')">HITL Approval</div>
+        <div class="tmpl-item tmpl-indent" onclick="loadTemplate('multi_model_panel')">Multi-Model Panel</div>
+        <div class="tmpl-item tmpl-indent" onclick="loadTemplate('chain_of_thought')">Chain of Thought</div>
+        <div class="tmpl-divider"></div>
+        <div class="tmpl-item" onclick="openImport();closeMenus()">Import YAML / Python&#8230;</div>
+        <div class="tmpl-item" onclick="openWatchFile();closeMenus()">&#x1F4C2; Watch File&#8230;</div>
+      </div>
+    </div>
+    <button id="headerGenBtn" class="btn" onclick="openGenBar()" title="Generate a workflow from a plain-English description" style="color:#a855f7;border-color:rgba(168,85,247,0.4)">&#10024; Generate</button>
+    <div class="tmpl-wrap">
+      <button class="btn" onclick="toggleExportMenu(event)" title="Export as Python or YAML · Get embed code · Load production trace">Export &#9660;</button>
+      <div class="tmpl-menu" id="exportMenu">
+        <div class="tmpl-item" onclick="doExport('python');closeMenus()">Python</div>
+        <div class="tmpl-item" onclick="doExport('yaml');closeMenus()">YAML</div>
+        <div class="tmpl-divider"></div>
+        <div class="tmpl-item" onclick="openEmbed();closeMenus()">&#128279; Embed Widget</div>
+        <div class="tmpl-item" onclick="openLoadTrace();closeMenus()">&#x1F4E5; Load Trace</div>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="openTestPanel()" title="Open test panel to run your workflow">&#9654; Run</button>
+    <button class="btn" onclick="openHelp()" title="Help &amp; keyboard shortcuts (?)">?</button>
+  </div>
+</header>
+
+<div id="genBar" class="gen-bar" style="display:none"
+  <input id="genInput" type="text" autocomplete="off" placeholder="Describe your agent workflow&#8230;" style="flex:1; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:inherit; font-size:12px; padding:5px 10px" />
+  <button id="genBtn" class="btn btn-primary" onclick="doGenerate()">Generate</button>
+  <button class="btn" onclick="closeGenBar()">&#10005;</button>
+</div>
+
+<div class="main">
+  <!-- Palette -->
+  <div class="palette">
+    <div class="section-title">Add Nodes</div>
+
+    <div class="palette-item" draggable="true" data-type="agent"
+         ondragstart="palDragStart(event,'agent')">
+      <div class="dot" style="background:#22d3ee"></div> Agent
+    </div>
+    <div class="palette-item" draggable="true" data-type="start"
+         ondragstart="palDragStart(event,'start')">
+      <div class="dot" style="background:#22c55e"></div> START
+    </div>
+    <div class="palette-item" draggable="true" data-type="end"
+         ondragstart="palDragStart(event,'end')">
+      <div class="dot" style="background:#ef4444"></div> END
+    </div>
+    <div class="palette-item" draggable="true" data-type="loop"
+         ondragstart="palDragStart(event,'loop')">
+      <div class="dot" style="background:#f97316"></div> Loop
+    </div>
+    <div class="palette-item" draggable="true" data-type="subgraph"
+         ondragstart="palDragStart(event,'subgraph')">
+      <div class="dot" style="background:#a855f7"></div> Subgraph
+    </div>
+    <div class="palette-item" draggable="true" data-type="note"
+         ondragstart="palDragStart(event,'note')">
+      <div class="dot" style="background:#f59e0b"></div> Note
+    </div>
+    <div class="palette-item" draggable="true" data-type="hitl"
+         ondragstart="palDragStart(event,'hitl')">
+      <div class="dot" style="background:#f59e0b"></div> Human Input
+    </div>
+    <div class="palette-item" draggable="true" data-type="agent_tool"
+         ondragstart="palDragStart(event,'agent_tool')">
+      <div class="dot" style="background:#a78bfa"></div> Agent Tool
+    </div>
+
+    <div class="section-title" style="margin-top:10px">Tips</div>
+    <div class="tip-box">
+      Drag nodes onto canvas.<br>
+      Click <span style="color:var(--cyan)">&#9675;</span> output port<br>
+      then click input port<br>
+      to connect.<br><br>
+      Click node to edit.<br>
+      Click edge to label.<br>
+      Right-click node for more.<br><br>
+      <kbd>Del</kbd> delete selected<br>
+      <kbd>Esc</kbd> cancel / deselect<br>
+      <kbd>Ctrl+Z</kbd> undo<br>
+      <kbd>Ctrl+Y</kbd> redo<br>
+      <kbd>Ctrl+C</kbd> copy node<br>
+      <kbd>Ctrl+V</kbd> paste node<br>
+      <kbd>Cmd+K</kbd> search nodes<br>
+      <kbd>+</kbd> / <kbd>-</kbd> zoom<br>
+      <kbd>Ctrl+0</kbd> reset zoom<br>
+      <kbd>Space</kbd>+drag pan<br>
+      <kbd>?</kbd> help
+    </div>
+  </div>
+
+  <!-- Canvas -->
+  <div class="canvas-wrap" id="canvasWrap"
+       ondragover="event.preventDefault()"
+       ondrop="canvasDrop(event)">
+    <svg id="canvas"
+         onmousemove="svgMouseMove(event)"
+         onmouseup="svgMouseUp(event)"
+         onclick="svgClick(event)">
+      <defs>
+        <marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="3"
+                orient="auto" markerUnits="userSpaceOnUse">
+          <path d="M0,0 L0,6 L9,3 z" fill="#475569"/>
+        </marker>
+        <marker id="arr-sel" markerWidth="9" markerHeight="9" refX="7" refY="3"
+                orient="auto" markerUnits="userSpaceOnUse">
+          <path d="M0,0 L0,6 L9,3 z" fill="#22d3ee"/>
+        </marker>
+      </defs>
+      <g id="viewport">
+        <g id="layer-edges"></g>
+        <g id="layer-nodes"></g>
+        <path id="preview" class="preview" d="" style="display:none"/>
+      </g>
+    </svg>
+    <div class="canvas-hint" id="canvasHint">&#x2190; Drag a node to start<br><span style="font-size:11px;color:rgba(148,163,184,0.2)">or <span onclick="openGenBar()" style="color:rgba(168,85,247,0.55);cursor:pointer;text-decoration:underline;text-decoration-color:rgba(168,85,247,0.3);pointer-events:all">&#10024; generate with AI</span></span></div>
+    <div class="zoom-controls">
+      <button class="zoom-btn" onclick="adjustZoom(0.2)" title="Zoom in (+)">+</button>
+      <span id="zoomLabel" class="zoom-label">100%</span>
+      <button class="zoom-btn" onclick="adjustZoom(-0.2)" title="Zoom out (-)">&#8722;</button>
+      <button class="zoom-btn" onclick="resetZoom()" title="Reset zoom (Ctrl+0)" style="font-size:10px">&#8634;</button>
+    </div>
+    <svg class="minimap" id="minimap" viewBox="0 0 160 96" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+
+  <!-- Properties -->
+  <div class="props">
+    <div class="panel-header">Properties</div>
+    <div class="props-scroll">
+      <div id="propsEmpty" class="props-empty">Select a node or edge<br>to edit its properties.</div>
+      <div id="propsBody" class="props-body" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Code panel -->
+<div class="code-panel">
+  <div class="code-resize-handle" id="resizeHandle"></div>
+  <div class="code-tabs" role="tablist" aria-label="Code output format">
+    <span class="code-tab active" id="tab-python" onclick="switchTab('python')" role="tab" aria-selected="true">Python</span>
+    <span class="code-tab" id="tab-yaml" onclick="switchTab('yaml')" role="tab" aria-selected="false">YAML</span>
+    <div class="code-actions">
+      <button class="btn" id="copyBtn" onclick="copyCode()" title="Copy code to clipboard">Copy</button>
+      <button class="btn" onclick="downloadCode()" title="Download as .py or .yaml file">Download</button>
+      <button class="btn" id="codeToggleBtn" onclick="toggleCodePanel()" title="Expand / collapse code panel" style="padding:3px 8px;font-size:11px">&#9650; Code</button>
+    </div>
+  </div>
+  <div class="code-output" id="codeOut"></div>
+</div>
+
+<!-- Test panel — right-side drawer -->
+<div id="testPanel" class="test-panel" style="display:none">
+  <div class="test-resize-handle" id="testResizeHandle"></div>
+  <div class="test-header">
+    <span style="color:var(--cyan);font-weight:600;font-size:13px">&#9654; Test Run</span>
+    <span id="testStatus" style="margin-left:8px;font-size:11px;color:var(--muted)"></span>
+    <button class="btn" onclick="document.getElementById('testPanel').style.width='420px'" title="Reset panel width" style="margin-left:auto;font-size:10px;padding:2px 6px">&#x229E;</button>
+    <button class="btn" onclick="closeTestPanel()" title="Close test panel">&#10005;</button>
+  </div>
+  <div class="test-input-area">
+    <textarea id="testInput" placeholder="Enter test message&#8230; (e.g. &#8216;Summarize the latest AI news&#8217;)"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:8px 10px;font-family:inherit;font-size:12px;resize:none;height:64px;outline:none;box-sizing:border-box"></textarea>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input id="apiKeyInput" type="password" placeholder="API key (optional — leave blank for mock)"
+             style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:11px;outline:none" />
+      <button class="btn btn-primary" id="runBtn" onclick="runTest()" title="Run the workflow with this message">&#9654; Run</button>
+    </div>
+  </div>
+  <div class="test-tabs-bar" role="tablist" aria-label="Test panel tabs">
+    <span class="test-tab active" id="ttab-output" onclick="switchTestTab('output')" role="tab" aria-selected="true">Output</span>
+    <span class="test-tab" id="ttab-history" onclick="switchTestTab('history')" role="tab" aria-selected="false">History (0)</span>
+    <span class="test-tab" id="ttab-ai" onclick="switchTestTab('ai')" role="tab" aria-selected="false">&#x1F4AC; AI</span>
+  </div>
+  <div id="testOutput" class="test-output"></div>
+  <!-- Feature 14: AI Copilot Tab -->
+  <div id="aiCopilotTab" style="display:none;flex-direction:column;height:100%">
+    <div id="aiCopilotHistory" style="flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px"></div>
+    <div id="aiSuggestedFollowUp" style="padding:3px 8px;font-size:10px;color:var(--muted);cursor:pointer" onclick="useFollowUp()"></div>
+    <div style="display:flex;gap:6px;padding:7px 8px;border-top:1px solid var(--border)">
+      <input id="aiCopilotInput" type="text" placeholder="Describe what to change..." style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 8px;font:11px ui-monospace,monospace;outline:none" onkeydown="if(event.key==='Enter')sendAiCopilot()">
+      <button class="btn btn-primary" style="font-size:11px;padding:3px 10px" onclick="sendAiCopilot()" title="Ask AI to modify your workflow">Send</button>
+    </div>
+  </div>
+  <div id="scrubberHeader" class="scrub-header" style="display:none">
+    <span style="font-size:10px;color:var(--muted)">Execution steps</span>
+    <button id="ganttToggleBtn" class="btn" style="font-size:10px;padding:2px 6px" onclick="toggleGantt()" title="Toggle Gantt chart showing per-node execution timing">&#x1F4CA; Timeline</button>
+  </div>
+  <div id="scrubber" class="scrubber" style="display:none"></div>
+  <div id="ganttWrap" class="gantt-wrap" style="display:none">
+    <svg id="ganttSvg" style="width:100%;display:block;"></svg>
+  </div>
+  <div id="historyControls" style="display:none;padding:6px 8px;border-bottom:1px solid var(--border);gap:6px;align-items:center;flex-shrink:0">
+    <input id="historySearch" type="text" placeholder="Search runs..." oninput="filterHistory()"
+           style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:3px 7px;font-size:11px;outline:none">
+    <button class="btn" style="font-size:11px;padding:2px 8px" onclick="exportHistory()">&#x2B07; Export</button>
+  </div>
+  <div id="historySessionCost" style="display:none;padding:4px 10px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)"></div>
+  <div id="testHistory" class="test-history" style="display:none"></div>
+</div>
+
+<!-- Search overlay (Cmd+K) -->
+<div id="searchOverlay" class="search-overlay" style="display:none">
+  <input id="searchInput" type="text" placeholder="Search nodes…" oninput="searchNodes(this.value)" />
+  <div id="searchResults" style="max-height:220px;overflow-y:auto"></div>
+</div>
+
+<script>{{JS}}</script>
+
+<!-- Confirm modal -->
+<div id="confirmModal" class="modal-overlay" role="dialog" aria-modal="true" style="display:none; z-index:400">
+  <div class="modal-card" style="width:340px; padding:24px; display:flex; flex-direction:column; gap:20px">
+    <div id="confirmMsg" style="font-size:var(--text-lg); color:var(--text); line-height:1.6"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="_confirmCancel()">Cancel</button>
+      <button class="btn btn-primary" id="confirmOkBtn" onclick="_confirmOk()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Help modal -->
+<div id="helpModal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Help and keyboard shortcuts" style="display:none">
+  <div class="modal-card" style="width:580px; max-width:94vw; max-height:88vh; display:flex; flex-direction:column">
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--border); flex-shrink:0">
+      <span class="modal-title">selectools builder</span>
+      <button class="btn" onclick="closeHelp()" title="Close (Esc)" style="padding:3px 9px">&#10005;</button>
+    </div>
+    <div class="help-modal-body">
+
+      <div class="help-section">
+        <h3>Quick start</h3>
+        <div class="help-row"><span>1. Drag a node from the left panel onto the canvas</span></div>
+        <div class="help-row"><span>2. Click an output port <span style="color:var(--cyan)">&#9675;</span> then click an input port to connect</span></div>
+        <div class="help-row"><span>3. Click a node to edit its name, model, and system prompt</span></div>
+        <div class="help-row"><span>4. Press <span class="help-kbd">&#9654; Run</span> to test with a message</span></div>
+      </div>
+
+      <div class="help-section">
+        <h3>Node types</h3>
+        <div class="help-node-row"><div class="help-dot" style="background:#22c55e"></div><div><strong>START</strong> &mdash; Entry point. Every graph needs exactly one.<div class="help-node-desc">Receives the initial user message.</div></div></div>
+        <div class="help-node-row"><div class="help-dot" style="background:#22d3ee"></div><div><strong>Agent</strong> &mdash; An LLM-powered node.<div class="help-node-desc">Configure provider, model, system prompt, and tools. Supports OpenAI, Anthropic, Gemini, Ollama.</div></div></div>
+        <div class="help-node-row"><div class="help-dot" style="background:#f97316"></div><div><strong>Loop</strong> &mdash; Repeats until an exit condition is met.<div class="help-node-desc">Set max iterations as a safety limit. Has two output ports: body (loop continues) and done (exit).</div></div></div>
+        <div class="help-node-row"><div class="help-dot" style="background:#a855f7"></div><div><strong>Subgraph</strong> &mdash; Runs another workflow as a nested step.<div class="help-node-desc">Reference any other AgentGraph by name.</div></div></div>
+        <div class="help-node-row"><div class="help-dot" style="background:#f59e0b"></div><div><strong>Human Input (HITL)</strong> &mdash; Pauses and waits for approval.<div class="help-node-desc">Shows a form with configurable options. Timeout auto-resumes. Each option becomes an output port.</div></div></div>
+        <div class="help-node-row"><div class="help-dot" style="background:#a78bfa"></div><div><strong>Agent Tool</strong> &mdash; Wraps another agent as a callable tool.<div class="help-node-desc">Use an entire workflow as a tool inside another agent node.</div></div></div>
+        <div class="help-node-row"><div class="help-dot" style="background:#f59e0b"></div><div><strong>Note</strong> &mdash; Canvas annotation. Does not execute.<div class="help-node-desc">Document your design. Supports Markdown, resizable, collapsible.</div></div></div>
+        <div class="help-node-row"><div class="help-dot" style="background:#ef4444"></div><div><strong>END</strong> &mdash; Exit point. Graph stops here.<div class="help-node-desc">Connect any agent to END to terminate the flow.</div></div></div>
+      </div>
+
+      <div class="help-section">
+        <h3>Connecting nodes</h3>
+        <div class="help-row"><span>Click an output port (right side), then an input port (left side)</span></div>
+        <div class="help-row"><span>Click an edge to add a condition label (e.g. <em>approved</em>, <em>retry</em>)</span></div>
+        <div class="help-row"><span>Port colors indicate type — cyan = text, purple = variable/subgraph, amber = HITL option</span></div>
+        <div class="help-row"><span>Incompatible port types are blocked and greyed out</span></div>
+        <div class="help-row"><span>Hover over an edge to preview the last output from that connection</span></div>
+      </div>
+
+      <div class="help-section">
+        <h3>Header buttons</h3>
+        <div class="help-row"><span><strong>File &#9660;</strong></span><span>New, Load Example, Templates, Import YAML/Python, Watch File</span></div>
+        <div class="help-row"><span><strong>&#10024; AI</strong></span><span>Describe a workflow in plain English &mdash; AI generates it</span></div>
+        <div class="help-row"><span><strong>Export &#9660;</strong></span><span>Python / YAML download, Embed Widget &lt;iframe&gt;, Load Trace</span></div>
+        <div class="help-row"><span><strong>&#9654; Run</strong></span><span>Open test panel and send a message to your workflow</span></div>
+        <div class="help-row"><span><strong>&#9650; Code</strong></span><span>Expand the code panel &mdash; live Python/YAML updates as you build</span></div>
+      </div>
+
+      <div class="help-section">
+        <h3>Testing &amp; debugging</h3>
+        <div class="help-row"><span><strong>Output tab</strong></span><span>Streaming response from the workflow, with tool call trace</span></div>
+        <div class="help-row"><span><strong>History tab</strong></span><span>All previous runs &mdash; search, replay, export as JSONL</span></div>
+        <div class="help-row"><span><strong>AI tab</strong></span><span>Chat with AI copilot to modify the workflow on the canvas</span></div>
+        <div class="help-row"><span><strong>&#x1F4CA; Timeline</strong></span><span>Gantt chart with per-node timing, token count, cost on hover</span></div>
+        <div class="help-row"><span><strong>Scrubber</strong></span><span>Click any step to highlight the node &mdash; &#9654; to re-run from that point</span></div>
+        <div class="help-row"><span><strong>Right-click a node</strong></span><span>Re-run in isolation, pin last output, freeze/unfreeze</span></div>
+        <div class="help-row"><span><strong>Freeze node</strong></span><span>Skips re-execution and reuses cached output &mdash; great for debugging</span></div>
+        <div class="help-row"><span><strong>Export &rarr; Load Trace</strong></span><span>Paste <code>trace_to_json(result.trace)</code> to replay a production run</span></div>
+      </div>
+
+      <div class="help-section">
+        <h3>Keyboard shortcuts</h3>
+        <div class="help-row"><span>Undo / Redo</span><span><span class="help-kbd">Ctrl+Z</span> / <span class="help-kbd">Ctrl+Y</span></span></div>
+        <div class="help-row"><span>Copy / Paste node</span><span><span class="help-kbd">Ctrl+C</span> / <span class="help-kbd">Ctrl+V</span></span></div>
+        <div class="help-row"><span>Delete selected</span><span><span class="help-kbd">Del</span> or <span class="help-kbd">Backspace</span></span></div>
+        <div class="help-row"><span>Cancel / deselect</span><span><span class="help-kbd">Esc</span></span></div>
+        <div class="help-row"><span>Search nodes</span><span><span class="help-kbd">Cmd+K</span></span></div>
+        <div class="help-row"><span>Zoom in / out</span><span><span class="help-kbd">+</span> / <span class="help-kbd">-</span></span></div>
+        <div class="help-row"><span>Reset zoom</span><span><span class="help-kbd">Ctrl+0</span></span></div>
+        <div class="help-row"><span>Pan canvas</span><span><span class="help-kbd">Space</span> + drag &nbsp;or&nbsp; middle mouse</span></div>
+        <div class="help-row"><span>Mouse wheel</span><span>Zoom toward cursor</span></div>
+        <div class="help-row"><span>Open this help</span><span><span class="help-kbd">?</span></span></div>
+      </div>
+
+      <div class="help-section">
+        <h3>Auth &amp; deployment</h3>
+        <div class="help-row"><span>Start with token auth</span><span><code style="font-size:10px">selectools serve --builder --auth-token TOKEN</code></span></div>
+        <div class="help-row"><span>Or set environment variable</span><span><code style="font-size:10px">BUILDER_AUTH_TOKEN=TOKEN</code></span></div>
+        <div class="help-row"><span>Or save to dotfile</span><span><code style="font-size:10px">~/.selectools/auth_token</code></span></div>
+        <div class="help-row"><span>Docker Compose</span><span><code style="font-size:10px">docker-compose up</code> &mdash; see docker-compose.yml</span></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div id="importModal" class="modal-overlay" role="dialog" aria-modal="true" style="display:none">
+  <div class="modal-card" style="padding:24px; width:560px; max-height:80vh; display:flex; flex-direction:column; gap:12px">
+    <div class="modal-title" style="font-size:14px">Import Graph</div>
+    <div class="modal-subtitle">Paste selectools Python (AgentGraph) or YAML (type: graph)</div>
+    <textarea id="importInput" style="flex:1; min-height:260px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:inherit; font-size:12px; padding:10px; resize:vertical" placeholder="from selectools.orchestration import AgentGraph&#10;...&#10;&#10;or&#10;&#10;name: my-graph&#10;type: graph&#10;nodes:&#10;  ..."></textarea>
+    <div id="importError" style="color:var(--red); font-size:12px; display:none"></div>
+    <div style="display:flex; gap:8px; justify-content:flex-end">
+      <button class="btn" onclick="closeImport()">Cancel</button>
+      <button class="btn btn-primary" onclick="doImport()">Import to Canvas</button>
+    </div>
+  </div>
+</div>
+
+<!-- Wire-Hover Tooltip -->
+<div id="wireTooltip" class="wire-tooltip" style="display:none"></div>
+
+<!-- Wire Inspector Panel -->
+<div id="wireInspector" class="wire-inspector" style="display:none">
+  <div style="display:flex;align-items:center;color:var(--cyan);font-size:10px;font-weight:700">
+    <span id="wireInspectorLabel">► Wire Output</span>
+    <button class="wire-copy-btn" onclick="copyWireInspector()">Copy</button>
+  </div>
+  <pre id="wireInspectorBody"></pre>
+</div>
+
+<!-- Right-Click Context Menu -->
+<div id="ctxMenu" style="display:none;position:fixed;z-index:600;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px 0;min-width:170px;box-shadow:0 4px 20px rgba(0,0,0,0.5)">
+  <div id="ctxRerun" class="ctx-item" onclick="rerunNodeAlone(ctxNodeId)">&#8635; Re-run in isolation</div>
+  <div class="ctx-item" onclick="ctxPinOutput()">&#x1F4CC; Pin last output</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" onclick="hideCtxMenu()">&#10005; Close</div>
+</div>
+
+<!-- Embed Modal -->
+<div id="embedModal" class="modal-overlay" role="dialog" aria-modal="true" style="display:none;z-index:300">
+  <div class="modal-card" style="padding:24px;width:580px;max-height:80vh;display:flex;flex-direction:column;gap:12px">
+    <div class="modal-title" style="font-size:14px">&#128279; Embed This Workflow</div>
+    <div style="color:var(--muted);font-size:12px">Embeds the workflow as a live interactive chat widget. The iframe loads <code style="color:var(--cyan)">?embed=1</code> mode — full chat panel, no editor chrome. Visitors can run the agent directly.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center">
+      <label style="font-size:11px;color:var(--muted)">Accent color
+        <input type="color" id="embedAccent" value="#22d3ee" oninput="updateEmbedCode();updateEmbedPreview()"
+               style="margin-left:6px;border:none;background:none;cursor:pointer;width:36px;height:22px;vertical-align:middle">
+      </label>
+      <label style="font-size:11px;color:var(--muted)">Position
+        <select id="embedPosition" oninput="updateEmbedCode()"
+                style="margin-left:6px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:11px">
+          <option value="bottom-right">Bottom-right</option>
+          <option value="bottom-left">Bottom-left</option>
+          <option value="inline">Inline</option>
+        </select>
+      </label>
+      <label style="font-size:11px;color:var(--muted);grid-column:1/-1">Welcome message
+        <input id="embedWelcome" type="text" placeholder="Hi! How can I help?" oninput="updateEmbedCode()"
+               style="margin-left:6px;flex:1;width:calc(100% - 130px);background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:3px 7px;font-size:11px;outline:none">
+      </label>
+    </div>
+    <div id="embedPreviewWidget" title="Live accent preview" style="width:40px;height:40px;border-radius:50%;background:#22d3ee;align-self:flex-start;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.4)"></div>
+    <pre id="embedCode" style="flex:1;min-height:140px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:ui-monospace,monospace;font-size:11px;padding:12px;overflow-x:auto;white-space:pre-wrap;margin:0"></pre>
+    <div style="color:var(--muted);font-size:11px">&#9432; Self-host: <code>selectools serve --builder --port 8000</code> — then paste this code in any web page.</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn" onclick="closeEmbed()">Cancel</button>
+      <button class="btn btn-primary" id="embedCopyBtn" onclick="copyEmbedCode()">Copy Code</button>
+    </div>
+  </div>
+</div>
+
+<div id="loadTraceModal" class="modal-overlay" role="dialog" aria-modal="true" style="display:none;z-index:300">
+  <div class="modal-card" style="padding:20px;width:540px;max-height:80vh;display:flex;flex-direction:column;gap:10px">
+    <div class="modal-title" style="font-size:14px">&#x1F4E5; Load Production Trace</div>
+    <div style="color:var(--muted);font-size:11px">Paste the JSON output of <code style="color:var(--cyan)">trace_to_json(result.trace)</code> to replay a real run in the scrubber and timeline.</div>
+    <textarea id="loadTraceInput" style="flex:1;min-height:200px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:10px;font:11px ui-monospace,monospace;resize:vertical" placeholder='{"steps": [...], "total_tokens": 142, "total_cost": 0.0021, ...}'></textarea>
+    <div id="loadTraceError" style="display:none;color:#f87171;font-size:11px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn" onclick="closeLoadTrace()">Cancel</button>
+      <button class="btn btn-primary" onclick="doLoadTrace()">Load into Scrubber</button>
+    </div>
+  </div>
+</div>
+
+<!-- Feature 11: Replay Diff Panel -->
+<div id="replayDiffPanel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:300;align-items:center;justify-content:center">
+  <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px;max-width:720px;width:95%;max-height:80vh;display:flex;flex-direction:column">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span id="replayDiffTitle" style="font-size:13px;font-weight:600;color:var(--cyan)">Diff</span>
+      <button class="btn" onclick="closeReplayDiff()">&#10005; Close</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;overflow:auto;flex:1">
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Before</div>
+        <pre id="replayDiffBefore" style="margin:0;font-size:11px;white-space:pre-wrap;line-height:1.5"></pre>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">After</div>
+        <pre id="replayDiffAfter" style="margin:0;font-size:11px;white-space:pre-wrap;line-height:1.5"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Feature 16: Watch File Modal -->
+<div id="watchFileModal" class="modal-overlay" role="dialog" aria-modal="true" style="display:none;z-index:300">
+  <div class="modal-card" style="padding:20px;max-width:480px;width:90%">
+    <h3 class="modal-title" style="margin:0 0 12px;font-size:14px">&#x1F4C2; Watch Python File</h3>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Paste an absolute path to a selectools agent .py file. Canvas updates on every save.</div>
+    <input id="watchFilePath" type="text" placeholder="/home/user/myagent.py" style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:6px 10px;font:11px ui-monospace,monospace;outline:none">
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button class="btn btn-primary" onclick="startWatchFile()">Start Watching</button>
+      <button class="btn" onclick="stopWatchFile()">Stop</button>
+      <button class="btn" onclick="closeWatchFileModal()">Cancel</button>
+    </div>
+    <div id="watchFileStatus" style="font-size:10px;color:var(--muted);margin-top:6px"></div>
+  </div>
+</div>
+</body>
+</html>

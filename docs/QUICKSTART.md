@@ -54,6 +54,32 @@ python my_agent.py
 > learning the API and running tests, but it does not actually call an LLM.
 > Step 3 shows you how to connect to a real model.
 
+## Step 2b: Try the Visual Builder (optional)
+
+Prefer clicking over coding? Try it instantly in the browser — no install needed:
+
+**[Open the builder on GitHub Pages →](https://johnnichev.github.io/selectools/builder/)**
+
+Or run it locally for full features (live API runs, file sync):
+
+```bash
+selectools serve --builder
+# → http://localhost:8000/builder
+```
+
+- Drag node types from the left panel onto the canvas
+- Click the **○ output port** of a node, then click an **input port** to connect
+- Click a node to set its model, system prompt, and tools
+- Press **`?`** inside the builder for the full help panel
+- Click **▶ Run** to test with a real message
+- Click **Export → Python** to get runnable code
+
+The builder exports standard `AgentGraph` Python — the code runs without the builder, without selectools lock-in, with any provider.
+
+→ Full builder documentation: [Visual Agent Builder](modules/builder.md)
+
+---
+
 ## Step 3: Connect to a Real LLM
 
 Add your provider's API key to a `.env` file in your project root and swap the provider:
