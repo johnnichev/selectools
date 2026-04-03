@@ -80,16 +80,10 @@
   background: var(--md-primary-fg-color);
 }
 
-/* Copy Markdown button */
-.copy-md-btn {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  z-index: 50;
-  background: var(--md-accent-fg-color);
-  color: #0f172a;
-  border: none;
-  border-radius: 8px;
+/* Copy Markdown button (now inline in h1, styles in JS) */
+/* .copy-md-btn removed — button is now styled inline via JS */
+.copy-md-btn-legacy {
+  display: none; /* legacy, remove in next release */
   padding: 10px 16px;
   font-family: inherit;
   font-size: 13px;
