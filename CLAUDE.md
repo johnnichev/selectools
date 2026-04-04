@@ -103,7 +103,7 @@ src/selectools/
 │   └── supervisor.py        # SupervisorAgent with 4 strategies
 ├── pipeline.py              # Pipeline, Step, StepResult, @step, parallel(), branch() — composable pipelines (v0.18.0)
 
-tests/                       # 3344 tests (unit, integration, regression, E2E)
+tests/                       # 4612 tests (unit, integration, regression, E2E)
 ├── agent/                   # Agent core tests
 ├── providers/               # Provider-specific tests
 ├── rag/                     # RAG pipeline tests
@@ -420,6 +420,6 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 - **v0.19.1** ✅ Advanced Agent Patterns — PlanAndExecuteAgent, ReflectiveAgent, DebateAgent, TeamLeadAgent, 11 new evaluators (39 → 50 total), ralph loop (~90 bugs fixed, 2918 tests)
 - **v0.19.2** ✅ Enterprise Hardening — stability markers, trace_to_html(), deprecation policy, security audit, property-based tests, concurrency smoke suite, 5 new production simulations (3135 tests)
 - **v0.20.0** ✅ Visual Agent Builder — `selectools serve --builder`, drag-drop AgentGraph UI, YAML/Python export, live test, self-contained HTML
-- **v0.20.1** ✅ Builder Polish + Starlette + GitHub Pages — UI polish (20 features), `_static/` architecture split, Starlette ASGI app, serverless mode, GitHub Pages deployment, design system (3344 tests)
+- **v0.20.1** ✅ Builder Polish + Starlette + GitHub Pages — UI polish (20 features), `_static/` architecture split, Starlette ASGI app, serverless mode, GitHub Pages deployment, design system (4612 tests)
 - **v0.21.0** 🟡 Connector Expansion — Bedrock, Azure, FAISS, Qdrant, pgvector, CSV/JSON/HTML/URL loaders, code/search/GitHub/DB toolbox
 - **v1.0.0** 🟡 Stable Release — API freeze, stability markers, security audit, deprecation policy, Production/Stable classifier

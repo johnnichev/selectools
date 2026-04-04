@@ -89,7 +89,7 @@ Path("trace.html").write_text(trace_to_html(result.trace))
 - **Trace HTML viewer** — `trace_to_html(trace)` renders a standalone waterfall timeline
 - **Deprecation policy** — 2-minor-version window, programmatic introspection via `.__stability__`
 - **Security audit** — all 41 `# nosec` annotations reviewed and published in `docs/SECURITY.md`
-- **Quality infrastructure** — property-based tests (Hypothesis), thread-safety smoke suite, 5 new production simulations (3344 tests total)
+- **Quality infrastructure** — property-based tests (Hypothesis), thread-safety smoke suite, 5 new production simulations (4612 tests total)
 
 ### v0.19.1 — Advanced Agent Patterns
 
@@ -1059,7 +1059,7 @@ pytest tests/ -x -q          # All tests
 pytest tests/ -k "not e2e"   # Skip E2E (no API keys needed)
 ```
 
-3344 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, orchestration, pipelines, agent patterns, stability markers, trace viewer, and E2E integration with real API calls.
+4612 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, orchestration, pipelines, agent patterns, stability markers, trace viewer, and E2E integration with real API calls.
 
 ## License
 
