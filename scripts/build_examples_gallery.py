@@ -17,6 +17,7 @@ import re
 import sys
 
 EXAMPLES_DIR = os.path.join(os.path.dirname(__file__), "..", "examples")
+SIMULATIONS_DIR = os.path.join(os.path.dirname(__file__), "..", "tests", "simulations")
 REPO_URL = "https://github.com/johnnichev/selectools"
 BUILDER_URL = "builder/"
 
@@ -39,6 +40,7 @@ CAT_DOCS = {
     "streaming": "modules/STREAMING/",
     "structured": "modules/AGENT/",
     "tools": "modules/TOOLS/",
+    "simulation": "ARCHITECTURE/",
 }
 
 CAT_ICONS = {
@@ -59,6 +61,7 @@ CAT_ICONS = {
     "streaming": "&#9889;",
     "structured": "&#128196;",
     "tools": "&#128295;",
+    "simulation": "&#127919;",
 }
 
 
@@ -94,7 +97,8 @@ def extract_metadata(path: str) -> dict:
     if len(desc) > 220:
         desc = desc[:217] + "..."
 
-    num = int(re.match(r"(\d+)", fname).group(1))
+    num_match = re.match(r"(\d+)", fname)
+    num = int(num_match.group(1)) if num_match else 0
 
     cats: set[str] = set()
     if "AgentGraph" in source or "agent_graph" in fname:
@@ -317,6 +321,19 @@ def main() -> None:
             continue
         path = os.path.join(EXAMPLES_DIR, fname)
         examples.append(extract_metadata(path))
+
+    # Also include simulations as a "simulation" category
+    if os.path.isdir(SIMULATIONS_DIR):
+        for fname in sorted(os.listdir(SIMULATIONS_DIR)):
+            if not fname.endswith(".py") or fname.startswith("__"):
+                continue
+            path = os.path.join(SIMULATIONS_DIR, fname)
+            meta = extract_metadata(path)
+            meta["categories"] = ["simulation"]
+            meta["needs_key"] = False
+            meta["num"] = 900 + len([e for e in examples if e.get("num", 0) >= 900])
+            examples.append(meta)
+
     sys.stdout.write(build_gallery(examples))
 
 
