@@ -545,6 +545,15 @@ print(f"Steps taken: {result.steps}")
 
 ---
 
+## What's New in v0.21.0
+
+- **3 new vector stores**: FAISS, Qdrant, pgvector -- see [RAG Pipeline](modules/RAG.md#faiss-v0210)
+- **4 new document loaders**: `from_csv`, `from_json`, `from_html`, `from_url` -- see [RAG Pipeline](modules/RAG.md#loading-from-csv-v0210)
+- **9 new toolbox tools**: code execution, web search, GitHub, database queries -- see [Toolbox](modules/TOOLBOX.md#code-tools-2--v0210)
+- **Azure OpenAI provider**: use Azure-hosted OpenAI models -- see [Providers](modules/PROVIDERS.md#azure-openai-provider-v0210)
+- **OTel + Langfuse observers**: ship traces to OpenTelemetry or Langfuse -- see [Providers](modules/PROVIDERS.md#observability-integrations-v0210)
+- **Multimodal messages**: `ContentPart`, `image_message()`, `text_content()` -- see [Streaming](modules/STREAMING.md#multimodal-messages-v0210)
+
 ## What's Next?
 
 You now know the core API. Here is where to go from here:
@@ -571,7 +580,12 @@ You now know the core API. Here is where to go from here:
 | Add audit logging | [Audit Guide](modules/AUDIT.md) |
 | Screen tool outputs for injection | [Security Guide](modules/SECURITY.md) |
 | Enable coherence checking | [Security Guide — Coherence](modules/SECURITY.md#coherence-checking) |
-| Use 24 pre-built tools | [Toolbox Guide](modules/TOOLBOX.md) |
+| Use 33 pre-built tools | [Toolbox Guide](modules/TOOLBOX.md) |
+| Use Azure OpenAI | [Providers Guide -- Azure](modules/PROVIDERS.md#azure-openai-provider-v0210) |
+| Send traces to OTel / Langfuse | [Providers Guide -- Observability](modules/PROVIDERS.md#observability-integrations-v0210) |
+| Load CSV, JSON, HTML, or URLs | [RAG Guide -- Loaders](modules/RAG.md#loading-from-csv-v0210) |
+| Use FAISS, Qdrant, or pgvector | [RAG Guide -- Vector Stores](modules/RAG.md#faiss-v0210) |
+| Send images to vision models | [Streaming Guide -- Multimodal](modules/STREAMING.md#multimodal-messages-v0210) |
 | Handle errors gracefully | [Exceptions Guide](modules/EXCEPTIONS.md) |
 | Look up model pricing at runtime | [Models Guide — Pricing API](modules/MODELS.md#programmatic-pricing-api) |
 | Use structured output helpers | [Agent Guide — Structured Helpers](modules/AGENT.md#standalone-helpers) |

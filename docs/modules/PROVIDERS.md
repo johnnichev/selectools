@@ -43,7 +43,7 @@ print(result.content)
 ---
 
 **Directory:** `src/selectools/providers/`
-**Files:** `base.py`, `openai_provider.py`, `anthropic_provider.py`, `gemini_provider.py`, `ollama_provider.py`, `fallback.py`
+**Files:** `base.py`, `openai_provider.py`, `azure_openai_provider.py`, `anthropic_provider.py`, `gemini_provider.py`, `ollama_provider.py`, `fallback.py`
 
 ## Table of Contents
 
@@ -164,7 +164,9 @@ class Provider(Protocol):
 All providers support namespace imports from the `selectools.providers` package:
 
 ```python
-from selectools.providers import OpenAIProvider, AnthropicProvider, GeminiProvider, OllamaProvider
+from selectools.providers import (
+    OpenAIProvider, AzureOpenAIProvider, AnthropicProvider, GeminiProvider, OllamaProvider
+)
 ```
 
 ### OpenAI Provider
@@ -257,6 +259,51 @@ provider = OllamaProvider(
 > `_OpenAICompatibleBase` (Template Method pattern), sharing message formatting,
 > response parsing, and streaming logic. Only pricing, error messages, and token
 > parameter naming differ between them.
+
+### Azure OpenAI Provider (v0.21.0)
+
+**Stability:** <span class="badge-beta">beta</span>
+
+```python
+from selectools.providers import AzureOpenAIProvider
+
+provider = AzureOpenAIProvider(
+    azure_endpoint="https://my-resource.openai.azure.com",
+    api_key="...",                    # Or set AZURE_OPENAI_API_KEY env var
+    azure_deployment="gpt-4o",        # Or set AZURE_OPENAI_DEPLOYMENT env var
+    api_version="2024-10-21",         # Azure API version (default)
+)
+
+# Features:
+# - Inherits all OpenAI capabilities (streaming, async, vision, tool calling)
+# - Azure Active Directory (AAD) token authentication
+# - Uses the openai SDK's built-in Azure support (no extra deps)
+```
+
+**API:** Azure OpenAI Service
+
+**Environment Variables:**
+
+| Variable | Description |
+|---|---|
+| `AZURE_OPENAI_ENDPOINT` | Azure resource endpoint URL |
+| `AZURE_OPENAI_API_KEY` | Azure API key (can omit if using AAD token) |
+| `AZURE_OPENAI_DEPLOYMENT` | Default deployment name |
+
+**AAD Token Authentication:**
+
+```python
+# Use Azure Active Directory instead of an API key
+provider = AzureOpenAIProvider(
+    azure_endpoint="https://my-resource.openai.azure.com",
+    azure_ad_token="eyJ...",          # AAD token
+    azure_deployment="gpt-4o",
+)
+```
+
+> **Implementation note**: `AzureOpenAIProvider` extends `OpenAIProvider`, overriding
+> only the client initialization to use `AzureOpenAI` / `AsyncAzureOpenAI` from the
+> OpenAI SDK. All complete/stream/acomplete/astream behaviour is inherited.
 
 ### Local Provider (Testing)
 
@@ -830,6 +877,65 @@ The provider falls through to the next on:
 - `provider.supports_streaming` — `True` if any child provider supports streaming
 - `provider.supports_async` — `True` if any child provider supports async
 - `provider.name` — `"fallback"`
+
+---
+
+## Observability Integrations (v0.21.0)
+
+Two new observer implementations let you ship agent traces to external observability platforms.
+
+### OTelObserver
+
+**Stability:** <span class="badge-beta">beta</span>
+
+Sends agent traces to OpenTelemetry following the GenAI semantic conventions.
+
+```bash
+pip install opentelemetry-api
+```
+
+```python
+from selectools.observe.otel import OTelObserver
+
+agent = Agent(
+    tools=[...],
+    provider=provider,
+    config=AgentConfig(observers=[OTelObserver(tracer_name="my-app")]),
+)
+```
+
+Creates spans for `agent.run`, `gen_ai.chat` (LLM calls), and `tool.execute` (tool executions) with standard GenAI attributes like `gen_ai.usage.input_tokens` and `gen_ai.request.model`.
+
+### LangfuseObserver
+
+**Stability:** <span class="badge-beta">beta</span>
+
+Sends agent traces to Langfuse for observability, cost tracking, and debugging.
+
+```bash
+pip install langfuse
+```
+
+```python
+from selectools.observe.langfuse import LangfuseObserver
+
+observer = LangfuseObserver(
+    public_key="pk-...",     # Or set LANGFUSE_PUBLIC_KEY env var
+    secret_key="sk-...",     # Or set LANGFUSE_SECRET_KEY env var
+    host="https://...",      # Or set LANGFUSE_HOST env var (for self-hosted)
+)
+
+agent = Agent(
+    tools=[...],
+    provider=provider,
+    config=AgentConfig(observers=[observer]),
+)
+
+# On application shutdown
+observer.shutdown()
+```
+
+Both observers implement the standard `AgentObserver` protocol and can be composed with other observers (e.g. `LoggingObserver`, `AuditLogger`).
 
 ---
 

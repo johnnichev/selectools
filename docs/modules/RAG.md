@@ -45,7 +45,7 @@ graph LR
 
 !!! tip "See Also"
     - [Embeddings](EMBEDDINGS.md) -- OpenAI, Anthropic, Gemini, Cohere embedding providers
-    - [Vector Stores](VECTOR_STORES.md) -- Memory, SQLite, Chroma, Pinecone backends
+    - [Vector Stores](VECTOR_STORES.md) -- 7 backends: Memory, SQLite, Chroma, Pinecone, FAISS, Qdrant, pgvector
     - [Advanced Chunking](ADVANCED_CHUNKING.md) -- semantic and contextual chunking
     - [Hybrid Search](HYBRID_SEARCH.md) -- BM25 + vector fusion with reranking
 
@@ -124,6 +124,53 @@ docs = DocumentLoader.from_directory(
 
 # From PDF
 docs = DocumentLoader.from_pdf("manual.pdf")
+```
+
+### Loading from CSV (v0.21.0)
+
+```python
+from selectools.rag import DocumentLoader
+
+# One document per row; text_column selects the content field
+docs = DocumentLoader.from_csv(
+    "data.csv",
+    text_column="content",
+    metadata_columns=["author", "category"],
+    delimiter=",",
+)
+# When text_column is None, all columns are concatenated as "key: value" pairs
+```
+
+### Loading from JSON (v0.21.0)
+
+```python
+# Handles JSON arrays (one Document per item) or a single object
+docs = DocumentLoader.from_json(
+    "articles.json",
+    text_field="body",                       # Key whose value becomes the text
+    metadata_fields=["title", "author"],     # Keys for metadata (None = all)
+)
+```
+
+### Loading from HTML (v0.21.0)
+
+```python
+# Full page
+docs = DocumentLoader.from_html("page.html")
+
+# With CSS selector (requires beautifulsoup4)
+docs = DocumentLoader.from_html("page.html", selector="article")
+```
+
+### Loading from URL (v0.21.0)
+
+```python
+# Fetch a web page and extract text content
+docs = DocumentLoader.from_url(
+    "https://example.com/article",
+    selector="main",           # Optional CSS selector (requires beautifulsoup4)
+    timeout=30.0,
+)
 ```
 
 ### Document Structure
@@ -232,6 +279,113 @@ store = VectorStore.create("chroma", embedder=embedder, persist_directory="./chr
 # Pinecone (cloud-hosted, scalable)
 store = VectorStore.create("pinecone", embedder=embedder, index_name="my-index")
 ```
+
+### FAISS (v0.21.0)
+
+**Stability:** <span class="badge-beta">beta</span>
+
+Fast local similarity search using Facebook AI Similarity Search. Uses `IndexFlatIP` with L2-normalized vectors for exact cosine similarity. Thread-safe with persistence support.
+
+```bash
+pip install faiss-cpu numpy
+```
+
+```python
+from selectools.embeddings import OpenAIEmbeddingProvider
+from selectools.rag.stores import FAISSVectorStore
+
+embedder = OpenAIEmbeddingProvider()
+store = FAISSVectorStore(embedder, dimension=1536)
+
+# Add documents
+docs = [Document(text="Hello world", metadata={"source": "test"})]
+ids = store.add_documents(docs)
+
+# Search
+query_emb = embedder.embed_query("hi")
+results = store.search(query_emb, top_k=3)
+
+# Persist to disk and reload
+store.save("/tmp/my_index")
+loaded = FAISSVectorStore.load("/tmp/my_index", embedder)
+```
+
+### Qdrant (v0.21.0)
+
+**Stability:** <span class="badge-beta">beta</span>
+
+Production vector search with gRPC transport, automatic collection management, and advanced metadata filtering. Supports both self-hosted and Qdrant Cloud.
+
+```bash
+pip install qdrant-client
+```
+
+```python
+from selectools.embeddings import OpenAIEmbeddingProvider
+from selectools.rag.stores import QdrantVectorStore
+
+embedder = OpenAIEmbeddingProvider()
+store = QdrantVectorStore(
+    embedder,
+    collection_name="my_docs",
+    url="http://localhost:6333",        # Qdrant server URL
+    api_key="...",                       # Optional: for Qdrant Cloud
+    prefer_grpc=True,                    # Default: use gRPC transport
+)
+
+# Collection is auto-created on first add_documents() call
+docs = [Document(text="Hello world", metadata={"source": "test"})]
+ids = store.add_documents(docs)
+
+# Search with metadata filtering
+query_emb = embedder.embed_query("hi")
+results = store.search(query_emb, top_k=3, filter={"source": "test"})
+```
+
+### pgvector (v0.21.0)
+
+**Stability:** <span class="badge-beta">beta</span>
+
+PostgreSQL-native vector search using the `pgvector` extension with HNSW indexing for fast approximate nearest-neighbour queries. Automatic table and index creation, JSONB metadata, and parameterized queries throughout.
+
+```bash
+pip install 'selectools[postgres]'
+# or: pip install psycopg2-binary
+```
+
+Requires a PostgreSQL server with the `vector` extension installed.
+
+```python
+from selectools.embeddings import OpenAIEmbeddingProvider
+from selectools.rag.stores.pgvector import PgVectorStore
+
+embedder = OpenAIEmbeddingProvider()
+store = PgVectorStore(
+    embedder=embedder,
+    connection_string="postgresql://user:pass@localhost:5432/mydb",
+    table_name="selectools_documents",   # Optional custom table name
+)
+
+# Table and HNSW index are created automatically on first use
+docs = [Document(text="Hello world", metadata={"source": "test"})]
+ids = store.add_documents(docs)
+
+# Search with JSONB metadata filtering
+query_emb = embedder.embed_query("hi")
+results = store.search(query_emb, top_k=3, filter={"source": "test"})
+```
+
+### Vector Store Comparison
+
+| Backend | Install | Persistent | Scalable | Metadata Filter | Best For |
+|---------|---------|------------|----------|-----------------|----------|
+| Memory | built-in | No | No | Yes | Prototyping, tests |
+| SQLite | built-in | Yes | No | Yes | Local apps |
+| Chroma | `chromadb` | Yes | No | Yes | Local + advanced |
+| Pinecone | `pinecone-client` | Yes | Yes | Yes | Cloud scale |
+| **FAISS** | `faiss-cpu` | Yes (save/load) | No | Yes | Fast local search |
+| **Qdrant** | `qdrant-client` | Yes | Yes | Yes (advanced) | Production self-hosted/cloud |
+| **pgvector** | `psycopg2-binary` | Yes | Yes | Yes (JSONB) | PostgreSQL-native apps |
 
 ### Interface
 
@@ -501,10 +655,17 @@ rag_tool = RAGTool(
 # Prototyping
 store = VectorStore.create("memory", embedder)
 
-# Production (local)
+# Production (local, fast)
+store = FAISSVectorStore(embedder, dimension=1536)
+
+# Production (local, SQL)
 store = VectorStore.create("sqlite", embedder, db_path="prod.db")
 
-# Production (scale)
+# Production (PostgreSQL-native)
+store = PgVectorStore(embedder, connection_string="postgresql://...")
+
+# Production (managed, scalable)
+store = QdrantVectorStore(embedder, url="http://qdrant:6333")
 store = VectorStore.create("pinecone", embedder, index_name="prod")
 ```
 
