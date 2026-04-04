@@ -734,12 +734,6 @@ class TestDateTimeToolsExtended:
         # Should contain an error indicator regardless of pytz availability
         assert "❌" in result or "Error" in result or "error" in result or "Unknown" in result
 
-        import importlib
-
-        import selectools.toolbox.datetime_tools as dt_mod2
-
-        importlib.reload(dt_mod2)
-
     def test_get_current_time_unknown_timezone(self) -> None:
         """get_current_time returns error for unknown timezone."""
         try:

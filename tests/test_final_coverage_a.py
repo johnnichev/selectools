@@ -817,16 +817,21 @@ class TestToolBaseEdgeCases:
 
     def test_validate_uninspectable_function(self):
         """Lines 249-251: validate() skips signature check for uninspectable functions."""
+        import unittest.mock as mock
+
         from selectools.tools.base import Tool, ToolParameter
 
-        # Create a tool with a built-in function that can't be inspected
+        # Create a function that raises ValueError on inspect.signature
+        fn = mock.MagicMock(return_value="ok")
+        fn.__signature__ = property(lambda self: (_ for _ in ()).throw(ValueError))
+
         t = Tool(
             name="test",
             description="test",
             parameters=[ToolParameter(name="x", param_type=str, description="input")],
-            function=print,  # built-in, may fail signature inspection
+            function=fn,
         )
-        # validate() should not raise
+        # validate() should not raise even though signature inspection fails
         t.validate({"x": "hello"})
 
     def test_validate_single_bool_for_int(self):
