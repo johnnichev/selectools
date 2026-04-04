@@ -129,7 +129,7 @@
         "name": "Is Selectools production-ready?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Yes. 4,612 tests, published security audit, SBOM (CycloneDX), formal deprecation policy, @stable/@beta markers on every public API, compatibility matrix for Python 3.9-3.13. Apache-2.0 licensed."
+          "text": "Yes. 4,612 tests at 95% coverage, published security audit, SBOM (CycloneDX), formal deprecation policy, @stable/@beta markers on every public API, compatibility matrix for Python 3.9-3.13. Migration guides for 4 frameworks. Apache-2.0 licensed."
         }
       }
     ]
@@ -709,6 +709,7 @@
   <div class="status-items">
     <div class="status-item"><span class="status-val">152</span> models</div>
     <div class="status-item"><span class="status-val">4612</span> tests</div>
+    <div class="status-item"><span class="status-val">95%</span> coverage</div>
     <div class="status-item"><span class="status-val">76</span> examples</div>
     <div class="status-item"><span class="status-val">50</span> evaluators</div>
     <div class="status-item"><span class="status-val">4</span> providers</div>
@@ -1167,7 +1168,9 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
             <tr><td class="cap">Composable pipelines</td><td class="yes">@step + | + parallel</td><td class="mid">LCEL (complex)</td><td class="no">Not built-in</td></tr>
             <tr><td class="cap">Setup</td><td class="yes">1 package</td><td class="no">5+ packages</td><td class="yes">1 package</td></tr>
             <tr><td class="cap">Deploy CLI</td><td class="yes"><code style="font-size:11px">selectools serve</code></td><td class="no">LangServe (separate)</td><td class="no">Enterprise only</td></tr>
-            <tr><td class="cap">Enterprise signals</td><td class="yes">SBOM + audit + markers</td><td class="no">Not built-in</td><td class="no">Not built-in</td></tr>
+            <tr><td class="cap">Enterprise signals</td><td class="yes">SBOM + audit + 95% coverage</td><td class="no">Not built-in</td><td class="no">Not built-in</td></tr>
+            <tr><td class="cap">Migration guides</td><td class="yes">4 frameworks</td><td class="no">Not available</td><td class="no">Not available</td></tr>
+            <tr><td class="cap">AI-agent docs (llms.txt)</td><td class="yes">Full index + content</td><td class="no">Not available</td><td class="no">Not available</td></tr>
             <tr><td class="cap">Community</td><td class="mid">Growing</td><td class="yes">Massive</td><td class="yes">Large</td></tr>
           </tbody>
         </table>
@@ -1354,7 +1357,7 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
           <span style="color:var(--text-faint);font-size:12px;flex-shrink:0;margin-left:16px">&#9660;</span>
         </summary>
         <div style="padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7">
-          Yes. 4,612 tests (including 40 real API evaluations), published security audit, SBOM (CycloneDX 1.6), formal deprecation policy, <code style="color:var(--cyan)">@stable</code>/<code style="color:var(--cyan)">@beta</code> markers on every public API, and a compatibility matrix covering Python 3.9 to 3.13. Apache-2.0 licensed.
+          Yes. 4,612 tests at 95% coverage (including 40 real API evaluations), published security audit, SBOM (CycloneDX 1.6), formal deprecation policy, <code style="color:var(--cyan)">@stable</code>/<code style="color:var(--cyan)">@beta</code> markers on every public API, and a compatibility matrix covering Python 3.9 to 3.13. Migration guides for LangChain, CrewAI, AutoGen, and LlamaIndex. Apache-2.0 licensed.
         </div>
       </details>
     </div>
