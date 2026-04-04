@@ -67,9 +67,12 @@ v0.20.1 ✅ Builder Polish + Starlette + GitHub Pages
 UI polish (20 features) → _static/ architecture split → Starlette ASGI app
 → Serverless mode (client-side AI/runs) → GitHub Pages deployment → Design system
 
-v0.21.0 🟡 Connector Expansion
-AWS Bedrock → Azure OpenAI → FAISS → Qdrant
-→ CSV/JSON/HTML/URL loaders → GitHub/DB toolbox
+v0.21.0 🟡 Connector Expansion + Multimodal + Observability
+FAISS → Qdrant → pgvector vector stores
+→ Azure OpenAI provider → Multimodal messages (images, audio)
+→ CSV/JSON/HTML/URL document loaders
+→ OTel observer → Langfuse observer
+→ Code execution, web search, GitHub, DB toolbox tools
 
 v1.0.0 🟡 Stable Release
 API freeze → Stability markers on all modules → Deprecation policy
@@ -296,7 +299,7 @@ UI polish (20 features), `_static/` architecture split, Starlette ASGI app, serv
 
 - Visual builder live at: https://johnnichev.github.io/selectools/builder/
 - Examples gallery: https://johnnichev.github.io/selectools/examples/
-- 3,344 tests, 76 examples, 50 evaluators, 152 models
+- 4,612 tests (95% coverage), 76 examples, 50 evaluators, 152 models
 
 | Feature                                      | Status | Impact | Effort |
 | -------------------------------------------- | ------ | ------ | ------ |
@@ -311,18 +314,18 @@ UI polish (20 features), `_static/` architecture split, Starlette ASGI app, serv
 
 ---
 
-## v0.21.0: Connector Expansion 🟡
+## v0.21.0: Connector Expansion + Multimodal + Observability 🟡
 
-Close the integration gap with LangChain by adding high-demand providers, vector stores, document loaders, and toolbox modules.
+Close integration gaps, add multimodal support (images/audio), and ship enterprise-grade observability (OTel + Langfuse). Full spec: `.private/plans/07-v0.21.0-connector-expansion.md`
 
 ### Current Inventory
-
 
 | Category            | Count    | Items                                    |
 | ------------------- | -------- | ---------------------------------------- |
 | Document Loaders    | 4        | text, file, directory, PDF               |
 | Vector Stores       | 4        | Memory, SQLite, Chroma, Pinecone         |
 | Embedding Providers | 4        | OpenAI, Anthropic/Voyage, Gemini, Cohere |
+| LLM Providers       | 5        | OpenAI, Anthropic, Gemini, Ollama, Fallback |
 | Toolbox             | 24 tools | file, web, data, datetime, text          |
 | Rerankers           | 2        | Cohere, Jina                             |
 
@@ -391,29 +394,36 @@ rag = [
 Individual stores/loaders remain installable a la carte: `pip install selectools faiss-cpu` works without the full `[rag]` group.
 
 
-| Feature                    | Status    | Impact | Effort |
-| -------------------------- | --------- | ------ | ------ |
-| **CSV/JSON/JSONL Loaders** | 🟡 High   | High   | Small  |
-| **HTML/URL Loaders**       | 🟡 High   | High   | Small  |
-| **FAISS Vector Store**     | 🟡 High   | High   | Medium |
-| **Qdrant Vector Store**    | 🟡 Medium | Medium | Medium |
-| **pgvector Store**         | 🟡 Medium | High   | Medium |
-| **Code Execution Tools**   | 🟡 High   | High   | Medium |
-| **Search Tools**           | 🟡 High   | High   | Small  |
-| **SaaS Loaders**           | 🟡 Medium | Medium | Medium |
-| **GitHub/DB Toolbox**      | 🟡 Medium | Medium | Medium |
+| Feature                         | Status | Impact | Effort |
+| ------------------------------- | ------ | ------ | ------ |
+| **Multimodal messages**         | 🟡     | High   | Medium |
+| **OTel observer**               | 🟡     | High   | Medium |
+| **Azure OpenAI provider**       | 🟡     | High   | Small  |
+| **Langfuse observer**           | 🟡     | High   | Small  |
+| **FAISS Vector Store**          | 🟡     | High   | Small  |
+| **Qdrant Vector Store**         | 🟡     | Medium | Small  |
+| **pgvector Store**              | 🟡     | High   | Small  |
+| **CSV/JSON/HTML/URL Loaders**   | 🟡     | High   | Small  |
+| **Code Execution Tools**        | 🟡     | High   | Medium |
+| **Web Search + GitHub Tools**   | 🟡     | High   | Small  |
+| **Database Query Tools**        | 🟡     | Medium | Small  |
 
 
 ---
 
 ## Backlog (Unscheduled)
 
-
-| Feature                                                                   | Notes                               | Target |
-| ------------------------------------------------------------------------- | ----------------------------------- | ------ |
-| Universal Vision Support                                                  | Unified vision API across providers | Future |
-| Rate Limiting & Quotas                                                    | Per-tool and per-user quotas        | Future |
-| CRM & Business Tools                                                      | HubSpot, Salesforce integrations    | Future |
-| Niche Loaders (Slack, Confluence, Jira, Discord, Email, Docx, Excel, XML) | Community-driven                    | Future |
-| Niche Vector Stores (Milvus, OpenSearch, Lance)                           | As demand dictates                  | Future |
-| Niche Toolbox (Email, Calendar, Browser, Financial)                       | As demand dictates                  | Future |
+| Feature                                                                   | Notes                                           | Target  |
+| ------------------------------------------------------------------------- | ----------------------------------------------- | ------- |
+| AWS Bedrock provider                                                      | boto3 wrapper, enterprise gateway               | v0.22.0 |
+| Google A2A protocol                                                       | Cross-framework agent interop (Linux Foundation) | v0.22.0 |
+| Durable execution / webhooks                                              | Task queue, resume from checkpoint               | v0.22.0 |
+| Code execution sandbox (Docker/E2B)                                       | Sandboxed code execution for untrusted input     | v0.22.0 |
+| Prompt registry / versioning                                              | Version, A/B test, rollback prompts              | v0.22.0 |
+| Time-travel debugging / state replay                                      | Rewind, edit, replay from any checkpoint         | v1.x    |
+| Voice / real-time audio agents                                            | WebRTC, STT/TTS, sub-500ms latency              | v1.x    |
+| Rate Limiting & Quotas                                                    | Per-tool and per-user quotas                     | Future  |
+| CRM & Business Tools                                                     | HubSpot, Salesforce integrations                 | Future  |
+| Niche Loaders (Slack, Confluence, Jira, Discord, Email, Docx, Excel, XML) | Community-driven                                 | Future  |
+| Niche Vector Stores (Weaviate, Redis Vector, Milvus, OpenSearch, Lance)   | As demand dictates                               | Future  |
+| Niche Toolbox (Email, Calendar, Browser, Financial)                       | As demand dictates                               | Future  |
