@@ -46,6 +46,77 @@ def _encode_image(image_path: str) -> str:
 
 @stable
 @dataclass
+class ContentPart:
+    """A single part of a multimodal message (text, image, etc.).
+
+    Use this to build messages with multiple images or mixed content types.
+
+    Example:
+        >>> parts = [
+        ...     ContentPart(type="text", text="What's in these images?"),
+        ...     ContentPart(type="image_url", image_url="https://example.com/photo.jpg"),
+        ...     ContentPart(type="image_base64", image_base64="...", media_type="image/png"),
+        ... ]
+        >>> msg = Message(role=Role.USER, content="", content_parts=parts)
+    """
+
+    type: str  # "text", "image_url", "image_base64"
+    text: Optional[str] = None
+    image_url: Optional[str] = None
+    image_base64: Optional[str] = None
+    media_type: Optional[str] = None  # "image/png", "image/jpeg", etc.
+
+
+def image_message(image: str, prompt: str = "Describe this image.") -> "Message":
+    """Create a user message with an image.
+
+    Args:
+        image: URL (http/https) or local file path.
+        prompt: Text prompt to accompany the image.
+
+    Returns:
+        A Message with content_parts containing the text and image.
+    """
+    parts: List[ContentPart] = [ContentPart(type="text", text=prompt)]
+    if image.startswith(("http://", "https://")):
+        parts.append(ContentPart(type="image_url", image_url=image))
+    else:
+        b64 = _encode_image(image)
+        suffix = Path(image).suffix.lower()
+        media = {
+            "png": "image/png",
+            "jpg": "image/jpeg",
+            "jpeg": "image/jpeg",
+            "gif": "image/gif",
+            "webp": "image/webp",
+        }.get(suffix.lstrip("."), "image/jpeg")
+        parts.append(ContentPart(type="image_base64", image_base64=b64, media_type=media))
+    msg = object.__new__(Message)
+    msg.role = Role.USER
+    msg.content = prompt
+    msg.content_parts = parts
+    msg.image_path = None
+    msg.image_base64 = None
+    msg.tool_name = None
+    msg.tool_result = None
+    msg.tool_calls = None
+    msg.tool_call_id = None
+    return msg
+
+
+def text_content(message: "Message") -> str:
+    """Extract text content from a Message, handling both str and content_parts."""
+    if message.content_parts:
+        return (
+            " ".join(p.text for p in message.content_parts if p.type == "text" and p.text)
+            or message.content
+            or ""
+        )
+    return message.content or ""
+
+
+@stable
+@dataclass
 class Message:
     """
     Conversation message with optional inline image payload and tool metadata.
@@ -83,12 +154,13 @@ class Message:
     """
 
     role: Role
-    content: str
+    content: str = ""
     image_path: Optional[str] = None
     tool_name: Optional[str] = None
     tool_result: Optional[str] = None
     tool_calls: Optional[List["ToolCall"]] = None
     tool_call_id: Optional[str] = None
+    content_parts: Optional[List[ContentPart]] = None
     image_base64: Optional[str] = field(init=False, default=None)
 
     def __post_init__(self) -> None:
