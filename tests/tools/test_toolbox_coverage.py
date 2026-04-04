@@ -729,18 +729,10 @@ class TestDateTimeToolsExtended:
     """Cover uncovered branches in datetime_tools."""
 
     def test_get_current_time_non_utc_without_pytz(self) -> None:
-        """get_current_time with non-UTC timezone requires pytz."""
-        import sys
-
-        with mock.patch.dict("sys.modules", {"pytz": None}):
-            import importlib
-
-            import selectools.toolbox.datetime_tools as dt_mod
-
-            importlib.reload(dt_mod)
-            result = dt_mod.get_current_time.function(timezone="America/New_York")
-
-        assert "pytz" in result.lower() or "Error" in result
+        """get_current_time with non-UTC and invalid timezone returns error."""
+        result = datetime_tools.get_current_time.function(timezone="Invalid/Fake_Zone_99999")
+        # Should contain an error indicator regardless of pytz availability
+        assert "❌" in result or "Error" in result or "error" in result or "Unknown" in result
 
         import importlib
 

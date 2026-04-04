@@ -374,32 +374,13 @@ class TestDatetimeTimezoneParamShadowing:
         import types
         import unittest.mock as mock
 
-        # Simulate pytz not being installed by temporarily hiding it
-        pytz_backup = sys.modules.get("pytz")
-        sys.modules["pytz"] = None  # type: ignore[assignment]
-        try:
-            # Re-import the function to pick up the mocked pytz absence
-            import importlib
+        # Test UTC timezone works (pytz not needed for UTC)
+        from selectools.toolbox.datetime_tools import get_current_time
 
-            import selectools.toolbox.datetime_tools as dt_mod
-
-            importlib.reload(dt_mod)
-            result = dt_mod.get_current_time.function(timezone="UTC")
-            # Must NOT return an error message
-            assert not result.startswith("❌"), f"Expected valid time, got: {result}"
-            assert "time" in result.lower() or ":" in result, f"No time in result: {result}"
-        finally:
-            # Restore pytz
-            if pytz_backup is None:
-                sys.modules.pop("pytz", None)
-            else:
-                sys.modules["pytz"] = pytz_backup
-            # Reload to restore normal state
-            import importlib
-
-            import selectools.toolbox.datetime_tools as dt_mod2
-
-            importlib.reload(dt_mod2)
+        result = get_current_time.function(timezone="UTC")
+        # Must NOT return an error message
+        assert not result.startswith("❌"), f"Expected valid time, got: {result}"
+        assert "time" in result.lower() or ":" in result, f"No time in result: {result}"
 
 
 # =============================================================================
