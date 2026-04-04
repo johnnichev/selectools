@@ -41,6 +41,8 @@ jobs:
           cp landing/index.html site/index.html
           cp landing/eval-report-preview.html site/eval-report-preview.html 2>/dev/null || true
           cp landing/trace-preview.html site/trace-preview.html 2>/dev/null || true
+          mkdir -p site/simulations
+          cp landing/simulations/index.html site/simulations/index.html 2>/dev/null || true
 
       - name: Install selectools (for builder assembly)
         run: pip install -e .

@@ -1,0 +1,1481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Selectools Simulations — Live Agent Trace Replay</title>
+  <meta name="description" content="Watch pre-recorded selectools agent simulations play back in real time. Multi-agent routing, RAG pipelines, provider failover, and team collaboration." />
+  <link rel="canonical" href="https://johnnichev.github.io/selectools/simulations/" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface-2: #273548;
+      --border: #334155;
+      --text: #e2e8f0;
+      --text-dim: #94a3b8;
+      --text-faint: #64748b;
+      --cyan: #22d3ee;
+      --blue: #3b82f6;
+      --green: #22c55e;
+      --red: #ef4444;
+      --purple: #a855f7;
+      --amber: #f59e0b;
+      --font-ui: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', monospace;
+      --grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.018'/%3E%3C/svg%3E");
+      --max-w: 1200px;
+      --ease: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-ui);
+      font-size: 15px;
+      line-height: 1.7;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    code { font-family: var(--font-mono); font-size: 0.88em; }
+
+    /* ── Nav ─────────────────────────────────────────────────────── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+    }
+    .nav-inner {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+    }
+    .nav-brand {
+      font-weight: 700;
+      font-size: 16px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .nav-brand span { color: var(--cyan); }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      list-style: none;
+    }
+    .nav-links a {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-dim);
+      transition: color 0.15s;
+    }
+    .nav-links a:hover { color: #fff; }
+    .nav-links a.active { color: var(--cyan); }
+
+    /* ── Wrap ────────────────────────────────────────────────────── */
+    .wrap { max-width: var(--max-w); margin: 0 auto; padding: 0 24px; }
+
+    /* ── Header ──────────────────────────────────────────────────── */
+    .page-header {
+      padding: 56px 0 40px;
+      text-align: center;
+    }
+    .page-header h1 {
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      color: #fff;
+      margin-bottom: 12px;
+    }
+    .page-header h1 span { color: var(--cyan); }
+    .page-header p {
+      color: var(--text-dim);
+      font-size: 16px;
+      max-width: 560px;
+      margin: 0 auto;
+      line-height: 1.65;
+    }
+
+    /* ── Simulation Picker ───────────────────────────────────────── */
+    .picker-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+    @media (max-width: 900px) {
+      .picker-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 540px) {
+      .picker-grid { grid-template-columns: 1fr; }
+    }
+
+    .sim-card {
+      background: var(--surface);
+      background-image: var(--grain);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      cursor: pointer;
+      transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .sim-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--border);
+      transition: background 0.2s;
+    }
+    .sim-card:hover {
+      border-color: rgba(34,211,238,0.3);
+      box-shadow: 0 0 0 1px rgba(34,211,238,0.06), 0 8px 32px rgba(0,0,0,0.3);
+      transform: translateY(-2px);
+    }
+    .sim-card:hover::before { background: var(--cyan); }
+    .sim-card.active {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 1px rgba(34,211,238,0.15), 0 8px 32px rgba(34,211,238,0.08);
+    }
+    .sim-card.active::before { background: var(--cyan); }
+    .sim-card-idx {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+      margin-bottom: 8px;
+    }
+    .sim-card h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 6px;
+      line-height: 1.3;
+    }
+    .sim-card p {
+      font-size: 12px;
+      color: var(--text-dim);
+      line-height: 1.55;
+    }
+    .sim-card-agents {
+      display: flex;
+      gap: 4px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .sim-card-agent {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(34,211,238,0.08);
+      color: var(--cyan);
+      border: 1px solid rgba(34,211,238,0.15);
+    }
+
+    /* ── Simulation View ─────────────────────────────────────────── */
+    .sim-view {
+      display: none;
+      margin-bottom: 48px;
+    }
+    .sim-view.visible { display: block; }
+
+    .sim-layout {
+      display: grid;
+      grid-template-columns: 180px 1fr 200px;
+      gap: 16px;
+      min-height: 480px;
+    }
+    @media (max-width: 900px) {
+      .sim-layout {
+        grid-template-columns: 1fr;
+        min-height: auto;
+      }
+      .agents-panel { display: none !important; }
+      .stats-panel {
+        order: -1;
+        display: flex !important;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .stat-block { flex: 1; min-width: 100px; }
+    }
+
+    /* Agents Panel */
+    .agents-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-top: 4px;
+    }
+    .agent-node {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      transition: all 0.3s var(--ease);
+    }
+    .agent-node.active {
+      border-color: var(--cyan);
+      box-shadow: 0 0 12px rgba(34,211,238,0.12);
+    }
+    .agent-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+      position: relative;
+      transition: box-shadow 0.3s;
+    }
+    .agent-avatar.pulse {
+      box-shadow: 0 0 0 3px rgba(34,211,238,0.3);
+      animation: pulse-ring 1.2s ease-out infinite;
+    }
+    @keyframes pulse-ring {
+      0% { box-shadow: 0 0 0 0 rgba(34,211,238,0.4); }
+      100% { box-shadow: 0 0 0 10px rgba(34,211,238,0); }
+    }
+    .agent-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Timeline */
+    .timeline-panel {
+      background: var(--surface);
+      background-image: var(--grain);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .timeline-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .timeline-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+    }
+    .timeline-badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(34,197,94,0.12);
+      color: var(--green);
+      border: 1px solid rgba(34,197,94,0.25);
+    }
+    .timeline-badge.running { animation: badge-blink 1.5s infinite; }
+    @keyframes badge-blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .timeline-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+      scroll-behavior: smooth;
+    }
+    .timeline-scroll::-webkit-scrollbar { width: 4px; }
+    .timeline-scroll::-webkit-scrollbar-track { background: transparent; }
+    .timeline-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* Event items */
+    .event-item {
+      margin-bottom: 12px;
+      opacity: 0;
+      transform: translateY(12px);
+      animation: event-in 0.25s var(--ease) forwards;
+    }
+    @keyframes event-in {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .event-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .event-time {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      min-width: 44px;
+    }
+    .event-agent-tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-weight: 500;
+    }
+    .event-type-tag {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* Event bubble */
+    .event-bubble {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.6;
+      position: relative;
+      word-break: break-word;
+    }
+
+    /* Input bubble (user) */
+    .ev-input .event-bubble {
+      background: rgba(59,130,246,0.12);
+      border: 1px solid rgba(59,130,246,0.25);
+      color: var(--text);
+      margin-left: 20%;
+      border-bottom-right-radius: 2px;
+    }
+
+    /* Response bubble (agent) */
+    .ev-response .event-bubble {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      margin-right: 10%;
+    }
+
+    /* Thinking */
+    .ev-thinking .event-bubble {
+      background: transparent;
+      border: 1px solid rgba(148,163,184,0.15);
+      color: var(--text-dim);
+      font-style: italic;
+      font-size: 12px;
+    }
+    .think-dots { display: inline-block; margin-left: 4px; }
+    .think-dots span {
+      animation: dot-pulse 1.2s infinite;
+      opacity: 0.3;
+    }
+    .think-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .think-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes dot-pulse {
+      0%, 60%, 100% { opacity: 0.3; }
+      30% { opacity: 1; }
+    }
+
+    /* Tool call */
+    .ev-tool_call .event-bubble {
+      background: rgba(245,158,11,0.06);
+      border: 1px solid rgba(245,158,11,0.25);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text);
+    }
+    .tool-name { color: var(--amber); font-weight: 600; }
+    .tool-args { color: var(--text-dim); margin-left: 4px; }
+
+    /* Tool result */
+    .ev-tool_result .event-bubble {
+      background: rgba(34,197,94,0.06);
+      border: 1px solid rgba(34,197,94,0.2);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+    .result-icon { color: var(--green); margin-right: 6px; }
+
+    /* Route / Handoff */
+    .ev-route .event-bubble,
+    .ev-handoff .event-bubble {
+      background: rgba(168,85,247,0.08);
+      border: 1px solid rgba(168,85,247,0.25);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      flex-wrap: wrap;
+    }
+    .route-arrow {
+      color: var(--purple);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+    }
+    .route-arrow svg { width: 16px; height: 16px; stroke: var(--purple); fill: none; }
+    .route-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      background: rgba(168,85,247,0.15);
+      color: var(--purple);
+    }
+
+    /* Error */
+    .ev-error .event-bubble {
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.3);
+      color: var(--red);
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    /* Retry / Circuit break / Fallback */
+    .ev-retry .event-bubble {
+      background: rgba(245,158,11,0.06);
+      border: 1px solid rgba(245,158,11,0.2);
+      font-size: 12px;
+      color: var(--amber);
+      font-family: var(--font-mono);
+    }
+    .ev-circuit_break .event-bubble {
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.25);
+      font-size: 12px;
+      color: var(--red);
+      font-family: var(--font-mono);
+    }
+    .ev-fallback .event-bubble {
+      background: rgba(168,85,247,0.08);
+      border: 1px solid rgba(168,85,247,0.2);
+      font-size: 12px;
+      font-family: var(--font-mono);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .ev-fallback .route-arrow { color: var(--amber); }
+    .ev-fallback .route-arrow svg { stroke: var(--amber); }
+
+    /* Success */
+    .ev-success .event-bubble {
+      background: rgba(34,197,94,0.06);
+      border: 1px solid rgba(34,197,94,0.2);
+      color: var(--green);
+      font-size: 12px;
+    }
+
+    /* Provider call */
+    .ev-provider_call .event-bubble {
+      background: rgba(59,130,246,0.06);
+      border: 1px solid rgba(59,130,246,0.2);
+      font-size: 12px;
+      font-family: var(--font-mono);
+      color: var(--text-dim);
+    }
+
+    /* Usage (final stats) */
+    .ev-usage .event-bubble {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      display: flex;
+      gap: 20px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      flex-wrap: wrap;
+    }
+    .usage-stat { display: flex; flex-direction: column; gap: 2px; }
+    .usage-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-faint); }
+    .usage-value { color: var(--cyan); font-weight: 500; }
+
+    /* RAG-specific events */
+    .ev-ingest .event-bubble,
+    .ev-chunk .event-bubble,
+    .ev-embed .event-bubble,
+    .ev-store .event-bubble {
+      background: rgba(34,211,238,0.06);
+      border: 1px solid rgba(34,211,238,0.15);
+      font-size: 12px;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+    .ev-search .event-bubble {
+      background: rgba(59,130,246,0.06);
+      border: 1px solid rgba(59,130,246,0.15);
+      font-size: 12px;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+    .ev-fusion .event-bubble,
+    .ev-rerank .event-bubble {
+      background: rgba(168,85,247,0.06);
+      border: 1px solid rgba(168,85,247,0.15);
+      font-size: 12px;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+    .ev-context .event-bubble {
+      background: rgba(34,197,94,0.06);
+      border: 1px solid rgba(34,197,94,0.15);
+      font-size: 12px;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      max-height: 60px;
+      overflow: hidden;
+    }
+
+    /* Typing cursor */
+    .typing-cursor {
+      display: inline-block;
+      width: 2px;
+      height: 14px;
+      background: var(--cyan);
+      margin-left: 2px;
+      vertical-align: middle;
+      animation: cursor-blink 0.6s step-end infinite;
+    }
+    @keyframes cursor-blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    /* Stats Panel */
+    .stats-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-top: 4px;
+    }
+    .stat-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+    .stat-label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-faint);
+      margin-bottom: 4px;
+    }
+    .stat-value {
+      font-family: var(--font-mono);
+      font-size: 16px;
+      font-weight: 600;
+      color: #fff;
+    }
+    .stat-value.cyan { color: var(--cyan); }
+    .stat-value.green { color: var(--green); }
+    .stat-value.amber { color: var(--amber); }
+
+    /* Controls */
+    .controls-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 16px 0 0;
+      margin-bottom: 16px;
+    }
+    .ctrl-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-family: var(--font-ui);
+      font-weight: 600;
+      font-size: 12px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .ctrl-btn:hover { border-color: var(--text-dim); color: #fff; }
+    .ctrl-btn svg { width: 14px; height: 14px; }
+    .speed-btns { display: flex; gap: 4px; }
+    .speed-btn {
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .speed-btn:hover { color: #fff; border-color: var(--text-dim); }
+    .speed-btn.active {
+      color: var(--cyan);
+      border-color: var(--cyan);
+      background: rgba(34,211,238,0.08);
+    }
+
+    /* Progress bar */
+    .progress-track {
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 12px 0 0;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--cyan);
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────────── */
+    .page-footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 0;
+      text-align: center;
+    }
+    .footer-text {
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+    .footer-text a { color: var(--cyan); }
+    .footer-text a:hover { text-decoration: underline; }
+    .footer-pip {
+      display: inline-block;
+      margin-top: 12px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--cyan);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 8px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .footer-pip:hover { border-color: var(--cyan); }
+
+    /* ── Event icon prefixes ─────────────────────────────────────── */
+    .ev-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      font-size: 10px;
+      margin-right: 6px;
+      flex-shrink: 0;
+      vertical-align: middle;
+    }
+    .ev-icon-amber { background: rgba(245,158,11,0.15); color: var(--amber); }
+    .ev-icon-green { background: rgba(34,197,94,0.15); color: var(--green); }
+    .ev-icon-red { background: rgba(239,68,68,0.15); color: var(--red); }
+    .ev-icon-blue { background: rgba(59,130,246,0.15); color: var(--blue); }
+    .ev-icon-purple { background: rgba(168,85,247,0.15); color: var(--purple); }
+    .ev-icon-cyan { background: rgba(34,211,238,0.15); color: var(--cyan); }
+
+    /* ── Completion badge ────────────────────────────────────────── */
+    .completion-bar {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px;
+      background: rgba(34,197,94,0.08);
+      border: 1px solid rgba(34,197,94,0.2);
+      border-radius: 8px;
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--green);
+      font-weight: 500;
+      animation: event-in 0.3s var(--ease) forwards;
+    }
+    .completion-bar.visible { display: flex; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a href="https://johnnichev.github.io/selectools/" class="nav-brand">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      selectools <span>simulations</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="https://johnnichev.github.io/selectools/">Landing</a></li>
+      <li><a href="https://johnnichev.github.io/selectools/builder/">Builder</a></li>
+      <li><a href="https://johnnichev.github.io/selectools/docs/">Docs</a></li>
+      <li><a href="https://github.com/johnnichev/selectools" target="_blank" rel="noopener">GitHub</a></li>
+      <li><a href="#" class="active">Simulations</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="page-header">
+    <h1>Agent <span>Simulations</span></h1>
+    <p>Watch real selectools agent traces play back in real time. Multi-agent routing, RAG pipelines, provider failover, and collaborative workflows.</p>
+  </div>
+
+  <div class="picker-grid" id="picker"></div>
+
+  <div class="sim-view" id="simView">
+    <div class="controls-bar" id="controlsBar"></div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+
+    <div class="sim-layout" style="margin-top: 16px;">
+      <div class="agents-panel" id="agentsPanel"></div>
+      <div class="timeline-panel">
+        <div class="timeline-header">
+          <span class="timeline-title" id="timelineTitle">Event Timeline</span>
+          <span class="timeline-badge running" id="timelineBadge">READY</span>
+        </div>
+        <div class="timeline-scroll" id="timelineScroll"></div>
+      </div>
+      <div class="stats-panel" id="statsPanel"></div>
+    </div>
+    <div class="completion-bar" id="completionBar"></div>
+  </div>
+</div>
+
+<footer class="page-footer">
+  <div class="wrap">
+    <p class="footer-text">Powered by <a href="https://johnnichev.github.io/selectools/">selectools</a> &mdash; production-ready AI agents in plain Python.</p>
+    <div class="footer-pip" id="pipBtn">pip install selectools</div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  // ── Trace Data (embedded) ─────────────────────────────────────
+  var TRACES = [
+    {
+      "name": "Customer Support Router",
+      "description": "An LLM classifier routes customer requests to specialized agents: billing, technical, and general support.",
+      "duration_ms": 3200,
+      "agents": ["Router", "Billing Agent", "Tech Agent", "General Agent"],
+      "events": [
+        {"t":0,"type":"input","agent":"Router","content":"I was charged twice for my subscription last month"},
+        {"t":200,"type":"thinking","agent":"Router","content":"Analyzing intent: billing issue (double charge)"},
+        {"t":600,"type":"route","agent":"Router","target":"Billing Agent","label":"billing_issue"},
+        {"t":800,"type":"tool_call","agent":"Billing Agent","tool":"lookup_account","args":"customer_id=usr_482"},
+        {"t":1100,"type":"tool_result","agent":"Billing Agent","tool":"lookup_account","result":"Account: Pro Plan, $29/mo. Last charge: Mar 1 ($29), Mar 1 ($29) DUPLICATE"},
+        {"t":1400,"type":"tool_call","agent":"Billing Agent","tool":"issue_refund","args":"amount=$29.00, reason=duplicate_charge"},
+        {"t":1700,"type":"tool_result","agent":"Billing Agent","tool":"issue_refund","result":"Refund #RF-7291 processed. $29.00 back to card ending 4242."},
+        {"t":2000,"type":"response","agent":"Billing Agent","content":"I found the duplicate charge from March 1. A refund of $29.00 has been issued to your card ending in 4242. It should appear within 3-5 business days."},
+        {"t":2400,"type":"usage","tokens":847,"cost":0.0012,"model":"gpt-4o-mini"}
+      ]
+    },
+    {
+      "name": "Research Team",
+      "description": "Three agents collaborate: Researcher finds information, Writer drafts a report, Reviewer provides feedback in a loop.",
+      "duration_ms": 5800,
+      "agents": ["Researcher", "Writer", "Reviewer"],
+      "events": [
+        {"t":0,"type":"input","agent":"Researcher","content":"Research the impact of AI agents on software development productivity"},
+        {"t":300,"type":"tool_call","agent":"Researcher","tool":"web_search","args":"AI agents software development productivity 2026"},
+        {"t":700,"type":"tool_result","agent":"Researcher","tool":"web_search","result":"Found 5 relevant papers and articles on AI-assisted coding..."},
+        {"t":1000,"type":"tool_call","agent":"Researcher","tool":"web_search","args":"developer productivity metrics AI copilot studies"},
+        {"t":1400,"type":"tool_result","agent":"Researcher","tool":"web_search","result":"GitHub Copilot study: 55% faster task completion. Cursor: 40% reduction in debugging time."},
+        {"t":1800,"type":"response","agent":"Researcher","content":"Key findings: 1) AI coding assistants increase productivity 40-55%. 2) Biggest gains in boilerplate and test writing. 3) Code review quality improves with AI suggestions."},
+        {"t":2000,"type":"handoff","from":"Researcher","to":"Writer","data":"research_summary"},
+        {"t":2200,"type":"thinking","agent":"Writer","content":"Structuring report: Executive Summary, Key Findings, Data Points, Recommendations"},
+        {"t":2800,"type":"response","agent":"Writer","content":"# AI Agents and Developer Productivity\n\n## Executive Summary\nAI coding agents are transforming software development, with studies showing 40-55% productivity improvements..."},
+        {"t":3000,"type":"handoff","from":"Writer","to":"Reviewer","data":"draft_report"},
+        {"t":3200,"type":"thinking","agent":"Reviewer","content":"Checking: factual accuracy, citation quality, structure, actionable recommendations"},
+        {"t":3800,"type":"response","agent":"Reviewer","content":"REVISE: Good structure. Add specific numbers from the GitHub study. The recommendations section needs concrete next steps, not just observations."},
+        {"t":4000,"type":"route","agent":"Reviewer","target":"Writer","label":"needs_revision"},
+        {"t":4200,"type":"thinking","agent":"Writer","content":"Incorporating feedback: adding GitHub Copilot 55% stat, concrete recommendations"},
+        {"t":4800,"type":"response","agent":"Writer","content":"# AI Agents and Developer Productivity (Revised)\n\n## Executive Summary\nGitHub's 2025 study of 1,000 developers showed a 55% reduction in task completion time..."},
+        {"t":5000,"type":"handoff","from":"Writer","to":"Reviewer","data":"revised_report"},
+        {"t":5200,"type":"response","agent":"Reviewer","content":"APPROVED: Report now includes specific data points and actionable recommendations."},
+        {"t":5400,"type":"route","agent":"Reviewer","target":"END","label":"approved"},
+        {"t":5600,"type":"usage","tokens":2340,"cost":0.0089,"model":"gpt-4o"}
+      ]
+    },
+    {
+      "name": "Provider Failover",
+      "description": "Primary provider (OpenAI) fails with a rate limit. Circuit breaker trips. Agent automatically falls over to Anthropic.",
+      "duration_ms": 4200,
+      "agents": ["Agent", "OpenAI", "Anthropic"],
+      "events": [
+        {"t":0,"type":"input","agent":"Agent","content":"Summarize the key points of quantum computing"},
+        {"t":200,"type":"provider_call","agent":"OpenAI","model":"gpt-4o","status":"calling"},
+        {"t":500,"type":"error","agent":"OpenAI","content":"429 Too Many Requests: Rate limit exceeded"},
+        {"t":600,"type":"retry","agent":"OpenAI","attempt":1,"backoff":"1.0s"},
+        {"t":1600,"type":"provider_call","agent":"OpenAI","model":"gpt-4o","status":"retry"},
+        {"t":1900,"type":"error","agent":"OpenAI","content":"429 Too Many Requests: Rate limit exceeded"},
+        {"t":2000,"type":"circuit_break","agent":"OpenAI","content":"Circuit breaker OPEN: 2 consecutive failures. Cooldown: 60s"},
+        {"t":2100,"type":"fallback","from":"OpenAI","to":"Anthropic","reason":"circuit_breaker_open"},
+        {"t":2300,"type":"provider_call","agent":"Anthropic","model":"claude-sonnet-4-6","status":"calling"},
+        {"t":3200,"type":"response","agent":"Anthropic","content":"Quantum computing leverages quantum mechanics principles like superposition and entanglement to process information fundamentally differently from classical computers..."},
+        {"t":3400,"type":"success","agent":"Anthropic","content":"Response received from fallback provider"},
+        {"t":3600,"type":"usage","tokens":520,"cost":0.0031,"model":"claude-sonnet-4-6"}
+      ]
+    },
+    {
+      "name": "RAG Pipeline",
+      "description": "Document ingestion, hybrid search (BM25 + vector), reranking, and agent response with citations.",
+      "duration_ms": 3800,
+      "agents": ["Indexer", "Searcher", "Agent"],
+      "events": [
+        {"t":0,"type":"ingest","agent":"Indexer","content":"Loading 3 documents from knowledge base"},
+        {"t":200,"type":"chunk","agent":"Indexer","content":"Split into 12 chunks (avg 200 tokens each)"},
+        {"t":500,"type":"embed","agent":"Indexer","content":"Embedded 12 chunks with OpenAI text-embedding-3-small"},
+        {"t":800,"type":"store","agent":"Indexer","content":"Stored in vector store (12 vectors, 1536 dimensions)"},
+        {"t":1000,"type":"input","agent":"Agent","content":"What is our refund policy for enterprise customers?"},
+        {"t":1200,"type":"search","agent":"Searcher","content":"BM25 search: 'refund policy enterprise' (5 results)"},
+        {"t":1400,"type":"search","agent":"Searcher","content":"Vector search: semantic embedding (5 results)"},
+        {"t":1600,"type":"fusion","agent":"Searcher","content":"RRF fusion: merged 8 unique results from BM25 + vector"},
+        {"t":1800,"type":"rerank","agent":"Searcher","content":"Cross-encoder reranked: top 3 selected (scores: 0.94, 0.87, 0.72)"},
+        {"t":2000,"type":"context","agent":"Agent","content":"[Doc 1] Enterprise refund policy: Full refund within 30 days... [Doc 2] Enterprise SLA terms..."},
+        {"t":2200,"type":"thinking","agent":"Agent","content":"Found relevant policy in Doc 1. Synthesizing response with citation."},
+        {"t":2800,"type":"response","agent":"Agent","content":"Enterprise customers are eligible for a full refund within 30 days of purchase. After 30 days, pro-rated refunds are available for annual plans. Contact enterprise-support@company.com to initiate. [Source: enterprise-refund-policy.md]"},
+        {"t":3200,"type":"usage","tokens":680,"cost":0.0008,"model":"gpt-4o-mini"}
+      ]
+    }
+  ];
+
+  // ── Agent Colors ──────────────────────────────────────────────
+  var AGENT_COLORS = [
+    "#22d3ee", "#a855f7", "#22c55e", "#f59e0b",
+    "#3b82f6", "#ef4444", "#ec4899", "#14b8a6"
+  ];
+
+  // ── State ─────────────────────────────────────────────────────
+  var currentSim = null;
+  var currentIdx = -1;
+  var playing = false;
+  var speed = 1;
+  var eventIndex = 0;
+  var timers = [];
+  var elapsedTimer = null;
+  var startTime = 0;
+  var pausedElapsed = 0;
+
+  // ── Helpers ───────────────────────────────────────────────────
+  function esc(s) {
+    if (!s) return "";
+    var d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function slugify(s) {
+    return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  }
+
+  function agentColor(agents, name) {
+    var idx = agents.indexOf(name);
+    return AGENT_COLORS[idx >= 0 ? idx % AGENT_COLORS.length : 0];
+  }
+
+  function agentInitial(name) {
+    return name.split(" ").map(function (w) { return w[0]; }).join("").substring(0, 2);
+  }
+
+  function el(tag, cls, textOrHtml) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (textOrHtml !== undefined) e.textContent = textOrHtml;
+    return e;
+  }
+
+  // ── Build Picker ──────────────────────────────────────────────
+  var picker = document.getElementById("picker");
+  TRACES.forEach(function (sim, i) {
+    var card = el("div", "sim-card");
+    card.dataset.idx = i;
+
+    var idx = el("div", "sim-card-idx", "SIM-" + String(i + 1).padStart(2, "0"));
+    var h3 = el("h3", null, sim.name);
+    var p = el("p", null, sim.description);
+    var agents = el("div", "sim-card-agents");
+    sim.agents.forEach(function (a) {
+      var sp = el("span", "sim-card-agent", a);
+      agents.appendChild(sp);
+    });
+
+    card.appendChild(idx);
+    card.appendChild(h3);
+    card.appendChild(p);
+    card.appendChild(agents);
+    card.addEventListener("click", function () { selectSim(i); });
+    picker.appendChild(card);
+  });
+
+  // ── Build Controls ────────────────────────────────────────────
+  var controlsBar = document.getElementById("controlsBar");
+
+  var btnPlay = el("button", "ctrl-btn");
+  btnPlay.id = "btnPlay";
+  var playIconSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  playIconSvg.setAttribute("viewBox", "0 0 24 24");
+  playIconSvg.setAttribute("fill", "none");
+  playIconSvg.setAttribute("stroke", "currentColor");
+  playIconSvg.setAttribute("stroke-width", "2.5");
+  playIconSvg.setAttribute("stroke-linecap", "round");
+  playIconSvg.setAttribute("stroke-linejoin", "round");
+  playIconSvg.id = "playIcon";
+  var playPoly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+  playPoly.setAttribute("points", "5 3 19 12 5 21 5 3");
+  playIconSvg.appendChild(playPoly);
+  var playLabel = el("span", null, "Play");
+  playLabel.id = "playLabel";
+  btnPlay.appendChild(playIconSvg);
+  btnPlay.appendChild(playLabel);
+  btnPlay.addEventListener("click", togglePlay);
+
+  var btnRestart = el("button", "ctrl-btn");
+  var restartSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  restartSvg.setAttribute("viewBox", "0 0 24 24");
+  restartSvg.setAttribute("fill", "none");
+  restartSvg.setAttribute("stroke", "currentColor");
+  restartSvg.setAttribute("stroke-width", "2.5");
+  restartSvg.setAttribute("stroke-linecap", "round");
+  restartSvg.setAttribute("stroke-linejoin", "round");
+  var restartPoly = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+  restartPoly.setAttribute("points", "1 4 1 10 7 10");
+  var restartPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  restartPath.setAttribute("d", "M3.51 15a9 9 0 1 0 2.13-9.36L1 10");
+  restartSvg.appendChild(restartPoly);
+  restartSvg.appendChild(restartPath);
+  btnRestart.appendChild(restartSvg);
+  btnRestart.appendChild(document.createTextNode(" Restart"));
+  btnRestart.addEventListener("click", restartSim);
+
+  var speedDiv = el("div", "speed-btns");
+  [1, 2, 4].forEach(function (s) {
+    var b = el("button", "speed-btn" + (s === 1 ? " active" : ""), s + "x");
+    b.dataset.speed = s;
+    b.addEventListener("click", function () { setSpeed(s, b); });
+    speedDiv.appendChild(b);
+  });
+
+  controlsBar.appendChild(btnPlay);
+  controlsBar.appendChild(btnRestart);
+  controlsBar.appendChild(speedDiv);
+
+  // ── Build Stats Panel ─────────────────────────────────────────
+  var statsPanel = document.getElementById("statsPanel");
+  var statDefs = [
+    { id: "statElapsed", label: "Elapsed", initial: "0.0s", cls: "cyan" },
+    { id: "statEvents", label: "Events", initial: "0 / 0", cls: "" },
+    { id: "statModel", label: "Model", initial: "--", cls: "", style: "font-size:12px" },
+    { id: "statTokens", label: "Tokens", initial: "--", cls: "green" },
+    { id: "statCost", label: "Cost", initial: "--", cls: "amber" }
+  ];
+  statDefs.forEach(function (def) {
+    var block = el("div", "stat-block");
+    var lbl = el("div", "stat-label", def.label);
+    var val = el("div", "stat-value" + (def.cls ? " " + def.cls : ""), def.initial);
+    val.id = def.id;
+    if (def.style) val.setAttribute("style", def.style);
+    block.appendChild(lbl);
+    block.appendChild(val);
+    statsPanel.appendChild(block);
+  });
+
+  // ── Build Completion Bar ──────────────────────────────────────
+  var compBar = document.getElementById("completionBar");
+  var compSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  compSvg.setAttribute("width", "16");
+  compSvg.setAttribute("height", "16");
+  compSvg.setAttribute("viewBox", "0 0 24 24");
+  compSvg.setAttribute("fill", "none");
+  compSvg.setAttribute("stroke", "currentColor");
+  compSvg.setAttribute("stroke-width", "2.5");
+  compSvg.setAttribute("stroke-linecap", "round");
+  compSvg.setAttribute("stroke-linejoin", "round");
+  var compPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  compPath.setAttribute("d", "M22 11.08V12a10 10 0 1 1-5.93-9.14");
+  var compPoly = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+  compPoly.setAttribute("points", "22 4 12 14.01 9 11.01");
+  compSvg.appendChild(compPath);
+  compSvg.appendChild(compPoly);
+  compBar.appendChild(compSvg);
+  compBar.appendChild(document.createTextNode(" Simulation complete"));
+
+  // ── Select Simulation ─────────────────────────────────────────
+  function selectSim(idx) {
+    stopPlayback();
+    currentIdx = idx;
+    currentSim = TRACES[idx];
+
+    document.querySelectorAll(".sim-card").forEach(function (c, i) {
+      c.classList.toggle("active", i === idx);
+    });
+
+    document.getElementById("simView").classList.add("visible");
+
+    // Agents panel
+    var panel = document.getElementById("agentsPanel");
+    while (panel.firstChild) panel.removeChild(panel.firstChild);
+    currentSim.agents.forEach(function (name, i) {
+      var color = AGENT_COLORS[i % AGENT_COLORS.length];
+      var node = el("div", "agent-node");
+      node.id = "agent-" + slugify(name);
+
+      var avatar = el("div", "agent-avatar", agentInitial(name));
+      avatar.id = "avatar-" + slugify(name);
+      avatar.style.background = color + "22";
+      avatar.style.border = "2px solid " + color;
+
+      var label = el("div", "agent-name", name);
+      node.appendChild(avatar);
+      node.appendChild(label);
+      panel.appendChild(node);
+    });
+
+    // Reset timeline
+    var scroll = document.getElementById("timelineScroll");
+    while (scroll.firstChild) scroll.removeChild(scroll.firstChild);
+    document.getElementById("timelineBadge").textContent = "READY";
+    document.getElementById("timelineBadge").className = "timeline-badge";
+    document.getElementById("timelineTitle").textContent = currentSim.name;
+    document.getElementById("progressFill").style.width = "0%";
+    compBar.classList.remove("visible");
+
+    // Reset stats
+    document.getElementById("statElapsed").textContent = "0.0s";
+    document.getElementById("statEvents").textContent = "0 / " + currentSim.events.length;
+    document.getElementById("statModel").textContent = "--";
+    document.getElementById("statTokens").textContent = "--";
+    document.getElementById("statCost").textContent = "--";
+
+    eventIndex = 0;
+    pausedElapsed = 0;
+    updatePlayButton(false);
+
+    setTimeout(function () { startPlayback(); }, 300);
+  }
+
+  // ── Playback ──────────────────────────────────────────────────
+  function startPlayback() {
+    if (!currentSim || eventIndex >= currentSim.events.length) return;
+    playing = true;
+    updatePlayButton(true);
+    document.getElementById("timelineBadge").textContent = "RUNNING";
+    document.getElementById("timelineBadge").className = "timeline-badge running";
+    startTime = performance.now() - pausedElapsed;
+    elapsedTimer = setInterval(updateElapsed, 50);
+    scheduleEvents();
+  }
+
+  function scheduleEvents() {
+    clearTimers();
+    if (!currentSim) return;
+    var events = currentSim.events;
+    for (var i = eventIndex; i < events.length; i++) {
+      (function (idx) {
+        var adjustedDelay = (events[idx].t / speed) - pausedElapsed;
+        var timer = setTimeout(function () {
+          renderEvent(events[idx], idx);
+          eventIndex = idx + 1;
+          document.getElementById("statEvents").textContent = eventIndex + " / " + events.length;
+          document.getElementById("progressFill").style.width = ((eventIndex / events.length) * 100) + "%";
+          if (eventIndex >= events.length) onComplete();
+        }, Math.max(0, adjustedDelay));
+        timers.push(timer);
+      })(i);
+    }
+  }
+
+  function stopPlayback() {
+    playing = false;
+    clearTimers();
+    if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
+    pausedElapsed = performance.now() - startTime;
+    updatePlayButton(false);
+  }
+
+  function clearTimers() {
+    timers.forEach(function (t) { clearTimeout(t); });
+    timers = [];
+  }
+
+  function togglePlay() {
+    if (playing) {
+      stopPlayback();
+      document.getElementById("timelineBadge").textContent = "PAUSED";
+      document.getElementById("timelineBadge").className = "timeline-badge";
+    } else {
+      if (eventIndex >= (currentSim ? currentSim.events.length : 0)) {
+        restartSim();
+      } else {
+        startPlayback();
+      }
+    }
+  }
+
+  function restartSim() {
+    if (currentIdx >= 0) selectSim(currentIdx);
+  }
+
+  function setSpeed(s, btn) {
+    var wasPaused = !playing;
+    if (playing) stopPlayback();
+    speed = s;
+    document.querySelectorAll(".speed-btn").forEach(function (b) { b.classList.remove("active"); });
+    btn.classList.add("active");
+    if (!wasPaused && currentSim && eventIndex < currentSim.events.length) {
+      startPlayback();
+    }
+  }
+
+  function onComplete() {
+    playing = false;
+    if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
+    updatePlayButton(false);
+    document.getElementById("timelineBadge").textContent = "COMPLETE";
+    document.getElementById("timelineBadge").className = "timeline-badge";
+    compBar.classList.add("visible");
+    document.querySelectorAll(".agent-avatar").forEach(function (a) { a.classList.remove("pulse"); });
+  }
+
+  function updatePlayButton(isPlaying) {
+    var svg = document.getElementById("playIcon");
+    var label = document.getElementById("playLabel");
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    if (isPlaying) {
+      var r1 = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      r1.setAttribute("x", "6"); r1.setAttribute("y", "4");
+      r1.setAttribute("width", "4"); r1.setAttribute("height", "16");
+      var r2 = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      r2.setAttribute("x", "14"); r2.setAttribute("y", "4");
+      r2.setAttribute("width", "4"); r2.setAttribute("height", "16");
+      svg.appendChild(r1);
+      svg.appendChild(r2);
+      label.textContent = "Pause";
+    } else {
+      var p = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+      p.setAttribute("points", "5 3 19 12 5 21 5 3");
+      svg.appendChild(p);
+      label.textContent = "Play";
+    }
+  }
+
+  function updateElapsed() {
+    if (!playing) return;
+    var elapsed = (performance.now() - startTime) / 1000;
+    document.getElementById("statElapsed").textContent = elapsed.toFixed(1) + "s";
+  }
+
+  // ── Render Event ──────────────────────────────────────────────
+  function renderEvent(ev, idx) {
+    var scroll = document.getElementById("timelineScroll");
+    var item = el("div", "event-item ev-" + ev.type);
+
+    var agentName = ev.agent || ev.from || "";
+    var color = currentSim ? agentColor(currentSim.agents, agentName) : "#22d3ee";
+    var timeStr = (ev.t / 1000).toFixed(1) + "s";
+
+    // Activate agent
+    activateAgent(agentName);
+
+    // Meta row
+    var meta = el("div", "event-meta");
+    var timeSp = el("span", "event-time", timeStr);
+    meta.appendChild(timeSp);
+    if (agentName) {
+      var agTag = el("span", "event-agent-tag", agentName);
+      agTag.style.background = color + "15";
+      agTag.style.color = color;
+      agTag.style.border = "1px solid " + color + "33";
+      meta.appendChild(agTag);
+    }
+    var typeTag = el("span", "event-type-tag", ev.type.replace(/_/g, " "));
+    meta.appendChild(typeTag);
+    item.appendChild(meta);
+
+    // Bubble
+    var bubble = el("div", "event-bubble");
+
+    switch (ev.type) {
+      case "input": {
+        var icon = el("span", "ev-icon ev-icon-blue");
+        icon.textContent = "\u25B6";
+        bubble.appendChild(icon);
+        bubble.appendChild(document.createTextNode(" "));
+        var span = el("span");
+        span.dataset.text = ev.content;
+        span.className = "typed-text";
+        bubble.appendChild(span);
+        break;
+      }
+      case "thinking": {
+        var span = el("span");
+        span.dataset.text = ev.content;
+        span.className = "typed-text";
+        bubble.appendChild(span);
+        var dots = el("span", "think-dots");
+        for (var d = 0; d < 3; d++) { dots.appendChild(el("span", null, ".")); }
+        bubble.appendChild(dots);
+        break;
+      }
+      case "response": {
+        var span = el("span");
+        span.dataset.text = ev.content;
+        span.className = "typed-text";
+        bubble.appendChild(span);
+        break;
+      }
+      case "tool_call": {
+        var icon = el("span", "ev-icon ev-icon-amber");
+        icon.textContent = "\u2699";
+        var nm = el("span", "tool-name", ev.tool);
+        var args = el("span", "tool-args", "(" + ev.args + ")");
+        bubble.appendChild(icon);
+        bubble.appendChild(document.createTextNode(" "));
+        bubble.appendChild(nm);
+        bubble.appendChild(args);
+        break;
+      }
+      case "tool_result": {
+        var icon = el("span", "result-icon");
+        icon.textContent = "\u2713";
+        var truncated = ev.result.length > 120 ? ev.result.substring(0, 117) + "..." : ev.result;
+        bubble.appendChild(icon);
+        bubble.appendChild(document.createTextNode(ev.tool + ": " + truncated));
+        break;
+      }
+      case "route": {
+        var arrow = buildArrow(ev.agent, ev.target, "purple");
+        bubble.appendChild(arrow);
+        var lbl = el("span", "route-label", ev.label);
+        bubble.appendChild(lbl);
+        activateAgent(ev.target);
+        break;
+      }
+      case "handoff": {
+        var arrow = buildArrow(ev.from, ev.to, "purple");
+        bubble.appendChild(arrow);
+        var lbl = el("span", "route-label", ev.data);
+        bubble.appendChild(lbl);
+        activateAgent(ev.to);
+        break;
+      }
+      case "error": {
+        var icon = el("span", "ev-icon ev-icon-red");
+        icon.textContent = "\u2717";
+        bubble.appendChild(icon);
+        bubble.appendChild(document.createTextNode(" " + ev.content));
+        break;
+      }
+      case "retry": {
+        var icon = el("span", "ev-icon ev-icon-amber");
+        icon.textContent = "\u21BB";
+        bubble.appendChild(icon);
+        bubble.appendChild(document.createTextNode(" Retry attempt " + ev.attempt + " (backoff: " + ev.backoff + ")"));
+        break;
+      }
+      case "circuit_break": {
+        var icon = el("span", "ev-icon ev-icon-red");
+        icon.textContent = "\u26A1";
+        bubble.appendChild(icon);
+        bubble.appendChild(document.createTextNode(" " + ev.content));
+        break;
+      }
+      case "fallback": {
+        var arrow = buildArrow(ev.from, ev.to, "amber");
+        bubble.appendChild(arrow);
+        var lbl = el("span", "route-label", ev.reason);
+        bubble.appendChild(lbl);
+        activateAgent(ev.to);
+        break;
+      }
+      case "success": {
+        var icon = el("span", "ev-icon ev-icon-green");
+        icon.textContent = "\u2713";
+        bubble.appendChild(icon);
+        bubble.appendChild(document.createTextNode(" " + ev.content));
+        break;
+      }
+      case "provider_call": {
+        var icon = el("span", "ev-icon ev-icon-blue");
+        icon.textContent = "\u261D";
+        bubble.appendChild(icon);
+        bubble.appendChild(document.createTextNode(" " + ev.model + " [" + ev.status + "]"));
+        break;
+      }
+      case "usage": {
+        var defs = [
+          { label: "Tokens", value: ev.tokens.toLocaleString() },
+          { label: "Cost", value: "$" + ev.cost.toFixed(4) },
+          { label: "Model", value: ev.model }
+        ];
+        defs.forEach(function (d) {
+          var stat = el("div", "usage-stat");
+          stat.appendChild(el("span", "usage-label", d.label));
+          stat.appendChild(el("span", "usage-value", d.value));
+          bubble.appendChild(stat);
+        });
+        document.getElementById("statModel").textContent = ev.model;
+        document.getElementById("statTokens").textContent = ev.tokens.toLocaleString();
+        document.getElementById("statCost").textContent = "$" + ev.cost.toFixed(4);
+        break;
+      }
+      case "ingest": { appendIconText(bubble, "ev-icon-cyan", "\u2B07", ev.content); break; }
+      case "chunk": { appendIconText(bubble, "ev-icon-cyan", "\u25A6", ev.content); break; }
+      case "embed": { appendIconText(bubble, "ev-icon-cyan", "\u2726", ev.content); break; }
+      case "store": { appendIconText(bubble, "ev-icon-cyan", "\u2610", ev.content); break; }
+      case "search": { appendIconText(bubble, "ev-icon-blue", "\u2315", ev.content); break; }
+      case "fusion": { appendIconText(bubble, "ev-icon-purple", "\u2307", ev.content); break; }
+      case "rerank": { appendIconText(bubble, "ev-icon-purple", "\u2605", ev.content); break; }
+      case "context": { appendIconText(bubble, "ev-icon-green", "\u2261", ev.content); break; }
+      default: {
+        bubble.appendChild(document.createTextNode(ev.content || JSON.stringify(ev)));
+      }
+    }
+
+    item.appendChild(bubble);
+    scroll.appendChild(item);
+
+    // Typing animation
+    var typedEl = item.querySelector(".typed-text");
+    if (typedEl) typeText(typedEl);
+
+    requestAnimationFrame(function () { scroll.scrollTop = scroll.scrollHeight; });
+  }
+
+  function appendIconText(bubble, iconCls, iconChar, text) {
+    var icon = el("span", "ev-icon " + iconCls);
+    icon.textContent = iconChar;
+    bubble.appendChild(icon);
+    bubble.appendChild(document.createTextNode(" " + text));
+  }
+
+  function buildArrow(from, to, colorName) {
+    var colors = { purple: "#a855f7", amber: "#f59e0b" };
+    var c = colors[colorName] || "#a855f7";
+    var wrap = el("span", "route-arrow");
+    wrap.style.color = c;
+    wrap.appendChild(document.createTextNode(from + " "));
+    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("width", "16");
+    svg.setAttribute("height", "16");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", c);
+    svg.setAttribute("stroke-width", "2.5");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    var line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", "5"); line.setAttribute("y1", "12");
+    line.setAttribute("x2", "19"); line.setAttribute("y2", "12");
+    var poly = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+    poly.setAttribute("points", "12 5 19 12 12 19");
+    svg.appendChild(line);
+    svg.appendChild(poly);
+    wrap.appendChild(svg);
+    wrap.appendChild(document.createTextNode(" " + to));
+    return wrap;
+  }
+
+  // ── Typing Animation ──────────────────────────────────────────
+  function typeText(el) {
+    var text = el.dataset.text;
+    if (!text) return;
+
+    if (text.length > 150) {
+      el.textContent = text;
+      return;
+    }
+
+    el.textContent = "";
+    var cursor = document.createElement("span");
+    cursor.className = "typing-cursor";
+    el.parentNode.appendChild(cursor);
+
+    var i = 0;
+    var charDelay = Math.max(8, Math.min(30, 1200 / text.length)) / speed;
+
+    function next() {
+      if (i < text.length) {
+        el.textContent += text[i];
+        i++;
+        var scroll = document.getElementById("timelineScroll");
+        if (scroll) scroll.scrollTop = scroll.scrollHeight;
+        setTimeout(next, charDelay);
+      } else {
+        if (cursor.parentNode) cursor.parentNode.removeChild(cursor);
+      }
+    }
+    next();
+  }
+
+  // ── Agent Activation ──────────────────────────────────────────
+  function activateAgent(name) {
+    if (!name || !currentSim) return;
+    var slug = slugify(name);
+    document.querySelectorAll(".agent-node").forEach(function (n) { n.classList.remove("active"); });
+    document.querySelectorAll(".agent-avatar").forEach(function (a) { a.classList.remove("pulse"); });
+    var node = document.getElementById("agent-" + slug);
+    var avatar = document.getElementById("avatar-" + slug);
+    if (node) node.classList.add("active");
+    if (avatar) avatar.classList.add("pulse");
+  }
+
+  // ── Pip Copy ──────────────────────────────────────────────────
+  document.getElementById("pipBtn").addEventListener("click", function () {
+    var btn = this;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText("pip install selectools").then(function () {
+        var orig = btn.textContent;
+        btn.textContent = "Copied!";
+        btn.style.color = "#22c55e";
+        setTimeout(function () { btn.textContent = orig; btn.style.color = ""; }, 1500);
+      });
+    }
+  });
+})();
+</script>
+
+</body>
+</html>

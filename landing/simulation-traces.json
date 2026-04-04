@@ -1,0 +1,392 @@
+[
+  {
+    "name": "Customer Support Router",
+    "description": "An LLM classifier routes customer requests to specialized agents: billing, technical, and general support.",
+    "duration_ms": 3200,
+    "agents": [
+      "Router",
+      "Billing Agent",
+      "Tech Agent",
+      "General Agent"
+    ],
+    "events": [
+      {
+        "t": 0,
+        "type": "input",
+        "agent": "Router",
+        "content": "I was charged twice for my subscription last month"
+      },
+      {
+        "t": 200,
+        "type": "thinking",
+        "agent": "Router",
+        "content": "Analyzing intent: billing issue (double charge)"
+      },
+      {
+        "t": 600,
+        "type": "route",
+        "agent": "Router",
+        "target": "Billing Agent",
+        "label": "billing_issue"
+      },
+      {
+        "t": 800,
+        "type": "tool_call",
+        "agent": "Billing Agent",
+        "tool": "lookup_account",
+        "args": "customer_id=usr_482"
+      },
+      {
+        "t": 1100,
+        "type": "tool_result",
+        "agent": "Billing Agent",
+        "tool": "lookup_account",
+        "result": "Account: Pro Plan, $29/mo. Last charge: Mar 1 ($29), Mar 1 ($29) DUPLICATE"
+      },
+      {
+        "t": 1400,
+        "type": "tool_call",
+        "agent": "Billing Agent",
+        "tool": "issue_refund",
+        "args": "amount=$29.00, reason=duplicate_charge"
+      },
+      {
+        "t": 1700,
+        "type": "tool_result",
+        "agent": "Billing Agent",
+        "tool": "issue_refund",
+        "result": "Refund #RF-7291 processed. $29.00 back to card ending 4242."
+      },
+      {
+        "t": 2000,
+        "type": "response",
+        "agent": "Billing Agent",
+        "content": "I found the duplicate charge from March 1. A refund of $29.00 has been issued to your card ending in 4242. It should appear within 3-5 business days."
+      },
+      {
+        "t": 2400,
+        "type": "usage",
+        "tokens": 847,
+        "cost": 0.0012,
+        "model": "gpt-4o-mini"
+      }
+    ]
+  },
+  {
+    "name": "Research Team",
+    "description": "Three agents collaborate: Researcher finds information, Writer drafts a report, Reviewer provides feedback in a loop.",
+    "duration_ms": 5800,
+    "agents": [
+      "Researcher",
+      "Writer",
+      "Reviewer"
+    ],
+    "events": [
+      {
+        "t": 0,
+        "type": "input",
+        "agent": "Researcher",
+        "content": "Research the impact of AI agents on software development productivity"
+      },
+      {
+        "t": 300,
+        "type": "tool_call",
+        "agent": "Researcher",
+        "tool": "web_search",
+        "args": "AI agents software development productivity 2026"
+      },
+      {
+        "t": 700,
+        "type": "tool_result",
+        "agent": "Researcher",
+        "tool": "web_search",
+        "result": "Found 5 relevant papers and articles on AI-assisted coding..."
+      },
+      {
+        "t": 1000,
+        "type": "tool_call",
+        "agent": "Researcher",
+        "tool": "web_search",
+        "args": "developer productivity metrics AI copilot studies"
+      },
+      {
+        "t": 1400,
+        "type": "tool_result",
+        "agent": "Researcher",
+        "tool": "web_search",
+        "result": "GitHub Copilot study: 55% faster task completion. Cursor: 40% reduction in debugging time."
+      },
+      {
+        "t": 1800,
+        "type": "response",
+        "agent": "Researcher",
+        "content": "Key findings: 1) AI coding assistants increase productivity 40-55%. 2) Biggest gains in boilerplate and test writing. 3) Code review quality improves with AI suggestions."
+      },
+      {
+        "t": 2000,
+        "type": "handoff",
+        "from": "Researcher",
+        "to": "Writer",
+        "data": "research_summary"
+      },
+      {
+        "t": 2200,
+        "type": "thinking",
+        "agent": "Writer",
+        "content": "Structuring report: Executive Summary, Key Findings, Data Points, Recommendations"
+      },
+      {
+        "t": 2800,
+        "type": "response",
+        "agent": "Writer",
+        "content": "# AI Agents and Developer Productivity\n\n## Executive Summary\nAI coding agents are transforming software development, with studies showing 40-55% productivity improvements..."
+      },
+      {
+        "t": 3000,
+        "type": "handoff",
+        "from": "Writer",
+        "to": "Reviewer",
+        "data": "draft_report"
+      },
+      {
+        "t": 3200,
+        "type": "thinking",
+        "agent": "Reviewer",
+        "content": "Checking: factual accuracy, citation quality, structure, actionable recommendations"
+      },
+      {
+        "t": 3800,
+        "type": "response",
+        "agent": "Reviewer",
+        "content": "REVISE: Good structure. Add specific numbers from the GitHub study. The recommendations section needs concrete next steps, not just observations."
+      },
+      {
+        "t": 4000,
+        "type": "route",
+        "agent": "Reviewer",
+        "target": "Writer",
+        "label": "needs_revision"
+      },
+      {
+        "t": 4200,
+        "type": "thinking",
+        "agent": "Writer",
+        "content": "Incorporating feedback: adding GitHub Copilot 55% stat, concrete recommendations"
+      },
+      {
+        "t": 4800,
+        "type": "response",
+        "agent": "Writer",
+        "content": "# AI Agents and Developer Productivity (Revised)\n\n## Executive Summary\nGitHub's 2025 study of 1,000 developers showed a 55% reduction in task completion time..."
+      },
+      {
+        "t": 5000,
+        "type": "handoff",
+        "from": "Writer",
+        "to": "Reviewer",
+        "data": "revised_report"
+      },
+      {
+        "t": 5200,
+        "type": "response",
+        "agent": "Reviewer",
+        "content": "APPROVED: Report now includes specific data points and actionable recommendations."
+      },
+      {
+        "t": 5400,
+        "type": "route",
+        "agent": "Reviewer",
+        "target": "END",
+        "label": "approved"
+      },
+      {
+        "t": 5600,
+        "type": "usage",
+        "tokens": 2340,
+        "cost": 0.0089,
+        "model": "gpt-4o"
+      }
+    ]
+  },
+  {
+    "name": "Provider Failover",
+    "description": "Primary provider (OpenAI) fails with a rate limit. Circuit breaker trips. Agent automatically falls over to Anthropic.",
+    "duration_ms": 4200,
+    "agents": [
+      "Agent",
+      "OpenAI",
+      "Anthropic"
+    ],
+    "events": [
+      {
+        "t": 0,
+        "type": "input",
+        "agent": "Agent",
+        "content": "Summarize the key points of quantum computing"
+      },
+      {
+        "t": 200,
+        "type": "provider_call",
+        "agent": "OpenAI",
+        "model": "gpt-4o",
+        "status": "calling"
+      },
+      {
+        "t": 500,
+        "type": "error",
+        "agent": "OpenAI",
+        "content": "429 Too Many Requests: Rate limit exceeded"
+      },
+      {
+        "t": 600,
+        "type": "retry",
+        "agent": "OpenAI",
+        "attempt": 1,
+        "backoff": "1.0s"
+      },
+      {
+        "t": 1600,
+        "type": "provider_call",
+        "agent": "OpenAI",
+        "model": "gpt-4o",
+        "status": "retry"
+      },
+      {
+        "t": 1900,
+        "type": "error",
+        "agent": "OpenAI",
+        "content": "429 Too Many Requests: Rate limit exceeded"
+      },
+      {
+        "t": 2000,
+        "type": "circuit_break",
+        "agent": "OpenAI",
+        "content": "Circuit breaker OPEN: 2 consecutive failures. Cooldown: 60s"
+      },
+      {
+        "t": 2100,
+        "type": "fallback",
+        "from": "OpenAI",
+        "to": "Anthropic",
+        "reason": "circuit_breaker_open"
+      },
+      {
+        "t": 2300,
+        "type": "provider_call",
+        "agent": "Anthropic",
+        "model": "claude-sonnet-4-6",
+        "status": "calling"
+      },
+      {
+        "t": 3200,
+        "type": "response",
+        "agent": "Anthropic",
+        "content": "Quantum computing leverages quantum mechanics principles like superposition and entanglement to process information fundamentally differently from classical computers..."
+      },
+      {
+        "t": 3400,
+        "type": "success",
+        "agent": "Anthropic",
+        "content": "Response received from fallback provider"
+      },
+      {
+        "t": 3600,
+        "type": "usage",
+        "tokens": 520,
+        "cost": 0.0031,
+        "model": "claude-sonnet-4-6"
+      }
+    ]
+  },
+  {
+    "name": "RAG Pipeline",
+    "description": "Document ingestion, hybrid search (BM25 + vector), reranking, and agent response with citations.",
+    "duration_ms": 3800,
+    "agents": [
+      "Indexer",
+      "Searcher",
+      "Agent"
+    ],
+    "events": [
+      {
+        "t": 0,
+        "type": "ingest",
+        "agent": "Indexer",
+        "content": "Loading 3 documents from knowledge base"
+      },
+      {
+        "t": 200,
+        "type": "chunk",
+        "agent": "Indexer",
+        "content": "Split into 12 chunks (avg 200 tokens each)"
+      },
+      {
+        "t": 500,
+        "type": "embed",
+        "agent": "Indexer",
+        "content": "Embedded 12 chunks with OpenAI text-embedding-3-small"
+      },
+      {
+        "t": 800,
+        "type": "store",
+        "agent": "Indexer",
+        "content": "Stored in vector store (12 vectors, 1536 dimensions)"
+      },
+      {
+        "t": 1000,
+        "type": "input",
+        "agent": "Agent",
+        "content": "What is our refund policy for enterprise customers?"
+      },
+      {
+        "t": 1200,
+        "type": "search",
+        "agent": "Searcher",
+        "content": "BM25 search: 'refund policy enterprise' (5 results)"
+      },
+      {
+        "t": 1400,
+        "type": "search",
+        "agent": "Searcher",
+        "content": "Vector search: semantic embedding (5 results)"
+      },
+      {
+        "t": 1600,
+        "type": "fusion",
+        "agent": "Searcher",
+        "content": "RRF fusion: merged 8 unique results from BM25 + vector"
+      },
+      {
+        "t": 1800,
+        "type": "rerank",
+        "agent": "Searcher",
+        "content": "Cross-encoder reranked: top 3 selected (scores: 0.94, 0.87, 0.72)"
+      },
+      {
+        "t": 2000,
+        "type": "context",
+        "agent": "Agent",
+        "content": "[Doc 1] Enterprise refund policy: Full refund within 30 days... [Doc 2] Enterprise SLA terms..."
+      },
+      {
+        "t": 2200,
+        "type": "thinking",
+        "agent": "Agent",
+        "content": "Found relevant policy in Doc 1. Synthesizing response with citation."
+      },
+      {
+        "t": 2800,
+        "type": "response",
+        "agent": "Agent",
+        "content": "Enterprise customers are eligible for a full refund within 30 days of purchase. After 30 days, pro-rated refunds are available for annual plans. Contact enterprise-support@company.com to initiate. [Source: enterprise-refund-policy.md]"
+      },
+      {
+        "t": 3200,
+        "type": "usage",
+        "tokens": 680,
+        "cost": 0.0008,
+        "model": "gpt-4o-mini"
+      }
+    ]
+  }
+]
