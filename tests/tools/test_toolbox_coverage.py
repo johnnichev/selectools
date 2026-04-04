@@ -1157,13 +1157,21 @@ class TestDateTimeToolsExceptionHandlers:
     """Cover generic except Exception handlers in datetime_tools."""
 
     def test_get_current_time_generic_exception(self) -> None:
-        """get_current_time handles unexpected errors."""
-        with mock.patch("selectools.toolbox.datetime_tools.datetime") as mock_dt:
-            mock_dt.now.side_effect = TypeError("bad")
-            mock_dt.strptime = None
-            # Need pytz to be importable for the try block to proceed
-            result = datetime_tools.get_current_time.function(timezone="UTC")
-        assert "Error" in result
+        """get_current_time handles unexpected errors for non-UTC timezone."""
+        # Create a proper mock pytz with real exception classes
+        mock_pytz = mock.MagicMock()
+        mock_pytz.exceptions.UnknownTimeZoneError = type("UnknownTimeZoneError", (Exception,), {})
+        mock_pytz.timezone.side_effect = RuntimeError("unexpected error")
+        with mock.patch.dict(
+            "sys.modules", {"pytz": mock_pytz, "pytz.exceptions": mock_pytz.exceptions}
+        ):
+            # Force reimport to pick up mock
+            import importlib
+
+            importlib.reload(datetime_tools)
+            result = datetime_tools.get_current_time.function(timezone="BadZone")
+            importlib.reload(datetime_tools)  # restore
+        assert "error" in result.lower() or "Error" in result
 
     def test_parse_datetime_generic_exception(self) -> None:
         """parse_datetime handles unexpected errors."""

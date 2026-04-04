@@ -381,6 +381,10 @@ class TestServeWithReload:
 
 
 class TestServeBuilder:
+    @pytest.mark.skipif(
+        not pytest.importorskip("starlette", reason="starlette not installed"),
+        reason="starlette not installed",
+    )
     def test_builder_with_uvicorn(self):
         from selectools.serve.cli import _serve_builder
 

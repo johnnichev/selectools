@@ -3,9 +3,11 @@
 import json
 
 import pytest
-from starlette.testclient import TestClient
 
-from selectools.serve._starlette_app import create_builder_app
+starlette = pytest.importorskip("starlette", reason="starlette not installed")
+from starlette.testclient import TestClient  # noqa: E402
+
+from selectools.serve._starlette_app import create_builder_app  # noqa: E402
 
 # ─── Health ──────────────────────────────────────────────────────────────────
 

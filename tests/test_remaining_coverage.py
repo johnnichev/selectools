@@ -2043,3 +2043,520 @@ class TestAgentCoreAstreamError:
         )
         with pytest.raises(RuntimeError, match="provider crashed"):
             await agent.arun("Hello")
+
+
+# ── 23. evals/pairwise.py — _compare_case branches ─────────────────────────
+
+
+class TestPairwiseCompareCases:
+    """Cover all branches of PairwiseEval._compare_case."""
+
+    def _make_case_result(
+        self,
+        verdict: str = "pass",
+        latency_ms: float = 100.0,
+        cost_usd: float = 0.001,
+        failures: int = 0,
+    ):
+        from selectools.evals.types import CaseResult, CaseVerdict, EvalFailure, TestCase
+
+        cr = MagicMock(spec=CaseResult)
+        cr.verdict = CaseVerdict.PASS if verdict == "pass" else CaseVerdict.FAIL
+        cr.latency_ms = latency_ms
+        cr.cost_usd = cost_usd
+        cr.failures = [MagicMock(spec=EvalFailure)] * failures
+        cr.case = TestCase(input="test", name="test")
+        cr.agent_result = MagicMock()
+        cr.agent_result.content = "response"
+        cr.agent_result.iterations = 1
+        cr.tool_calls = []
+        cr.error = None
+        return cr
+
+    def test_a_pass_b_fail(self):
+        from selectools.evals.pairwise import PairwiseEval
+
+        pe = PairwiseEval.__new__(PairwiseEval)
+        cr_a = self._make_case_result(verdict="pass")
+        cr_b = self._make_case_result(verdict="fail")
+        winner, reason = pe._compare_case(cr_a, cr_b)
+        assert winner == "A"
+
+    def test_b_pass_a_fail(self):
+        from selectools.evals.pairwise import PairwiseEval
+
+        pe = PairwiseEval.__new__(PairwiseEval)
+        cr_a = self._make_case_result(verdict="fail")
+        cr_b = self._make_case_result(verdict="pass")
+        winner, reason = pe._compare_case(cr_a, cr_b)
+        assert winner == "B"
+
+    def test_both_fail_a_fewer(self):
+        from selectools.evals.pairwise import PairwiseEval
+
+        pe = PairwiseEval.__new__(PairwiseEval)
+        cr_a = self._make_case_result(verdict="fail", failures=1)
+        cr_b = self._make_case_result(verdict="fail", failures=3)
+        winner, reason = pe._compare_case(cr_a, cr_b)
+        assert winner == "A"
+        assert "fewer" in reason
+
+    def test_both_fail_b_fewer(self):
+        from selectools.evals.pairwise import PairwiseEval
+
+        pe = PairwiseEval.__new__(PairwiseEval)
+        cr_a = self._make_case_result(verdict="fail", failures=3)
+        cr_b = self._make_case_result(verdict="fail", failures=1)
+        winner, reason = pe._compare_case(cr_a, cr_b)
+        assert winner == "B"
+
+    def test_both_fail_same(self):
+        from selectools.evals.pairwise import PairwiseEval
+
+        pe = PairwiseEval.__new__(PairwiseEval)
+        cr_a = self._make_case_result(verdict="fail", failures=2)
+        cr_b = self._make_case_result(verdict="fail", failures=2)
+        winner, reason = pe._compare_case(cr_a, cr_b)
+        assert winner == "tie"
+
+    def test_both_pass_a_faster(self):
+        from selectools.evals.pairwise import PairwiseEval
+
+        pe = PairwiseEval.__new__(PairwiseEval)
+        cr_a = self._make_case_result(latency_ms=50.0)
+        cr_b = self._make_case_result(latency_ms=200.0)
+        winner, reason = pe._compare_case(cr_a, cr_b)
+        assert winner == "A"
+        assert "faster" in reason
+
+    def test_both_pass_b_faster(self):
+        from selectools.evals.pairwise import PairwiseEval
+
+        pe = PairwiseEval.__new__(PairwiseEval)
+        cr_a = self._make_case_result(latency_ms=200.0)
+        cr_b = self._make_case_result(latency_ms=50.0)
+        winner, reason = pe._compare_case(cr_a, cr_b)
+        assert winner == "B"
+        assert "faster" in reason
+
+    def test_both_pass_a_cheaper(self):
+        from selectools.evals.pairwise import PairwiseEval
+
+        pe = PairwiseEval.__new__(PairwiseEval)
+        cr_a = self._make_case_result(latency_ms=100.0, cost_usd=0.001)
+        cr_b = self._make_case_result(latency_ms=100.0, cost_usd=0.01)
+        winner, reason = pe._compare_case(cr_a, cr_b)
+        assert winner == "A"
+        assert "cheaper" in reason
+
+    def test_both_pass_b_cheaper(self):
+        from selectools.evals.pairwise import PairwiseEval
+
+        pe = PairwiseEval.__new__(PairwiseEval)
+        cr_a = self._make_case_result(latency_ms=100.0, cost_usd=0.01)
+        cr_b = self._make_case_result(latency_ms=100.0, cost_usd=0.001)
+        winner, reason = pe._compare_case(cr_a, cr_b)
+        assert winner == "B"
+        assert "cheaper" in reason
+
+    def test_both_pass_tie(self):
+        from selectools.evals.pairwise import PairwiseEval
+
+        pe = PairwiseEval.__new__(PairwiseEval)
+        cr_a = self._make_case_result(latency_ms=100.0, cost_usd=0.001)
+        cr_b = self._make_case_result(latency_ms=100.0, cost_usd=0.001)
+        winner, reason = pe._compare_case(cr_a, cr_b)
+        assert winner == "tie"
+        assert "similar performance" in reason
+
+
+# ── 24. token_estimation.py — tiktoken model paths ──────────────────────────
+
+
+class TestTokenEstimationAdditional:
+    """Cover tiktoken-related code paths."""
+
+    def test_estimate_run_tokens_method_detection(self):
+        """Ensure method field reflects tiktoken availability."""
+        from selectools.token_estimation import estimate_run_tokens
+
+        msgs = [Message(role=Role.USER, content="Hello")]
+        result = estimate_run_tokens(
+            messages=msgs,
+            tools=[greet],
+            system_prompt="System",
+            model="gpt-4o",
+        )
+        # Method should be either "tiktoken" or "heuristic"
+        assert result.method in ("tiktoken", "heuristic")
+
+    def test_estimate_run_tokens_context_window(self):
+        """Check remaining_tokens calculation."""
+        from selectools.token_estimation import estimate_run_tokens
+
+        msgs = [Message(role=Role.USER, content="Hi")]
+        result = estimate_run_tokens(
+            messages=msgs,
+            tools=[],
+            system_prompt="",
+            model="gpt-4o",
+        )
+        if result.context_window > 0:
+            assert result.remaining_tokens == result.context_window - result.total_tokens
+        else:
+            assert result.remaining_tokens == 0
+
+
+# ── 25. trace.py — trace_to_json edge cases ────────────────────────────────
+
+
+class TestTraceAdditional:
+    """Cover trace_to_json with enum and dataclass serialization."""
+
+    def test_trace_to_json_with_enum_values(self):
+        trace = AgentTrace()
+        trace.steps.append(
+            TraceStep(
+                type=StepType.GRAPH_ROUTING,
+                duration_ms=5.0,
+                from_node="a",
+                to_node="b",
+            )
+        )
+        result = trace_to_json(trace)
+        parsed = json.loads(result)
+        # Enum values should be serialized as strings
+        assert parsed["steps"][0]["type"] == "graph_routing"
+
+
+# ── 26. agent/_tool_executor.py — async policy/coherence ────────────────────
+
+
+class TestToolExecutorAsync:
+    """Cover async policy and coherence paths."""
+
+    @pytest.mark.asyncio
+    async def test_async_policy_deny(self):
+        from selectools.policy import ToolPolicy
+
+        policy = ToolPolicy(deny=["greet"])
+
+        class ToolCallProvider(LocalProvider):
+            _called = False
+
+            def complete(self, **kwargs):
+                if not self._called:
+                    self._called = True
+                    msg = Message(
+                        role=Role.ASSISTANT,
+                        content="calling greet",
+                        tool_calls=[ToolCall(tool_name="greet", parameters={"name": "X"})],
+                    )
+                    return msg, UsageStats(
+                        prompt_tokens=5,
+                        completion_tokens=5,
+                        total_tokens=10,
+                        cost_usd=0.0,
+                        model="test",
+                    )
+                return Message(role=Role.ASSISTANT, content="Done"), UsageStats(
+                    prompt_tokens=5,
+                    completion_tokens=5,
+                    total_tokens=10,
+                    cost_usd=0.0,
+                    model="test",
+                )
+
+            @property
+            def supports_streaming(self):
+                return False
+
+            @property
+            def supports_async(self):
+                return False
+
+        provider = ToolCallProvider()
+        agent = Agent(
+            [greet],
+            provider=provider,
+            config=AgentConfig(model="test", max_iterations=3, tool_policy=policy),
+        )
+        result = await agent.arun("Greet X")
+        assert result.content is not None
+
+    @pytest.mark.asyncio
+    async def test_async_approval_gate_rejection(self):
+        """Approval callback that rejects in async."""
+
+        def rejector(tool_name, tool_args, reason):
+            return False
+
+        from selectools.policy import ToolPolicy
+
+        policy = ToolPolicy(review=["greet"])
+
+        class ToolCallProvider(LocalProvider):
+            _called = False
+
+            def complete(self, **kwargs):
+                if not self._called:
+                    self._called = True
+                    msg = Message(
+                        role=Role.ASSISTANT,
+                        content="calling greet",
+                        tool_calls=[ToolCall(tool_name="greet", parameters={"name": "X"})],
+                    )
+                    return msg, UsageStats(
+                        prompt_tokens=5,
+                        completion_tokens=5,
+                        total_tokens=10,
+                        cost_usd=0.0,
+                        model="test",
+                    )
+                return Message(role=Role.ASSISTANT, content="Done"), UsageStats(
+                    prompt_tokens=5,
+                    completion_tokens=5,
+                    total_tokens=10,
+                    cost_usd=0.0,
+                    model="test",
+                )
+
+            @property
+            def supports_streaming(self):
+                return False
+
+            @property
+            def supports_async(self):
+                return False
+
+        provider = ToolCallProvider()
+        agent = Agent(
+            [greet],
+            provider=provider,
+            config=AgentConfig(
+                model="test",
+                max_iterations=3,
+                tool_policy=policy,
+                confirm_action=rejector,
+                approval_timeout=5.0,
+            ),
+        )
+        result = await agent.arun("Greet X")
+        assert result.content is not None
+
+    @pytest.mark.asyncio
+    async def test_async_tool_error_handling(self):
+        """Cover async tool execution error path."""
+
+        @tool()
+        def failing_tool() -> str:
+            """Always fails."""
+            raise ValueError("tool broke")
+
+        class ToolCallProvider(LocalProvider):
+            _called = False
+
+            def complete(self, **kwargs):
+                if not self._called:
+                    self._called = True
+                    msg = Message(
+                        role=Role.ASSISTANT,
+                        content="calling",
+                        tool_calls=[ToolCall(tool_name="failing_tool", parameters={})],
+                    )
+                    return msg, UsageStats(
+                        prompt_tokens=5,
+                        completion_tokens=5,
+                        total_tokens=10,
+                        cost_usd=0.0,
+                        model="test",
+                    )
+                return Message(role=Role.ASSISTANT, content="Done"), UsageStats(
+                    prompt_tokens=5,
+                    completion_tokens=5,
+                    total_tokens=10,
+                    cost_usd=0.0,
+                    model="test",
+                )
+
+            @property
+            def supports_streaming(self):
+                return False
+
+            @property
+            def supports_async(self):
+                return False
+
+        provider = ToolCallProvider()
+        agent = Agent(
+            [failing_tool],
+            provider=provider,
+            config=AgentConfig(model="test", max_iterations=3),
+        )
+        result = await agent.arun("Call failing_tool")
+        assert result.content is not None
+
+    @pytest.mark.asyncio
+    async def test_async_parallel_tool_execution(self):
+        """Cover parallel tool execution in arun."""
+
+        @tool()
+        def add(a: int, b: int) -> str:
+            """Add two numbers."""
+            return str(a + b)
+
+        class MultiToolProvider(LocalProvider):
+            _called = False
+
+            def complete(self, **kwargs):
+                if not self._called:
+                    self._called = True
+                    msg = Message(
+                        role=Role.ASSISTANT,
+                        content="computing",
+                        tool_calls=[
+                            ToolCall(tool_name="add", parameters={"a": 1, "b": 2}),
+                            ToolCall(tool_name="add", parameters={"a": 3, "b": 4}),
+                        ],
+                    )
+                else:
+                    msg = Message(role=Role.ASSISTANT, content="3 and 7")
+                return msg, UsageStats(
+                    prompt_tokens=5,
+                    completion_tokens=5,
+                    total_tokens=10,
+                    cost_usd=0.0,
+                    model="test",
+                )
+
+            @property
+            def supports_streaming(self):
+                return False
+
+            @property
+            def supports_async(self):
+                return False
+
+        provider = MultiToolProvider()
+        agent = Agent(
+            [add],
+            provider=provider,
+            config=AgentConfig(model="test", max_iterations=5, parallel_tool_execution=True),
+        )
+        result = await agent.arun("Add 1+2 and 3+4")
+        assert result.content is not None
+
+
+# ── 27. observer.py — remaining observer events ────────────────────────────
+
+
+class TestObserverAdditional:
+    """Cover remaining LoggingObserver and SimpleStepObserver events."""
+
+    def test_logging_observer_model_switch(self):
+        from selectools.observer import LoggingObserver
+
+        obs = LoggingObserver()
+        obs.on_model_switch("r1", 2, "gpt-4o", "gpt-4o-mini")
+
+    def test_logging_observer_graph_events(self):
+        from selectools.observer import LoggingObserver
+
+        obs = LoggingObserver()
+        obs.on_stall_detected("r1", "node_a", 3)
+        obs.on_loop_detected("r1", "node_a", 2)
+        obs.on_supervisor_replan("r1", 1, "new plan text")
+
+    def test_hooks_adapter_iteration_events(self):
+        """Ensure HooksAdapter forwards iteration events."""
+        calls: list = []
+
+        def on_iteration_start(iteration, messages):
+            calls.append(("start", iteration))
+
+        def on_iteration_end(iteration, response):
+            calls.append(("end", iteration))
+
+        with pytest.warns(DeprecationWarning):
+            agent = _make_agent(
+                hooks={
+                    "on_iteration_start": on_iteration_start,
+                    "on_iteration_end": on_iteration_end,
+                }
+            )
+        agent.run("Hello")
+        assert any(c[0] == "start" for c in calls)
+        assert any(c[0] == "end" for c in calls)
+
+    def test_hooks_adapter_error_event(self):
+        """HooksAdapter should forward error events."""
+        errors: list = []
+
+        def on_error(error, context):
+            errors.append(str(error))
+
+        class ErrorProvider(LocalProvider):
+            def complete(self, **kwargs):
+                raise RuntimeError("boom")
+
+        with pytest.warns(DeprecationWarning):
+            agent = Agent(
+                [greet],
+                provider=ErrorProvider(),
+                config=AgentConfig(model="test", hooks={"on_error": on_error}),
+            )
+        with pytest.raises(RuntimeError):
+            agent.run("Hello")
+        assert len(errors) >= 1
+
+
+# ── 28. serve/_starlette_app.py — watch file and eval routes ────────────────
+
+
+class TestStarletteAppAdditional:
+    """Cover more Starlette app routes."""
+
+    @pytest.fixture
+    def no_auth_client(self):
+        try:
+            from starlette.testclient import TestClient
+
+            from selectools.serve._starlette_app import create_builder_app
+        except ImportError:
+            pytest.skip("starlette not installed")
+        app = create_builder_app(auth_token=None)
+        return TestClient(app)
+
+    def test_eval_route(self, no_auth_client):
+        resp = no_auth_client.post(
+            "/eval-route",
+            json={
+                "prompt": "test",
+                "system_prompt": "sys",
+                "eval_cases": [],
+                "threshold": 0.7,
+                "api_key": "",
+            },
+        )
+        assert resp.status_code == 200
+
+    def test_run_sse_with_nodes(self, no_auth_client):
+        resp = no_auth_client.post(
+            "/run",
+            json={
+                "input": "Hello",
+                "nodes": [
+                    {
+                        "id": "n1",
+                        "type": "agent",
+                        "data": {
+                            "model": "test",
+                            "system_prompt": "You are helpful",
+                        },
+                    }
+                ],
+                "edges": [],
+                "api_key": "",
+            },
+        )
+        assert resp.status_code == 200

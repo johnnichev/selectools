@@ -1064,7 +1064,7 @@ class TestTeamLeadParallelStrategy:
         from selectools.providers.stubs import LocalProvider
         from selectools.tools.base import Tool
 
-        provider = LocalProvider(responses=[response] * 5)
+        provider = LocalProvider()
         dummy_tool = Tool(
             name="noop",
             description="does nothing",
@@ -1709,7 +1709,7 @@ class TestGraphAgentNode:
         from selectools.providers.stubs import LocalProvider
         from selectools.tools.base import Tool
 
-        provider = LocalProvider(responses=["agent response"])
+        provider = LocalProvider()
         dummy_tool = Tool(
             name="noop",
             description="does nothing",
@@ -1743,7 +1743,7 @@ class TestGraphCustomInputTransform:
         from selectools.providers.stubs import LocalProvider
         from selectools.tools.base import Tool
 
-        provider = LocalProvider(responses=["response"])
+        provider = LocalProvider()
         dummy_tool = Tool(name="noop", description="x", parameters={}, function=lambda: "ok")
         agent = Agent(tools=[dummy_tool], provider=provider)
 
