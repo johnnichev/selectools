@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import csv
+import io
+import json
 import logging
+import re
+import urllib.request
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -225,6 +230,283 @@ class DocumentLoader:
             documents.append(Document(text=text, metadata=meta))
 
         return documents
+
+    @staticmethod
+    def from_csv(
+        path: str,
+        text_column: Optional[str] = None,
+        metadata_columns: Optional[List[str]] = None,
+        delimiter: str = ",",
+    ) -> List[Document]:
+        """
+        Load documents from a CSV file. One document per row.
+
+        If ``text_column`` is provided, that column's value becomes the document
+        text.  Otherwise all columns are concatenated as ``"key: value"`` pairs.
+
+        Args:
+            path: Path to the CSV file
+            text_column: Column name to use as document text (None = all columns)
+            metadata_columns: Column names to include in metadata (None = all except text)
+            delimiter: CSV delimiter (default: comma)
+
+        Returns:
+            List of Documents (one per row)
+
+        Example:
+            >>> docs = DocumentLoader.from_csv("data.csv", text_column="content")
+        """
+        file_path = Path(path)
+        if not file_path.exists():
+            raise FileNotFoundError(f"CSV file not found: {path}")
+
+        try:
+            content = file_path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            content = file_path.read_text(encoding="latin-1")
+
+        reader = csv.DictReader(io.StringIO(content), delimiter=delimiter)
+        fieldnames: List[str] = list(reader.fieldnames or [])
+
+        if text_column is not None and text_column not in fieldnames:
+            raise ValueError(f"text_column {text_column!r} not found in CSV columns: {fieldnames}")
+
+        documents: List[Document] = []
+        for row_idx, row in enumerate(reader):
+            # Build text
+            if text_column is not None:
+                text = row.get(text_column, "") or ""
+            else:
+                text = "\n".join(f"{k}: {v}" for k, v in row.items() if v)
+
+            if not text.strip():
+                continue
+
+            # Build metadata
+            meta: Dict[str, Any] = {"source": str(file_path), "row": row_idx}
+            if metadata_columns is not None:
+                for col in metadata_columns:
+                    if col in row:
+                        meta[col] = row[col]
+            else:
+                # Include all columns except the text column
+                for col in fieldnames:
+                    if col != text_column:
+                        meta[col] = row.get(col, "")
+
+            documents.append(Document(text=text, metadata=meta))
+
+        return documents
+
+    @staticmethod
+    def from_json(
+        path: str,
+        text_field: str = "text",
+        metadata_fields: Optional[List[str]] = None,
+    ) -> List[Document]:
+        """
+        Load documents from a JSON file.
+
+        Handles both JSON arrays (each item becomes a Document) and single
+        objects (one Document).
+
+        Args:
+            path: Path to the JSON file
+            text_field: Key whose value becomes the document text (default: "text")
+            metadata_fields: Keys to include in metadata (None = all except text_field)
+
+        Returns:
+            List of Documents
+
+        Example:
+            >>> docs = DocumentLoader.from_json("articles.json", text_field="body")
+        """
+        file_path = Path(path)
+        if not file_path.exists():
+            raise FileNotFoundError(f"JSON file not found: {path}")
+
+        try:
+            content = file_path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            content = file_path.read_text(encoding="latin-1")
+
+        data = json.loads(content)
+
+        items: List[Dict[str, Any]]
+        if isinstance(data, list):
+            items = data
+        elif isinstance(data, dict):
+            items = [data]
+        else:
+            raise ValueError(f"Expected JSON array or object, got {type(data).__name__}")
+
+        documents: List[Document] = []
+        for item in items:
+            if not isinstance(item, dict):
+                logger.warning("Skipping non-object JSON item: %s", type(item).__name__)
+                continue
+
+            text = str(item.get(text_field, ""))
+            if not text.strip():
+                continue
+
+            meta: Dict[str, Any] = {"source": str(file_path)}
+            if metadata_fields is not None:
+                for field in metadata_fields:
+                    if field in item:
+                        meta[field] = item[field]
+            else:
+                for key, value in item.items():
+                    if key != text_field:
+                        meta[key] = value
+
+            documents.append(Document(text=text, metadata=meta))
+
+        return documents
+
+    @staticmethod
+    def from_html(
+        path: str,
+        selector: Optional[str] = None,
+        strip_tags: bool = True,
+    ) -> List[Document]:
+        """
+        Load documents from an HTML file.
+
+        Uses BeautifulSoup if available for CSS selector support and clean text
+        extraction.  Falls back to regex-based tag stripping when BeautifulSoup
+        is not installed.
+
+        Args:
+            path: Path to the HTML file
+            selector: CSS selector to narrow content (requires BeautifulSoup)
+            strip_tags: Whether to strip HTML tags from text (default: True)
+
+        Returns:
+            List containing one or more Documents
+
+        Example:
+            >>> docs = DocumentLoader.from_html("page.html", selector="article")
+        """
+        file_path = Path(path)
+        if not file_path.exists():
+            raise FileNotFoundError(f"HTML file not found: {path}")
+
+        try:
+            raw_html = file_path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            raw_html = file_path.read_text(encoding="latin-1")
+
+        return DocumentLoader._parse_html(
+            raw_html, source=str(file_path), selector=selector, strip_tags=strip_tags
+        )
+
+    @staticmethod
+    def from_url(
+        url: str,
+        selector: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+        timeout: float = 30.0,
+    ) -> List[Document]:
+        """
+        Fetch a URL and load as document.
+
+        Delegates to :meth:`from_html` for HTML content, or
+        :meth:`from_text` for plain text.
+
+        Args:
+            url: URL to fetch
+            selector: CSS selector for HTML content (requires BeautifulSoup)
+            headers: Optional HTTP headers dict
+            timeout: Request timeout in seconds (default: 30)
+
+        Returns:
+            List of Documents
+
+        Example:
+            >>> docs = DocumentLoader.from_url("https://example.com/article")
+        """
+        req = urllib.request.Request(url, headers=headers or {})
+
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                content_type: str = response.headers.get("Content-Type", "")
+                raw_bytes: bytes = response.read()
+        except urllib.error.HTTPError as e:
+            raise ValueError(f"HTTP error fetching {url}: {e.code} {e.reason}") from e
+        except urllib.error.URLError as e:
+            raise ConnectionError(f"Could not connect to {url}: {e.reason}") from e
+
+        # Decode response body
+        encoding = "utf-8"
+        if "charset=" in content_type:
+            encoding = content_type.split("charset=")[-1].split(";")[0].strip()
+        try:
+            text = raw_bytes.decode(encoding)
+        except (UnicodeDecodeError, LookupError):
+            text = raw_bytes.decode("latin-1")
+
+        base_meta: Dict[str, Any] = {"source": url, "content_type": content_type}
+
+        if "html" in content_type.lower():
+            docs = DocumentLoader._parse_html(text, source=url, selector=selector, strip_tags=True)
+            for doc in docs:
+                doc.metadata.update(base_meta)
+            return docs
+
+        # Plain text (or other non-HTML)
+        return [Document(text=text, metadata=base_meta)]
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _parse_html(
+        raw_html: str,
+        source: str,
+        selector: Optional[str] = None,
+        strip_tags: bool = True,
+    ) -> List[Document]:
+        """Parse HTML into Documents, using BeautifulSoup when available."""
+        try:
+            from bs4 import BeautifulSoup  # type: ignore[import-untyped]
+
+            soup = BeautifulSoup(raw_html, "html.parser")
+
+            if selector:
+                elements = soup.select(selector)
+                if not elements:
+                    return []
+                documents = []
+                for elem in elements:
+                    text = elem.get_text(separator="\n", strip=True) if strip_tags else str(elem)
+                    if text.strip():
+                        documents.append(Document(text=text, metadata={"source": source}))
+                return documents
+
+            text = soup.get_text(separator="\n", strip=True) if strip_tags else raw_html
+            if not text.strip():
+                return []
+            return [Document(text=text, metadata={"source": source})]
+
+        except ImportError:
+            if selector:
+                logger.warning(
+                    "BeautifulSoup not installed — CSS selector %r will be ignored. "
+                    "Install with: pip install beautifulsoup4",
+                    selector,
+                )
+            if strip_tags:
+                text = re.sub(r"<[^>]+>", "", raw_html)
+                # Collapse excessive whitespace
+                text = re.sub(r"\n{3,}", "\n\n", text).strip()
+            else:
+                text = raw_html
+
+            if not text.strip():
+                return []
+            return [Document(text=text, metadata={"source": source})]
 
 
 __all__ = ["DocumentLoader"]

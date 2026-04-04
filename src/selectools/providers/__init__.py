@@ -1,6 +1,7 @@
 """Provider implementations for various LLM backends."""
 
 from .anthropic_provider import AnthropicProvider
+from .azure_openai_provider import AzureOpenAIProvider
 from .base import Provider, ProviderError
 from .fallback import FallbackProvider
 from .gemini_provider import GeminiProvider
@@ -12,6 +13,7 @@ __all__ = [
     "Provider",
     "ProviderError",
     "OpenAIProvider",
+    "AzureOpenAIProvider",
     "AnthropicProvider",
     "GeminiProvider",
     "OllamaProvider",
