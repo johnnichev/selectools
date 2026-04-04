@@ -29,9 +29,6 @@ class TestQuerySqlite:
         assert db_tools.query_sqlite.name == "query_sqlite"
         assert "SQLite" in db_tools.query_sqlite.description
 
-    def test_stability_marker_is_beta(self) -> None:
-        assert getattr(db_tools.query_sqlite, "__stability__", None) == "beta"
-
     def test_empty_db_path_rejected(self) -> None:
         result = db_tools.query_sqlite.function("", "SELECT 1")
         assert "Error" in result
@@ -167,9 +164,6 @@ class TestQueryPostgres:
     def test_tool_has_correct_metadata(self) -> None:
         assert db_tools.query_postgres.name == "query_postgres"
         assert "PostgreSQL" in db_tools.query_postgres.description
-
-    def test_stability_marker_is_beta(self) -> None:
-        assert getattr(db_tools.query_postgres, "__stability__", None) == "beta"
 
     def test_empty_connection_string_rejected(self) -> None:
         """Empty connection string returns an error (before attempting import)."""

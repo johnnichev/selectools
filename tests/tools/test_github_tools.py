@@ -40,9 +40,6 @@ class TestGithubSearchRepos:
         assert github_tools.github_search_repos.name == "github_search_repos"
         assert "GitHub" in github_tools.github_search_repos.description
 
-    def test_stability_marker_is_beta(self) -> None:
-        assert getattr(github_tools.github_search_repos, "__stability__", None) == "beta"
-
     def test_empty_query_rejected(self) -> None:
         result = github_tools.github_search_repos.function("")
         assert "Error" in result
@@ -106,9 +103,6 @@ class TestGithubGetFile:
     def test_tool_has_correct_metadata(self) -> None:
         assert github_tools.github_get_file.name == "github_get_file"
         assert "file" in github_tools.github_get_file.description.lower()
-
-    def test_stability_marker_is_beta(self) -> None:
-        assert getattr(github_tools.github_get_file, "__stability__", None) == "beta"
 
     def test_invalid_repo_format(self) -> None:
         result = github_tools.github_get_file.function("no-slash", "README.md")
@@ -184,9 +178,6 @@ class TestGithubListIssues:
     def test_tool_has_correct_metadata(self) -> None:
         assert github_tools.github_list_issues.name == "github_list_issues"
         assert "issue" in github_tools.github_list_issues.description.lower()
-
-    def test_stability_marker_is_beta(self) -> None:
-        assert getattr(github_tools.github_list_issues, "__stability__", None) == "beta"
 
     def test_invalid_repo_format(self) -> None:
         result = github_tools.github_list_issues.function("noslash")

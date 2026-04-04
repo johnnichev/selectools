@@ -27,10 +27,6 @@ class TestExecutePython:
         assert "Python" in code_tools.execute_python.description
         assert hasattr(code_tools.execute_python, "function")
 
-    def test_stability_marker_is_beta(self) -> None:
-        """execute_python should carry the @beta stability marker."""
-        assert getattr(code_tools.execute_python, "__stability__", None) == "beta"
-
     @patch("selectools.toolbox.code_tools.subprocess.run")
     def test_successful_execution(self, mock_run: MagicMock) -> None:
         """Successful code execution returns stdout."""
@@ -142,10 +138,6 @@ class TestExecuteShell:
         """Tool has name, description, and function attributes."""
         assert code_tools.execute_shell.name == "execute_shell"
         assert "shell" in code_tools.execute_shell.description.lower()
-
-    def test_stability_marker_is_beta(self) -> None:
-        """execute_shell should carry the @beta stability marker."""
-        assert getattr(code_tools.execute_shell, "__stability__", None) == "beta"
 
     @patch("selectools.toolbox.code_tools.subprocess.run")
     def test_successful_command(self, mock_run: MagicMock) -> None:

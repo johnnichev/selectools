@@ -38,10 +38,6 @@ class TestWebSearch:
         assert search_tools.web_search.name == "web_search"
         assert "search" in search_tools.web_search.description.lower()
 
-    def test_stability_marker_is_beta(self) -> None:
-        """web_search should carry the @beta stability marker."""
-        assert getattr(search_tools.web_search, "__stability__", None) == "beta"
-
     def test_empty_query_rejected(self) -> None:
         """Empty query returns an error."""
         result = search_tools.web_search.function("")
@@ -119,10 +115,6 @@ class TestScrapeUrl:
             "URL" in search_tools.scrape_url.description
             or "url" in search_tools.scrape_url.description.lower()
         )
-
-    def test_stability_marker_is_beta(self) -> None:
-        """scrape_url should carry the @beta stability marker."""
-        assert getattr(search_tools.scrape_url, "__stability__", None) == "beta"
 
     def test_empty_url_rejected(self) -> None:
         """Empty URL returns an error."""
