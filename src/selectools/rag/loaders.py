@@ -403,7 +403,8 @@ class DocumentLoader:
                 logger.warning("Skipping non-object JSON item: %s", type(item).__name__)
                 continue
 
-            text = str(item.get(text_field, ""))
+            raw_text = item.get(text_field, "")
+            text = str(raw_text) if raw_text is not None else ""
             if not text.strip():
                 continue
 

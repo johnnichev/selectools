@@ -119,7 +119,8 @@ class VectorStore(ABC):
         Factory method to create a vector store.
 
         Args:
-            backend: Backend type ("memory", "sqlite", "chroma", "pinecone")
+            backend: Backend type ("memory", "sqlite", "chroma", "pinecone",
+                     "faiss", "qdrant", "pgvector")
             embedder: Embedding provider to use for computing embeddings
             **kwargs: Additional backend-specific arguments
 
@@ -149,10 +150,22 @@ class VectorStore(ABC):
             from .stores.pinecone import PineconeVectorStore
 
             return PineconeVectorStore(embedder, **kwargs)
+        elif backend == "faiss":
+            from .stores.faiss import FAISSVectorStore
+
+            return FAISSVectorStore(embedder, **kwargs)
+        elif backend == "qdrant":
+            from .stores.qdrant import QdrantVectorStore
+
+            return QdrantVectorStore(embedder, **kwargs)
+        elif backend == "pgvector":
+            from .stores.pgvector import PgVectorStore
+
+            return PgVectorStore(embedder, **kwargs)
         else:
             raise ValueError(
                 f"Unknown vector store backend: {backend}. "
-                f"Supported: memory, sqlite, chroma, pinecone"
+                f"Supported: memory, sqlite, chroma, pinecone, faiss, qdrant, pgvector"
             )
 
 

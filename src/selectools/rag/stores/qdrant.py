@@ -358,12 +358,14 @@ class QdrantVectorStore(VectorStore):
         if not isinstance(filter, dict):
             return filter
 
-        # Simple equality-based filter
+        # Simple equality-based filter.  User metadata is stored under the
+        # nested ``_st_meta`` payload field, so filter keys must be prefixed
+        # with ``_st_meta.`` for Qdrant's nested field access syntax.
         conditions: List[Any] = []
         for key, value in filter.items():
             conditions.append(
                 models.FieldCondition(
-                    key=key,
+                    key=f"_st_meta.{key}",
                     match=models.MatchValue(value=value),
                 )
             )
