@@ -1,0 +1,53 @@
+{
+  "hooks": {
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c \"import json,sys; lines=open('CLAUDE.md').readlines()[:30]; json.dump({'hookSpecificOutput':{'hookEventName':'PostCompact','additionalContext':''.join(lines)}},sys.stdout)\"",
+            "timeout": 5,
+            "statusMessage": "Re-injecting CLAUDE.md rules..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // .tool_response.filePath' | { read -r f; if echo \"$f\" | grep -qE '\\.py$'; then black \"$f\" --line-length=100 -q && isort \"$f\" --profile=black --line-length=100 -q; fi; } 2>/dev/null || true",
+            "timeout": 15,
+            "statusMessage": "Auto-formatting..."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.command' | { read -r cmd; if echo \"$cmd\" | grep -qE 'git\\s+push\\s+.*\\b(main|master)\\b'; then echo '{\"decision\":\"block\",\"reason\":\"Direct push to main/master is blocked. Use a feature branch + PR.\"}'; fi; } 2>/dev/null || true",
+            "timeout": 5,
+            "statusMessage": "Checking push target..."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.command' | { read -r cmd; if echo \"$cmd\" | grep -qE 'git\\s+commit'; then result=$(flake8 src/ --count -q 2>&1 | tail -1); if [ \"$result\" != \"0\" ] && [ -n \"$result\" ]; then echo \"{\\\"decision\\\":\\\"block\\\",\\\"reason\\\":\\\"flake8 found $result issue(s). Fix before committing.\\\"}\"; fi; fi; } 2>/dev/null || true",
+            "timeout": 30,
+            "statusMessage": "Running flake8..."
+          }
+        ]
+      }
+    ]
+  }
+}
