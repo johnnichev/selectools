@@ -401,6 +401,16 @@ Every `AgentTrace` contains `TraceStep` entries with one of these types:
 
 21. **Python 3.10+ `X | None` union syntax in tool parameters**: `typing.get_origin(str | None)` returns `types.UnionType` on Python 3.10+, not `typing.Union`. `_unwrap_type()` must handle both to avoid `ToolValidationError` when users annotate tool parameters with `str | None` instead of `Optional[str]`.
 
+22. **Zero/falsy confusion with `or` defaults**: Never use `x = x or default` when `0`, `""`, or `[]` are valid values. `days=0` with `days = days or 7` silently becomes `7`. Always use `x = default if x is None else x`. This bit us in `KnowledgeMemory.get_recent_logs(days=0)`, `FileKnowledgeStore.prune(max_age_days=0)`, and their Redis/Supabase variants.
+
+23. **`_system_prompt` must be saved before `_prepare_run()`**: The `try/finally` block that restores `_system_prompt` must wrap the `_prepare_run()` call, not just the iteration loop. If `_prepare_run` raises after modifying the prompt (e.g., for `response_format` schema injection), the prompt is never restored and all subsequent `run()` calls use a corrupted prompt.
+
+24. **Early-exit result builders must persist state**: `_build_max_iterations_result`, `_build_budget_exceeded_result`, and `_build_cancelled_result` must call `_session_save()` and (for non-cancellation exits) `_extract_entities()` and `_extract_kg_triples()`. Without this, conversations ending via budget/iteration limits lose their session and knowledge state.
+
+25. **`ConversationMemory.branch()` must deep-copy Messages**: Use `dataclasses.replace()` on every Message, not just those with `tool_calls`. Shared references mean mutating a message on one branch silently corrupts the other. Also: `image_base64` is `init=False`, so `replace()` resets it to `None` — restore it explicitly after copying.
+
+26. **SVG badge content must be XML-escaped**: `generate_badge()` interpolates label/value into SVG XML. Use `xml.sax.saxutils.escape()` to prevent SVG injection via `<`, `>`, `&`, or `"` in user-provided labels.
+
 ## Current Roadmap
 
 - **v0.15.0** ✅ Enterprise Reliability (guardrails, audit, screening, coherence)
