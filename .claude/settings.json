@@ -1,5 +1,16 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c \"import os,time,json; stale=[f for f in ['CLAUDE.md','AGENTS.md'] if os.path.exists(f) and time.time()-os.path.getmtime(f)>14*86400]; msg='\\n'.join(f'Warning: {f} is over 14 days old — review for staleness' for f in stale); print(json.dumps({'systemMessage':msg}) if msg else '{}')\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
     "PostCompact": [
       {
         "hooks": [

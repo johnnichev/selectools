@@ -9,6 +9,8 @@ Production-ready Python library for AI agents with tool calling, RAG, and multi-
 See `AGENTS.md` for commands, boundaries, and condensed landmines.
 See subdirectory `CLAUDE.md` files for scoped rules: `tests/`, `src/selectools/`, `docs/`.
 
+**Session workflow:** At ~40 messages or when context feels heavy: update `HANDOFF.md` with current state, run `/clear`, start fresh. This outperforms auto-compaction.
+
 ## Commands
 
 ```bash

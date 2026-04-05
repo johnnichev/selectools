@@ -87,3 +87,10 @@ cp CHANGELOG.md docs/CHANGELOG.md && mkdocs build
 - **mkdocs.yml YAML check**: needs `args: ["--unsafe"]` for Python emoji tags
 - **MkDocs links**: files outside `docs/` MUST use absolute GitHub URLs
 - **Every feature needs**: source + exports in `__init__.py` + tests + module docs + example
+
+## Subagent Patterns
+
+- **Bug hunts**: use `/bug-hunt` (parallel read-only audit) or `/ralph-bug-hunt module loops=N` (auto-fix loop)
+- **Fan-out**: for 2+ independent tasks, dispatch parallel agents. Each agent MUST work on separate files
+- **Worktrees**: use `isolation: "worktree"` for agents that need to make changes without conflicting with the main workspace
+- **Quality gate**: after parallel agents complete, run `pytest tests/ -x -q` on the merged result before committing
