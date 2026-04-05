@@ -1,0 +1,45 @@
+# Landing page (HTML/CSS/JS, not Python source)
+landing/
+
+# Jupyter notebooks
+notebooks/
+
+# Doc assets (CSS/JS, not content)
+docs/stylesheets/
+docs/javascripts/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+site/
+
+# Bytecode
+*.pyc
+__pycache__/
+
+# Coverage
+htmlcov/
+
+# Logs
+logs/
+*.log
+
+# Private strategy docs
+.private/
+
+# One-off scripts
+scripts/
+
+# Generated artifacts
+*.db
+*.sqlite
+*.sqlite3
+*_with_bbox.png
+mypy_output.txt
+
+# Test/tool caches
+.pytest_cache/
+.mypy_cache/
+.hypothesis/
+.cache/
