@@ -19,6 +19,7 @@ class TestLangfuseObserver:
             obs._langfuse = mock_client
             obs._traces = {}
             obs._generations = {}
+            obs._llm_counter = 0
         return obs, mock_client
 
     def test_import_error(self):
@@ -73,7 +74,7 @@ class TestLangfuseObserver:
         obs._traces["run1"] = mock_trace
         obs.on_llm_start("run1", [{"role": "user", "content": "hi"}], "gpt-4o", "prompt")
         mock_trace.generation.assert_called_once()
-        assert "run1:llm" in obs._generations
+        assert "run1:llm:1" in obs._generations
 
     def test_llm_start_no_trace(self):
         obs, _ = self._make_observer()
@@ -82,7 +83,7 @@ class TestLangfuseObserver:
     def test_llm_end_updates_generation(self):
         obs, _ = self._make_observer()
         mock_gen = MagicMock()
-        obs._generations["run1:llm"] = mock_gen
+        obs._generations["run1:llm:1"] = mock_gen
         usage = MagicMock()
         usage.prompt_tokens = 50
         usage.completion_tokens = 30
@@ -93,7 +94,7 @@ class TestLangfuseObserver:
     def test_llm_end_no_usage(self):
         obs, _ = self._make_observer()
         mock_gen = MagicMock()
-        obs._generations["run1:llm"] = mock_gen
+        obs._generations["run1:llm:1"] = mock_gen
         obs.on_llm_end("run1", "response", None)
         mock_gen.update.assert_called_once()
 
@@ -131,6 +132,93 @@ class TestLangfuseObserver:
         obs, client = self._make_observer()
         client.flush.side_effect = Exception("fail")
         obs.shutdown()  # Should not raise
+
+    def test_multi_iteration_llm_no_overwrite(self):
+        """Regression: Bug 8 — multiple LLM calls must not overwrite generations."""
+        obs, _ = self._make_observer()
+        mock_trace = MagicMock()
+        gen1 = MagicMock()
+        gen2 = MagicMock()
+        mock_trace.generation.side_effect = [gen1, gen2]
+        obs._traces["run1"] = mock_trace
+
+        obs.on_llm_start("run1", [], "gpt-4o", "prompt")
+        assert "run1:llm:1" in obs._generations
+        assert obs._generations["run1:llm:1"] is gen1
+
+        # End the first
+        obs.on_llm_end("run1", "response 1", None)
+        gen1.update.assert_called_once()
+
+        # Start a second — must not overwrite the first key
+        obs.on_llm_start("run1", [], "gpt-4o", "prompt")
+        assert "run1:llm:2" in obs._generations
+        assert obs._generations["run1:llm:2"] is gen2
+
+        obs.on_llm_end("run1", "response 2", None)
+        gen2.update.assert_called_once()
+
+    def test_concurrent_llm_generations_resolved_correctly(self):
+        """Regression: Bug 8 — on_llm_end picks the highest-numbered generation."""
+        obs, _ = self._make_observer()
+        mock_trace = MagicMock()
+        gen1 = MagicMock()
+        gen2 = MagicMock()
+        mock_trace.generation.side_effect = [gen1, gen2]
+        obs._traces["run1"] = mock_trace
+
+        obs.on_llm_start("run1", [], "gpt-4o", "prompt")
+        obs.on_llm_start("run1", [], "gpt-4o", "prompt")
+
+        # End should close the most recent (gen2)
+        obs.on_llm_end("run1", "response", None)
+        gen2.update.assert_called_once()
+        gen1.update.assert_not_called()
+        assert "run1:llm:1" in obs._generations  # gen1 still open
+
+    def test_run_end_cleans_up_orphaned_generations(self):
+        """Regression: Bug 18 — orphaned generations cleaned up on run end."""
+        obs, client = self._make_observer()
+        mock_trace = MagicMock()
+        orphan_llm = MagicMock()
+        orphan_tool = MagicMock()
+        obs._traces["run1"] = mock_trace
+        obs._generations["run1:llm:1"] = orphan_llm
+        obs._generations["run1:tool:call99"] = orphan_tool
+
+        result = MagicMock()
+        result.content = "done"
+        result.usage = None
+        del result.iterations
+        obs.on_run_end("run1", result)
+
+        # Orphans should be updated with error
+        orphan_llm.update.assert_called_once()
+        orphan_tool.update.assert_called_once()
+        # Trace updated and flushed
+        mock_trace.update.assert_called_once()
+        client.flush.assert_called_once()
+        # All cleaned up
+        assert not any(k.startswith("run1") for k in obs._generations)
+        assert "run1" not in obs._traces
+
+    def test_run_end_orphan_cleanup_does_not_affect_other_runs(self):
+        """Orphan cleanup must only touch generations for the given run_id."""
+        obs, client = self._make_observer()
+        mock_trace = MagicMock()
+        run2_gen = MagicMock()
+        obs._traces["run1"] = mock_trace
+        obs._generations["run2:llm:1"] = run2_gen
+
+        result = MagicMock()
+        result.content = "done"
+        result.usage = None
+        del result.iterations
+        obs.on_run_end("run1", result)
+
+        # run2's generation should be untouched
+        run2_gen.update.assert_not_called()
+        assert "run2:llm:1" in obs._generations
 
     def test_stability_marker(self):
         obs, _ = self._make_observer()

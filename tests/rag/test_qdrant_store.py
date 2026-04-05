@@ -329,35 +329,37 @@ class TestQdrantAddDocuments:
     def test_add_documents_stores_text_in_payload(
         self, qdrant_store: Any, sample_documents: list[Document]
     ) -> None:
-        """Document text is stored in payload under __selectools_text__."""
+        """Document text is stored in payload under _st_text."""
         qdrant_store.add_documents(sample_documents)
 
         call_kwargs = qdrant_store.client.upsert.call_args[1]
         point = call_kwargs["points"][0]
-        assert point.payload["__selectools_text__"] == sample_documents[0].text
+        assert point.payload["_st_text"] == sample_documents[0].text
 
     def test_add_documents_preserves_metadata(
         self, qdrant_store: Any, sample_documents: list[Document]
     ) -> None:
-        """User metadata is preserved in the payload."""
+        """User metadata is preserved in the payload under _st_meta."""
         qdrant_store.add_documents(sample_documents)
 
         call_kwargs = qdrant_store.client.upsert.call_args[1]
         point = call_kwargs["points"][0]
-        assert point.payload["category"] == "animals"
-        assert point.payload["source"] == "test1.txt"
+        assert point.payload["_st_meta"]["category"] == "animals"
+        assert point.payload["_st_meta"]["source"] == "test1.txt"
 
-    def test_add_documents_returns_deterministic_ids(
+    def test_add_documents_returns_unique_ids(
         self, qdrant_store: Any, sample_documents: list[Document]
     ) -> None:
-        """IDs are deterministic (SHA256 based)."""
+        """IDs are unique UUIDs (no collisions across calls)."""
         ids1 = qdrant_store.add_documents(sample_documents)
         qdrant_store._collection_exists = True  # skip re-check
         ids2 = qdrant_store.add_documents(sample_documents)
 
-        assert ids1 == ids2
-        for doc_id in ids1:
-            assert doc_id.startswith("doc_")
+        # Each call returns unique IDs
+        assert len(set(ids1)) == len(ids1)
+        assert len(set(ids2)) == len(ids2)
+        # IDs across calls must not collide
+        assert set(ids1).isdisjoint(set(ids2))
 
 
 # ============================================================================
@@ -374,11 +376,11 @@ class TestQdrantSearch:
         mock_qdrant_client_module: MagicMock,
     ) -> None:
         """Search returns properly structured SearchResult objects."""
-        # Set up mock search results
+        # Set up mock search results using the new _st_text/_st_meta structure
         scored_point = MagicMock()
         scored_point.payload = {
-            "__selectools_text__": "Hello world",
-            "source": "test.txt",
+            "_st_text": "Hello world",
+            "_st_meta": {"source": "test.txt"},
         }
         scored_point.score = 0.95
         qdrant_store.client.search.return_value = [scored_point]
@@ -413,20 +415,39 @@ class TestQdrantSearch:
         results = qdrant_store.search([0.1] * 128)
         assert results == []
 
-    def test_search_strips_internal_metadata(self, qdrant_store: Any) -> None:
-        """__selectools_text__ is stripped from metadata in results."""
+    def test_search_uses_namespaced_payload(self, qdrant_store: Any) -> None:
+        """Internal _st_text/_st_meta keys are unpacked correctly."""
         scored_point = MagicMock()
         scored_point.payload = {
-            "__selectools_text__": "Some text",
-            "author": "Alice",
+            "_st_text": "Some text",
+            "_st_meta": {"author": "Alice"},
         }
         scored_point.score = 0.8
         qdrant_store.client.search.return_value = [scored_point]
 
         results = qdrant_store.search([0.1] * 128)
 
+        assert results[0].document.text == "Some text"
+        assert results[0].document.metadata == {"author": "Alice"}
+        # Internal keys must not leak into metadata
+        assert "_st_text" not in results[0].document.metadata
+        assert "_st_meta" not in results[0].document.metadata
+
+    def test_search_legacy_payload_fallback(self, qdrant_store: Any) -> None:
+        """Legacy __selectools_text__ payload is still read correctly."""
+        scored_point = MagicMock()
+        scored_point.payload = {
+            "__selectools_text__": "Legacy text",
+            "author": "Bob",
+        }
+        scored_point.score = 0.7
+        qdrant_store.client.search.return_value = [scored_point]
+
+        results = qdrant_store.search([0.1] * 128)
+
+        assert results[0].document.text == "Legacy text"
+        assert results[0].document.metadata == {"author": "Bob"}
         assert "__selectools_text__" not in results[0].document.metadata
-        assert results[0].document.metadata["author"] == "Alice"
 
     def test_search_handles_none_payload(self, qdrant_store: Any) -> None:
         """Search handles points with None payload gracefully."""
@@ -477,7 +498,7 @@ class TestQdrantSearch:
             ]
         ):
             pt = MagicMock()
-            pt.payload = {"__selectools_text__": text}
+            pt.payload = {"_st_text": text, "_st_meta": {}}
             pt.score = score
             points.append(pt)
 

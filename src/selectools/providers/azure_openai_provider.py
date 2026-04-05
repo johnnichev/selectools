@@ -102,11 +102,20 @@ class AzureOpenAIProvider(OpenAIProvider):
         else:
             client_kwargs["api_key"] = resolved_key
 
-        # Bypass OpenAIProvider.__init__ — we wire the clients ourselves.
+        # Bypass OpenAIProvider.__init__ intentionally.
+        #
+        # OpenAIProvider.__init__ creates standard ``openai.OpenAI`` /
+        # ``openai.AsyncOpenAI`` clients.  Calling it here would instantiate
+        # those *then* immediately discard them in favour of the Azure
+        # variants, wasting resources and potentially raising configuration
+        # errors for the non-Azure env vars.  Instead we manually set the
+        # four attributes that OpenAIProvider (and the inherited
+        # complete/stream/acomplete/astream methods) depend on:
+        #   _client, _async_client, default_model, api_key
         self._client = AzureOpenAI(**client_kwargs)
         self._async_client = AsyncAzureOpenAI(**client_kwargs)
         self.default_model = azure_deployment or os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
-        self.api_key = resolved_key or ""
+        self.api_key = resolved_key
 
     # -- template method overrides -------------------------------------------
 

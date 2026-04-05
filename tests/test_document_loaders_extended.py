@@ -388,14 +388,16 @@ class TestFromURL:
         with pytest.raises(ValueError, match="HTTP error.*404"):
             DocumentLoader.from_url("https://example.com/missing")
 
+    @patch("selectools.rag.loaders._validate_url")
     @patch("selectools.rag.loaders.urllib.request.urlopen")
-    def test_url_connection_error(self, mock_urlopen: MagicMock) -> None:
+    def test_url_connection_error(self, mock_urlopen: MagicMock, _mock_validate: MagicMock) -> None:
         mock_urlopen.side_effect = urllib.error.URLError("Connection refused")
         with pytest.raises(ConnectionError, match="Could not connect"):
             DocumentLoader.from_url("https://down.example.com")
 
+    @patch("selectools.rag.loaders._validate_url")
     @patch("selectools.rag.loaders.urllib.request.urlopen")
-    def test_url_timeout(self, mock_urlopen: MagicMock) -> None:
+    def test_url_timeout(self, mock_urlopen: MagicMock, _mock_validate: MagicMock) -> None:
         mock_urlopen.side_effect = urllib.error.URLError("timed out")
         with pytest.raises(ConnectionError):
             DocumentLoader.from_url("https://slow.example.com", timeout=1.0)

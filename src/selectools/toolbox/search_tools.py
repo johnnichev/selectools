@@ -8,12 +8,63 @@ and regex-based HTML parsing (no BeautifulSoup needed).
 from __future__ import annotations
 
 import html
+import ipaddress
 import re
+import socket
 import urllib.parse
 import urllib.request
 from typing import Optional
+from urllib.parse import urlparse
 
 from ..tools import tool
+
+# Private IP networks that must be blocked to prevent SSRF
+_BLOCKED_NETWORKS = [
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),
+    ipaddress.ip_network("fe80::/10"),
+]
+
+
+def _validate_url(url: str) -> str | None:
+    """Validate a URL to prevent SSRF attacks.
+
+    Returns an error message if the URL is invalid/blocked, or None if safe.
+    """
+    parsed = urlparse(url)
+
+    if parsed.scheme not in ("http", "https"):
+        return f"Error: URL scheme {parsed.scheme!r} is not allowed."
+
+    hostname = parsed.hostname
+    if not hostname:
+        return "Error: URL has no hostname."
+
+    lower_host = hostname.lower()
+    if lower_host in ("localhost", "0.0.0.0"):
+        return f"Error: Requests to {hostname!r} are blocked (loopback/internal address)."
+
+    try:
+        addr_infos = socket.getaddrinfo(hostname, None)
+    except socket.gaierror as e:
+        return f"Error: Could not resolve hostname {hostname!r}: {e}"
+
+    for _family, _type, _proto, _canonname, sockaddr in addr_infos:
+        ip = ipaddress.ip_address(sockaddr[0])
+        for network in _BLOCKED_NETWORKS:
+            if ip in network:
+                return (
+                    f"Error: URL resolves to private/reserved address {ip} "
+                    f"(network {network}). Requests to internal networks are blocked."
+                )
+
+    return None
+
 
 _MAX_OUTPUT_BYTES = 10 * 1024  # 10 KB
 _DEFAULT_TIMEOUT = 15
@@ -139,6 +190,10 @@ def scrape_url(url: str, selector: Optional[str] = None) -> str:
 
     if not url.startswith(("http://", "https://")):
         return "Error: URL must start with http:// or https://"
+
+    ssrf_error = _validate_url(url)
+    if ssrf_error:
+        return ssrf_error
 
     try:
         req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})

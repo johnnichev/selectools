@@ -51,6 +51,7 @@ class LangfuseObserver(AgentObserver):
         )
         self._traces: Dict[str, Any] = {}
         self._generations: Dict[str, Any] = {}
+        self._llm_counter: int = 0
 
     # ── Run lifecycle ─────────────────────────────────────────────────
 
@@ -69,7 +70,25 @@ class LangfuseObserver(AgentObserver):
         self._traces[run_id] = trace
 
     def on_run_end(self, run_id: str, result: Any) -> None:
-        """Update the trace with final results and flush."""
+        """Update the trace with final results and flush.
+
+        Also cleans up any orphaned generations/spans (LLM/tool) that were
+        started but never ended due to abnormal exits.
+        """
+        # Clean up orphaned child generations/spans first
+        prefix = f"{run_id}:"
+        orphaned_keys = [k for k in self._generations if k.startswith(prefix)]
+        for key in orphaned_keys:
+            orphan = self._generations.pop(key, None)
+            if orphan is not None:
+                try:
+                    orphan.update(
+                        output="ERROR: Orphaned — run ended before span closed",
+                        level="ERROR",
+                    )
+                except Exception:
+                    logger.debug("Failed to update orphaned Langfuse span %s", key)
+
         trace = self._traces.pop(run_id, None)
         if trace is None:
             return
@@ -98,6 +117,7 @@ class LangfuseObserver(AgentObserver):
         system_prompt: str,
     ) -> None:
         """Create a Langfuse generation for an LLM call."""
+        self._llm_counter += 1
         trace = self._traces.get(run_id)
         if trace is None:
             return
@@ -106,7 +126,7 @@ class LangfuseObserver(AgentObserver):
             model=model or "unknown",
             input=str(messages)[:2000] if messages else "",
         )
-        self._generations[f"{run_id}:llm"] = gen
+        self._generations[f"{run_id}:llm:{self._llm_counter}"] = gen
 
     def on_llm_end(
         self,
@@ -114,8 +134,12 @@ class LangfuseObserver(AgentObserver):
         content: str,
         usage: Any,
     ) -> None:
-        """Update the generation with output and usage."""
-        key = f"{run_id}:llm"
+        """Update the most recent generation for this run."""
+        prefix = f"{run_id}:llm:"
+        matching = [k for k in self._generations if k.startswith(prefix)]
+        if not matching:
+            return
+        key = max(matching, key=lambda k: int(k.rsplit(":", 1)[1]))
         gen = self._generations.pop(key, None)
         if gen is None:
             return

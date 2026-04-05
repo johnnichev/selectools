@@ -23,6 +23,8 @@ class TestOTelObserver:
             obs._trace_mod = mock_trace
             obs._spans = {}
             obs._llm_starts = {}
+            obs._llm_counter = 0
+            obs._tool_counter = 0
         return obs, mock_tracer
 
     def test_import_error(self):
@@ -64,13 +66,13 @@ class TestOTelObserver:
         obs, tracer = self._make_observer()
         obs._spans["run1"] = MagicMock()
         obs.on_llm_start("run1", [], "gpt-4o", "prompt")
-        assert "run1:llm" in obs._spans
+        assert "run1:llm:1" in obs._spans
 
     def test_llm_end_ends_child_span(self):
         obs, _ = self._make_observer()
         mock_span = MagicMock()
-        obs._spans["run1:llm"] = mock_span
-        obs._llm_starts["run1:llm"] = 1000.0
+        obs._spans["run1:llm:1"] = mock_span
+        obs._llm_starts["run1:llm:1"] = 1000.0
         usage = MagicMock()
         usage.prompt_tokens = 50
         usage.completion_tokens = 25
@@ -97,6 +99,91 @@ class TestOTelObserver:
         obs.on_tool_error("run1", "call1", "search", Exception("timeout"), {"q": "test"}, 100.0)
         mock_span.set_attribute.assert_any_call("error", True)
         mock_span.end.assert_called_once()
+
+    def test_multi_iteration_llm_no_overwrite(self):
+        """Regression: Bug 7 — multiple LLM calls must not overwrite spans."""
+        obs, tracer = self._make_observer()
+        span1 = MagicMock()
+        span2 = MagicMock()
+        tracer.start_span.side_effect = [span1, span2]
+        obs._spans["run1"] = MagicMock()
+
+        obs.on_llm_start("run1", [], "gpt-4o", "prompt")
+        # First span should be stored
+        assert "run1:llm:1" in obs._spans
+        assert obs._spans["run1:llm:1"] is span1
+
+        # End the first LLM call
+        obs.on_llm_end("run1", "response 1", None)
+        span1.end.assert_called_once()
+
+        # Start a second LLM call — should NOT overwrite the first key
+        obs.on_llm_start("run1", [], "gpt-4o", "prompt")
+        assert "run1:llm:2" in obs._spans
+        assert obs._spans["run1:llm:2"] is span2
+
+        obs.on_llm_end("run1", "response 2", None)
+        span2.end.assert_called_once()
+
+    def test_concurrent_llm_spans_resolved_correctly(self):
+        """Regression: Bug 7 — on_llm_end picks the highest-numbered span."""
+        obs, tracer = self._make_observer()
+        span1 = MagicMock()
+        span2 = MagicMock()
+        tracer.start_span.side_effect = [span1, span2]
+        obs._spans["run1"] = MagicMock()
+
+        # Start two LLM calls without ending either
+        obs.on_llm_start("run1", [], "gpt-4o", "prompt")
+        obs.on_llm_start("run1", [], "gpt-4o", "prompt")
+
+        # End should close the most recent (span2)
+        obs.on_llm_end("run1", "response", None)
+        span2.end.assert_called_once()
+        span1.end.assert_not_called()
+        assert "run1:llm:1" in obs._spans  # span1 still open
+
+    def test_run_end_cleans_up_orphaned_spans(self):
+        """Regression: Bug 17 — orphaned spans cleaned up on run end."""
+        obs, _ = self._make_observer()
+        run_span = MagicMock()
+        orphan_llm = MagicMock()
+        orphan_tool = MagicMock()
+        obs._spans["run1"] = run_span
+        obs._spans["run1:llm:1"] = orphan_llm
+        obs._spans["run1:tool:call99"] = orphan_tool
+        obs._llm_starts["run1:llm:1"] = 1000.0
+
+        result = MagicMock()
+        result.usage = None
+        del result.iterations  # no iterations attr
+        obs.on_run_end("run1", result)
+
+        # Orphans should be ended
+        orphan_llm.end.assert_called_once()
+        orphan_tool.end.assert_called_once()
+        # Run span also ended
+        run_span.end.assert_called_once()
+        # All cleaned up
+        assert not any(k.startswith("run1") for k in obs._spans)
+        assert "run1:llm:1" not in obs._llm_starts
+
+    def test_run_end_orphan_cleanup_does_not_affect_other_runs(self):
+        """Orphan cleanup must only touch spans for the given run_id."""
+        obs, _ = self._make_observer()
+        run1_span = MagicMock()
+        run2_llm = MagicMock()
+        obs._spans["run1"] = run1_span
+        obs._spans["run2:llm:1"] = run2_llm
+
+        result = MagicMock()
+        result.usage = None
+        del result.iterations
+        obs.on_run_end("run1", result)
+
+        # run2's span should be untouched
+        run2_llm.end.assert_not_called()
+        assert "run2:llm:1" in obs._spans
 
     def test_stability_marker(self):
         obs, _ = self._make_observer()

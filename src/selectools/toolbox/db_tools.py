@@ -8,9 +8,32 @@ support requires the ``psycopg2`` package (lazy-imported at call time).
 from __future__ import annotations
 
 import os
+import re
 import sqlite3
 
 from ..tools import tool
+
+
+def _validate_sql_readonly(sql: str) -> str | None:
+    """Validate that SQL is a single read-only SELECT statement.
+
+    Returns an error message if invalid, or None if the query is acceptable.
+    """
+    # Strip trailing whitespace and trailing semicolons
+    stripped = sql.strip().rstrip(";").strip()
+
+    if not stripped:
+        return "Error: No SQL query provided."
+
+    # Reject multi-statement queries (semicolons in the body)
+    if ";" in stripped:
+        return "Error: Multi-statement queries are not allowed. Submit one SELECT at a time."
+
+    # Only allow SELECT statements
+    if not re.match(r"^\s*SELECT\b", stripped, re.IGNORECASE):
+        return "Error: Only SELECT queries are allowed."
+
+    return None
 
 
 def _format_table(columns: list[str], rows: list[tuple]) -> str:
@@ -61,6 +84,10 @@ def query_sqlite(db_path: str, sql: str, max_rows: int = 100) -> str:
 
     if not sql or not sql.strip():
         return "Error: No SQL query provided."
+
+    sql_error = _validate_sql_readonly(sql)
+    if sql_error:
+        return sql_error
 
     if not os.path.isfile(db_path):
         return f"Error: Database file not found: {db_path}"
@@ -129,14 +156,21 @@ def query_postgres(connection_string: str, sql: str, max_rows: int = 100) -> str
     if not sql or not sql.strip():
         return "Error: No SQL query provided."
 
+    sql_error = _validate_sql_readonly(sql)
+    if sql_error:
+        return sql_error
+
     max_rows = max(1, min(max_rows, 10000))
 
     conn = None
     try:
         conn = psycopg2.connect(connection_string)
-        conn.set_session(readonly=True, autocommit=True)
+        conn.set_session(autocommit=False)
 
         cursor = conn.cursor()
+        # Use per-transaction read-only (cannot be overridden within the transaction,
+        # unlike session-level SET default_transaction_read_only)
+        cursor.execute("SET TRANSACTION READ ONLY")
         cursor.execute(sql)
 
         columns = [desc[0] for desc in cursor.description] if cursor.description else []

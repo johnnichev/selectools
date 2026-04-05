@@ -15,6 +15,10 @@ from ..tools import tool
 
 _MAX_OUTPUT_BYTES = 10 * 1024  # 10 KB
 
+# Shell metacharacters that enable command chaining, subshells, or redirection.
+# Commands containing any of these are rejected to prevent shell injection.
+_SHELL_BLOCKLIST = [";", "|", "&&", "||", "`", "$(", "{", ">", ">>", "<", "<<", "2>"]
+
 
 def _truncate(text: str, max_bytes: int = _MAX_OUTPUT_BYTES) -> str:
     """Truncate text to max_bytes, appending a notice if truncated."""
@@ -96,10 +100,15 @@ def execute_shell(command: str, timeout: int = 30) -> str:
     """
     Execute a shell command and return combined stdout + stderr.
 
+    **WARNING**: This tool executes arbitrary shell commands. It should be
+    restricted via ``ToolPolicy`` to prevent misuse in untrusted contexts.
+    Commands containing shell metacharacters (pipes, redirects, chaining)
+    are rejected to mitigate injection attacks.
+
     Output is truncated to 10 KB to avoid overwhelming the context window.
 
     Args:
-        command: Shell command to execute.
+        command: Shell command to execute (no shell metacharacters allowed).
         timeout: Maximum execution time in seconds (default: 30).
 
     Returns:
@@ -113,10 +122,18 @@ def execute_shell(command: str, timeout: int = 30) -> str:
     if timeout > 300:
         return "Error: Timeout must not exceed 300 seconds."
 
+    # Reject commands containing dangerous shell metacharacters
+    for meta in _SHELL_BLOCKLIST:
+        if meta in command:
+            return (
+                f"Error: Command contains blocked shell metacharacter {meta!r}. "
+                "Shell chaining, pipes, redirects, and subshells are not allowed."
+            )
+
     try:
-        result = subprocess.run(  # nosec B603 B607
+        result = subprocess.run(  # nosec B602 B603 B607 — intentional shell tool
             command,
-            shell=True,
+            shell=True,  # nosec B602
             capture_output=True,
             text=True,
             timeout=timeout,

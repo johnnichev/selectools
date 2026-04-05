@@ -148,9 +148,18 @@ class PgVectorStore(VectorStore):
         Returns a ``psycopg2`` connection object. Callers are responsible for
         closing the connection.
 
+        .. note::
+
+            This creates a fresh connection per call.  In production
+            deployments with high concurrency, use an external connection
+            pooler (e.g. PgBouncer) or wrap the connection string with a
+            ``psycopg2.pool`` pool.  Adding a built-in ``pool_size`` option
+            is tracked as a future enhancement.
+
         Returns:
             A psycopg2 connection instance.
         """
+        # TODO: add optional pool_size parameter and use psycopg2.pool.SimpleConnectionPool
         return self._psycopg2.connect(self.connection_string)
 
     # ------------------------------------------------------------------

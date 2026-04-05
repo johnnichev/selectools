@@ -194,7 +194,7 @@ class TestQueryPostgres:
         assert "Alice" in result
 
     def test_psycopg2_connect_and_readonly(self) -> None:
-        """Verify psycopg2.connect is called with readonly session."""
+        """Verify psycopg2.connect uses per-transaction READ ONLY."""
         mock_psycopg2 = MagicMock()
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
@@ -216,7 +216,10 @@ class TestQueryPostgres:
             )
 
         assert "Alice" in result
-        mock_conn.set_session.assert_called_once_with(readonly=True, autocommit=True)
+        mock_conn.set_session.assert_called_once_with(autocommit=False)
+        # Verify per-transaction READ ONLY is set before the user query
+        execute_calls = [str(c) for c in mock_cursor.execute.call_args_list]
+        assert any("SET TRANSACTION READ ONLY" in c for c in execute_calls)
 
     def test_connection_error_handled(self) -> None:
         """Connection errors are caught gracefully."""

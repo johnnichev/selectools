@@ -195,6 +195,20 @@ class Message:
                 else None
             ),
             "tool_call_id": self.tool_call_id,
+            "content_parts": (
+                [
+                    {
+                        "type": cp.type,
+                        "text": cp.text,
+                        "image_url": cp.image_url,
+                        "image_base64": cp.image_base64,
+                        "media_type": cp.media_type,
+                    }
+                    for cp in self.content_parts
+                ]
+                if self.content_parts
+                else None
+            ),
         }
 
     @classmethod
@@ -226,6 +240,20 @@ class Message:
             ]
         else:
             msg.tool_calls = None
+        raw_parts = data.get("content_parts")
+        if raw_parts:
+            msg.content_parts = [
+                ContentPart(
+                    type=cp["type"],
+                    text=cp.get("text"),
+                    image_url=cp.get("image_url"),
+                    image_base64=cp.get("image_base64"),
+                    media_type=cp.get("media_type"),
+                )
+                for cp in raw_parts
+            ]
+        else:
+            msg.content_parts = None
         return msg
 
 

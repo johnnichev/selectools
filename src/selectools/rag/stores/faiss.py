@@ -48,9 +48,9 @@ class FAISSVectorStore(VectorStore):
     perform exact cosine similarity search. Documents are stored in a parallel
     list since FAISS only manages raw vectors.
 
-    Thread-safe: all write operations are protected by a threading.Lock.
-    Read operations (search) take a snapshot under the lock, then compute
-    outside it.
+    Thread-safe: all mutations are protected by a threading.Lock.
+    Read operations (search) hold the lock for the duration of the FAISS
+    search call to avoid racing with concurrent index mutations.
 
     Persistence is supported via ``save()`` / ``load()`` which use FAISS
     native ``write_index`` / ``read_index`` plus a JSON sidecar for documents.
@@ -236,24 +236,24 @@ class FAISSVectorStore(VectorStore):
         """
         np = _import_numpy()
 
-        with self._lock:
-            if self._index is None or self._index.ntotal == 0:
-                return []
-            # Snapshot under lock
-            index_snapshot = self._index
-            docs_snapshot = list(self._documents)
-            ids_snapshot = list(self._ids)
-            n_total = self._index.ntotal
-
-        # Prepare query vector
+        # Prepare query vector outside the lock (pure computation)
         query_vec = np.array([query_embedding], dtype=np.float32)
         query_vec = self._normalize(query_vec)
 
-        # Over-fetch when filtering to compensate for filtered-out docs
-        fetch_k = min(top_k * 4, n_total) if filter else min(top_k, n_total)
+        with self._lock:
+            if self._index is None or self._index.ntotal == 0:
+                return []
 
-        # FAISS search returns (distances, indices) arrays of shape (1, fetch_k)
-        scores, indices = index_snapshot.search(query_vec, fetch_k)
+            n_total = self._index.ntotal
+
+            # Over-fetch when filtering to compensate for filtered-out docs
+            fetch_k = min(top_k * 4, n_total) if filter else min(top_k, n_total)
+
+            # FAISS search returns (distances, indices) arrays of shape (1, fetch_k)
+            scores, indices = self._index.search(query_vec, fetch_k)
+
+            # Snapshot documents under lock so post-processing is consistent
+            docs_snapshot = list(self._documents)
 
         results: List[SearchResult] = []
         for score, idx in zip(scores[0], indices[0]):
@@ -478,7 +478,7 @@ class FAISSVectorStore(VectorStore):
 
     def __repr__(self) -> str:
         """Return string representation."""
-        return f"FAISSVectorStore(dimension={self._dimension}, " f"count={len(self._documents)})"
+        return f"FAISSVectorStore(dimension={self._dimension}, count={self.count})"
 
 
 __all__ = ["FAISSVectorStore"]

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
+import threading
 import uuid
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence
 
@@ -101,6 +101,7 @@ class QdrantVectorStore(VectorStore):
         self.collection_name = collection_name
         self.url = url
         self._collection_exists: bool = False
+        self._init_lock = threading.Lock()
 
         self.client = qdrant_client.QdrantClient(
             url=url,
@@ -119,7 +120,8 @@ class QdrantVectorStore(VectorStore):
 
         Uses cosine similarity as the default distance metric.  The check is
         cached in ``_collection_exists`` to avoid repeated round-trips after
-        the first call.
+        the first call.  A lock prevents concurrent threads from racing to
+        create the same collection.
 
         Args:
             dimension: Embedding vector dimension (auto-detected from embedder).
@@ -127,27 +129,32 @@ class QdrantVectorStore(VectorStore):
         if self._collection_exists:
             return
 
-        models = _import_qdrant_models()
+        with self._init_lock:
+            # Double-check after acquiring the lock
+            if self._collection_exists:
+                return
 
-        # Check whether the collection already exists on the server
-        collections = self.client.get_collections().collections
-        existing_names = {c.name for c in collections}
+            models = _import_qdrant_models()
 
-        if self.collection_name not in existing_names:
-            self.client.create_collection(
-                collection_name=self.collection_name,
-                vectors_config=models.VectorParams(
-                    size=dimension,
-                    distance=models.Distance.COSINE,
-                ),
-            )
-            logger.info(
-                "Created Qdrant collection %r (dim=%d, distance=cosine)",
-                self.collection_name,
-                dimension,
-            )
+            # Check whether the collection already exists on the server
+            collections = self.client.get_collections().collections
+            existing_names = {c.name for c in collections}
 
-        self._collection_exists = True
+            if self.collection_name not in existing_names:
+                self.client.create_collection(
+                    collection_name=self.collection_name,
+                    vectors_config=models.VectorParams(
+                        size=dimension,
+                        distance=models.Distance.COSINE,
+                    ),
+                )
+                logger.info(
+                    "Created Qdrant collection %r (dim=%d, distance=cosine)",
+                    self.collection_name,
+                    dimension,
+                )
+
+            self._collection_exists = True
 
     def _detect_dimension(self, embeddings: List[List[float]]) -> int:
         """
@@ -207,14 +214,16 @@ class QdrantVectorStore(VectorStore):
         ids: List[str] = []
         points: List[Any] = []
 
-        for i, (doc, embedding) in enumerate(zip(documents, embeddings)):
-            doc_id = f"doc_{hashlib.sha256(doc.text.encode()).hexdigest()[:16]}_{i}"
+        for doc, embedding in zip(documents, embeddings):
+            doc_id = uuid.uuid4().hex
             ids.append(doc_id)
 
-            # Store text alongside user metadata so we can reconstruct
-            # Document objects on retrieval.
-            payload: Dict[str, Any] = doc.metadata.copy()
-            payload["__selectools_text__"] = doc.text
+            # Store text and metadata in separate namespaced keys to avoid
+            # collision between user metadata and internal fields.
+            payload: Dict[str, Any] = {
+                "_st_text": doc.text,
+                "_st_meta": doc.metadata.copy() if doc.metadata else {},
+            }
 
             points.append(
                 models.PointStruct(
@@ -273,9 +282,17 @@ class QdrantVectorStore(VectorStore):
         for scored_point in results:
             payload = scored_point.payload or {}
 
-            # Extract document text from payload
-            text = payload.get("__selectools_text__", "")
-            metadata = {k: v for k, v in payload.items() if k != "__selectools_text__"}
+            # Extract document text and metadata from namespaced keys.
+            # Falls back to legacy flat layout for indices written before
+            # the _st_text/_st_meta structure was introduced.
+            if "_st_text" in payload:
+                text = payload["_st_text"]
+                metadata = payload.get("_st_meta", {})
+            else:
+                # Legacy format: text stored as __selectools_text__,
+                # remaining keys are user metadata.
+                text = payload.get("__selectools_text__", "")
+                metadata = {k: v for k, v in payload.items() if k != "__selectools_text__"}
 
             doc = Document(text=text, metadata=metadata)
             search_results.append(SearchResult(document=doc, score=scored_point.score))
