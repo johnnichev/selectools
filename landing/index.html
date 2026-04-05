@@ -545,15 +545,6 @@
     .cmp-table .cap { color: var(--text); }
 
     /* ── Builder Compare Details ───────────────────────────────────── */
-    details.builder-compare { margin-top: 28px; }
-    details.builder-compare summary {
-      cursor: pointer;
-      list-style: none;
-    }
-    details.builder-compare summary::-webkit-details-marker { display: none; }
-    details.builder-compare summary::marker { display: none; content: ""; }
-    details.builder-compare .code-frame { margin-top: 16px; }
-
     /* ── Result Boxes ──────────────────────────────────────────────── */
     .result-box {
       background: var(--surface);
@@ -653,39 +644,45 @@
 
     /* ── Simulation Player ─────────────────────────────────────────── */
     .sim-tabs {
-      display: flex;
-      gap: 4px;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+      margin-bottom: 20px;
     }
+    @media (max-width: 900px) { .sim-tabs { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 540px) { .sim-tabs { grid-template-columns: repeat(2, 1fr); } }
     .sim-tab {
-      padding: 8px 16px;
+      padding: 8px 12px;
       border-radius: 6px;
       border: 1px solid var(--border);
       background: transparent;
       color: var(--text-dim);
       font-family: var(--font-ui);
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 500;
       cursor: pointer;
       transition: all 0.15s;
+      text-align: center;
+      white-space: nowrap;
     }
     .sim-tab:hover { border-color: var(--text-faint); color: var(--text); }
     .sim-tab.active { background: rgba(34,211,238,0.1); border-color: var(--cyan); color: var(--cyan); }
 
     .sim-container {
       display: grid;
-      grid-template-columns: 200px 1fr;
+      grid-template-columns: 180px 1fr 180px;
       gap: 16px;
-      min-height: 420px;
+      min-height: 460px;
     }
     @media (max-width: 900px) {
       .sim-container { grid-template-columns: 1fr; min-height: auto; }
-      .sim-sidebar { display: flex; flex-wrap: wrap; gap: 12px; }
-      .sim-agents { display: flex; flex-wrap: wrap; gap: 6px; }
+      .sim-sidebar-left { display: flex; flex-wrap: wrap; gap: 8px; }
+      .sim-sidebar-left .sim-agents { display: flex; flex-direction: row; flex-wrap: wrap; gap: 6px; }
+      .sim-sidebar-right { display: flex; flex-wrap: wrap; gap: 8px; }
+      .sim-sidebar-right .sim-stat-block { flex: 1; min-width: 100px; }
     }
 
-    .sim-sidebar { display: flex; flex-direction: column; gap: 12px; }
+    .sim-sidebar-left, .sim-sidebar-right { display: flex; flex-direction: column; gap: 10px; }
     .sim-desc {
       font-size: 12px;
       color: var(--text-dim);
@@ -714,23 +711,22 @@
       width: 8px; height: 8px;
       border-radius: 50%;
       flex-shrink: 0;
-      opacity: 0.5;
+      opacity: 0.4;
       transition: all 0.3s;
     }
     .sim-agent-node.active .sim-agent-dot { opacity: 1; box-shadow: 0 0 6px currentColor; }
 
-    .sim-stats {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
+    .sim-stat-block {
       padding: 10px 12px;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 8px;
     }
-    .sim-stat { display: flex; justify-content: space-between; align-items: center; }
-    .sim-stat-label { font-size: 11px; color: var(--text-faint); }
-    .sim-stat-val { font-family: var(--font-mono); font-size: 11px; color: var(--cyan); }
+    .sim-stat-label { font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 2px; }
+    .sim-stat-value { font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+    .sim-stat-value.cyan { color: var(--cyan); }
+    .sim-stat-value.green { color: var(--green); }
+    .sim-stat-value.amber { color: var(--amber); }
 
     .sim-timeline {
       background: var(--surface);
@@ -763,11 +759,14 @@
     .sim-status[data-state="done"] { background: rgba(34,197,94,0.12); color: var(--green); }
     @keyframes badge-blink { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
 
+    .sim-progress { height: 2px; background: var(--border); }
+    .sim-progress-fill { height: 100%; width: 0; background: var(--cyan); transition: width 0.15s linear; }
+
     .sim-timeline-body {
       flex: 1;
       overflow-y: auto;
       padding: 16px 20px;
-      max-height: 360px;
+      max-height: 400px;
       scroll-behavior: smooth;
     }
     .sim-timeline-body::-webkit-scrollbar { width: 4px; }
@@ -818,7 +817,7 @@
     .sim-evt-bubble.ev-input { background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2); margin-left: 20%; }
     .sim-evt-bubble.ev-response { background: var(--surface-2); border: 1px solid var(--border); margin-right: 10%; }
     .sim-evt-bubble.ev-thinking { background: transparent; border: 1px solid rgba(148,163,184,0.12); color: var(--text-dim); font-style: italic; font-size: 12px; }
-    .sim-evt-bubble.ev-tool_call { background: rgba(168,85,247,0.08); border: 1px solid rgba(168,85,247,0.2); }
+    .sim-evt-bubble.ev-tool_call { background: rgba(168,85,247,0.08); border: 1px solid rgba(168,85,247,0.2); font-family: var(--font-mono); font-size: 11px; }
     .sim-evt-bubble.ev-tool_result { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); font-family: var(--font-mono); font-size: 11px; }
     .sim-evt-bubble.ev-error { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: var(--red); }
     .sim-evt-bubble.ev-route,
@@ -914,25 +913,40 @@
     </div>
 
     <div class="sim-container reveal">
-      <div class="sim-sidebar">
+      <div class="sim-sidebar-left">
         <div class="sim-desc" id="simDesc"></div>
         <div class="sim-agents" id="simAgents"></div>
-        <div class="sim-stats">
-          <div class="sim-stat"><span class="sim-stat-label">Tokens</span><span class="sim-stat-val" id="simTokens">--</span></div>
-          <div class="sim-stat"><span class="sim-stat-label">Cost</span><span class="sim-stat-val" id="simCost">--</span></div>
-          <div class="sim-stat"><span class="sim-stat-label">Model</span><span class="sim-stat-val" id="simModel">--</span></div>
-        </div>
       </div>
       <div class="sim-timeline">
         <div class="sim-timeline-header">
           <span class="sim-timeline-title" id="simTitle">Customer Support Router</span>
           <span class="sim-status" id="simStatus">ready</span>
         </div>
+        <div class="sim-progress"><div class="sim-progress-fill" id="simProgress"></div></div>
         <div class="sim-timeline-body" id="simBody"></div>
       </div>
-    </div>
-    <div style="text-align:center;margin-top:16px">
-      <a href="simulations/" class="btn btn-ghost" style="font-size:13px">Open full simulation viewer &rarr;</a>
+      <div class="sim-sidebar-right">
+        <div class="sim-stat-block">
+          <div class="sim-stat-label">Elapsed</div>
+          <div class="sim-stat-value cyan" id="simElapsed">0.0s</div>
+        </div>
+        <div class="sim-stat-block">
+          <div class="sim-stat-label">Events</div>
+          <div class="sim-stat-value" id="simEvents">0 / 0</div>
+        </div>
+        <div class="sim-stat-block">
+          <div class="sim-stat-label">Model</div>
+          <div class="sim-stat-value" id="simModel" style="font-size:11px">--</div>
+        </div>
+        <div class="sim-stat-block">
+          <div class="sim-stat-label">Tokens</div>
+          <div class="sim-stat-value green" id="simTokens">--</div>
+        </div>
+        <div class="sim-stat-block">
+          <div class="sim-stat-label">Cost</div>
+          <div class="sim-stat-value amber" id="simCost">--</div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -1331,34 +1345,31 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
         <div style="font-size:11px;color:var(--text-faint);margin-top:4px">vs LangGraph Studio (paid)</div>
       </div>
     </div>
-    <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap">
+    <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap;justify-content:center">
       <a href="builder/" class="btn btn-cyan">Open Full Builder &rarr;</a>
-      <a href="simulations/" class="btn btn-ghost">Live Simulations</a>
+      <a href="#simulations" class="btn btn-ghost">Live Simulations</a>
       <a href="examples/" class="btn btn-ghost">88 Examples</a>
     </div>
-    <details class="builder-compare">
-      <summary class="btn btn-ghost">See how the builder compares</summary>
-      <div class="code-frame" style="overflow-x:auto">
-        <table class="cmp-table">
-          <thead>
-            <tr><th class="cap">Feature</th><th>selectools</th><th>LangGraph Studio</th><th>n8n</th><th>Flowise</th><th>Dify</th><th>Rivet</th></tr>
-          </thead>
-          <tbody>
-            <tr><td class="cap">Price</td><td class="yes">Free, forever</td><td class="no">Paid (LangSmith)</td><td class="mid">&euro;20/mo cloud</td><td class="yes">Free self-host</td><td class="yes">Free self-host</td><td class="yes">Free</td></tr>
-            <tr><td class="cap">Install</td><td class="yes"><code style="font-size:11px">pip install</code></td><td class="mid">macOS desktop app</td><td class="no">Docker</td><td class="no">Docker</td><td class="no">Docker</td><td class="mid">Desktop app</td></tr>
-            <tr><td class="cap">Self-hosted</td><td class="yes">Yes</td><td class="no">No (desktop only)</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="no">No</td></tr>
-            <tr><td class="cap">No CDN/build step</td><td class="yes">Yes</td><td class="mid">N/A</td><td class="no">No (React)</td><td class="no">No (React)</td><td class="no">No (React)</td><td class="no">No (Electron)</td></tr>
-            <tr><td class="cap">Code export (Python)</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
-            <tr><td class="cap">Code export (YAML)</td><td class="yes">Yes</td><td class="no">No</td><td class="mid">JSON only</td><td class="mid">JSON only</td><td class="mid">YAML</td><td class="no">No</td></tr>
-            <tr><td class="cap">AI generation</td><td class="yes">Yes (NL to graph)</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
-            <tr><td class="cap">Live test from browser</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
-            <tr><td class="cap">Runs on GitHub Pages</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
-            <tr><td class="cap">Per-node cost preview</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
-            <tr><td class="cap">Built-in evals</td><td class="yes">50 evaluators</td><td class="mid">LangSmith (paid)</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </details>
+    <div class="code-frame reveal" style="overflow-x:auto;margin-top:32px">
+      <table class="cmp-table">
+        <thead>
+          <tr><th class="cap">Feature</th><th>selectools</th><th>LangGraph Studio</th><th>n8n</th><th>Flowise</th><th>Dify</th><th>Rivet</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="cap">Price</td><td class="yes">Free, forever</td><td class="no">Paid (LangSmith)</td><td class="mid">&euro;20/mo cloud</td><td class="yes">Free self-host</td><td class="yes">Free self-host</td><td class="yes">Free</td></tr>
+          <tr><td class="cap">Install</td><td class="yes"><code style="font-size:11px">pip install</code></td><td class="mid">macOS desktop app</td><td class="no">Docker</td><td class="no">Docker</td><td class="no">Docker</td><td class="mid">Desktop app</td></tr>
+          <tr><td class="cap">Self-hosted</td><td class="yes">Yes</td><td class="no">No (desktop only)</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="no">No</td></tr>
+          <tr><td class="cap">No CDN/build step</td><td class="yes">Yes</td><td class="mid">N/A</td><td class="no">No (React)</td><td class="no">No (React)</td><td class="no">No (React)</td><td class="no">No (Electron)</td></tr>
+          <tr><td class="cap">Code export (Python)</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+          <tr><td class="cap">Code export (YAML)</td><td class="yes">Yes</td><td class="no">No</td><td class="mid">JSON only</td><td class="mid">JSON only</td><td class="mid">YAML</td><td class="no">No</td></tr>
+          <tr><td class="cap">AI generation</td><td class="yes">Yes (NL to graph)</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+          <tr><td class="cap">Live test from browser</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+          <tr><td class="cap">Runs on GitHub Pages</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+          <tr><td class="cap">Per-node cost preview</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+          <tr><td class="cap">Built-in evals</td><td class="yes">50 evaluators</td><td class="mid">LangSmith (paid)</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </section>
 
@@ -1850,8 +1861,9 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
 
   function loadSim(idx) {
     if (playTimer) { clearTimeout(playTimer); playTimer = null; }
+    if (elapsedInterval) { clearInterval(elapsedInterval); elapsedInterval = null; }
     currentSim = idx;
-    const sim = TRACES[idx];
+    var sim = TRACES[idx];
 
     document.querySelectorAll('.sim-tab').forEach(function(t, i) { t.classList.toggle('active', i === idx); });
 
@@ -1860,6 +1872,9 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
     document.getElementById('simTokens').textContent = '--';
     document.getElementById('simCost').textContent = '--';
     document.getElementById('simModel').textContent = '--';
+    document.getElementById('simElapsed').textContent = '0.0s';
+    document.getElementById('simEvents').textContent = '0 / ' + sim.events.length;
+    document.getElementById('simProgress').style.width = '0%';
 
     var status = document.getElementById('simStatus');
     status.textContent = 'ready';
@@ -1882,19 +1897,35 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
     playSim(sim);
   }
 
+  var elapsedInterval = null;
+
   function playSim(sim) {
     var status = document.getElementById('simStatus');
     status.textContent = 'running';
     status.dataset.state = 'running';
 
+    var startTime = Date.now();
+    var totalEvents = sim.events.length;
+    var lastT = sim.events[totalEvents - 1] ? sim.events[totalEvents - 1].t : 0;
+
+    elapsedInterval = setInterval(function() {
+      var elapsed = (Date.now() - startTime) * SPEED / 1000;
+      document.getElementById('simElapsed').textContent = elapsed.toFixed(1) + 's';
+    }, 100);
+
     var evtIdx = 0;
     function next() {
-      if (evtIdx >= sim.events.length) {
+      if (evtIdx >= totalEvents) {
         status.textContent = 'complete';
         status.dataset.state = 'done';
+        if (elapsedInterval) { clearInterval(elapsedInterval); elapsedInterval = null; }
         document.getElementById('simTokens').textContent = sim.tokens.toLocaleString();
         document.getElementById('simCost').textContent = sim.cost;
         document.getElementById('simModel').textContent = sim.model;
+        document.getElementById('simProgress').style.width = '100%';
+        document.getElementById('simEvents').textContent = totalEvents + ' / ' + totalEvents;
+        var finalT = lastT / 1000;
+        document.getElementById('simElapsed').textContent = finalT.toFixed(1) + 's';
         document.querySelectorAll('.sim-agent-node').forEach(function(n) { n.classList.remove('active'); });
         return;
       }
@@ -1905,6 +1936,11 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
       document.querySelectorAll('.sim-agent-node').forEach(function(n) {
         n.classList.toggle('active', n.dataset.agent === ev.agent);
       });
+
+      document.getElementById('simEvents').textContent = (evtIdx + 1) + ' / ' + totalEvents;
+      if (lastT > 0) {
+        document.getElementById('simProgress').style.width = ((ev.t / lastT) * 100) + '%';
+      }
 
       var color = AGENT_COLORS[ev.agent] || '#94a3b8';
 
@@ -1926,7 +1962,7 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
       body.scrollTop = body.scrollHeight;
 
       evtIdx++;
-      var delay = evtIdx < sim.events.length
+      var delay = evtIdx < totalEvents
         ? (sim.events[evtIdx].t - ev.t) / SPEED
         : 800;
       playTimer = setTimeout(next, Math.max(delay, 80));
