@@ -266,16 +266,21 @@ When implementing a new feature, ALWAYS complete ALL of these steps:
 - [ ] Run full suite: `pytest tests/ -x -q` — ALL must pass
 - [ ] Verify no tests were broken by the change
 
-### 4. Documentation Updates (ALL of these, every time)
+### 4. Documentation Updates (MANDATORY for every feature, DO NOT SKIP)
 
-- [ ] **Module doc**: Create or update `docs/modules/<MODULE>.md`
+Documentation is NOT optional. A feature without updated docs is an incomplete feature.
+
+- [ ] **Module docs**: For EACH source file modified, update the corresponding `docs/modules/*.md` with new sections, code examples, and "Since: vX.Y.Z"
 - [ ] **Architecture doc**: Update `docs/ARCHITECTURE.md` if it adds a new component
-- [ ] **Quickstart**: Update `docs/QUICKSTART.md` if it's user-facing
-- [ ] **docs/README.md**: Update the documentation index
-- [ ] **docs/index.md**: Update the landing page feature table and model counts
-- [ ] **Notebook**: Add section to `notebooks/getting_started.ipynb`
+- [ ] **Quickstart**: Update `docs/QUICKSTART.md` if it's user-facing (add "What's New" entry)
+- [ ] **docs/index.md**: Update the feature table and counts
+- [ ] **llms.txt**: Update module descriptions, counts, and links in `docs/llms.txt`
+- [ ] **Landing page**: Update `landing/index.html` stats bar (tests, examples, models, tools) and comparison tables if competitive
+- [ ] **mkdocs.yml**: Update nav labels (e.g., tool counts, store counts) if changed
+- [ ] **Notebook**: Add step to `notebooks/getting_started.ipynb`
 - [ ] **Example script**: Add `examples/NN_<feature>.py`
-- [ ] Verify all internal links work: `cp CHANGELOG.md docs/CHANGELOG.md && mkdocs build`
+- [ ] **Gallery**: Regenerate `landing/examples.json` if new examples added
+- [ ] **Verify build**: `cp CHANGELOG.md docs/CHANGELOG.md && mkdocs build`
 
 ### 5. Release Artifacts (for each release)
 
