@@ -382,17 +382,11 @@
       -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 20%, transparent 80%);
     }
     .hero .wrap { position: relative; z-index: 1; }
-    .hero-grid {
-      display: grid;
-      grid-template-columns: 1.15fr 1fr;
-      gap: 40px;
-      align-items: center;
+    .hero-content {
+      max-width: 720px;
+      margin: 0 auto;
+      text-align: center;
     }
-    @media (max-width: 900px) {
-      .hero-grid { grid-template-columns: 1fr; }
-      .hero-right { display: none; }
-    }
-    .hero-content { }
     .hero h1 { margin-bottom: 20px; }
     .hero h1 .grad {
       background: linear-gradient(135deg, var(--cyan) 0%, var(--blue) 100%);
@@ -405,59 +399,26 @@
       font-size: 17px;
       line-height: 1.75;
       margin-bottom: 36px;
-      max-width: 540px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
     }
     .hero-actions {
       display: flex;
       flex-wrap: wrap;
       gap: 12px;
       align-items: center;
+      justify-content: center;
       margin-bottom: 40px;
     }
     .hero-pills {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
+      justify-content: center;
     }
 
-    /* Hero Right */
-    .hero-right { display: flex; flex-direction: column; gap: 12px; }
-    .hero-result {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .hero-result-row {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      padding: 8px 12px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      font-size: 13px;
-      opacity: 0;
-      transform: translateY(6px);
-      animation: hero-res-in 0.3s var(--ease) forwards;
-    }
-    .hero-result-row:nth-child(1) { animation-delay: 1.8s; }
-    .hero-result-row:nth-child(2) { animation-delay: 2.1s; }
-    .hero-result-row:nth-child(3) { animation-delay: 2.4s; }
-    .hero-result-row:nth-child(4) { animation-delay: 2.7s; }
-    @keyframes hero-res-in { to { opacity: 1; transform: translateY(0); } }
-    .hero-res-label {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--cyan);
-      white-space: nowrap;
-      min-width: 100px;
-      padding-top: 1px;
-    }
-    .hero-res-val {
-      color: var(--text-dim);
-      font-size: 12.5px;
-      line-height: 1.5;
-    }
+
     .pill {
       font-family: var(--font-mono);
       font-size: 11px;
@@ -899,76 +860,30 @@
 <!-- ─── Hero ───────────────────────────────────────────────────────── -->
 <section class="hero">
   <div class="wrap">
-    <div class="hero-grid">
-      <div class="hero-content">
-        <span class="section-label" style="margin-bottom:16px">Open Source from NichevLabs</span>
-        <h1>AI agents that are <span class="grad">just Python.</span></h1>
-        <p class="hero-sub">
-          Multi-agent graphs, tool calling, RAG, 50 evaluators, and a drag-drop visual builder. All in one <code>pip install</code>. No DSL to learn. No SaaS to pay for. No vendor to depend on.
-        </p>
-        <div class="hero-actions">
-          <button onclick="copyPip()" class="btn btn-pip" id="pipBtn">
-            <span>pip install selectools</span>
-            <svg id="copy-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-            <svg id="check-icon" width="16" height="16" fill="none" stroke="#22c55e" stroke-width="2" viewBox="0 0 24 24" style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
-          </button>
-          <a href="builder/" class="btn btn-cyan">Try the Builder &rarr;</a>
-          <a href="QUICKSTART/" class="btn btn-primary">Read the Docs</a>
-        </div>
-        <div class="hero-pills">
-          <span class="pill pill-cyan">OpenAI</span>
-          <span class="pill pill-cyan">Anthropic</span>
-          <span class="pill pill-cyan">Gemini</span>
-          <span class="pill pill-cyan">Ollama</span>
-          <span class="pill">Multi-Agent Graphs</span>
-          <span class="pill">50 Evaluators</span>
-          <span class="pill">Composable Pipelines</span>
-          <span class="pill">Visual Builder</span>
-        </div>
+    <div class="hero-content">
+      <span class="section-label" style="margin-bottom:16px">Open Source from NichevLabs</span>
+      <h1>AI agents that are <span class="grad">just Python.</span></h1>
+      <p class="hero-sub">
+        Multi-agent graphs, tool calling, RAG, 50 evaluators, and a drag-drop visual builder. All in one <code>pip install</code>. No DSL to learn. No SaaS to pay for. No vendor to depend on.
+      </p>
+      <div class="hero-actions">
+        <button onclick="copyPip()" class="btn btn-pip" id="pipBtn">
+          <span>pip install selectools</span>
+          <svg id="copy-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          <svg id="check-icon" width="16" height="16" fill="none" stroke="#22c55e" stroke-width="2" viewBox="0 0 24 24" style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
+        </button>
+        <a href="builder/" class="btn btn-cyan">Try the Builder &rarr;</a>
+        <a href="QUICKSTART/" class="btn btn-primary">Read the Docs</a>
       </div>
-      <div class="hero-right">
-        <div class="code-frame code-frame-accent">
-          <div class="code-bar">
-            <div class="code-dot" style="background:rgba(239,68,68,0.8)"></div>
-            <div class="code-dot" style="background:rgba(250,204,21,0.8)"></div>
-            <div class="code-dot" style="background:rgba(34,197,94,0.8)"></div>
-            <span class="code-bar-label">agent.py</span>
-          </div>
-          <div class="code-body"><span class="kw">from</span> <span class="cls">selectools</span> <span class="kw">import</span> Agent, tool
-<span class="kw">from</span> <span class="cls">selectools.providers</span> <span class="kw">import</span> OpenAIProvider
-
-<span class="kw">@tool</span>()
-<span class="kw">def</span> <span class="fn">search</span>(query: <span class="cls">str</span>) -> <span class="cls">str</span>:
-    <span class="str">"""Search the knowledge base."""</span>
-    <span class="kw">return</span> db.search(query)
-
-result = <span class="fn">Agent</span>(
-    tools=[search],
-    provider=<span class="fn">OpenAIProvider</span>(),
-).<span class="fn">run</span>(<span class="str">"Find our refund policy"</span>)</div>
-        </div>
-        <div class="hero-result">
-          <div class="hero-result-row">
-            <span class="hero-res-label">result.content</span>
-            <span class="hero-res-val">&ldquo;Our refund policy allows returns within 30 days...&rdquo;</span>
-          </div>
-          <div class="hero-result-row">
-            <span class="hero-res-label">result.trace</span>
-            <span class="hero-res-val" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-family:var(--font-mono);font-size:11px">
-              <span class="trace-step" style="background:rgba(59,130,246,0.15);color:#93c5fd;padding:3px 8px;border-radius:4px">llm_call</span>
-              <span style="color:var(--text-faint)">&rarr;</span>
-              <span class="trace-step" style="background:rgba(168,85,247,0.15);color:#c4b5fd;padding:3px 8px;border-radius:4px">tool_select</span>
-              <span style="color:var(--text-faint)">&rarr;</span>
-              <span class="trace-step" style="background:rgba(34,197,94,0.15);color:#86efac;padding:3px 8px;border-radius:4px">tool_exec</span>
-              <span style="color:var(--text-faint)">&rarr;</span>
-              <span class="trace-step" style="background:rgba(59,130,246,0.15);color:#93c5fd;padding:3px 8px;border-radius:4px">llm_call</span>
-            </span>
-          </div>
-          <div class="hero-result-row">
-            <span class="hero-res-label">result.usage</span>
-            <span class="hero-res-val" style="font-family:var(--font-mono);font-size:11px">847 tokens &middot; <span style="color:var(--green)">$0.0012</span> &middot; 1.2s</span>
-          </div>
-        </div>
+      <div class="hero-pills">
+        <span class="pill pill-cyan">OpenAI</span>
+        <span class="pill pill-cyan">Anthropic</span>
+        <span class="pill pill-cyan">Gemini</span>
+        <span class="pill pill-cyan">Ollama</span>
+        <span class="pill">Multi-Agent Graphs</span>
+        <span class="pill">50 Evaluators</span>
+        <span class="pill">Composable Pipelines</span>
+        <span class="pill">Visual Builder</span>
       </div>
     </div>
   </div>
@@ -1206,7 +1121,7 @@ agent = <span class="fn">Agent</span>(
     tools=[search_docs],
     provider=<span class="fn">OpenAIProvider</span>(),
     config=<span class="fn">AgentConfig</span>(
-        model=<span class="str">"gpt-4.1-mini"</span>,
+        model=<span class="str">"gpt-5-mini"</span>,
         guardrails=<span class="fn">GuardrailsPipeline</span>(
             input=[<span class="fn">PIIGuardrail</span>(action=<span class="str">"redact"</span>)],
         ),
@@ -1742,7 +1657,7 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
         { t:1700, type:"tool_result", agent:"Billing Agent", text:"Refund #RF-7291 processed. $29.00 back to card ending 4242." },
         { t:2000, type:"response", agent:"Billing Agent", text:"I found the duplicate charge from March 1. A refund of $29.00 has been issued to your card ending in 4242. It should appear within 3-5 business days." }
       ],
-      tokens: 847, cost: "$0.0012", model: "gpt-4o-mini"
+      tokens: 847, cost: "$0.0012", model: "gpt-5-mini"
     },
     {
       name: "Research Team",
@@ -1767,7 +1682,7 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
         { t:4800, type:"response", agent:"Writer", text:"# AI Agents and Developer Productivity (Revised)\n\nGitHub's 2025 study of 1,000 developers showed a 55% reduction in task completion time..." },
         { t:5200, type:"response", agent:"Reviewer", text:"APPROVED: Report now includes specific data points and actionable recommendations." }
       ],
-      tokens: 2340, cost: "$0.0089", model: "gpt-4o"
+      tokens: 2340, cost: "$0.0089", model: "gpt-5"
     },
     {
       name: "Provider Failover",
@@ -1776,10 +1691,10 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
       colors: ["#3b82f6", "#22c55e", "#a855f7"],
       events: [
         { t:0, type:"input", agent:"Agent", text:"Summarize the key points of quantum computing" },
-        { t:200, type:"other", agent:"OpenAI", text:"Calling gpt-4o..." },
+        { t:200, type:"other", agent:"OpenAI", text:"Calling gpt-5..." },
         { t:500, type:"error", agent:"OpenAI", text:"429 Too Many Requests: Rate limit exceeded" },
         { t:600, type:"other", agent:"OpenAI", text:"Retry attempt 1, backoff: 1.0s" },
-        { t:1600, type:"other", agent:"OpenAI", text:"Retrying gpt-4o..." },
+        { t:1600, type:"other", agent:"OpenAI", text:"Retrying gpt-5..." },
         { t:1900, type:"error", agent:"OpenAI", text:"429 Too Many Requests: Rate limit exceeded" },
         { t:2000, type:"error", agent:"OpenAI", text:"Circuit breaker OPEN: 2 consecutive failures. Cooldown: 60s" },
         { t:2100, type:"fallback", agent:"Agent", text:"Falling over: OpenAI \u2192 Anthropic (circuit_breaker_open)" },
@@ -1808,7 +1723,7 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
         { t:2200, type:"thinking", agent:"Agent", text:"Found relevant policy in Doc 1. Synthesizing response with citation." },
         { t:2800, type:"response", agent:"Agent", text:"Enterprise customers are eligible for a full refund within 30 days of purchase. After 30 days, pro-rated refunds are available. [Source: enterprise-refund-policy.md]" }
       ],
-      tokens: 680, cost: "$0.0008", model: "gpt-4o-mini"
+      tokens: 680, cost: "$0.0008", model: "gpt-5-mini"
     },
     {
       name: "Guardrails Pipeline",
@@ -1827,7 +1742,7 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
         { t:2000, type:"error", agent:"Injection Screen", text:"BLOCKED: prompt injection detected (pattern: system prompt extraction)" },
         { t:2200, type:"response", agent:"Agent", text:"I can only help with order-related questions." }
       ],
-      tokens: 312, cost: "$0.0004", model: "gpt-4o-mini"
+      tokens: 312, cost: "$0.0004", model: "gpt-5-mini"
     },
     {
       name: "Eval Suite",
@@ -1849,7 +1764,7 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
         { t:2400, type:"other", agent:"EvalSuite", text:"Results: 5/5 passed, avg score 9.1/10, total cost $0.003" },
         { t:2600, type:"response", agent:"EvalSuite", text:"Report saved to report.html. All test cases passed." }
       ],
-      tokens: 1850, cost: "$0.003", model: "gpt-4o"
+      tokens: 1850, cost: "$0.003", model: "gpt-5"
     },
     {
       name: "Plan & Execute",
@@ -1872,7 +1787,7 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
         { t:3400, type:"thinking", agent:"Synthesizer", text:"Combining results from 4 steps into final comparison report" },
         { t:4000, type:"response", agent:"Synthesizer", text:"FastAPI is best for async REST APIs with modern auth. Django is best for full-stack with admin panel. Flask for minimal APIs. Recommendation: FastAPI for your use case." }
       ],
-      tokens: 1620, cost: "$0.0058", model: "gpt-4o"
+      tokens: 1620, cost: "$0.0058", model: "gpt-5"
     },
     {
       name: "Streaming + Tools",
@@ -1887,7 +1802,7 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
         { t:900, type:"other", agent:"Agent", text:"Streaming response token by token..." },
         { t:1200, type:"response", agent:"Agent", text:"Currently in Tokyo it is 22\u00b0C and partly cloudy. I would recommend a light jacket or cardigan with comfortable walking shoes. The humidity is moderate so breathable fabrics are ideal." }
       ],
-      tokens: 284, cost: "$0.0003", model: "gpt-4o-mini"
+      tokens: 284, cost: "$0.0003", model: "gpt-5-mini"
     },
     {
       name: "Budget Control",
@@ -1907,7 +1822,7 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
         { t:1800, type:"error", agent:"Budget Monitor", text:"AgentResult.stopped_reason = budget_exceeded" },
         { t:2000, type:"response", agent:"Agent", text:"[Partial result returned with 2 sections completed. Budget limit reached at 510 tokens / $0.0019]" }
       ],
-      tokens: 510, cost: "$0.0019", model: "gpt-4o-mini"
+      tokens: 510, cost: "$0.0019", model: "gpt-5-mini"
     },
     {
       name: "Supervisor Agent",
@@ -1930,7 +1845,7 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
         { t:2600, type:"thinking", agent:"Supervisor", text:"All workers complete. Synthesizing final launch brief." },
         { t:3000, type:"response", agent:"Supervisor", text:"Launch brief complete: market data, messaging, and visual direction aligned. Ready for review." }
       ],
-      tokens: 2100, cost: "$0.0076", model: "gpt-4o"
+      tokens: 2100, cost: "$0.0076", model: "gpt-5"
     }
   ];
 
