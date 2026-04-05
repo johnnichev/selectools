@@ -893,6 +893,50 @@
   </div>
 </div>
 
+<!-- ─── Live Simulations ──────────────────────────────────────────── -->
+<section class="section" id="simulations">
+  <div class="wrap">
+    <span class="section-label">See it run</span>
+    <h2 class="mb-4">Watch agents work. In real time.</h2>
+    <p class="section-desc mb-14">Pre-recorded traces from real selectools agents. Routing, tool calls, failover, RAG. No API key needed.</p>
+
+    <div class="sim-tabs reveal">
+      <button class="sim-tab active" data-sim="0">Customer Support</button>
+      <button class="sim-tab" data-sim="1">Research Team</button>
+      <button class="sim-tab" data-sim="2">Provider Failover</button>
+      <button class="sim-tab" data-sim="3">RAG Pipeline</button>
+      <button class="sim-tab" data-sim="4">Guardrails</button>
+      <button class="sim-tab" data-sim="5">Eval Suite</button>
+      <button class="sim-tab" data-sim="6">Plan & Execute</button>
+      <button class="sim-tab" data-sim="7">Streaming</button>
+      <button class="sim-tab" data-sim="8">Budget Control</button>
+      <button class="sim-tab" data-sim="9">Supervisor</button>
+    </div>
+
+    <div class="sim-container reveal">
+      <div class="sim-sidebar">
+        <div class="sim-desc" id="simDesc"></div>
+        <div class="sim-agents" id="simAgents"></div>
+        <div class="sim-stats">
+          <div class="sim-stat"><span class="sim-stat-label">Tokens</span><span class="sim-stat-val" id="simTokens">--</span></div>
+          <div class="sim-stat"><span class="sim-stat-label">Cost</span><span class="sim-stat-val" id="simCost">--</span></div>
+          <div class="sim-stat"><span class="sim-stat-label">Model</span><span class="sim-stat-val" id="simModel">--</span></div>
+        </div>
+      </div>
+      <div class="sim-timeline">
+        <div class="sim-timeline-header">
+          <span class="sim-timeline-title" id="simTitle">Customer Support Router</span>
+          <span class="sim-status" id="simStatus">ready</span>
+        </div>
+        <div class="sim-timeline-body" id="simBody"></div>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:16px">
+      <a href="simulations/" class="btn btn-ghost" style="font-size:13px">Open full simulation viewer &rarr;</a>
+    </div>
+  </div>
+</section>
+
 <!-- ─── What is Selectools ──────────────────────────────────────────── -->
 <section class="section" id="what">
   <div class="wrap">
@@ -930,6 +974,35 @@ agent = <span class="fn">Agent</span>(
 result = agent.<span class="fn">run</span>(<span class="str">"Find our refund policy"</span>)
 <span class="cmt"># result.content, result.trace, result.usage</span></div>
         </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── Why Selectools ─────────────────────────────────────────────── -->
+<section class="section" id="why">
+  <div class="wrap">
+    <span class="section-label">Why selectools?</span>
+    <h2 class="mb-4">Three problems every agent team hits.</h2>
+    <p class="section-desc mb-14">And how Selectools solves them out of the box. No paid debugger. No SaaS account. No bolt-on libraries.</p>
+    <div class="grid-3 gap-8">
+      <div class="card card-cyan reveal">
+        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M2 12h4l3-9 4 18 3-9h6"/></svg></div>
+        <h3>Can't see what your agent is doing?</h3>
+        <p>Every <code style="color:var(--cyan)">run()</code> returns <code style="color:var(--cyan)">result.trace</code> + <code style="color:var(--cyan)">result.reasoning</code>. Structured timeline of every LLM call, tool pick, and execution. Free, local, always on.</p>
+        <a href="modules/AGENT/" class="card-link">Agent docs &rarr;</a>
+      </div>
+      <div class="card card-red reveal reveal-d1">
+        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <h3>No guardrails until prod breaks?</h3>
+        <p>Built-in PII redaction, topic blocking, toxicity detection, and prompt injection screening with 15 patterns. Plus LLM-based coherence checking.</p>
+        <a href="modules/GUARDRAILS/" class="card-link">Guardrails docs &rarr;</a>
+      </div>
+      <div class="card card-green reveal reveal-d2">
+        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
+        <h3>Don't know what your agents cost?</h3>
+        <p><code style="color:var(--cyan)">result.usage.total_cost</code> gives you automatic per-call token counts and dollar costs across all providers. 152 models with built-in pricing.</p>
+        <a href="modules/USAGE/" class="card-link">Usage tracking docs &rarr;</a>
       </div>
     </div>
   </div>
@@ -991,150 +1064,6 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
           <li>Deploy: <code style="color:var(--cyan)">selectools serve agent.yaml</code></li>
         </ul>
       </div>
-    </div>
-  </div>
-</section>
-
-<!-- ─── Visual Builder ─────────────────────────────────────────────── -->
-<section class="section" id="builder">
-  <div class="wrap">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:40px">
-      <div>
-        <span class="section-label">Visual Agent Builder</span>
-        <h2 class="mb-4">Design workflows in the browser.</h2>
-        <p class="section-desc">The only open-source agent builder that runs in the browser with zero installation. Drag nodes, connect agents, test with real APIs, export runnable Python. 49KB gzipped. No signup. No CDN. No Electron.</p>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;margin-top:4px">
-        <span class="builder-badge"><span class="dot"></span> Live &middot; no server required</span>
-      </div>
-    </div>
-    <div class="reveal">
-      <div class="builder-frame">
-        <iframe src="builder/" loading="lazy" title="Selectools Visual Agent Builder" sandbox="allow-scripts allow-same-origin"></iframe>
-      </div>
-    </div>
-    <div class="grid-4 gap-8" style="margin-top:32px">
-      <div class="card reveal text-center" style="padding:20px">
-        <div style="font-size:26px;font-weight:800;color:var(--cyan);margin-bottom:4px">49KB</div>
-        <div style="font-size:12px;color:var(--text-dim)">gzipped over the wire</div>
-        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">self-contained, no CDN</div>
-      </div>
-      <div class="card reveal reveal-d1 text-center" style="padding:20px">
-        <div style="font-size:26px;font-weight:800;color:var(--cyan);margin-bottom:4px">0 deps</div>
-        <div style="font-size:12px;color:var(--text-dim)">no React, no build step</div>
-        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">single HTML file</div>
-      </div>
-      <div class="card reveal reveal-d2 text-center" style="padding:20px">
-        <div style="font-size:26px;font-weight:800;color:var(--cyan);margin-bottom:4px">8 nodes</div>
-        <div style="font-size:12px;color:var(--text-dim)">agent, loop, HITL, subgraph&hellip;</div>
-        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">7 built-in templates</div>
-      </div>
-      <div class="card reveal reveal-d3 text-center" style="padding:20px">
-        <div style="font-size:26px;font-weight:800;color:var(--cyan);margin-bottom:4px">$0</div>
-        <div style="font-size:12px;color:var(--text-dim)">free, forever</div>
-        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">vs LangGraph Studio (paid)</div>
-      </div>
-    </div>
-    <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap">
-      <a href="builder/" class="btn btn-cyan">Open Full Builder &rarr;</a>
-      <a href="simulations/" class="btn btn-ghost">Live Simulations</a>
-      <a href="examples/" class="btn btn-ghost">88 Examples</a>
-    </div>
-    <details class="builder-compare">
-      <summary class="btn btn-ghost">See how the builder compares</summary>
-      <div class="code-frame" style="overflow-x:auto">
-        <table class="cmp-table">
-          <thead>
-            <tr><th class="cap">Feature</th><th>selectools</th><th>LangGraph Studio</th><th>n8n</th><th>Flowise</th><th>Dify</th><th>Rivet</th></tr>
-          </thead>
-          <tbody>
-            <tr><td class="cap">Price</td><td class="yes">Free, forever</td><td class="no">Paid (LangSmith)</td><td class="mid">&euro;20/mo cloud</td><td class="yes">Free self-host</td><td class="yes">Free self-host</td><td class="yes">Free</td></tr>
-            <tr><td class="cap">Install</td><td class="yes"><code style="font-size:11px">pip install</code></td><td class="mid">macOS desktop app</td><td class="no">Docker</td><td class="no">Docker</td><td class="no">Docker</td><td class="mid">Desktop app</td></tr>
-            <tr><td class="cap">Self-hosted</td><td class="yes">Yes</td><td class="no">No (desktop only)</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="no">No</td></tr>
-            <tr><td class="cap">No CDN/build step</td><td class="yes">Yes</td><td class="mid">N/A</td><td class="no">No (React)</td><td class="no">No (React)</td><td class="no">No (React)</td><td class="no">No (Electron)</td></tr>
-            <tr><td class="cap">Code export (Python)</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
-            <tr><td class="cap">Code export (YAML)</td><td class="yes">Yes</td><td class="no">No</td><td class="mid">JSON only</td><td class="mid">JSON only</td><td class="mid">YAML</td><td class="no">No</td></tr>
-            <tr><td class="cap">AI generation</td><td class="yes">Yes (NL to graph)</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
-            <tr><td class="cap">Live test from browser</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
-            <tr><td class="cap">Runs on GitHub Pages</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
-            <tr><td class="cap">Per-node cost preview</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
-            <tr><td class="cap">Built-in evals</td><td class="yes">50 evaluators</td><td class="mid">LangSmith (paid)</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </details>
-  </div>
-</section>
-
-<!-- ─── Why Selectools ─────────────────────────────────────────────── -->
-<section class="section" id="why">
-  <div class="wrap">
-    <span class="section-label">Why selectools?</span>
-    <h2 class="mb-4">Three problems every agent team hits.</h2>
-    <p class="section-desc mb-14">And how Selectools solves them out of the box. No paid debugger. No SaaS account. No bolt-on libraries.</p>
-    <div class="grid-3 gap-8">
-      <div class="card card-cyan reveal">
-        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M2 12h4l3-9 4 18 3-9h6"/></svg></div>
-        <h3>Can't see what your agent is doing?</h3>
-        <p>Every <code style="color:var(--cyan)">run()</code> returns <code style="color:var(--cyan)">result.trace</code> + <code style="color:var(--cyan)">result.reasoning</code>. Structured timeline of every LLM call, tool pick, and execution. Free, local, always on.</p>
-        <a href="modules/AGENT/" class="card-link">Agent docs &rarr;</a>
-      </div>
-      <div class="card card-red reveal reveal-d1">
-        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
-        <h3>No guardrails until prod breaks?</h3>
-        <p>Built-in PII redaction, topic blocking, toxicity detection, and prompt injection screening with 15 patterns. Plus LLM-based coherence checking.</p>
-        <a href="modules/GUARDRAILS/" class="card-link">Guardrails docs &rarr;</a>
-      </div>
-      <div class="card card-green reveal reveal-d2">
-        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
-        <h3>Don't know what your agents cost?</h3>
-        <p><code style="color:var(--cyan)">result.usage.total_cost</code> gives you automatic per-call token counts and dollar costs across all providers. 152 models with built-in pricing.</p>
-        <a href="modules/USAGE/" class="card-link">Usage tracking docs &rarr;</a>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ─── Live Simulations ──────────────────────────────────────────── -->
-<section class="section" id="simulations">
-  <div class="wrap">
-    <span class="section-label">See it run</span>
-    <h2 class="mb-4">Watch agents work. In real time.</h2>
-    <p class="section-desc mb-14">Pre-recorded traces from real selectools agents. Routing, tool calls, failover, RAG. No API key needed.</p>
-
-    <div class="sim-tabs reveal">
-      <button class="sim-tab active" data-sim="0">Customer Support</button>
-      <button class="sim-tab" data-sim="1">Research Team</button>
-      <button class="sim-tab" data-sim="2">Provider Failover</button>
-      <button class="sim-tab" data-sim="3">RAG Pipeline</button>
-      <button class="sim-tab" data-sim="4">Guardrails</button>
-      <button class="sim-tab" data-sim="5">Eval Suite</button>
-      <button class="sim-tab" data-sim="6">Plan & Execute</button>
-      <button class="sim-tab" data-sim="7">Streaming</button>
-      <button class="sim-tab" data-sim="8">Budget Control</button>
-      <button class="sim-tab" data-sim="9">Supervisor</button>
-    </div>
-
-    <div class="sim-container reveal">
-      <div class="sim-sidebar">
-        <div class="sim-desc" id="simDesc"></div>
-        <div class="sim-agents" id="simAgents"></div>
-        <div class="sim-stats">
-          <div class="sim-stat"><span class="sim-stat-label">Tokens</span><span class="sim-stat-val" id="simTokens">--</span></div>
-          <div class="sim-stat"><span class="sim-stat-label">Cost</span><span class="sim-stat-val" id="simCost">--</span></div>
-          <div class="sim-stat"><span class="sim-stat-label">Model</span><span class="sim-stat-val" id="simModel">--</span></div>
-        </div>
-      </div>
-      <div class="sim-timeline">
-        <div class="sim-timeline-header">
-          <span class="sim-timeline-title" id="simTitle">Customer Support Router</span>
-          <span class="sim-status" id="simStatus">ready</span>
-        </div>
-        <div class="sim-timeline-body" id="simBody"></div>
-      </div>
-    </div>
-    <div style="text-align:center;margin-top:16px">
-      <a href="simulations/" class="btn btn-ghost" style="font-size:13px">Open full simulation viewer &rarr;</a>
     </div>
   </div>
 </section>
@@ -1359,6 +1288,77 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
         <p style="font-size:12px;color:var(--text-faint);margin-top:8px"><code style="color:var(--cyan)">trace_to_html(result.trace)</code></p>
       </div>
     </div>
+  </div>
+</section>
+
+<!-- ─── Visual Builder ─────────────────────────────────────────────── -->
+<section class="section" id="builder">
+  <div class="wrap">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:40px">
+      <div>
+        <span class="section-label">Visual Agent Builder</span>
+        <h2 class="mb-4">Design workflows in the browser.</h2>
+        <p class="section-desc">The only open-source agent builder that runs in the browser with zero installation. Drag nodes, connect agents, test with real APIs, export runnable Python. 49KB gzipped. No signup. No CDN. No Electron.</p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;margin-top:4px">
+        <span class="builder-badge"><span class="dot"></span> Live &middot; no server required</span>
+      </div>
+    </div>
+    <div class="reveal">
+      <div class="builder-frame">
+        <iframe src="builder/" loading="lazy" title="Selectools Visual Agent Builder" sandbox="allow-scripts allow-same-origin"></iframe>
+      </div>
+    </div>
+    <div class="grid-4 gap-8" style="margin-top:32px">
+      <div class="card reveal text-center" style="padding:20px">
+        <div style="font-size:26px;font-weight:800;color:var(--cyan);margin-bottom:4px">49KB</div>
+        <div style="font-size:12px;color:var(--text-dim)">gzipped over the wire</div>
+        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">self-contained, no CDN</div>
+      </div>
+      <div class="card reveal reveal-d1 text-center" style="padding:20px">
+        <div style="font-size:26px;font-weight:800;color:var(--cyan);margin-bottom:4px">0 deps</div>
+        <div style="font-size:12px;color:var(--text-dim)">no React, no build step</div>
+        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">single HTML file</div>
+      </div>
+      <div class="card reveal reveal-d2 text-center" style="padding:20px">
+        <div style="font-size:26px;font-weight:800;color:var(--cyan);margin-bottom:4px">8 nodes</div>
+        <div style="font-size:12px;color:var(--text-dim)">agent, loop, HITL, subgraph&hellip;</div>
+        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">7 built-in templates</div>
+      </div>
+      <div class="card reveal reveal-d3 text-center" style="padding:20px">
+        <div style="font-size:26px;font-weight:800;color:var(--cyan);margin-bottom:4px">$0</div>
+        <div style="font-size:12px;color:var(--text-dim)">free, forever</div>
+        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">vs LangGraph Studio (paid)</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap">
+      <a href="builder/" class="btn btn-cyan">Open Full Builder &rarr;</a>
+      <a href="simulations/" class="btn btn-ghost">Live Simulations</a>
+      <a href="examples/" class="btn btn-ghost">88 Examples</a>
+    </div>
+    <details class="builder-compare">
+      <summary class="btn btn-ghost">See how the builder compares</summary>
+      <div class="code-frame" style="overflow-x:auto">
+        <table class="cmp-table">
+          <thead>
+            <tr><th class="cap">Feature</th><th>selectools</th><th>LangGraph Studio</th><th>n8n</th><th>Flowise</th><th>Dify</th><th>Rivet</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="cap">Price</td><td class="yes">Free, forever</td><td class="no">Paid (LangSmith)</td><td class="mid">&euro;20/mo cloud</td><td class="yes">Free self-host</td><td class="yes">Free self-host</td><td class="yes">Free</td></tr>
+            <tr><td class="cap">Install</td><td class="yes"><code style="font-size:11px">pip install</code></td><td class="mid">macOS desktop app</td><td class="no">Docker</td><td class="no">Docker</td><td class="no">Docker</td><td class="mid">Desktop app</td></tr>
+            <tr><td class="cap">Self-hosted</td><td class="yes">Yes</td><td class="no">No (desktop only)</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="no">No</td></tr>
+            <tr><td class="cap">No CDN/build step</td><td class="yes">Yes</td><td class="mid">N/A</td><td class="no">No (React)</td><td class="no">No (React)</td><td class="no">No (React)</td><td class="no">No (Electron)</td></tr>
+            <tr><td class="cap">Code export (Python)</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td class="cap">Code export (YAML)</td><td class="yes">Yes</td><td class="no">No</td><td class="mid">JSON only</td><td class="mid">JSON only</td><td class="mid">YAML</td><td class="no">No</td></tr>
+            <tr><td class="cap">AI generation</td><td class="yes">Yes (NL to graph)</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td class="cap">Live test from browser</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+            <tr><td class="cap">Runs on GitHub Pages</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td class="cap">Per-node cost preview</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td class="cap">Built-in evals</td><td class="yes">50 evaluators</td><td class="mid">LangSmith (paid)</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
   </div>
 </section>
 
