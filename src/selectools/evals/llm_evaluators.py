@@ -26,7 +26,14 @@ def _strip_fenced_content(text: str) -> str:
     """Remove fenced user content blocks to prevent score injection."""
     while _FENCE_START in text and _FENCE_END in text:
         start = text.index(_FENCE_START)
-        end = text.index(_FENCE_END) + len(_FENCE_END)
+        # Find the closing fence AFTER the opening fence to avoid infinite
+        # loops and incorrect stripping when _FENCE_END appears before
+        # _FENCE_START in the text.
+        end_search_from = start + len(_FENCE_START)
+        end_pos = text.find(_FENCE_END, end_search_from)
+        if end_pos == -1:
+            break
+        end = end_pos + len(_FENCE_END)
         text = text[:start] + text[end:]
     return text
 

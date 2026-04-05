@@ -1,24 +1,34 @@
 #!/usr/bin/env bash
-# Ralph loop: hunt + fix per module until 3 consecutive clean passes.
+# Ralph loop: hunt + fix per module until N consecutive clean passes.
 #
 # Usage:
-#   bash scripts/ralph_bug_hunt.sh              # all 7 modules
+#   bash scripts/ralph_bug_hunt.sh              # all 7 modules, defaults
 #   bash scripts/ralph_bug_hunt.sh rag          # single module
 #   bash scripts/ralph_bug_hunt.sh agent providers  # multiple modules
+#
+# Options (via environment variables):
+#   MAX_ITER=10          Max iterations per module before giving up (default: 10)
+#   REQUIRED_CLEAN=3     Consecutive clean passes needed (default: 3)
+#
+# Examples:
+#   MAX_ITER=5 REQUIRED_CLEAN=2 bash scripts/ralph_bug_hunt.sh rag
+#   REQUIRED_CLEAN=1 bash scripts/ralph_bug_hunt.sh agent providers tools
 #
 # Modules: agent | providers | tools | rag | memory | evals | security
 #
 # Exit codes:
-#   0 — all modules reached 3 consecutive clean passes
+#   0 — all modules reached the required consecutive clean passes
 #   1 — one or more modules hit the iteration cap without converging
 
 set -euo pipefail
 
 ALL_MODULES=("agent" "providers" "tools" "rag" "memory" "evals" "security")
-MAX_ITER=10
-REQUIRED_CLEAN=3
+MAX_ITER="${MAX_ITER:-10}"
+REQUIRED_CLEAN="${REQUIRED_CLEAN:-3}"
 LOG_DIR="logs/ralph_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$LOG_DIR"
+
+echo "Config: MAX_ITER=$MAX_ITER  REQUIRED_CLEAN=$REQUIRED_CLEAN"
 
 # Resolve modules from args (default: all)
 if [ "$#" -eq 0 ]; then

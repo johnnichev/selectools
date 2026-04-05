@@ -225,6 +225,39 @@ class TestKnowledgePrune:
         assert removed == 0
         assert (tmp_path / "notes.txt").exists()
 
+    def test_prune_old_logs_explicit_zero_keep_days(self, tmp_path) -> None:
+        """Regression: prune_old_logs(keep_days=0) used ``or`` instead of ``is None``.
+
+        Passing keep_days=0 was treated as falsy, falling through to the
+        default recent_days value.  With recent_days=7, keep_days=0 would
+        actually keep 7 days instead of 0.
+        """
+        km = KnowledgeMemory(directory=str(tmp_path), recent_days=7)
+        km.remember("Today's note")
+        # Create a 2-day-old log that should be pruned with keep_days=0
+        old_date = (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d")
+        old_path = tmp_path / f"{old_date}.log"
+        old_path.write_text("old note\n")
+        # With the bug, keep_days=0 fell through to recent_days=7 and kept the old log
+        removed = km.prune_old_logs(keep_days=0)
+        assert removed >= 1, "keep_days=0 must prune all log files including 2-day-old"
+        assert not old_path.exists()
+
+
+class TestGetRecentLogsExplicitZero:
+    def test_get_recent_logs_explicit_zero_days(self, tmp_path) -> None:
+        """Regression: get_recent_logs(days=0) used ``or`` instead of ``is None``.
+
+        Passing days=0 was treated as falsy, falling through to the default
+        recent_days value.  With recent_days=7, days=0 would actually read
+        7 days of logs instead of 0.
+        """
+        km = KnowledgeMemory(directory=str(tmp_path), recent_days=7)
+        km.remember("Today's note")
+        # days=0 should read zero days of logs (return empty)
+        logs = km.get_recent_logs(days=0)
+        assert logs == "", "get_recent_logs(days=0) must return empty string"
+
 
 # ======================================================================
 # KnowledgeMemory — serialization

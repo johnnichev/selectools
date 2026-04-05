@@ -465,6 +465,9 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         )
         self._history.append(final_response)
         self._memory_add(final_response, ctx.run_id)
+        self._extract_entities(ctx.run_id)
+        self._extract_kg_triples(ctx.run_id)
+        self._session_save(ctx.run_id)
         result = AgentResult(
             message=final_response,
             tool_name=ctx.last_tool_name,
@@ -516,6 +519,9 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         final_response = Message(role=Role.ASSISTANT, content=reason)
         self._history.append(final_response)
         self._memory_add(final_response, ctx.run_id)
+        self._extract_entities(ctx.run_id)
+        self._extract_kg_triples(ctx.run_id)
+        self._session_save(ctx.run_id)
         result = AgentResult(
             message=final_response,
             tool_name=ctx.last_tool_name,
@@ -539,6 +545,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         final_response = Message(role=Role.ASSISTANT, content=reason)
         self._history.append(final_response)
         self._memory_add(final_response, ctx.run_id)
+        self._session_save(ctx.run_id)
         result = AgentResult(
             message=final_response,
             tool_name=ctx.last_tool_name,
@@ -945,11 +952,13 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             >>> result = agent.run([Message(role=Role.USER, content="Hello")])
         """
         messages = self._normalize_messages(messages)
-        ctx = self._prepare_run(
-            messages, response_format=response_format, parent_run_id=parent_run_id
-        )
-
+        saved_system_prompt = self._system_prompt
+        ctx: Optional[_RunContext] = None
         try:
+            ctx = self._prepare_run(
+                messages, response_format=response_format, parent_run_id=parent_run_id
+            )
+
             while ctx.iteration < self.config.max_iterations:
                 ctx.iteration += 1
 
@@ -1098,18 +1107,19 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
 
             return self._build_max_iterations_result(ctx)
         except Exception as exc:
-            if not self.memory:
-                self._history = self._history[: ctx.history_checkpoint]
-            self._notify_observers(
-                "on_error",
-                ctx.run_id,
-                exc,
-                {"messages": messages, "iteration": ctx.iteration},
-            )
+            if ctx is not None:
+                if not self.memory:
+                    self._history = self._history[: ctx.history_checkpoint]
+                self._notify_observers(
+                    "on_error",
+                    ctx.run_id,
+                    exc,
+                    {"messages": messages, "iteration": ctx.iteration},
+                )
             raise
         finally:
             self._unwire_fallback_observer()
-            self._system_prompt = ctx.original_system_prompt
+            self._system_prompt = saved_system_prompt
 
     def _clone_for_isolation(self) -> "Agent":
         """Create a lightweight clone for batch processing with isolated state."""
@@ -1140,31 +1150,33 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             AgentResult: The final result object (yielded at the very end).
         """
         messages = self._normalize_messages(messages)
-        ctx = self._prepare_run(
-            messages,
-            response_format=response_format,
-            parent_run_id=parent_run_id,
-            skip_guardrails=True,
-        )
-
-        # Async input guardrails (non-blocking).
-        # Only process the newly added messages — those are always at the tail of
-        # self._history (appended last by _prepare_run). Applying guardrails to
-        # the entire history would re-validate previously processed turns from
-        # memory, which wastes work and can corrupt already-validated content.
-        if self.config.guardrails and self.config.guardrails.input:
-            new_msg_start = len(self._history) - len(messages)
-            for i in range(new_msg_start, len(self._history)):
-                msg = self._history[i]
-                if msg.role == Role.USER and msg.content:
-                    self._history[i] = copy.copy(msg)
-                    self._history[i].content = await self._arun_input_guardrails(
-                        msg.content, ctx.trace
-                    )
-
-        await self._anotify_observers("on_run_start", ctx.run_id, messages, self._system_prompt)
-
+        saved_system_prompt = self._system_prompt
+        ctx: Optional[_RunContext] = None
         try:
+            ctx = self._prepare_run(
+                messages,
+                response_format=response_format,
+                parent_run_id=parent_run_id,
+                skip_guardrails=True,
+            )
+
+            # Async input guardrails (non-blocking).
+            # Only process the newly added messages — those are always at the tail of
+            # self._history (appended last by _prepare_run). Applying guardrails to
+            # the entire history would re-validate previously processed turns from
+            # memory, which wastes work and can corrupt already-validated content.
+            if self.config.guardrails and self.config.guardrails.input:
+                new_msg_start = len(self._history) - len(messages)
+                for i in range(new_msg_start, len(self._history)):
+                    msg = self._history[i]
+                    if msg.role == Role.USER and msg.content:
+                        self._history[i] = copy.copy(msg)
+                        self._history[i].content = await self._arun_input_guardrails(
+                            msg.content, ctx.trace
+                        )
+
+            await self._anotify_observers("on_run_start", ctx.run_id, messages, self._system_prompt)
+
             while ctx.iteration < self.config.max_iterations:
                 ctx.iteration += 1
 
@@ -1471,24 +1483,25 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             yield _result
             return
         except Exception as exc:
-            if not self.memory:
-                self._history = self._history[: ctx.history_checkpoint]
-            self._notify_observers(
-                "on_error",
-                ctx.run_id,
-                exc,
-                {"messages": messages, "iteration": ctx.iteration},
-            )
-            await self._anotify_observers(
-                "on_error",
-                ctx.run_id,
-                exc,
-                {"messages": messages, "iteration": ctx.iteration},
-            )
+            if ctx is not None:
+                if not self.memory:
+                    self._history = self._history[: ctx.history_checkpoint]
+                self._notify_observers(
+                    "on_error",
+                    ctx.run_id,
+                    exc,
+                    {"messages": messages, "iteration": ctx.iteration},
+                )
+                await self._anotify_observers(
+                    "on_error",
+                    ctx.run_id,
+                    exc,
+                    {"messages": messages, "iteration": ctx.iteration},
+                )
             raise
         finally:
             self._unwire_fallback_observer()
-            self._system_prompt = ctx.original_system_prompt
+            self._system_prompt = saved_system_prompt
 
     async def arun(
         self,
@@ -1513,31 +1526,33 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             AgentResult with the final response and tool call metadata.
         """
         messages = self._normalize_messages(messages)
-        ctx = self._prepare_run(
-            messages,
-            response_format=response_format,
-            parent_run_id=parent_run_id,
-            skip_guardrails=True,
-        )
-
-        # Async input guardrails (non-blocking).
-        # Only process the newly added messages — those are always at the tail of
-        # self._history (appended last by _prepare_run). Applying guardrails to
-        # the entire history would re-validate previously processed turns from
-        # memory, which wastes work and can corrupt already-validated content.
-        if self.config.guardrails and self.config.guardrails.input:
-            new_msg_start = len(self._history) - len(messages)
-            for i in range(new_msg_start, len(self._history)):
-                msg = self._history[i]
-                if msg.role == Role.USER and msg.content:
-                    self._history[i] = copy.copy(msg)
-                    self._history[i].content = await self._arun_input_guardrails(
-                        msg.content, ctx.trace
-                    )
-
-        await self._anotify_observers("on_run_start", ctx.run_id, messages, self._system_prompt)
-
+        saved_system_prompt = self._system_prompt
+        ctx: Optional[_RunContext] = None
         try:
+            ctx = self._prepare_run(
+                messages,
+                response_format=response_format,
+                parent_run_id=parent_run_id,
+                skip_guardrails=True,
+            )
+
+            # Async input guardrails (non-blocking).
+            # Only process the newly added messages — those are always at the tail of
+            # self._history (appended last by _prepare_run). Applying guardrails to
+            # the entire history would re-validate previously processed turns from
+            # memory, which wastes work and can corrupt already-validated content.
+            if self.config.guardrails and self.config.guardrails.input:
+                new_msg_start = len(self._history) - len(messages)
+                for i in range(new_msg_start, len(self._history)):
+                    msg = self._history[i]
+                    if msg.role == Role.USER and msg.content:
+                        self._history[i] = copy.copy(msg)
+                        self._history[i].content = await self._arun_input_guardrails(
+                            msg.content, ctx.trace
+                        )
+
+            await self._anotify_observers("on_run_start", ctx.run_id, messages, self._system_prompt)
+
             while ctx.iteration < self.config.max_iterations:
                 ctx.iteration += 1
 
@@ -1735,24 +1750,25 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             await self._anotify_observers("on_run_end", ctx.run_id, result)
             return result
         except Exception as exc:
-            if not self.memory:
-                self._history = self._history[: ctx.history_checkpoint]
-            self._notify_observers(
-                "on_error",
-                ctx.run_id,
-                exc,
-                {"messages": messages, "iteration": ctx.iteration},
-            )
-            await self._anotify_observers(
-                "on_error",
-                ctx.run_id,
-                exc,
-                {"messages": messages, "iteration": ctx.iteration},
-            )
+            if ctx is not None:
+                if not self.memory:
+                    self._history = self._history[: ctx.history_checkpoint]
+                self._notify_observers(
+                    "on_error",
+                    ctx.run_id,
+                    exc,
+                    {"messages": messages, "iteration": ctx.iteration},
+                )
+                await self._anotify_observers(
+                    "on_error",
+                    ctx.run_id,
+                    exc,
+                    {"messages": messages, "iteration": ctx.iteration},
+                )
             raise
         finally:
             self._unwire_fallback_observer()
-            self._system_prompt = ctx.original_system_prompt
+            self._system_prompt = saved_system_prompt
 
     # Usage tracking convenience methods
     @property

@@ -583,3 +583,66 @@ class TestBranchDeepCopy:
         assert (
             original_tc.parameters is not branch_tc.parameters
         ), "branch() must deep-copy ToolCall.parameters"
+
+    def test_branch_plain_messages_are_independent(self) -> None:
+        """Regression: branch() shared plain Message objects by reference.
+
+        Messages without tool_calls were placed directly into the branched
+        memory without copying.  Mutating such a message (e.g. setting its
+        content) on one side would silently corrupt the other.
+        """
+        mem = ConversationMemory()
+        mem.add(_msg("original text", Role.USER))
+
+        branched = mem.branch()
+
+        original_msg = mem.get_history()[0]
+        branch_msg = branched.get_history()[0]
+        assert (
+            original_msg is not branch_msg
+        ), "branch() must copy plain messages, not share by reference"
+
+        # Mutating the branch must not affect the original
+        branch_msg.content = "mutated"
+        assert mem.get_history()[0].content == "original text"
+
+    def test_branch_content_parts_are_independent(self) -> None:
+        """Regression: branch() did not copy content_parts lists.
+
+        Multimodal messages with content_parts shared the same list and
+        ContentPart objects between original and branched memory.
+        """
+        from selectools.types import ContentPart
+
+        mem = ConversationMemory()
+        parts = [ContentPart(type="text", text="hello")]
+        mem.add(Message(role=Role.USER, content="hello", content_parts=parts))
+
+        branched = mem.branch()
+
+        original_parts = mem.get_history()[0].content_parts
+        branch_parts = branched.get_history()[0].content_parts
+        assert original_parts is not branch_parts, "branch() must copy content_parts list"
+        assert original_parts[0] is not branch_parts[0], "branch() must copy ContentPart objects"
+
+    def test_branch_preserves_image_base64(self) -> None:
+        """Regression: branch() used dataclasses.replace() which resets init=False fields.
+
+        Message.image_base64 is init=False (set via __post_init__).
+        dataclasses.replace() only passes init=True fields to the constructor,
+        so image_base64 was silently dropped to None during branch().
+        """
+        mem = ConversationMemory()
+        msg = Message(role=Role.USER, content="Describe this image")
+        # Simulate image_base64 being set (normally via __post_init__ from image_path)
+        object.__setattr__(msg, "image_base64", "iVBORw0KGgo=")
+        mem.add(msg)
+
+        branched = mem.branch()
+
+        original_b64 = mem.get_history()[0].image_base64
+        branch_b64 = branched.get_history()[0].image_base64
+        assert original_b64 == "iVBORw0KGgo=", "Original image_base64 must be preserved"
+        assert (
+            branch_b64 == "iVBORw0KGgo="
+        ), "branch() must preserve image_base64 (init=False field)"

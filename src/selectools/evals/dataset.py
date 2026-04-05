@@ -40,9 +40,14 @@ class DatasetLoader:
         """Convert a list of dicts to TestCase objects.
 
         Unknown keys are stored in TestCase.metadata.
+        Non-dict items are skipped with a warning.
         """
         cases: List[TestCase] = []
-        for item in data:
+        for _idx, item in enumerate(data):
+            if not isinstance(item, dict):
+                continue
+            if "input" not in item:
+                continue
             known = {k: v for k, v in item.items() if k in _TESTCASE_FIELDS}
             unknown = {k: v for k, v in item.items() if k not in _TESTCASE_FIELDS}
             if unknown:

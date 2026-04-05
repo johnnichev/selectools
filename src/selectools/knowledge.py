@@ -261,7 +261,9 @@ class FileKnowledgeStore:
             entries = self._load_all()
             before = len(entries)
             cutoff = (
-                datetime.now(timezone.utc) - timedelta(days=max_age_days) if max_age_days else None
+                datetime.now(timezone.utc) - timedelta(days=max_age_days)
+                if max_age_days is not None
+                else None
             )
             kept = []
             for e in entries:
@@ -270,7 +272,7 @@ class FileKnowledgeStore:
                     continue
                 if e.is_expired:
                     continue
-                if cutoff and e.created_at < cutoff:
+                if cutoff is not None and e.created_at < cutoff:
                     continue
                 if e.importance < min_importance:
                     continue
@@ -576,7 +578,7 @@ class KnowledgeMemory:
         Returns:
             Combined text from recent daily log files.
         """
-        days = days or self._recent_days
+        days = self._recent_days if days is None else days
         lines: List[str] = []
 
         for i in range(days):
@@ -663,7 +665,7 @@ class KnowledgeMemory:
         Returns:
             Number of log files removed.
         """
-        keep_days = keep_days or self._recent_days
+        keep_days = self._recent_days if keep_days is None else keep_days
         cutoff = datetime.now(timezone.utc) - timedelta(days=keep_days)
         removed = 0
 

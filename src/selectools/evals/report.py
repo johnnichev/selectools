@@ -198,7 +198,9 @@ class EvalReport:
             f"| **Model** | {self.metadata.model or 'unknown'} |",
         ]
 
-        failures = [cr for cr in self.case_results if cr.verdict != CaseVerdict.PASS]
+        failures = [
+            cr for cr in self.case_results if cr.verdict not in (CaseVerdict.PASS, CaseVerdict.SKIP)
+        ]
         if failures:
             lines.extend(
                 [

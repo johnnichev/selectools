@@ -225,6 +225,32 @@ class ConversationMemory:
             break
         return removed
 
+    @staticmethod
+    def _copy_message(msg: Message) -> Message:
+        """Create an independent copy of a Message.
+
+        Handles the ``image_base64`` field which is ``init=False`` and would
+        be lost by a naive ``dataclasses.replace()`` call.
+        """
+        new_msg = replace(
+            msg,
+            tool_calls=(
+                [replace(tc, parameters=copy.deepcopy(tc.parameters)) for tc in msg.tool_calls]
+                if msg.tool_calls
+                else msg.tool_calls
+            ),
+            content_parts=(
+                [replace(cp) for cp in msg.content_parts]
+                if msg.content_parts
+                else msg.content_parts
+            ),
+        )
+        # image_base64 is init=False so replace() resets it to None;
+        # restore it from the original.
+        if msg.image_base64 is not None:
+            object.__setattr__(new_msg, "image_base64", msg.image_base64)
+        return new_msg
+
     def branch(self) -> "ConversationMemory":
         """Return an independent snapshot of this memory.
 
@@ -247,20 +273,7 @@ class ConversationMemory:
             max_messages=self.max_messages,
             max_tokens=self.max_tokens,
         )
-        branched._messages = [
-            (
-                replace(
-                    msg,
-                    tool_calls=[
-                        replace(tc, parameters=copy.deepcopy(tc.parameters))
-                        for tc in msg.tool_calls
-                    ],
-                )
-                if msg.tool_calls
-                else msg
-            )
-            for msg in self._messages
-        ]
+        branched._messages = [self._copy_message(msg) for msg in self._messages]
         branched._summary = self._summary
         branched._last_trimmed = []
         return branched

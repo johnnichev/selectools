@@ -101,6 +101,8 @@ class JsonFileSessionStore:
         os.makedirs(directory, exist_ok=True)
 
     def _path(self, session_id: str) -> str:
+        if not session_id:
+            raise ValueError("session_id must not be empty")
         safe_id = os.path.basename(session_id)
         if safe_id != session_id or ".." in session_id or "\x00" in session_id:
             raise ValueError(f"Invalid session_id: {session_id!r}")

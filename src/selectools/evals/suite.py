@@ -264,8 +264,18 @@ class EvalSuite:
 
         all_failures: List[EvalFailure] = []
         for evaluator in self.evaluators:
-            failures = evaluator.check(case, case_result)
-            all_failures.extend(failures)
+            try:
+                failures = evaluator.check(case, case_result)
+                all_failures.extend(failures)
+            except Exception as exc:
+                all_failures.append(
+                    EvalFailure(
+                        evaluator_name=getattr(evaluator, "name", type(evaluator).__name__),
+                        expected="evaluator to run without error",
+                        actual=f"{type(exc).__name__}: {exc}",
+                        message=f"Evaluator crashed: {type(exc).__name__}: {exc}",
+                    )
+                )
 
         case_result.failures = all_failures
         if all_failures:

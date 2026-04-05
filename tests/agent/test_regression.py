@@ -122,22 +122,22 @@ class _CountingObserver:
     def _record(self, event: str, *args: Any) -> None:
         self.events.setdefault(event, []).append(args)
 
-    def on_run_start(self, run_id: str, messages: Any) -> None:
+    def on_run_start(self, run_id: str, messages: Any, system_prompt: str = "") -> None:
         self._record("on_run_start", run_id)
 
     def on_run_end(self, run_id: str, result: Any) -> None:
         self._record("on_run_end", run_id)
 
-    def on_llm_start(self, run_id: str, model: str, messages: Any) -> None:
+    def on_llm_start(self, run_id: str, messages: Any, model: str, system_prompt: str = "") -> None:
         self._record("on_llm_start", run_id)
 
-    def on_llm_end(self, run_id: str, model: str, content: str) -> None:
+    def on_llm_end(self, run_id: str, content: Any, usage: Any = None) -> None:
         self._record("on_llm_end", run_id)
 
-    def on_iteration_start(self, run_id: str, iteration: int) -> None:
+    def on_iteration_start(self, run_id: str, iteration: int, messages: Any = None) -> None:
         self._record("on_iteration_start", run_id, iteration)
 
-    def on_iteration_end(self, run_id: str, iteration: int, content: str) -> None:
+    def on_iteration_end(self, run_id: str, iteration: int, content: str = "") -> None:
         self._record("on_iteration_end", run_id, iteration)
 
     def on_tool_start(self, run_id: str, call_id: str, name: str, args: Any) -> None:
@@ -146,7 +146,15 @@ class _CountingObserver:
     def on_tool_end(self, run_id: str, call_id: str, name: str, result: str, dur: float) -> None:
         self._record("on_tool_end", run_id, name)
 
-    def on_tool_error(self, run_id: str, call_id: str, name: str, error: str, dur: float) -> None:
+    def on_tool_error(
+        self,
+        run_id: str,
+        call_id: str,
+        name: str,
+        error: Any = None,
+        tool_args: Any = None,
+        dur: float = 0.0,
+    ) -> None:
         self._record("on_tool_error", run_id, name)
 
     def on_policy_decision(
@@ -157,7 +165,7 @@ class _CountingObserver:
     def on_provider_fallback(self, run_id: str, failed: str, next_p: str, exc: Exception) -> None:
         self._record("on_provider_fallback", run_id, failed, next_p)
 
-    def on_memory_trim(self, run_id: str, removed: int, remaining: int) -> None:
+    def on_memory_trim(self, run_id: str, removed: int, remaining: int, reason: str = "") -> None:
         self._record("on_memory_trim", run_id, removed, remaining)
 
     def on_batch_start(self, batch_id: str, size: int) -> None:
@@ -1862,3 +1870,219 @@ class TestBugHuntRegressions:
 
         assert hasattr(Agent, "_aprocess_response")
         assert inspect.iscoroutinefunction(Agent._aprocess_response)
+
+
+# ---------------------------------------------------------------------------
+# Bug: _system_prompt leak if _prepare_run fails after modifying prompt
+# ---------------------------------------------------------------------------
+
+
+class _FailingGuardrail:
+    """Guardrail that always raises so _prepare_run fails after prompt mutation."""
+
+    def check(self, text: str) -> Any:
+        from selectools.guardrails.base import GuardrailResult
+
+        raise RuntimeError("guardrail boom")
+
+
+class _FailingGuardrailsPipeline:
+    """Minimal pipeline that triggers an error in _run_input_guardrails."""
+
+    def __init__(self) -> None:
+        self.input = [_FailingGuardrail()]
+        self.output: list = []
+
+    def check_input(self, text: str) -> Any:
+        raise RuntimeError("guardrail boom")
+
+    async def acheck_input(self, text: str) -> Any:
+        raise RuntimeError("guardrail boom")
+
+
+class TestPrepareRunPromptLeakFix:
+    """If _prepare_run raises, _system_prompt must be restored."""
+
+    def test_system_prompt_restored_on_prepare_run_failure_sync(self) -> None:
+        """Bug: _prepare_run modifies _system_prompt for response_format, then
+        raises during guardrails/memory/etc. Without the fix, the modified prompt
+        (including JSON schema instruction) leaks to subsequent run() calls."""
+        provider = _SimpleProvider(content="hello")
+        agent = Agent(
+            tools=[noop_tool],
+            provider=provider,
+            config=AgentConfig(
+                max_iterations=1,
+                guardrails=_FailingGuardrailsPipeline(),
+            ),
+        )
+        original_prompt = agent._system_prompt
+
+        schema: Dict[str, Any] = {"type": "object", "properties": {"x": {"type": "string"}}}
+
+        with pytest.raises(RuntimeError, match="guardrail boom"):
+            agent.run("test", response_format=schema)
+
+        assert (
+            agent._system_prompt == original_prompt
+        ), "_system_prompt was not restored after _prepare_run failure"
+
+    @pytest.mark.asyncio
+    async def test_system_prompt_restored_on_prepare_run_failure_arun(self) -> None:
+        """Async variant: arun() must also restore _system_prompt when _prepare_run fails."""
+        provider = _SimpleProvider(content="hello")
+        agent = Agent(
+            tools=[noop_tool],
+            provider=provider,
+            config=AgentConfig(
+                max_iterations=1,
+                guardrails=_FailingGuardrailsPipeline(),
+            ),
+        )
+        original_prompt = agent._system_prompt
+
+        schema: Dict[str, Any] = {"type": "object", "properties": {"x": {"type": "string"}}}
+
+        with pytest.raises(RuntimeError, match="guardrail boom"):
+            await agent.arun("test", response_format=schema)
+
+        assert agent._system_prompt == original_prompt
+
+    @pytest.mark.asyncio
+    async def test_system_prompt_restored_on_prepare_run_failure_astream(self) -> None:
+        """Async streaming variant: astream() must also restore _system_prompt."""
+        provider = _SimpleProvider(content="hello")
+        agent = Agent(
+            tools=[noop_tool],
+            provider=provider,
+            config=AgentConfig(
+                max_iterations=1,
+                guardrails=_FailingGuardrailsPipeline(),
+            ),
+        )
+        original_prompt = agent._system_prompt
+
+        schema: Dict[str, Any] = {"type": "object", "properties": {"x": {"type": "string"}}}
+
+        with pytest.raises(RuntimeError, match="guardrail boom"):
+            async for _ in agent.astream("test", response_format=schema):
+                pass
+
+        assert agent._system_prompt == original_prompt
+
+
+# ---------------------------------------------------------------------------
+# Bug: _build_max_iterations_result skips session save / entity extraction
+# ---------------------------------------------------------------------------
+
+
+class _RecordingSessionStore:
+    """Minimal session store that records save calls."""
+
+    def __init__(self) -> None:
+        self.saves: List[str] = []
+
+    def load(self, session_id: str) -> Any:
+        return None
+
+    def save(self, session_id: str, memory: Any) -> None:
+        self.saves.append(session_id)
+
+
+class TestEarlyExitSessionSave:
+    """Session must be saved even when the agent hits max iterations or budget."""
+
+    def test_max_iterations_saves_session(self) -> None:
+        """Bug: _build_max_iterations_result didn't call _session_save."""
+        from selectools.memory import ConversationMemory
+
+        store = _RecordingSessionStore()
+        # Provider always returns a tool call so the agent loops until max_iterations
+        provider = _SimpleProvider(
+            tool_calls=[ToolCall(tool_name="dummy_tool", parameters={"x": "hi"})],
+        )
+        mem = ConversationMemory(max_messages=50)
+        agent = Agent(
+            tools=[dummy_tool],
+            provider=provider,
+            config=AgentConfig(
+                max_iterations=2,
+                session_store=store,
+                session_id="test-session",
+            ),
+            memory=mem,
+        )
+        result = agent.run("hello")
+        assert "Maximum iterations" in result.content
+        assert len(store.saves) >= 1, "Session was not saved on max_iterations exit"
+
+    def test_budget_exceeded_saves_session(self) -> None:
+        """Bug: _build_budget_exceeded_result didn't call _session_save."""
+        from selectools.memory import ConversationMemory
+
+        store = _RecordingSessionStore()
+        provider = _SimpleProvider(content="hello")
+        mem = ConversationMemory(max_messages=50)
+        agent = Agent(
+            tools=[noop_tool],
+            provider=provider,
+            config=AgentConfig(
+                max_iterations=3,
+                max_total_tokens=0,  # immediately exceeds budget
+                session_store=store,
+                session_id="budget-test",
+            ),
+            memory=mem,
+        )
+        result = agent.run("hello")
+        assert "budget" in result.content.lower() or "Budget" in result.content
+        assert len(store.saves) >= 1, "Session was not saved on budget-exceeded exit"
+
+    def test_cancelled_saves_session(self) -> None:
+        """Bug: _build_cancelled_result didn't call _session_save."""
+        from selectools.cancellation import CancellationToken
+        from selectools.memory import ConversationMemory
+
+        store = _RecordingSessionStore()
+        token = CancellationToken()
+        token.cancel()  # pre-cancelled
+        provider = _SimpleProvider(content="hello")
+        mem = ConversationMemory(max_messages=50)
+        agent = Agent(
+            tools=[noop_tool],
+            provider=provider,
+            config=AgentConfig(
+                max_iterations=3,
+                cancellation_token=token,
+                session_store=store,
+                session_id="cancel-test",
+            ),
+            memory=mem,
+        )
+        result = agent.run("hello")
+        assert "cancelled" in result.content.lower()
+        assert len(store.saves) >= 1, "Session was not saved on cancellation exit"
+
+    @pytest.mark.asyncio
+    async def test_max_iterations_saves_session_async(self) -> None:
+        """Async variant of the max-iterations session save test."""
+        from selectools.memory import ConversationMemory
+
+        store = _RecordingSessionStore()
+        provider = _SimpleProvider(
+            tool_calls=[ToolCall(tool_name="dummy_tool", parameters={"x": "hi"})],
+        )
+        mem = ConversationMemory(max_messages=50)
+        agent = Agent(
+            tools=[dummy_tool],
+            provider=provider,
+            config=AgentConfig(
+                max_iterations=2,
+                session_store=store,
+                session_id="async-session",
+            ),
+            memory=mem,
+        )
+        result = await agent.arun("hello")
+        assert "Maximum iterations" in result.content
+        assert len(store.saves) >= 1, "Session was not saved on async max_iterations exit"

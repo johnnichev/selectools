@@ -166,7 +166,7 @@ class SupabaseKnowledgeStore:
             rows = response.data or []
 
             now = datetime.now(timezone.utc)
-            cutoff = now - timedelta(days=max_age_days) if max_age_days else None
+            cutoff = now - timedelta(days=max_age_days) if max_age_days is not None else None
             removed = 0
 
             for row in rows:

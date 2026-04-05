@@ -247,6 +247,39 @@ class TestSQLiteKnowledgeStore:
         assert removed == 1
 
 
+class TestPruneMaxAgeDaysZero:
+    """Regression: prune(max_age_days=0) treated 0 as falsy, skipping age-based pruning."""
+
+    def test_file_store_prune_max_age_zero_removes_all_non_persistent(self, tmp_path):
+        """Regression: FileKnowledgeStore.prune(max_age_days=0) used ``if max_age_days``
+        instead of ``if max_age_days is not None``, so 0 was treated as no age limit.
+
+        With max_age_days=0, all non-persistent entries should be pruned
+        (cutoff = now - 0 days = now, everything is older than now).
+        """
+        store = FileKnowledgeStore(directory=str(tmp_path / "prune0"))
+        store.save(
+            KnowledgeEntry(
+                content="yesterday",
+                created_at=datetime.now(timezone.utc) - timedelta(days=1),
+            )
+        )
+        removed = store.prune(max_age_days=0)
+        assert removed == 1, "prune(max_age_days=0) must remove entries older than now"
+
+    def test_sqlite_store_prune_max_age_zero_removes_all_non_persistent(self, tmp_path):
+        """Regression: same 0-is-falsy bug in SQLiteKnowledgeStore."""
+        store = SQLiteKnowledgeStore(db_path=str(tmp_path / "prune0.db"))
+        store.save(
+            KnowledgeEntry(
+                content="yesterday",
+                created_at=datetime.now(timezone.utc) - timedelta(days=1),
+            )
+        )
+        removed = store.prune(max_age_days=0)
+        assert removed == 1, "prune(max_age_days=0) must remove entries older than now"
+
+
 class TestKnowledgeMemoryEnhanced:
     """KnowledgeMemory with new store-based features."""
 

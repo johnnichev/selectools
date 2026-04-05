@@ -196,6 +196,17 @@ class TestJsonFileSessionStoreDeleteListExists:
         store.save("s1", _memory_with_messages("ok"))
         assert store.exists("s1")
 
+    def test_empty_session_id_raises(self, tmp_path: "os.PathLike[str]") -> None:
+        """Regression: empty session_id created a file named '.json'.
+
+        An empty string passed all validation checks (basename('') == '',
+        no '..' or null bytes) and resulted in a '.json' file that could
+        collide with other hidden files or cause confusion.
+        """
+        store = JsonFileSessionStore(directory=str(tmp_path))
+        with pytest.raises(ValueError, match="must not be empty"):
+            store.save("", _memory_with_messages("Hello"))
+
 
 # ======================================================================
 # SQLiteSessionStore

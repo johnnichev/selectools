@@ -1,7 +1,7 @@
 ---
 name: ralph-bug-hunt
 description: Autonomous hunt-and-fix loop for a single selectools module. Finds bugs, auto-applies fixes, writes regression tests, verifies with pytest. Outputs RALPH_RESULT sentinel on the last line so the orchestration script can detect convergence.
-argument-hint: [module] e.g. "agent", "providers", "tools", "rag", "memory", "evals", "security"
+argument-hint: <module> [loops=N] e.g. "agent", "rag loops=5", "providers loops=1"
 ---
 
 # Ralph Bug Hunt
@@ -10,11 +10,52 @@ Autonomous bug hunt + auto-fix loop for module: **$ARGUMENTS**
 
 If no module is given, default to "rag".
 
+## Loop Count
+
+Parse the `loops=N` parameter from $ARGUMENTS if present. This controls how many
+hunt-fix-verify cycles to run before emitting the sentinel. Default: 1 (single pass).
+
+- `loops=1` (default) — one pass: hunt, fix, verify, emit sentinel
+- `loops=3` — three passes: after fixing, re-scan the same module for new bugs
+  exposed by the fixes, fix those too, repeat until N passes or clean
+- `loops=0` — audit only: hunt and report but do NOT fix anything
+
+When `loops > 1`, each pass re-reads all source files from scratch (fixes from
+pass 1 may expose new issues in pass 2). If a pass finds zero bugs, emit
+`RALPH_RESULT: CLEAN` immediately without running remaining passes.
+
+## Orchestration Script
+
+The `scripts/ralph_bug_hunt.sh` script runs this skill in a convergence loop.
+Configure via environment variables:
+
+```bash
+MAX_ITER=10 REQUIRED_CLEAN=3 bash scripts/ralph_bug_hunt.sh        # all modules
+MAX_ITER=5 REQUIRED_CLEAN=2 bash scripts/ralph_bug_hunt.sh rag     # single module
+REQUIRED_CLEAN=1 bash scripts/ralph_bug_hunt.sh agent providers    # quick pass
+```
+
 ## What makes this different from /bug-hunt
 
 1. **Every finding is fixed immediately** — no "ask user" step.
 2. **The last line of output is always a machine-parseable sentinel** so the
    orchestration script (`scripts/ralph_bug_hunt.sh`) can detect convergence.
+
+---
+
+## Step 0 — Parse Arguments
+
+Parse `$ARGUMENTS` to extract:
+- **module**: the first word (e.g. "rag", "agent")
+- **loops**: if `loops=N` appears, extract N (integer). Default: 1.
+
+Example: `rag loops=3` → module="rag", loops=3
+Example: `agent` → module="agent", loops=1
+Example: `providers loops=0` → module="providers", loops=0 (audit only, no fixes)
+
+If `loops=0`, skip Steps 3-4 entirely. Only run Steps 1-2 (scan + report) and Step 5 (sentinel).
+
+If `loops > 1`, wrap Steps 2-4 in a loop. After each pass, if zero findings, break early.
 
 ---
 

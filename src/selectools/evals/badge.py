@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Union
+from xml.sax.saxutils import escape as _xml_escape  # nosec B406
 
 
 def _badge_color(accuracy: float) -> str:
@@ -38,6 +39,8 @@ def generate_badge(
     """
     value = f"{report.accuracy:.0%}"
     color = _badge_color(report.accuracy)
+    safe_label = _xml_escape(label)
+    safe_value = _xml_escape(value)
 
     # Calculate text widths (approximate: 6.5px per char)
     label_width = len(label) * 6.5 + 12
@@ -56,10 +59,10 @@ def generate_badge(
     <rect width="{total_width:.0f}" height="20" fill="url(#s)"/>
   </g>
   <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,sans-serif" font-size="11">
-    <text x="{label_width / 2:.0f}" y="15" fill="#010101" fill-opacity=".3">{label}</text>
-    <text x="{label_width / 2:.0f}" y="14">{label}</text>
-    <text x="{label_width + value_width / 2:.0f}" y="15" fill="#010101" fill-opacity=".3">{value}</text>
-    <text x="{label_width + value_width / 2:.0f}" y="14">{value}</text>
+    <text x="{label_width / 2:.0f}" y="15" fill="#010101" fill-opacity=".3">{safe_label}</text>
+    <text x="{label_width / 2:.0f}" y="14">{safe_label}</text>
+    <text x="{label_width + value_width / 2:.0f}" y="15" fill="#010101" fill-opacity=".3">{safe_value}</text>
+    <text x="{label_width + value_width / 2:.0f}" y="14">{safe_value}</text>
   </g>
 </svg>"""
 
@@ -77,9 +80,11 @@ def generate_detailed_badge(
 
     Example: [eval | 95% · 19/20 pass]
     """
-    value = f"{report.accuracy:.0%} · {report.pass_count}/{report.metadata.total_cases} pass"
+    value = f"{report.accuracy:.0%} \u00b7 {report.pass_count}/{report.metadata.total_cases} pass"
     color = _badge_color(report.accuracy)
     label = "eval"
+    safe_label = _xml_escape(label)
+    safe_value = _xml_escape(value)
 
     label_width = len(label) * 6.5 + 12
     value_width = len(value) * 6.5 + 12
@@ -97,10 +102,10 @@ def generate_detailed_badge(
     <rect width="{total_width:.0f}" height="20" fill="url(#s)"/>
   </g>
   <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,sans-serif" font-size="11">
-    <text x="{label_width / 2:.0f}" y="15" fill="#010101" fill-opacity=".3">{label}</text>
-    <text x="{label_width / 2:.0f}" y="14">{label}</text>
-    <text x="{label_width + value_width / 2:.0f}" y="15" fill="#010101" fill-opacity=".3">{value}</text>
-    <text x="{label_width + value_width / 2:.0f}" y="14">{value}</text>
+    <text x="{label_width / 2:.0f}" y="15" fill="#010101" fill-opacity=".3">{safe_label}</text>
+    <text x="{label_width / 2:.0f}" y="14">{safe_label}</text>
+    <text x="{label_width + value_width / 2:.0f}" y="15" fill="#010101" fill-opacity=".3">{safe_value}</text>
+    <text x="{label_width + value_width / 2:.0f}" y="14">{safe_value}</text>
   </g>
 </svg>"""
 
