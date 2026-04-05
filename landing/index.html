@@ -1034,7 +1034,7 @@
         <div class="hf-scene-label" id="hfSceneLabel"></div>
         <div class="hf-nodes" id="hfNodes"></div>
         <div class="hf-output" id="hfOutput"></div>
-        <svg class="hf-svg" id="hfSvg" viewBox="0 0 480 400" preserveAspectRatio="xMidYMid meet"></svg>
+        <svg class="hf-svg" id="hfSvg"></svg>
         <div class="hf-carousel" id="hfCarousel"></div>
       </div>
     </div>
@@ -1973,22 +1973,36 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
       setTimeout(function() { el.style.opacity = '1'; el.style.transition = 'opacity 0.3s'; }, 50);
     });
 
-    // Create edges + pulses
-    scene.edges.forEach(function(e) {
-      var a = scene.nodes[e[0]], b = scene.nodes[e[1]];
-      var dashed = e[2] === 1;
-      var line = document.createElementNS(NS, 'line');
-      line.setAttribute('x1', a.x); line.setAttribute('y1', a.y + 16);
-      line.setAttribute('x2', b.x); line.setAttribute('y2', b.y - 2);
-      line.setAttribute('class', 'hf-path');
-      if (dashed) line.setAttribute('stroke-dasharray', '4 4');
-      svg.appendChild(line);
+    // Draw edges after nodes are in the DOM so we can read their actual positions
+    requestAnimationFrame(function() {
+      var flowRect = document.getElementById('heroFlow').getBoundingClientRect();
 
-      var c = document.createElementNS(NS, 'circle');
-      c.setAttribute('cx', a.x); c.setAttribute('cy', a.y);
-      c.setAttribute('r', '3'); c.setAttribute('class', 'hf-pulse');
-      svg.appendChild(c);
-      pulses.push({ el: c, x1: a.x, y1: a.y + 16, x2: b.x, y2: b.y - 2 });
+      scene.edges.forEach(function(e) {
+        var srcEl = nodeEls[e[0]], tgtEl = nodeEls[e[1]];
+        var dashed = e[2] === 1;
+
+        var srcRect = srcEl.getBoundingClientRect();
+        var tgtRect = tgtEl.getBoundingClientRect();
+
+        // Line from bottom-center of source to top-center of target
+        var x1 = srcRect.left + srcRect.width / 2 - flowRect.left;
+        var y1 = srcRect.bottom - flowRect.top;
+        var x2 = tgtRect.left + tgtRect.width / 2 - flowRect.left;
+        var y2 = tgtRect.top - flowRect.top;
+
+        var line = document.createElementNS(NS, 'line');
+        line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+        line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+        line.setAttribute('class', 'hf-path');
+        if (dashed) line.setAttribute('stroke-dasharray', '4 4');
+        svg.appendChild(line);
+
+        var c = document.createElementNS(NS, 'circle');
+        c.setAttribute('cx', x1); c.setAttribute('cy', y1);
+        c.setAttribute('r', '3'); c.setAttribute('class', 'hf-pulse');
+        svg.appendChild(c);
+        pulses.push({ el: c, x1: x1, y1: y1, x2: x2, y2: y2 });
+      });
     });
   }
 
@@ -2079,7 +2093,7 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
       }
     }
 
-    delay(300, nextStep);
+    delay(400, nextStep);
   }
 
   function cycle() {
