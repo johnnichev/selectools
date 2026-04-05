@@ -986,32 +986,50 @@
         </div>
       </div>
       <div class="hero-flow" id="heroFlow">
-        <div class="hf-node" id="hfUser" style="top:4px;left:50%;transform:translateX(-50%)">
-          <div class="hf-dot" style="background:#3b82f6"></div>User Input
+        <div class="hf-node" id="hfUser" style="top:0;left:50%;transform:translateX(-50%)">
+          <div class="hf-dot" style="background:#3b82f6"></div>User Query
         </div>
-        <div class="hf-node" id="hfRouter" style="top:76px;left:50%;transform:translateX(-50%)">
-          <div class="hf-dot" style="background:#22d3ee"></div>Router<span class="hf-label">AgentGraph</span>
+        <div class="hf-node" id="hfProvider" style="top:62px;left:2%">
+          <div class="hf-dot" style="background:#22c55e"></div>Providers<span class="hf-label">failover</span>
         </div>
-        <div class="hf-node" id="hfSearch" style="top:152px;left:6%">
-          <div class="hf-dot" style="background:#a855f7"></div>RAG Search
+        <div class="hf-node" id="hfSupervisor" style="top:62px;left:50%;transform:translateX(-50%)">
+          <div class="hf-dot" style="background:#22d3ee"></div>Supervisor<span class="hf-label">4 strategies</span>
         </div>
-        <div class="hf-node" id="hfTool" style="top:152px;right:6%">
-          <div class="hf-dot" style="background:#f59e0b"></div>Tool Call
+        <div class="hf-node" id="hfMemory" style="top:62px;right:2%">
+          <div class="hf-dot" style="background:#ec4899"></div>Memory<span class="hf-label">sessions</span>
         </div>
-        <div class="hf-node" id="hfGuard" style="top:228px;left:50%;transform:translateX(-50%)">
-          <div class="hf-dot" style="background:#ef4444"></div>Guardrails<span class="hf-label">PII + Inject</span>
+        <div class="hf-node" id="hfAgent1" style="top:130px;left:6%">
+          <div class="hf-dot" style="background:#a855f7"></div>Research
+        </div>
+        <div class="hf-node" id="hfAgent2" style="top:130px;left:50%;transform:translateX(-50%)">
+          <div class="hf-dot" style="background:#f59e0b"></div>Writer
+        </div>
+        <div class="hf-node" id="hfAgent3" style="top:130px;right:6%">
+          <div class="hf-dot" style="background:#14b8a6"></div>Reviewer
+        </div>
+        <div class="hf-node" id="hfRag" style="top:198px;left:10%">
+          <div class="hf-dot" style="background:#a855f7"></div>RAG<span class="hf-label">hybrid</span>
+        </div>
+        <div class="hf-node" id="hfTools" style="top:198px;left:50%;transform:translateX(-50%)">
+          <div class="hf-dot" style="background:#f59e0b"></div>33 Tools
+        </div>
+        <div class="hf-node" id="hfGuard" style="top:198px;right:10%">
+          <div class="hf-dot" style="background:#ef4444"></div>Guardrails
+        </div>
+        <div class="hf-node" id="hfEval" style="top:266px;left:50%;transform:translateX(-50%)">
+          <div class="hf-dot" style="background:#22c55e"></div>Trace + Eval<span class="hf-label">50 evals</span>
         </div>
         <div class="hf-output" id="hfOutput">
           <div class="hf-output-label">AgentResult</div>
-          <div class="hf-output-text">&ldquo;Your refund of $29.00 has been issued to card ending 4242.&rdquo;</div>
+          <div class="hf-output-text">&ldquo;Refund of $29.00 issued to card ending 4242.&rdquo;</div>
           <div class="hf-output-meta">
-            <span>847 tokens</span> &middot;
+            <span>847 tok</span> &middot;
             <span>$0.0012</span> &middot;
             <span>1.2s</span> &middot;
-            4 trace steps
+            27 trace steps
           </div>
         </div>
-        <svg class="hf-svg" id="hfSvg" viewBox="0 0 460 400" preserveAspectRatio="xMidYMid meet"></svg>
+        <svg class="hf-svg" id="hfSvg" viewBox="0 0 480 420" preserveAspectRatio="xMidYMid meet"></svg>
       </div>
     </div>
   </div>
@@ -1771,59 +1789,65 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
   if (!svg) return;
   var NS = 'http://www.w3.org/2000/svg';
 
-  // Node center positions (approximate, in viewBox coords)
   var nodes = {
-    user:   { x: 230, y: 20 },
-    router: { x: 230, y: 92 },
-    search: { x: 80,  y: 168 },
-    tool:   { x: 380, y: 168 },
-    guard:  { x: 230, y: 244 }
+    user:       { x: 240, y: 16 },
+    provider:   { x: 65,  y: 78 },
+    supervisor: { x: 240, y: 78 },
+    memory:     { x: 415, y: 78 },
+    agent1:     { x: 70,  y: 146 },
+    agent2:     { x: 240, y: 146 },
+    agent3:     { x: 410, y: 146 },
+    rag:        { x: 85,  y: 214 },
+    tools:      { x: 240, y: 214 },
+    guard:      { x: 395, y: 214 },
+    eval:       { x: 240, y: 282 }
   };
 
-  // Edges: from -> to
   var edges = [
-    { from: 'user',   to: 'router' },
-    { from: 'router', to: 'search' },
-    { from: 'router', to: 'tool' },
-    { from: 'search', to: 'guard' },
-    { from: 'tool',   to: 'guard' }
+    { from: 'user',       to: 'supervisor' },
+    { from: 'supervisor', to: 'provider',  dashed: true },
+    { from: 'supervisor', to: 'memory',    dashed: true },
+    { from: 'supervisor', to: 'agent1' },
+    { from: 'supervisor', to: 'agent2' },
+    { from: 'supervisor', to: 'agent3' },
+    { from: 'agent1',     to: 'rag' },
+    { from: 'agent2',     to: 'tools' },
+    { from: 'agent3',     to: 'guard' },
+    { from: 'rag',        to: 'eval' },
+    { from: 'tools',      to: 'eval' },
+    { from: 'guard',      to: 'eval' }
   ];
 
-  // Draw paths and create pulses
   var pulses = [];
   edges.forEach(function(e) {
     var a = nodes[e.from], b = nodes[e.to];
-    var path = document.createElementNS(NS, 'line');
-    path.setAttribute('x1', a.x); path.setAttribute('y1', a.y + 16);
-    path.setAttribute('x2', b.x); path.setAttribute('y2', b.y - 4);
-    path.setAttribute('class', 'hf-path');
-    svg.appendChild(path);
+    var line = document.createElementNS(NS, 'line');
+    line.setAttribute('x1', a.x); line.setAttribute('y1', a.y + 14);
+    line.setAttribute('x2', b.x); line.setAttribute('y2', b.y - 4);
+    line.setAttribute('class', 'hf-path');
+    if (e.dashed) line.setAttribute('stroke-dasharray', '4 4');
+    svg.appendChild(line);
 
     var pulse = document.createElementNS(NS, 'circle');
     pulse.setAttribute('cx', a.x); pulse.setAttribute('cy', a.y);
     pulse.setAttribute('r', '3'); pulse.setAttribute('class', 'hf-pulse');
     svg.appendChild(pulse);
-    pulses.push({ el: pulse, x1: a.x, y1: a.y + 16, x2: b.x, y2: b.y - 4 });
+    pulses.push({ el: pulse, x1: a.x, y1: a.y + 14, x2: b.x, y2: b.y - 4 });
   });
 
-  // Animate sequence
-  var nodeIds = ['hfUser', 'hfRouter', 'hfSearch', 'hfTool', 'hfGuard'];
-  var sequence = [
-    { step: 0, pulseIdx: 0, activate: 'hfUser' },     // user -> router
-    { step: 1, pulseIdx: 0, activate: 'hfRouter' },
-    { step: 2, pulseIdx: 1, activate: 'hfRouter' },    // router -> search
-    { step: 2, pulseIdx: 2, activate: 'hfRouter' },    // router -> tool (parallel)
-    { step: 3, pulseIdx: null, activate: 'hfSearch' },
-    { step: 3, pulseIdx: null, activate: 'hfTool' },
-    { step: 4, pulseIdx: 3, activate: 'hfSearch' },    // search -> guard
-    { step: 4, pulseIdx: 4, activate: 'hfTool' },      // tool -> guard
-    { step: 5, pulseIdx: null, activate: 'hfGuard' },
-    { step: 6, pulseIdx: null, activate: null }         // show output
-  ];
+  var allNodeIds = ['hfUser','hfProvider','hfSupervisor','hfMemory',
+    'hfAgent1','hfAgent2','hfAgent3','hfRag','hfTools','hfGuard','hfEval'];
 
-  function animatePulse(p, dur, cb) {
-    p.el.setAttribute('cx', p.x1);
-    p.el.setAttribute('cy', p.y1);
+  function activate(ids) {
+    allNodeIds.forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.classList.toggle('active', ids.indexOf(id) >= 0);
+    });
+  }
+
+  function animP(idx, dur, cb) {
+    var p = pulses[idx];
+    p.el.setAttribute('cx', p.x1); p.el.setAttribute('cy', p.y1);
     p.el.classList.add('go');
     var start = performance.now();
     function tick(now) {
@@ -1838,53 +1862,56 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
   }
 
   function runCycle() {
-    // Reset
-    nodeIds.forEach(function(id) {
-      var el = document.getElementById(id);
-      if (el) el.classList.remove('active');
-    });
+    activate([]);
     var output = document.getElementById('hfOutput');
     if (output) output.classList.remove('visible');
 
     var steps = [
+      function(next) { activate(['hfUser']); setTimeout(next, 500); },
       function(next) {
-        var el = document.getElementById('hfUser');
-        if (el) el.classList.add('active');
-        setTimeout(next, 600);
-      },
-      function(next) {
-        animatePulse(pulses[0], 400, function() {
-          document.getElementById('hfUser').classList.remove('active');
-          document.getElementById('hfRouter').classList.add('active');
-          setTimeout(next, 400);
+        animP(0, 350, function() {
+          activate(['hfSupervisor']);
+          setTimeout(next, 300);
         });
       },
       function(next) {
-        animatePulse(pulses[1], 350, function() {});
-        animatePulse(pulses[2], 350, function() {
-          document.getElementById('hfRouter').classList.remove('active');
-          document.getElementById('hfSearch').classList.add('active');
-          document.getElementById('hfTool').classList.add('active');
-          setTimeout(next, 600);
-        });
+        animP(1, 250, function() {}); // provider (side)
+        animP(2, 250, function() {}); // memory (side)
+        activate(['hfSupervisor','hfProvider','hfMemory']);
+        setTimeout(next, 400);
       },
       function(next) {
-        animatePulse(pulses[3], 350, function() {});
-        animatePulse(pulses[4], 350, function() {
-          document.getElementById('hfSearch').classList.remove('active');
-          document.getElementById('hfTool').classList.remove('active');
-          document.getElementById('hfGuard').classList.add('active');
+        animP(3, 300, function() {}); // -> agent1
+        animP(4, 300, function() {}); // -> agent2
+        animP(5, 300, function() {    // -> agent3
+          activate(['hfAgent1','hfAgent2','hfAgent3']);
           setTimeout(next, 500);
         });
       },
       function(next) {
-        document.getElementById('hfGuard').classList.remove('active');
-        if (output) output.classList.add('visible');
-        setTimeout(next, 3000);
+        animP(6, 300, function() {}); // agent1 -> rag
+        animP(7, 300, function() {}); // agent2 -> tools
+        animP(8, 300, function() {    // agent3 -> guard
+          activate(['hfRag','hfTools','hfGuard']);
+          setTimeout(next, 500);
+        });
       },
       function(next) {
+        animP(9, 300, function() {});  // rag -> eval
+        animP(10, 300, function() {}); // tools -> eval
+        animP(11, 300, function() {    // guard -> eval
+          activate(['hfEval']);
+          setTimeout(next, 400);
+        });
+      },
+      function(next) {
+        activate([]);
+        if (output) output.classList.add('visible');
+        setTimeout(next, 2800);
+      },
+      function() {
         if (output) output.classList.remove('visible');
-        setTimeout(function() { runCycle(); }, 800);
+        setTimeout(runCycle, 600);
       }
     ];
 
@@ -1893,7 +1920,7 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
     go();
   }
 
-  setTimeout(runCycle, 800);
+  setTimeout(runCycle, 700);
 })();
 
 /* ── Simulation Player ─────────────────────────────────────────── */
