@@ -382,11 +382,17 @@
       -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 20%, transparent 80%);
     }
     .hero .wrap { position: relative; z-index: 1; }
-    .hero-content {
-      max-width: 720px;
-      margin: 0 auto;
-      text-align: center;
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      align-items: center;
     }
+    @media (max-width: 900px) {
+      .hero-grid { grid-template-columns: 1fr; }
+      .hero-flow { display: none; }
+    }
+    .hero-content { }
     .hero h1 { margin-bottom: 20px; }
     .hero h1 .grad {
       background: linear-gradient(135deg, var(--cyan) 0%, var(--blue) 100%);
@@ -399,24 +405,116 @@
       font-size: 17px;
       line-height: 1.75;
       margin-bottom: 36px;
-      max-width: 600px;
-      margin-left: auto;
-      margin-right: auto;
+      max-width: 540px;
     }
     .hero-actions {
       display: flex;
       flex-wrap: wrap;
       gap: 12px;
       align-items: center;
-      justify-content: center;
       margin-bottom: 40px;
     }
     .hero-pills {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
-      justify-content: center;
     }
+
+    /* ── Hero Flow Animation ──────────────────────────────────────── */
+    .hero-flow {
+      position: relative;
+      height: 400px;
+    }
+    .hf-node {
+      position: absolute;
+      padding: 10px 16px;
+      border-radius: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      z-index: 2;
+      transition: border-color 0.4s, box-shadow 0.4s;
+      white-space: nowrap;
+    }
+    .hf-node.active {
+      border-color: var(--cyan);
+      box-shadow: 0 0 20px rgba(34,211,238,0.15), 0 0 0 1px rgba(34,211,238,0.1);
+    }
+    .hf-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .hf-node.active .hf-dot {
+      box-shadow: 0 0 8px currentColor;
+    }
+    .hf-label {
+      font-size: 10px;
+      color: var(--text-faint);
+      font-weight: 400;
+      margin-left: 2px;
+    }
+    .hf-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+    .hf-path {
+      fill: none;
+      stroke: var(--border);
+      stroke-width: 1.5;
+    }
+    .hf-pulse {
+      fill: var(--cyan);
+      r: 3;
+      opacity: 0;
+    }
+    .hf-pulse.go {
+      opacity: 1;
+      filter: drop-shadow(0 0 4px rgba(34,211,238,0.6));
+    }
+    .hf-output {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 12px;
+      z-index: 2;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.4s, transform 0.4s;
+    }
+    .hf-output.visible { opacity: 1; transform: translateY(0); }
+    .hf-output-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--cyan);
+      margin-bottom: 4px;
+    }
+    .hf-output-text {
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+    .hf-output-meta {
+      display: flex;
+      gap: 16px;
+      margin-top: 6px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+    }
+    .hf-output-meta span { color: var(--green); }
 
 
     .pill {
@@ -860,30 +958,60 @@
 <!-- ─── Hero ───────────────────────────────────────────────────────── -->
 <section class="hero">
   <div class="wrap">
-    <div class="hero-content">
-      <span class="section-label" style="margin-bottom:16px">Open Source from NichevLabs</span>
-      <h1>AI agents that are <span class="grad">just Python.</span></h1>
-      <p class="hero-sub">
-        Multi-agent graphs, tool calling, RAG, 50 evaluators, and a drag-drop visual builder. All in one <code>pip install</code>. No DSL to learn. No SaaS to pay for. No vendor to depend on.
-      </p>
-      <div class="hero-actions">
-        <button onclick="copyPip()" class="btn btn-pip" id="pipBtn">
-          <span>pip install selectools</span>
-          <svg id="copy-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-          <svg id="check-icon" width="16" height="16" fill="none" stroke="#22c55e" stroke-width="2" viewBox="0 0 24 24" style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
-        </button>
-        <a href="builder/" class="btn btn-cyan">Try the Builder &rarr;</a>
-        <a href="QUICKSTART/" class="btn btn-primary">Read the Docs</a>
+    <div class="hero-grid">
+      <div class="hero-content">
+        <span class="section-label" style="margin-bottom:16px">Open Source from NichevLabs</span>
+        <h1>AI agents that are <span class="grad">just Python.</span></h1>
+        <p class="hero-sub">
+          Multi-agent graphs, tool calling, RAG, 50 evaluators, and a drag-drop visual builder. All in one <code>pip install</code>. No DSL to learn. No SaaS to pay for. No vendor to depend on.
+        </p>
+        <div class="hero-actions">
+          <button onclick="copyPip()" class="btn btn-pip" id="pipBtn">
+            <span>pip install selectools</span>
+            <svg id="copy-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            <svg id="check-icon" width="16" height="16" fill="none" stroke="#22c55e" stroke-width="2" viewBox="0 0 24 24" style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <a href="builder/" class="btn btn-cyan">Try the Builder &rarr;</a>
+          <a href="QUICKSTART/" class="btn btn-primary">Read the Docs</a>
+        </div>
+        <div class="hero-pills">
+          <span class="pill pill-cyan">OpenAI</span>
+          <span class="pill pill-cyan">Anthropic</span>
+          <span class="pill pill-cyan">Gemini</span>
+          <span class="pill pill-cyan">Ollama</span>
+          <span class="pill">Multi-Agent Graphs</span>
+          <span class="pill">50 Evaluators</span>
+          <span class="pill">Composable Pipelines</span>
+          <span class="pill">Visual Builder</span>
+        </div>
       </div>
-      <div class="hero-pills">
-        <span class="pill pill-cyan">OpenAI</span>
-        <span class="pill pill-cyan">Anthropic</span>
-        <span class="pill pill-cyan">Gemini</span>
-        <span class="pill pill-cyan">Ollama</span>
-        <span class="pill">Multi-Agent Graphs</span>
-        <span class="pill">50 Evaluators</span>
-        <span class="pill">Composable Pipelines</span>
-        <span class="pill">Visual Builder</span>
+      <div class="hero-flow" id="heroFlow">
+        <div class="hf-node" id="hfUser" style="top:4px;left:50%;transform:translateX(-50%)">
+          <div class="hf-dot" style="background:#3b82f6"></div>User Input
+        </div>
+        <div class="hf-node" id="hfRouter" style="top:76px;left:50%;transform:translateX(-50%)">
+          <div class="hf-dot" style="background:#22d3ee"></div>Router<span class="hf-label">AgentGraph</span>
+        </div>
+        <div class="hf-node" id="hfSearch" style="top:152px;left:6%">
+          <div class="hf-dot" style="background:#a855f7"></div>RAG Search
+        </div>
+        <div class="hf-node" id="hfTool" style="top:152px;right:6%">
+          <div class="hf-dot" style="background:#f59e0b"></div>Tool Call
+        </div>
+        <div class="hf-node" id="hfGuard" style="top:228px;left:50%;transform:translateX(-50%)">
+          <div class="hf-dot" style="background:#ef4444"></div>Guardrails<span class="hf-label">PII + Inject</span>
+        </div>
+        <div class="hf-output" id="hfOutput">
+          <div class="hf-output-label">AgentResult</div>
+          <div class="hf-output-text">&ldquo;Your refund of $29.00 has been issued to card ending 4242.&rdquo;</div>
+          <div class="hf-output-meta">
+            <span>847 tokens</span> &middot;
+            <span>$0.0012</span> &middot;
+            <span>1.2s</span> &middot;
+            4 trace steps
+          </div>
+        </div>
+        <svg class="hf-svg" id="hfSvg" viewBox="0 0 460 400" preserveAspectRatio="xMidYMid meet"></svg>
       </div>
     </div>
   </div>
@@ -1636,6 +1764,137 @@ const obs = new IntersectionObserver(entries => {
   entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
 }, { threshold: 0.08 });
 document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+
+/* ── Hero Flow Animation ───────────────────────────────────────── */
+(function() {
+  var svg = document.getElementById('hfSvg');
+  if (!svg) return;
+  var NS = 'http://www.w3.org/2000/svg';
+
+  // Node center positions (approximate, in viewBox coords)
+  var nodes = {
+    user:   { x: 230, y: 20 },
+    router: { x: 230, y: 92 },
+    search: { x: 80,  y: 168 },
+    tool:   { x: 380, y: 168 },
+    guard:  { x: 230, y: 244 }
+  };
+
+  // Edges: from -> to
+  var edges = [
+    { from: 'user',   to: 'router' },
+    { from: 'router', to: 'search' },
+    { from: 'router', to: 'tool' },
+    { from: 'search', to: 'guard' },
+    { from: 'tool',   to: 'guard' }
+  ];
+
+  // Draw paths and create pulses
+  var pulses = [];
+  edges.forEach(function(e) {
+    var a = nodes[e.from], b = nodes[e.to];
+    var path = document.createElementNS(NS, 'line');
+    path.setAttribute('x1', a.x); path.setAttribute('y1', a.y + 16);
+    path.setAttribute('x2', b.x); path.setAttribute('y2', b.y - 4);
+    path.setAttribute('class', 'hf-path');
+    svg.appendChild(path);
+
+    var pulse = document.createElementNS(NS, 'circle');
+    pulse.setAttribute('cx', a.x); pulse.setAttribute('cy', a.y);
+    pulse.setAttribute('r', '3'); pulse.setAttribute('class', 'hf-pulse');
+    svg.appendChild(pulse);
+    pulses.push({ el: pulse, x1: a.x, y1: a.y + 16, x2: b.x, y2: b.y - 4 });
+  });
+
+  // Animate sequence
+  var nodeIds = ['hfUser', 'hfRouter', 'hfSearch', 'hfTool', 'hfGuard'];
+  var sequence = [
+    { step: 0, pulseIdx: 0, activate: 'hfUser' },     // user -> router
+    { step: 1, pulseIdx: 0, activate: 'hfRouter' },
+    { step: 2, pulseIdx: 1, activate: 'hfRouter' },    // router -> search
+    { step: 2, pulseIdx: 2, activate: 'hfRouter' },    // router -> tool (parallel)
+    { step: 3, pulseIdx: null, activate: 'hfSearch' },
+    { step: 3, pulseIdx: null, activate: 'hfTool' },
+    { step: 4, pulseIdx: 3, activate: 'hfSearch' },    // search -> guard
+    { step: 4, pulseIdx: 4, activate: 'hfTool' },      // tool -> guard
+    { step: 5, pulseIdx: null, activate: 'hfGuard' },
+    { step: 6, pulseIdx: null, activate: null }         // show output
+  ];
+
+  function animatePulse(p, dur, cb) {
+    p.el.setAttribute('cx', p.x1);
+    p.el.setAttribute('cy', p.y1);
+    p.el.classList.add('go');
+    var start = performance.now();
+    function tick(now) {
+      var t = Math.min((now - start) / dur, 1);
+      var ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t;
+      p.el.setAttribute('cx', p.x1 + (p.x2 - p.x1) * ease);
+      p.el.setAttribute('cy', p.y1 + (p.y2 - p.y1) * ease);
+      if (t < 1) requestAnimationFrame(tick);
+      else { p.el.classList.remove('go'); if (cb) cb(); }
+    }
+    requestAnimationFrame(tick);
+  }
+
+  function runCycle() {
+    // Reset
+    nodeIds.forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.classList.remove('active');
+    });
+    var output = document.getElementById('hfOutput');
+    if (output) output.classList.remove('visible');
+
+    var steps = [
+      function(next) {
+        var el = document.getElementById('hfUser');
+        if (el) el.classList.add('active');
+        setTimeout(next, 600);
+      },
+      function(next) {
+        animatePulse(pulses[0], 400, function() {
+          document.getElementById('hfUser').classList.remove('active');
+          document.getElementById('hfRouter').classList.add('active');
+          setTimeout(next, 400);
+        });
+      },
+      function(next) {
+        animatePulse(pulses[1], 350, function() {});
+        animatePulse(pulses[2], 350, function() {
+          document.getElementById('hfRouter').classList.remove('active');
+          document.getElementById('hfSearch').classList.add('active');
+          document.getElementById('hfTool').classList.add('active');
+          setTimeout(next, 600);
+        });
+      },
+      function(next) {
+        animatePulse(pulses[3], 350, function() {});
+        animatePulse(pulses[4], 350, function() {
+          document.getElementById('hfSearch').classList.remove('active');
+          document.getElementById('hfTool').classList.remove('active');
+          document.getElementById('hfGuard').classList.add('active');
+          setTimeout(next, 500);
+        });
+      },
+      function(next) {
+        document.getElementById('hfGuard').classList.remove('active');
+        if (output) output.classList.add('visible');
+        setTimeout(next, 3000);
+      },
+      function(next) {
+        if (output) output.classList.remove('visible');
+        setTimeout(function() { runCycle(); }, 800);
+      }
+    ];
+
+    var i = 0;
+    function go() { if (i < steps.length) steps[i++](go); }
+    go();
+  }
+
+  setTimeout(runCycle, 800);
+})();
 
 /* ── Simulation Player ─────────────────────────────────────────── */
 /* All data is hardcoded static content (no user input). DOM creation
