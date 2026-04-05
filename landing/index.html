@@ -437,6 +437,39 @@
       transition: opacity 0.3s;
     }
     .hf-nodes { position: absolute; inset: 0; }
+    .hf-carousel {
+      position: absolute;
+      bottom: -36px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 6px;
+      z-index: 3;
+    }
+    .hf-car-dot {
+      width: 48px;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--border);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: background 0.2s;
+    }
+    .hf-car-dot:hover { background: var(--text-faint); }
+    .hf-car-fill {
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 0;
+      background: var(--cyan);
+      border-radius: 2px;
+    }
+    .hf-car-dot.active .hf-car-fill {
+      animation: hf-fill-bar linear forwards;
+    }
+    .hf-car-dot.done .hf-car-fill { width: 100%; }
+    .hf-car-dot.done { background: rgba(34,211,238,0.2); }
+    @keyframes hf-fill-bar { from { width: 0; } to { width: 100%; } }
     .hf-node {
       position: absolute;
       padding: 10px 16px;
@@ -1002,6 +1035,7 @@
         <div class="hf-nodes" id="hfNodes"></div>
         <div class="hf-output" id="hfOutput"></div>
         <svg class="hf-svg" id="hfSvg" viewBox="0 0 480 400" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="hf-carousel" id="hfCarousel"></div>
       </div>
     </div>
   </div>
@@ -1822,20 +1856,19 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
     { title: 'Eval + Guardrail Pipeline',
       nodes: [
         { id:'n0', x:240, y:8,   c:'#3b82f6', name:'Test Cases', sub:'5 inputs' },
-        { id:'n1', x:240, y:72,  c:'#22d3ee', name:'Agent' },
-        { id:'n2', x:80,  y:144, c:'#22c55e', name:'ToolUse', sub:'eval' },
-        { id:'n3', x:200, y:144, c:'#22c55e', name:'Correct', sub:'eval' },
-        { id:'n4', x:310, y:144, c:'#22c55e', name:'Safety', sub:'eval' },
-        { id:'n5', x:420, y:144, c:'#22c55e', name:'Halluc.', sub:'eval' },
-        { id:'n6', x:160, y:216, c:'#ef4444', name:'PII Guard' },
-        { id:'n7', x:320, y:216, c:'#ef4444', name:'Inject Screen' },
-        { id:'n8', x:240, y:280, c:'#a855f7', name:'HTML Report', sub:'+ JUnit XML' }
+        { id:'n1', x:240, y:76,  c:'#22d3ee', name:'Agent' },
+        { id:'n2', x:100, y:148, c:'#22c55e', name:'ToolUse' },
+        { id:'n3', x:240, y:148, c:'#22c55e', name:'Correctness' },
+        { id:'n4', x:380, y:148, c:'#22c55e', name:'Safety' },
+        { id:'n5', x:140, y:222, c:'#ef4444', name:'PII Guard' },
+        { id:'n6', x:340, y:222, c:'#ef4444', name:'Inject Screen' },
+        { id:'n7', x:240, y:290, c:'#a855f7', name:'Report', sub:'HTML + JUnit' }
       ],
       edges: [
-        [0,1],[1,2],[1,3],[1,4],[1,5],[2,6],[3,6],[4,7],[5,7],[6,8],[7,8]
+        [0,1],[1,2],[1,3],[1,4],[2,5],[3,5],[3,6],[4,6],[5,7],[6,7]
       ],
-      steps: [[0],[0,1],[1,2,3,4,5],[2,3,4,5,6,7],[6,7,8],[]],
-      pulseGroups: [[0],[1,2,3,4],[5,6,7,8],[9,10]],
+      steps: [[0],[0,1],[1,2,3,4],[2,3,4,5,6],[5,6,7],[]],
+      pulseGroups: [[0],[1,2,3],[4,5,6,7],[8,9]],
       result: { label:'EvalReport', text:'5/5 passed. Avg score 9.1/10. No PII leaked. No injections.', meta:'50 evaluators \u00b7 A/B testing \u00b7 regression detection' }
     }
   ];
@@ -1843,6 +1876,49 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
   var curScene = 0;
   var pulses = [];
   var nodeEls = [];
+  var sceneAborted = false;
+  var sceneTimer = null;
+
+  // Build carousel dots
+  var carouselEl = document.getElementById('hfCarousel');
+  var carDots = [];
+  SCENES.forEach(function(s, i) {
+    var dot = document.createElement('div');
+    dot.className = 'hf-car-dot';
+    dot.title = s.title;
+    var fill = document.createElement('div');
+    fill.className = 'hf-car-fill';
+    dot.appendChild(fill);
+    dot.addEventListener('click', function() { jumpToScene(i); });
+    carouselEl.appendChild(dot);
+    carDots.push({ dot: dot, fill: fill });
+  });
+
+  function updateCarousel(idx, duration) {
+    carDots.forEach(function(d, i) {
+      d.dot.classList.remove('active', 'done');
+      d.fill.style.animation = 'none';
+      d.fill.style.width = '0';
+      if (i < idx) {
+        d.dot.classList.add('done');
+        d.fill.style.width = '100%';
+      }
+    });
+    if (idx < carDots.length) {
+      var cur = carDots[idx];
+      cur.dot.classList.add('active');
+      cur.fill.style.animation = 'none';
+      void cur.fill.offsetWidth; // force reflow
+      cur.fill.style.animation = 'hf-fill-bar ' + duration + 'ms linear forwards';
+    }
+  }
+
+  function jumpToScene(idx) {
+    sceneAborted = true;
+    if (sceneTimer) clearTimeout(sceneTimer);
+    curScene = idx;
+    setTimeout(function() { sceneAborted = false; cycle(); }, 50);
+  }
 
   function makeNode(n) {
     var el = document.createElement('div');
@@ -1940,53 +2016,61 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
     outputEl.classList.add('visible');
   }
 
+  function delay(ms, cb) {
+    sceneTimer = setTimeout(function() { if (!sceneAborted) cb(); }, ms);
+  }
+
   function playScene(scene, onDone) {
     buildScene(scene);
+    // Estimate scene duration for progress bar: ~450ms per step + 2400ms result
+    var estDur = scene.steps.length * 500 + 2800;
+    updateCarousel(curScene, estDur);
+
     var stepIdx = 0;
     var pgIdx = 0;
 
     function nextStep() {
+      if (sceneAborted) return;
       if (stepIdx >= scene.steps.length) {
         showResult(scene.result);
-        setTimeout(function() {
+        delay(2400, function() {
           outputEl.classList.remove('visible');
-          // Fade out nodes
           nodeEls.forEach(function(el) { el.style.opacity = '0'; });
-          setTimeout(onDone, 400);
-        }, 2400);
+          delay(400, onDone);
+        });
         return;
       }
 
       var activeNodes = scene.steps[stepIdx];
       activateIds(activeNodes);
 
-      // Fire pulses for this step if available
       if (pgIdx < scene.pulseGroups.length && stepIdx > 0) {
         var pg = scene.pulseGroups[pgIdx];
         var done = 0;
         pg.forEach(function(pi) {
           animP(pi, 300, function() {
             done++;
-            if (done >= pg.length) {
+            if (done >= pg.length && !sceneAborted) {
               stepIdx++;
               pgIdx++;
-              setTimeout(nextStep, 350);
+              delay(350, nextStep);
             }
           });
         });
       } else {
         stepIdx++;
-        setTimeout(nextStep, 450);
+        delay(450, nextStep);
       }
     }
 
-    setTimeout(nextStep, 300);
+    delay(300, nextStep);
   }
 
   function cycle() {
+    if (sceneAborted) return;
     playScene(SCENES[curScene], function() {
       curScene = (curScene + 1) % SCENES.length;
-      setTimeout(cycle, 300);
+      delay(300, cycle);
     });
   }
 
