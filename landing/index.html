@@ -1873,21 +1873,19 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
     },
     { title: 'Memory + Knowledge',
       nodes: [
-        { id:'n0', x:240, y:8,   c:'#3b82f6', name:'Conversation', sub:'turn 14' },
-        { id:'n1', x:240, y:76,  c:'#22d3ee', name:'Agent Loop' },
-        { id:'n2', x:80,  y:150, c:'#a855f7', name:'Entity Memory', sub:'LLM extract' },
-        { id:'n3', x:240, y:150, c:'#f59e0b', name:'Knowledge Graph', sub:'triples' },
-        { id:'n4', x:400, y:150, c:'#ec4899', name:'Knowledge Store', sub:'remember()' },
-        { id:'n5', x:80,  y:224, c:'#22c55e', name:'Conv Memory', sub:'trim + summary' },
-        { id:'n6', x:240, y:224, c:'#14b8a6', name:'Context Builder' },
-        { id:'n7', x:400, y:224, c:'#3b82f6', name:'Sessions', sub:'3 backends' }
+        { id:'n0', x:240, y:8,   c:'#3b82f6', name:'Turn 14' },
+        { id:'n1', x:240, y:80,  c:'#22d3ee', name:'Agent' },
+        { id:'n2', x:100, y:156, c:'#a855f7', name:'Entities', sub:'LLM extract' },
+        { id:'n3', x:380, y:156, c:'#f59e0b', name:'KG Triples', sub:'relations' },
+        { id:'n4', x:240, y:232, c:'#ec4899', name:'Context', sub:'3 memory blocks' },
+        { id:'n5', x:240, y:300, c:'#22c55e', name:'Sessions', sub:'JSON/SQLite/Redis' }
       ],
       edges: [
-        [0,1],[1,2],[1,3],[1,4],[2,6],[3,6],[4,6],[1,5],[5,6],[5,7,1],[7,5,1]
+        [0,1],[1,2],[1,3],[2,4],[3,4],[4,5]
       ],
-      steps: [[0],[0,1],[1,2,3,4],[2,3,4,5],[5,6],[6,7],[]],
-      pulseGroups: [[0],[1,2,3],[4,5,6],[7],[8,9,10]],
-      result: { label:'Context Enriched', text:'[Known Entities] + [Relationships] + [Long-term Memory] injected into system prompt.', meta:'entity LRU prune \u00b7 triple store \u00b7 summarize-on-trim \u00b7 JSON/SQLite/Redis sessions' }
+      steps: [[0],[0,1],[1,2,3],[2,3,4],[4,5],[]],
+      pulseGroups: [[0],[1,2],[3,4],[5]],
+      result: { label:'Context Enriched', text:'[Known Entities] + [Relationships] + [Long-term Memory] injected. Session persisted.', meta:'entity LRU \u00b7 triple store \u00b7 summarize-on-trim \u00b7 remember() tool' }
     }
   ];
 
