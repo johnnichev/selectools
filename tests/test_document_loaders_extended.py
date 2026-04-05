@@ -225,6 +225,7 @@ class TestFromHTML:
         assert "<div>" in docs[0].text
 
     def test_html_with_selector_bs4(self, tmp_path: Path) -> None:
+        pytest.importorskip("bs4")
         html = "<html><body><article>Article text</article><footer>F</footer></body></html>"
         f = tmp_path / "page.html"
         f.write_text(html)
@@ -234,6 +235,7 @@ class TestFromHTML:
         assert "F" not in docs[0].text
 
     def test_html_selector_no_match(self, tmp_path: Path) -> None:
+        pytest.importorskip("bs4")
         html = "<html><body><p>Hi</p></body></html>"
         f = tmp_path / "page.html"
         f.write_text(html)
@@ -241,6 +243,7 @@ class TestFromHTML:
         assert docs == []
 
     def test_html_multiple_selector_matches(self, tmp_path: Path) -> None:
+        pytest.importorskip("bs4")
         html = "<div class='item'>A</div><div class='item'>B</div>"
         f = tmp_path / "page.html"
         f.write_text(html)
