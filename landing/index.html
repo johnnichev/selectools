@@ -423,8 +423,20 @@
     /* ── Hero Flow Animation ──────────────────────────────────────── */
     .hero-flow {
       position: relative;
-      height: 400px;
+      height: 420px;
     }
+    .hf-scene-label {
+      position: absolute;
+      top: -28px;
+      left: 0;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      transition: opacity 0.3s;
+    }
+    .hf-nodes { position: absolute; inset: 0; }
     .hf-node {
       position: absolute;
       padding: 10px 16px;
@@ -986,50 +998,10 @@
         </div>
       </div>
       <div class="hero-flow" id="heroFlow">
-        <div class="hf-node" id="hfUser" style="top:0;left:50%;transform:translateX(-50%)">
-          <div class="hf-dot" style="background:#3b82f6"></div>User Query
-        </div>
-        <div class="hf-node" id="hfProvider" style="top:62px;left:2%">
-          <div class="hf-dot" style="background:#22c55e"></div>Providers<span class="hf-label">failover</span>
-        </div>
-        <div class="hf-node" id="hfSupervisor" style="top:62px;left:50%;transform:translateX(-50%)">
-          <div class="hf-dot" style="background:#22d3ee"></div>Supervisor<span class="hf-label">4 strategies</span>
-        </div>
-        <div class="hf-node" id="hfMemory" style="top:62px;right:2%">
-          <div class="hf-dot" style="background:#ec4899"></div>Memory<span class="hf-label">sessions</span>
-        </div>
-        <div class="hf-node" id="hfAgent1" style="top:130px;left:6%">
-          <div class="hf-dot" style="background:#a855f7"></div>Research
-        </div>
-        <div class="hf-node" id="hfAgent2" style="top:130px;left:50%;transform:translateX(-50%)">
-          <div class="hf-dot" style="background:#f59e0b"></div>Writer
-        </div>
-        <div class="hf-node" id="hfAgent3" style="top:130px;right:6%">
-          <div class="hf-dot" style="background:#14b8a6"></div>Reviewer
-        </div>
-        <div class="hf-node" id="hfRag" style="top:198px;left:10%">
-          <div class="hf-dot" style="background:#a855f7"></div>RAG<span class="hf-label">hybrid</span>
-        </div>
-        <div class="hf-node" id="hfTools" style="top:198px;left:50%;transform:translateX(-50%)">
-          <div class="hf-dot" style="background:#f59e0b"></div>33 Tools
-        </div>
-        <div class="hf-node" id="hfGuard" style="top:198px;right:10%">
-          <div class="hf-dot" style="background:#ef4444"></div>Guardrails
-        </div>
-        <div class="hf-node" id="hfEval" style="top:266px;left:50%;transform:translateX(-50%)">
-          <div class="hf-dot" style="background:#22c55e"></div>Trace + Eval<span class="hf-label">50 evals</span>
-        </div>
-        <div class="hf-output" id="hfOutput">
-          <div class="hf-output-label">AgentResult</div>
-          <div class="hf-output-text">&ldquo;Refund of $29.00 issued to card ending 4242.&rdquo;</div>
-          <div class="hf-output-meta">
-            <span>847 tok</span> &middot;
-            <span>$0.0012</span> &middot;
-            <span>1.2s</span> &middot;
-            27 trace steps
-          </div>
-        </div>
-        <svg class="hf-svg" id="hfSvg" viewBox="0 0 480 420" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="hf-scene-label" id="hfSceneLabel"></div>
+        <div class="hf-nodes" id="hfNodes"></div>
+        <div class="hf-output" id="hfOutput"></div>
+        <svg class="hf-svg" id="hfSvg" viewBox="0 0 480 400" preserveAspectRatio="xMidYMid meet"></svg>
       </div>
     </div>
   </div>
@@ -1783,69 +1755,153 @@ const obs = new IntersectionObserver(entries => {
 }, { threshold: 0.08 });
 document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
 
-/* ── Hero Flow Animation ───────────────────────────────────────── */
+/* ── Hero Flow Animation (Multi-Scene) ─────────────────────────── */
 (function() {
   var svg = document.getElementById('hfSvg');
-  if (!svg) return;
+  var nodesEl = document.getElementById('hfNodes');
+  var outputEl = document.getElementById('hfOutput');
+  var labelEl = document.getElementById('hfSceneLabel');
+  if (!svg || !nodesEl) return;
   var NS = 'http://www.w3.org/2000/svg';
 
-  var nodes = {
-    user:       { x: 240, y: 16 },
-    provider:   { x: 65,  y: 78 },
-    supervisor: { x: 240, y: 78 },
-    memory:     { x: 415, y: 78 },
-    agent1:     { x: 70,  y: 146 },
-    agent2:     { x: 240, y: 146 },
-    agent3:     { x: 410, y: 146 },
-    rag:        { x: 85,  y: 214 },
-    tools:      { x: 240, y: 214 },
-    guard:      { x: 395, y: 214 },
-    eval:       { x: 240, y: 282 }
-  };
-
-  var edges = [
-    { from: 'user',       to: 'supervisor' },
-    { from: 'supervisor', to: 'provider',  dashed: true },
-    { from: 'supervisor', to: 'memory',    dashed: true },
-    { from: 'supervisor', to: 'agent1' },
-    { from: 'supervisor', to: 'agent2' },
-    { from: 'supervisor', to: 'agent3' },
-    { from: 'agent1',     to: 'rag' },
-    { from: 'agent2',     to: 'tools' },
-    { from: 'agent3',     to: 'guard' },
-    { from: 'rag',        to: 'eval' },
-    { from: 'tools',      to: 'eval' },
-    { from: 'guard',      to: 'eval' }
+  /* ── Scene definitions ─────────────────────────────────────── */
+  var SCENES = [
+    { title: 'Multi-Agent Orchestration',
+      nodes: [
+        { id:'n0', x:240, y:8,   c:'#3b82f6', name:'User Query' },
+        { id:'n1', x:60,  y:70,  c:'#22c55e', name:'Providers', sub:'failover' },
+        { id:'n2', x:240, y:70,  c:'#22d3ee', name:'Supervisor', sub:'4 strategies' },
+        { id:'n3', x:420, y:70,  c:'#ec4899', name:'Memory', sub:'sessions' },
+        { id:'n4', x:70,  y:138, c:'#a855f7', name:'Research' },
+        { id:'n5', x:240, y:138, c:'#f59e0b', name:'Writer' },
+        { id:'n6', x:410, y:138, c:'#14b8a6', name:'Reviewer' },
+        { id:'n7', x:85,  y:206, c:'#a855f7', name:'RAG', sub:'hybrid' },
+        { id:'n8', x:240, y:206, c:'#f59e0b', name:'33 Tools' },
+        { id:'n9', x:395, y:206, c:'#ef4444', name:'Guardrails' },
+        { id:'n10',x:240, y:274, c:'#22c55e', name:'Trace + Eval', sub:'50 evals' }
+      ],
+      edges: [
+        [0,2],[2,1,1],[2,3,1],[2,4],[2,5],[2,6],[4,7],[5,8],[6,9],[7,10],[8,10],[9,10]
+      ],
+      steps: [[0],[0,2],[2,1,3],[2,4,5,6],[4,5,6,7,8,9],[7,8,9,10],[]],
+      pulseGroups: [[0],[1,2],[3,4,5],[6,7,8],[9,10,11]],
+      result: { label:'AgentResult', text:'\u201cRefund of $29.00 issued to card ending 4242.\u201d', meta:'847 tok \u00b7 $0.0012 \u00b7 1.2s \u00b7 27 trace steps' }
+    },
+    { title: 'RAG Pipeline',
+      nodes: [
+        { id:'n0', x:240, y:8,   c:'#3b82f6', name:'Documents', sub:'CSV, PDF, URL' },
+        { id:'n1', x:240, y:72,  c:'#22d3ee', name:'Chunker', sub:'semantic' },
+        { id:'n2', x:240, y:136, c:'#a855f7', name:'Embeddings', sub:'3 providers' },
+        { id:'n3', x:100, y:204, c:'#f59e0b', name:'BM25 Search' },
+        { id:'n4', x:380, y:204, c:'#a855f7', name:'Vector Search' },
+        { id:'n5', x:240, y:204, c:'#22c55e', name:'RRF Fusion' },
+        { id:'n6', x:240, y:272, c:'#ec4899', name:'Reranker', sub:'cross-encoder' }
+      ],
+      edges: [
+        [0,1],[1,2],[2,3],[2,4],[3,5],[4,5],[5,6]
+      ],
+      steps: [[0],[0,1],[1,2],[2,3,4],[3,4,5],[5,6],[]],
+      pulseGroups: [[0],[1],[2,3],[4,5],[6]],
+      result: { label:'Context Retrieved', text:'Top 3 chunks (scores: 0.94, 0.87, 0.72) injected into agent prompt.', meta:'12 chunks \u00b7 7 vector stores \u00b7 BM25+vector fusion' }
+    },
+    { title: 'Provider Failover',
+      nodes: [
+        { id:'n0', x:240, y:8,   c:'#3b82f6', name:'Agent Request' },
+        { id:'n1', x:240, y:76,  c:'#22c55e', name:'OpenAI', sub:'gpt-5' },
+        { id:'n2', x:240, y:144, c:'#ef4444', name:'Rate Limited', sub:'429 error' },
+        { id:'n3', x:240, y:212, c:'#f59e0b', name:'Circuit Breaker', sub:'open' },
+        { id:'n4', x:240, y:280, c:'#a855f7', name:'Anthropic', sub:'claude-sonnet' }
+      ],
+      edges: [
+        [0,1],[1,2],[2,3],[3,4]
+      ],
+      steps: [[0],[0,1],[1,2],[2,3],[3,4],[]],
+      pulseGroups: [[0],[1],[2],[3]],
+      result: { label:'Failover Success', text:'Automatic fallback to Anthropic. Zero downtime, no code changes.', meta:'FallbackProvider \u00b7 circuit breaker \u00b7 health checks' }
+    },
+    { title: 'Eval + Guardrail Pipeline',
+      nodes: [
+        { id:'n0', x:240, y:8,   c:'#3b82f6', name:'Test Cases', sub:'5 inputs' },
+        { id:'n1', x:240, y:72,  c:'#22d3ee', name:'Agent' },
+        { id:'n2', x:80,  y:144, c:'#22c55e', name:'ToolUse', sub:'eval' },
+        { id:'n3', x:200, y:144, c:'#22c55e', name:'Correct', sub:'eval' },
+        { id:'n4', x:310, y:144, c:'#22c55e', name:'Safety', sub:'eval' },
+        { id:'n5', x:420, y:144, c:'#22c55e', name:'Halluc.', sub:'eval' },
+        { id:'n6', x:160, y:216, c:'#ef4444', name:'PII Guard' },
+        { id:'n7', x:320, y:216, c:'#ef4444', name:'Inject Screen' },
+        { id:'n8', x:240, y:280, c:'#a855f7', name:'HTML Report', sub:'+ JUnit XML' }
+      ],
+      edges: [
+        [0,1],[1,2],[1,3],[1,4],[1,5],[2,6],[3,6],[4,7],[5,7],[6,8],[7,8]
+      ],
+      steps: [[0],[0,1],[1,2,3,4,5],[2,3,4,5,6,7],[6,7,8],[]],
+      pulseGroups: [[0],[1,2,3,4],[5,6,7,8],[9,10]],
+      result: { label:'EvalReport', text:'5/5 passed. Avg score 9.1/10. No PII leaked. No injections.', meta:'50 evaluators \u00b7 A/B testing \u00b7 regression detection' }
+    }
   ];
 
+  var curScene = 0;
   var pulses = [];
-  edges.forEach(function(e) {
-    var a = nodes[e.from], b = nodes[e.to];
-    var line = document.createElementNS(NS, 'line');
-    line.setAttribute('x1', a.x); line.setAttribute('y1', a.y + 14);
-    line.setAttribute('x2', b.x); line.setAttribute('y2', b.y - 4);
-    line.setAttribute('class', 'hf-path');
-    if (e.dashed) line.setAttribute('stroke-dasharray', '4 4');
-    svg.appendChild(line);
+  var nodeEls = [];
 
-    var pulse = document.createElementNS(NS, 'circle');
-    pulse.setAttribute('cx', a.x); pulse.setAttribute('cy', a.y);
-    pulse.setAttribute('r', '3'); pulse.setAttribute('class', 'hf-pulse');
-    svg.appendChild(pulse);
-    pulses.push({ el: pulse, x1: a.x, y1: a.y + 14, x2: b.x, y2: b.y - 4 });
-  });
+  function makeNode(n) {
+    var el = document.createElement('div');
+    el.className = 'hf-node';
+    el.id = n.id;
+    el.style.cssText = 'left:' + n.x + 'px;top:' + n.y + 'px;transform:translateX(-50%);position:absolute;opacity:0';
+    var dot = document.createElement('div');
+    dot.className = 'hf-dot';
+    dot.style.background = n.c;
+    el.appendChild(dot);
+    el.appendChild(document.createTextNode(n.name));
+    if (n.sub) {
+      var sub = document.createElement('span');
+      sub.className = 'hf-label';
+      sub.textContent = n.sub;
+      el.appendChild(sub);
+    }
+    return el;
+  }
 
-  var allNodeIds = ['hfUser','hfProvider','hfSupervisor','hfMemory',
-    'hfAgent1','hfAgent2','hfAgent3','hfRag','hfTools','hfGuard','hfEval'];
+  function buildScene(scene) {
+    // Clear
+    nodesEl.textContent = '';
+    svg.textContent = '';
+    outputEl.textContent = '';
+    outputEl.classList.remove('visible');
+    pulses = [];
+    nodeEls = [];
+    labelEl.textContent = scene.title;
 
-  function activate(ids) {
-    allNodeIds.forEach(function(id) {
-      var el = document.getElementById(id);
-      if (el) el.classList.toggle('active', ids.indexOf(id) >= 0);
+    // Create nodes
+    scene.nodes.forEach(function(n) {
+      var el = makeNode(n);
+      nodesEl.appendChild(el);
+      nodeEls.push(el);
+      setTimeout(function() { el.style.opacity = '1'; el.style.transition = 'opacity 0.3s'; }, 50);
+    });
+
+    // Create edges + pulses
+    scene.edges.forEach(function(e) {
+      var a = scene.nodes[e[0]], b = scene.nodes[e[1]];
+      var dashed = e[2] === 1;
+      var line = document.createElementNS(NS, 'line');
+      line.setAttribute('x1', a.x); line.setAttribute('y1', a.y + 16);
+      line.setAttribute('x2', b.x); line.setAttribute('y2', b.y - 2);
+      line.setAttribute('class', 'hf-path');
+      if (dashed) line.setAttribute('stroke-dasharray', '4 4');
+      svg.appendChild(line);
+
+      var c = document.createElementNS(NS, 'circle');
+      c.setAttribute('cx', a.x); c.setAttribute('cy', a.y);
+      c.setAttribute('r', '3'); c.setAttribute('class', 'hf-pulse');
+      svg.appendChild(c);
+      pulses.push({ el: c, x1: a.x, y1: a.y + 16, x2: b.x, y2: b.y - 2 });
     });
   }
 
   function animP(idx, dur, cb) {
+    if (idx >= pulses.length) { if (cb) cb(); return; }
     var p = pulses[idx];
     p.el.setAttribute('cx', p.x1); p.el.setAttribute('cy', p.y1);
     p.el.classList.add('go');
@@ -1861,66 +1917,80 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
     requestAnimationFrame(tick);
   }
 
-  function runCycle() {
-    activate([]);
-    var output = document.getElementById('hfOutput');
-    if (output) output.classList.remove('visible');
-
-    var steps = [
-      function(next) { activate(['hfUser']); setTimeout(next, 500); },
-      function(next) {
-        animP(0, 350, function() {
-          activate(['hfSupervisor']);
-          setTimeout(next, 300);
-        });
-      },
-      function(next) {
-        animP(1, 250, function() {}); // provider (side)
-        animP(2, 250, function() {}); // memory (side)
-        activate(['hfSupervisor','hfProvider','hfMemory']);
-        setTimeout(next, 400);
-      },
-      function(next) {
-        animP(3, 300, function() {}); // -> agent1
-        animP(4, 300, function() {}); // -> agent2
-        animP(5, 300, function() {    // -> agent3
-          activate(['hfAgent1','hfAgent2','hfAgent3']);
-          setTimeout(next, 500);
-        });
-      },
-      function(next) {
-        animP(6, 300, function() {}); // agent1 -> rag
-        animP(7, 300, function() {}); // agent2 -> tools
-        animP(8, 300, function() {    // agent3 -> guard
-          activate(['hfRag','hfTools','hfGuard']);
-          setTimeout(next, 500);
-        });
-      },
-      function(next) {
-        animP(9, 300, function() {});  // rag -> eval
-        animP(10, 300, function() {}); // tools -> eval
-        animP(11, 300, function() {    // guard -> eval
-          activate(['hfEval']);
-          setTimeout(next, 400);
-        });
-      },
-      function(next) {
-        activate([]);
-        if (output) output.classList.add('visible');
-        setTimeout(next, 2800);
-      },
-      function() {
-        if (output) output.classList.remove('visible');
-        setTimeout(runCycle, 600);
-      }
-    ];
-
-    var i = 0;
-    function go() { if (i < steps.length) steps[i++](go); }
-    go();
+  function activateIds(ids) {
+    nodeEls.forEach(function(el, i) {
+      el.classList.toggle('active', ids.indexOf(i) >= 0);
+    });
   }
 
-  setTimeout(runCycle, 700);
+  function showResult(r) {
+    outputEl.textContent = '';
+    var lbl = document.createElement('div');
+    lbl.className = 'hf-output-label';
+    lbl.textContent = r.label;
+    var txt = document.createElement('div');
+    txt.className = 'hf-output-text';
+    txt.textContent = r.text;
+    var meta = document.createElement('div');
+    meta.className = 'hf-output-meta';
+    meta.textContent = r.meta;
+    outputEl.appendChild(lbl);
+    outputEl.appendChild(txt);
+    outputEl.appendChild(meta);
+    outputEl.classList.add('visible');
+  }
+
+  function playScene(scene, onDone) {
+    buildScene(scene);
+    var stepIdx = 0;
+    var pgIdx = 0;
+
+    function nextStep() {
+      if (stepIdx >= scene.steps.length) {
+        showResult(scene.result);
+        setTimeout(function() {
+          outputEl.classList.remove('visible');
+          // Fade out nodes
+          nodeEls.forEach(function(el) { el.style.opacity = '0'; });
+          setTimeout(onDone, 400);
+        }, 2400);
+        return;
+      }
+
+      var activeNodes = scene.steps[stepIdx];
+      activateIds(activeNodes);
+
+      // Fire pulses for this step if available
+      if (pgIdx < scene.pulseGroups.length && stepIdx > 0) {
+        var pg = scene.pulseGroups[pgIdx];
+        var done = 0;
+        pg.forEach(function(pi) {
+          animP(pi, 300, function() {
+            done++;
+            if (done >= pg.length) {
+              stepIdx++;
+              pgIdx++;
+              setTimeout(nextStep, 350);
+            }
+          });
+        });
+      } else {
+        stepIdx++;
+        setTimeout(nextStep, 450);
+      }
+    }
+
+    setTimeout(nextStep, 300);
+  }
+
+  function cycle() {
+    playScene(SCENES[curScene], function() {
+      curScene = (curScene + 1) % SCENES.length;
+      setTimeout(cycle, 300);
+    });
+  }
+
+  setTimeout(cycle, 600);
 })();
 
 /* ── Simulation Player ─────────────────────────────────────────── */
