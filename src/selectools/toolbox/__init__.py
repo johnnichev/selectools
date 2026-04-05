@@ -7,6 +7,10 @@ This module provides a collection of ready-to-use tools for:
 - Data processing (JSON, CSV parsing and formatting)
 - Date/time utilities (current time, parsing, arithmetic)
 - Text processing (search, replace, extract, case conversion)
+- Code execution (Python, shell commands)
+- Web search and scraping (DuckDuckGo, URL scraping)
+- GitHub API (repos, files, issues)
+- Database queries (SQLite, PostgreSQL)
 
 Usage:
     from selectools.toolbox import get_all_tools, file_tools, web_tools
@@ -26,7 +30,17 @@ from typing import List
 from ..tools import Tool
 
 # Import all tool modules
-from . import data_tools, datetime_tools, file_tools, text_tools, web_tools
+from . import (
+    code_tools,
+    data_tools,
+    datetime_tools,
+    db_tools,
+    file_tools,
+    github_tools,
+    search_tools,
+    text_tools,
+    web_tools,
+)
 
 __all__ = [
     "file_tools",
@@ -34,6 +48,10 @@ __all__ = [
     "data_tools",
     "datetime_tools",
     "text_tools",
+    "code_tools",
+    "search_tools",
+    "github_tools",
+    "db_tools",
     "get_all_tools",
     "get_tools_by_category",
 ]
@@ -97,6 +115,24 @@ def get_all_tools() -> List[Tool]:
         ]
     )
 
+    # Code tools
+    tools.extend([code_tools.execute_python, code_tools.execute_shell])
+
+    # Search tools
+    tools.extend([search_tools.web_search, search_tools.scrape_url])
+
+    # GitHub tools
+    tools.extend(
+        [
+            github_tools.github_search_repos,
+            github_tools.github_get_file,
+            github_tools.github_list_issues,
+        ]
+    )
+
+    # Database tools
+    tools.extend([db_tools.query_sqlite, db_tools.query_postgres])
+
     return tools
 
 
@@ -145,6 +181,14 @@ def get_tools_by_category(category: str) -> List[Tool]:
             text_tools.convert_case,
             text_tools.truncate_text,
         ],
+        "code": [code_tools.execute_python, code_tools.execute_shell],
+        "search": [search_tools.web_search, search_tools.scrape_url],
+        "github": [
+            github_tools.github_search_repos,
+            github_tools.github_get_file,
+            github_tools.github_list_issues,
+        ],
+        "database": [db_tools.query_sqlite, db_tools.query_postgres],
     }
 
     if category not in categories:

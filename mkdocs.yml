@@ -105,7 +105,7 @@ nav:
   - Core:
     - Agent: modules/AGENT.md
     - Tools: modules/TOOLS.md
-    - Toolbox (24 Built-in): modules/TOOLBOX.md
+    - Toolbox (33 Built-in): modules/TOOLBOX.md
     - Dynamic Tools: modules/DYNAMIC_TOOLS.md
     - Streaming: modules/STREAMING.md
     - Memory: modules/MEMORY.md

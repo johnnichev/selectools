@@ -1,11 +1,11 @@
 ---
-description: "24 pre-built tools for file I/O, web requests, data processing, datetime, and text"
+description: "33 pre-built tools for file I/O, web requests, data processing, datetime, text, code, search, GitHub, and databases"
 tags:
   - tools
   - built-in
 ---
 
-# Toolbox: 24 Pre-Built Tools
+# Toolbox: 33 Pre-Built Tools
 
 **Import:** `from selectools.toolbox import get_all_tools`
 
@@ -16,11 +16,11 @@ from selectools import Agent, AgentConfig, Message, Role
 from selectools.providers.stubs import LocalProvider
 from selectools.toolbox import get_all_tools, get_tools_by_category
 
-# Load all 24 pre-built tools across 5 categories
+# Load all 33 pre-built tools across 9 categories
 all_tools = get_all_tools()
 print(f"Loaded {len(all_tools)} tools")
 
-# Or load by category: file, web, data, datetime, text
+# Or load by category: file, web, data, datetime, text, code, search, github, db
 text_tools = get_tools_by_category("text")
 data_tools = get_tools_by_category("data")
 
@@ -43,9 +43,9 @@ print(result.content)
 
 ---
 
-**Added in:** v0.12.0
+**Added in:** v0.12.0 | **Expanded in:** v0.21.0
 
-The toolbox provides **24 ready-to-use tools** across 5 categories that you can give to an agent immediately — no implementation needed.
+The toolbox provides **33 ready-to-use tools** across 9 categories that you can give to an agent immediately — no implementation needed.
 
 ---
 
@@ -56,7 +56,7 @@ from selectools import Agent, AgentConfig, OpenAIProvider
 from selectools.toolbox import get_all_tools
 
 agent = Agent(
-    tools=get_all_tools(),           # all 24 tools
+    tools=get_all_tools(),           # all 33 tools
     provider=OpenAIProvider(),
     config=AgentConfig(max_iterations=5),
 )
@@ -74,7 +74,7 @@ print(result.content)
 ```python
 from selectools.toolbox import get_all_tools
 
-tools = get_all_tools()  # List[Tool], 24 tools
+tools = get_all_tools()  # List[Tool], 33 tools
 ```
 
 ### By Category
@@ -82,11 +82,15 @@ tools = get_all_tools()  # List[Tool], 24 tools
 ```python
 from selectools.toolbox import get_tools_by_category
 
-file_tools = get_tools_by_category("file")       # 5 tools
-web_tools  = get_tools_by_category("web")        # 2 tools
-data_tools = get_tools_by_category("data")       # 6 tools
-dt_tools   = get_tools_by_category("datetime")   # 4 tools
-text_tools = get_tools_by_category("text")       # 7 tools
+file_tools   = get_tools_by_category("file")       # 5 tools
+web_tools    = get_tools_by_category("web")        # 2 tools
+data_tools   = get_tools_by_category("data")       # 6 tools
+dt_tools     = get_tools_by_category("datetime")   # 4 tools
+text_tools   = get_tools_by_category("text")       # 7 tools
+code_tools   = get_tools_by_category("code")       # 2 tools  (v0.21.0)
+search_tools = get_tools_by_category("search")     # 2 tools  (v0.21.0)
+gh_tools     = get_tools_by_category("github")     # 3 tools  (v0.21.0)
+db_tools     = get_tools_by_category("db")         # 2 tools  (v0.21.0)
 ```
 
 ### Individual Tools
@@ -97,6 +101,10 @@ from selectools.toolbox.web_tools import http_get
 from selectools.toolbox.data_tools import parse_json, json_to_csv
 from selectools.toolbox.text_tools import extract_emails, convert_case
 from selectools.toolbox.datetime_tools import get_current_time
+from selectools.toolbox.code_tools import execute_python, execute_shell       # v0.21.0
+from selectools.toolbox.search_tools import web_search, scrape_url            # v0.21.0
+from selectools.toolbox.github_tools import github_search_repos, github_get_file  # v0.21.0
+from selectools.toolbox.db_tools import query_sqlite, query_postgres          # v0.21.0
 ```
 
 ---
@@ -231,6 +239,103 @@ agent.ask("Count the words in this paragraph: ...")
 
 ---
 
+## Code Tools (2) — v0.21.0
+
+| Tool | Description | Parameters |
+|---|---|---|
+| `execute_python` | Execute Python code in a subprocess | `code`, `timeout=30` |
+| `execute_shell` | Execute a shell command | `command`, `timeout=30` |
+
+!!! warning "Security"
+    Code execution tools run commands on the host machine. Use `ToolPolicy` to restrict access or require human approval:
+
+    ```python
+    from selectools.policy import ToolPolicy
+
+    policy = ToolPolicy(review=["execute_*"])  # Require approval before execution
+    ```
+
+```python
+agent = Agent(
+    tools=get_tools_by_category("code"),
+    provider=provider,
+    config=AgentConfig(max_iterations=3),
+)
+
+agent.ask("Run this Python code: print('Hello from subprocess!')")
+```
+
+Output is truncated to 10 KB. Maximum timeout is 300 seconds.
+
+---
+
+## Search Tools (2) — v0.21.0
+
+| Tool | Description | Parameters |
+|---|---|---|
+| `web_search` | Search the web via DuckDuckGo (no API key) | `query`, `num_results=5` |
+| `scrape_url` | Fetch a URL and extract text content | `url`, `selector=None` |
+
+No external dependencies required -- uses `urllib` from the standard library.
+
+```python
+agent = Agent(
+    tools=get_tools_by_category("search"),
+    provider=provider,
+    config=AgentConfig(max_iterations=3),
+)
+
+agent.ask("Search for 'Python async programming best practices'")
+agent.ask("Scrape the text from https://example.com")
+```
+
+---
+
+## GitHub Tools (3) — v0.21.0
+
+| Tool | Description | Parameters |
+|---|---|---|
+| `github_search_repos` | Search GitHub repositories | `query`, `max_results=5` |
+| `github_get_file` | Get file contents from a repository | `repo`, `path`, `ref="main"` |
+| `github_list_issues` | List issues in a repository | `repo`, `state="open"`, `max_results=10` |
+
+Uses the GitHub REST API v3. Set the `GITHUB_TOKEN` environment variable for authenticated requests (higher rate limits).
+
+```python
+agent = Agent(
+    tools=get_tools_by_category("github"),
+    provider=provider,
+    config=AgentConfig(max_iterations=3),
+)
+
+agent.ask("Search GitHub for 'machine learning language:python'")
+agent.ask("Get the README from johnnichev/selectools")
+agent.ask("List open issues in johnnichev/selectools")
+```
+
+---
+
+## Database Tools (2) — v0.21.0
+
+| Tool | Description | Parameters |
+|---|---|---|
+| `query_sqlite` | Execute a read-only SQL query against SQLite | `db_path`, `sql`, `max_rows=100` |
+| `query_postgres` | Execute a read-only SQL query against PostgreSQL | `connection_string`, `sql`, `max_rows=100` |
+
+Both tools enforce **read-only mode** to prevent accidental writes. SQLite uses the standard-library `sqlite3` module. PostgreSQL requires `psycopg2` (`pip install psycopg2-binary`).
+
+```python
+agent = Agent(
+    tools=get_tools_by_category("db"),
+    provider=provider,
+    config=AgentConfig(max_iterations=3),
+)
+
+agent.ask("Query the database at ./app.db: SELECT name, email FROM users LIMIT 5")
+```
+
+---
+
 ## Combining with Custom Tools
 
 Toolbox tools are regular `Tool` objects — mix them freely with your own:
@@ -257,13 +362,17 @@ agent = Agent(
 
 | Function | Description |
 |---|---|
-| `get_all_tools()` | Returns all 24 tools as `List[Tool]` |
-| `get_tools_by_category(category)` | Returns tools for one category (`"file"`, `"web"`, `"data"`, `"datetime"`, `"text"`) |
+| `get_all_tools()` | Returns all 33 tools as `List[Tool]` |
+| `get_tools_by_category(category)` | Returns tools for one category (`"file"`, `"web"`, `"data"`, `"datetime"`, `"text"`, `"code"`, `"search"`, `"github"`, `"db"`) |
 | `selectools.toolbox.file_tools` | Module with 5 file tools |
 | `selectools.toolbox.web_tools` | Module with 2 web tools |
 | `selectools.toolbox.data_tools` | Module with 6 data tools |
 | `selectools.toolbox.datetime_tools` | Module with 4 datetime tools |
 | `selectools.toolbox.text_tools` | Module with 7 text tools |
+| `selectools.toolbox.code_tools` | Module with 2 code execution tools (v0.21.0) |
+| `selectools.toolbox.search_tools` | Module with 2 web search tools (v0.21.0) |
+| `selectools.toolbox.github_tools` | Module with 3 GitHub tools (v0.21.0) |
+| `selectools.toolbox.db_tools` | Module with 2 database tools (v0.21.0) |
 
 ---
 
@@ -279,5 +388,5 @@ agent = Agent(
 
 | # | Script | Description |
 |---|--------|-------------|
-| 03 | [`03_toolbox.py`](https://github.com/johnnichev/selectools/blob/main/examples/03_toolbox.py) | Working demo of all 24 pre-built tools across 5 categories |
+| 03 | [`03_toolbox.py`](https://github.com/johnnichev/selectools/blob/main/examples/03_toolbox.py) | Working demo of all 33 pre-built tools across 9 categories |
 | 13 | [`13_dynamic_tools.py`](https://github.com/johnnichev/selectools/blob/main/examples/13_dynamic_tools.py) | Loading tools dynamically from files and directories |

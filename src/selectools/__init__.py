@@ -134,7 +134,7 @@ from .structured import ResponseFormat
 from .token_estimation import TokenEstimate, estimate_run_tokens, estimate_tokens
 from .tools import Tool, ToolParameter, ToolRegistry, tool
 from .trace import AgentTrace, StepType, TraceStep, trace_to_html, trace_to_json
-from .types import AgentResult, Message, Role, ToolCall
+from .types import AgentResult, ContentPart, Message, Role, ToolCall, image_message, text_content
 from .usage import AgentUsage, UsageStats
 
 __all__ = [

@@ -460,6 +460,24 @@ class _OpenAICompatibleBase(ABC):
         return payload
 
     def _format_content(self, message: Message) -> str | List[Any]:
+        # Multimodal content_parts (new)
+        if hasattr(message, "content_parts") and message.content_parts:
+            parts: List[Any] = []
+            for cp in message.content_parts:
+                if cp.type == "text" and cp.text:
+                    parts.append({"type": "text", "text": cp.text})
+                elif cp.type == "image_url" and cp.image_url:
+                    parts.append({"type": "image_url", "image_url": {"url": cp.image_url}})
+                elif cp.type == "image_base64" and cp.image_base64:
+                    media = cp.media_type or "image/jpeg"
+                    parts.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:{media};base64,{cp.image_base64}"},
+                        }
+                    )
+            return parts if parts else (message.content or "")
+        # Legacy single-image support
         if message.image_base64:
             return [
                 {"type": "text", "text": message.content or ""},

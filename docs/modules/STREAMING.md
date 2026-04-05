@@ -616,6 +616,56 @@ Use `result.tool_calls` and `result.iterations` for logging and monitoring.
 
 ---
 
+## Multimodal Messages (v0.21.0)
+
+**Stability:** <span class="badge-beta">beta</span>
+
+Selectools supports multimodal messages through the `ContentPart`, `image_message()`, and `text_content()` helpers. These let you send images alongside text to vision-capable models.
+
+### ContentPart
+
+```python
+from selectools.types import ContentPart, Message, Role
+
+# Build a message with multiple content parts
+parts = [
+    ContentPart(type="text", text="What's in these images?"),
+    ContentPart(type="image_url", image_url="https://example.com/photo.jpg"),
+    ContentPart(type="image_base64", image_base64="...", media_type="image/png"),
+]
+
+msg = Message(role=Role.USER, content="", content_parts=parts)
+```
+
+### image_message() Helper
+
+```python
+from selectools.types import image_message
+
+# From a URL
+msg = image_message("https://example.com/photo.jpg", prompt="Describe this image.")
+
+# From a local file path
+msg = image_message("/path/to/photo.png", prompt="What do you see?")
+```
+
+### text_content() Helper
+
+Extract text from a message regardless of format:
+
+```python
+from selectools.types import text_content
+
+# Works with both plain content and content_parts messages
+text = text_content(message)
+```
+
+### Provider Handling
+
+When streaming with `astream()`, providers serialize `content_parts` into their native multimodal format (OpenAI content arrays, Anthropic content blocks, Gemini parts). The streaming pipeline handles content parts transparently -- text deltas and tool calls are yielded as usual.
+
+---
+
 ## Further Reading
 
 - [Agent Module](AGENT.md) - Agent lifecycle, hooks, configuration

@@ -30,3 +30,24 @@ try:
     __all__.append("PineconeVectorStore")
 except ImportError:
     pass
+
+try:
+    from .faiss import FAISSVectorStore  # noqa: F401
+
+    __all__.append("FAISSVectorStore")
+except ImportError:
+    pass
+
+try:
+    from .qdrant import QdrantVectorStore  # noqa: F401
+
+    __all__.append("QdrantVectorStore")
+except ImportError:
+    pass
+
+try:
+    from .pgvector import PgVectorStore  # noqa: F401
+
+    __all__.append("PgVectorStore")
+except ImportError:
+    pass

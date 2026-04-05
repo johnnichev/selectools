@@ -92,9 +92,37 @@ See `/test` for detailed testing patterns. Key reminders:
 
 Create `examples/NN_feature_name.py` (use next number from Live Project State above).
 
-## 7. Write Documentation
+## 7. Write Documentation (MANDATORY, DO NOT SKIP)
 
-See `/docs` for detailed documentation patterns.
+Every feature MUST have documentation updated before the feature is considered complete.
+This is not optional. Failing to update docs is the same as shipping broken code.
+
+### 7a. Update existing module docs
+For EACH source file you modified or created, find the corresponding doc in `docs/modules/`
+and update it with the new feature. Add code examples, API signatures, and "Since: vX.Y.Z".
+
+### 7b. Update index docs
+- `docs/QUICKSTART.md` — add a "What's New" entry if user-facing
+- `docs/llms.txt` — update module descriptions, counts, and links
+- `docs/index.md` — update feature table and counts if applicable
+- `mkdocs.yml` — update nav labels (e.g., tool counts) if changed
+
+### 7c. Update landing page
+- `landing/index.html` — update stats bar counts (tests, examples, models, etc.)
+- Update comparison tables if the feature adds competitive advantages
+
+### 7d. Update notebook
+- `notebooks/getting_started.ipynb` — add a new step if the feature is user-facing
+
+### 7e. Verify docs build
+```bash
+cp CHANGELOG.md docs/CHANGELOG.md && mkdocs build
+```
+
+If you created new source modules, also update:
+- `docs/llms-full.txt` (regenerate with the build script)
+- `docs/ARCHITECTURE.md` if it changes the system architecture
+- `docs/MIGRATION.md` if it replaces or improves on a competitor feature
 
 ## 8. Run Full Test Suite
 

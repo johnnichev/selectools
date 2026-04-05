@@ -33,7 +33,7 @@ result = agent.run("Find our refund policy")
 
 - [Agent](https://johnnichev.github.io/selectools/modules/AGENT/): Agent class, AgentConfig, AgentResult — the central orchestrator
 - [Tools](https://johnnichev.github.io/selectools/modules/TOOLS/): @tool decorator, Tool class, ToolLoader, ToolRegistry
-- [Toolbox](https://johnnichev.github.io/selectools/modules/TOOLBOX/): 24 pre-built tools (file, web, data, datetime, text)
+- [Toolbox](https://johnnichev.github.io/selectools/modules/TOOLBOX/): 33 pre-built tools (file, web, data, datetime, text, code, search, github, db)
 - [Memory](https://johnnichev.github.io/selectools/modules/MEMORY/): ConversationMemory with sliding window and summarize-on-trim
 - [Streaming](https://johnnichev.github.io/selectools/modules/STREAMING/): Token-level astream() with tool call support
 
@@ -42,11 +42,11 @@ result = agent.run("Find our refund policy")
 - [RAG Pipeline](https://johnnichev.github.io/selectools/modules/RAG/): Document loading, chunking, retrieval
 - [Hybrid Search](https://johnnichev.github.io/selectools/modules/HYBRID_SEARCH/): BM25 + vector fusion with RRF
 - [Embeddings](https://johnnichev.github.io/selectools/modules/EMBEDDINGS/): OpenAI, Anthropic, Gemini, Cohere embedding providers
-- [Vector Stores](https://johnnichev.github.io/selectools/modules/VECTOR_STORES/): Memory, SQLite, Chroma, Pinecone backends
+- [Vector Stores](https://johnnichev.github.io/selectools/modules/VECTOR_STORES/): Memory, SQLite, Chroma, Pinecone, FAISS, Qdrant, pgvector backends
 
 ## Providers
 
-- [Providers](https://johnnichev.github.io/selectools/modules/PROVIDERS/): OpenAI, Anthropic, Gemini, Ollama + FallbackProvider
+- [Providers](https://johnnichev.github.io/selectools/modules/PROVIDERS/): OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama + FallbackProvider
 - [Models](https://johnnichev.github.io/selectools/modules/MODELS/): 152 models with built-in pricing data
 
 ## Multi-Agent
@@ -76,6 +76,9 @@ result = agent.run("Find our refund policy")
 - [Reasoning Strategies](https://johnnichev.github.io/selectools/modules/REASONING_STRATEGIES/): ReAct, CoT, Plan-Then-Act
 - [Builder Docs](https://johnnichev.github.io/selectools/modules/builder/): Visual builder reference
 - [Templates](https://johnnichev.github.io/selectools/modules/TEMPLATES/): YAML agent configuration
+- [OTel Observer](https://johnnichev.github.io/selectools/modules/PROVIDERS/#observability-integrations-v0210): OpenTelemetry agent trace export
+- [Langfuse Observer](https://johnnichev.github.io/selectools/modules/PROVIDERS/#langfuseobserver): Langfuse agent trace export
+- [Multimodal Messages](https://johnnichev.github.io/selectools/modules/STREAMING/#multimodal-messages-v0210): ContentPart, image_message(), text_content()
 - [Stability Markers](https://johnnichev.github.io/selectools/modules/STABILITY/): @stable, @beta, @deprecated
 - [Changelog](https://johnnichev.github.io/selectools/CHANGELOG/): Release history
 - [Examples Gallery](https://johnnichev.github.io/selectools/examples/): 76 runnable scripts with categories
