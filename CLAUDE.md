@@ -4,7 +4,7 @@ Production-ready Python library for AI agents with tool calling, RAG, and multi-
 
 - **Version**: `src/selectools/__init__.py`
 - **PyPI**: https://pypi.org/project/selectools/
-- **Docs**: https://johnnichev.github.io/selectools
+- **Docs**: https://selectools.dev
 
 See `AGENTS.md` for commands, boundaries, and condensed landmines.
 See subdirectory `CLAUDE.md` files for scoped rules: `tests/`, `src/selectools/`, `docs/`.

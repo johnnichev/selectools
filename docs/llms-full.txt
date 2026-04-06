@@ -73,7 +73,7 @@ python my_agent.py
 
 Prefer clicking over coding? Try it instantly in the browser — no install needed:
 
-**[Open the builder on GitHub Pages →](https://johnnichev.github.io/selectools/builder/)**
+**[Open the builder on GitHub Pages →](https://selectools.dev/builder/)**
 
 Or run it locally for full features (live API runs, file sync):
 
@@ -11688,7 +11688,7 @@ Returns an `AgentServer` instance. Call `.serve()` to start (blocking).
 
 The selectools builder is a drag-and-drop graph editor that runs entirely from `pip install selectools` — no separate server, no CDN, no build step.
 
-**Try it now** — no install required: [**Open the builder on GitHub Pages**](https://johnnichev.github.io/selectools/builder/)
+**Try it now** — no install required: [**Open the builder on GitHub Pages**](https://selectools.dev/builder/)
 
 Or run it locally:
 

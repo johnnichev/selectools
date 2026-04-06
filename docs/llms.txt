@@ -24,61 +24,61 @@ result = agent.run("Find our refund policy")
 
 ## Getting Started
 
-- [Quickstart](https://johnnichev.github.io/selectools/QUICKSTART/): 5-minute setup guide with first agent
-- [Migration Guide](https://johnnichev.github.io/selectools/MIGRATION/): Coming from LangChain
-- [Architecture](https://johnnichev.github.io/selectools/ARCHITECTURE/): System design overview
-- [Visual Builder](https://johnnichev.github.io/selectools/builder/): Drag-drop graph editor in the browser (zero install)
+- [Quickstart](https://selectools.dev/QUICKSTART/): 5-minute setup guide with first agent
+- [Migration Guide](https://selectools.dev/MIGRATION/): Coming from LangChain
+- [Architecture](https://selectools.dev/ARCHITECTURE/): System design overview
+- [Visual Builder](https://selectools.dev/builder/): Drag-drop graph editor in the browser (zero install)
 
 ## Core API
 
-- [Agent](https://johnnichev.github.io/selectools/modules/AGENT/): Agent class, AgentConfig, AgentResult — the central orchestrator
-- [Tools](https://johnnichev.github.io/selectools/modules/TOOLS/): @tool decorator, Tool class, ToolLoader, ToolRegistry
-- [Toolbox](https://johnnichev.github.io/selectools/modules/TOOLBOX/): 33 pre-built tools (file, web, data, datetime, text, code, search, github, db)
-- [Memory](https://johnnichev.github.io/selectools/modules/MEMORY/): ConversationMemory with sliding window and summarize-on-trim
-- [Streaming](https://johnnichev.github.io/selectools/modules/STREAMING/): Token-level astream() with tool call support
+- [Agent](https://selectools.dev/modules/AGENT/): Agent class, AgentConfig, AgentResult — the central orchestrator
+- [Tools](https://selectools.dev/modules/TOOLS/): @tool decorator, Tool class, ToolLoader, ToolRegistry
+- [Toolbox](https://selectools.dev/modules/TOOLBOX/): 33 pre-built tools (file, web, data, datetime, text, code, search, github, db)
+- [Memory](https://selectools.dev/modules/MEMORY/): ConversationMemory with sliding window and summarize-on-trim
+- [Streaming](https://selectools.dev/modules/STREAMING/): Token-level astream() with tool call support
 
 ## RAG
 
-- [RAG Pipeline](https://johnnichev.github.io/selectools/modules/RAG/): Document loading, chunking, retrieval
-- [Hybrid Search](https://johnnichev.github.io/selectools/modules/HYBRID_SEARCH/): BM25 + vector fusion with RRF
-- [Embeddings](https://johnnichev.github.io/selectools/modules/EMBEDDINGS/): OpenAI, Anthropic, Gemini, Cohere embedding providers
-- [Vector Stores](https://johnnichev.github.io/selectools/modules/VECTOR_STORES/): Memory, SQLite, Chroma, Pinecone, FAISS, Qdrant, pgvector backends
+- [RAG Pipeline](https://selectools.dev/modules/RAG/): Document loading, chunking, retrieval
+- [Hybrid Search](https://selectools.dev/modules/HYBRID_SEARCH/): BM25 + vector fusion with RRF
+- [Embeddings](https://selectools.dev/modules/EMBEDDINGS/): OpenAI, Anthropic, Gemini, Cohere embedding providers
+- [Vector Stores](https://selectools.dev/modules/VECTOR_STORES/): Memory, SQLite, Chroma, Pinecone, FAISS, Qdrant, pgvector backends
 
 ## Providers
 
-- [Providers](https://johnnichev.github.io/selectools/modules/PROVIDERS/): OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama + FallbackProvider
-- [Models](https://johnnichev.github.io/selectools/modules/MODELS/): 152 models with built-in pricing data
+- [Providers](https://selectools.dev/modules/PROVIDERS/): OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama + FallbackProvider
+- [Models](https://selectools.dev/modules/MODELS/): 152 models with built-in pricing data
 
 ## Multi-Agent
 
-- [Orchestration](https://johnnichev.github.io/selectools/modules/ORCHESTRATION/): AgentGraph engine with routing, parallel, checkpoints
-- [Supervisor](https://johnnichev.github.io/selectools/modules/SUPERVISOR/): SupervisorAgent with 4 coordination strategies
-- [Pipeline](https://johnnichev.github.io/selectools/modules/PIPELINE/): Composable pipelines with @step + | + parallel() + branch()
-- [Patterns](https://johnnichev.github.io/selectools/modules/PATTERNS/): PlanAndExecute, Reflective, Debate, TeamLead agents
+- [Orchestration](https://selectools.dev/modules/ORCHESTRATION/): AgentGraph engine with routing, parallel, checkpoints
+- [Supervisor](https://selectools.dev/modules/SUPERVISOR/): SupervisorAgent with 4 coordination strategies
+- [Pipeline](https://selectools.dev/modules/PIPELINE/): Composable pipelines with @step + | + parallel() + branch()
+- [Patterns](https://selectools.dev/modules/PATTERNS/): PlanAndExecute, Reflective, Debate, TeamLead agents
 
 ## Security
 
-- [Guardrails](https://johnnichev.github.io/selectools/modules/GUARDRAILS/): PII redaction, toxicity, topic blocking, format validation
-- [Audit](https://johnnichev.github.io/selectools/modules/AUDIT/): JSONL audit logging with 4 privacy levels
-- [Security](https://johnnichev.github.io/selectools/modules/SECURITY/): Prompt injection screening (15 patterns)
+- [Guardrails](https://selectools.dev/modules/GUARDRAILS/): PII redaction, toxicity, topic blocking, format validation
+- [Audit](https://selectools.dev/modules/AUDIT/): JSONL audit logging with 4 privacy levels
+- [Security](https://selectools.dev/modules/SECURITY/): Prompt injection screening (15 patterns)
 
 ## Evaluation
 
-- [Evals](https://johnnichev.github.io/selectools/modules/EVALS/): 50 evaluators, EvalSuite, A/B testing, regression detection, HTML reports
+- [Evals](https://selectools.dev/modules/EVALS/): 50 evaluators, EvalSuite, A/B testing, regression detection, HTML reports
 
 ## Optional
 
-- [Sessions](https://johnnichev.github.io/selectools/modules/SESSIONS/): JSON, SQLite, Redis session backends
-- [Entity Memory](https://johnnichev.github.io/selectools/modules/ENTITY_MEMORY/): LLM-based entity extraction
-- [Knowledge Graph](https://johnnichev.github.io/selectools/modules/KNOWLEDGE_GRAPH/): Triple extraction and storage
-- [MCP](https://johnnichev.github.io/selectools/modules/MCP/): Model Context Protocol client/server
-- [Semantic Cache](https://johnnichev.github.io/selectools/modules/SEMANTIC_CACHE/): Embedding-based response caching
-- [Reasoning Strategies](https://johnnichev.github.io/selectools/modules/REASONING_STRATEGIES/): ReAct, CoT, Plan-Then-Act
-- [Builder Docs](https://johnnichev.github.io/selectools/modules/builder/): Visual builder reference
-- [Templates](https://johnnichev.github.io/selectools/modules/TEMPLATES/): YAML agent configuration
-- [OTel Observer](https://johnnichev.github.io/selectools/modules/PROVIDERS/#observability-integrations-v0210): OpenTelemetry agent trace export
-- [Langfuse Observer](https://johnnichev.github.io/selectools/modules/PROVIDERS/#langfuseobserver): Langfuse agent trace export
-- [Multimodal Messages](https://johnnichev.github.io/selectools/modules/STREAMING/#multimodal-messages-v0210): ContentPart, image_message(), text_content()
-- [Stability Markers](https://johnnichev.github.io/selectools/modules/STABILITY/): @stable, @beta, @deprecated
-- [Changelog](https://johnnichev.github.io/selectools/CHANGELOG/): Release history
-- [Examples Gallery](https://johnnichev.github.io/selectools/examples/): 76 runnable scripts with categories
+- [Sessions](https://selectools.dev/modules/SESSIONS/): JSON, SQLite, Redis session backends
+- [Entity Memory](https://selectools.dev/modules/ENTITY_MEMORY/): LLM-based entity extraction
+- [Knowledge Graph](https://selectools.dev/modules/KNOWLEDGE_GRAPH/): Triple extraction and storage
+- [MCP](https://selectools.dev/modules/MCP/): Model Context Protocol client/server
+- [Semantic Cache](https://selectools.dev/modules/SEMANTIC_CACHE/): Embedding-based response caching
+- [Reasoning Strategies](https://selectools.dev/modules/REASONING_STRATEGIES/): ReAct, CoT, Plan-Then-Act
+- [Builder Docs](https://selectools.dev/modules/builder/): Visual builder reference
+- [Templates](https://selectools.dev/modules/TEMPLATES/): YAML agent configuration
+- [OTel Observer](https://selectools.dev/modules/PROVIDERS/#observability-integrations-v0210): OpenTelemetry agent trace export
+- [Langfuse Observer](https://selectools.dev/modules/PROVIDERS/#langfuseobserver): Langfuse agent trace export
+- [Multimodal Messages](https://selectools.dev/modules/STREAMING/#multimodal-messages-v0210): ContentPart, image_message(), text_content()
+- [Stability Markers](https://selectools.dev/modules/STABILITY/): @stable, @beta, @deprecated
+- [Changelog](https://selectools.dev/CHANGELOG/): Release history
+- [Examples Gallery](https://selectools.dev/examples/): 76 runnable scripts with categories

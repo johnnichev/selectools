@@ -1,10 +1,10 @@
 # Selectools
 
 [![PyPI version](https://badge.fury.io/py/selectools.svg)](https://badge.fury.io/py/selectools)
-[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://johnnichev.github.io/selectools)
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://selectools.dev)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![Evaluators](https://img.shields.io/badge/evaluators-50-06b6d4.svg)](https://johnnichev.github.io/selectools/modules/EVALS/)
+[![Evaluators](https://img.shields.io/badge/evaluators-50-06b6d4.svg)](https://selectools.dev/modules/EVALS/)
 
 An open-source project from **[NichevLabs](https://nichevlabs.com)**.
 
@@ -30,9 +30,9 @@ result = AgentGraph.chain(planner, writer, reviewer).run("Write a blog post")
 
 The first AI agent framework to ship a visual graph builder in a single `pip install`. No React. No build step. No CDN.
 
-**[Try the builder in your browser →](https://johnnichev.github.io/selectools/builder/)** — no install required.
+**[Try the builder in your browser →](https://selectools.dev/builder/)** — no install required.
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb) [![Examples Gallery](https://img.shields.io/badge/examples-76_scripts-22d3ee)](https://johnnichev.github.io/selectools/examples/)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb) [![Examples Gallery](https://img.shields.io/badge/examples-76_scripts-22d3ee)](https://selectools.dev/examples/)
 
 ```bash
 pip install selectools
@@ -1016,7 +1016,7 @@ python examples/14_rag_basic.py     # Needs OPENAI_API_KEY
 
 ## Documentation
 
-**[Read the full documentation](https://johnnichev.github.io/selectools)** — hosted on GitHub Pages with search, dark mode, and easy navigation.
+**[Read the full documentation](https://selectools.dev)** — hosted on GitHub Pages with search, dark mode, and easy navigation.
 
 Also available in [`docs/`](docs/README.md):
 

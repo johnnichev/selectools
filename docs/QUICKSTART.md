@@ -58,7 +58,7 @@ python my_agent.py
 
 Prefer clicking over coding? Try it instantly in the browser — no install needed:
 
-**[Open the builder on GitHub Pages →](https://johnnichev.github.io/selectools/builder/)**
+**[Open the builder on GitHub Pages →](https://selectools.dev/builder/)**
 
 Or run it locally for full features (live API runs, file sync):
 
