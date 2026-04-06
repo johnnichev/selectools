@@ -35,7 +35,7 @@ classifiers = [
 Homepage = "https://nichevlabs.com"
 Repository = "https://github.com/johnnichev/selectools"
 Issues = "https://github.com/johnnichev/selectools/issues"
-Documentation = "https://johnnichev.github.io/selectools"
+Documentation = "https://selectools.dev"
 Changelog = "https://github.com/johnnichev/selectools/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]

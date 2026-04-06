@@ -5,22 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Selectools — Production-Ready AI Agents in Plain Python</title>
   <meta name="description" content="Selectools is a Python library for building production-ready AI agents with tool calling, RAG, and multi-agent orchestration. 152 models, 50 evaluators, visual builder. Supports OpenAI, Anthropic, Gemini, Ollama. Free and open source." />
-  <link rel="canonical" href="https://johnnichev.github.io/selectools/" />
+  <link rel="canonical" href="https://selectools.dev/" />
   <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
   <meta name="keywords" content="python ai agent, tool calling, rag, hybrid search, openai, anthropic, gemini, ollama, ai agent framework, llm tools, python llm, multi-agent, agent graph, langchain alternative" />
   <meta name="author" content="NichevLabs" />
   <meta property="og:title" content="Selectools — Python AI Agent Framework" />
   <meta property="og:description" content="Multi-agent graphs, 50 built-in evaluators, visual builder, hybrid RAG. One pip install. No DSL. Free." />
   <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://johnnichev.github.io/selectools/" />
+  <meta property="og:url" content="https://selectools.dev/" />
   <meta property="og:site_name" content="Selectools" />
   <meta property="og:locale" content="en_US" />
-  <meta property="og:image" content="https://johnnichev.github.io/selectools/assets/og-image.svg" />
+  <meta property="og:image" content="https://selectools.dev/assets/og-image.svg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Selectools — AI Agents That Are Just Python" />
-  <meta name="twitter:image" content="https://johnnichev.github.io/selectools/assets/og-image.svg" />
+  <meta name="twitter:image" content="https://selectools.dev/assets/og-image.svg" />
   <meta name="twitter:description" content="Multi-agent orchestration, RAG, 50 evaluators, visual builder — one pip install. OpenAI, Anthropic, Gemini, Ollama." />
   <script type="application/ld+json">
   {
@@ -32,7 +32,7 @@
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "Any",
     "programmingLanguage": "Python",
-    "url": "https://johnnichev.github.io/selectools/",
+    "url": "https://selectools.dev/",
     "downloadUrl": "https://pypi.org/project/selectools/",
     "softwareVersion": "0.20.1",
     "license": "https://opensource.org/licenses/Apache-2.0",
@@ -89,7 +89,7 @@
         "name": "Does Selectools have a visual builder?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Yes. Selectools ships a drag-and-drop visual agent builder that runs in the browser with zero installation. Design multi-agent workflows, test with real APIs, and export runnable Python or YAML. Try it at: https://johnnichev.github.io/selectools/builder/"
+          "text": "Yes. Selectools ships a drag-and-drop visual agent builder that runs in the browser with zero installation. Design multi-agent workflows, test with real APIs, and export runnable Python or YAML. Try it at: https://selectools.dev/builder/"
         }
       },
       {
@@ -225,11 +225,16 @@
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 28px;
-      transition: border-color 0.2s, box-shadow 0.2s;
+      transition:
+        border-color 0.25s var(--ease),
+        box-shadow 0.25s var(--ease),
+        transform 0.25s var(--ease);
+      will-change: transform;
     }
     .card:hover {
       border-color: rgba(34,211,238,0.25);
-      box-shadow: 0 0 0 1px rgba(34,211,238,0.06), 0 8px 32px rgba(0,0,0,0.25);
+      box-shadow: 0 0 0 1px rgba(34,211,238,0.06), 0 12px 36px rgba(0,0,0,0.32);
+      transform: translateY(-2px);
     }
     .card-icon {
       width: 40px; height: 40px;
@@ -281,15 +286,26 @@
       font-size: 14px;
       border: 1px solid transparent;
       cursor: pointer;
-      transition: all 0.15s;
+      transition:
+        background-color 0.2s var(--ease),
+        border-color 0.2s var(--ease),
+        color 0.2s var(--ease),
+        transform 0.2s var(--ease),
+        box-shadow 0.2s var(--ease);
       white-space: nowrap;
+      will-change: transform;
     }
+    .btn:hover { transform: translateY(-1px); }
+    .btn:active { transform: translateY(1px); transition-duration: 0.08s; }
     .btn-primary {
       background: var(--blue);
       color: #fff;
       border-color: var(--blue);
     }
-    .btn-primary:hover { background: #2563eb; }
+    .btn-primary:hover {
+      background: #2563eb;
+      box-shadow: 0 6px 20px rgba(59,130,246,0.25);
+    }
     .btn-ghost {
       background: transparent;
       color: var(--text);
@@ -301,7 +317,11 @@
       color: var(--cyan);
       border-color: rgba(34,211,238,0.3);
     }
-    .btn-cyan:hover { background: rgba(34,211,238,0.18); border-color: var(--cyan); }
+    .btn-cyan:hover {
+      background: rgba(34,211,238,0.18);
+      border-color: var(--cyan);
+      box-shadow: 0 6px 20px rgba(34,211,238,0.18);
+    }
     .btn-pip {
       background: var(--surface);
       color: var(--cyan);
@@ -310,10 +330,24 @@
       font-weight: 400;
       font-size: 13px;
       padding: 12px 20px;
+      position: relative;
+      overflow: hidden;
     }
-    .btn-pip:hover { border-color: var(--cyan); }
-    .btn-pip:active { transform: scale(0.97); }
+    .btn-pip:hover {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 1px rgba(34,211,238,0.15), 0 6px 20px rgba(34,211,238,0.12);
+    }
     .btn-pip svg { flex-shrink: 0; }
+    .btn-pip.copied {
+      border-color: var(--cyan);
+      color: var(--green);
+      animation: pip-copied 0.6s var(--ease);
+    }
+    @keyframes pip-copied {
+      0%   { box-shadow: 0 0 0 0 rgba(34,211,238,0.5); }
+      40%  { box-shadow: 0 0 0 6px rgba(34,211,238,0.0); }
+      100% { box-shadow: 0 0 0 1px rgba(34,211,238,0.15), 0 6px 20px rgba(34,211,238,0.12); }
+    }
 
     /* ── Nav ───────────────────────────────────────────────────────── */
     nav {
@@ -977,14 +1011,59 @@
     .sim-evt-bubble.ev-handoff,
     .sim-evt-bubble.ev-fallback { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2); }
     .sim-evt-bubble.ev-other { background: rgba(100,116,139,0.08); border: 1px solid rgba(100,116,139,0.2); color: var(--text-dim); font-size: 12px; }
+
+    /* ── Nav: scroll hide + progress bar ───────────────────────────── */
+    nav {
+      transition: transform 0.3s var(--ease), background 0.3s var(--ease);
+      will-change: transform;
+    }
+    nav.nav-hidden { transform: translateY(-100%); }
+    nav.nav-scrolled { background: rgba(15,23,42,0.95); }
+    .nav-progress {
+      position: absolute;
+      left: 0;
+      bottom: -1px;
+      height: 2px;
+      width: 0;
+      background: linear-gradient(90deg, var(--cyan) 0%, var(--blue) 100%);
+      box-shadow: 0 0 8px rgba(34,211,238,0.45);
+      pointer-events: none;
+      transform-origin: left center;
+    }
+
+    /* ── Logo wink ─────────────────────────────────────────────────── */
+    .nav-logo {
+      display: inline-block;
+      transition: transform 0.25s var(--ease);
+      transform-origin: center;
+    }
+    .nav-logo:hover { transform: rotate(-3deg) scale(1.03); }
+    .nav-logo:active { transform: rotate(0deg) scale(0.98); }
+
+    /* ── Stats count-up: prevent layout shift ──────────────────────── */
+    .status-val { font-variant-numeric: tabular-nums; display: inline-block; }
+
+    /* ── Reduced motion (WCAG AA) ──────────────────────────────────── */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+      .reveal { opacity: 1 !important; transform: none !important; }
+      .nav-progress { display: none; }
+      .hero::before, .hero::after { animation: none; }
+      .sim-status[data-state="running"] { animation: none; }
+    }
   </style>
 </head>
 <body>
 
 <!-- ─── Nav ────────────────────────────────────────────────────────── -->
-<nav>
+<nav id="siteNav">
   <div class="wrap">
-    <a href="#" class="nav-logo">selectools</a>
+    <a href="#" class="nav-logo" aria-label="selectools home">selectools</a>
     <div class="nav-links hide-mobile">
       <a href="#builder">Builder</a>
       <a href="#simulations">Simulations</a>
@@ -998,6 +1077,7 @@
       </a>
     </div>
   </div>
+  <div class="nav-progress" id="navProgress" aria-hidden="true"></div>
 </nav>
 
 <!-- ─── Hero ───────────────────────────────────────────────────────── -->
@@ -1776,11 +1856,22 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
 <script>
 function copyPip() {
   navigator.clipboard.writeText('pip install selectools');
-  document.getElementById('copy-icon').style.display = 'none';
-  document.getElementById('check-icon').style.display = '';
-  setTimeout(() => {
-    document.getElementById('copy-icon').style.display = '';
-    document.getElementById('check-icon').style.display = 'none';
+  var btn = document.getElementById('pipBtn');
+  var label = btn.querySelector('span');
+  var copyIcon = document.getElementById('copy-icon');
+  var checkIcon = document.getElementById('check-icon');
+  var originalText = label.textContent;
+
+  btn.classList.add('copied');
+  label.textContent = 'Copied!';
+  copyIcon.style.display = 'none';
+  checkIcon.style.display = '';
+
+  setTimeout(function() {
+    btn.classList.remove('copied');
+    label.textContent = originalText;
+    copyIcon.style.display = '';
+    checkIcon.style.display = 'none';
   }, 2000);
 }
 
@@ -2465,6 +2556,120 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
     }, { threshold: 0.3 });
     simObs.observe(simSection);
   }
+})();
+
+/* ── Scroll progress bar + nav hide-on-scroll ─────────────────────── */
+(function() {
+  var prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var nav = document.getElementById('siteNav');
+  var bar = document.getElementById('navProgress');
+  if (!nav || !bar) return;
+
+  var lastY = 0;
+  var ticking = false;
+
+  function update() {
+    var y = window.scrollY || window.pageYOffset;
+    var doc = document.documentElement;
+    var max = (doc.scrollHeight - doc.clientHeight) || 1;
+    var pct = Math.min(1, Math.max(0, y / max));
+
+    bar.style.width = (pct * 100) + '%';
+
+    if (y > 80) nav.classList.add('nav-scrolled');
+    else nav.classList.remove('nav-scrolled');
+
+    if (!prefersReduced) {
+      if (y > lastY && y > 240) nav.classList.add('nav-hidden');
+      else nav.classList.remove('nav-hidden');
+    }
+
+    lastY = y;
+    ticking = false;
+  }
+
+  window.addEventListener('scroll', function() {
+    if (!ticking) {
+      window.requestAnimationFrame(update);
+      ticking = true;
+    }
+  }, { passive: true });
+  update();
+})();
+
+/* ── Stats count-up (hero status bar) ─────────────────────────────── */
+(function() {
+  var prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var els = document.querySelectorAll('.status-val');
+  if (!els.length) return;
+
+  // easeOutQuart — matches the CSS --ease curve in feel
+  function easeOutQuart(t) { return 1 - Math.pow(1 - t, 4); }
+
+  function animate(el) {
+    var raw = el.textContent.trim();
+    var match = raw.match(/^([\d.]+)(.*)$/);
+    if (!match) return;                    // leaves "v0.20.1" etc. alone
+    var target = parseFloat(match[1]);
+    var suffix = match[2] || '';
+    if (isNaN(target) || target === 0) return;
+
+    // integer vs decimal (e.g. 95% vs 95.0%)
+    var isInt = Number.isInteger(target);
+    var duration = 1200;
+    var start = performance.now();
+
+    if (prefersReduced) {
+      el.textContent = (isInt ? target : target.toFixed(1)) + suffix;
+      return;
+    }
+
+    function tick(now) {
+      var t = Math.min(1, (now - start) / duration);
+      var v = easeOutQuart(t) * target;
+      el.textContent = (isInt ? Math.round(v) : v.toFixed(1)) + suffix;
+      if (t < 1) requestAnimationFrame(tick);
+      else el.textContent = (isInt ? target : target.toFixed(1)) + suffix;
+    }
+    // set starting value to avoid layout shift from empty frame
+    el.textContent = (isInt ? 0 : '0.0') + suffix;
+    requestAnimationFrame(tick);
+  }
+
+  var bar = document.querySelector('.status-bar');
+  if (!bar) { els.forEach(animate); return; }
+
+  var seen = false;
+  var io = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (e.isIntersecting && !seen) {
+        seen = true;
+        els.forEach(animate);
+        io.disconnect();
+      }
+    });
+  }, { threshold: 0.5 });
+  io.observe(bar);
+})();
+
+/* ── Console easter egg ───────────────────────────────────────────── */
+(function() {
+  if (!window.console || !console.log) return;
+  var title = 'selectools';
+  var sub   = 'AI agents that are just Python.';
+  var lines = [
+    '%c' + title + '%c  ' + sub,
+    '%cLike what you see under the hood?',
+    '%cWe build open tooling at NichevLabs — say hi: %csupport@nichevlabs.com',
+    '%cStar us on GitHub: %chttps://github.com/johnnichev/selectools'
+  ].join('\n');
+
+  var big    = 'font: 800 22px "Plus Jakarta Sans", system-ui; color: #22d3ee; letter-spacing: -0.02em;';
+  var tag    = 'font: 500 13px "JetBrains Mono", monospace; color: #94a3b8;';
+  var plain  = 'font: 400 13px -apple-system, sans-serif; color: #e2e8f0; line-height: 1.6;';
+  var accent = 'font: 600 13px -apple-system, sans-serif; color: #22d3ee;';
+
+  console.log(lines, big, tag, plain, plain, accent, plain, accent);
 })();
 </script>
 </body>

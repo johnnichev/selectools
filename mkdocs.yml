@@ -1,6 +1,6 @@
 site_name: Selectools
 site_description: Production-ready AI agents with tool calling, RAG, and hybrid search
-site_url: https://johnnichev.github.io/selectools
+site_url: https://selectools.dev
 repo_url: https://github.com/johnnichev/selectools
 repo_name: johnnichev/selectools
 edit_uri: edit/main/docs/

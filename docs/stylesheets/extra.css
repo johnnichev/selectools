@@ -46,6 +46,10 @@
 .md-typeset pre {
   border-radius: 8px;
   border: 1px solid rgba(255,255,255,0.06);
+  transition: border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.md-typeset pre:hover {
+  border-color: rgba(34, 211, 238, 0.25);
 }
 
 /* Admonition refinements */
@@ -53,6 +57,14 @@
   border-radius: 8px;
   border-width: 1px;
   border-left-width: 4px;
+  transition:
+    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+.md-typeset .admonition:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
 }
 
 /* Cards */
@@ -60,6 +72,16 @@
   border: 1px solid var(--md-default-fg-color--lightest);
   border-radius: 8px;
   padding: 1rem 1.2rem;
+  transition:
+    border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+.md-typeset .grid.cards > ul > li:hover {
+  border-color: var(--md-accent-fg-color);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+  transform: translateY(-2px);
 }
 
 /* Headings */
@@ -90,13 +112,18 @@
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-  transition: transform 0.15s, box-shadow 0.15s;
+  transition:
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .copy-md-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(0,0,0,0.4);
 }
-.copy-md-btn:active { transform: scale(0.97); }
+.copy-md-btn:active {
+  transform: translateY(1px);
+  transition-duration: 0.08s;
+}
 
 /* Stability badges in headings */
 .badge-stable {
@@ -122,4 +149,79 @@
   border: 1px solid rgba(245,158,11,0.3);
   vertical-align: middle;
   margin-left: 8px;
+}
+
+/* Link hover underline — subtle animated underline for body links */
+.md-typeset a:not(.md-button):not(.md-nav__link):not(.headerlink) {
+  position: relative;
+  transition: color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.md-typeset a:not(.md-button):not(.md-nav__link):not(.headerlink)::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.md-typeset a:not(.md-button):not(.md-nav__link):not(.headerlink):hover::after {
+  transform: scaleX(1);
+}
+
+/* Copy-code button hover state */
+.md-clipboard {
+  transition:
+    color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.md-clipboard:hover {
+  color: var(--md-accent-fg-color);
+  transform: scale(1.1);
+}
+.md-clipboard:active {
+  transform: scale(0.95);
+  transition-duration: 0.08s;
+}
+
+/* Nav link hover — subtle slide-in effect */
+.md-nav__link {
+  transition:
+    color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.md-nav__link:hover {
+  transform: translateX(2px);
+}
+
+/* Content fade-in on page load (respects instant-nav) */
+.md-content__inner {
+  animation: md-content-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes md-content-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Reduced motion (WCAG AA) — respect user preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .md-content__inner { animation: none; }
+  .md-typeset .grid.cards > ul > li:hover,
+  .md-typeset .admonition:hover {
+    transform: none;
+  }
+  .md-nav__link:hover { transform: none; }
+  .md-typeset a:not(.md-button):not(.md-nav__link):not(.headerlink)::after {
+    transform: scaleX(1);
+    opacity: 0.3;
+  }
 }

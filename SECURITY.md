@@ -42,4 +42,4 @@ Selectools includes multiple layers of security for AI agent deployments:
 - **Audit Logging** — JSONL trail with privacy controls (redact, hash, omit)
 - **Tool Policy Engine** — Declarative allow/review/deny rules with human-in-the-loop
 
-See the [Security documentation](https://johnnichev.github.io/selectools/modules/SECURITY/) for details.
+See the [Security documentation](https://selectools.dev/modules/SECURITY/) for details.

@@ -9,7 +9,7 @@ tags:
 
 The selectools builder is a drag-and-drop graph editor that runs entirely from `pip install selectools` — no separate server, no CDN, no build step.
 
-**Try it now** — no install required: [**Open the builder on GitHub Pages**](https://johnnichev.github.io/selectools/builder/)
+**Try it now** — no install required: [**Open the builder on GitHub Pages**](https://selectools.dev/builder/)
 
 Or run it locally:
 

@@ -297,8 +297,8 @@ A web-based UI for designing, testing, and exporting agent configurations. Zero-
 
 UI polish (20 features), `_static/` architecture split, Starlette ASGI app, serverless mode (client-side AI/runs), GitHub Pages deployment, design system.
 
-- Visual builder live at: https://johnnichev.github.io/selectools/builder/
-- Examples gallery: https://johnnichev.github.io/selectools/examples/
+- Visual builder live at: https://selectools.dev/builder/
+- Examples gallery: https://selectools.dev/examples/
 - 4,612 tests (95% coverage), 76 examples, 50 evaluators, 152 models
 
 | Feature                                      | Status | Impact | Effort |
