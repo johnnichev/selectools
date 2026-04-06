@@ -6,16 +6,26 @@
 <title>Agent Trace — 77dc04c183ef487b…</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { overflow-x: hidden; max-width: 100%; }
   body { background: #0f172a; color: #e2e8f0; font-family: 'JetBrains Mono', 'Fira Code', monospace;
           font-size: 13px; padding: 24px; }
   h1 { font-size: 16px; font-weight: 600; color: #f8fafc; margin-bottom: 4px; }
   .meta { color: #64748b; font-size: 12px; margin-bottom: 24px; }
   .stat { display: inline-block; margin-right: 24px; }
   .stat b { color: #e2e8f0; }
-  table { width: 100%; border-collapse: collapse; }
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { width: 100%; border-collapse: collapse; min-width: 100%; }
   tr:hover td { background: #1a2744; }
   td { padding: 7px 4px; border-bottom: 1px solid #1e293b; vertical-align: middle; }
   code { background: #1e293b; padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+  @media (max-width: 560px) {
+    body { padding: 14px; font-size: 11px; }
+    h1 { font-size: 14px; }
+    .meta { font-size: 10px; margin-bottom: 14px; }
+    .stat { display: block; margin: 2px 0; }
+    .table-wrap table { min-width: 380px; }
+    td { padding: 5px 3px; }
+  }
 </style>
 </head>
 <body>
@@ -27,6 +37,7 @@
   <span class="stat"><b>llm:</b> 340.0ms (93%)</span>
   <span class="stat"><b>tools:</b> 23.0ms (6%)</span>
 </div>
+<div class="table-wrap">
 <table>
   <thead>
     <tr>
@@ -155,6 +166,7 @@
       </tr>
   </tbody>
 </table>
+</div>
 <script>
 function toggleDetail(id) {
   var el = document.getElementById(id);
