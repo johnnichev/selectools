@@ -243,6 +243,18 @@
       box-shadow: 0 0 0 1px rgba(34,211,238,0.06), 0 12px 36px rgba(0,0,0,0.32);
       transform: translateY(-2px);
     }
+    /* Compact card layout on mobile and touch devices: smaller padding,
+       smaller icon, tighter typography. Reduces vertical real estate so
+       cards stop feeling like 1/3-screen blocks with awkward gaps between.
+       Also drops grid gap so adjacent cards visually group. */
+    @media (max-width: 768px), (pointer: coarse) {
+      .card { padding: 20px; }
+      .card-icon { width: 32px; height: 32px; margin-bottom: 12px; border-radius: 8px; }
+      .card-icon svg { width: 16px; height: 16px; }
+      .card h3 { font-size: 14px; margin-bottom: 6px; }
+      .card p { font-size: 13px; line-height: 1.55; }
+      .grid-2, .grid-3, .grid-4 { gap: 14px; }
+    }
     .card-icon {
       width: 40px; height: 40px;
       border-radius: 10px;
@@ -481,6 +493,19 @@
       .nav-burger { display: block; }
       .nav-drawer { display: block; }
     }
+    /* Touch-input override: catches Galaxy S23 + iOS Safari in "Desktop Site"
+       mode, where Chrome reports a viewport of ~1280px (wider than the
+       1024px breakpoint above). Pointer-coarse is true for any touch device
+       regardless of what the viewport pretends to be — this is the only
+       reliable signal that defeats the Desktop Site toggle. */
+    @media (pointer: coarse) {
+      .nav-burger { display: block; }
+      .nav-drawer { display: block; }
+      .nav-links.hide-mobile { display: none; }
+      .hero-grid { grid-template-columns: 1fr; }
+      .hero-flow { display: none; }
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    }
 
     /* ── Hero ──────────────────────────────────────────────────────── */
     .hero {
@@ -557,6 +582,46 @@
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
+    }
+    /* New: provider strip — replaces the templated pill grid */
+    .hero-providers {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .hero-providers-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      flex-shrink: 0;
+    }
+    .hero-providers-list {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
+      color: var(--text);
+      font-weight: 500;
+      flex-wrap: wrap;
+    }
+    .hero-providers-list .provider {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .hero-providers-list .provider::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--cyan);
+      opacity: 0.6;
+    }
+    @media (max-width: 480px) {
+      .hero-providers-list { gap: 10px; font-size: 13px; }
     }
 
     /* ── Hero Flow Animation ──────────────────────────────────────── */
@@ -776,11 +841,25 @@
       white-space: pre;
       /* iOS Safari momentum scroll inside code blocks */
       -webkit-overflow-scrolling: touch;
+      /* Right-edge gradient mask: signals "more content this way" when the
+         code is wider than the container. Same pattern as comparison tables.
+         The mask only renders the fade on the right side because code reads
+         left-to-right and we never need to suggest scrolling backward. */
+      mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+      -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+    }
+    /* Disable the mask when the code fits without scrolling — otherwise the
+       last 28px of every code block looks faded for no reason. We use
+       :hover/:focus-within as proxies for "user is engaging with this", and
+       drop the mask momentarily so the full content is visible. */
+    .code-body:hover, .code-body:focus-within {
+      mask-image: none;
+      -webkit-mask-image: none;
     }
     @media (max-width: 640px) {
       .code-body {
         padding: 16px;
-        font-size: 12px;
+        font-size: 11.5px;
         line-height: 1.6;
       }
     }
@@ -885,8 +964,18 @@
       border-collapse: collapse;
       font-size: 13px;
       /* Force a minimum width so columns stay readable; the parent .cmp-scroll
-         then handles horizontal scrolling. */
-      min-width: 640px;
+         then handles horizontal scrolling. 800px gives each column ~115px on
+         the 6-column builder table (the widest comparison) — enough room
+         for "macOS desktop app" and "No (desktop only)" to fit on 1-2 lines
+         instead of wrapping to 3-4 lines as reported on Galaxy S23. */
+      min-width: 800px;
+    }
+    /* Yes/No verdict cells should never wrap — they're 2-3 chars and wrapping
+       them looks broken. Only let the long descriptive cells wrap. */
+    .cmp-table .yes,
+    .cmp-table .no,
+    .cmp-table .mid {
+      white-space: nowrap;
     }
     .cmp-hint {
       display: none;
@@ -897,10 +986,10 @@
       margin-top: 8px;
       letter-spacing: 0.05em;
     }
-    @media (max-width: 768px) {
+    @media (max-width: 768px), (pointer: coarse) {
       .cmp-hint { display: block; }
-      .cmp-table { font-size: 12px; }
-      .cmp-table th, .cmp-table td { padding: 8px 12px; }
+      .cmp-table { font-size: 12.5px; }
+      .cmp-table th, .cmp-table td { padding: 10px 14px; }
     }
     .cmp-table th {
       text-align: left;
@@ -1077,9 +1166,32 @@
     @media (max-width: 900px) {
       .sim-container { grid-template-columns: 1fr; min-height: auto; }
       .sim-sidebar-left { display: flex; flex-wrap: wrap; gap: 8px; }
-      .sim-sidebar-left .sim-agents { display: flex; flex-direction: row; flex-wrap: wrap; gap: 6px; }
+      /* Grid: agents always fill the row evenly. 2-column layout handles
+         the common cases (2, 3, 4 agents) gracefully — odd counts get the
+         last item spanning both columns so nothing looks orphaned. */
+      .sim-sidebar-left .sim-agents {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px;
+        width: 100%;
+      }
+      .sim-sidebar-left .sim-agent-node:last-child:nth-child(odd) {
+        grid-column: 1 / -1;
+      }
       .sim-sidebar-right { display: flex; flex-wrap: wrap; gap: 8px; }
       .sim-sidebar-right .sim-stat-block { flex: 1; min-width: 100px; }
+    }
+    /* Same grid behavior for touch devices regardless of viewport */
+    @media (pointer: coarse) {
+      .sim-sidebar-left .sim-agents {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px;
+        width: 100%;
+      }
+      .sim-sidebar-left .sim-agent-node:last-child:nth-child(odd) {
+        grid-column: 1 / -1;
+      }
     }
 
     .sim-sidebar-left, .sim-sidebar-right { display: flex; flex-direction: column; gap: 10px; }
@@ -1342,15 +1454,14 @@
           <a href="builder/" class="btn btn-cyan" style="flex:1;justify-content:center">Try the Builder &rarr;</a>
           <a href="QUICKSTART/" class="btn btn-primary" style="flex:1;justify-content:center">Read the Docs</a>
         </div>
-        <div class="hero-pills">
-          <span class="pill pill-cyan">OpenAI</span>
-          <span class="pill pill-cyan">Anthropic</span>
-          <span class="pill pill-cyan">Gemini</span>
-          <span class="pill pill-cyan">Ollama</span>
-          <span class="pill">Multi-Agent Graphs</span>
-          <span class="pill">50 Evaluators</span>
-          <span class="pill">Composable Pipelines</span>
-          <span class="pill">Visual Builder</span>
+        <div class="hero-providers">
+          <span class="hero-providers-label">Works with</span>
+          <div class="hero-providers-list">
+            <span class="provider">OpenAI</span>
+            <span class="provider">Anthropic</span>
+            <span class="provider">Gemini</span>
+            <span class="provider">Ollama</span>
+          </div>
         </div>
       </div>
       <div class="hero-flow" id="heroFlow">
@@ -1443,11 +1554,14 @@
     <h2 class="mb-6">A Python framework for production AI agents.</h2>
     <div class="grid-2 gap-12" style="align-items:start">
       <div class="reveal">
-        <p style="color:var(--text-dim);font-size:16px;line-height:1.8;margin-bottom:20px">
-          Selectools is an open-source Python library that gives you everything you need to build, test, and deploy AI agents: multi-agent graphs, tool calling, RAG with hybrid search, 50 evaluators, guardrails, audit logging, and a visual builder. All in a single <code style="color:var(--cyan)">pip install</code>.
+        <p style="color:var(--text-dim);font-size:16px;line-height:1.7;margin-bottom:18px">
+          Open-source Python library for production AI agents. One <code style="color:var(--cyan)">pip install</code> gives you the full stack:
         </p>
-        <p style="color:var(--text-dim);font-size:16px;line-height:1.8">
-          Unlike LangChain, there&rsquo;s no expression language to learn, no separate packages to install, and no paid SaaS for traces or evals. Unlike CrewAI, you get full graph orchestration, not just role-based agents. Your code stays plain Python. Readable, debuggable, yours.
+        <p style="color:var(--text);font-size:14px;line-height:1.9;margin-bottom:22px;font-weight:500">
+          Multi-agent graphs &middot; Tool calling &middot; Hybrid RAG &middot; 50 evaluators &middot; Guardrails &middot; Audit logging &middot; Visual builder
+        </p>
+        <p style="color:var(--text-dim);font-size:15px;line-height:1.7">
+          No DSL. No separate packages. No paid SaaS. Your code stays plain Python &mdash; readable, debuggable, yours.
         </p>
       </div>
       <div class="reveal reveal-d1">
@@ -1793,15 +1907,13 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
 <!-- ─── Visual Builder ─────────────────────────────────────────────── -->
 <section class="section" id="builder">
   <div class="wrap">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:40px">
-      <div>
-        <span class="section-label">Visual Agent Builder</span>
-        <h2 class="mb-4">Design workflows in the browser.</h2>
-        <p class="section-desc">The only open-source agent builder that runs in the browser with zero installation. Drag nodes, connect agents, test with real APIs, export runnable Python. 49KB gzipped. No signup. No CDN. No Electron.</p>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;margin-top:4px">
+    <div style="margin-bottom:40px">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+        <span class="section-label" style="margin-bottom:0">Visual Agent Builder</span>
         <span class="builder-badge"><span class="dot"></span> Live &middot; no server required</span>
       </div>
+      <h2 class="mb-4">Design workflows in the browser.</h2>
+      <p class="section-desc">The only open-source agent builder that runs in the browser with zero installation. Drag nodes, connect agents, test with real APIs, export runnable Python. 49KB gzipped. No signup. No CDN. No Electron.</p>
     </div>
     <div class="reveal">
       <div class="builder-frame" data-builder-iframe>
@@ -1962,8 +2074,8 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
   <div class="wrap text-center">
     <span class="section-label">Get started</span>
     <h2 class="mb-6">Three paths. Pick yours.</h2>
-    <p class="section-desc center mb-14">No API key needed for the builder or examples. Add one when you&rsquo;re ready to go live.</p>
-    <div class="grid-3 gap-8">
+    <p class="section-desc center mb-14" style="margin-bottom:64px">No API key needed for the builder or examples. Add one when you&rsquo;re ready to go live.</p>
+    <div class="grid-3 gap-8" style="padding-top:8px">
       <div class="card card-cyan reveal" style="padding:28px;display:flex;flex-direction:column;align-items:center;text-align:center">
         <div class="card-icon" style="margin-bottom:14px"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
         <h3 style="margin-bottom:6px">Visual Builder</h3>
@@ -2851,9 +2963,15 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
   });
 })();
 
-/* ── Scroll progress bar + nav hide-on-scroll ─────────────────────── */
+/* ── Scroll progress bar (nav stays fixed, no hide-on-scroll) ─────── */
 (function() {
   var prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* Touch devices and reduced-motion users get a fully-fixed nav. The
+     hide-on-scroll-down behavior only runs on desktop (pointer: fine), where
+     the user has more vertical real estate and the auto-hide feels like a
+     thoughtful progressive enhancement rather than a disorienting glitch. */
+  var allowHide = !prefersReduced &&
+    window.matchMedia('(pointer: fine)').matches;
   var nav = document.getElementById('siteNav');
   var bar = document.getElementById('navProgress');
   if (!nav || !bar) return;
@@ -2872,7 +2990,7 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
     if (y > 80) nav.classList.add('nav-scrolled');
     else nav.classList.remove('nav-scrolled');
 
-    if (!prefersReduced) {
+    if (allowHide) {
       if (y > lastY && y > 240) nav.classList.add('nav-hidden');
       else nav.classList.remove('nav-hidden');
     }
