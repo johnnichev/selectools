@@ -165,11 +165,14 @@ extra_javascript:
   - javascripts/fix-logo-link.js
 
 extra:
+  # When the docs logo/title is clicked, send users to the Quickstart
+  # instead of the site root. The site root is the marketing landing page,
+  # and Material's instant-navigation cannot render it inside the docs
+  # shell, which previously caused a broken half-rendered state.
+  homepage: https://selectools.dev/QUICKSTART/
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/johnnichev/selectools
     - icon: fontawesome/brands/python
       link: https://pypi.org/project/selectools/
   generator: false
-  version:
-    provider: mike

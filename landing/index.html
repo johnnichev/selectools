@@ -163,6 +163,10 @@
       --ease: cubic-bezier(0.16, 1, 0.3, 1);
     }
 
+    html, body {
+      overflow-x: hidden;
+      max-width: 100%;
+    }
     html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
 
     body {
@@ -171,8 +175,11 @@
       font-family: var(--font-ui);
       font-size: 15px;
       line-height: 1.7;
-      overflow-x: hidden;
+      position: relative;
     }
+
+    /* Defensive: anything that might escape its container, clip it */
+    img, video, iframe, table, pre { max-width: 100%; }
 
     /* ── Typography ────────────────────────────────────────────────── */
     h1, h2, h3, h4 { font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; }
@@ -209,7 +216,7 @@
     .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
     .text-center { text-align: center; }
 
-    @media (max-width: 900px) {
+    @media (max-width: 1024px) {
       .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
       .hide-mobile { display: none; }
     }
@@ -389,6 +396,92 @@
       gap: 5px;
     }
 
+    /* ── Hamburger button (only visible on narrow viewports) ────────── */
+    .nav-burger {
+      display: none;
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      position: relative;
+      flex-shrink: 0;
+      transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
+    }
+    .nav-burger:hover { border-color: var(--cyan); }
+    .nav-burger span {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      height: 2px;
+      background: var(--text);
+      border-radius: 2px;
+      transition: transform 0.25s var(--ease), opacity 0.2s var(--ease), top 0.25s var(--ease);
+    }
+    .nav-burger span:nth-child(1) { top: 13px; }
+    .nav-burger span:nth-child(2) { top: 19px; }
+    .nav-burger span:nth-child(3) { top: 25px; }
+    .nav-burger[aria-expanded="true"] span:nth-child(1) {
+      top: 19px;
+      transform: rotate(45deg);
+    }
+    .nav-burger[aria-expanded="true"] span:nth-child(2) {
+      opacity: 0;
+    }
+    .nav-burger[aria-expanded="true"] span:nth-child(3) {
+      top: 19px;
+      transform: rotate(-45deg);
+    }
+
+    /* ── Mobile drawer panel ────────────────────────────────────────── */
+    .nav-drawer {
+      position: fixed;
+      top: 56px;
+      left: 0;
+      right: 0;
+      background: rgba(15,23,42,0.97);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 24px 28px;
+      transform: translateY(-110%);
+      transition: transform 0.3s var(--ease);
+      z-index: 99;
+      display: none;
+      max-height: calc(100vh - 56px);
+      overflow-y: auto;
+    }
+    .nav-drawer.open {
+      transform: translateY(0);
+    }
+    .nav-drawer a {
+      display: block;
+      padding: 14px 4px;
+      font-size: 16px;
+      color: var(--text);
+      border-bottom: 1px solid rgba(51,65,85,0.4);
+      transition: color 0.2s var(--ease), padding-left 0.2s var(--ease);
+    }
+    .nav-drawer a:last-child { border-bottom: none; }
+    .nav-drawer a:hover, .nav-drawer a:focus-visible {
+      color: var(--cyan);
+      padding-left: 8px;
+    }
+    .nav-drawer .gh-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      color: var(--cyan);
+    }
+
+    @media (max-width: 1024px) {
+      .nav-burger { display: block; }
+      .nav-drawer { display: block; }
+    }
+
     /* ── Hero ──────────────────────────────────────────────────────── */
     .hero {
       padding: 140px 0 100px;
@@ -422,7 +515,7 @@
       gap: 48px;
       align-items: center;
     }
-    @media (max-width: 900px) {
+    @media (max-width: 1024px) {
       .hero-grid { grid-template-columns: 1fr; }
       .hero-flow { display: none; }
     }
@@ -447,6 +540,18 @@
       gap: 12px;
       align-items: center;
       margin-bottom: 40px;
+    }
+    @media (max-width: 640px) {
+      .hero-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      /* Override the inline `flex: 1` on each button so they get full width */
+      .hero-actions .btn {
+        flex: 1 1 auto !important;
+        width: 100%;
+        justify-content: center;
+      }
     }
     .hero-pills {
       display: flex;
@@ -641,6 +746,12 @@
       border: 1px solid var(--border);
       border-radius: 12px;
       overflow: hidden;
+      /* Critical: in flex/grid contexts, default min-width: auto resolves to
+         max-content, which lets long code lines force the parent wider than
+         the viewport. Setting min-width: 0 lets the container shrink, and
+         the inner .code-body's overflow-x: auto handles scrolling. */
+      min-width: 0;
+      max-width: 100%;
     }
     .code-bar {
       display: flex;
@@ -663,7 +774,18 @@
       line-height: 1.7;
       overflow-x: auto;
       white-space: pre;
+      /* iOS Safari momentum scroll inside code blocks */
+      -webkit-overflow-scrolling: touch;
     }
+    @media (max-width: 640px) {
+      .code-body {
+        padding: 16px;
+        font-size: 12px;
+        line-height: 1.6;
+      }
+    }
+    /* Children of grid/flex layouts need the same min-width: 0 escape */
+    .grid-2 > *, .grid-3 > *, .grid-4 > * { min-width: 0; }
     .code-body .kw { color: #c084fc; }
     .code-body .fn { color: #fbbf24; }
     .code-body .str { color: #86efac; }
@@ -691,6 +813,50 @@
       border: none;
       display: block;
     }
+
+    /* Eval/trace preview iframes — responsive height on mobile */
+    @media (max-width: 768px) {
+      .builder-frame iframe[src$="-preview.html"] {
+        height: 320px !important;
+      }
+    }
+
+    /* Mobile fallback for the desktop-only drag-drop builder iframe */
+    .builder-mobile-fallback {
+      display: none;
+      padding: 40px 24px;
+      text-align: center;
+      background: var(--surface);
+      background-image: var(--grain);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .builder-mobile-fallback .label {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--cyan);
+      margin-bottom: 14px;
+    }
+    .builder-mobile-fallback h3 {
+      font-size: 20px;
+      color: #fff;
+      margin-bottom: 12px;
+      letter-spacing: -0.01em;
+    }
+    .builder-mobile-fallback p {
+      color: var(--text-dim);
+      font-size: 14px;
+      line-height: 1.6;
+      max-width: 360px;
+      margin: 0 auto 20px;
+    }
+    @media (max-width: 768px) {
+      .builder-frame[data-builder-iframe] { display: none; }
+      .builder-mobile-fallback { display: block; }
+    }
     .builder-badge {
       display: inline-flex;
       align-items: center;
@@ -706,10 +872,35 @@
     .builder-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
 
     /* ── Comparison Table ──────────────────────────────────────────── */
+    .cmp-scroll {
+      position: relative;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      /* Edge gradient masks tell users there's more content to scroll to */
+      mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+      -webkit-mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+    }
     .cmp-table {
       width: 100%;
       border-collapse: collapse;
       font-size: 13px;
+      /* Force a minimum width so columns stay readable; the parent .cmp-scroll
+         then handles horizontal scrolling. */
+      min-width: 640px;
+    }
+    .cmp-hint {
+      display: none;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      text-align: center;
+      margin-top: 8px;
+      letter-spacing: 0.05em;
+    }
+    @media (max-width: 768px) {
+      .cmp-hint { display: block; }
+      .cmp-table { font-size: 12px; }
+      .cmp-table th, .cmp-table td { padding: 8px 12px; }
     }
     .cmp-table th {
       text-align: left;
@@ -805,7 +996,7 @@
     }
 
     .footer {
-      padding: 40px 0;
+      padding: 40px 0 56px;
       border-top: 1px solid var(--border);
       font-size: 13px;
       color: var(--text-faint);
@@ -819,6 +1010,28 @@
     }
     .footer-links { display: flex; gap: 24px; }
     .footer-links a:hover { color: var(--text); }
+    @media (max-width: 640px) {
+      .footer { padding: 32px 0 48px; }
+      .footer .wrap {
+        flex-direction: column;
+        gap: 20px;
+        text-align: center;
+      }
+      .footer-attribution {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        line-height: 1.5;
+      }
+      .footer-attribution .footer-meta {
+        font-size: 11px;
+        margin-left: 0 !important;
+      }
+      .footer-links {
+        gap: 18px;
+        font-size: 12px;
+      }
+    }
 
     /* ── Utility ───────────────────────────────────────────────────── */
     .mb-4 { margin-bottom: 16px; }
@@ -1043,6 +1256,19 @@
     /* ── Stats count-up: prevent layout shift ──────────────────────── */
     .status-val { font-variant-numeric: tabular-nums; display: inline-block; }
 
+    /* ── Touch-device hover guard ──────────────────────────────────── */
+    /* On touch devices, transform-based hover states ("sticky hover") persist
+       visibly after a tap until the user taps somewhere else. This neutralizes
+       only the transform/shadow side of hover — color changes are kept because
+       they're harmless during the brief tap-state animation. */
+    @media (hover: none) {
+      .btn:hover, .btn:active { transform: none !important; box-shadow: none !important; }
+      .card:hover { transform: none !important; }
+      .nav-logo:hover, .nav-logo:active { transform: none !important; }
+      .sim-tab:hover { transform: none !important; }
+      .nav-burger:hover { background: transparent !important; }
+    }
+
     /* ── Reduced motion (WCAG AA) ──────────────────────────────────── */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
@@ -1076,8 +1302,25 @@
         GitHub
       </a>
     </div>
+    <button class="nav-burger" id="navBurger" aria-label="Open navigation menu" aria-expanded="false" aria-controls="navDrawer">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
   </div>
   <div class="nav-progress" id="navProgress" aria-hidden="true"></div>
+  <div class="nav-drawer" id="navDrawer" aria-hidden="true">
+    <a href="#builder">Builder</a>
+    <a href="#simulations">Simulations</a>
+    <a href="#features">Features</a>
+    <a href="#compare">Compare</a>
+    <a href="#get-started">Get Started</a>
+    <a href="QUICKSTART/">Docs</a>
+    <a href="https://github.com/johnnichev/selectools" class="gh-link">
+      <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+      GitHub
+    </a>
+  </div>
 </nav>
 
 <!-- ─── Hero ───────────────────────────────────────────────────────── -->
@@ -1561,8 +1804,14 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
       </div>
     </div>
     <div class="reveal">
-      <div class="builder-frame">
+      <div class="builder-frame" data-builder-iframe>
         <iframe src="builder/" loading="lazy" title="Selectools Visual Agent Builder" sandbox="allow-scripts allow-same-origin"></iframe>
+      </div>
+      <div class="builder-mobile-fallback">
+        <span class="label">Best on desktop</span>
+        <h3>The visual builder needs more room.</h3>
+        <p>The drag-and-drop canvas is designed for screens 768px and wider. Open it in a new tab to try it on a desktop, or come back from a laptop.</p>
+        <a href="builder/" class="btn btn-cyan">Open builder &rarr;</a>
       </div>
     </div>
     <div class="grid-4 gap-8" style="margin-top:32px">
@@ -1592,7 +1841,8 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
       <a href="#simulations" class="btn btn-ghost">Live Simulations</a>
       <a href="examples/" class="btn btn-ghost">88 Examples</a>
     </div>
-    <div class="code-frame reveal" style="overflow-x:auto;margin-top:32px">
+    <div class="code-frame reveal" style="margin-top:32px;padding:0">
+      <div class="cmp-scroll">
       <table class="cmp-table">
         <thead>
           <tr><th class="cap">Feature</th><th>selectools</th><th>LangGraph Studio</th><th>n8n</th><th>Flowise</th><th>Dify</th><th>Rivet</th></tr>
@@ -1611,6 +1861,8 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
           <tr><td class="cap">Built-in evals</td><td class="yes">50 evaluators</td><td class="mid">LangSmith (paid)</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
         </tbody>
       </table>
+      </div>
+      <p class="cmp-hint">scroll &rarr; for full comparison</p>
     </div>
   </div>
 </section>
@@ -1624,7 +1876,8 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
       <p class="section-desc center">LangChain has the ecosystem. We have everything it charges extra for (traces, evals, guardrails, builder) included and free.</p>
     </div>
     <div class="reveal">
-      <div class="code-frame" style="overflow-x:auto">
+      <div class="code-frame" style="padding:0">
+        <div class="cmp-scroll">
         <table class="cmp-table">
           <thead>
             <tr><th class="cap">Capability</th><th>Selectools</th><th>LangChain</th><th>CrewAI</th></tr>
@@ -1647,7 +1900,9 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
             <tr><td class="cap">Community</td><td class="mid">Growing</td><td class="yes">Massive</td><td class="yes">Large</td></tr>
           </tbody>
         </table>
+        </div>
       </div>
+      <p class="cmp-hint">scroll &rarr; for full comparison</p>
     </div>
 
     <div class="grid-4 gap-8 mt-16">
@@ -1840,9 +2095,9 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
 <!-- ─── Footer ─────────────────────────────────────────────────────── -->
 <footer class="footer">
   <div class="wrap">
-    <div>
-      An open-source project from <a href="https://nichevlabs.com" style="color:var(--cyan)">NichevLabs</a>.
-      <span style="margin-left:8px;color:var(--text-faint)">Apache-2.0 &middot; Python 3.9+ &middot; v0.20.1</span>
+    <div class="footer-attribution">
+      <span>An open-source project from <a href="https://nichevlabs.com" style="color:var(--cyan)">NichevLabs</a>.</span>
+      <span class="footer-meta" style="margin-left:8px;color:var(--text-faint)">Apache-2.0 &middot; Python 3.9+ &middot; v0.20.1</span>
     </div>
     <div class="footer-links">
       <a href="https://github.com/johnnichev/selectools">GitHub</a>
@@ -2556,6 +2811,44 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
     }, { threshold: 0.3 });
     simObs.observe(simSection);
   }
+})();
+
+/* ── Hamburger nav drawer ─────────────────────────────────────────── */
+(function() {
+  var burger = document.getElementById('navBurger');
+  var drawer = document.getElementById('navDrawer');
+  if (!burger || !drawer) return;
+
+  function setOpen(open) {
+    burger.setAttribute('aria-expanded', open ? 'true' : 'false');
+    drawer.setAttribute('aria-hidden', open ? 'false' : 'true');
+    drawer.classList.toggle('open', open);
+    document.body.style.overflow = open ? 'hidden' : '';
+  }
+
+  burger.addEventListener('click', function() {
+    var isOpen = burger.getAttribute('aria-expanded') === 'true';
+    setOpen(!isOpen);
+  });
+
+  // Close on link click (so internal anchors work and the drawer dismisses)
+  drawer.querySelectorAll('a').forEach(function(link) {
+    link.addEventListener('click', function() { setOpen(false); });
+  });
+
+  // Close on Escape
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && burger.getAttribute('aria-expanded') === 'true') {
+      setOpen(false);
+      burger.focus();
+    }
+  });
+
+  // Close on resize back to desktop
+  var mq = window.matchMedia('(min-width: 1025px)');
+  mq.addEventListener('change', function(e) {
+    if (e.matches) setOpen(false);
+  });
 })();
 
 /* ── Scroll progress bar + nav hide-on-scroll ─────────────────────── */
