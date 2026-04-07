@@ -5,9 +5,15 @@ hide:
 title: Selectools Documentation
 ---
 
+```
+┌─┐┌─┐┬  ┌─┐┌─┐┌┬┐┌─┐┌─┐┬  ┌─┐
+└─┐├┤ │  ├┤ │   │ │ ││ ││  └─┐
+└─┘└─┘┴─┘└─┘└─┘ ┴ └─┘└─┘┴─┘└─┘
+```
+
 # Welcome to Selectools
 
-**Production-ready AI agents in plain Python.** Multi-agent graphs, tool calling, RAG, 50 evaluators, and a drag-drop visual builder — all in one `pip install`. No DSL. No SaaS. No vendor lock-in.
+**Production-ready AI agents in plain Python.** Multi-agent graphs, tool calling, RAG, 50 evaluators, and a drag-drop visual builder. All in one `pip install`. No DSL. No SaaS. No vendor lock-in.
 
 ```bash
 pip install selectools

@@ -1,4 +1,8 @@
-# Selectools
+```
+┌─┐┌─┐┬  ┌─┐┌─┐┌┬┐┌─┐┌─┐┬  ┌─┐
+└─┐├┤ │  ├┤ │   │ │ ││ ││  └─┐
+└─┘└─┘┴─┘└─┘└─┘ ┴ └─┘└─┘┴─┘└─┘
+```
 
 [![PyPI](https://img.shields.io/pypi/v/selectools?color=06b6d4&label=pypi)](https://pypi.org/project/selectools/)
 [![Downloads](https://static.pepy.tech/badge/selectools/month)](https://pepy.tech/projects/selectools)
