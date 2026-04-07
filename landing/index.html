@@ -6,6 +6,23 @@
   <title>Selectools — Production-Ready AI Agents in Plain Python</title>
   <meta name="description" content="Selectools is a Python library for building production-ready AI agents with tool calling, RAG, and multi-agent orchestration. 152 models, 50 evaluators, visual builder. Supports OpenAI, Anthropic, Gemini, Ollama. Free and open source." />
   <link rel="canonical" href="https://selectools.dev/" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <script>
+    /* OVERDRIVE FUSED — wordmark variant: read ?logo=1|2|3, persist
+       to localStorage, set body[data-logo] BEFORE paint to avoid FOUC */
+    (function() {
+      try {
+        var p = new URLSearchParams(window.location.search).get('logo');
+        var stored = localStorage.getItem('sel-logo');
+        var logo = (p === '1' || p === '2' || p === '3') ? p : (stored || '1');
+        if (p) localStorage.setItem('sel-logo', logo);
+        document.documentElement.setAttribute('data-logo', logo);
+        document.addEventListener('DOMContentLoaded', function() {
+          document.body.setAttribute('data-logo', logo);
+        });
+      } catch (e) { document.documentElement.setAttribute('data-logo', '1'); }
+    })();
+  </script>
   <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
   <meta name="keywords" content="python ai agent, tool calling, rag, hybrid search, openai, anthropic, gemini, ollama, ai agent framework, llm tools, python llm, multi-agent, agent graph, langchain alternative" />
   <meta name="author" content="NichevLabs" />
@@ -161,6 +178,20 @@
       --grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.018'/%3E%3C/svg%3E");
       --max-w: 1120px;
       --ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+      /* OVERDRIVE FUSED — execution-pointer system
+         Shared design tokens for all six redesigned sections.
+         The execution pointer is a conceptual entity (a cyan pulse that
+         represents where the program is executing) implemented as
+         section-local animations sharing these tokens. */
+      --exec-color: #22d3ee;            /* same as --cyan, aliased for intent */
+      --exec-glow: rgba(34, 211, 238, 0.55);
+      --exec-glow-soft: rgba(34, 211, 238, 0.18);
+      --exec-pulse-dur: 1.6s;           /* default pulse loop */
+      --exec-step-dur: 0.55s;           /* node-to-node travel */
+      --exec-ease-step: cubic-bezier(0.4, 0, 0.2, 1);
+      --exec-ease-soft: cubic-bezier(0.16, 1, 0.3, 1);
+      --exec-blink-dur: 1.05s;          /* terminal caret cadence */
     }
 
     html, body {
@@ -219,6 +250,10 @@
     @media (max-width: 1024px) {
       .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
       .hide-mobile { display: none; }
+      /* The .nav-links { display: flex } rule comes later in the source than
+         .hide-mobile, so without the higher-specificity .nav-links.hide-mobile
+         override here, the nav links would still show on tablet/mobile. */
+      .nav-links.hide-mobile { display: none; }
     }
     @media (max-width: 640px) {
       .section { padding: 64px 0; }
@@ -1793,13 +1828,29 @@
         grid-auto-rows: auto;
         gap: 12px;
       }
-      .bento__cell, .bento__cell--hero, .bento__cell--wide, .bento__cell--full {
-        grid-column: span 1;
-        grid-row: span 1;
+      /* !important is required to override the inline grid-row/grid-column
+         placements on the wide cells (lines ~4481, ~4489 in markup). Without
+         this, the pinned cells try to occupy invalid grid positions in the
+         1-column mobile layout and either overflow or render at 0 width. */
+      .bento__cell,
+      .bento__cell--hero,
+      .bento__cell--wide,
+      .bento__cell--full {
+        grid-column: 1 / -1 !important;
+        grid-row: auto !important;
         min-height: 0;
       }
       .bento__cell--hero .bento__title { font-size: 22px; }
       .bento__cell--hero .bento__metric-num { font-size: 44px; }
+    }
+    /* Same fix for the intermediate 1100px breakpoint — the inline styles
+       there pin to columns 4-7, which is fine in a 6-col grid but invalid
+       in the 4-col grid. Reset them so the auto-flow takes over. */
+    @media (max-width: 1100px) and (min-width: 701px) {
+      .bento__cell--wide[style] {
+        grid-column: span 4 !important;
+        grid-row: auto !important;
+      }
     }
 
     /* ════════════════════════════════════════════════════════════════
@@ -2340,6 +2391,1430 @@
       100% { box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.18); }
     }
 
+    /* ════════════════════════════════════════════════════════════════
+       OVERDRIVE FUSED — execution-pointer system (shared atoms)
+       Reusable building blocks for all six redesigned sections.
+       Each section composes these atoms to create its hero moment;
+       the visual cohesion comes from sharing color, easing, and timing.
+       Consumers: #what, #see-difference, #production, #enterprise,
+                  #eval, #faq, footer, wordmarks.
+       ════════════════════════════════════════════════════════════════ */
+
+    /* The pulse — a cyan dot that represents the live execution pointer.
+       Used standalone as a status indicator and inside section animations. */
+    .exec-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--exec-color);
+      box-shadow: 0 0 0 0 var(--exec-glow);
+      animation: exec-pulse var(--exec-pulse-dur) var(--exec-ease-soft) infinite;
+      vertical-align: middle;
+    }
+    .exec-dot--lg { width: 10px; height: 10px; }
+    .exec-dot--sm { width: 6px; height: 6px; }
+
+    @keyframes exec-pulse {
+      0%   { box-shadow: 0 0 0 0 var(--exec-glow); }
+      60%  { box-shadow: 0 0 0 8px rgba(34, 211, 238, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+    }
+
+    /* The caret — a blinking block-cursor used in terminals and the wordmark. */
+    .exec-caret {
+      display: inline-block;
+      width: 0.55em;
+      height: 1.1em;
+      vertical-align: text-bottom;
+      background: var(--exec-color);
+      box-shadow: 0 0 6px var(--exec-glow);
+      animation: exec-blink var(--exec-blink-dur) steps(2, jump-none) infinite;
+      margin-left: 2px;
+    }
+    .exec-caret--thin { width: 2px; box-shadow: 0 0 4px var(--exec-glow-soft); }
+
+    @keyframes exec-blink {
+      0%, 49%   { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+
+    /* The scan line — a horizontal cyan beam that sweeps once across an element.
+       Used by the wordmark banner and Section 1 terminal on viewport entry.
+       Apply to a positioned parent: the ::after acts as the beam. */
+    .exec-scan { position: relative; overflow: hidden; }
+    .exec-scan.in-view::after {
+      content: "";
+      position: absolute;
+      top: 0; left: -25%;
+      width: 25%;
+      height: 100%;
+      background: linear-gradient(
+        90deg,
+        rgba(34, 211, 238, 0) 0%,
+        rgba(34, 211, 238, 0.18) 40%,
+        rgba(34, 211, 238, 0.55) 50%,
+        rgba(34, 211, 238, 0.18) 60%,
+        rgba(34, 211, 238, 0) 100%
+      );
+      pointer-events: none;
+      animation: exec-scan-sweep 1.4s var(--exec-ease-step) 0.2s 1 forwards;
+    }
+    @keyframes exec-scan-sweep {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(520%); }
+    }
+
+    /* The stamp — a one-shot scale + cyan ring used when the pointer "stamps"
+       an exhibit (Section 4 compliance shelf, Section 1 capability rail). */
+    @keyframes exec-stamp {
+      0%   { transform: scale(0.92); box-shadow: 0 0 0 0 var(--exec-glow); }
+      40%  { transform: scale(1.02); box-shadow: 0 0 0 6px var(--exec-glow-soft); }
+      100% { transform: scale(1);    box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.18); }
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       OVERDRIVE FUSED — #what — terminal + capability rail
+       Single full-width terminal panel that types out a script while
+       a vertical rail of capability chips lights up in sync with each
+       trigger line. The pointer (caret) lives at the end of the script.
+       ════════════════════════════════════════════════════════════════ */
+    .what-stage {
+      display: grid;
+      grid-template-columns: 1.55fr 1fr;
+      gap: 36px;
+      align-items: stretch;
+      margin-top: 28px;
+    }
+    .what-term {
+      position: relative;
+      background: #0b1220;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 20px 60px -28px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(34, 211, 238, 0.05);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .what-term__bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.7);
+    }
+    .what-term__dot {
+      width: 11px; height: 11px; border-radius: 999px;
+    }
+    .what-term__dot--r { background: rgba(239, 68, 68, 0.85); }
+    .what-term__dot--y { background: rgba(250, 204, 21, 0.85); }
+    .what-term__dot--g { background: rgba(34, 197, 94, 0.85); }
+    .what-term__name {
+      margin-left: 8px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-faint);
+    }
+    .what-term__shell {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+      letter-spacing: 0.08em;
+    }
+    .what-term__body {
+      padding: 22px 22px 26px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.75;
+      color: var(--text);
+      flex: 1;
+      min-height: 380px;
+    }
+    .what-term__line {
+      display: block;
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 0.35s var(--exec-ease-soft), transform 0.35s var(--exec-ease-soft);
+      white-space: pre;
+    }
+    .what-term__line.is-blank { height: 0.95em; }
+    .what-term.in-view .what-term__line { opacity: 1; transform: translateY(0); }
+    .what-term.in-view .what-term__line:nth-child(1)  { transition-delay: 0.10s; }
+    .what-term.in-view .what-term__line:nth-child(2)  { transition-delay: 0.32s; }
+    .what-term.in-view .what-term__line:nth-child(3)  { transition-delay: 0.54s; }
+    .what-term.in-view .what-term__line:nth-child(4)  { transition-delay: 0.76s; }
+    .what-term.in-view .what-term__line:nth-child(5)  { transition-delay: 0.98s; }
+    .what-term.in-view .what-term__line:nth-child(6)  { transition-delay: 1.20s; }
+    .what-term.in-view .what-term__line:nth-child(7)  { transition-delay: 1.42s; }
+    .what-term.in-view .what-term__line:nth-child(8)  { transition-delay: 1.64s; }
+    .what-term.in-view .what-term__line:nth-child(9)  { transition-delay: 1.86s; }
+    .what-term.in-view .what-term__line:nth-child(10) { transition-delay: 2.05s; }
+    .what-term.in-view .what-term__line:nth-child(11) { transition-delay: 2.24s; }
+    .what-term.in-view .what-term__line:nth-child(12) { transition-delay: 2.43s; }
+    .what-term.in-view .what-term__line:nth-child(13) { transition-delay: 2.62s; }
+    .what-term.in-view .what-term__line:nth-child(14) { transition-delay: 2.81s; }
+    .what-term.in-view .what-term__line:nth-child(15) { transition-delay: 3.00s; }
+    .what-term__line .kw  { color: #c084fc; }
+    .what-term__line .cls { color: var(--cyan); }
+    .what-term__line .fn  { color: #fbbf24; }
+    .what-term__line .str { color: #86efac; }
+    .what-term__line .cmt { color: var(--text-faint); font-style: italic; }
+    .what-term__caret {
+      display: inline-block;
+      width: 0.55em;
+      height: 1em;
+      vertical-align: text-bottom;
+      background: var(--exec-color);
+      box-shadow: 0 0 8px var(--exec-glow);
+      opacity: 0;
+      margin-left: 2px;
+    }
+    .what-term.in-view .what-term__caret {
+      opacity: 1;
+      animation: exec-blink var(--exec-blink-dur) steps(2, jump-none) 3.4s infinite;
+    }
+
+    .what-rail {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 4px 0;
+    }
+    .what-rail__title {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin: 0 0 8px 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .what-chip {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.45);
+      font-family: var(--font-ui);
+      font-size: 13.5px;
+      color: var(--text-dim);
+      transition:
+        border-color 0.5s var(--exec-ease-soft),
+        background 0.5s var(--exec-ease-soft),
+        color 0.5s var(--exec-ease-soft),
+        transform 0.5s var(--exec-ease-soft);
+    }
+    .what-chip__bullet {
+      width: 8px; height: 8px; border-radius: 999px;
+      background: var(--border);
+      box-shadow: 0 0 0 0 rgba(34, 211, 238, 0);
+      transition: background 0.4s var(--exec-ease-soft), box-shadow 0.4s var(--exec-ease-soft);
+      flex: 0 0 auto;
+    }
+    .what-chip__name { flex: 1; }
+    .what-chip__hint {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--text-faint);
+      letter-spacing: 0.04em;
+    }
+    .what-term.in-view ~ .what-rail .what-chip { /* fallback if rail comes after */ }
+    .what-stage.in-view .what-chip {
+      transition-delay: var(--chip-delay, 0s);
+    }
+    .what-stage.in-view .what-chip.is-lit {
+      border-color: rgba(34, 211, 238, 0.45);
+      background: rgba(34, 211, 238, 0.06);
+      color: var(--text);
+    }
+    .what-stage.in-view .what-chip.is-lit .what-chip__bullet {
+      background: var(--exec-color);
+      box-shadow: 0 0 0 4px var(--exec-glow-soft), 0 0 12px var(--exec-glow);
+    }
+    .what-stage.in-view .what-chip.is-lit .what-chip__hint {
+      color: var(--cyan);
+      opacity: 0.85;
+    }
+
+    @media (max-width: 880px) {
+      .what-stage { grid-template-columns: 1fr; gap: 22px; }
+      .what-term__body { min-height: 340px; padding: 18px 16px 20px; font-size: 12px; }
+      .what-rail { gap: 8px; }
+      .what-chip { padding: 10px 12px; font-size: 13px; }
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       OVERDRIVE FUSED — #eval — live test report + 50-evaluator marquee
+       Code on the left stays. Right side is a hardcoded mock test
+       report that fills in metric-by-metric on viewport entry. Below
+       both: a 2-row marquee of all 50 evaluator names scrolling in
+       opposite directions (too many to count, which is the point).
+       ════════════════════════════════════════════════════════════════ */
+    .eval-stage {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 28px;
+      align-items: stretch;
+      margin-top: 28px;
+    }
+    .eval-report {
+      background: #0b1220;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 20px 60px -28px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(34, 211, 238, 0.05);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .eval-report__bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.7);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+    }
+    .eval-report__bar .exec-dot { background: #f59e0b; box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.45); animation: eval-spinner 1.2s linear infinite; }
+    .eval-report.is-done .eval-report__bar .exec-dot { background: var(--green); box-shadow: 0 0 8px rgba(34, 197, 94, 0.6); animation: none; }
+    @keyframes eval-spinner {
+      0%, 100% { transform: scale(0.9); opacity: 0.6; }
+      50%      { transform: scale(1.1); opacity: 1; }
+    }
+    .eval-report__title {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text);
+      letter-spacing: 0.02em;
+    }
+    .eval-report__status {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: rgba(245, 158, 11, 0.12);
+      color: #f59e0b;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      transition: background 0.4s var(--exec-ease-soft), color 0.4s var(--exec-ease-soft), border-color 0.4s var(--exec-ease-soft);
+    }
+    .eval-report.is-done .eval-report__status {
+      background: rgba(34, 197, 94, 0.12);
+      color: var(--green);
+      border-color: rgba(34, 197, 94, 0.4);
+    }
+    .eval-report__body {
+      padding: 24px 22px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      flex: 1;
+    }
+    .eval-metric { display: flex; flex-direction: column; gap: 7px; }
+    .eval-metric__row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+    }
+    .eval-metric__label { color: var(--text-faint); text-transform: uppercase; }
+    .eval-metric__value {
+      color: var(--cyan);
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 0;
+      font-variant-numeric: tabular-nums;
+    }
+    .eval-metric__bar {
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(34, 211, 238, 0.08);
+      overflow: hidden;
+      position: relative;
+    }
+    .eval-metric__bar::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      width: 0%;
+      background: linear-gradient(90deg, var(--cyan), #67e8f9);
+      box-shadow: 0 0 12px var(--exec-glow);
+      transition: width 1.4s var(--exec-ease-soft);
+    }
+    .eval-report.is-running .eval-metric.is-acc .eval-metric__bar::after { width: 100%; transition-delay: 0.2s; }
+    .eval-report.is-running .eval-metric.is-lat .eval-metric__bar::after { width: 86%;  transition-delay: 0.55s; background: linear-gradient(90deg, #fbbf24, #fde68a); box-shadow: 0 0 12px rgba(251, 191, 36, 0.45); }
+    .eval-report.is-running .eval-metric.is-cost .eval-metric__bar::after { width: 12%; transition-delay: 0.9s; background: linear-gradient(90deg, var(--green), #86efac); box-shadow: 0 0 12px rgba(34, 197, 94, 0.45); }
+    .eval-metric .eval-metric__value { opacity: 0; transform: translateY(2px); transition: opacity 0.5s var(--exec-ease-soft), transform 0.5s var(--exec-ease-soft); }
+    .eval-report.is-running .eval-metric.is-acc  .eval-metric__value { opacity: 1; transform: none; transition-delay: 1.5s; }
+    .eval-report.is-running .eval-metric.is-lat  .eval-metric__value { opacity: 1; transform: none; transition-delay: 1.85s; }
+    .eval-report.is-running .eval-metric.is-cost .eval-metric__value { opacity: 1; transform: none; transition-delay: 2.2s; }
+
+    .eval-report__footer {
+      padding: 14px 22px 18px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+    }
+    .eval-report__footer code { color: var(--cyan); font-size: 11px; }
+
+    /* The marquee — full-bleed under the stage */
+    .eval-marquee {
+      margin-top: 28px;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.4);
+      padding: 16px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+      -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+      overflow: hidden;
+    }
+    .eval-marquee__label {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%) translateY(-26px);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      background: var(--bg);
+      padding: 0 10px;
+    }
+    .eval-marquee__row {
+      display: flex;
+      gap: 10px;
+      width: max-content;
+      animation: eval-marquee-l 32s linear infinite;
+    }
+    .eval-marquee__row--rev {
+      animation: eval-marquee-r 38s linear infinite;
+    }
+    @keyframes eval-marquee-l {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    @keyframes eval-marquee-r {
+      0%   { transform: translateX(-50%); }
+      100% { transform: translateX(0); }
+    }
+    .eval-tag {
+      flex: 0 0 auto;
+      padding: 7px 13px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-dim);
+      background: rgba(15, 23, 42, 0.6);
+      letter-spacing: 0.02em;
+    }
+    .eval-tag--det { color: var(--cyan); border-color: rgba(34, 211, 238, 0.3); }
+    .eval-tag--judge { color: #93c5fd; border-color: rgba(147, 197, 253, 0.3); }
+
+    @media (max-width: 880px) {
+      .eval-stage { grid-template-columns: 1fr; gap: 22px; }
+      .eval-report__body { padding: 18px 16px 18px; gap: 16px; }
+      .eval-metric__value { font-size: 16px; }
+      .eval-marquee { padding: 12px 0; }
+      .eval-tag { font-size: 10px; padding: 6px 10px; }
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       OVERDRIVE FUSED — #production — interactive trace explorer
+       Code on the left stays. Right side is a clickable agent loop:
+       4 nodes (llm_call → tool_selection → tool_execution → llm_call)
+       above a single result panel that swaps content based on the
+       active node. Auto-plays once on viewport entry, then idles.
+       ════════════════════════════════════════════════════════════════ */
+    .prod-stage {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr;
+      gap: 28px;
+      align-items: stretch;
+      margin-top: 28px;
+    }
+    .prod-trace {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      padding: 4px 0;
+    }
+    .prod-trace__title {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin: 0 0 4px 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .prod-trace__nodes {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
+      align-items: center;
+      gap: 8px;
+      padding: 14px;
+      background: rgba(15, 23, 42, 0.45);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .prod-node {
+      appearance: none;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 10px 8px;
+      border-radius: 9px;
+      cursor: pointer;
+      text-align: center;
+      transition:
+        border-color 0.35s var(--exec-ease-soft),
+        background 0.35s var(--exec-ease-soft),
+        color 0.35s var(--exec-ease-soft),
+        transform 0.35s var(--exec-ease-soft),
+        box-shadow 0.35s var(--exec-ease-soft);
+      position: relative;
+      letter-spacing: 0.02em;
+      min-width: 0;
+    }
+    .prod-node:hover { color: var(--text); border-color: var(--text-faint); }
+    .prod-node:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+    .prod-node.is-active {
+      border-color: var(--exec-color);
+      background: rgba(34, 211, 238, 0.1);
+      color: var(--cyan);
+      box-shadow: 0 0 0 4px var(--exec-glow-soft), 0 0 18px var(--exec-glow-soft);
+      transform: translateY(-1px);
+    }
+    .prod-node__num {
+      display: block;
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      color: var(--text-faint);
+      margin-bottom: 4px;
+    }
+    .prod-node.is-active .prod-node__num { color: var(--cyan); opacity: 0.75; }
+    .prod-trace__arrow {
+      color: var(--border);
+      font-family: var(--font-mono);
+      font-size: 14px;
+      transition: color 0.35s var(--exec-ease-soft);
+    }
+    .prod-trace__arrow.is-passed { color: var(--exec-color); }
+
+    .prod-panel {
+      flex: 1;
+      background: #0b1220;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 220px;
+      position: relative;
+      overflow: hidden;
+    }
+    .prod-panel__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .prod-panel__label code { font-size: 11px; color: var(--cyan); }
+    .prod-panel__body {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text);
+    }
+    .prod-panel__meta {
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 1px dashed var(--border);
+      display: flex;
+      gap: 16px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+    }
+    .prod-panel__meta strong { color: var(--green); font-weight: 500; }
+    .prod-panel__state { display: none; flex-direction: column; gap: 14px; flex: 1; }
+    .prod-panel__state.is-active { display: flex; }
+    .prod-panel__state .prod-panel__body { animation: prod-fade 0.4s var(--exec-ease-soft); }
+    @keyframes prod-fade {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    @media (max-width: 880px) {
+      .prod-stage { grid-template-columns: 1fr; gap: 22px; }
+      .prod-trace__nodes {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+      .prod-trace__arrow { display: none; }
+      .prod-panel { min-height: 200px; padding: 18px; }
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       OVERDRIVE FUSED — #see-difference — drag-to-compare slider
+       LangGraph (25 lines) and selectools (1 line) stacked in the
+       same container. A range slider drags the split point left/right.
+       Annotations fade in as the slider passes their thresholds.
+       Auto-sweeps once on viewport entry, then idles awaiting drag.
+       ════════════════════════════════════════════════════════════════ */
+    .diff-stage {
+      position: relative;
+      margin-top: 28px;
+      --split: 50;
+    }
+    .diff-pane {
+      position: relative;
+      border-radius: 14px;
+      overflow: hidden;
+      isolation: isolate;
+      min-height: 480px;
+      box-shadow: 0 20px 60px -28px rgba(0, 0, 0, 0.55);
+      display: grid;
+      /* Driven by --split (a unitless 0-100 value, JS keeps it in sync) */
+      grid-template-columns: calc(var(--split) * 1%) calc((100 - var(--split)) * 1%);
+      gap: 0;
+      transition: grid-template-columns 0.6s var(--exec-ease-soft);
+    }
+    .diff-stage.is-dragging .diff-pane { transition: none; }
+    .diff-pane__col {
+      position: relative;
+      min-width: 0;       /* allow column to shrink below content size */
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .diff-pane__col--l { border-right: none; border-radius: 14px 0 0 14px; }
+    .diff-pane__col--r {
+      border-left: none;
+      border-radius: 0 14px 14px 0;
+      border-color: rgba(34, 211, 238, 0.35);
+      box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.08);
+    }
+    .diff-pane__col .code-frame {
+      height: 100%;
+      margin: 0;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      min-width: 0;
+      max-width: none;
+    }
+    .diff-pane__col--l .code-frame { background: #0b1220; }
+    .diff-pane__col--r .code-frame { background: #0a1220; }
+    .diff-pane__col .code-body {
+      height: calc(100% - 44px);
+      overflow: hidden;
+      mask-image: none;
+      -webkit-mask-image: none;
+    }
+
+    /* The split handle line */
+    .diff-pane__split-line {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: var(--split);
+      width: 2px;
+      background: var(--exec-color);
+      box-shadow: 0 0 12px var(--exec-glow), 0 0 0 1px rgba(11, 18, 32, 0.6);
+      transform: translateX(-1px);
+      pointer-events: none;
+      z-index: 3;
+      transition: left 0.6s var(--exec-ease-soft);
+    }
+    .diff-stage.is-dragging .diff-pane__split-line { transition: none; }
+    .diff-pane__split-knob {
+      position: absolute;
+      top: 50%;
+      left: var(--split);
+      width: 40px;
+      height: 40px;
+      transform: translate(-50%, -50%);
+      border-radius: 999px;
+      background: var(--bg);
+      border: 2px solid var(--exec-color);
+      box-shadow: 0 0 24px var(--exec-glow), 0 4px 12px rgba(0, 0, 0, 0.4);
+      pointer-events: none;
+      z-index: 4;
+      display: grid;
+      place-items: center;
+      color: var(--cyan);
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 700;
+      transition: left 0.6s var(--exec-ease-soft);
+    }
+    .diff-pane__split-knob::before { content: "‹"; transform: translateX(-2px); }
+    .diff-pane__split-knob::after  { content: "›"; transform: translateX(2px); }
+    .diff-stage.is-dragging .diff-pane__split-knob { transition: none; }
+
+    /* The actual range input — covers the entire pane, invisible thumb */
+    .diff-pane__range {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      border: none;
+      cursor: ew-resize;
+      z-index: 5;
+      -webkit-appearance: none;
+      appearance: none;
+      opacity: 0;
+    }
+    .diff-pane__range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 60px;
+      height: 100%;
+      cursor: ew-resize;
+    }
+    .diff-pane__range::-moz-range-thumb {
+      width: 60px;
+      height: 100%;
+      cursor: ew-resize;
+      border: none;
+      background: transparent;
+    }
+    .diff-pane__range:focus-visible { outline: none; }
+    .diff-pane__range:focus-visible ~ .diff-pane__split-knob {
+      box-shadow: 0 0 0 4px var(--exec-glow-soft), 0 0 24px var(--exec-glow);
+    }
+
+    /* Side labels — sit above the pane */
+    .diff-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      color: var(--text-faint);
+    }
+    .diff-labels__l { color: var(--text-dim); }
+    .diff-labels__r { color: var(--cyan); }
+
+    /* Drag hint below the pane */
+    .diff-hint {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 14px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+      letter-spacing: 0.04em;
+    }
+    .diff-hint__bar {
+      flex: 1;
+      max-width: 60px;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* Annotations — pop in as slider passes their thresholds */
+    .diff-annotations {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 22px;
+    }
+    .diff-anno {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.45);
+      opacity: 0.35;
+      transform: translateY(4px);
+      transition:
+        opacity 0.45s var(--exec-ease-soft),
+        transform 0.45s var(--exec-ease-soft),
+        border-color 0.45s var(--exec-ease-soft),
+        background 0.45s var(--exec-ease-soft);
+    }
+    .diff-anno.is-shown {
+      opacity: 1;
+      transform: none;
+      border-color: rgba(34, 211, 238, 0.35);
+      background: rgba(34, 211, 238, 0.06);
+    }
+    .diff-anno__num {
+      flex: 0 0 auto;
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      background: rgba(34, 211, 238, 0.12);
+      color: var(--cyan);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      display: grid;
+      place-items: center;
+      font-weight: 600;
+    }
+    .diff-anno.is-shown .diff-anno__num {
+      background: var(--exec-color);
+      color: var(--bg);
+      box-shadow: 0 0 0 3px var(--exec-glow-soft);
+    }
+    .diff-anno__text {
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.55;
+    }
+    .diff-anno__text code { color: var(--cyan); font-size: 12px; }
+
+    @media (max-width: 880px) {
+      .diff-pane { min-height: 420px; }
+      .diff-pane__split-knob { width: 48px; height: 48px; font-size: 16px; }
+      .diff-annotations { grid-template-columns: 1fr; }
+    }
+    /* Mobile fallback: at narrow viewports, drag-to-compare is too tight to
+       read because each column shrinks below ~200px. Stack the two code
+       blocks vertically instead, both full-width. The slider, divider, and
+       knob are hidden — the comparison becomes static (LangGraph above,
+       selectools below) which is plenty for the message. */
+    @media (max-width: 700px) {
+      .diff-pane {
+        grid-template-columns: 1fr !important;
+        grid-template-rows: auto auto;
+        min-height: 0;
+      }
+      .diff-pane__col {
+        height: auto;
+      }
+      .diff-pane__col .code-body {
+        height: auto;
+        max-height: 320px;
+        overflow-y: auto;
+      }
+      .diff-pane__col--l {
+        border-right: 1px solid var(--border);
+        border-bottom: none;
+        border-radius: 14px 14px 0 0;
+      }
+      .diff-pane__col--r {
+        border-left: 1px solid rgba(34, 211, 238, 0.35);
+        border-top: 1px solid rgba(34, 211, 238, 0.35);
+        border-radius: 0 0 14px 14px;
+      }
+      .diff-pane__split-line,
+      .diff-pane__split-knob,
+      .diff-pane__range {
+        display: none;
+      }
+      .diff-labels { display: none; }
+      .diff-hint { display: none; }
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       OVERDRIVE FUSED — #enterprise — compliance shelf (5 exhibits)
+       Replaces the sad full-width pill row that lived inside #features.
+       Now its own standalone section with 5 distinct micro-components:
+       coverage ring, test counter, version stack, SBOM card, audit doc.
+       The pointer "stamps" each exhibit on viewport entry, staggered.
+       ════════════════════════════════════════════════════════════════ */
+    .ent-shelf {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 18px;
+      margin-top: 28px;
+    }
+    .ent-exhibit {
+      position: relative;
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px 20px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 220px;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.5s var(--exec-ease-soft), transform 0.5s var(--exec-ease-soft);
+    }
+    .ent-shelf.in-view .ent-exhibit { opacity: 1; transform: none; }
+    .ent-shelf.in-view .ent-exhibit:nth-child(1) { transition-delay: 0.05s; }
+    .ent-shelf.in-view .ent-exhibit:nth-child(2) { transition-delay: 0.18s; }
+    .ent-shelf.in-view .ent-exhibit:nth-child(3) { transition-delay: 0.31s; }
+    .ent-shelf.in-view .ent-exhibit:nth-child(4) { transition-delay: 0.44s; }
+    .ent-shelf.in-view .ent-exhibit:nth-child(5) { transition-delay: 0.57s; }
+    .ent-shelf.in-view .ent-exhibit::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 14px;
+      pointer-events: none;
+      animation: exec-stamp 0.7s var(--exec-ease-step) both;
+    }
+    .ent-shelf.in-view .ent-exhibit:nth-child(1)::after { animation-delay: 0.10s; }
+    .ent-shelf.in-view .ent-exhibit:nth-child(2)::after { animation-delay: 0.23s; }
+    .ent-shelf.in-view .ent-exhibit:nth-child(3)::after { animation-delay: 0.36s; }
+    .ent-shelf.in-view .ent-exhibit:nth-child(4)::after { animation-delay: 0.49s; }
+    .ent-shelf.in-view .ent-exhibit:nth-child(5)::after { animation-delay: 0.62s; }
+    .ent-exhibit__label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .ent-exhibit__caption {
+      margin-top: auto;
+      font-size: 12.5px;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+
+    /* Exhibit 1: Coverage ring */
+    .ent-ring {
+      width: 110px;
+      height: 110px;
+      margin: 8px auto 4px;
+      position: relative;
+    }
+    .ent-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .ent-ring__track { fill: none; stroke: var(--border); stroke-width: 8; }
+    .ent-ring__fill {
+      fill: none;
+      stroke: var(--exec-color);
+      stroke-width: 8;
+      stroke-linecap: round;
+      stroke-dasharray: 314.16; /* 2 * π * 50 */
+      stroke-dashoffset: 314.16;
+      filter: drop-shadow(0 0 8px var(--exec-glow));
+      transition: stroke-dashoffset 1.4s var(--exec-ease-soft) 0.2s;
+    }
+    .ent-shelf.in-view .ent-ring__fill { stroke-dashoffset: 15.71; /* 95% → 314.16 * 0.05 */ }
+    .ent-ring__num {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      font-family: var(--font-mono);
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--cyan);
+      font-variant-numeric: tabular-nums;
+    }
+    .ent-ring__num small { font-size: 13px; color: var(--text-faint); margin-left: 1px; }
+
+    /* Exhibit 2: Test counter */
+    .ent-counter {
+      flex: 1;
+      display: grid;
+      place-items: center;
+      padding: 10px 0;
+    }
+    .ent-counter__num {
+      font-family: var(--font-mono);
+      font-size: 42px;
+      font-weight: 700;
+      color: var(--exec-color);
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 20px var(--exec-glow-soft);
+      letter-spacing: -0.02em;
+    }
+
+    /* Exhibit 3: Version stack */
+    .ent-versions {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 6px 0;
+      justify-content: center;
+    }
+    .ent-version {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-dim);
+      transition: border-color 0.4s, color 0.4s, background 0.4s;
+    }
+    .ent-version__check { color: var(--text-faint); transition: color 0.4s; }
+    .ent-shelf.in-view .ent-version {
+      border-color: rgba(34, 211, 238, 0.3);
+      background: rgba(34, 211, 238, 0.05);
+      color: var(--text);
+    }
+    .ent-shelf.in-view .ent-version__check { color: var(--cyan); }
+    .ent-shelf.in-view .ent-version:nth-child(1) { transition-delay: 0.5s; }
+    .ent-shelf.in-view .ent-version:nth-child(2) { transition-delay: 0.6s; }
+    .ent-shelf.in-view .ent-version:nth-child(3) { transition-delay: 0.7s; }
+    .ent-shelf.in-view .ent-version:nth-child(4) { transition-delay: 0.8s; }
+    .ent-shelf.in-view .ent-version:nth-child(5) { transition-delay: 0.9s; }
+
+    /* Exhibit 4: CycloneDX SBOM card */
+    .ent-sbom {
+      flex: 1;
+      display: grid;
+      place-items: center;
+      padding: 8px 0;
+    }
+    .ent-sbom__doc {
+      width: 90px;
+      height: 110px;
+      background: linear-gradient(135deg, #1e2c44 0%, #0f1a2e 100%);
+      border: 1px solid rgba(34, 197, 94, 0.4);
+      border-radius: 6px;
+      position: relative;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(34, 197, 94, 0.08);
+      padding: 10px 8px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .ent-sbom__doc::before {
+      /* Folded corner */
+      content: "";
+      position: absolute;
+      top: 0; right: 0;
+      width: 18px;
+      height: 18px;
+      background: linear-gradient(225deg, transparent 50%, rgba(34, 197, 94, 0.25) 50%, var(--bg) 51%);
+    }
+    .ent-sbom__doc::after {
+      content: "CycloneDX";
+      position: absolute;
+      bottom: 6px;
+      left: 0; right: 0;
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 8px;
+      letter-spacing: 0.1em;
+      color: var(--green);
+      text-transform: uppercase;
+    }
+    .ent-sbom__line {
+      height: 2px;
+      background: rgba(34, 197, 94, 0.25);
+      border-radius: 999px;
+    }
+    .ent-sbom__line--s { width: 60%; }
+    .ent-sbom__line--m { width: 80%; }
+    .ent-sbom__line--l { width: 95%; }
+
+    /* Exhibit 5: Audit / markers */
+    .ent-markers {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 8px 0;
+      justify-content: center;
+    }
+    .ent-marker {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: rgba(168, 85, 247, 0.05);
+      border: 1px solid rgba(168, 85, 247, 0.18);
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+    .ent-marker--stable { background: rgba(34, 197, 94, 0.06); border-color: rgba(34, 197, 94, 0.22); color: #86efac; }
+    .ent-marker--beta { background: rgba(245, 158, 11, 0.06); border-color: rgba(245, 158, 11, 0.22); color: #fde68a; }
+    .ent-marker--dep { background: rgba(239, 68, 68, 0.06); border-color: rgba(239, 68, 68, 0.22); color: #fca5a5; }
+    .ent-marker__dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; box-shadow: 0 0 6px currentColor; }
+    .ent-marker__name { font-weight: 600; }
+    .ent-marker__count { margin-left: auto; opacity: 0.7; }
+
+    @media (max-width: 1080px) {
+      .ent-shelf { grid-template-columns: repeat(2, 1fr); }
+      .ent-exhibit { min-height: 200px; }
+    }
+    @media (max-width: 600px) {
+      .ent-shelf { grid-template-columns: 1fr; gap: 14px; }
+      .ent-counter__num { font-size: 36px; }
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       OVERDRIVE FUSED — #faq — selectools docs REPL
+       Replaces accordion with a search-driven docs REPL: prompt-styled
+       search bar at top, left rail of category tabs, questions render
+       as ? prompts in monospace, answers stream in below with inline
+       syntax-highlighted code blocks.
+       ════════════════════════════════════════════════════════════════ */
+    .repl {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: 0;
+      margin-top: 32px;
+      background: #0b1220;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px -28px rgba(0, 0, 0, 0.55);
+      min-height: 540px;
+    }
+    .repl__rail {
+      background: rgba(15, 23, 42, 0.55);
+      border-right: 1px solid var(--border);
+      padding: 18px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .repl__rail-title {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      padding: 0 18px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .repl__cat {
+      appearance: none;
+      background: transparent;
+      border: none;
+      border-left: 2px solid transparent;
+      padding: 9px 18px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-dim);
+      cursor: pointer;
+      text-align: left;
+      transition: color 0.25s, border-color 0.25s, background 0.25s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .repl__cat::before { content: "#"; color: var(--text-faint); }
+    .repl__cat:hover { color: var(--text); }
+    .repl__cat.is-active {
+      color: var(--cyan);
+      border-left-color: var(--cyan);
+      background: rgba(34, 211, 238, 0.06);
+    }
+    .repl__cat.is-active::before { color: var(--cyan); }
+    .repl__cat-count {
+      margin-left: auto;
+      font-size: 10px;
+      color: var(--text-faint);
+      background: rgba(34, 211, 238, 0.08);
+      padding: 1px 6px;
+      border-radius: 999px;
+    }
+    .repl__cat.is-active .repl__cat-count { color: var(--cyan); background: rgba(34, 211, 238, 0.15); }
+
+    .repl__main {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .repl__searchbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.5);
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    .repl__prompt { color: var(--cyan); font-weight: 600; }
+    .repl__search {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      padding: 4px 0;
+      outline: none;
+    }
+    .repl__search::placeholder { color: var(--text-faint); }
+    .repl__searchbar .exec-caret { width: 7px; height: 14px; }
+
+    .repl__list {
+      flex: 1;
+      padding: 8px 0 18px;
+      overflow-y: auto;
+      max-height: 540px;
+    }
+    .repl__q {
+      border-bottom: 1px solid rgba(51, 65, 85, 0.45);
+    }
+    .repl__q:last-child { border-bottom: none; }
+    .repl__q-summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 14px 22px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text);
+      transition: background 0.2s, color 0.2s;
+    }
+    .repl__q-summary::-webkit-details-marker { display: none; }
+    .repl__q-summary:hover { background: rgba(34, 211, 238, 0.04); color: var(--cyan); }
+    .repl__q-marker {
+      color: var(--cyan);
+      font-weight: 700;
+      flex: 0 0 auto;
+      opacity: 0.7;
+    }
+    .repl__q[open] .repl__q-summary { color: var(--cyan); background: rgba(34, 211, 238, 0.05); }
+    .repl__q[open] .repl__q-marker { opacity: 1; }
+    .repl__q-text { flex: 1; }
+    .repl__q-cat {
+      font-size: 10px;
+      color: var(--text-faint);
+      letter-spacing: 0.06em;
+      flex: 0 0 auto;
+      opacity: 0.7;
+    }
+    .repl__q-answer {
+      padding: 0 22px 22px 50px;
+      color: var(--text-dim);
+      font-family: var(--font-ui);
+      font-size: 13.5px;
+      line-height: 1.75;
+      animation: repl-stream 0.5s var(--exec-ease-soft);
+    }
+    .repl__q-answer code {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--cyan);
+      background: rgba(34, 211, 238, 0.08);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+    .repl__q-answer a { color: var(--cyan); }
+    @keyframes repl-stream {
+      0%   { opacity: 0; transform: translateY(2px); }
+      100% { opacity: 1; transform: none; }
+    }
+    .repl__q.is-hidden { display: none; }
+    .repl__empty {
+      padding: 40px 22px;
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-faint);
+      display: none;
+    }
+    .repl.is-empty .repl__empty { display: block; }
+
+    @media (max-width: 760px) {
+      .repl { grid-template-columns: 1fr; min-height: auto; }
+      .repl__rail {
+        flex-direction: row;
+        overflow-x: auto;
+        gap: 4px;
+        padding: 12px 14px;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+      .repl__rail-title { display: none; }
+      .repl__cat {
+        flex-shrink: 0;
+        border-left: none;
+        border-bottom: 2px solid transparent;
+        padding: 8px 12px;
+      }
+      .repl__cat.is-active { border-left-color: transparent; border-bottom-color: var(--cyan); }
+      .repl__list { max-height: 460px; }
+      .repl__q-summary { padding: 12px 16px; font-size: 12.5px; }
+      .repl__q-answer { padding: 0 16px 18px 38px; font-size: 13px; }
+      .repl__q-cat { display: none; }
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       OVERDRIVE FUSED — footer — terminal sitemap
+       Renders as `$ tree selectools.dev/` output: hover-highlighted
+       paths, social/legal/version inline as # comments, blinking caret
+       at the end (the page is "still running").
+       ════════════════════════════════════════════════════════════════ */
+    .footer-term {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 50px 24px 60px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.85;
+      color: var(--text-dim);
+      border-top: 1px solid var(--border);
+      background:
+        linear-gradient(180deg, transparent, rgba(34, 211, 238, 0.02));
+    }
+    .footer-term__prompt {
+      color: var(--text-faint);
+      margin-bottom: 8px;
+    }
+    .footer-term__prompt .pr { color: var(--cyan); margin-right: 6px; }
+    .footer-term__tree { white-space: pre; overflow-x: auto; padding-bottom: 6px; }
+    .footer-term__tree a {
+      color: var(--text-dim);
+      text-decoration: none;
+      transition: color 0.2s, background 0.2s, text-shadow 0.2s;
+      padding: 0 2px;
+      border-radius: 2px;
+    }
+    .footer-term__tree a:hover {
+      color: var(--cyan);
+      background: rgba(34, 211, 238, 0.08);
+      text-shadow: 0 0 8px var(--exec-glow);
+    }
+    .footer-term__cmt {
+      color: var(--text-faint);
+      font-style: italic;
+      opacity: 0.85;
+    }
+    .footer-term__heart { color: var(--cyan); }
+    .footer-term__nichev a { color: var(--cyan); }
+    .footer-term__final {
+      margin-top: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .footer-term__final .pr { color: var(--cyan); }
+    @media (max-width: 720px) {
+      .footer-term { font-size: 11.5px; padding: 36px 16px 44px; }
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       OVERDRIVE FUSED — wordmarks (3 switchable variants)
+       The body carries data-logo="1|2|3" set on load by reading the
+       ?logo= URL param (default "1"). Each variant renders inside the
+       nav-logo slot; only the active one is displayed.
+       ════════════════════════════════════════════════════════════════ */
+    .wm { display: none; align-items: center; }
+    [data-logo="1"] .wm--1,
+    [data-logo="2"] .wm--2,
+    [data-logo="3"] .wm--3 { display: inline-flex; }
+
+    /* Variant 1 — [•] selectools */
+    .wm--1 {
+      gap: 8px;
+      font-family: var(--font-ui);
+      font-weight: 800;
+      font-size: 17px;
+      color: #fff;
+      letter-spacing: -0.03em;
+    }
+    .wm--1__brackets {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--exec-color);
+      font-size: 16px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .wm--1__brackets::before { content: "["; }
+    .wm--1__brackets::after  { content: "]"; }
+    .wm--1__brackets .exec-dot { width: 6px; height: 6px; }
+
+    /* Variant 2 — s▌electools (cursor inside the word) */
+    .wm--2 {
+      font-family: var(--font-ui);
+      font-weight: 800;
+      font-size: 17px;
+      color: #fff;
+      letter-spacing: -0.03em;
+      gap: 0;
+    }
+    .wm--2__pre,
+    .wm--2__post { display: inline-block; }
+    .wm--2__caret {
+      display: inline-block;
+      width: 0.18em;
+      height: 0.95em;
+      background: var(--exec-color);
+      box-shadow: 0 0 6px var(--exec-glow);
+      vertical-align: text-bottom;
+      animation: exec-blink 1.05s steps(2, jump-none) infinite;
+      margin: 0 1px;
+    }
+
+    /* Variant 3 — terminal banner art (3-row box-drawing) */
+    .wm--3 {
+      font-family: var(--font-mono);
+      color: var(--exec-color);
+      align-items: center;
+    }
+    .wm--3__banner {
+      display: block;
+      font-size: 5.5px;
+      line-height: 1;
+      letter-spacing: 0;
+      white-space: pre;
+      text-shadow: 0 0 6px var(--exec-glow);
+      margin: 0;
+      user-select: none;
+      filter: drop-shadow(0 0 2px rgba(34, 211, 238, 0.4));
+    }
+    @media (min-width: 720px) {
+      .wm--3__banner { font-size: 6.5px; }
+    }
+    /* Reveal animation: blocks scan-print on load */
+    .wm--3__banner.is-typing { mask-image: linear-gradient(90deg, #000 0%, #000 var(--w, 0%), transparent var(--w, 0%)); -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 var(--w, 0%), transparent var(--w, 0%)); }
+
+    /* Visually-hidden semantic h1 for screen readers across all variants */
+    .nav-logo .vh {
+      position: absolute;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
     /* ── Reduced motion (WCAG AA) ──────────────────────────────────── */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
@@ -2369,6 +3844,68 @@
       .path-term__caret { animation: none; opacity: 1; }
       .path-marquee__row { animation: none; }
       .path:hover { transform: none; }
+
+      /* OVERDRIVE FUSED — execution-pointer atoms: kill all motion */
+      .exec-dot { animation: none; box-shadow: 0 0 0 1px var(--exec-glow-soft); }
+      .exec-caret { animation: none; opacity: 1; }
+      .exec-scan.in-view::after { animation: none; display: none; }
+
+      /* OVERDRIVE FUSED — wordmarks: kill blink + scan animations */
+      .wm--2__caret { animation: none !important; opacity: 1; }
+      .wm--3__banner.is-typing { mask-image: none !important; -webkit-mask-image: none !important; }
+
+      /* OVERDRIVE FUSED — #faq: kill answer fade-in */
+      .repl__q-answer { animation: none !important; }
+
+      /* OVERDRIVE FUSED — #enterprise: snap exhibits visible, freeze ring at 95% */
+      .ent-exhibit { opacity: 1 !important; transform: none !important; transition: none !important; }
+      .ent-exhibit::after { animation: none !important; display: none !important; }
+      .ent-ring__fill { stroke-dashoffset: 15.71 !important; transition: none !important; }
+      .ent-version {
+        border-color: rgba(34, 211, 238, 0.3) !important;
+        background: rgba(34, 211, 238, 0.05) !important;
+        color: var(--text) !important;
+        transition: none !important;
+      }
+      .ent-version__check { color: var(--cyan) !important; }
+
+      /* OVERDRIVE FUSED — #see-difference: kill clip-path transition + force show all annotations */
+      .diff-pane__layer--fg, .diff-pane__split-line, .diff-pane__split-knob { transition: none !important; }
+      .diff-anno {
+        opacity: 1 !important;
+        transform: none !important;
+        border-color: rgba(34, 211, 238, 0.35) !important;
+        background: rgba(34, 211, 238, 0.06) !important;
+      }
+      .diff-anno__num { background: var(--exec-color) !important; color: var(--bg) !important; }
+
+      /* OVERDRIVE FUSED — #production: kill auto-play fade */
+      .prod-panel__state .prod-panel__body { animation: none !important; }
+
+      /* OVERDRIVE FUSED — #eval: snap report to done, freeze marquee */
+      .eval-report__bar .exec-dot { animation: none !important; background: var(--green); }
+      .eval-metric__bar::after { transition: none !important; }
+      .eval-report .eval-metric.is-acc  .eval-metric__bar::after { width: 100% !important; }
+      .eval-report .eval-metric.is-lat  .eval-metric__bar::after { width: 86%  !important; background: linear-gradient(90deg, #fbbf24, #fde68a) !important; }
+      .eval-report .eval-metric.is-cost .eval-metric__bar::after { width: 12%  !important; background: linear-gradient(90deg, var(--green), #86efac) !important; }
+      .eval-metric__value { opacity: 1 !important; transform: none !important; transition: none !important; }
+      .eval-report__status { background: rgba(34, 197, 94, 0.12) !important; color: var(--green) !important; border-color: rgba(34, 197, 94, 0.4) !important; }
+      .eval-marquee__row { animation: none !important; }
+
+      /* OVERDRIVE FUSED — #what: snap terminal lines visible, light all chips */
+      .what-term__line { opacity: 1 !important; transform: none !important; transition: none !important; }
+      .what-term__caret { animation: none !important; opacity: 1; }
+      .what-stage .what-chip {
+        border-color: rgba(34, 211, 238, 0.4) !important;
+        background: rgba(34, 211, 238, 0.05) !important;
+        color: var(--text) !important;
+        transition: none !important;
+      }
+      .what-stage .what-chip__bullet {
+        background: var(--exec-color) !important;
+        box-shadow: 0 0 0 3px var(--exec-glow-soft) !important;
+      }
+      .what-stage .what-chip__hint { color: var(--cyan) !important; }
     }
   </style>
 </head>
@@ -2377,7 +3914,22 @@
 <!-- ─── Nav ────────────────────────────────────────────────────────── -->
 <nav id="siteNav">
   <div class="wrap">
-    <a href="#" class="nav-logo" aria-label="selectools home">selectools</a>
+    <a href="#" class="nav-logo" aria-label="selectools home">
+      <span class="vh">selectools</span>
+      <!-- Variant 1: [•] selectools -->
+      <span class="wm wm--1" aria-hidden="true">
+        <span class="wm--1__brackets"><span class="exec-dot exec-dot--sm"></span></span>
+        <span>selectools</span>
+      </span>
+      <!-- Variant 2: s▌electools -->
+      <span class="wm wm--2" aria-hidden="true">
+        <span class="wm--2__pre">s</span><span class="wm--2__caret"></span><span class="wm--2__post">electools</span>
+      </span>
+      <!-- Variant 3: terminal banner art (3-row box-drawing) -->
+      <span class="wm wm--3" aria-hidden="true"><pre class="wm--3__banner">┌─┐┌─┐┬  ┌─┐┌─┐┌┬┐┌─┐┌─┐┬  ┌─┐
+└─┐├┤ │  ├┤ │   │ │ ││ ││  └─┐
+└─┘└─┘┴─┘└─┘└─┘ ┴ └─┘└─┘┴─┘└─┘</pre></span>
+    </a>
     <div class="nav-links hide-mobile">
       <a href="#builder">Builder</a>
       <a href="#simulations">Simulations</a>
@@ -2545,41 +4097,59 @@
 <section class="section" id="what">
   <div class="wrap">
     <span class="section-label">What is selectools?</span>
-    <h2 class="mb-6">A Python framework for production AI agents.</h2>
-    <div class="grid-2 gap-12" style="align-items:start">
-      <div class="reveal">
-        <p style="color:var(--text-dim);font-size:16px;line-height:1.7;margin-bottom:18px">
-          Open-source Python library for production AI agents. One <code style="color:var(--cyan)">pip install</code> gives you the full stack:
-        </p>
-        <p style="color:var(--text);font-size:14px;line-height:1.9;margin-bottom:22px;font-weight:500">
-          Multi-agent graphs &middot; Tool calling &middot; Hybrid RAG &middot; 50 evaluators &middot; Guardrails &middot; Audit logging &middot; Visual builder
-        </p>
-        <p style="color:var(--text-dim);font-size:15px;line-height:1.7">
-          No DSL. No separate packages. No paid SaaS. Your code stays plain Python &mdash; readable, debuggable, yours.
-        </p>
+    <h2 class="mb-4">A Python framework for production AI agents.</h2>
+    <p class="section-desc mb-10">One <code style="color:var(--cyan)">pip install</code>. The whole stack. No DSL, no separate packages, no paid SaaS &mdash; your code stays plain Python.</p>
+
+    <div class="what-stage">
+      <!-- Terminal: types the script line by line on viewport entry -->
+      <div class="what-term">
+        <div class="what-term__bar">
+          <span class="what-term__dot what-term__dot--r"></span>
+          <span class="what-term__dot what-term__dot--y"></span>
+          <span class="what-term__dot what-term__dot--g"></span>
+          <span class="what-term__name">agent.py</span>
+          <span class="what-term__shell">~/selectools $</span>
+        </div>
+        <div class="what-term__body" aria-label="Selectools quickstart code example"><span class="what-term__line"><span class="kw">from</span> <span class="cls">selectools</span> <span class="kw">import</span> Agent, tool</span><span class="what-term__line"><span class="kw">from</span> <span class="cls">selectools.rag</span> <span class="kw">import</span> HybridRAG</span><span class="what-term__line"><span class="kw">from</span> <span class="cls">selectools.guardrails</span> <span class="kw">import</span> PIIGuardrail</span><span class="what-term__line"><span class="kw">from</span> <span class="cls">selectools.audit</span> <span class="kw">import</span> AuditLogger</span><span class="what-term__line is-blank"> </span><span class="what-term__line"><span class="kw">@tool</span>()</span><span class="what-term__line"><span class="kw">def</span> <span class="fn">search</span>(q): <span class="kw">return</span> rag.<span class="fn">query</span>(q)</span><span class="what-term__line is-blank"> </span><span class="what-term__line">agent = <span class="fn">Agent</span>(</span><span class="what-term__line">    tools=[search],</span><span class="what-term__line">    rag=<span class="fn">HybridRAG</span>(<span class="str">"./docs"</span>),</span><span class="what-term__line">    guardrails=[<span class="fn">PIIGuardrail</span>()],</span><span class="what-term__line">    audit=<span class="fn">AuditLogger</span>(),</span><span class="what-term__line">)</span><span class="what-term__line">result = agent.<span class="fn">run</span>(<span class="str">"refund policy?"</span>)<span class="what-term__caret" aria-hidden="true"></span></span></div>
       </div>
-      <div class="reveal reveal-d1">
-        <div class="code-frame code-frame-accent">
-          <div class="code-bar">
-            <div class="code-dot" style="background:rgba(239,68,68,0.8)"></div>
-            <div class="code-dot" style="background:rgba(250,204,21,0.8)"></div>
-            <div class="code-dot" style="background:rgba(34,197,94,0.8)"></div>
-            <span class="code-bar-label">hello.py</span>
-          </div>
-          <div class="code-body"><span class="kw">from</span> <span class="cls">selectools</span> <span class="kw">import</span> Agent, tool
-<span class="kw">from</span> <span class="cls">selectools.providers</span> <span class="kw">import</span> OpenAIProvider
 
-<span class="kw">@tool</span>()
-<span class="kw">def</span> <span class="fn">search</span>(query: <span class="cls">str</span>) -> <span class="cls">str</span>:
-    <span class="str">"""Search the knowledge base."""</span>
-    <span class="kw">return</span> db.search(query)
-
-agent = <span class="fn">Agent</span>(
-    tools=[search],
-    provider=<span class="fn">OpenAIProvider</span>(),
-)
-result = agent.<span class="fn">run</span>(<span class="str">"Find our refund policy"</span>)
-<span class="cmt"># result.content, result.trace, result.usage</span></div>
+      <!-- Capability rail: chips light up in sync with their trigger lines -->
+      <div class="what-rail" aria-label="What you get with one pip install">
+        <p class="what-rail__title"><span class="exec-dot exec-dot--sm" aria-hidden="true"></span> what you get</p>
+        <div class="what-chip" data-chip="multi"   style="--chip-delay:1.95s">
+          <span class="what-chip__bullet" aria-hidden="true"></span>
+          <span class="what-chip__name">Multi-agent graphs</span>
+          <span class="what-chip__hint">Agent()</span>
+        </div>
+        <div class="what-chip" data-chip="rag"     style="--chip-delay:0.45s">
+          <span class="what-chip__bullet" aria-hidden="true"></span>
+          <span class="what-chip__name">Hybrid RAG</span>
+          <span class="what-chip__hint">HybridRAG</span>
+        </div>
+        <div class="what-chip" data-chip="guard"   style="--chip-delay:0.65s">
+          <span class="what-chip__bullet" aria-hidden="true"></span>
+          <span class="what-chip__name">Guardrails</span>
+          <span class="what-chip__hint">PIIGuardrail</span>
+        </div>
+        <div class="what-chip" data-chip="audit"   style="--chip-delay:0.85s">
+          <span class="what-chip__bullet" aria-hidden="true"></span>
+          <span class="what-chip__name">Audit logging</span>
+          <span class="what-chip__hint">AuditLogger</span>
+        </div>
+        <div class="what-chip" data-chip="tools"   style="--chip-delay:1.30s">
+          <span class="what-chip__bullet" aria-hidden="true"></span>
+          <span class="what-chip__name">Tool calling</span>
+          <span class="what-chip__hint">@tool()</span>
+        </div>
+        <div class="what-chip" data-chip="evals"   style="--chip-delay:2.75s">
+          <span class="what-chip__bullet" aria-hidden="true"></span>
+          <span class="what-chip__name">50 evaluators</span>
+          <span class="what-chip__hint">tested</span>
+        </div>
+        <div class="what-chip" data-chip="builder" style="--chip-delay:3.10s">
+          <span class="what-chip__bullet" aria-hidden="true"></span>
+          <span class="what-chip__name">Visual builder</span>
+          <span class="what-chip__hint">/builder/</span>
         </div>
       </div>
     </div>
@@ -2711,22 +4281,30 @@ result = agent.<span class="cyan">execute</span>(user_input)
   </div>
 </section>
 
-<!-- ─── Code Comparison ────────────────────────────────────────────── -->
-<section class="section">
+<!-- ─── See the difference: drag-to-compare slider ────────────────── -->
+<section class="section" id="see-difference">
   <div class="wrap">
     <span class="section-label">See the difference</span>
     <h2 class="mb-4">The same pipeline. Less ceremony.</h2>
-    <p class="section-desc mb-14">A 3-agent workflow: planner &rarr; writer &rarr; reviewer. One framework wraps it in a DSL. The other stays out of your way.</p>
-    <div class="grid-2 gap-8">
-      <div class="reveal">
-        <div class="code-frame">
-          <div class="code-bar">
-            <div class="code-dot" style="background:rgba(239,68,68,0.35)"></div>
-            <div class="code-dot" style="background:rgba(250,204,21,0.35)"></div>
-            <div class="code-dot" style="background:rgba(34,197,94,0.35)"></div>
-            <span class="code-bar-label">LangGraph &middot; 25 lines</span>
-          </div>
-          <div class="code-body code-dim"><span class="kw">from</span> langgraph.graph <span class="kw">import</span> StateGraph, START, END
+    <p class="section-desc mb-14">A 3-agent workflow: planner &rarr; writer &rarr; reviewer. Same outcome &mdash; 25 lines of ceremony, or one.</p>
+
+    <div class="diff-stage" data-stage>
+      <div class="diff-labels">
+        <span class="diff-labels__l">← LangGraph &middot; 25 lines</span>
+        <span class="diff-labels__r">selectools &middot; 1 line →</span>
+      </div>
+
+      <div class="diff-pane">
+        <!-- LEFT column: LangGraph (shrinks as you drag right) -->
+        <div class="diff-pane__col diff-pane__col--l">
+          <div class="code-frame">
+            <div class="code-bar">
+              <div class="code-dot" style="background:rgba(239,68,68,0.35)"></div>
+              <div class="code-dot" style="background:rgba(250,204,21,0.35)"></div>
+              <div class="code-dot" style="background:rgba(34,197,94,0.35)"></div>
+              <span class="code-bar-label">LangGraph &middot; 25 lines</span>
+            </div>
+            <div class="code-body code-dim"><span class="kw">from</span> langgraph.graph <span class="kw">import</span> StateGraph, START, END
 <span class="kw">from</span> typing_extensions <span class="kw">import</span> TypedDict
 
 <span class="kw">class</span> <span class="cls">State</span>(TypedDict):
@@ -2746,47 +4324,88 @@ g.add_edge(<span class="str">"writer"</span>, <span class="str">"reviewer"</span
 g.add_edge(<span class="str">"reviewer"</span>, END)
 app = g.<span class="fn">compile</span>()
 result = app.<span class="fn">invoke</span>({<span class="str">"text"</span>: <span class="str">"prompt"</span>})</div>
-        </div>
-      </div>
-      <div class="reveal reveal-d1">
-        <div class="code-frame code-frame-accent">
-          <div class="code-bar">
-            <div class="code-dot" style="background:rgba(239,68,68,0.8)"></div>
-            <div class="code-dot" style="background:rgba(250,204,21,0.8)"></div>
-            <div class="code-dot" style="background:rgba(34,197,94,0.8)"></div>
-            <span class="code-bar-label">selectools &middot; 1 line</span>
           </div>
-          <div class="code-body"><span class="kw">from</span> <span class="cls">selectools</span> <span class="kw">import</span> AgentGraph
-
-result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planner, writer, reviewer).<span class="fn">run</span>(<span class="str">"prompt"</span>)</div>
         </div>
-        <ul class="check-list" style="margin-top:20px">
-          <li>Plain Python. No StateGraph, no TypedDict, no compile()</li>
-          <li>HITL resumes at yield point, not by restarting the node</li>
-          <li>Zero extra deps. No langchain-core required</li>
-          <li>Deploy: <code style="color:var(--cyan)">selectools serve agent.yaml</code></li>
-        </ul>
+
+        <!-- RIGHT column: selectools (grows as you drag right) -->
+        <div class="diff-pane__col diff-pane__col--r">
+          <div class="code-frame code-frame-accent">
+            <div class="code-bar">
+              <div class="code-dot" style="background:rgba(239,68,68,0.8)"></div>
+              <div class="code-dot" style="background:rgba(250,204,21,0.8)"></div>
+              <div class="code-dot" style="background:rgba(34,197,94,0.8)"></div>
+              <span class="code-bar-label">selectools &middot; 1 line</span>
+            </div>
+            <div class="code-body"><span class="kw">from</span> <span class="cls">selectools</span> <span class="kw">import</span> AgentGraph
+
+result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planner, writer, reviewer).<span class="fn">run</span>(<span class="str">"prompt"</span>)
+
+<span class="cmt"># That's it. No StateGraph. No TypedDict.</span>
+<span class="cmt"># No add_node, no add_edge, no compile().</span>
+<span class="cmt"># Just three callables and a chain.</span>
+
+<span class="cmt"># Need branching? AgentGraph.router(...)</span>
+<span class="cmt"># Need parallel? AgentGraph.parallel(...)</span>
+<span class="cmt"># Need HITL? yield and resume — no node restart.</span>
+<span class="cmt"># Need to deploy? selectools serve agent.yaml</span></div>
+          </div>
+        </div>
+
+        <!-- Range input (invisible, drives --split via JS).
+             Default 50; user drags LEFT to wipe LangGraph away. -->
+        <input type="range" class="diff-pane__range"
+               min="0" max="100" value="50" step="0.5"
+               aria-label="Drag to compare LangGraph and selectools" />
+        <div class="diff-pane__split-line" aria-hidden="true"></div>
+        <div class="diff-pane__split-knob" aria-hidden="true"></div>
+      </div>
+
+      <div class="diff-hint">
+        <span class="diff-hint__bar"></span>
+        <span>drag to compare</span>
+        <span class="diff-hint__bar"></span>
+      </div>
+
+      <!-- Annotations: pop in as the slider passes their thresholds -->
+      <div class="diff-annotations">
+        <div class="diff-anno" data-threshold="20">
+          <span class="diff-anno__num">01</span>
+          <span class="diff-anno__text">Plain Python. No <code>StateGraph</code>, no <code>TypedDict</code>, no <code>compile()</code>.</span>
+        </div>
+        <div class="diff-anno" data-threshold="40">
+          <span class="diff-anno__num">02</span>
+          <span class="diff-anno__text">HITL resumes at yield point, not by restarting the node.</span>
+        </div>
+        <div class="diff-anno" data-threshold="60">
+          <span class="diff-anno__num">03</span>
+          <span class="diff-anno__text">Zero extra deps. No <code>langchain-core</code> required.</span>
+        </div>
+        <div class="diff-anno" data-threshold="80">
+          <span class="diff-anno__num">04</span>
+          <span class="diff-anno__text">Deploy with <code>selectools serve agent.yaml</code>.</span>
+        </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ─── Code Showcase ──────────────────────────────────────────────── -->
-<section class="section">
+<!-- ─── Production-ready: interactive trace explorer ──────────────── -->
+<section class="section" id="production">
   <div class="wrap">
     <span class="section-label">Production-ready</span>
     <h2 class="mb-4">Guardrails in the constructor, not an afterthought.</h2>
-    <p class="section-desc mb-14">PII redaction, audit logging, and injection defense, configured in one <code style="color:var(--cyan)">AgentConfig</code>, not bolted on with separate packages.</p>
-    <div class="grid-2 gap-8">
-      <div class="reveal">
-        <div class="code-frame code-frame-accent">
-          <div class="code-bar">
-            <div class="code-dot" style="background:rgba(239,68,68,0.8)"></div>
-            <div class="code-dot" style="background:rgba(250,204,21,0.8)"></div>
-            <div class="code-dot" style="background:rgba(34,197,94,0.8)"></div>
-            <span class="code-bar-label">agent.py</span>
-          </div>
-          <div class="code-body"><span class="kw">from</span> <span class="cls">selectools</span> <span class="kw">import</span> Agent, AgentConfig, tool
+    <p class="section-desc mb-14">PII redaction, audit logging, and injection defense, configured in one <code style="color:var(--cyan)">AgentConfig</code>. Click any step to inspect what the agent produced.</p>
+
+    <div class="prod-stage">
+      <!-- Code: full agent.py with the AgentConfig stack -->
+      <div class="code-frame code-frame-accent">
+        <div class="code-bar">
+          <div class="code-dot" style="background:rgba(239,68,68,0.8)"></div>
+          <div class="code-dot" style="background:rgba(250,204,21,0.8)"></div>
+          <div class="code-dot" style="background:rgba(34,197,94,0.8)"></div>
+          <span class="code-bar-label">agent.py</span>
+        </div>
+        <div class="code-body"><span class="kw">from</span> <span class="cls">selectools</span> <span class="kw">import</span> Agent, AgentConfig, tool
 <span class="kw">from</span> <span class="cls">selectools.providers</span> <span class="kw">import</span> OpenAIProvider
 <span class="kw">from</span> <span class="cls">selectools.guardrails</span> <span class="kw">import</span> GuardrailsPipeline, PIIGuardrail
 <span class="kw">from</span> <span class="cls">selectools.audit</span> <span class="kw">import</span> AuditLogger, PrivacyLevel
@@ -2811,32 +4430,66 @@ agent = <span class="fn">Agent</span>(
 )
 
 result = agent.<span class="fn">run</span>(<span class="str">"Find our refund policy"</span>)</div>
-        </div>
       </div>
-      <div class="reveal reveal-d1" style="display:flex;flex-direction:column;justify-content:center;gap:12px">
-        <div class="result-box">
-          <div class="result-label">result.content</div>
-          <div class="result-val">&ldquo;Our refund policy allows returns within 30 days...&rdquo;</div>
+
+      <!-- Interactive trace: click a node to inspect its output -->
+      <div class="prod-trace">
+        <p class="prod-trace__title"><span class="exec-dot exec-dot--sm" aria-hidden="true"></span> result.trace</p>
+        <div class="prod-trace__nodes" role="tablist" aria-label="Agent execution trace">
+          <button type="button" class="prod-node is-active" role="tab" aria-selected="true" data-step="0">
+            <span class="prod-node__num">01</span>llm_call
+          </button>
+          <span class="prod-trace__arrow" aria-hidden="true">→</span>
+          <button type="button" class="prod-node" role="tab" aria-selected="false" data-step="1">
+            <span class="prod-node__num">02</span>tool_selection
+          </button>
+          <span class="prod-trace__arrow" aria-hidden="true">→</span>
+          <button type="button" class="prod-node" role="tab" aria-selected="false" data-step="2">
+            <span class="prod-node__num">03</span>tool_execution
+          </button>
+          <span class="prod-trace__arrow" aria-hidden="true">→</span>
+          <button type="button" class="prod-node" role="tab" aria-selected="false" data-step="3">
+            <span class="prod-node__num">04</span>llm_call
+          </button>
         </div>
-        <div class="result-box">
-          <div class="result-label">result.reasoning</div>
-          <div class="result-val">&ldquo;User asked about refund policy &rarr; search_docs is the right tool&rdquo;</div>
-        </div>
-        <div class="result-box">
-          <div class="result-label">result.trace</div>
-          <div class="trace-flow">
-            <span class="trace-step" style="background:rgba(59,130,246,0.15);color:#93c5fd">llm_call</span>
-            <span class="trace-arrow">&rarr;</span>
-            <span class="trace-step" style="background:rgba(168,85,247,0.15);color:#c4b5fd">tool_selection</span>
-            <span class="trace-arrow">&rarr;</span>
-            <span class="trace-step" style="background:rgba(34,197,94,0.15);color:#86efac">tool_execution</span>
-            <span class="trace-arrow">&rarr;</span>
-            <span class="trace-step" style="background:rgba(59,130,246,0.15);color:#93c5fd">llm_call</span>
+
+        <div class="prod-panel" role="tabpanel">
+          <div class="prod-panel__state is-active" data-state="0">
+            <div class="prod-panel__label"><code>result.reasoning</code></div>
+            <div class="prod-panel__body">&ldquo;The user is asking about the refund policy. I should search the knowledge base for the current terms before answering.&rdquo;</div>
+            <div class="prod-panel__meta">
+              <span>step 1 of 4</span>
+              <span>llm: <strong>gpt-5-mini</strong></span>
+              <span>tokens: 124</span>
+            </div>
           </div>
-        </div>
-        <div class="result-box">
-          <div class="result-label">result.usage</div>
-          <div class="result-val">847 tokens &middot; <span style="color:var(--green)">$0.0012</span></div>
+          <div class="prod-panel__state" data-state="1">
+            <div class="prod-panel__label"><code>result.tool_calls[0]</code></div>
+            <div class="prod-panel__body"><span style="color:#fbbf24">search_docs</span>(<span style="color:#86efac">query=</span><span style="color:#86efac">"refund policy"</span>)</div>
+            <div class="prod-panel__meta">
+              <span>step 2 of 4</span>
+              <span>tool: <strong>search_docs</strong></span>
+              <span>guardrails: ✓</span>
+            </div>
+          </div>
+          <div class="prod-panel__state" data-state="2">
+            <div class="prod-panel__label"><code>result.tool_outputs[0]</code></div>
+            <div class="prod-panel__body">&ldquo;Returns within 30 days of purchase. Original packaging required. Refund issued to original payment method within 5 business days...&rdquo;</div>
+            <div class="prod-panel__meta">
+              <span>step 3 of 4</span>
+              <span>screen_tool_output: <strong>passed</strong></span>
+              <span>pii: <strong>none</strong></span>
+            </div>
+          </div>
+          <div class="prod-panel__state" data-state="3">
+            <div class="prod-panel__label"><code>result.content</code></div>
+            <div class="prod-panel__body">&ldquo;Our refund policy allows returns within 30 days of purchase, in original packaging. Refunds go back to your original payment method within 5 business days.&rdquo;</div>
+            <div class="prod-panel__meta">
+              <span>step 4 of 4</span>
+              <span>tokens: <strong>847</strong></span>
+              <span>cost: <strong>$0.0012</strong></span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2960,12 +4613,92 @@ result = agent.<span class="fn">run</span>(<span class="str">"Find our refund po
         <p class="bento__desc">Both client and server. Connect to any MCP server, expose your tools as one.</p>
       </div>
 
-      <!-- Full-width footer cell: Enterprise -->
-      <div class="bento__cell bento__cell--full" data-accent="green">
-        <span class="bento__label"><span class="bento__dot"></span>Enterprise-ready</span>
-        <div class="bento__title">SBOM (CycloneDX) &middot; Security audit published &middot; <code style="color:var(--green)">@stable</code> / <code style="color:var(--green)">@beta</code> / <code style="color:var(--green)">@deprecated</code> markers &middot; Python 3.9 to 3.13 &middot; 95% test coverage &middot; 4612 tests</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── Enterprise-ready: compliance shelf (extracted from bento) ─── -->
+<section class="section" id="enterprise">
+  <div class="wrap">
+    <span class="section-label">Enterprise-ready</span>
+    <h2 class="mb-4">Five things your security team will ask for first.</h2>
+    <p class="section-desc mb-14">Not a checkbox row. Real artifacts: a coverage gauge, a test count, a version matrix, an SBOM, stability markers. Audited and shipped.</p>
+
+    <div class="ent-shelf">
+      <!-- Exhibit 1: Coverage ring -->
+      <div class="ent-exhibit">
+        <span class="ent-exhibit__label">test coverage</span>
+        <div class="ent-ring" aria-label="95 percent test coverage">
+          <svg viewBox="0 0 120 120" aria-hidden="true">
+            <circle class="ent-ring__track" cx="60" cy="60" r="50"/>
+            <circle class="ent-ring__fill"  cx="60" cy="60" r="50"/>
+          </svg>
+          <div class="ent-ring__num">95<small>%</small></div>
+        </div>
+        <p class="ent-exhibit__caption">Statement coverage on the public API surface.</p>
       </div>
 
+      <!-- Exhibit 2: Test counter -->
+      <div class="ent-exhibit">
+        <span class="ent-exhibit__label">tests passing</span>
+        <div class="ent-counter">
+          <span class="ent-counter__num" data-target="4612">0</span>
+        </div>
+        <p class="ent-exhibit__caption">Unit, integration, and e2e — green on every commit.</p>
+      </div>
+
+      <!-- Exhibit 3: Version stack -->
+      <div class="ent-exhibit">
+        <span class="ent-exhibit__label">python supported</span>
+        <div class="ent-versions">
+          <span class="ent-version"><span class="ent-version__check">✓</span> 3.13</span>
+          <span class="ent-version"><span class="ent-version__check">✓</span> 3.12</span>
+          <span class="ent-version"><span class="ent-version__check">✓</span> 3.11</span>
+          <span class="ent-version"><span class="ent-version__check">✓</span> 3.10</span>
+          <span class="ent-version"><span class="ent-version__check">✓</span> 3.9</span>
+        </div>
+        <p class="ent-exhibit__caption">Five major versions, one wheel.</p>
+      </div>
+
+      <!-- Exhibit 4: CycloneDX SBOM -->
+      <div class="ent-exhibit">
+        <span class="ent-exhibit__label">supply chain</span>
+        <div class="ent-sbom">
+          <div class="ent-sbom__doc" aria-hidden="true">
+            <span class="ent-sbom__line ent-sbom__line--l"></span>
+            <span class="ent-sbom__line ent-sbom__line--m"></span>
+            <span class="ent-sbom__line ent-sbom__line--s"></span>
+            <span class="ent-sbom__line ent-sbom__line--m"></span>
+            <span class="ent-sbom__line ent-sbom__line--l"></span>
+            <span class="ent-sbom__line ent-sbom__line--s"></span>
+            <span class="ent-sbom__line ent-sbom__line--m"></span>
+          </div>
+        </div>
+        <p class="ent-exhibit__caption">CycloneDX SBOM published with every release. Security audit on file.</p>
+      </div>
+
+      <!-- Exhibit 5: Stability markers -->
+      <div class="ent-exhibit">
+        <span class="ent-exhibit__label">api stability</span>
+        <div class="ent-markers">
+          <span class="ent-marker ent-marker--stable">
+            <span class="ent-marker__dot"></span>
+            <span class="ent-marker__name">@stable</span>
+            <span class="ent-marker__count">core</span>
+          </span>
+          <span class="ent-marker ent-marker--beta">
+            <span class="ent-marker__dot"></span>
+            <span class="ent-marker__name">@beta</span>
+            <span class="ent-marker__count">new</span>
+          </span>
+          <span class="ent-marker ent-marker--dep">
+            <span class="ent-marker__dot"></span>
+            <span class="ent-marker__name">@deprecated</span>
+            <span class="ent-marker__count">2 minors</span>
+          </span>
+        </div>
+        <p class="ent-exhibit__caption">Every public symbol marked. Deprecations stay live for two minor releases.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -2976,16 +4709,16 @@ result = agent.<span class="fn">run</span>(<span class="str">"Find our refund po
     <span class="section-label">Built-in evaluation</span>
     <h2 class="mb-4">Test your agents. Not just your code.</h2>
     <p class="section-desc mb-14">LangSmith charges $39/seat/mo for agent evaluation. DeepEval requires a separate install. Selectools ships 50 evaluators. Free, local, built in.</p>
-    <div class="grid-2 gap-8">
-      <div class="reveal">
-        <div class="code-frame code-frame-accent">
-          <div class="code-bar">
-            <div class="code-dot" style="background:rgba(239,68,68,0.8)"></div>
-            <div class="code-dot" style="background:rgba(250,204,21,0.8)"></div>
-            <div class="code-dot" style="background:rgba(34,197,94,0.8)"></div>
-            <span class="code-bar-label">test_agent.py</span>
-          </div>
-          <div class="code-body"><span class="kw">from</span> <span class="cls">selectools.evals</span> <span class="kw">import</span> EvalSuite, TestCase
+    <div class="eval-stage">
+      <!-- Code: stays as-is, the test definition the report runs against -->
+      <div class="code-frame code-frame-accent">
+        <div class="code-bar">
+          <div class="code-dot" style="background:rgba(239,68,68,0.8)"></div>
+          <div class="code-dot" style="background:rgba(250,204,21,0.8)"></div>
+          <div class="code-dot" style="background:rgba(34,197,94,0.8)"></div>
+          <span class="code-bar-label">test_agent.py</span>
+        </div>
+        <div class="code-body"><span class="kw">from</span> <span class="cls">selectools.evals</span> <span class="kw">import</span> EvalSuite, TestCase
 
 suite = <span class="fn">EvalSuite</span>(agent=agent, cases=[
     <span class="fn">TestCase</span>(
@@ -3001,30 +4734,56 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
 <span class="cmt"># report.accuracy → 1.0</span>
 <span class="cmt"># report.latency_p50 → 142ms</span>
 <span class="cmt"># report.total_cost → $0.002</span></div>
+      </div>
+
+      <!-- Live mock test report: fills in metric-by-metric on viewport entry -->
+      <div class="eval-report" role="figure" aria-label="Eval suite mock test report">
+        <div class="eval-report__bar">
+          <span class="exec-dot" aria-hidden="true"></span>
+          <span class="eval-report__title">pytest test_agent.py</span>
+          <span class="eval-report__status">running</span>
+        </div>
+        <div class="eval-report__body">
+          <div class="eval-metric is-acc">
+            <div class="eval-metric__row">
+              <span class="eval-metric__label">accuracy</span>
+              <span class="eval-metric__value">1.000</span>
+            </div>
+            <div class="eval-metric__bar" aria-hidden="true"></div>
+          </div>
+          <div class="eval-metric is-lat">
+            <div class="eval-metric__row">
+              <span class="eval-metric__label">latency p50</span>
+              <span class="eval-metric__value">142 ms</span>
+            </div>
+            <div class="eval-metric__bar" aria-hidden="true"></div>
+          </div>
+          <div class="eval-metric is-cost">
+            <div class="eval-metric__row">
+              <span class="eval-metric__label">total cost</span>
+              <span class="eval-metric__value">$0.0020</span>
+            </div>
+            <div class="eval-metric__bar" aria-hidden="true"></div>
+          </div>
+        </div>
+        <div class="eval-report__footer">
+          <code>1 passed in 142ms</code>
+          <span style="margin-left:auto">no PII · no injections · cancel_sub ✓</span>
         </div>
       </div>
-      <div class="reveal reveal-d1" style="display:flex;flex-direction:column;gap:16px;justify-content:center">
-        <div class="card" style="padding:20px">
-          <h3 style="font-size:13px;color:var(--cyan);margin-bottom:10px">30 Deterministic Evaluators</h3>
-          <div class="tag-group">
-            <span class="tag">ToolUse</span><span class="tag">ToolOrder</span><span class="tag">Contains</span><span class="tag">Output</span><span class="tag">Structured</span><span class="tag">JSON</span><span class="tag">Python</span><span class="tag">SQL</span><span class="tag">PII</span><span class="tag">Injection</span><span class="tag">Sentiment</span><span class="tag">Readability</span><span class="tag">AgentTrajectory</span><span class="tag">ToolEfficiency</span><span class="tag">SemanticSimilarity</span>
-          </div>
-        </div>
-        <div class="card" style="padding:20px">
-          <h3 style="font-size:13px;color:var(--cyan);margin-bottom:10px">20 LLM-as-Judge Evaluators</h3>
-          <div class="tag-group">
-            <span class="tag tag-blue">Correctness</span><span class="tag tag-blue">Relevance</span><span class="tag tag-blue">Faithfulness</span><span class="tag tag-blue">Hallucination</span><span class="tag tag-blue">Toxicity</span><span class="tag tag-blue">Safety</span><span class="tag tag-blue">Coherence</span><span class="tag tag-blue">Completeness</span><span class="tag tag-blue">Conciseness</span><span class="tag tag-blue">Bias</span><span class="tag tag-blue">FactConsistency</span>
-          </div>
-        </div>
-        <div class="card" style="padding:20px">
-          <h3 style="font-size:13px;color:var(--cyan);margin-bottom:10px">Infrastructure</h3>
-          <ul class="check-list" style="font-size:13px">
-            <li>Interactive HTML report with charts</li>
-            <li>JUnit XML for CI (GitHub Actions, Jenkins)</li>
-            <li>Regression detection with baseline comparison</li>
-            <li>A/B testing with PairwiseEval</li>
-          </ul>
-        </div>
+    </div>
+
+    <!-- Marquee: all 50 evaluators in 2 rows scrolling in opposite directions -->
+    <div class="eval-marquee" aria-label="All 50 selectools evaluators">
+      <div class="eval-marquee__row">
+        <span class="eval-tag eval-tag--det">ToolUse</span><span class="eval-tag eval-tag--det">ToolOrder</span><span class="eval-tag eval-tag--det">ToolEfficiency</span><span class="eval-tag eval-tag--det">AgentTrajectory</span><span class="eval-tag eval-tag--det">Contains</span><span class="eval-tag eval-tag--det">NotContains</span><span class="eval-tag eval-tag--det">Equals</span><span class="eval-tag eval-tag--det">Regex</span><span class="eval-tag eval-tag--det">Output</span><span class="eval-tag eval-tag--det">Structured</span><span class="eval-tag eval-tag--det">JSON</span><span class="eval-tag eval-tag--det">JSONSchema</span><span class="eval-tag eval-tag--det">Python</span><span class="eval-tag eval-tag--det">SQL</span><span class="eval-tag eval-tag--det">Markdown</span><span class="eval-tag eval-tag--det">XML</span><span class="eval-tag eval-tag--det">YAML</span><span class="eval-tag eval-tag--det">PII</span><span class="eval-tag eval-tag--det">Injection</span><span class="eval-tag eval-tag--det">Sentiment</span><span class="eval-tag eval-tag--det">Readability</span><span class="eval-tag eval-tag--det">SemanticSimilarity</span><span class="eval-tag eval-tag--det">EditDistance</span><span class="eval-tag eval-tag--det">BLEU</span><span class="eval-tag eval-tag--det">ROUGE</span><span class="eval-tag eval-tag--det">TokenCount</span><span class="eval-tag eval-tag--det">Latency</span><span class="eval-tag eval-tag--det">Cost</span><span class="eval-tag eval-tag--det">Cardinality</span><span class="eval-tag eval-tag--det">Determinism</span>
+        <!-- duplicated for seamless loop -->
+        <span class="eval-tag eval-tag--det">ToolUse</span><span class="eval-tag eval-tag--det">ToolOrder</span><span class="eval-tag eval-tag--det">ToolEfficiency</span><span class="eval-tag eval-tag--det">AgentTrajectory</span><span class="eval-tag eval-tag--det">Contains</span><span class="eval-tag eval-tag--det">NotContains</span><span class="eval-tag eval-tag--det">Equals</span><span class="eval-tag eval-tag--det">Regex</span><span class="eval-tag eval-tag--det">Output</span><span class="eval-tag eval-tag--det">Structured</span><span class="eval-tag eval-tag--det">JSON</span><span class="eval-tag eval-tag--det">JSONSchema</span><span class="eval-tag eval-tag--det">Python</span><span class="eval-tag eval-tag--det">SQL</span><span class="eval-tag eval-tag--det">Markdown</span><span class="eval-tag eval-tag--det">XML</span><span class="eval-tag eval-tag--det">YAML</span><span class="eval-tag eval-tag--det">PII</span><span class="eval-tag eval-tag--det">Injection</span><span class="eval-tag eval-tag--det">Sentiment</span><span class="eval-tag eval-tag--det">Readability</span><span class="eval-tag eval-tag--det">SemanticSimilarity</span><span class="eval-tag eval-tag--det">EditDistance</span><span class="eval-tag eval-tag--det">BLEU</span><span class="eval-tag eval-tag--det">ROUGE</span><span class="eval-tag eval-tag--det">TokenCount</span><span class="eval-tag eval-tag--det">Latency</span><span class="eval-tag eval-tag--det">Cost</span><span class="eval-tag eval-tag--det">Cardinality</span><span class="eval-tag eval-tag--det">Determinism</span>
+      </div>
+      <div class="eval-marquee__row eval-marquee__row--rev">
+        <span class="eval-tag eval-tag--judge">Correctness</span><span class="eval-tag eval-tag--judge">Relevance</span><span class="eval-tag eval-tag--judge">Faithfulness</span><span class="eval-tag eval-tag--judge">Hallucination</span><span class="eval-tag eval-tag--judge">Groundedness</span><span class="eval-tag eval-tag--judge">Toxicity</span><span class="eval-tag eval-tag--judge">Safety</span><span class="eval-tag eval-tag--judge">Bias</span><span class="eval-tag eval-tag--judge">Coherence</span><span class="eval-tag eval-tag--judge">Completeness</span><span class="eval-tag eval-tag--judge">Conciseness</span><span class="eval-tag eval-tag--judge">FactConsistency</span><span class="eval-tag eval-tag--judge">Helpfulness</span><span class="eval-tag eval-tag--judge">InstructionFollow</span><span class="eval-tag eval-tag--judge">ContextRelevance</span><span class="eval-tag eval-tag--judge">AnswerRelevance</span><span class="eval-tag eval-tag--judge">RagFaithfulness</span><span class="eval-tag eval-tag--judge">PairwiseEval</span><span class="eval-tag eval-tag--judge">RubricScore</span><span class="eval-tag eval-tag--judge">CustomJudge</span>
+        <!-- duplicated for seamless loop -->
+        <span class="eval-tag eval-tag--judge">Correctness</span><span class="eval-tag eval-tag--judge">Relevance</span><span class="eval-tag eval-tag--judge">Faithfulness</span><span class="eval-tag eval-tag--judge">Hallucination</span><span class="eval-tag eval-tag--judge">Groundedness</span><span class="eval-tag eval-tag--judge">Toxicity</span><span class="eval-tag eval-tag--judge">Safety</span><span class="eval-tag eval-tag--judge">Bias</span><span class="eval-tag eval-tag--judge">Coherence</span><span class="eval-tag eval-tag--judge">Completeness</span><span class="eval-tag eval-tag--judge">Conciseness</span><span class="eval-tag eval-tag--judge">FactConsistency</span><span class="eval-tag eval-tag--judge">Helpfulness</span><span class="eval-tag eval-tag--judge">InstructionFollow</span><span class="eval-tag eval-tag--judge">ContextRelevance</span><span class="eval-tag eval-tag--judge">AnswerRelevance</span><span class="eval-tag eval-tag--judge">RagFaithfulness</span><span class="eval-tag eval-tag--judge">PairwiseEval</span><span class="eval-tag eval-tag--judge">RubricScore</span><span class="eval-tag eval-tag--judge">CustomJudge</span>
       </div>
     </div>
     <div class="grid-2 gap-8 mt-16">
@@ -3377,116 +5136,166 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
   <div class="wrap">
     <div class="text-center mb-14">
       <span class="section-label">FAQ</span>
-      <h2>Frequently asked questions</h2>
+      <h2>Type a question. Or browse the docs.</h2>
     </div>
-    <div style="max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:2px">
-      <details class="card reveal" style="cursor:pointer;padding:0">
-        <summary style="padding:18px 24px;font-weight:600;font-size:14px;color:#fff;list-style:none;display:flex;justify-content:space-between;align-items:center">
-          What is Selectools?
-          <span style="color:var(--text-faint);font-size:12px;flex-shrink:0;margin-left:16px">&#9660;</span>
-        </summary>
-        <div style="padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7">
-          Selectools is an open-source Python library for building production-ready AI agents with tool calling, RAG (retrieval-augmented generation), and multi-agent orchestration. It supports OpenAI, Anthropic, Gemini, and Ollama providers with a single unified API. Install with: <code style="color:var(--cyan)">pip install selectools</code>.
+
+    <div class="repl">
+      <!-- Left rail: category tabs (div with role=navigation to avoid the global nav { position:fixed } selector) -->
+      <div class="repl__rail" role="navigation" aria-label="FAQ categories">
+        <p class="repl__rail-title"><span class="exec-dot exec-dot--sm" aria-hidden="true"></span> categories</p>
+        <button type="button" class="repl__cat is-active" data-cat="all">all<span class="repl__cat-count">10</span></button>
+        <button type="button" class="repl__cat" data-cat="getting-started">getting-started<span class="repl__cat-count">2</span></button>
+        <button type="button" class="repl__cat" data-cat="concepts">concepts<span class="repl__cat-count">3</span></button>
+        <button type="button" class="repl__cat" data-cat="providers">providers<span class="repl__cat-count">2</span></button>
+        <button type="button" class="repl__cat" data-cat="advanced">advanced<span class="repl__cat-count">3</span></button>
+      </div>
+
+      <!-- Main panel: search + question list -->
+      <div class="repl__main">
+        <div class="repl__searchbar">
+          <span class="repl__prompt">docs &gt;</span>
+          <input type="text" class="repl__search" placeholder="search the docs..." aria-label="Search FAQ" />
+          <span class="exec-caret" aria-hidden="true"></span>
         </div>
-      </details>
-      <details class="card reveal reveal-d1" style="cursor:pointer;padding:0">
-        <summary style="padding:18px 24px;font-weight:600;font-size:14px;color:#fff;list-style:none;display:flex;justify-content:space-between;align-items:center">
-          How is Selectools different from LangChain?
-          <span style="color:var(--text-faint);font-size:12px;flex-shrink:0;margin-left:16px">&#9660;</span>
-        </summary>
-        <div style="padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7">
-          Selectools uses a single <code>Agent</code> class with native tool calling. No chains, no expression language, no complex abstractions. It includes built-in features that require separate paid services in LangChain: 50 evaluators (vs LangSmith at $39/seat/mo), hybrid RAG search, guardrails, audit logging, multi-agent orchestration, and a visual builder. One <code style="color:var(--cyan)">pip install</code>, everything included, free.
+
+        <div class="repl__list" role="list">
+          <details class="repl__q" data-cat="getting-started" data-q="what is selectools install pip">
+            <summary class="repl__q-summary">
+              <span class="repl__q-marker">?</span>
+              <span class="repl__q-text">What is Selectools?</span>
+              <span class="repl__q-cat">getting-started</span>
+            </summary>
+            <div class="repl__q-answer">
+              Selectools is an open-source Python library for building production-ready AI agents with tool calling, RAG (retrieval-augmented generation), and multi-agent orchestration. It supports OpenAI, Anthropic, Gemini, and Ollama providers with a single unified API. Install with: <code>pip install selectools</code>.
+            </div>
+          </details>
+
+          <details class="repl__q" data-cat="concepts" data-q="langchain difference compare alternative">
+            <summary class="repl__q-summary">
+              <span class="repl__q-marker">?</span>
+              <span class="repl__q-text">How is Selectools different from LangChain?</span>
+              <span class="repl__q-cat">concepts</span>
+            </summary>
+            <div class="repl__q-answer">
+              Selectools uses a single <code>Agent</code> class with native tool calling. No chains, no expression language, no complex abstractions. It includes built-in features that require separate paid services in LangChain: 50 evaluators (vs LangSmith at $39/seat/mo), hybrid RAG search, guardrails, audit logging, multi-agent orchestration, and a visual builder. One <code>pip install</code>, everything included, free.
+            </div>
+          </details>
+
+          <details class="repl__q" data-cat="providers" data-q="providers openai anthropic gemini ollama llm">
+            <summary class="repl__q-summary">
+              <span class="repl__q-marker">?</span>
+              <span class="repl__q-text">What LLM providers does Selectools support?</span>
+              <span class="repl__q-cat">providers</span>
+            </summary>
+            <div class="repl__q-answer">
+              Five providers: OpenAI (GPT-4, GPT-5, o-series), Anthropic (Claude), Google Gemini, Ollama (local models), and a FallbackProvider for automatic failover with circuit breaker. Includes pricing data for 152 models. For testing without any API key, use the built-in <code>LocalProvider</code>.
+            </div>
+          </details>
+
+          <details class="repl__q" data-cat="concepts" data-q="visual builder ui drag drop browser">
+            <summary class="repl__q-summary">
+              <span class="repl__q-marker">?</span>
+              <span class="repl__q-text">Does Selectools have a visual builder?</span>
+              <span class="repl__q-cat">concepts</span>
+            </summary>
+            <div class="repl__q-answer">
+              Yes. Selectools ships a drag-and-drop visual agent builder that runs in the browser with zero installation. Design multi-agent workflows, test with mock or real APIs, and export runnable Python or YAML. <a href="builder/">Try it now &rarr;</a>
+            </div>
+          </details>
+
+          <details class="repl__q" data-cat="getting-started" data-q="install pip how setup">
+            <summary class="repl__q-summary">
+              <span class="repl__q-marker">?</span>
+              <span class="repl__q-text">How do I install Selectools?</span>
+              <span class="repl__q-cat">getting-started</span>
+            </summary>
+            <div class="repl__q-answer">
+              <code>pip install selectools</code>. For the visual builder with Starlette server: <code>pip install selectools[serve]</code>. For Chroma/Pinecone vector stores: <code>pip install selectools[rag]</code>. Requires Python 3.9+.
+            </div>
+          </details>
+
+          <details class="repl__q" data-cat="advanced" data-q="streaming async astream tokens">
+            <summary class="repl__q-summary">
+              <span class="repl__q-marker">?</span>
+              <span class="repl__q-text">Does Selectools support streaming?</span>
+              <span class="repl__q-cat">advanced</span>
+            </summary>
+            <div class="repl__q-answer">
+              Yes. <code>astream()</code> provides token-level async streaming with native tool call support. Tool calls are yielded as structured <code>ToolCall</code> objects alongside text chunks, not mixed into the text stream.
+            </div>
+          </details>
+
+          <details class="repl__q" data-cat="advanced" data-q="rag retrieval search vector chroma pinecone bm25">
+            <summary class="repl__q-summary">
+              <span class="repl__q-marker">?</span>
+              <span class="repl__q-text">Does Selectools support RAG?</span>
+              <span class="repl__q-cat">advanced</span>
+            </summary>
+            <div class="repl__q-answer">
+              Yes. The built-in RAG pipeline includes BM25 keyword search + vector semantic search, reciprocal rank fusion (RRF), cross-encoder reranking, semantic and contextual chunking, and 4 vector store backends (memory, SQLite, Chroma, Pinecone).
+            </div>
+          </details>
+
+          <details class="repl__q" data-cat="providers" data-q="local models ollama llama mistral offline">
+            <summary class="repl__q-summary">
+              <span class="repl__q-marker">?</span>
+              <span class="repl__q-text">Can I use Selectools with local models?</span>
+              <span class="repl__q-cat">providers</span>
+            </summary>
+            <div class="repl__q-answer">
+              Yes. Use the <code>OllamaProvider</code> to run agents with any Ollama-compatible local model (Llama, Mistral, Gemma, etc.). For testing without any API or model, use the built-in <code>LocalProvider</code> stub.
+            </div>
+          </details>
+
+          <details class="repl__q" data-cat="advanced" data-q="multi agent graph supervisor orchestration parallel">
+            <summary class="repl__q-summary">
+              <span class="repl__q-marker">?</span>
+              <span class="repl__q-text">Does Selectools support multi-agent orchestration?</span>
+              <span class="repl__q-cat">advanced</span>
+            </summary>
+            <div class="repl__q-answer">
+              Yes. <code>AgentGraph</code> supports directed graph orchestration with conditional routing, parallel fan-out (3 merge policies), and checkpoint-backed state. <code>SupervisorAgent</code> provides 4 coordination strategies: plan-and-execute, round-robin, dynamic routing, and magentic-one. Higher-level patterns include PlanAndExecute, Reflective, Debate, and TeamLead agents.
+            </div>
+          </details>
+
+          <details class="repl__q" data-cat="concepts" data-q="production ready stable tests coverage audit security">
+            <summary class="repl__q-summary">
+              <span class="repl__q-marker">?</span>
+              <span class="repl__q-text">Is Selectools production-ready?</span>
+              <span class="repl__q-cat">concepts</span>
+            </summary>
+            <div class="repl__q-answer">
+              Yes. 4,612 tests at 95% coverage (including 40 real API evaluations), published security audit, SBOM (CycloneDX 1.6), formal deprecation policy, <code>@stable</code>/<code>@beta</code> markers on every public API, and a compatibility matrix covering Python 3.9 to 3.13. Migration guides for LangChain, CrewAI, AutoGen, and LlamaIndex. Apache-2.0 licensed.
+            </div>
+          </details>
+
+          <div class="repl__empty">no questions match. try a broader search.</div>
         </div>
-      </details>
-      <details class="card reveal reveal-d2" style="cursor:pointer;padding:0">
-        <summary style="padding:18px 24px;font-weight:600;font-size:14px;color:#fff;list-style:none;display:flex;justify-content:space-between;align-items:center">
-          What LLM providers does Selectools support?
-          <span style="color:var(--text-faint);font-size:12px;flex-shrink:0;margin-left:16px">&#9660;</span>
-        </summary>
-        <div style="padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7">
-          Five providers: OpenAI (GPT-4, GPT-5, o-series), Anthropic (Claude), Google Gemini, Ollama (local models), and a FallbackProvider for automatic failover with circuit breaker. Includes pricing data for 152 models. For testing without any API key, use the built-in <code>LocalProvider</code>.
-        </div>
-      </details>
-      <details class="card reveal reveal-d3" style="cursor:pointer;padding:0">
-        <summary style="padding:18px 24px;font-weight:600;font-size:14px;color:#fff;list-style:none;display:flex;justify-content:space-between;align-items:center">
-          Does Selectools have a visual builder?
-          <span style="color:var(--text-faint);font-size:12px;flex-shrink:0;margin-left:16px">&#9660;</span>
-        </summary>
-        <div style="padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7">
-          Yes. Selectools ships a drag-and-drop visual agent builder that runs in the browser with zero installation. Design multi-agent workflows, test with mock or real APIs, and export runnable Python or YAML. <a href="builder/" style="color:var(--cyan)">Try it now &rarr;</a>
-        </div>
-      </details>
-      <details class="card reveal" style="cursor:pointer;padding:0">
-        <summary style="padding:18px 24px;font-weight:600;font-size:14px;color:#fff;list-style:none;display:flex;justify-content:space-between;align-items:center">
-          How do I install Selectools?
-          <span style="color:var(--text-faint);font-size:12px;flex-shrink:0;margin-left:16px">&#9660;</span>
-        </summary>
-        <div style="padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7">
-          <code style="color:var(--cyan)">pip install selectools</code>. For the visual builder with Starlette server: <code style="color:var(--cyan)">pip install selectools[serve]</code>. For Chroma/Pinecone vector stores: <code style="color:var(--cyan)">pip install selectools[rag]</code>. Requires Python 3.9+.
-        </div>
-      </details>
-      <details class="card reveal reveal-d1" style="cursor:pointer;padding:0">
-        <summary style="padding:18px 24px;font-weight:600;font-size:14px;color:#fff;list-style:none;display:flex;justify-content:space-between;align-items:center">
-          Does Selectools support streaming?
-          <span style="color:var(--text-faint);font-size:12px;flex-shrink:0;margin-left:16px">&#9660;</span>
-        </summary>
-        <div style="padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7">
-          Yes. <code style="color:var(--cyan)">astream()</code> provides token-level async streaming with native tool call support. Tool calls are yielded as structured <code>ToolCall</code> objects alongside text chunks, not mixed into the text stream.
-        </div>
-      </details>
-      <details class="card reveal reveal-d2" style="cursor:pointer;padding:0">
-        <summary style="padding:18px 24px;font-weight:600;font-size:14px;color:#fff;list-style:none;display:flex;justify-content:space-between;align-items:center">
-          Does Selectools support RAG?
-          <span style="color:var(--text-faint);font-size:12px;flex-shrink:0;margin-left:16px">&#9660;</span>
-        </summary>
-        <div style="padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7">
-          Yes. The built-in RAG pipeline includes BM25 keyword search + vector semantic search, reciprocal rank fusion (RRF), cross-encoder reranking, semantic and contextual chunking, and 4 vector store backends (memory, SQLite, Chroma, Pinecone).
-        </div>
-      </details>
-      <details class="card reveal reveal-d3" style="cursor:pointer;padding:0">
-        <summary style="padding:18px 24px;font-weight:600;font-size:14px;color:#fff;list-style:none;display:flex;justify-content:space-between;align-items:center">
-          Can I use Selectools with local models?
-          <span style="color:var(--text-faint);font-size:12px;flex-shrink:0;margin-left:16px">&#9660;</span>
-        </summary>
-        <div style="padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7">
-          Yes. Use the <code style="color:var(--cyan)">OllamaProvider</code> to run agents with any Ollama-compatible local model (Llama, Mistral, Gemma, etc.). For testing without any API or model, use the built-in <code style="color:var(--cyan)">LocalProvider</code> stub.
-        </div>
-      </details>
-      <details class="card reveal" style="cursor:pointer;padding:0">
-        <summary style="padding:18px 24px;font-weight:600;font-size:14px;color:#fff;list-style:none;display:flex;justify-content:space-between;align-items:center">
-          Does Selectools support multi-agent orchestration?
-          <span style="color:var(--text-faint);font-size:12px;flex-shrink:0;margin-left:16px">&#9660;</span>
-        </summary>
-        <div style="padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7">
-          Yes. <code style="color:var(--cyan)">AgentGraph</code> supports directed graph orchestration with conditional routing, parallel fan-out (3 merge policies), and checkpoint-backed state. <code style="color:var(--cyan)">SupervisorAgent</code> provides 4 coordination strategies: plan-and-execute, round-robin, dynamic routing, and magentic-one. Higher-level patterns include PlanAndExecute, Reflective, Debate, and TeamLead agents.
-        </div>
-      </details>
-      <details class="card reveal reveal-d1" style="cursor:pointer;padding:0">
-        <summary style="padding:18px 24px;font-weight:600;font-size:14px;color:#fff;list-style:none;display:flex;justify-content:space-between;align-items:center">
-          Is Selectools production-ready?
-          <span style="color:var(--text-faint);font-size:12px;flex-shrink:0;margin-left:16px">&#9660;</span>
-        </summary>
-        <div style="padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7">
-          Yes. 4,612 tests at 95% coverage (including 40 real API evaluations), published security audit, SBOM (CycloneDX 1.6), formal deprecation policy, <code style="color:var(--cyan)">@stable</code>/<code style="color:var(--cyan)">@beta</code> markers on every public API, and a compatibility matrix covering Python 3.9 to 3.13. Migration guides for LangChain, CrewAI, AutoGen, and LlamaIndex. Apache-2.0 licensed.
-        </div>
-      </details>
+      </div>
     </div>
   </div>
 </section>
 
 <!-- ─── Footer ─────────────────────────────────────────────────────── -->
-<footer class="footer">
-  <div class="wrap">
-    <div class="footer-attribution">
-      <span>An open-source project from <a href="https://nichevlabs.com" style="color:var(--cyan)">NichevLabs</a>.</span>
-      <span class="footer-meta" style="margin-left:8px;color:var(--text-faint)">Apache-2.0 &middot; Python 3.9+ &middot; v0.20.1</span>
-    </div>
-    <div class="footer-links">
-      <a href="https://github.com/johnnichev/selectools">GitHub</a>
-      <a href="https://pypi.org/project/selectools/">PyPI</a>
-      <a href="QUICKSTART/">Docs</a>
-      <a href="CHANGELOG/">Changelog</a>
-    </div>
+<footer class="footer-term" role="contentinfo">
+  <div class="footer-term__prompt"><span class="pr">$</span>tree selectools.dev/ <span class="footer-term__cmt"># site map</span></div>
+<div class="footer-term__tree">.
+├── <a href="QUICKSTART/">docs/</a>
+│   ├── <a href="QUICKSTART/">quickstart.md</a>
+│   ├── <a href="docs/configuration/">configuration.md</a>
+│   ├── <a href="docs/providers/">providers.md</a>
+│   └── <a href="docs/api-reference/">api-reference/</a>
+├── <a href="examples/">examples/</a>      <span class="footer-term__cmt"># 88 numbered scripts</span>
+├── <a href="builder/">builder/</a>       <span class="footer-term__cmt"># visual flow editor</span>
+├── <a href="https://github.com/johnnichev/selectools">github/</a>        <span class="footer-term__cmt"># source &middot; issues &middot; discussions</span>
+├── <a href="https://pypi.org/project/selectools/">pypi/</a>          <span class="footer-term__cmt"># pip install selectools</span>
+└── <a href="CHANGELOG/">changelog/</a>     <span class="footer-term__cmt"># what shipped, what changed</span>
+
+<span class="footer-term__cmt"># selectools v0.20.1 &middot; Apache-2.0 &middot; <span class="footer-term__nichev">made by <a href="https://nichevlabs.com">NichevLabs</a></span></span>
+<span class="footer-term__cmt"># for developers who ship</span></div>
+  <div class="footer-term__final">
+    <span class="pr">$</span>
+    <span class="exec-caret" aria-hidden="true"></span>
   </div>
 </footer>
 
@@ -3575,6 +5384,263 @@ const obs = new IntersectionObserver(entries => {
   entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
 }, { threshold: 0.08 });
 document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+
+/* ── #faq REPL: category filter + search + auto-type seed ───────── */
+(function() {
+  var repl = document.querySelector('.repl');
+  if (!repl) return;
+  var cats = repl.querySelectorAll('.repl__cat');
+  var qs = repl.querySelectorAll('.repl__q');
+  var search = repl.querySelector('.repl__search');
+  var activeCat = 'all';
+
+  function applyFilters() {
+    var query = (search.value || '').trim().toLowerCase();
+    var anyVisible = false;
+    qs.forEach(function(q) {
+      var qcat = q.getAttribute('data-cat');
+      var qtext = (q.getAttribute('data-q') + ' ' + q.querySelector('.repl__q-text').textContent).toLowerCase();
+      var matchCat = (activeCat === 'all') || (qcat === activeCat);
+      var matchText = !query || qtext.indexOf(query) !== -1;
+      var visible = matchCat && matchText;
+      q.classList.toggle('is-hidden', !visible);
+      if (visible) anyVisible = true;
+    });
+    repl.classList.toggle('is-empty', !anyVisible);
+  }
+
+  cats.forEach(function(cat) {
+    cat.addEventListener('click', function() {
+      cats.forEach(function(c) { c.classList.remove('is-active'); });
+      cat.classList.add('is-active');
+      activeCat = cat.getAttribute('data-cat');
+      applyFilters();
+    });
+  });
+
+  search.addEventListener('input', applyFilters);
+
+  // Auto-type a seed query into the search bar on viewport entry
+  // (purely cosmetic — the input clears itself after to leave the user free)
+  var seeded = false;
+  var io = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (!e.isIntersecting || seeded) return;
+      seeded = true;
+      var seed = 'production';
+      var i = 0;
+      var typer = setInterval(function() {
+        if (i > seed.length) {
+          clearInterval(typer);
+          // Clear after a brief pause so user has a clean input
+          setTimeout(function() {
+            search.value = '';
+            applyFilters();
+          }, 1400);
+          return;
+        }
+        search.value = seed.slice(0, i);
+        applyFilters();
+        i++;
+      }, 95);
+      io.disconnect();
+    });
+  }, { threshold: 0.25, rootMargin: '0px 0px -10% 0px' });
+  io.observe(repl);
+})();
+
+/* ── #enterprise compliance shelf: stamp + counter tick ─────────── */
+(function() {
+  var shelf = document.querySelector('.ent-shelf');
+  if (!shelf) return;
+  var counter = shelf.querySelector('.ent-counter__num');
+  var io = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (!e.isIntersecting) return;
+      shelf.classList.add('in-view');
+      // Tick the counter from 0 to its target with eased ramp
+      if (counter) {
+        var target = parseInt(counter.getAttribute('data-target'), 10) || 0;
+        var dur = 1600;
+        var t0 = performance.now() + 300; // start after the stamp
+        function step(now) {
+          if (now < t0) { requestAnimationFrame(step); return; }
+          var p = Math.min(1, (now - t0) / dur);
+          var eased = 1 - Math.pow(1 - p, 3);
+          counter.textContent = Math.round(target * eased).toLocaleString();
+          if (p < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      }
+      io.disconnect();
+    });
+  }, { threshold: 0.25, rootMargin: '0px 0px -8% 0px' });
+  io.observe(shelf);
+})();
+
+/* ── #see-difference: drag-to-compare slider + auto-sweep ───────── */
+(function() {
+  var stage = document.querySelector('.diff-stage');
+  if (!stage) return;
+  var range = stage.querySelector('.diff-pane__range');
+  var annos = stage.querySelectorAll('.diff-anno');
+  if (!range) return;
+
+  var splitLine = stage.querySelector('.diff-pane__split-line');
+  var splitKnob = stage.querySelector('.diff-pane__split-knob');
+  function setSplit(v) {
+    // --split is a unitless 0..100 value. CSS multiplies it by 1% to get a length.
+    // Slider value v = how much LangGraph (left col) is visible (0..100).
+    // So drag LEFT (lower v) = less LangGraph = more selectools = "wipe ceremony away".
+    var langgraphPct = 100 - v;
+    stage.style.setProperty('--split', langgraphPct);
+    if (splitLine) splitLine.style.left = langgraphPct + '%';
+    if (splitKnob) splitKnob.style.left = langgraphPct + '%';
+    annos.forEach(function(a) {
+      var t = parseFloat(a.getAttribute('data-threshold')) || 0;
+      a.classList.toggle('is-shown', v >= t);
+    });
+  }
+
+  // User drag/keyboard input
+  range.addEventListener('input', function() {
+    stage.classList.add('is-dragging');
+    setSplit(parseFloat(range.value));
+  });
+  range.addEventListener('change', function() {
+    setSplit(parseFloat(range.value));
+    setTimeout(function() { stage.classList.remove('is-dragging'); }, 200);
+  });
+
+  // Auto-sweep: 50 → 95 → 50 once on viewport entry
+  var io = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (!e.isIntersecting) return;
+      var start = 50, end = 95, mid = 50;
+      var t0 = performance.now();
+      function step(now) {
+        var elapsed = now - t0;
+        var v;
+        if (elapsed < 1100) {
+          // 50 → 95
+          var p = elapsed / 1100;
+          v = start + (end - start) * (1 - Math.pow(1 - p, 3));
+        } else if (elapsed < 1400) {
+          // hold at 95
+          v = end;
+        } else if (elapsed < 2400) {
+          // 95 → 50
+          var p2 = (elapsed - 1400) / 1000;
+          v = end + (mid - end) * (1 - Math.pow(1 - p2, 3));
+        } else {
+          v = mid;
+          range.value = v;
+          setSplit(v);
+          return;
+        }
+        range.value = v;
+        setSplit(v);
+        requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+      io.disconnect();
+    });
+  }, { threshold: 0.35, rootMargin: '0px 0px -8% 0px' });
+  io.observe(stage);
+
+  // Init at 50
+  setSplit(50);
+})();
+
+/* ── #production trace explorer: clickable nodes + auto-play ────── */
+(function() {
+  var stage = document.querySelector('.prod-stage');
+  if (!stage) return;
+  var nodes = stage.querySelectorAll('.prod-node');
+  var arrows = stage.querySelectorAll('.prod-trace__arrow');
+  var states = stage.querySelectorAll('.prod-panel__state');
+  if (!nodes.length || !states.length) return;
+
+  function activate(idx) {
+    nodes.forEach(function(n, i) {
+      n.classList.toggle('is-active', i === idx);
+      n.setAttribute('aria-selected', i === idx ? 'true' : 'false');
+    });
+    states.forEach(function(s, i) { s.classList.toggle('is-active', i === idx); });
+    arrows.forEach(function(a, i) { a.classList.toggle('is-passed', i < idx); });
+  }
+
+  // Click handlers — instant inspection
+  nodes.forEach(function(n, i) {
+    n.addEventListener('click', function() { activate(i); });
+  });
+
+  // Keyboard nav (left/right between nodes)
+  stage.addEventListener('keydown', function(e) {
+    var active = Array.from(nodes).findIndex(function(n) { return n.classList.contains('is-active'); });
+    if (e.key === 'ArrowRight' && active < nodes.length - 1) {
+      activate(active + 1); nodes[active + 1].focus();
+    } else if (e.key === 'ArrowLeft' && active > 0) {
+      activate(active - 1); nodes[active - 1].focus();
+    }
+  });
+
+  // Auto-play through nodes once on viewport entry, then idle
+  var io = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (!e.isIntersecting) return;
+      var i = 0;
+      var interval = setInterval(function() {
+        i++;
+        if (i >= nodes.length) { clearInterval(interval); return; }
+        activate(i);
+      }, 850);
+      io.disconnect();
+    });
+  }, { threshold: 0.35, rootMargin: '0px 0px -8% 0px' });
+  io.observe(stage);
+})();
+
+/* ── #eval report: fills in metrics on viewport entry ───────────── */
+(function() {
+  var report = document.querySelector('.eval-report');
+  if (!report) return;
+  var status = report.querySelector('.eval-report__status');
+  var io = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (!e.isIntersecting) return;
+      report.classList.add('is-running');
+      // Mark "done" after the last metric+value finishes (~2.7s in)
+      setTimeout(function() {
+        report.classList.add('is-done');
+        if (status) status.textContent = 'passed';
+      }, 2700);
+      io.disconnect();
+    });
+  }, { threshold: 0.3, rootMargin: '0px 0px -8% 0px' });
+  io.observe(report);
+})();
+
+/* ── #what stage: terminal types script + chips light up in sync ── */
+(function() {
+  var stage = document.querySelector('.what-stage');
+  if (!stage) return;
+  var term = stage.querySelector('.what-term');
+  var chips = stage.querySelectorAll('.what-chip');
+  var io = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (!e.isIntersecting) return;
+      stage.classList.add('in-view');
+      if (term) term.classList.add('in-view');
+      chips.forEach(function(chip) {
+        var delay = parseFloat(getComputedStyle(chip).getPropertyValue('--chip-delay')) || 0;
+        setTimeout(function() { chip.classList.add('is-lit'); }, delay * 1000);
+      });
+      io.disconnect();
+    });
+  }, { threshold: 0.25, rootMargin: '0px 0px -8% 0px' });
+  io.observe(stage);
+})();
 
 /* ── Section 1 vignette in-view trigger ──────────────────────────── */
 /* Separate observer with a higher threshold so the diff-glow animation
