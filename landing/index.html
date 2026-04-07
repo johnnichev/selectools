@@ -2612,6 +2612,195 @@
       .what-chip { padding: 10px 12px; font-size: 13px; }
     }
 
+    /* ════════════════════════════════════════════════════════════════
+       OVERDRIVE FUSED — #eval — live test report + 50-evaluator marquee
+       Code on the left stays. Right side is a hardcoded mock test
+       report that fills in metric-by-metric on viewport entry. Below
+       both: a 2-row marquee of all 50 evaluator names scrolling in
+       opposite directions (too many to count, which is the point).
+       ════════════════════════════════════════════════════════════════ */
+    .eval-stage {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 28px;
+      align-items: stretch;
+      margin-top: 28px;
+    }
+    .eval-report {
+      background: #0b1220;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 20px 60px -28px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(34, 211, 238, 0.05);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .eval-report__bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.7);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+    }
+    .eval-report__bar .exec-dot { background: #f59e0b; box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.45); animation: eval-spinner 1.2s linear infinite; }
+    .eval-report.is-done .eval-report__bar .exec-dot { background: var(--green); box-shadow: 0 0 8px rgba(34, 197, 94, 0.6); animation: none; }
+    @keyframes eval-spinner {
+      0%, 100% { transform: scale(0.9); opacity: 0.6; }
+      50%      { transform: scale(1.1); opacity: 1; }
+    }
+    .eval-report__title {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text);
+      letter-spacing: 0.02em;
+    }
+    .eval-report__status {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: rgba(245, 158, 11, 0.12);
+      color: #f59e0b;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      transition: background 0.4s var(--exec-ease-soft), color 0.4s var(--exec-ease-soft), border-color 0.4s var(--exec-ease-soft);
+    }
+    .eval-report.is-done .eval-report__status {
+      background: rgba(34, 197, 94, 0.12);
+      color: var(--green);
+      border-color: rgba(34, 197, 94, 0.4);
+    }
+    .eval-report__body {
+      padding: 24px 22px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      flex: 1;
+    }
+    .eval-metric { display: flex; flex-direction: column; gap: 7px; }
+    .eval-metric__row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+    }
+    .eval-metric__label { color: var(--text-faint); text-transform: uppercase; }
+    .eval-metric__value {
+      color: var(--cyan);
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 0;
+      font-variant-numeric: tabular-nums;
+    }
+    .eval-metric__bar {
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(34, 211, 238, 0.08);
+      overflow: hidden;
+      position: relative;
+    }
+    .eval-metric__bar::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      width: 0%;
+      background: linear-gradient(90deg, var(--cyan), #67e8f9);
+      box-shadow: 0 0 12px var(--exec-glow);
+      transition: width 1.4s var(--exec-ease-soft);
+    }
+    .eval-report.is-running .eval-metric.is-acc .eval-metric__bar::after { width: 100%; transition-delay: 0.2s; }
+    .eval-report.is-running .eval-metric.is-lat .eval-metric__bar::after { width: 86%;  transition-delay: 0.55s; background: linear-gradient(90deg, #fbbf24, #fde68a); box-shadow: 0 0 12px rgba(251, 191, 36, 0.45); }
+    .eval-report.is-running .eval-metric.is-cost .eval-metric__bar::after { width: 12%; transition-delay: 0.9s; background: linear-gradient(90deg, var(--green), #86efac); box-shadow: 0 0 12px rgba(34, 197, 94, 0.45); }
+    .eval-metric .eval-metric__value { opacity: 0; transform: translateY(2px); transition: opacity 0.5s var(--exec-ease-soft), transform 0.5s var(--exec-ease-soft); }
+    .eval-report.is-running .eval-metric.is-acc  .eval-metric__value { opacity: 1; transform: none; transition-delay: 1.5s; }
+    .eval-report.is-running .eval-metric.is-lat  .eval-metric__value { opacity: 1; transform: none; transition-delay: 1.85s; }
+    .eval-report.is-running .eval-metric.is-cost .eval-metric__value { opacity: 1; transform: none; transition-delay: 2.2s; }
+
+    .eval-report__footer {
+      padding: 14px 22px 18px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+    }
+    .eval-report__footer code { color: var(--cyan); font-size: 11px; }
+
+    /* The marquee — full-bleed under the stage */
+    .eval-marquee {
+      margin-top: 28px;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.4);
+      padding: 16px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+      -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+      overflow: hidden;
+    }
+    .eval-marquee__label {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%) translateY(-26px);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      background: var(--bg);
+      padding: 0 10px;
+    }
+    .eval-marquee__row {
+      display: flex;
+      gap: 10px;
+      width: max-content;
+      animation: eval-marquee-l 32s linear infinite;
+    }
+    .eval-marquee__row--rev {
+      animation: eval-marquee-r 38s linear infinite;
+    }
+    @keyframes eval-marquee-l {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    @keyframes eval-marquee-r {
+      0%   { transform: translateX(-50%); }
+      100% { transform: translateX(0); }
+    }
+    .eval-tag {
+      flex: 0 0 auto;
+      padding: 7px 13px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-dim);
+      background: rgba(15, 23, 42, 0.6);
+      letter-spacing: 0.02em;
+    }
+    .eval-tag--det { color: var(--cyan); border-color: rgba(34, 211, 238, 0.3); }
+    .eval-tag--judge { color: #93c5fd; border-color: rgba(147, 197, 253, 0.3); }
+
+    @media (max-width: 880px) {
+      .eval-stage { grid-template-columns: 1fr; gap: 22px; }
+      .eval-report__body { padding: 18px 16px 18px; gap: 16px; }
+      .eval-metric__value { font-size: 16px; }
+      .eval-marquee { padding: 12px 0; }
+      .eval-tag { font-size: 10px; padding: 6px 10px; }
+    }
+
     /* ── Reduced motion (WCAG AA) ──────────────────────────────────── */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
@@ -2646,6 +2835,16 @@
       .exec-dot { animation: none; box-shadow: 0 0 0 1px var(--exec-glow-soft); }
       .exec-caret { animation: none; opacity: 1; }
       .exec-scan.in-view::after { animation: none; display: none; }
+
+      /* OVERDRIVE FUSED — #eval: snap report to done, freeze marquee */
+      .eval-report__bar .exec-dot { animation: none !important; background: var(--green); }
+      .eval-metric__bar::after { transition: none !important; }
+      .eval-report .eval-metric.is-acc  .eval-metric__bar::after { width: 100% !important; }
+      .eval-report .eval-metric.is-lat  .eval-metric__bar::after { width: 86%  !important; background: linear-gradient(90deg, #fbbf24, #fde68a) !important; }
+      .eval-report .eval-metric.is-cost .eval-metric__bar::after { width: 12%  !important; background: linear-gradient(90deg, var(--green), #86efac) !important; }
+      .eval-metric__value { opacity: 1 !important; transform: none !important; transition: none !important; }
+      .eval-report__status { background: rgba(34, 197, 94, 0.12) !important; color: var(--green) !important; border-color: rgba(34, 197, 94, 0.4) !important; }
+      .eval-marquee__row { animation: none !important; }
 
       /* OVERDRIVE FUSED — #what: snap terminal lines visible, light all chips */
       .what-term__line { opacity: 1 !important; transform: none !important; transition: none !important; }
@@ -3286,16 +3485,16 @@ result = agent.<span class="fn">run</span>(<span class="str">"Find our refund po
     <span class="section-label">Built-in evaluation</span>
     <h2 class="mb-4">Test your agents. Not just your code.</h2>
     <p class="section-desc mb-14">LangSmith charges $39/seat/mo for agent evaluation. DeepEval requires a separate install. Selectools ships 50 evaluators. Free, local, built in.</p>
-    <div class="grid-2 gap-8">
-      <div class="reveal">
-        <div class="code-frame code-frame-accent">
-          <div class="code-bar">
-            <div class="code-dot" style="background:rgba(239,68,68,0.8)"></div>
-            <div class="code-dot" style="background:rgba(250,204,21,0.8)"></div>
-            <div class="code-dot" style="background:rgba(34,197,94,0.8)"></div>
-            <span class="code-bar-label">test_agent.py</span>
-          </div>
-          <div class="code-body"><span class="kw">from</span> <span class="cls">selectools.evals</span> <span class="kw">import</span> EvalSuite, TestCase
+    <div class="eval-stage">
+      <!-- Code: stays as-is, the test definition the report runs against -->
+      <div class="code-frame code-frame-accent">
+        <div class="code-bar">
+          <div class="code-dot" style="background:rgba(239,68,68,0.8)"></div>
+          <div class="code-dot" style="background:rgba(250,204,21,0.8)"></div>
+          <div class="code-dot" style="background:rgba(34,197,94,0.8)"></div>
+          <span class="code-bar-label">test_agent.py</span>
+        </div>
+        <div class="code-body"><span class="kw">from</span> <span class="cls">selectools.evals</span> <span class="kw">import</span> EvalSuite, TestCase
 
 suite = <span class="fn">EvalSuite</span>(agent=agent, cases=[
     <span class="fn">TestCase</span>(
@@ -3311,30 +3510,56 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
 <span class="cmt"># report.accuracy → 1.0</span>
 <span class="cmt"># report.latency_p50 → 142ms</span>
 <span class="cmt"># report.total_cost → $0.002</span></div>
+      </div>
+
+      <!-- Live mock test report: fills in metric-by-metric on viewport entry -->
+      <div class="eval-report" role="figure" aria-label="Eval suite mock test report">
+        <div class="eval-report__bar">
+          <span class="exec-dot" aria-hidden="true"></span>
+          <span class="eval-report__title">pytest test_agent.py</span>
+          <span class="eval-report__status">running</span>
+        </div>
+        <div class="eval-report__body">
+          <div class="eval-metric is-acc">
+            <div class="eval-metric__row">
+              <span class="eval-metric__label">accuracy</span>
+              <span class="eval-metric__value">1.000</span>
+            </div>
+            <div class="eval-metric__bar" aria-hidden="true"></div>
+          </div>
+          <div class="eval-metric is-lat">
+            <div class="eval-metric__row">
+              <span class="eval-metric__label">latency p50</span>
+              <span class="eval-metric__value">142 ms</span>
+            </div>
+            <div class="eval-metric__bar" aria-hidden="true"></div>
+          </div>
+          <div class="eval-metric is-cost">
+            <div class="eval-metric__row">
+              <span class="eval-metric__label">total cost</span>
+              <span class="eval-metric__value">$0.0020</span>
+            </div>
+            <div class="eval-metric__bar" aria-hidden="true"></div>
+          </div>
+        </div>
+        <div class="eval-report__footer">
+          <code>1 passed in 142ms</code>
+          <span style="margin-left:auto">no PII · no injections · cancel_sub ✓</span>
         </div>
       </div>
-      <div class="reveal reveal-d1" style="display:flex;flex-direction:column;gap:16px;justify-content:center">
-        <div class="card" style="padding:20px">
-          <h3 style="font-size:13px;color:var(--cyan);margin-bottom:10px">30 Deterministic Evaluators</h3>
-          <div class="tag-group">
-            <span class="tag">ToolUse</span><span class="tag">ToolOrder</span><span class="tag">Contains</span><span class="tag">Output</span><span class="tag">Structured</span><span class="tag">JSON</span><span class="tag">Python</span><span class="tag">SQL</span><span class="tag">PII</span><span class="tag">Injection</span><span class="tag">Sentiment</span><span class="tag">Readability</span><span class="tag">AgentTrajectory</span><span class="tag">ToolEfficiency</span><span class="tag">SemanticSimilarity</span>
-          </div>
-        </div>
-        <div class="card" style="padding:20px">
-          <h3 style="font-size:13px;color:var(--cyan);margin-bottom:10px">20 LLM-as-Judge Evaluators</h3>
-          <div class="tag-group">
-            <span class="tag tag-blue">Correctness</span><span class="tag tag-blue">Relevance</span><span class="tag tag-blue">Faithfulness</span><span class="tag tag-blue">Hallucination</span><span class="tag tag-blue">Toxicity</span><span class="tag tag-blue">Safety</span><span class="tag tag-blue">Coherence</span><span class="tag tag-blue">Completeness</span><span class="tag tag-blue">Conciseness</span><span class="tag tag-blue">Bias</span><span class="tag tag-blue">FactConsistency</span>
-          </div>
-        </div>
-        <div class="card" style="padding:20px">
-          <h3 style="font-size:13px;color:var(--cyan);margin-bottom:10px">Infrastructure</h3>
-          <ul class="check-list" style="font-size:13px">
-            <li>Interactive HTML report with charts</li>
-            <li>JUnit XML for CI (GitHub Actions, Jenkins)</li>
-            <li>Regression detection with baseline comparison</li>
-            <li>A/B testing with PairwiseEval</li>
-          </ul>
-        </div>
+    </div>
+
+    <!-- Marquee: all 50 evaluators in 2 rows scrolling in opposite directions -->
+    <div class="eval-marquee" aria-label="All 50 selectools evaluators">
+      <div class="eval-marquee__row">
+        <span class="eval-tag eval-tag--det">ToolUse</span><span class="eval-tag eval-tag--det">ToolOrder</span><span class="eval-tag eval-tag--det">ToolEfficiency</span><span class="eval-tag eval-tag--det">AgentTrajectory</span><span class="eval-tag eval-tag--det">Contains</span><span class="eval-tag eval-tag--det">NotContains</span><span class="eval-tag eval-tag--det">Equals</span><span class="eval-tag eval-tag--det">Regex</span><span class="eval-tag eval-tag--det">Output</span><span class="eval-tag eval-tag--det">Structured</span><span class="eval-tag eval-tag--det">JSON</span><span class="eval-tag eval-tag--det">JSONSchema</span><span class="eval-tag eval-tag--det">Python</span><span class="eval-tag eval-tag--det">SQL</span><span class="eval-tag eval-tag--det">Markdown</span><span class="eval-tag eval-tag--det">XML</span><span class="eval-tag eval-tag--det">YAML</span><span class="eval-tag eval-tag--det">PII</span><span class="eval-tag eval-tag--det">Injection</span><span class="eval-tag eval-tag--det">Sentiment</span><span class="eval-tag eval-tag--det">Readability</span><span class="eval-tag eval-tag--det">SemanticSimilarity</span><span class="eval-tag eval-tag--det">EditDistance</span><span class="eval-tag eval-tag--det">BLEU</span><span class="eval-tag eval-tag--det">ROUGE</span><span class="eval-tag eval-tag--det">TokenCount</span><span class="eval-tag eval-tag--det">Latency</span><span class="eval-tag eval-tag--det">Cost</span><span class="eval-tag eval-tag--det">Cardinality</span><span class="eval-tag eval-tag--det">Determinism</span>
+        <!-- duplicated for seamless loop -->
+        <span class="eval-tag eval-tag--det">ToolUse</span><span class="eval-tag eval-tag--det">ToolOrder</span><span class="eval-tag eval-tag--det">ToolEfficiency</span><span class="eval-tag eval-tag--det">AgentTrajectory</span><span class="eval-tag eval-tag--det">Contains</span><span class="eval-tag eval-tag--det">NotContains</span><span class="eval-tag eval-tag--det">Equals</span><span class="eval-tag eval-tag--det">Regex</span><span class="eval-tag eval-tag--det">Output</span><span class="eval-tag eval-tag--det">Structured</span><span class="eval-tag eval-tag--det">JSON</span><span class="eval-tag eval-tag--det">JSONSchema</span><span class="eval-tag eval-tag--det">Python</span><span class="eval-tag eval-tag--det">SQL</span><span class="eval-tag eval-tag--det">Markdown</span><span class="eval-tag eval-tag--det">XML</span><span class="eval-tag eval-tag--det">YAML</span><span class="eval-tag eval-tag--det">PII</span><span class="eval-tag eval-tag--det">Injection</span><span class="eval-tag eval-tag--det">Sentiment</span><span class="eval-tag eval-tag--det">Readability</span><span class="eval-tag eval-tag--det">SemanticSimilarity</span><span class="eval-tag eval-tag--det">EditDistance</span><span class="eval-tag eval-tag--det">BLEU</span><span class="eval-tag eval-tag--det">ROUGE</span><span class="eval-tag eval-tag--det">TokenCount</span><span class="eval-tag eval-tag--det">Latency</span><span class="eval-tag eval-tag--det">Cost</span><span class="eval-tag eval-tag--det">Cardinality</span><span class="eval-tag eval-tag--det">Determinism</span>
+      </div>
+      <div class="eval-marquee__row eval-marquee__row--rev">
+        <span class="eval-tag eval-tag--judge">Correctness</span><span class="eval-tag eval-tag--judge">Relevance</span><span class="eval-tag eval-tag--judge">Faithfulness</span><span class="eval-tag eval-tag--judge">Hallucination</span><span class="eval-tag eval-tag--judge">Groundedness</span><span class="eval-tag eval-tag--judge">Toxicity</span><span class="eval-tag eval-tag--judge">Safety</span><span class="eval-tag eval-tag--judge">Bias</span><span class="eval-tag eval-tag--judge">Coherence</span><span class="eval-tag eval-tag--judge">Completeness</span><span class="eval-tag eval-tag--judge">Conciseness</span><span class="eval-tag eval-tag--judge">FactConsistency</span><span class="eval-tag eval-tag--judge">Helpfulness</span><span class="eval-tag eval-tag--judge">InstructionFollow</span><span class="eval-tag eval-tag--judge">ContextRelevance</span><span class="eval-tag eval-tag--judge">AnswerRelevance</span><span class="eval-tag eval-tag--judge">RagFaithfulness</span><span class="eval-tag eval-tag--judge">PairwiseEval</span><span class="eval-tag eval-tag--judge">RubricScore</span><span class="eval-tag eval-tag--judge">CustomJudge</span>
+        <!-- duplicated for seamless loop -->
+        <span class="eval-tag eval-tag--judge">Correctness</span><span class="eval-tag eval-tag--judge">Relevance</span><span class="eval-tag eval-tag--judge">Faithfulness</span><span class="eval-tag eval-tag--judge">Hallucination</span><span class="eval-tag eval-tag--judge">Groundedness</span><span class="eval-tag eval-tag--judge">Toxicity</span><span class="eval-tag eval-tag--judge">Safety</span><span class="eval-tag eval-tag--judge">Bias</span><span class="eval-tag eval-tag--judge">Coherence</span><span class="eval-tag eval-tag--judge">Completeness</span><span class="eval-tag eval-tag--judge">Conciseness</span><span class="eval-tag eval-tag--judge">FactConsistency</span><span class="eval-tag eval-tag--judge">Helpfulness</span><span class="eval-tag eval-tag--judge">InstructionFollow</span><span class="eval-tag eval-tag--judge">ContextRelevance</span><span class="eval-tag eval-tag--judge">AnswerRelevance</span><span class="eval-tag eval-tag--judge">RagFaithfulness</span><span class="eval-tag eval-tag--judge">PairwiseEval</span><span class="eval-tag eval-tag--judge">RubricScore</span><span class="eval-tag eval-tag--judge">CustomJudge</span>
       </div>
     </div>
     <div class="grid-2 gap-8 mt-16">
@@ -3885,6 +4110,22 @@ const obs = new IntersectionObserver(entries => {
   entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
 }, { threshold: 0.08 });
 document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+
+/* ── #eval report: fills in metrics on viewport entry ───────────── */
+(function() {
+  var report = document.querySelector('.eval-report');
+  if (!report) return;
+  var io = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (!e.isIntersecting) return;
+      report.classList.add('is-running');
+      // Mark "done" after the last metric+value finishes (~2.7s in)
+      setTimeout(function() { report.classList.add('is-done'); }, 2700);
+      io.disconnect();
+    });
+  }, { threshold: 0.3, rootMargin: '0px 0px -8% 0px' });
+  io.observe(report);
+})();
 
 /* ── #what stage: terminal types script + chips light up in sync ── */
 (function() {
