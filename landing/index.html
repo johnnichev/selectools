@@ -1576,6 +1576,770 @@
       .nav-burger:hover { background: transparent !important; }
     }
 
+    /* ════════════════════════════════════════════════════════════════
+       SECTION 2 — "What's included" asymmetric feature mosaic
+       Bento-box style. Hero feature spans 2x2, supporting features
+       in varied 1x1 / 1x2 / 2x1 sizes. Mouse parallax. Each cell
+       has unique pattern hints (no two icons alike).
+       ════════════════════════════════════════════════════════════════ */
+    .bento {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      grid-auto-rows: 160px;
+      grid-auto-flow: dense;
+      gap: 14px;
+      margin-top: 32px;
+    }
+    .bento__cell {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px;
+      position: relative;
+      overflow: hidden;
+      transition:
+        border-color 0.3s var(--ease),
+        transform 0.3s var(--ease),
+        box-shadow 0.3s var(--ease);
+      will-change: transform;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 0;
+    }
+    .bento__cell:hover {
+      border-color: rgba(34, 211, 238, 0.35);
+      transform: translateY(-3px);
+      box-shadow: 0 24px 48px -20px rgba(0,0,0,0.4), 0 0 0 1px rgba(34,211,238,0.1);
+    }
+    .bento__cell::before {
+      /* Subtle radial spotlight that follows mouse via JS-set custom prop */
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(
+        320px circle at var(--mx, 50%) var(--my, 50%),
+        rgba(34, 211, 238, 0.08),
+        transparent 60%
+      );
+      opacity: 0;
+      transition: opacity 0.4s var(--ease);
+    }
+    .bento__cell:hover::before { opacity: 1; }
+
+    /* Hero cell — 2 cols × 2 rows, contains a live mini eval-report viz */
+    .bento__cell--hero {
+      grid-column: span 3;
+      grid-row: span 2;
+      padding: 26px;
+      gap: 14px;
+      background:
+        radial-gradient(ellipse at top right, rgba(34,211,238,0.06), transparent 50%),
+        var(--surface);
+    }
+    /* Wide cells (2 cols) */
+    .bento__cell--wide { grid-column: span 3; }
+    /* Tall cells (2 rows) */
+    .bento__cell--tall { grid-row: span 2; }
+    /* Standard 1x1 cells default to span 2 cols (since grid is 6-col) */
+    .bento__cell { grid-column: span 2; }
+
+    /* Override defaults for sized variants — order matters in CSS source */
+    .bento__cell--hero { grid-column: span 3; grid-row: span 2; }
+    .bento__cell--wide { grid-column: span 3; grid-row: span 1; }
+    .bento__cell--full { grid-column: span 6; grid-row: span 1; min-height: 96px; }
+
+    .bento__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .bento__title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+    }
+    .bento__cell--hero .bento__title { font-size: 26px; }
+    .bento__desc {
+      font-size: 12.5px;
+      color: var(--text-dim);
+      line-height: 1.55;
+    }
+    .bento__cell--hero .bento__desc { font-size: 14px; }
+    .bento__metric {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .bento__metric-num {
+      font-family: var(--font-mono);
+      font-size: 36px;
+      font-weight: 800;
+      color: var(--cyan);
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+    .bento__metric-unit {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .bento__cell--hero .bento__metric-num { font-size: 56px; }
+
+    /* Hero eval bars — fake bar chart inside the hero cell */
+    .bento__bars {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-top: auto;
+    }
+    .bento__bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+    .bento__bar-label { width: 96px; flex-shrink: 0; }
+    .bento__bar-track {
+      flex: 1;
+      height: 6px;
+      background: rgba(51,65,85,0.6);
+      border-radius: 3px;
+      overflow: hidden;
+      position: relative;
+    }
+    .bento__bar-fill {
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 0;
+      background: linear-gradient(to right, #22d3ee, #3b82f6);
+      border-radius: 3px;
+      transition: width 1.2s var(--ease);
+    }
+    .bento.in-view .bento__bar-fill { width: var(--pct, 70%); }
+    .bento__bar-pct {
+      width: 30px;
+      text-align: right;
+      color: var(--cyan);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Inline mini-icon as a tiny accent (NOT the giant card-icon AI slop) */
+    .bento__dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+
+    /* Color variants — ONE accent per cell, used for the dot + hover border */
+    .bento__cell[data-accent="cyan"]:hover { border-color: rgba(34, 211, 238, 0.45); }
+    .bento__cell[data-accent="green"]:hover { border-color: rgba(34, 197, 94, 0.45); }
+    .bento__cell[data-accent="purple"]:hover { border-color: rgba(168, 85, 247, 0.45); }
+    .bento__cell[data-accent="amber"]:hover { border-color: rgba(245, 158, 11, 0.45); }
+    .bento__cell[data-accent="red"]:hover { border-color: rgba(239, 68, 68, 0.45); }
+    .bento__cell[data-accent="blue"]:hover { border-color: rgba(59, 130, 246, 0.45); }
+
+    .bento__cell[data-accent="cyan"] .bento__dot { background: var(--cyan); box-shadow: 0 0 8px rgba(34,211,238,0.5); }
+    .bento__cell[data-accent="green"] .bento__dot { background: var(--green); box-shadow: 0 0 8px rgba(34,197,94,0.5); }
+    .bento__cell[data-accent="purple"] .bento__dot { background: var(--purple); box-shadow: 0 0 8px rgba(168,85,247,0.5); }
+    .bento__cell[data-accent="amber"] .bento__dot { background: var(--amber); box-shadow: 0 0 8px rgba(245,158,11,0.5); }
+    .bento__cell[data-accent="red"] .bento__dot { background: var(--red); box-shadow: 0 0 8px rgba(239,68,68,0.5); }
+    .bento__cell[data-accent="blue"] .bento__dot { background: var(--blue); box-shadow: 0 0 8px rgba(59,130,246,0.5); }
+
+    /* Background pattern hints — ONE per cell type, very subtle */
+    .bento__pattern {
+      position: absolute;
+      pointer-events: none;
+      opacity: 0.4;
+    }
+    /* Bracket pattern for code-flavored cells */
+    .bento__pattern--code {
+      bottom: -8px;
+      right: -8px;
+      font-family: var(--font-mono);
+      font-size: 88px;
+      font-weight: 200;
+      color: rgba(255,255,255,0.04);
+      line-height: 0.7;
+      letter-spacing: -0.05em;
+    }
+
+    /* Mosaic responsive: collapse to a simple 2-col grid on tablet, 1-col on mobile */
+    @media (max-width: 1100px) {
+      .bento {
+        grid-template-columns: repeat(4, 1fr);
+        grid-auto-rows: 150px;
+      }
+      .bento__cell { grid-column: span 2; }
+      .bento__cell--hero { grid-column: span 4; grid-row: span 2; }
+      .bento__cell--wide { grid-column: span 4; }
+      .bento__cell--full { grid-column: span 4; }
+    }
+    @media (max-width: 700px) {
+      .bento {
+        grid-template-columns: 1fr;
+        grid-auto-rows: auto;
+        gap: 12px;
+      }
+      .bento__cell, .bento__cell--hero, .bento__cell--wide, .bento__cell--full {
+        grid-column: span 1;
+        grid-row: span 1;
+        min-height: 0;
+      }
+      .bento__cell--hero .bento__title { font-size: 22px; }
+      .bento__cell--hero .bento__metric-num { font-size: 44px; }
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       SECTION 3 — "Built for" tilted persona postcards
+       3 cards in an asymmetric grid. Each has:
+         - A unique background pattern (terminal grid / shield grid / bars)
+         - A real-looking testimonial quote in display font
+         - A persona name + one metric chip
+         - A "you'll appreciate" feature highlight
+       Cards have slight rotation and CSS perspective tilt on hover.
+       ════════════════════════════════════════════════════════════════ */
+    .personas {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr 1.1fr;
+      gap: 28px;
+      margin-top: 32px;
+      perspective: 1400px;
+    }
+    @media (max-width: 1024px) {
+      .personas { grid-template-columns: 1fr; gap: 20px; }
+    }
+    .persona {
+      position: relative;
+      padding: 32px 30px 28px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      overflow: hidden;
+      transform-style: preserve-3d;
+      transition:
+        transform 0.4s var(--ease),
+        border-color 0.3s var(--ease),
+        box-shadow 0.4s var(--ease);
+      will-change: transform;
+      min-width: 0;
+    }
+    .persona:nth-child(1) { transform: rotate(-1.2deg) translateY(8px); }
+    .persona:nth-child(2) { transform: rotate(0.6deg); }
+    .persona:nth-child(3) { transform: rotate(-0.4deg) translateY(14px); }
+    @media (hover: hover) and (pointer: fine) {
+      .persona:hover {
+        transform: rotate(0deg) translateY(-6px) scale(1.015);
+        box-shadow: 0 32px 60px -24px rgba(0,0,0,0.6), 0 0 0 1px rgba(34,211,238,0.18);
+      }
+      .persona:nth-child(1):hover { border-color: rgba(34,211,238,0.5); }
+      .persona:nth-child(2):hover { border-color: rgba(239,68,68,0.5); }
+      .persona:nth-child(3):hover { border-color: rgba(245,158,11,0.5); }
+    }
+    @media (max-width: 1024px) {
+      .persona, .persona:nth-child(1), .persona:nth-child(2), .persona:nth-child(3) {
+        transform: none;
+      }
+    }
+
+    /* Background patterns — one per card, very subtle */
+    .persona__pattern {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.18;
+      mask-image: radial-gradient(ellipse at center bottom, #000 30%, transparent 75%);
+      -webkit-mask-image: radial-gradient(ellipse at center bottom, #000 30%, transparent 75%);
+    }
+    /* Pattern 1 — terminal-prompt grid for ML/AI Engineers */
+    .persona--engineers .persona__pattern {
+      background-image:
+        linear-gradient(to right, rgba(34,211,238,0.5) 0, rgba(34,211,238,0.5) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(34,211,238,0.5) 0, rgba(34,211,238,0.5) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+    /* Pattern 2 — checkmark/shield for Regulated Industries */
+    .persona--compliance .persona__pattern {
+      background-image: radial-gradient(circle at center, rgba(239,68,68,0.6) 1.2px, transparent 1.5px);
+      background-size: 22px 22px;
+    }
+    /* Pattern 3 — vertical "cost bars" for Migrating teams */
+    .persona--migrating .persona__pattern {
+      background-image: linear-gradient(
+        to right,
+        rgba(245,158,11,0.5) 0, rgba(245,158,11,0.5) 2px,
+        transparent 2px, transparent 12px
+      );
+      background-size: 12px 100%;
+    }
+
+    .persona__quote {
+      position: relative;
+      font-size: clamp(18px, 1.7vw, 22px);
+      font-weight: 600;
+      line-height: 1.35;
+      letter-spacing: -0.012em;
+      color: var(--text);
+      margin-bottom: 28px;
+      max-width: 28ch;
+    }
+    .persona__quote::before {
+      content: '\201C';
+      position: absolute;
+      top: -32px;
+      left: -8px;
+      font-family: Georgia, serif;
+      font-size: 80px;
+      line-height: 1;
+      color: var(--text-faint);
+      opacity: 0.25;
+      pointer-events: none;
+    }
+    .persona__meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 22px;
+      position: relative;
+    }
+    .persona__name {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .persona__chip {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 3px 9px;
+      border-radius: 100px;
+      border: 1px solid;
+    }
+    .persona--engineers .persona__chip { background: rgba(34,211,238,0.08); border-color: rgba(34,211,238,0.3); color: var(--cyan); }
+    .persona--compliance .persona__chip { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.3); color: #fca5a5; }
+    .persona--migrating .persona__chip { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.3); color: #fbbf24; }
+    .persona__answer {
+      position: relative;
+      padding-top: 18px;
+      border-top: 1px solid rgba(51,65,85,0.5);
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text-dim);
+    }
+    .persona__answer-label {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      color: var(--text-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 6px;
+    }
+    .persona__answer code {
+      color: var(--text);
+      font-size: 11.5px;
+      background: rgba(255,255,255,0.04);
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       SECTION 4 — "Three paths" live preview cards
+       Three asymmetric cards. Each contains a real preview of what
+       that path looks like — NOT a generic icon. Hover lift, click
+       leads to the actual feature.
+         - Visual Builder: animated SVG mini-graph
+         - Code First: typing terminal
+         - Learn by Example: scrolling marquee of example filenames
+       ════════════════════════════════════════════════════════════════ */
+    .paths {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 22px;
+      margin-top: 48px;
+    }
+    @media (max-width: 1024px) {
+      .paths { grid-template-columns: 1fr; gap: 18px; }
+    }
+    .path {
+      position: relative;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition:
+        transform 0.3s var(--ease),
+        border-color 0.3s var(--ease),
+        box-shadow 0.3s var(--ease);
+      will-change: transform;
+      text-align: left;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .path:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 28px 56px -22px rgba(0,0,0,0.5);
+      }
+      .path--builder:hover { border-color: rgba(34,211,238,0.45); }
+      .path--code:hover { border-color: rgba(59,130,246,0.45); }
+      .path--examples:hover { border-color: rgba(168,85,247,0.45); }
+    }
+    .path__preview {
+      position: relative;
+      height: 220px;
+      overflow: hidden;
+      border-bottom: 1px solid rgba(51,65,85,0.5);
+      background: #0b1120;
+    }
+    .path__body {
+      padding: 22px 24px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex: 1;
+    }
+    .path__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .path--builder .path__label { color: var(--cyan); }
+    .path--code .path__label { color: #93c5fd; }
+    .path--examples .path__label { color: #c4b5fd; }
+    .path__title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.015em;
+      line-height: 1.2;
+    }
+    .path__desc {
+      font-size: 13.5px;
+      color: var(--text-dim);
+      line-height: 1.55;
+      flex: 1;
+    }
+    .path__cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      padding-top: 4px;
+      transition: gap 0.2s var(--ease), color 0.2s var(--ease);
+    }
+    .path--builder .path__cta { color: var(--cyan); }
+    .path--code .path__cta { color: #93c5fd; }
+    .path--examples .path__cta { color: #c4b5fd; }
+    .path:hover .path__cta { gap: 10px; }
+
+    /* ── Preview 1: Visual Builder mini-graph ─────────────────────── */
+    .path-graph {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .path-graph svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .path-graph__node {
+      fill: #0f172a;
+      stroke: rgba(34,211,238,0.4);
+      stroke-width: 1.5;
+      transition: stroke 0.3s var(--ease), filter 0.3s var(--ease);
+    }
+    .path-graph__node-text {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      fill: var(--text);
+    }
+    .path-graph__edge {
+      stroke: rgba(51,65,85,0.8);
+      stroke-width: 1.5;
+      fill: none;
+    }
+    .path-graph__pulse {
+      fill: var(--cyan);
+      filter: drop-shadow(0 0 4px rgba(34,211,238,0.6));
+    }
+    /* Animated pulse traveling along edges (loops) */
+    @keyframes path-graph-pulse-1 {
+      0%   { offset-distance: 0%; opacity: 0; }
+      10%  { opacity: 1; }
+      90%  { opacity: 1; }
+      100% { offset-distance: 100%; opacity: 0; }
+    }
+    .path:hover .path-graph__node {
+      stroke: rgba(34,211,238,0.7);
+      filter: drop-shadow(0 0 6px rgba(34,211,238,0.3));
+    }
+
+    /* ── Preview 2: Typing terminal ───────────────────────────────── */
+    .path-term {
+      position: absolute;
+      inset: 0;
+      padding: 22px 24px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.7;
+      color: var(--text);
+      overflow: hidden;
+    }
+    .path-term__line { display: block; white-space: nowrap; overflow: hidden; }
+    .path-term .pr { color: #3b82f6; font-weight: 600; user-select: none; margin-right: 8px; }
+    .path-term .ok { color: #22c55e; }
+    .path-term .dm { color: var(--text-faint); }
+    .path-term__caret {
+      display: inline-block;
+      width: 7px;
+      height: 1em;
+      vertical-align: -2px;
+      background: #93c5fd;
+      animation: path-caret-blink 1.2s var(--ease) infinite;
+      margin-left: 2px;
+    }
+    @keyframes path-caret-blink {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.2; }
+    }
+
+    /* Type animation: lines slide up one by one when card enters view */
+    .path-term__line {
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.4s var(--ease), transform 0.4s var(--ease);
+    }
+    .path--code.in-view .path-term__line { opacity: 1; transform: translateY(0); }
+    .path--code.in-view .path-term__line:nth-child(1) { transition-delay: 0.1s; }
+    .path--code.in-view .path-term__line:nth-child(2) { transition-delay: 0.5s; }
+    .path--code.in-view .path-term__line:nth-child(3) { transition-delay: 0.9s; }
+    .path--code.in-view .path-term__line:nth-child(4) { transition-delay: 1.3s; }
+    .path--code.in-view .path-term__line:nth-child(5) { transition-delay: 1.6s; }
+
+    /* ── Preview 3: Marquee of example filenames ─────────────────── */
+    .path-marquee {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 8px;
+      overflow: hidden;
+      mask-image: linear-gradient(to bottom, transparent 0%, #000 20%, #000 80%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 20%, #000 80%, transparent 100%);
+    }
+    .path-marquee__row {
+      display: flex;
+      gap: 12px;
+      animation: path-marquee-scroll var(--marquee-dur, 24s) linear infinite;
+      will-change: transform;
+    }
+    .path-marquee__row.reverse { animation-direction: reverse; }
+    .path-marquee__chip {
+      flex-shrink: 0;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 5px 11px;
+      border-radius: 6px;
+      background: rgba(168,85,247,0.08);
+      border: 1px solid rgba(168,85,247,0.25);
+      color: #c4b5fd;
+      white-space: nowrap;
+    }
+    .path-marquee__chip .num {
+      color: var(--text-faint);
+      margin-right: 5px;
+    }
+    @keyframes path-marquee-scroll {
+      from { transform: translateX(0); }
+      to   { transform: translateX(-50%); }
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       SECTION 1 — "Three problems" before/after diff vignettes
+       Stacked vertically. Each vignette has:
+         - Oversized number (01, 02, 03) on the left
+         - Pain-state on the upper-right (broken terminal/log)
+         - Selectools fix on the lower-right (clean code)
+         - Vertical line connecting them
+       Scroll-triggered reveal animates the diff effect.
+       ════════════════════════════════════════════════════════════════ */
+    .why-stack { display: flex; flex-direction: column; gap: 80px; margin-top: 32px; }
+    .why-vignette {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 48px;
+      align-items: start;
+      position: relative;
+    }
+    .why-vignette__num {
+      font-family: var(--font-mono);
+      font-size: clamp(48px, 7vw, 88px);
+      font-weight: 800;
+      line-height: 0.85;
+      color: var(--cyan);
+      letter-spacing: -0.04em;
+      opacity: 0.85;
+      position: sticky;
+      top: 100px;
+      align-self: start;
+    }
+    .why-vignette__num::after {
+      content: '';
+      display: block;
+      width: 1px;
+      height: 60px;
+      background: linear-gradient(to bottom, var(--cyan) 0%, transparent 100%);
+      margin-top: 14px;
+      margin-left: 4px;
+      opacity: 0.4;
+    }
+    .why-vignette__body { min-width: 0; }
+    .why-vignette__pain {
+      font-family: var(--font-ui);
+      font-size: clamp(22px, 2.4vw, 30px);
+      font-weight: 700;
+      line-height: 1.25;
+      letter-spacing: -0.015em;
+      color: var(--text);
+      margin-bottom: 24px;
+      max-width: 720px;
+    }
+    .why-vignette__pain .strike {
+      color: var(--text-faint);
+      text-decoration: line-through;
+      text-decoration-color: rgba(239, 68, 68, 0.5);
+      text-decoration-thickness: 2px;
+    }
+    .why-vignette__diff {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    @media (max-width: 900px) {
+      .why-vignette { grid-template-columns: 1fr; gap: 18px; }
+      .why-vignette__num { position: static; font-size: 40px; }
+      .why-vignette__num::after { display: none; }
+      .why-vignette__diff { grid-template-columns: 1fr; gap: 12px; }
+      .why-stack { gap: 56px; }
+    }
+    .why-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.6;
+      min-width: 0;
+    }
+    .why-block__head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-bottom: 1px solid rgba(51,65,85,0.5);
+      font-size: 10px;
+      color: var(--text-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .why-block__head::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .why-block.is-pain { background: rgba(239, 68, 68, 0.04); border-color: rgba(239, 68, 68, 0.2); }
+    .why-block.is-pain .why-block__head { color: rgba(252, 165, 165, 0.85); border-bottom-color: rgba(239, 68, 68, 0.18); }
+    .why-block.is-pain .why-block__head::before { background: #ef4444; box-shadow: 0 0 8px rgba(239,68,68,0.5); }
+    .why-block.is-fix { background: rgba(34, 211, 238, 0.04); border-color: rgba(34, 211, 238, 0.25); }
+    .why-block.is-fix .why-block__head { color: var(--cyan); border-bottom-color: rgba(34, 211, 238, 0.2); }
+    .why-block.is-fix .why-block__head::before { background: var(--cyan); box-shadow: 0 0 8px rgba(34,211,238,0.6); }
+    .why-block__body {
+      padding: 16px 18px;
+      overflow-x: auto;
+      white-space: pre;
+      color: var(--text);
+      -webkit-overflow-scrolling: touch;
+    }
+    .why-block__body .dim { color: var(--text-faint); }
+    .why-block__body .red { color: #fca5a5; }
+    .why-block__body .green { color: #86efac; }
+    .why-block__body .cyan { color: var(--cyan); }
+    .why-block__body .amber { color: #fbbf24; }
+    .why-block__body .gutter {
+      display: inline-block;
+      width: 14px;
+      color: var(--text-faint);
+      user-select: none;
+    }
+    .why-block__body .gutter.minus { color: rgba(239, 68, 68, 0.7); }
+    .why-block__body .gutter.plus { color: rgba(34, 211, 238, 0.85); }
+    .why-vignette__answer {
+      color: var(--text-dim);
+      font-size: 14px;
+      line-height: 1.65;
+      max-width: 720px;
+      margin-top: 6px;
+    }
+    .why-vignette__answer code {
+      background: rgba(34, 211, 238, 0.08);
+      color: var(--cyan);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    .why-vignette__answer a {
+      color: var(--cyan);
+      border-bottom: 1px solid rgba(34, 211, 238, 0.3);
+      transition: border-color 0.2s var(--ease);
+    }
+    .why-vignette__answer a:hover { border-bottom-color: var(--cyan); }
+
+    /* Scroll-triggered reveal: vignettes fade up when entering viewport */
+    .why-vignette {
+      opacity: 0;
+      transform: translateY(40px);
+      transition: opacity 0.7s var(--ease), transform 0.7s var(--ease);
+    }
+    .why-vignette.in-view {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .why-vignette.in-view .why-block.is-fix {
+      animation: why-fix-glow 1.2s var(--ease) 0.4s both;
+    }
+    @keyframes why-fix-glow {
+      0%   { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+      50%  { box-shadow: 0 0 0 6px rgba(34, 211, 238, 0.12); }
+      100% { box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.18); }
+    }
+
     /* ── Reduced motion (WCAG AA) ──────────────────────────────────── */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
@@ -1591,6 +2355,20 @@
       /* Terminal install: kill caret blink and hover lift */
       .terminal-body .caret { animation: none; opacity: 1; }
       .terminal-install:hover { transform: none; }
+      /* Section 1 vignettes: snap to visible, kill glow animation */
+      .why-vignette { opacity: 1 !important; transform: none !important; }
+      .why-vignette.in-view .why-block.is-fix { animation: none; }
+      .why-vignette__num { position: static !important; }
+      /* Section 2 bento: snap bars to full width, kill hover transform */
+      .bento .bento__bar-fill { width: var(--pct, 70%) !important; transition: none; }
+      .bento__cell:hover { transform: none; }
+      /* Section 3 personas: kill rotations */
+      .persona, .persona:nth-child(1), .persona:nth-child(2), .persona:nth-child(3) { transform: none !important; }
+      /* Section 4 paths: snap typing terminal to visible, kill marquee scroll */
+      .path--code .path-term__line { opacity: 1 !important; transform: none !important; transition: none !important; }
+      .path-term__caret { animation: none; opacity: 1; }
+      .path-marquee__row { animation: none; }
+      .path:hover { transform: none; }
     }
   </style>
 </head>
@@ -1813,26 +2591,122 @@ result = agent.<span class="fn">run</span>(<span class="str">"Find our refund po
   <div class="wrap">
     <span class="section-label">Why selectools?</span>
     <h2 class="mb-4">Three problems every agent team hits.</h2>
-    <p class="section-desc mb-14">And how Selectools solves them out of the box. No paid debugger. No SaaS account. No bolt-on libraries.</p>
-    <div class="grid-3 gap-8">
-      <div class="card card-cyan reveal">
-        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M2 12h4l3-9 4 18 3-9h6"/></svg></div>
-        <h3>Can't see what your agent is doing?</h3>
-        <p>Every <code style="color:var(--cyan)">run()</code> returns <code style="color:var(--cyan)">result.trace</code> + <code style="color:var(--cyan)">result.reasoning</code>. Structured timeline of every LLM call, tool pick, and execution. Free, local, always on.</p>
-        <a href="modules/AGENT/" class="card-link">Agent docs &rarr;</a>
-      </div>
-      <div class="card card-red reveal reveal-d1">
-        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
-        <h3>No guardrails until prod breaks?</h3>
-        <p>Built-in PII redaction, topic blocking, toxicity detection, and prompt injection screening with 15 patterns. Plus LLM-based coherence checking.</p>
-        <a href="modules/GUARDRAILS/" class="card-link">Guardrails docs &rarr;</a>
-      </div>
-      <div class="card card-green reveal reveal-d2">
-        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
-        <h3>Don't know what your agents cost?</h3>
-        <p><code style="color:var(--cyan)">result.usage.total_cost</code> gives you automatic per-call token counts and dollar costs across all providers. 152 models with built-in pricing.</p>
-        <a href="modules/USAGE/" class="card-link">Usage tracking docs &rarr;</a>
-      </div>
+    <p class="section-desc mb-14">No paid debugger. No SaaS account. No bolt-on libraries. Just open the file, see the fix.</p>
+
+    <div class="why-stack">
+
+      <article class="why-vignette" data-why="visibility">
+        <div class="why-vignette__num">01</div>
+        <div class="why-vignette__body">
+          <p class="why-vignette__pain">Your agent did <span class="strike">something</span> &mdash; you have no idea what.</p>
+          <div class="why-vignette__diff">
+            <div class="why-block is-pain">
+              <div class="why-block__head">langchain &middot; what you see</div>
+<pre class="why-block__body"><span class="dim">$</span> python agent.py
+<span class="red">[ERROR]</span> AgentExecutionError
+<span class="dim">  at langchain_core.runnables...</span>
+<span class="dim">  at langgraph.pregel.invoke...</span>
+<span class="dim">  ?? which tool ran</span>
+<span class="dim">  ?? what model called</span>
+<span class="dim">  ?? where it broke</span>
+<span class="red">$</span> open <span class="dim">$LANGSMITH_DASHBOARD</span></pre>
+            </div>
+            <div class="why-block is-fix">
+              <div class="why-block__head">selectools &middot; what you get</div>
+<pre class="why-block__body">result = agent.<span class="cyan">run</span>(<span class="green">"refund?"</span>)
+
+<span class="dim">&gt;&gt;&gt;</span> result.<span class="cyan">trace</span>
+[<span class="amber">llm_call</span>      142ms]
+[<span class="amber">tool_select</span>   tool=<span class="green">search</span>]
+[<span class="amber">tool_exec</span>     ok 218ms]
+[<span class="amber">llm_call</span>      198ms]
+
+<span class="dim">&gt;&gt;&gt;</span> result.<span class="cyan">reasoning</span>
+<span class="green">"User asked refund &rarr; search_docs"</span></pre>
+            </div>
+          </div>
+          <p class="why-vignette__answer">
+            Every <code>run()</code> returns <code>result.trace</code> and <code>result.reasoning</code>. Structured timeline of every LLM call, tool pick, and execution. Free, local, always on. <a href="modules/AGENT/">Agent docs &rarr;</a>
+          </p>
+        </div>
+      </article>
+
+      <article class="why-vignette" data-why="guardrails">
+        <div class="why-vignette__num">02</div>
+        <div class="why-vignette__body">
+          <p class="why-vignette__pain">A user typed their SSN. <span class="strike">Now it&rsquo;s in your logs forever.</span></p>
+          <div class="why-vignette__diff">
+            <div class="why-block is-pain">
+              <div class="why-block__head">crewai &middot; what happens</div>
+<pre class="why-block__body"><span class="dim"># your agent code</span>
+agent = <span class="cyan">Agent</span>(role=<span class="green">"support"</span>)
+result = agent.<span class="cyan">execute</span>(user_input)
+
+<span class="dim"># your logs at 2am</span>
+<span class="red">[INFO]</span> <span class="green">"my ssn is 123-45-6789"</span>
+<span class="red">[INFO]</span> <span class="green">"my email is jane@..."</span>
+<span class="red">[INFO]</span> sent to OpenAI: <span class="dim">^^^</span>
+<span class="red">[ALERT]</span> compliance review needed</pre>
+            </div>
+            <div class="why-block is-fix">
+              <div class="why-block__head">selectools &middot; what ships</div>
+<pre class="why-block__body">agent = <span class="cyan">Agent</span>(
+  guardrails=<span class="cyan">GuardrailsPipeline</span>(
+    input=[<span class="cyan">PIIGuardrail</span>(<span class="green">"redact"</span>)],
+    output=[<span class="cyan">InjectionScreen</span>()],
+  ),
+)
+
+<span class="dim"># your logs</span>
+<span class="amber">[INFO]</span> <span class="green">"my ssn is [REDACTED]"</span>
+<span class="amber">[INFO]</span> screened: <span class="green">15 patterns</span> &check;</pre>
+            </div>
+          </div>
+          <p class="why-vignette__answer">
+            Built-in PII redaction, topic blocking, toxicity detection, and prompt injection screening with <code>15 patterns</code>. Plus LLM-based coherence checking. <a href="modules/GUARDRAILS/">Guardrails docs &rarr;</a>
+          </p>
+        </div>
+      </article>
+
+      <article class="why-vignette" data-why="cost">
+        <div class="why-vignette__num">03</div>
+        <div class="why-vignette__body">
+          <p class="why-vignette__pain">It&rsquo;s the 28th. Your OpenAI bill is <span class="strike">a surprise</span>.</p>
+          <div class="why-vignette__diff">
+            <div class="why-block is-pain">
+              <div class="why-block__head">other tools &middot; the bill</div>
+<pre class="why-block__body"><span class="red">$ stripe receipts list</span>
+2026-04-28  OpenAI       <span class="red">$2,847.10</span>
+2026-04-28  Anthropic    <span class="red">$1,203.55</span>
+2026-04-28  LangSmith    <span class="red">$  468.00</span>
+
+<span class="dim"># breakdown by agent?</span>
+<span class="dim">&nbsp;&nbsp;-&gt; you don't have one</span>
+<span class="dim"># cost per call?</span>
+<span class="dim">&nbsp;&nbsp;-&gt; manual SQL on raw logs</span></pre>
+            </div>
+            <div class="why-block is-fix">
+              <div class="why-block__head">selectools &middot; the answer</div>
+<pre class="why-block__body">result = agent.<span class="cyan">run</span>(prompt)
+
+<span class="dim">&gt;&gt;&gt;</span> result.<span class="cyan">usage</span>
+<span class="amber">UsageStats</span>(
+  prompt_tokens=<span class="amber">1247</span>,
+  completion_tokens=<span class="amber">438</span>,
+  total_cost=<span class="green">$0.00184</span>,
+  model=<span class="green">"gpt-5-mini"</span>,
+  provider=<span class="green">"openai"</span>,
+)
+
+<span class="dim"># 152 models, all priced</span></pre>
+            </div>
+          </div>
+          <p class="why-vignette__answer">
+            <code>result.usage.total_cost</code> gives you automatic per-call token counts and dollar costs across all providers. <code>152 models</code> with built-in pricing data. <a href="modules/USAGE/">Usage tracking docs &rarr;</a>
+          </p>
+        </div>
+      </article>
+
     </div>
   </div>
 </section>
@@ -1972,74 +2846,126 @@ result = agent.<span class="fn">run</span>(<span class="str">"Find our refund po
 <!-- ─── Features Grid ──────────────────────────────────────────────── -->
 <section class="section" id="features">
   <div class="wrap">
-    <div class="text-center mb-14">
+    <div class="mb-14" style="max-width:720px">
       <span class="section-label">What&rsquo;s included</span>
       <h2 class="mb-4">One install. Everything built in.</h2>
-      <p class="section-desc center">No langchain-core. No separate eval SDK. No paid debugger. <code>pip install selectools</code> gives you all of this, tested across Python 3.9 to 3.13.</p>
+      <p class="section-desc">No <code>langchain-core</code>. No separate eval SDK. No paid debugger. <code>pip install selectools</code> gives you all of this, tested across Python 3.9 to 3.13.</p>
     </div>
-    <div class="grid-4 gap-8">
-      <div class="card card-blue reveal">
-        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div>
-        <h3>50 Evaluators</h3>
-        <p>Test tool use, correctness, safety, LLM-as-judge, regression detection. <strong>Free. No SaaS.</strong></p>
+
+    <div class="bento" id="bentoGrid">
+
+      <!-- Hero cell: 50 Evaluators with live mini bar chart -->
+      <div class="bento__cell bento__cell--hero" data-accent="cyan">
+        <span class="bento__label"><span class="bento__dot"></span>Eval framework</span>
+        <div class="bento__metric">
+          <span class="bento__metric-num">50</span>
+          <span class="bento__metric-unit">Evaluators</span>
+        </div>
+        <p class="bento__desc">Tool-use checks, correctness scoring, safety screening, LLM-as-judge, regression detection, A/B with PairwiseEval. 30 deterministic + 20 LLM-judge. Free, local, no SaaS account.</p>
+        <div class="bento__bars">
+          <div class="bento__bar">
+            <span class="bento__bar-label">Deterministic</span>
+            <div class="bento__bar-track"><div class="bento__bar-fill" style="--pct:60%"></div></div>
+            <span class="bento__bar-pct">30</span>
+          </div>
+          <div class="bento__bar">
+            <span class="bento__bar-label">LLM-as-judge</span>
+            <div class="bento__bar-track"><div class="bento__bar-fill" style="--pct:40%"></div></div>
+            <span class="bento__bar-pct">20</span>
+          </div>
+          <div class="bento__bar">
+            <span class="bento__bar-label">Coverage tests</span>
+            <div class="bento__bar-track"><div class="bento__bar-fill" style="--pct:95%"></div></div>
+            <span class="bento__bar-pct">95</span>
+          </div>
+        </div>
       </div>
-      <div class="card card-red reveal reveal-d1">
-        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
-        <h3>Guardrails</h3>
-        <p>PII redaction, toxicity, topic blocking, prompt injection screening with <strong>15 patterns</strong>.</p>
+
+      <!-- Wide: Multi-Agent Orchestration — pinned to row 1 cols 4-6 -->
+      <div class="bento__cell bento__cell--wide" data-accent="purple" style="grid-row:1;grid-column:4 / 7">
+        <span class="bento__label"><span class="bento__dot"></span>Orchestration</span>
+        <div class="bento__title">Multi-agent graphs, plain Python.</div>
+        <p class="bento__desc"><code style="color:var(--purple)">AgentGraph</code> for directed graphs with conditional routing. <code style="color:var(--purple)">SupervisorAgent</code> with 4 strategies. HITL resumes at the yield point, not by restarting the node. Parallel execution + checkpointing + subgraph composition.</p>
+        <div class="bento__pattern bento__pattern--code">{ }</div>
       </div>
-      <div class="card card-purple reveal reveal-d2">
-        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></div>
-        <h3>Hybrid RAG</h3>
-        <p>BM25 + vector search with RRF fusion and cross-encoder reranking. <strong>4 store backends.</strong></p>
+
+      <!-- Wide: Composable Pipelines — pinned to row 2 cols 4-6 (fills the gap) -->
+      <div class="bento__cell bento__cell--wide" data-accent="blue" style="grid-row:2;grid-column:4 / 7">
+        <span class="bento__label"><span class="bento__dot"></span>Pipelines</span>
+        <div class="bento__title">Composable with the <code style="color:var(--blue);font-size:.85em">|</code> operator.</div>
+        <p class="bento__desc"><code style="color:var(--blue)">Pipeline</code> + <code style="color:var(--blue)">@step</code> + <code style="color:var(--blue)">parallel()</code> + <code style="color:var(--blue)">branch()</code>. Plus 4 advanced agent patterns: <code style="color:var(--blue)">PlanAndExecute</code>, <code style="color:var(--blue)">Reflective</code>, <code style="color:var(--blue)">Debate</code>, <code style="color:var(--blue)">TeamLead</code>.</p>
+        <div class="bento__pattern bento__pattern--code">|</div>
       </div>
-      <div class="card card-green reveal reveal-d3">
-        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
-        <h3>Cost Tracking</h3>
-        <p>Automatic per-call token counts and dollar costs. <strong>152 models</strong> with built-in pricing data.</p>
+
+      <!-- Standard: Guardrails -->
+      <div class="bento__cell" data-accent="red">
+        <span class="bento__label"><span class="bento__dot"></span>Guardrails</span>
+        <div class="bento__title">15 injection patterns</div>
+        <p class="bento__desc">PII redaction, topic blocking, toxicity, prompt injection screening, plus LLM coherence check.</p>
       </div>
-      <div class="card card-amber reveal">
-        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
-        <h3>Auto-Failover</h3>
-        <p>OpenAI, Anthropic, Gemini, Ollama. <strong>Circuit breaker</strong> with health checks.</p>
+
+      <!-- Standard: Cost Tracking -->
+      <div class="bento__cell" data-accent="green">
+        <span class="bento__label"><span class="bento__dot"></span>Usage</span>
+        <div class="bento__title">Cost on every call</div>
+        <p class="bento__desc">Automatic token + dollar tracking across 152 models. No manual SQL on raw logs.</p>
       </div>
-      <div class="card card-cyan reveal reveal-d1">
-        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></div>
-        <h3>Audit Logging</h3>
-        <p>JSONL trail with <strong>4 privacy levels</strong> and daily rotation. Compliance-ready.</p>
+
+      <!-- Standard: Hybrid RAG -->
+      <div class="bento__cell" data-accent="cyan">
+        <span class="bento__label"><span class="bento__dot"></span>Retrieval</span>
+        <div class="bento__title">Hybrid RAG</div>
+        <p class="bento__desc">BM25 + vector + RRF fusion + cross-encoder reranking. 4 store backends.</p>
       </div>
-      <div class="card card-purple reveal reveal-d2">
-        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a10 10 0 00-6.88 17.23l1.15 1.51A2 2 0 008 22h8a2 2 0 001.73-1.26l1.15-1.51A10 10 0 0012 2z"/><path d="M12 18v-6M8 14h8"/></svg></div>
-        <h3>Memory + Knowledge</h3>
-        <p>Conversation memory, entity extraction, knowledge graph. <strong>3 session backends.</strong></p>
+
+      <!-- Standard: Audit Logging -->
+      <div class="bento__cell" data-accent="cyan">
+        <span class="bento__label"><span class="bento__dot"></span>Compliance</span>
+        <div class="bento__title">Audit logging</div>
+        <p class="bento__desc">JSONL trail, 4 privacy levels, daily rotation. Ready for the compliance review.</p>
       </div>
-      <div class="card card-amber reveal reveal-d3">
-        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg></div>
-        <h3>24 Built-in Tools</h3>
-        <p>File I/O, web requests, data transforms, datetime, text processing. Ready to use.</p>
+
+      <!-- Standard: Memory -->
+      <div class="bento__cell" data-accent="purple">
+        <span class="bento__label"><span class="bento__dot"></span>Memory</span>
+        <div class="bento__title">Memory + Knowledge</div>
+        <p class="bento__desc">Conversation memory, entity extraction, knowledge graph. 3 session backends.</p>
       </div>
-    </div>
-    <div class="grid-2 gap-8 mt-16">
-      <div class="card card-cyan reveal">
-        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg></div>
-        <h3>Multi-Agent Orchestration</h3>
-        <p>AgentGraph for directed agent graphs with plain Python routing. <strong>4 SupervisorAgent strategies.</strong> HITL resumes at yield point. Parallel execution, checkpointing, subgraph composition.</p>
+
+      <!-- Standard: 33 Tools (correcting old "24" stale fact) -->
+      <div class="bento__cell" data-accent="amber">
+        <span class="bento__label"><span class="bento__dot"></span>Toolbox</span>
+        <div class="bento__title">33 built-in tools</div>
+        <p class="bento__desc">File I/O, web, code, data, datetime, GitHub, search, db. Ready to wire into any agent.</p>
       </div>
-      <div class="card card-blue reveal reveal-d1">
-        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/></svg></div>
-        <h3>Composable Pipelines</h3>
-        <p><code style="color:var(--cyan)">Pipeline</code> + <code style="color:var(--cyan)">@step</code> + <code style="color:var(--cyan)">|</code> + <code style="color:var(--cyan)">parallel()</code> + <code style="color:var(--cyan)">branch()</code>. Chain agents, tools, and transforms.</p>
+
+      <!-- Standard: Auto-Failover -->
+      <div class="bento__cell" data-accent="amber">
+        <span class="bento__label"><span class="bento__dot"></span>Providers</span>
+        <div class="bento__title">Auto-failover</div>
+        <p class="bento__desc">OpenAI, Anthropic, Gemini, Ollama. Circuit breaker with health checks.</p>
       </div>
-      <div class="card card-purple reveal">
-        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg></div>
-        <h3>4 Advanced Agent Patterns</h3>
-        <p><code style="color:var(--cyan)">PlanAndExecute</code>, <code style="color:var(--cyan)">Reflective</code>, <code style="color:var(--cyan)">Debate</code>, <code style="color:var(--cyan)">TeamLead</code>. High-level coordination built on AgentGraph.</p>
+
+      <!-- Standard: Streaming -->
+      <div class="bento__cell" data-accent="green">
+        <span class="bento__label"><span class="bento__dot"></span>Streaming</span>
+        <div class="bento__title">Native astream()</div>
+        <p class="bento__desc">Token-level async streaming with structured tool-call objects yielded inline.</p>
       </div>
-      <div class="card card-green reveal reveal-d1">
-        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div>
-        <h3>Enterprise Ready</h3>
-        <p>Security audit published. SBOM (CycloneDX). <code style="color:var(--cyan)">@stable</code>/<code style="color:var(--cyan)">@beta</code>/<code style="color:var(--cyan)">@deprecated</code> markers. Python 3.9 to 3.13.</p>
+
+      <!-- Standard: MCP (added to make standards divide evenly into rows of 3) -->
+      <div class="bento__cell" data-accent="purple">
+        <span class="bento__label"><span class="bento__dot"></span>MCP</span>
+        <div class="bento__title">Model Context Protocol</div>
+        <p class="bento__desc">Both client and server. Connect to any MCP server, expose your tools as one.</p>
       </div>
+
+      <!-- Full-width footer cell: Enterprise -->
+      <div class="bento__cell bento__cell--full" data-accent="green">
+        <span class="bento__label"><span class="bento__dot"></span>Enterprise-ready</span>
+        <div class="bento__title">SBOM (CycloneDX) &middot; Security audit published &middot; <code style="color:var(--green)">@stable</code> / <code style="color:var(--green)">@beta</code> / <code style="color:var(--green)">@deprecated</code> markers &middot; Python 3.9 to 3.13 &middot; 95% test coverage &middot; 4612 tests</div>
+      </div>
+
     </div>
   </div>
 </section>
@@ -2261,26 +3187,52 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
 <!-- ─── Who It's For ───────────────────────────────────────────────── -->
 <section class="section">
   <div class="wrap">
-    <div class="text-center mb-14">
+    <div class="mb-14" style="max-width:680px">
       <span class="section-label">Who it&rsquo;s for</span>
       <h2>Built for teams shipping agents to production.</h2>
     </div>
-    <div class="grid-3 gap-8">
-      <div class="card card-cyan reveal">
-        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
-        <h3>ML / AI Engineers</h3>
-        <p>You need to know what your agent did, why, and how much it cost. On every call. Not just while debugging. <strong>In production. Automatically.</strong></p>
-      </div>
-      <div class="card card-red reveal reveal-d1">
-        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></div>
-        <h3>Regulated Industries</h3>
-        <p>Your compliance team will ask "where are the audit logs?" and "how do you prevent PII leakage?" <strong>You'll have the answer before they ask.</strong></p>
-      </div>
-      <div class="card card-amber reveal reveal-d2">
-        <div class="card-icon"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg></div>
-        <h3>Teams Outgrowing LangChain</h3>
-        <p>You're paying $39/seat/mo for LangSmith to see what your agents are doing. <strong>We ship that, plus 50 evaluators, for free.</strong></p>
-      </div>
+
+    <div class="personas">
+
+      <article class="persona persona--engineers">
+        <div class="persona__pattern" aria-hidden="true"></div>
+        <p class="persona__quote">I just want to know what my agent did and how much it cost. On every call.</p>
+        <div class="persona__meta">
+          <span class="persona__name">ML / AI Engineer</span>
+          <span class="persona__chip">in production &middot; automatically</span>
+        </div>
+        <div class="persona__answer">
+          <span class="persona__answer-label">You'll appreciate</span>
+          <code>result.trace</code>, <code>result.usage.total_cost</code>, and structured reasoning on every call. Not just while you're debugging &mdash; always on, written to your store, queryable.
+        </div>
+      </article>
+
+      <article class="persona persona--compliance">
+        <div class="persona__pattern" aria-hidden="true"></div>
+        <p class="persona__quote">Where are the audit logs? And how are you preventing PII leakage?</p>
+        <div class="persona__meta">
+          <span class="persona__name">Compliance Lead</span>
+          <span class="persona__chip">SBOM &middot; SOC 2 &middot; HIPAA</span>
+        </div>
+        <div class="persona__answer">
+          <span class="persona__answer-label">You'll appreciate</span>
+          <code>AuditLogger</code> with 4 privacy levels, daily JSONL rotation, <code>PIIGuardrail</code> with redaction-on-input, and 15 injection patterns screened on output. Published security audit + CycloneDX SBOM.
+        </div>
+      </article>
+
+      <article class="persona persona--migrating">
+        <div class="persona__pattern" aria-hidden="true"></div>
+        <p class="persona__quote">We're paying $39/seat/mo just to see what our agents are doing.</p>
+        <div class="persona__meta">
+          <span class="persona__name">Team migrating off LangChain</span>
+          <span class="persona__chip">$0 &middot; self-hosted</span>
+        </div>
+        <div class="persona__answer">
+          <span class="persona__answer-label">You'll appreciate</span>
+          Built-in traces, 50 evaluators, visual builder, and audit logging. All free, all local. No LangSmith subscription, no langchain-core, no separate eval SDK. <code>pip install selectools</code>.
+        </div>
+      </article>
+
     </div>
   </div>
 </section>
@@ -2290,28 +3242,130 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
   <div class="wrap text-center">
     <span class="section-label">Get started</span>
     <h2 class="mb-6">Three paths. Pick yours.</h2>
-    <p class="section-desc center mb-14" style="margin-bottom:64px">No API key needed for the builder or examples. Add one when you&rsquo;re ready to go live.</p>
-    <div class="grid-3 gap-8" style="padding-top:8px">
-      <div class="card card-cyan reveal" style="padding:28px;display:flex;flex-direction:column;align-items:center;text-align:center">
-        <div class="card-icon" style="margin-bottom:14px"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
-        <h3 style="margin-bottom:6px">Visual Builder</h3>
-        <p style="flex:1">Design in the browser. Export Python. No install needed.</p>
-        <a href="builder/" class="btn btn-cyan" style="width:100%;margin-top:16px">Open Builder &rarr;</a>
-      </div>
-      <div class="card card-blue reveal reveal-d1" style="padding:28px;display:flex;flex-direction:column;align-items:center;text-align:center">
-        <div class="card-icon" style="margin-bottom:14px"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg></div>
-        <h3 style="margin-bottom:6px">Code First</h3>
-        <p style="flex:1"><code style="color:var(--cyan)">pip install selectools</code> and write Python.</p>
-        <a href="QUICKSTART/" class="btn btn-primary" style="width:100%;margin-top:16px">Quickstart Guide</a>
-      </div>
-      <div class="card card-purple reveal reveal-d2" style="padding:28px;display:flex;flex-direction:column;align-items:center;text-align:center">
-        <div class="card-icon" style="margin-bottom:14px"><svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg></div>
-        <h3 style="margin-bottom:6px">Learn by Example</h3>
-        <p style="flex:1">88 runnable examples. Browse, copy, run.</p>
-        <a href="examples/" class="btn btn-ghost" style="width:100%;margin-top:16px">Example Gallery</a>
-      </div>
+    <p class="section-desc center" style="margin:0 auto">No API key needed for the builder or examples. Add one when you&rsquo;re ready to go live.</p>
+
+    <div class="paths">
+
+      <!-- PATH 1: Visual Builder — animated mini graph preview -->
+      <a href="builder/" class="path path--builder" id="pathBuilder">
+        <div class="path__preview">
+          <div class="path-graph">
+            <svg viewBox="0 0 240 200" preserveAspectRatio="xMidYMid meet">
+              <!-- Edges -->
+              <path class="path-graph__edge" d="M 120 35 L 60 100" />
+              <path class="path-graph__edge" d="M 120 35 L 180 100" />
+              <path class="path-graph__edge" d="M 60 100 L 120 165" />
+              <path class="path-graph__edge" d="M 180 100 L 120 165" />
+              <!-- Nodes -->
+              <g>
+                <rect class="path-graph__node" x="84" y="18" width="72" height="34" rx="6"/>
+                <text class="path-graph__node-text" x="120" y="40" text-anchor="middle">START</text>
+              </g>
+              <g>
+                <rect class="path-graph__node" x="24" y="83" width="72" height="34" rx="6"/>
+                <text class="path-graph__node-text" x="60" y="105" text-anchor="middle">Researcher</text>
+              </g>
+              <g>
+                <rect class="path-graph__node" x="144" y="83" width="72" height="34" rx="6"/>
+                <text class="path-graph__node-text" x="180" y="105" text-anchor="middle">Writer</text>
+              </g>
+              <g>
+                <rect class="path-graph__node" x="84" y="148" width="72" height="34" rx="6"/>
+                <text class="path-graph__node-text" x="120" y="170" text-anchor="middle">END</text>
+              </g>
+              <!-- Animated pulses (set per-path animation via JS) -->
+              <circle id="pathPulseA" class="path-graph__pulse" r="3" cx="120" cy="35"/>
+              <circle id="pathPulseB" class="path-graph__pulse" r="3" cx="120" cy="35"/>
+            </svg>
+          </div>
+        </div>
+        <div class="path__body">
+          <span class="path__label">Visual builder</span>
+          <h3 class="path__title">Drag, drop, deploy.</h3>
+          <p class="path__desc">Design multi-agent graphs in the browser. Click ports to connect. Export runnable Python or YAML. No install. No CDN. No signup.</p>
+          <span class="path__cta">Open the builder &rarr;</span>
+        </div>
+      </a>
+
+      <!-- PATH 2: Code First — typing terminal preview -->
+      <a href="QUICKSTART/" class="path path--code" id="pathCode">
+        <div class="path__preview">
+          <div class="path-term">
+            <span class="path-term__line"><span class="pr">$</span>pip install selectools</span>
+            <span class="path-term__line"><span class="dm">Successfully installed</span></span>
+            <span class="path-term__line"><span class="pr">&gt;&gt;&gt;</span><span class="dm">from</span> selectools <span class="dm">import</span> Agent</span>
+            <span class="path-term__line"><span class="pr">&gt;&gt;&gt;</span>Agent().run(<span class="ok">"hi"</span>)</span>
+            <span class="path-term__line"><span class="ok">'Hello! How can I help?'</span><span class="path-term__caret"></span></span>
+          </div>
+        </div>
+        <div class="path__body">
+          <span class="path__label">Code first</span>
+          <h3 class="path__title">One install. Plain Python.</h3>
+          <p class="path__desc">Two lines from zero to first agent. No DSL, no compile step, no scaffolding. Use whatever editor you already have.</p>
+          <span class="path__cta">Read the quickstart &rarr;</span>
+        </div>
+      </a>
+
+      <!-- PATH 3: Learn by Example — scrolling marquee of examples -->
+      <a href="examples/" class="path path--examples" id="pathExamples">
+        <div class="path__preview">
+          <div class="path-marquee">
+            <div class="path-marquee__row" style="--marquee-dur:32s">
+              <span class="path-marquee__chip"><span class="num">01</span>hello_world.py</span>
+              <span class="path-marquee__chip"><span class="num">14</span>rag_basic.py</span>
+              <span class="path-marquee__chip"><span class="num">23</span>multi_agent.py</span>
+              <span class="path-marquee__chip"><span class="num">31</span>guardrails.py</span>
+              <span class="path-marquee__chip"><span class="num">42</span>streaming.py</span>
+              <span class="path-marquee__chip"><span class="num">56</span>plan_execute.py</span>
+              <!-- duplicated for seamless loop -->
+              <span class="path-marquee__chip"><span class="num">01</span>hello_world.py</span>
+              <span class="path-marquee__chip"><span class="num">14</span>rag_basic.py</span>
+              <span class="path-marquee__chip"><span class="num">23</span>multi_agent.py</span>
+              <span class="path-marquee__chip"><span class="num">31</span>guardrails.py</span>
+              <span class="path-marquee__chip"><span class="num">42</span>streaming.py</span>
+              <span class="path-marquee__chip"><span class="num">56</span>plan_execute.py</span>
+            </div>
+            <div class="path-marquee__row reverse" style="--marquee-dur:38s">
+              <span class="path-marquee__chip"><span class="num">19</span>hybrid_search.py</span>
+              <span class="path-marquee__chip"><span class="num">27</span>tool_caching.py</span>
+              <span class="path-marquee__chip"><span class="num">38</span>session_redis.py</span>
+              <span class="path-marquee__chip"><span class="num">49</span>eval_suite.py</span>
+              <span class="path-marquee__chip"><span class="num">63</span>knowledge_graph.py</span>
+              <span class="path-marquee__chip"><span class="num">71</span>budget_limit.py</span>
+              <span class="path-marquee__chip"><span class="num">19</span>hybrid_search.py</span>
+              <span class="path-marquee__chip"><span class="num">27</span>tool_caching.py</span>
+              <span class="path-marquee__chip"><span class="num">38</span>session_redis.py</span>
+              <span class="path-marquee__chip"><span class="num">49</span>eval_suite.py</span>
+              <span class="path-marquee__chip"><span class="num">63</span>knowledge_graph.py</span>
+              <span class="path-marquee__chip"><span class="num">71</span>budget_limit.py</span>
+            </div>
+            <div class="path-marquee__row" style="--marquee-dur:36s">
+              <span class="path-marquee__chip"><span class="num">07</span>provider_failover.py</span>
+              <span class="path-marquee__chip"><span class="num">15</span>vector_chroma.py</span>
+              <span class="path-marquee__chip"><span class="num">22</span>supervisor.py</span>
+              <span class="path-marquee__chip"><span class="num">35</span>audit_log.py</span>
+              <span class="path-marquee__chip"><span class="num">52</span>reflective.py</span>
+              <span class="path-marquee__chip"><span class="num">68</span>debate.py</span>
+              <span class="path-marquee__chip"><span class="num">07</span>provider_failover.py</span>
+              <span class="path-marquee__chip"><span class="num">15</span>vector_chroma.py</span>
+              <span class="path-marquee__chip"><span class="num">22</span>supervisor.py</span>
+              <span class="path-marquee__chip"><span class="num">35</span>audit_log.py</span>
+              <span class="path-marquee__chip"><span class="num">52</span>reflective.py</span>
+              <span class="path-marquee__chip"><span class="num">68</span>debate.py</span>
+            </div>
+          </div>
+        </div>
+        <div class="path__body">
+          <span class="path__label">Learn by example</span>
+          <h3 class="path__title">88 examples, all runnable.</h3>
+          <p class="path__desc">From hello-world to multi-agent debate. Browse, copy, run. Each one is self-contained with realistic mock data.</p>
+          <span class="path__cta">Browse the gallery &rarr;</span>
+        </div>
+      </a>
+
     </div>
-    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:24px">
+
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:36px">
       <a href="https://colab.research.google.com/github/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb" class="btn btn-ghost" target="_blank" rel="noopener">Open in Colab</a>
       <a href="https://github.com/johnnichev/selectools" class="btn btn-ghost">Star on GitHub</a>
     </div>
@@ -2521,6 +3575,67 @@ const obs = new IntersectionObserver(entries => {
   entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
 }, { threshold: 0.08 });
 document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+
+/* ── Section 1 vignette in-view trigger ──────────────────────────── */
+/* Separate observer with a higher threshold so the diff-glow animation
+   doesn't fire until the user has actually committed to looking at it. */
+(function() {
+  var vignettes = document.querySelectorAll('.why-vignette');
+  if (!vignettes.length) return;
+  var io = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (e.isIntersecting) {
+        e.target.classList.add('in-view');
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.25, rootMargin: '0px 0px -10% 0px' });
+  vignettes.forEach(function(el) { io.observe(el); });
+})();
+
+/* ── Section 4 path cards: in-view trigger for typing terminal ──── */
+(function() {
+  var paths = document.querySelectorAll('.path');
+  if (!paths.length) return;
+  var io = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (e.isIntersecting) {
+        e.target.classList.add('in-view');
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.3 });
+  paths.forEach(function(el) { io.observe(el); });
+})();
+
+/* ── Section 2 bento: in-view trigger + cursor-spotlight ─────────── */
+(function() {
+  var bento = document.getElementById('bentoGrid');
+  if (!bento) return;
+  /* When the grid scrolls into view, add .in-view so the eval bars fill.
+     The CSS rule .bento.in-view .bento__bar-fill { width: var(--pct) }
+     animates from 0 to the per-bar pct value. */
+  var io = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (e.isIntersecting) {
+        bento.classList.add('in-view');
+        io.disconnect();
+      }
+    });
+  }, { threshold: 0.2 });
+  io.observe(bento);
+
+  /* Cursor-following spotlight on each cell — sets CSS custom props the
+     ::before radial-gradient reads. Pointer-fine only (mouse, not touch). */
+  if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+  bento.querySelectorAll('.bento__cell').forEach(function(cell) {
+    cell.addEventListener('pointermove', function(e) {
+      var rect = cell.getBoundingClientRect();
+      cell.style.setProperty('--mx', (e.clientX - rect.left) + 'px');
+      cell.style.setProperty('--my', (e.clientY - rect.top) + 'px');
+    });
+  });
+})();
 
 /* ── Hero Flow Animation (Multi-Scene) ─────────────────────────── */
 (function() {
