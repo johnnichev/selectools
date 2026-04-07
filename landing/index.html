@@ -2974,7 +2974,7 @@
     .diff-stage {
       position: relative;
       margin-top: 28px;
-      --split: 50%;
+      --split: 50;
     }
     .diff-pane {
       position: relative;
@@ -2983,36 +2983,43 @@
       isolation: isolate;
       min-height: 480px;
       box-shadow: 0 20px 60px -28px rgba(0, 0, 0, 0.55);
+      display: grid;
+      /* Driven by --split (a unitless 0-100 value, JS keeps it in sync) */
+      grid-template-columns: calc(var(--split) * 1%) calc((100 - var(--split)) * 1%);
+      gap: 0;
+      transition: grid-template-columns 0.6s var(--exec-ease-soft);
     }
-    .diff-pane__layer {
-      position: absolute;
-      inset: 0;
-      border-radius: 14px;
+    .diff-stage.is-dragging .diff-pane { transition: none; }
+    .diff-pane__col {
+      position: relative;
+      min-width: 0;       /* allow column to shrink below content size */
       overflow: hidden;
       border: 1px solid var(--border);
     }
-    .diff-pane__layer--bg { z-index: 1; }
-    .diff-pane__layer--fg {
-      z-index: 2;
+    .diff-pane__col--l { border-right: none; border-radius: 14px 0 0 14px; }
+    .diff-pane__col--r {
+      border-left: none;
+      border-radius: 0 14px 14px 0;
       border-color: rgba(34, 211, 238, 0.35);
       box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.08);
-      clip-path: inset(0 calc(100% - var(--split)) 0 0);
-      transition: clip-path 0.6s var(--exec-ease-soft);
     }
-    .diff-stage.is-dragging .diff-pane__layer--fg { transition: none; }
-    .diff-pane__layer .code-frame {
+    .diff-pane__col .code-frame {
       height: 100%;
       margin: 0;
       border: none;
       border-radius: 0;
       box-shadow: none;
+      min-width: 0;
+      max-width: none;
     }
-    .diff-pane__layer .code-body {
+    .diff-pane__col--l .code-frame { background: #0b1220; }
+    .diff-pane__col--r .code-frame { background: #0a1220; }
+    .diff-pane__col .code-body {
       height: calc(100% - 44px);
-      overflow-y: auto;
+      overflow: hidden;
+      mask-image: none;
+      -webkit-mask-image: none;
     }
-    .diff-pane__layer--bg .code-frame { background: #0b1220; }
-    .diff-pane__layer--fg .code-frame { background: #0a1220; }
 
     /* The split handle line */
     .diff-pane__split-line {
@@ -4231,8 +4238,8 @@ result = agent.<span class="cyan">execute</span>(user_input)
       </div>
 
       <div class="diff-pane">
-        <!-- Background layer: LangGraph (always full) -->
-        <div class="diff-pane__layer diff-pane__layer--bg">
+        <!-- LEFT column: LangGraph (shrinks as you drag right) -->
+        <div class="diff-pane__col diff-pane__col--l">
           <div class="code-frame">
             <div class="code-bar">
               <div class="code-dot" style="background:rgba(239,68,68,0.35)"></div>
@@ -4263,8 +4270,8 @@ result = app.<span class="fn">invoke</span>({<span class="str">"text"</span>: <s
           </div>
         </div>
 
-        <!-- Foreground layer: selectools (clip-path tied to --split) -->
-        <div class="diff-pane__layer diff-pane__layer--fg">
+        <!-- RIGHT column: selectools (grows as you drag right) -->
+        <div class="diff-pane__col diff-pane__col--r">
           <div class="code-frame code-frame-accent">
             <div class="code-bar">
               <div class="code-dot" style="background:rgba(239,68,68,0.8)"></div>
@@ -4287,7 +4294,8 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
           </div>
         </div>
 
-        <!-- Range input (invisible, drives --split via JS) -->
+        <!-- Range input (invisible, drives --split via JS).
+             Default 50; user drags LEFT to wipe LangGraph away. -->
         <input type="range" class="diff-pane__range"
                min="0" max="100" value="50" step="0.5"
                aria-label="Drag to compare LangGraph and selectools" />
@@ -5075,15 +5083,15 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
     </div>
 
     <div class="repl">
-      <!-- Left rail: category tabs -->
-      <nav class="repl__rail" aria-label="FAQ categories">
+      <!-- Left rail: category tabs (div with role=navigation to avoid the global nav { position:fixed } selector) -->
+      <div class="repl__rail" role="navigation" aria-label="FAQ categories">
         <p class="repl__rail-title"><span class="exec-dot exec-dot--sm" aria-hidden="true"></span> categories</p>
         <button type="button" class="repl__cat is-active" data-cat="all">all<span class="repl__cat-count">10</span></button>
         <button type="button" class="repl__cat" data-cat="getting-started">getting-started<span class="repl__cat-count">2</span></button>
         <button type="button" class="repl__cat" data-cat="concepts">concepts<span class="repl__cat-count">3</span></button>
         <button type="button" class="repl__cat" data-cat="providers">providers<span class="repl__cat-count">2</span></button>
         <button type="button" class="repl__cat" data-cat="advanced">advanced<span class="repl__cat-count">3</span></button>
-      </nav>
+      </div>
 
       <!-- Main panel: search + question list -->
       <div class="repl__main">
@@ -5421,8 +5429,16 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
   var annos = stage.querySelectorAll('.diff-anno');
   if (!range) return;
 
+  var splitLine = stage.querySelector('.diff-pane__split-line');
+  var splitKnob = stage.querySelector('.diff-pane__split-knob');
   function setSplit(v) {
-    stage.style.setProperty('--split', v + '%');
+    // --split is a unitless 0..100 value. CSS multiplies it by 1% to get a length.
+    // Slider value v = how much LangGraph (left col) is visible (0..100).
+    // So drag LEFT (lower v) = less LangGraph = more selectools = "wipe ceremony away".
+    var langgraphPct = 100 - v;
+    stage.style.setProperty('--split', langgraphPct);
+    if (splitLine) splitLine.style.left = langgraphPct + '%';
+    if (splitKnob) splitKnob.style.left = langgraphPct + '%';
     annos.forEach(function(a) {
       var t = parseFloat(a.getAttribute('data-threshold')) || 0;
       a.classList.toggle('is-shown', v >= t);
@@ -5532,12 +5548,16 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
 (function() {
   var report = document.querySelector('.eval-report');
   if (!report) return;
+  var status = report.querySelector('.eval-report__status');
   var io = new IntersectionObserver(function(entries) {
     entries.forEach(function(e) {
       if (!e.isIntersecting) return;
       report.classList.add('is-running');
       // Mark "done" after the last metric+value finishes (~2.7s in)
-      setTimeout(function() { report.classList.add('is-done'); }, 2700);
+      setTimeout(function() {
+        report.classList.add('is-done');
+        if (status) status.textContent = 'passed';
+      }, 2700);
       io.disconnect();
     });
   }, { threshold: 0.3, rootMargin: '0px 0px -8% 0px' });
