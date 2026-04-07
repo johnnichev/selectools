@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Selectools — Production-Ready AI Agents in Plain Python</title>
+  <title>Selectools: Production-Ready AI Agents in Plain Python</title>
   <meta name="description" content="Selectools is a Python library for building production-ready AI agents with tool calling, RAG, and multi-agent orchestration. 152 models, 50 evaluators, visual builder. Supports OpenAI, Anthropic, Gemini, Ollama. Free and open source." />
   <link rel="canonical" href="https://selectools.dev/" />
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
@@ -26,7 +26,7 @@
   <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
   <meta name="keywords" content="python ai agent, tool calling, rag, hybrid search, openai, anthropic, gemini, ollama, ai agent framework, llm tools, python llm, multi-agent, agent graph, langchain alternative" />
   <meta name="author" content="NichevLabs" />
-  <meta property="og:title" content="Selectools — Python AI Agent Framework" />
+  <meta property="og:title" content="Selectools: Python AI Agent Framework" />
   <meta property="og:description" content="Multi-agent graphs, 50 built-in evaluators, visual builder, hybrid RAG. One pip install. No DSL. Free." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://selectools.dev/" />
@@ -36,9 +36,9 @@
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Selectools — AI Agents That Are Just Python" />
+  <meta name="twitter:title" content="Selectools: AI Agents That Are Just Python" />
   <meta name="twitter:image" content="https://selectools.dev/assets/og-image.svg" />
-  <meta name="twitter:description" content="Multi-agent orchestration, RAG, 50 evaluators, visual builder — one pip install. OpenAI, Anthropic, Gemini, Ollama." />
+  <meta name="twitter:description" content="Multi-agent orchestration, RAG, 50 evaluators, visual builder. One pip install. OpenAI, Anthropic, Gemini, Ollama." />
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -90,7 +90,7 @@
         "name": "How is Selectools different from LangChain?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Selectools uses a single Agent class with native tool calling — no chains, no expression language, no complex abstractions. It includes built-in features that require separate paid services in LangChain: 50 evaluators, hybrid RAG search, guardrails, audit logging, multi-agent orchestration, and a visual builder. One pip install, everything included, free."
+          "text": "Selectools uses a single Agent class with native tool calling. No chains, no expression language, no complex abstractions. It includes built-in features that require separate paid services in LangChain: 50 evaluators, hybrid RAG search, guardrails, audit logging, multi-agent orchestration, and a visual builder. One pip install, everything included, free."
         }
       },
       {
@@ -4098,7 +4098,7 @@
   <div class="wrap">
     <span class="section-label">What is selectools?</span>
     <h2 class="mb-4">A Python framework for production AI agents.</h2>
-    <p class="section-desc mb-10">One <code style="color:var(--cyan)">pip install</code>. The whole stack. No DSL, no separate packages, no paid SaaS &mdash; your code stays plain Python.</p>
+    <p class="section-desc mb-10">One <code style="color:var(--cyan)">pip install</code>. The whole stack. No DSL, no separate packages, no paid SaaS. Your code stays plain Python.</p>
 
     <div class="what-stage">
       <!-- Terminal: types the script line by line on viewport entry -->
@@ -4168,7 +4168,7 @@
       <article class="why-vignette" data-why="visibility">
         <div class="why-vignette__num">01</div>
         <div class="why-vignette__body">
-          <p class="why-vignette__pain">Your agent did <span class="strike">something</span> &mdash; you have no idea what.</p>
+          <p class="why-vignette__pain">Your agent did <span class="strike">something</span>. You have no idea what.</p>
           <div class="why-vignette__diff">
             <div class="why-block is-pain">
               <div class="why-block__head">langchain &middot; what you see</div>
@@ -4286,7 +4286,7 @@ result = agent.<span class="cyan">execute</span>(user_input)
   <div class="wrap">
     <span class="section-label">See the difference</span>
     <h2 class="mb-4">The same pipeline. Less ceremony.</h2>
-    <p class="section-desc mb-14">A 3-agent workflow: planner &rarr; writer &rarr; reviewer. Same outcome &mdash; 25 lines of ceremony, or one.</p>
+    <p class="section-desc mb-14">A 3-agent workflow: planner &rarr; writer &rarr; reviewer. Same outcome. 25 lines of ceremony, or one.</p>
 
     <div class="diff-stage" data-stage>
       <div class="diff-labels">
@@ -4346,7 +4346,7 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
 
 <span class="cmt"># Need branching? AgentGraph.router(...)</span>
 <span class="cmt"># Need parallel? AgentGraph.parallel(...)</span>
-<span class="cmt"># Need HITL? yield and resume — no node restart.</span>
+<span class="cmt"># Need HITL? yield and resume. No node restart.</span>
 <span class="cmt"># Need to deploy? selectools serve agent.yaml</span></div>
           </div>
         </div>
@@ -4644,7 +4644,7 @@ result = agent.<span class="fn">run</span>(<span class="str">"Find our refund po
         <div class="ent-counter">
           <span class="ent-counter__num" data-target="4612">0</span>
         </div>
-        <p class="ent-exhibit__caption">Unit, integration, and e2e — green on every commit.</p>
+        <p class="ent-exhibit__caption">Unit, integration, and e2e. Green on every commit.</p>
       </div>
 
       <!-- Exhibit 3: Version stack -->
@@ -4962,7 +4962,7 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
         </div>
         <div class="persona__answer">
           <span class="persona__answer-label">You'll appreciate</span>
-          <code>result.trace</code>, <code>result.usage.total_cost</code>, and structured reasoning on every call. Not just while you're debugging &mdash; always on, written to your store, queryable.
+          <code>result.trace</code>, <code>result.usage.total_cost</code>, and structured reasoning on every call. Not just while you're debugging. Always on, written to your store, queryable.
         </div>
       </article>
 
@@ -6091,7 +6091,7 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
         { t:2000, type:"error", agent:"OpenAI", text:"Circuit breaker OPEN: 2 consecutive failures. Cooldown: 60s" },
         { t:2100, type:"fallback", agent:"Agent", text:"Falling over: OpenAI \u2192 Anthropic (circuit_breaker_open)" },
         { t:2300, type:"other", agent:"Anthropic", text:"Calling claude-sonnet-4-6..." },
-        { t:3200, type:"response", agent:"Anthropic", text:"Quantum computing leverages quantum mechanics principles like superposition and entanglement to process information fundamentally differently from classical computers..." },
+        { t:3200, type:"response", agent:"Anthropic", text:"Quantum computing uses quantum mechanics principles like superposition and entanglement to process information differently from classical computers..." },
         { t:3400, type:"other", agent:"Anthropic", text:"Response received from fallback provider" }
       ],
       tokens: 520, cost: "$0.0031", model: "claude-sonnet-4-6"
@@ -6183,7 +6183,7 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
     },
     {
       name: "Streaming + Tools",
-      desc: "astream() delivers tokens in real time while seamlessly handling tool calls mid-stream. Tool results arrive between streamed chunks.",
+      desc: "astream() yields tokens in real time and handles tool calls mid-stream. Tool results arrive between streamed chunks.",
       agents: ["Agent", "Tools"],
       colors: ["#3b82f6", "#22c55e"],
       events: [
@@ -6203,7 +6203,7 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
       colors: ["#3b82f6", "#ef4444"],
       events: [
         { t:0, type:"other", agent:"Budget Monitor", text:"Budget set: max 500 tokens, max cost $0.002" },
-        { t:100, type:"input", agent:"Agent", text:"Write a comprehensive guide to machine learning" },
+        { t:100, type:"input", agent:"Agent", text:"Write a complete guide to machine learning" },
         { t:300, type:"tool_call", agent:"Agent", text:"web_search(machine learning fundamentals guide)" },
         { t:600, type:"tool_result", agent:"Agent", text:"Found 8 resources on ML fundamentals..." },
         { t:800, type:"other", agent:"Budget Monitor", text:"Iteration 1: 180/500 tokens used (36%)" },
