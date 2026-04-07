@@ -161,6 +161,20 @@
       --grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.018'/%3E%3C/svg%3E");
       --max-w: 1120px;
       --ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+      /* OVERDRIVE FUSED — execution-pointer system
+         Shared design tokens for all six redesigned sections.
+         The execution pointer is a conceptual entity (a cyan pulse that
+         represents where the program is executing) implemented as
+         section-local animations sharing these tokens. */
+      --exec-color: #22d3ee;            /* same as --cyan, aliased for intent */
+      --exec-glow: rgba(34, 211, 238, 0.55);
+      --exec-glow-soft: rgba(34, 211, 238, 0.18);
+      --exec-pulse-dur: 1.6s;           /* default pulse loop */
+      --exec-step-dur: 0.55s;           /* node-to-node travel */
+      --exec-ease-step: cubic-bezier(0.4, 0, 0.2, 1);
+      --exec-ease-soft: cubic-bezier(0.16, 1, 0.3, 1);
+      --exec-blink-dur: 1.05s;          /* terminal caret cadence */
     }
 
     html, body {
@@ -2340,6 +2354,88 @@
       100% { box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.18); }
     }
 
+    /* ════════════════════════════════════════════════════════════════
+       OVERDRIVE FUSED — execution-pointer system (shared atoms)
+       Reusable building blocks for all six redesigned sections.
+       Each section composes these atoms to create its hero moment;
+       the visual cohesion comes from sharing color, easing, and timing.
+       Consumers: #what, #see-difference, #production, #enterprise,
+                  #eval, #faq, footer, wordmarks.
+       ════════════════════════════════════════════════════════════════ */
+
+    /* The pulse — a cyan dot that represents the live execution pointer.
+       Used standalone as a status indicator and inside section animations. */
+    .exec-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--exec-color);
+      box-shadow: 0 0 0 0 var(--exec-glow);
+      animation: exec-pulse var(--exec-pulse-dur) var(--exec-ease-soft) infinite;
+      vertical-align: middle;
+    }
+    .exec-dot--lg { width: 10px; height: 10px; }
+    .exec-dot--sm { width: 6px; height: 6px; }
+
+    @keyframes exec-pulse {
+      0%   { box-shadow: 0 0 0 0 var(--exec-glow); }
+      60%  { box-shadow: 0 0 0 8px rgba(34, 211, 238, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+    }
+
+    /* The caret — a blinking block-cursor used in terminals and the wordmark. */
+    .exec-caret {
+      display: inline-block;
+      width: 0.55em;
+      height: 1.1em;
+      vertical-align: text-bottom;
+      background: var(--exec-color);
+      box-shadow: 0 0 6px var(--exec-glow);
+      animation: exec-blink var(--exec-blink-dur) steps(2, jump-none) infinite;
+      margin-left: 2px;
+    }
+    .exec-caret--thin { width: 2px; box-shadow: 0 0 4px var(--exec-glow-soft); }
+
+    @keyframes exec-blink {
+      0%, 49%   { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+
+    /* The scan line — a horizontal cyan beam that sweeps once across an element.
+       Used by the wordmark banner and Section 1 terminal on viewport entry.
+       Apply to a positioned parent: the ::after acts as the beam. */
+    .exec-scan { position: relative; overflow: hidden; }
+    .exec-scan.in-view::after {
+      content: "";
+      position: absolute;
+      top: 0; left: -25%;
+      width: 25%;
+      height: 100%;
+      background: linear-gradient(
+        90deg,
+        rgba(34, 211, 238, 0) 0%,
+        rgba(34, 211, 238, 0.18) 40%,
+        rgba(34, 211, 238, 0.55) 50%,
+        rgba(34, 211, 238, 0.18) 60%,
+        rgba(34, 211, 238, 0) 100%
+      );
+      pointer-events: none;
+      animation: exec-scan-sweep 1.4s var(--exec-ease-step) 0.2s 1 forwards;
+    }
+    @keyframes exec-scan-sweep {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(520%); }
+    }
+
+    /* The stamp — a one-shot scale + cyan ring used when the pointer "stamps"
+       an exhibit (Section 4 compliance shelf, Section 1 capability rail). */
+    @keyframes exec-stamp {
+      0%   { transform: scale(0.92); box-shadow: 0 0 0 0 var(--exec-glow); }
+      40%  { transform: scale(1.02); box-shadow: 0 0 0 6px var(--exec-glow-soft); }
+      100% { transform: scale(1);    box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.18); }
+    }
+
     /* ── Reduced motion (WCAG AA) ──────────────────────────────────── */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
@@ -2369,6 +2465,11 @@
       .path-term__caret { animation: none; opacity: 1; }
       .path-marquee__row { animation: none; }
       .path:hover { transform: none; }
+
+      /* OVERDRIVE FUSED — execution-pointer atoms: kill all motion */
+      .exec-dot { animation: none; box-shadow: 0 0 0 1px var(--exec-glow-soft); }
+      .exec-caret { animation: none; opacity: 1; }
+      .exec-scan.in-view::after { animation: none; display: none; }
     }
   </style>
 </head>
