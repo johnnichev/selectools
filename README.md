@@ -1,10 +1,12 @@
 # Selectools
 
-[![PyPI version](https://badge.fury.io/py/selectools.svg)](https://badge.fury.io/py/selectools)
-[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://selectools.dev)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![Evaluators](https://img.shields.io/badge/evaluators-50-06b6d4.svg)](https://selectools.dev/modules/EVALS/)
+[![PyPI](https://img.shields.io/pypi/v/selectools?color=06b6d4&label=pypi)](https://pypi.org/project/selectools/)
+[![Downloads](https://static.pepy.tech/badge/selectools/month)](https://pepy.tech/projects/selectools)
+[![CI](https://github.com/johnnichev/selectools/actions/workflows/ci.yml/badge.svg)](https://github.com/johnnichev/selectools/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-selectools.dev-06b6d4)](https://selectools.dev)
+[![Python](https://img.shields.io/pypi/pyversions/selectools?color=06b6d4)](https://pypi.org/project/selectools/)
+[![License](https://img.shields.io/badge/license-Apache_2.0-blue)](https://www.apache.org/licenses/LICENSE-2.0)
+[![Evaluators](https://img.shields.io/badge/evaluators-50-06b6d4)](https://selectools.dev/modules/EVALS/)
 
 An open-source project from **[NichevLabs](https://nichevlabs.com)**.
 
@@ -32,7 +34,7 @@ The first AI agent framework to ship a visual graph builder in a single `pip ins
 
 **[Try the builder in your browser →](https://selectools.dev/builder/)** — no install required.
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb) [![Examples Gallery](https://img.shields.io/badge/examples-76_scripts-22d3ee)](https://selectools.dev/examples/)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb) [![Examples Gallery](https://img.shields.io/badge/examples-88_scripts-06b6d4)](https://selectools.dev/examples/)
 
 ```bash
 pip install selectools

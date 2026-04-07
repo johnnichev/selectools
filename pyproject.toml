@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "selectools"
 version = "0.20.1"
-description = "Production-ready AI agents with tool calling, structured output, execution traces, and RAG. Provider-agnostic (OpenAI, Anthropic, Gemini, Ollama) with fallback chains, batch processing, tool policies, streaming, caching, and cost tracking."
+description = "Production-ready Python framework for AI agents with multi-agent graphs, hybrid RAG, guardrails, audit logging, 50 evaluators, and a visual builder. Supports OpenAI, Anthropic, Gemini, Ollama. By NichevLabs."
 readme = "README.md"
 requires-python = ">=3.9"
 license = "Apache-2.0"
@@ -17,7 +17,13 @@ dependencies = [
     "google-genai>=1.0.0",
     "numpy>=1.24.0,<3.0.0",
 ]
-keywords = ["llm", "tools", "ai", "openai", "agent", "rag", "embeddings", "vector-search", "hybrid-search", "tool-calling", "anthropic", "gemini", "structured-output", "observability", "fallback", "batch-processing"]
+keywords = [
+    "llm", "ai", "agent", "agents", "multi-agent", "agent-framework",
+    "tool-calling", "openai", "anthropic", "gemini", "ollama",
+    "rag", "hybrid-search", "vector-search", "embeddings",
+    "guardrails", "evals", "evaluators", "visual-builder",
+    "structured-output", "observability", "fallback", "langchain-alternative",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -32,11 +38,14 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://nichevlabs.com"
+Homepage = "https://selectools.dev"
+Documentation = "https://selectools.dev"
 Repository = "https://github.com/johnnichev/selectools"
 Issues = "https://github.com/johnnichev/selectools/issues"
-Documentation = "https://selectools.dev"
 Changelog = "https://github.com/johnnichev/selectools/blob/main/CHANGELOG.md"
+Builder = "https://selectools.dev/builder/"
+Examples = "https://selectools.dev/examples/"
+"NichevLabs" = "https://nichevlabs.com"
 
 [project.optional-dependencies]
 dev = [
