@@ -3,6 +3,7 @@ hide:
   - navigation
   - toc
 title: Selectools Documentation
+description: Selectools is a production-ready Python library for building AI agents with tool calling, RAG, multi-agent orchestration, 50 built-in evaluators, and a visual drag-drop builder. Free, open source, Apache-2.0. Supports OpenAI, Anthropic, Gemini, Ollama.
 ---
 
 ```

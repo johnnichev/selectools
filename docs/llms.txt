@@ -1,8 +1,8 @@
 # Selectools
 
-> Selectools is a production-ready Python library for building AI agents with tool calling, RAG, and multi-agent orchestration. One pip install. No DSL. Supports OpenAI, Anthropic, Gemini, Ollama. v0.20.1, 3344 tests, Apache-2.0.
+> Selectools is a production-ready Python library for building AI agents with tool calling, RAG, and multi-agent orchestration. One pip install. No DSL. Supports OpenAI, Anthropic, Gemini, Ollama. v0.20.1, 4612 tests at 95% coverage, Apache-2.0.
 
-Selectools uses a single `Agent` class with native tool calling — no chains, no expression language, no complex abstractions. It includes built-in features that require separate paid services in other frameworks: 50 evaluators, hybrid RAG search, guardrails, audit logging, multi-agent orchestration, and a visual drag-drop builder.
+Selectools uses a single `Agent` class with native tool calling. No chains, no expression language, no complex abstractions. It includes built-in features that other frameworks charge for or split into separate packages: 50 evaluators, hybrid RAG search (BM25 + vector), guardrails, audit logging, multi-agent orchestration, and a visual drag-drop builder. Free, local, MIT-compatible.
 
 Install: `pip install selectools`
 
@@ -17,9 +17,9 @@ def search(query: str) -> str:
 
 agent = Agent(tools=[search], provider=OpenAIProvider())
 result = agent.run("Find our refund policy")
-# result.content — the response text
-# result.trace   — structured execution timeline
-# result.usage   — token counts and dollar cost
+# result.content -> the response text
+# result.trace   -> structured execution timeline
+# result.usage   -> token counts and dollar cost
 ```
 
 ## Getting Started
@@ -33,7 +33,7 @@ result = agent.run("Find our refund policy")
 
 - [Agent](https://selectools.dev/modules/AGENT/): Agent class, AgentConfig, AgentResult — the central orchestrator
 - [Tools](https://selectools.dev/modules/TOOLS/): @tool decorator, Tool class, ToolLoader, ToolRegistry
-- [Toolbox](https://selectools.dev/modules/TOOLBOX/): 33 pre-built tools (file, web, data, datetime, text, code, search, github, db)
+- [Toolbox](https://selectools.dev/modules/TOOLBOX/): 33 pre-built tools (file I/O, HTTP/web, data parsing, datetime, text, code execution, search, GitHub, database)
 - [Memory](https://selectools.dev/modules/MEMORY/): ConversationMemory with sliding window and summarize-on-trim
 - [Streaming](https://selectools.dev/modules/STREAMING/): Token-level astream() with tool call support
 
@@ -81,4 +81,4 @@ result = agent.run("Find our refund policy")
 - [Multimodal Messages](https://selectools.dev/modules/STREAMING/#multimodal-messages-v0210): ContentPart, image_message(), text_content()
 - [Stability Markers](https://selectools.dev/modules/STABILITY/): @stable, @beta, @deprecated
 - [Changelog](https://selectools.dev/CHANGELOG/): Release history
-- [Examples Gallery](https://selectools.dev/examples/): 76 runnable scripts with categories
+- [Examples Gallery](https://selectools.dev/examples/): 88 runnable scripts with categories
