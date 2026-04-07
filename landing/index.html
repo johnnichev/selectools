@@ -2436,6 +2436,182 @@
       100% { transform: scale(1);    box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.18); }
     }
 
+    /* ════════════════════════════════════════════════════════════════
+       OVERDRIVE FUSED — #what — terminal + capability rail
+       Single full-width terminal panel that types out a script while
+       a vertical rail of capability chips lights up in sync with each
+       trigger line. The pointer (caret) lives at the end of the script.
+       ════════════════════════════════════════════════════════════════ */
+    .what-stage {
+      display: grid;
+      grid-template-columns: 1.55fr 1fr;
+      gap: 36px;
+      align-items: stretch;
+      margin-top: 28px;
+    }
+    .what-term {
+      position: relative;
+      background: #0b1220;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 20px 60px -28px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(34, 211, 238, 0.05);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .what-term__bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.7);
+    }
+    .what-term__dot {
+      width: 11px; height: 11px; border-radius: 999px;
+    }
+    .what-term__dot--r { background: rgba(239, 68, 68, 0.85); }
+    .what-term__dot--y { background: rgba(250, 204, 21, 0.85); }
+    .what-term__dot--g { background: rgba(34, 197, 94, 0.85); }
+    .what-term__name {
+      margin-left: 8px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-faint);
+    }
+    .what-term__shell {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+      letter-spacing: 0.08em;
+    }
+    .what-term__body {
+      padding: 22px 22px 26px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.75;
+      color: var(--text);
+      flex: 1;
+      min-height: 380px;
+    }
+    .what-term__line {
+      display: block;
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 0.35s var(--exec-ease-soft), transform 0.35s var(--exec-ease-soft);
+      white-space: pre;
+    }
+    .what-term__line.is-blank { height: 0.95em; }
+    .what-term.in-view .what-term__line { opacity: 1; transform: translateY(0); }
+    .what-term.in-view .what-term__line:nth-child(1)  { transition-delay: 0.10s; }
+    .what-term.in-view .what-term__line:nth-child(2)  { transition-delay: 0.32s; }
+    .what-term.in-view .what-term__line:nth-child(3)  { transition-delay: 0.54s; }
+    .what-term.in-view .what-term__line:nth-child(4)  { transition-delay: 0.76s; }
+    .what-term.in-view .what-term__line:nth-child(5)  { transition-delay: 0.98s; }
+    .what-term.in-view .what-term__line:nth-child(6)  { transition-delay: 1.20s; }
+    .what-term.in-view .what-term__line:nth-child(7)  { transition-delay: 1.42s; }
+    .what-term.in-view .what-term__line:nth-child(8)  { transition-delay: 1.64s; }
+    .what-term.in-view .what-term__line:nth-child(9)  { transition-delay: 1.86s; }
+    .what-term.in-view .what-term__line:nth-child(10) { transition-delay: 2.05s; }
+    .what-term.in-view .what-term__line:nth-child(11) { transition-delay: 2.24s; }
+    .what-term.in-view .what-term__line:nth-child(12) { transition-delay: 2.43s; }
+    .what-term.in-view .what-term__line:nth-child(13) { transition-delay: 2.62s; }
+    .what-term.in-view .what-term__line:nth-child(14) { transition-delay: 2.81s; }
+    .what-term.in-view .what-term__line:nth-child(15) { transition-delay: 3.00s; }
+    .what-term__line .kw  { color: #c084fc; }
+    .what-term__line .cls { color: var(--cyan); }
+    .what-term__line .fn  { color: #fbbf24; }
+    .what-term__line .str { color: #86efac; }
+    .what-term__line .cmt { color: var(--text-faint); font-style: italic; }
+    .what-term__caret {
+      display: inline-block;
+      width: 0.55em;
+      height: 1em;
+      vertical-align: text-bottom;
+      background: var(--exec-color);
+      box-shadow: 0 0 8px var(--exec-glow);
+      opacity: 0;
+      margin-left: 2px;
+    }
+    .what-term.in-view .what-term__caret {
+      opacity: 1;
+      animation: exec-blink var(--exec-blink-dur) steps(2, jump-none) 3.4s infinite;
+    }
+
+    .what-rail {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 4px 0;
+    }
+    .what-rail__title {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin: 0 0 8px 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .what-chip {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.45);
+      font-family: var(--font-ui);
+      font-size: 13.5px;
+      color: var(--text-dim);
+      transition:
+        border-color 0.5s var(--exec-ease-soft),
+        background 0.5s var(--exec-ease-soft),
+        color 0.5s var(--exec-ease-soft),
+        transform 0.5s var(--exec-ease-soft);
+    }
+    .what-chip__bullet {
+      width: 8px; height: 8px; border-radius: 999px;
+      background: var(--border);
+      box-shadow: 0 0 0 0 rgba(34, 211, 238, 0);
+      transition: background 0.4s var(--exec-ease-soft), box-shadow 0.4s var(--exec-ease-soft);
+      flex: 0 0 auto;
+    }
+    .what-chip__name { flex: 1; }
+    .what-chip__hint {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--text-faint);
+      letter-spacing: 0.04em;
+    }
+    .what-term.in-view ~ .what-rail .what-chip { /* fallback if rail comes after */ }
+    .what-stage.in-view .what-chip {
+      transition-delay: var(--chip-delay, 0s);
+    }
+    .what-stage.in-view .what-chip.is-lit {
+      border-color: rgba(34, 211, 238, 0.45);
+      background: rgba(34, 211, 238, 0.06);
+      color: var(--text);
+    }
+    .what-stage.in-view .what-chip.is-lit .what-chip__bullet {
+      background: var(--exec-color);
+      box-shadow: 0 0 0 4px var(--exec-glow-soft), 0 0 12px var(--exec-glow);
+    }
+    .what-stage.in-view .what-chip.is-lit .what-chip__hint {
+      color: var(--cyan);
+      opacity: 0.85;
+    }
+
+    @media (max-width: 880px) {
+      .what-stage { grid-template-columns: 1fr; gap: 22px; }
+      .what-term__body { min-height: 340px; padding: 18px 16px 20px; font-size: 12px; }
+      .what-rail { gap: 8px; }
+      .what-chip { padding: 10px 12px; font-size: 13px; }
+    }
+
     /* ── Reduced motion (WCAG AA) ──────────────────────────────────── */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
@@ -2470,6 +2646,21 @@
       .exec-dot { animation: none; box-shadow: 0 0 0 1px var(--exec-glow-soft); }
       .exec-caret { animation: none; opacity: 1; }
       .exec-scan.in-view::after { animation: none; display: none; }
+
+      /* OVERDRIVE FUSED — #what: snap terminal lines visible, light all chips */
+      .what-term__line { opacity: 1 !important; transform: none !important; transition: none !important; }
+      .what-term__caret { animation: none !important; opacity: 1; }
+      .what-stage .what-chip {
+        border-color: rgba(34, 211, 238, 0.4) !important;
+        background: rgba(34, 211, 238, 0.05) !important;
+        color: var(--text) !important;
+        transition: none !important;
+      }
+      .what-stage .what-chip__bullet {
+        background: var(--exec-color) !important;
+        box-shadow: 0 0 0 3px var(--exec-glow-soft) !important;
+      }
+      .what-stage .what-chip__hint { color: var(--cyan) !important; }
     }
   </style>
 </head>
@@ -2646,41 +2837,59 @@
 <section class="section" id="what">
   <div class="wrap">
     <span class="section-label">What is selectools?</span>
-    <h2 class="mb-6">A Python framework for production AI agents.</h2>
-    <div class="grid-2 gap-12" style="align-items:start">
-      <div class="reveal">
-        <p style="color:var(--text-dim);font-size:16px;line-height:1.7;margin-bottom:18px">
-          Open-source Python library for production AI agents. One <code style="color:var(--cyan)">pip install</code> gives you the full stack:
-        </p>
-        <p style="color:var(--text);font-size:14px;line-height:1.9;margin-bottom:22px;font-weight:500">
-          Multi-agent graphs &middot; Tool calling &middot; Hybrid RAG &middot; 50 evaluators &middot; Guardrails &middot; Audit logging &middot; Visual builder
-        </p>
-        <p style="color:var(--text-dim);font-size:15px;line-height:1.7">
-          No DSL. No separate packages. No paid SaaS. Your code stays plain Python &mdash; readable, debuggable, yours.
-        </p>
+    <h2 class="mb-4">A Python framework for production AI agents.</h2>
+    <p class="section-desc mb-10">One <code style="color:var(--cyan)">pip install</code>. The whole stack. No DSL, no separate packages, no paid SaaS &mdash; your code stays plain Python.</p>
+
+    <div class="what-stage">
+      <!-- Terminal: types the script line by line on viewport entry -->
+      <div class="what-term">
+        <div class="what-term__bar">
+          <span class="what-term__dot what-term__dot--r"></span>
+          <span class="what-term__dot what-term__dot--y"></span>
+          <span class="what-term__dot what-term__dot--g"></span>
+          <span class="what-term__name">agent.py</span>
+          <span class="what-term__shell">~/selectools $</span>
+        </div>
+        <div class="what-term__body" aria-label="Selectools quickstart code example"><span class="what-term__line"><span class="kw">from</span> <span class="cls">selectools</span> <span class="kw">import</span> Agent, tool</span><span class="what-term__line"><span class="kw">from</span> <span class="cls">selectools.rag</span> <span class="kw">import</span> HybridRAG</span><span class="what-term__line"><span class="kw">from</span> <span class="cls">selectools.guardrails</span> <span class="kw">import</span> PIIGuardrail</span><span class="what-term__line"><span class="kw">from</span> <span class="cls">selectools.audit</span> <span class="kw">import</span> AuditLogger</span><span class="what-term__line is-blank"> </span><span class="what-term__line"><span class="kw">@tool</span>()</span><span class="what-term__line"><span class="kw">def</span> <span class="fn">search</span>(q): <span class="kw">return</span> rag.<span class="fn">query</span>(q)</span><span class="what-term__line is-blank"> </span><span class="what-term__line">agent = <span class="fn">Agent</span>(</span><span class="what-term__line">    tools=[search],</span><span class="what-term__line">    rag=<span class="fn">HybridRAG</span>(<span class="str">"./docs"</span>),</span><span class="what-term__line">    guardrails=[<span class="fn">PIIGuardrail</span>()],</span><span class="what-term__line">    audit=<span class="fn">AuditLogger</span>(),</span><span class="what-term__line">)</span><span class="what-term__line">result = agent.<span class="fn">run</span>(<span class="str">"refund policy?"</span>)<span class="what-term__caret" aria-hidden="true"></span></span></div>
       </div>
-      <div class="reveal reveal-d1">
-        <div class="code-frame code-frame-accent">
-          <div class="code-bar">
-            <div class="code-dot" style="background:rgba(239,68,68,0.8)"></div>
-            <div class="code-dot" style="background:rgba(250,204,21,0.8)"></div>
-            <div class="code-dot" style="background:rgba(34,197,94,0.8)"></div>
-            <span class="code-bar-label">hello.py</span>
-          </div>
-          <div class="code-body"><span class="kw">from</span> <span class="cls">selectools</span> <span class="kw">import</span> Agent, tool
-<span class="kw">from</span> <span class="cls">selectools.providers</span> <span class="kw">import</span> OpenAIProvider
 
-<span class="kw">@tool</span>()
-<span class="kw">def</span> <span class="fn">search</span>(query: <span class="cls">str</span>) -> <span class="cls">str</span>:
-    <span class="str">"""Search the knowledge base."""</span>
-    <span class="kw">return</span> db.search(query)
-
-agent = <span class="fn">Agent</span>(
-    tools=[search],
-    provider=<span class="fn">OpenAIProvider</span>(),
-)
-result = agent.<span class="fn">run</span>(<span class="str">"Find our refund policy"</span>)
-<span class="cmt"># result.content, result.trace, result.usage</span></div>
+      <!-- Capability rail: chips light up in sync with their trigger lines -->
+      <div class="what-rail" aria-label="What you get with one pip install">
+        <p class="what-rail__title"><span class="exec-dot exec-dot--sm" aria-hidden="true"></span> what you get</p>
+        <div class="what-chip" data-chip="multi"   style="--chip-delay:1.95s">
+          <span class="what-chip__bullet" aria-hidden="true"></span>
+          <span class="what-chip__name">Multi-agent graphs</span>
+          <span class="what-chip__hint">Agent()</span>
+        </div>
+        <div class="what-chip" data-chip="rag"     style="--chip-delay:0.45s">
+          <span class="what-chip__bullet" aria-hidden="true"></span>
+          <span class="what-chip__name">Hybrid RAG</span>
+          <span class="what-chip__hint">HybridRAG</span>
+        </div>
+        <div class="what-chip" data-chip="guard"   style="--chip-delay:0.65s">
+          <span class="what-chip__bullet" aria-hidden="true"></span>
+          <span class="what-chip__name">Guardrails</span>
+          <span class="what-chip__hint">PIIGuardrail</span>
+        </div>
+        <div class="what-chip" data-chip="audit"   style="--chip-delay:0.85s">
+          <span class="what-chip__bullet" aria-hidden="true"></span>
+          <span class="what-chip__name">Audit logging</span>
+          <span class="what-chip__hint">AuditLogger</span>
+        </div>
+        <div class="what-chip" data-chip="tools"   style="--chip-delay:1.30s">
+          <span class="what-chip__bullet" aria-hidden="true"></span>
+          <span class="what-chip__name">Tool calling</span>
+          <span class="what-chip__hint">@tool()</span>
+        </div>
+        <div class="what-chip" data-chip="evals"   style="--chip-delay:2.75s">
+          <span class="what-chip__bullet" aria-hidden="true"></span>
+          <span class="what-chip__name">50 evaluators</span>
+          <span class="what-chip__hint">tested</span>
+        </div>
+        <div class="what-chip" data-chip="builder" style="--chip-delay:3.10s">
+          <span class="what-chip__bullet" aria-hidden="true"></span>
+          <span class="what-chip__name">Visual builder</span>
+          <span class="what-chip__hint">/builder/</span>
         </div>
       </div>
     </div>
@@ -3676,6 +3885,27 @@ const obs = new IntersectionObserver(entries => {
   entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
 }, { threshold: 0.08 });
 document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+
+/* ── #what stage: terminal types script + chips light up in sync ── */
+(function() {
+  var stage = document.querySelector('.what-stage');
+  if (!stage) return;
+  var term = stage.querySelector('.what-term');
+  var chips = stage.querySelectorAll('.what-chip');
+  var io = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (!e.isIntersecting) return;
+      stage.classList.add('in-view');
+      if (term) term.classList.add('in-view');
+      chips.forEach(function(chip) {
+        var delay = parseFloat(getComputedStyle(chip).getPropertyValue('--chip-delay')) || 0;
+        setTimeout(function() { chip.classList.add('is-lit'); }, delay * 1000);
+      });
+      io.disconnect();
+    });
+  }, { threshold: 0.25, rootMargin: '0px 0px -8% 0px' });
+  io.observe(stage);
+})();
 
 /* ── Section 1 vignette in-view trigger ──────────────────────────── */
 /* Separate observer with a higher threshold so the diff-glow animation
