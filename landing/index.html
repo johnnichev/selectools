@@ -3831,6 +3831,319 @@
       border: 0;
     }
 
+    /* ════════════════════════════════════════════════════════════════
+       OVERDRIVE — stat-card scoreboard system
+       Replaces bland 4-card metric rows below the visual builder and
+       below the comparison table. Each card has a distinctive central
+       visualization (bar comparison, mini graph, animated counter,
+       price display). Stagger reveal on viewport entry. Cyan ring lift
+       on hover. Distinct from the bento (asymmetric grid) and the
+       compliance shelf (5 exhibits) — these are dashboard scoreboard
+       tiles, not bento or shelf.
+       ════════════════════════════════════════════════════════════════ */
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-top: 32px;
+    }
+    .stat-card {
+      position: relative;
+      background:
+        linear-gradient(180deg, rgba(34, 211, 238, 0.02), transparent 60%),
+        rgba(15, 23, 42, 0.55);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px 22px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 230px;
+      overflow: hidden;
+      opacity: 0;
+      transform: translateY(8px);
+      transition:
+        opacity 0.55s var(--exec-ease-soft),
+        transform 0.55s var(--exec-ease-soft),
+        border-color 0.4s var(--exec-ease-soft),
+        box-shadow 0.4s var(--exec-ease-soft);
+    }
+    .stat-row.in-view .stat-card { opacity: 1; transform: none; }
+    .stat-row.in-view .stat-card:nth-child(1) { transition-delay: 0s; }
+    .stat-row.in-view .stat-card:nth-child(2) { transition-delay: 0.10s; }
+    .stat-row.in-view .stat-card:nth-child(3) { transition-delay: 0.20s; }
+    .stat-row.in-view .stat-card:nth-child(4) { transition-delay: 0.30s; }
+    @media (hover: hover) and (pointer: fine) {
+      .stat-card:hover {
+        border-color: rgba(34, 211, 238, 0.45);
+        box-shadow:
+          0 24px 48px -20px rgba(0, 0, 0, 0.45),
+          0 0 0 1px rgba(34, 211, 238, 0.12),
+          0 0 32px -8px rgba(34, 211, 238, 0.15);
+      }
+      .stat-card:hover .stat-card__metric { color: #67e8f9; }
+    }
+    .stat-card__label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .stat-card__label .exec-dot { width: 5px; height: 5px; }
+    .stat-card__viz {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 0;
+      min-height: 70px;
+    }
+    .stat-card__metric {
+      font-family: var(--font-ui);
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--cyan);
+      letter-spacing: -0.02em;
+      line-height: 1;
+      transition: color 0.3s var(--exec-ease-soft);
+    }
+    .stat-card__sub {
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.4;
+    }
+    .stat-card__compare {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--text-faint);
+      letter-spacing: 0.02em;
+    }
+    .stat-card__compare .strike { text-decoration: line-through; }
+    .stat-card__compare .ok { color: var(--cyan); }
+
+    /* Card 1: weight comparison (49KB vs Electron) */
+    .stat-viz-bars {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .stat-viz-bars__row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+    }
+    .stat-viz-bars__name { width: 56px; flex-shrink: 0; color: var(--text-faint); letter-spacing: 0.02em; }
+    .stat-viz-bars__bar {
+      flex: 1;
+      height: 6px;
+      background: rgba(34, 211, 238, 0.08);
+      border-radius: 999px;
+      overflow: hidden;
+      position: relative;
+    }
+    .stat-viz-bars__fill {
+      position: absolute;
+      inset: 0;
+      width: 0%;
+      background: linear-gradient(90deg, var(--cyan), #67e8f9);
+      box-shadow: 0 0 12px var(--exec-glow);
+      border-radius: 999px;
+      transition: width 1.2s var(--exec-ease-soft);
+    }
+    .stat-viz-bars__fill--faint {
+      background: linear-gradient(90deg, var(--text-faint), var(--border));
+      box-shadow: none;
+    }
+    .stat-row.in-view .stat-viz-bars__fill { width: var(--w, 100%); transition-delay: 0.2s; }
+    .stat-viz-bars__val { width: 38px; flex-shrink: 0; color: var(--text-dim); text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* Card 2: 0 deps - mini package.json */
+    .stat-viz-json {
+      width: 100%;
+      background: #0b1220;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      line-height: 1.55;
+      color: var(--text-dim);
+    }
+    .stat-viz-json .k { color: #93c5fd; }
+    .stat-viz-json .v { color: #fbbf24; }
+    .stat-viz-json .e { color: var(--cyan); font-weight: 600; }
+    .stat-viz-json .pulse {
+      display: inline-block;
+      animation: stat-pulse 1.6s var(--exec-ease-soft) infinite;
+    }
+    @keyframes stat-pulse {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.5; }
+    }
+
+    /* Card 3: 8 nodes - mini SVG graph */
+    .stat-viz-graph {
+      width: 100%;
+      max-width: 200px;
+    }
+    .stat-viz-graph svg { width: 100%; height: auto; display: block; }
+    .stat-viz-graph__node {
+      fill: var(--cyan);
+      filter: drop-shadow(0 0 4px var(--exec-glow));
+    }
+    .stat-viz-graph__node--alt { fill: #93c5fd; }
+    .stat-viz-graph__edge {
+      stroke: var(--cyan);
+      stroke-width: 1.5;
+      fill: none;
+      opacity: 0.55;
+      stroke-dasharray: 80;
+      stroke-dashoffset: 80;
+      transition: stroke-dashoffset 0.8s var(--exec-ease-soft);
+    }
+    .stat-row.in-view .stat-viz-graph__edge { stroke-dashoffset: 0; }
+    .stat-row.in-view .stat-viz-graph__edge:nth-child(1) { transition-delay: 0.4s; }
+    .stat-row.in-view .stat-viz-graph__edge:nth-child(2) { transition-delay: 0.5s; }
+    .stat-row.in-view .stat-viz-graph__edge:nth-child(3) { transition-delay: 0.6s; }
+    .stat-row.in-view .stat-viz-graph__edge:nth-child(4) { transition-delay: 0.7s; }
+    .stat-row.in-view .stat-viz-graph__edge:nth-child(5) { transition-delay: 0.8s; }
+    .stat-row.in-view .stat-viz-graph__edge:nth-child(6) { transition-delay: 0.9s; }
+    .stat-row.in-view .stat-viz-graph__edge:nth-child(7) { transition-delay: 1.0s; }
+
+    /* Card 4: $0 - price tag */
+    .stat-viz-price {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .stat-viz-price__strike {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-faint);
+      text-decoration: line-through;
+      text-decoration-color: rgba(239, 68, 68, 0.7);
+      text-decoration-thickness: 1.5px;
+    }
+    .stat-viz-price__big {
+      font-family: var(--font-ui);
+      font-weight: 800;
+      font-size: 56px;
+      color: var(--cyan);
+      letter-spacing: -0.04em;
+      line-height: 0.9;
+      text-shadow: 0 0 24px var(--exec-glow-soft);
+    }
+    .stat-viz-price__caption {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--cyan);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      opacity: 0.8;
+    }
+
+    /* Card 5: 1 line - actual code snippet */
+    .stat-viz-code {
+      width: 100%;
+      background: #0b1220;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      line-height: 1.6;
+      color: var(--text);
+      overflow-x: hidden;
+    }
+    .stat-viz-code .kw { color: #c084fc; }
+    .stat-viz-code .fn { color: #fbbf24; }
+    .stat-viz-code .str { color: #86efac; }
+    .stat-viz-code .cmt { color: var(--text-faint); font-style: italic; display: block; margin-top: 4px; }
+
+    /* Card 6: <0.5ms - latency dial */
+    .stat-viz-dial {
+      position: relative;
+      width: 130px;
+      height: 70px;
+    }
+    .stat-viz-dial svg { width: 100%; height: 100%; }
+    .stat-viz-dial__track { fill: none; stroke: var(--border); stroke-width: 8; stroke-linecap: round; }
+    .stat-viz-dial__fill {
+      fill: none;
+      stroke: var(--cyan);
+      stroke-width: 8;
+      stroke-linecap: round;
+      stroke-dasharray: 180;
+      stroke-dashoffset: 180;
+      filter: drop-shadow(0 0 6px var(--exec-glow));
+      transition: stroke-dashoffset 1.2s var(--exec-ease-soft);
+    }
+    .stat-row.in-view .stat-viz-dial__fill { stroke-dashoffset: 175; transition-delay: 0.3s; }
+    .stat-viz-dial__tick {
+      fill: var(--text-faint);
+      font-family: var(--font-mono);
+      font-size: 8px;
+    }
+
+    /* Card 7: 4612 - animated counter */
+    .stat-viz-counter {
+      font-family: var(--font-mono);
+      font-size: 38px;
+      font-weight: 700;
+      color: var(--cyan);
+      letter-spacing: -0.01em;
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 18px var(--exec-glow-soft);
+      line-height: 1;
+    }
+
+    /* Card 8: $0.03 - receipt line */
+    .stat-viz-receipt {
+      width: 100%;
+      max-width: 200px;
+      background: #0b1220;
+      border: 1px dashed var(--border);
+      border-radius: 6px;
+      padding: 12px 14px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+    }
+    .stat-viz-receipt__row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--text-dim);
+      padding: 2px 0;
+    }
+    .stat-viz-receipt__row--total {
+      border-top: 1px dashed var(--border);
+      margin-top: 6px;
+      padding-top: 8px;
+      color: var(--cyan);
+      font-weight: 600;
+    }
+    .stat-viz-receipt__amt { font-variant-numeric: tabular-nums; }
+
+    @media (max-width: 1024px) {
+      .stat-row { grid-template-columns: repeat(2, 1fr); gap: 14px; }
+      .stat-card { min-height: 210px; padding: 20px; }
+    }
+    @media (max-width: 600px) {
+      .stat-row { grid-template-columns: 1fr; }
+      .stat-card { min-height: 180px; }
+      .stat-card__metric { font-size: 28px; }
+      .stat-viz-price__big { font-size: 48px; }
+      .stat-viz-counter { font-size: 32px; }
+    }
+
     /* ── Reduced motion (WCAG AA) ──────────────────────────────────── */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
@@ -3860,6 +4173,13 @@
       .path-term__caret { animation: none; opacity: 1; }
       .path-marquee__row { animation: none; }
       .path:hover { transform: none; }
+
+      /* OVERDRIVE — stat-card scoreboard: snap visible, kill bar/edge fills */
+      .stat-card { opacity: 1 !important; transform: none !important; transition: none !important; }
+      .stat-viz-bars__fill { width: var(--w, 100%) !important; transition: none !important; }
+      .stat-viz-graph__edge { stroke-dashoffset: 0 !important; transition: none !important; }
+      .stat-viz-dial__fill { stroke-dashoffset: 175 !important; transition: none !important; }
+      .stat-viz-json .pulse { animation: none !important; }
 
       /* OVERDRIVE FUSED — execution-pointer atoms: kill all motion */
       .exec-dot { animation: none; box-shadow: 0 0 0 1px var(--exec-glow-soft); }
@@ -4843,26 +5163,87 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
         <a href="builder/" class="btn btn-cyan">Open builder &rarr;</a>
       </div>
     </div>
-    <div class="grid-4 gap-8" style="margin-top:32px">
-      <div class="card reveal text-center" style="padding:20px">
-        <div style="font-size:26px;font-weight:800;color:var(--cyan);margin-bottom:4px">49KB</div>
-        <div style="font-size:12px;color:var(--text-dim)">gzipped over the wire</div>
-        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">self-contained, no CDN</div>
+    <!-- Builder stat row: scoreboard cards with distinct vizes per metric -->
+    <div class="stat-row" data-stat-row>
+      <!-- Card 1: 49KB weight comparison -->
+      <div class="stat-card stat-card--bytes">
+        <span class="stat-card__label"><span class="exec-dot" aria-hidden="true"></span> bundle size</span>
+        <div class="stat-card__viz">
+          <div class="stat-viz-bars">
+            <div class="stat-viz-bars__row">
+              <span class="stat-viz-bars__name">selectools</span>
+              <div class="stat-viz-bars__bar"><div class="stat-viz-bars__fill" style="--w:8%"></div></div>
+              <span class="stat-viz-bars__val">49KB</span>
+            </div>
+            <div class="stat-viz-bars__row">
+              <span class="stat-viz-bars__name">electron</span>
+              <div class="stat-viz-bars__bar"><div class="stat-viz-bars__fill stat-viz-bars__fill--faint" style="--w:100%"></div></div>
+              <span class="stat-viz-bars__val">67MB</span>
+            </div>
+          </div>
+        </div>
+        <div class="stat-card__metric">49KB</div>
+        <div class="stat-card__sub">gzipped over the wire</div>
+        <div class="stat-card__compare">1400x lighter than electron</div>
       </div>
-      <div class="card reveal reveal-d1 text-center" style="padding:20px">
-        <div style="font-size:26px;font-weight:800;color:var(--cyan);margin-bottom:4px">0 deps</div>
-        <div style="font-size:12px;color:var(--text-dim)">no React, no build step</div>
-        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">single HTML file</div>
+
+      <!-- Card 2: 0 deps - mini package.json -->
+      <div class="stat-card stat-card--deps">
+        <span class="stat-card__label"><span class="exec-dot" aria-hidden="true"></span> package.json</span>
+        <div class="stat-card__viz">
+          <div class="stat-viz-json">
+<span class="k">"name"</span>: <span class="v">"builder"</span>,
+<span class="k">"version"</span>: <span class="v">"1.0.0"</span>,
+<span class="k">"dependencies"</span>: <span class="e pulse">{}</span>
+          </div>
+        </div>
+        <div class="stat-card__metric">0 deps</div>
+        <div class="stat-card__sub">no React, no build step</div>
+        <div class="stat-card__compare">single HTML file</div>
       </div>
-      <div class="card reveal reveal-d2 text-center" style="padding:20px">
-        <div style="font-size:26px;font-weight:800;color:var(--cyan);margin-bottom:4px">8 nodes</div>
-        <div style="font-size:12px;color:var(--text-dim)">agent, loop, HITL, subgraph&hellip;</div>
-        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">7 built-in templates</div>
+
+      <!-- Card 3: 8 nodes - mini SVG graph -->
+      <div class="stat-card stat-card--nodes">
+        <span class="stat-card__label"><span class="exec-dot" aria-hidden="true"></span> built-in nodes</span>
+        <div class="stat-card__viz">
+          <div class="stat-viz-graph">
+            <svg viewBox="0 0 200 100" aria-hidden="true">
+              <!-- 8 nodes connected in a flow: agent → tool → loop → hitl → subgraph → router → parallel → end -->
+              <path class="stat-viz-graph__edge" d="M 20 50 L 50 30" />
+              <path class="stat-viz-graph__edge" d="M 20 50 L 50 70" />
+              <path class="stat-viz-graph__edge" d="M 50 30 L 90 50" />
+              <path class="stat-viz-graph__edge" d="M 50 70 L 90 50" />
+              <path class="stat-viz-graph__edge" d="M 90 50 L 130 30" />
+              <path class="stat-viz-graph__edge" d="M 90 50 L 130 70" />
+              <path class="stat-viz-graph__edge" d="M 130 30 L 180 50" />
+              <path class="stat-viz-graph__edge" d="M 130 70 L 180 50" />
+              <circle class="stat-viz-graph__node" cx="20"  cy="50" r="4" />
+              <circle class="stat-viz-graph__node--alt stat-viz-graph__node" cx="50"  cy="30" r="3.5" />
+              <circle class="stat-viz-graph__node--alt stat-viz-graph__node" cx="50"  cy="70" r="3.5" />
+              <circle class="stat-viz-graph__node" cx="90"  cy="50" r="4" />
+              <circle class="stat-viz-graph__node--alt stat-viz-graph__node" cx="130" cy="30" r="3.5" />
+              <circle class="stat-viz-graph__node--alt stat-viz-graph__node" cx="130" cy="70" r="3.5" />
+              <circle class="stat-viz-graph__node" cx="180" cy="50" r="4" />
+            </svg>
+          </div>
+        </div>
+        <div class="stat-card__metric">8 nodes</div>
+        <div class="stat-card__sub">agent, loop, HITL, subgraph&hellip;</div>
+        <div class="stat-card__compare">7 built-in templates</div>
       </div>
-      <div class="card reveal reveal-d3 text-center" style="padding:20px">
-        <div style="font-size:26px;font-weight:800;color:var(--cyan);margin-bottom:4px">$0</div>
-        <div style="font-size:12px;color:var(--text-dim)">free, forever</div>
-        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">vs LangGraph Studio (paid)</div>
+
+      <!-- Card 4: $0 - price tag -->
+      <div class="stat-card stat-card--price">
+        <span class="stat-card__label"><span class="exec-dot" aria-hidden="true"></span> seat licenses</span>
+        <div class="stat-card__viz">
+          <div class="stat-viz-price">
+            <span class="stat-viz-price__strike">$39 / seat / mo</span>
+            <span class="stat-viz-price__big">$0</span>
+            <span class="stat-viz-price__caption">forever</span>
+          </div>
+        </div>
+        <div class="stat-card__sub">vs LangGraph Studio</div>
+        <div class="stat-card__compare">Apache-2.0, no signup</div>
       </div>
     </div>
     <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap;justify-content:center">
@@ -4934,26 +5315,63 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
       <p class="cmp-hint">scroll &rarr; for full comparison</p>
     </div>
 
-    <div class="grid-4 gap-8 mt-16">
-      <div class="card reveal text-center" style="padding:24px">
-        <div style="font-size:28px;font-weight:800;color:var(--cyan);margin-bottom:4px">1 line</div>
-        <div style="font-size:13px;color:var(--text-dim)">3-agent pipeline</div>
-        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">vs 25 lines (LangGraph)</div>
+    <!-- Comparison stat row: scoreboard cards (mirrors the builder row) -->
+    <div class="stat-row mt-16" data-stat-row>
+      <!-- Card 5: 1 line - actual code snippet -->
+      <div class="stat-card stat-card--code">
+        <span class="stat-card__label"><span class="exec-dot" aria-hidden="true"></span> 3-agent pipeline</span>
+        <div class="stat-card__viz">
+          <div class="stat-viz-code"><span class="kw">from</span> selectools <span class="kw">import</span> AgentGraph
+result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planner, writer, reviewer).<span class="fn">run</span>(<span class="str">"prompt"</span>)
+<span class="cmt"># That's it. No StateGraph, no compile().</span></div>
+        </div>
+        <div class="stat-card__metric">1 line</div>
+        <div class="stat-card__sub">three callables, one chain</div>
+        <div class="stat-card__compare"><span class="strike">25 lines (LangGraph)</span> &middot; <span class="ok">1 line (selectools)</span></div>
       </div>
-      <div class="card reveal reveal-d1 text-center" style="padding:24px">
-        <div style="font-size:28px;font-weight:800;color:var(--cyan);margin-bottom:4px">&lt;0.5ms</div>
-        <div style="font-size:13px;color:var(--text-dim)">framework overhead</div>
-        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">per agent call (measured)</div>
+
+      <!-- Card 6: <0.5ms latency dial -->
+      <div class="stat-card stat-card--latency">
+        <span class="stat-card__label"><span class="exec-dot" aria-hidden="true"></span> framework overhead</span>
+        <div class="stat-card__viz">
+          <div class="stat-viz-dial" aria-label="0.4ms latency dial">
+            <svg viewBox="0 0 130 70" aria-hidden="true">
+              <path class="stat-viz-dial__track" d="M 15 60 A 50 50 0 0 1 115 60" />
+              <path class="stat-viz-dial__fill"  d="M 15 60 A 50 50 0 0 1 115 60" />
+              <text class="stat-viz-dial__tick" x="15" y="68" text-anchor="middle">0</text>
+              <text class="stat-viz-dial__tick" x="115" y="68" text-anchor="middle">10ms</text>
+            </svg>
+          </div>
+        </div>
+        <div class="stat-card__metric">&lt;0.5ms</div>
+        <div class="stat-card__sub">per agent call</div>
+        <div class="stat-card__compare">measured across 1000 runs</div>
       </div>
-      <div class="card reveal reveal-d2 text-center" style="padding:24px">
-        <div style="font-size:28px;font-weight:800;color:var(--cyan);margin-bottom:4px">4612</div>
-        <div style="font-size:13px;color:var(--text-dim)">tests passing</div>
-        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">40 real API evals</div>
+
+      <!-- Card 7: 4612 - animated counter -->
+      <div class="stat-card stat-card--tests">
+        <span class="stat-card__label"><span class="exec-dot" aria-hidden="true"></span> tests passing</span>
+        <div class="stat-card__viz">
+          <div class="stat-viz-counter" data-counter-target="4612">0</div>
+        </div>
+        <div class="stat-card__metric" style="font-size:24px">95% coverage</div>
+        <div class="stat-card__sub">unit, integration, e2e</div>
+        <div class="stat-card__compare">40 real API evals included</div>
       </div>
-      <div class="card reveal reveal-d3 text-center" style="padding:24px">
-        <div style="font-size:28px;font-weight:800;color:var(--cyan);margin-bottom:4px">$0.03</div>
-        <div style="font-size:13px;color:var(--text-dim)">per eval run</div>
-        <div style="font-size:11px;color:var(--text-faint);margin-top:4px">40 tests, 3 providers</div>
+
+      <!-- Card 8: $0.03 per eval run - receipt -->
+      <div class="stat-card stat-card--cost">
+        <span class="stat-card__label"><span class="exec-dot" aria-hidden="true"></span> eval suite cost</span>
+        <div class="stat-card__viz">
+          <div class="stat-viz-receipt" aria-label="Eval cost breakdown">
+            <div class="stat-viz-receipt__row"><span>40 test cases</span><span class="stat-viz-receipt__amt">$0.018</span></div>
+            <div class="stat-viz-receipt__row"><span>3 providers</span><span class="stat-viz-receipt__amt">$0.009</span></div>
+            <div class="stat-viz-receipt__row"><span>20 judge calls</span><span class="stat-viz-receipt__amt">$0.003</span></div>
+            <div class="stat-viz-receipt__row stat-viz-receipt__row--total"><span>total</span><span class="stat-viz-receipt__amt">$0.03</span></div>
+          </div>
+        </div>
+        <div class="stat-card__sub">full eval suite, all providers</div>
+        <div class="stat-card__compare">vs $39/seat/mo (LangSmith)</div>
       </div>
     </div>
   </div>
@@ -5463,6 +5881,37 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
     });
   }, { threshold: 0.25, rootMargin: '0px 0px -10% 0px' });
   io.observe(repl);
+})();
+
+/* ── stat-card scoreboard rows: in-view trigger + counter tick ──── */
+(function() {
+  var rows = document.querySelectorAll('.stat-row[data-stat-row]');
+  if (!rows.length) return;
+  function tickCounter(el) {
+    var target = parseInt(el.getAttribute('data-counter-target'), 10) || 0;
+    var dur = 1400;
+    var t0 = performance.now() + 350;
+    function step(now) {
+      if (now < t0) { requestAnimationFrame(step); return; }
+      var p = Math.min(1, (now - t0) / dur);
+      var eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(target * eased).toLocaleString();
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  rows.forEach(function(row) {
+    var io = new IntersectionObserver(function(entries) {
+      entries.forEach(function(e) {
+        if (!e.isIntersecting) return;
+        row.classList.add('in-view');
+        var counter = row.querySelector('[data-counter-target]');
+        if (counter) tickCounter(counter);
+        io.disconnect();
+      });
+    }, { threshold: 0.2, rootMargin: '0px 0px -8% 0px' });
+    io.observe(row);
+  });
 })();
 
 /* ── #enterprise compliance shelf: stamp + counter tick ─────────── */
