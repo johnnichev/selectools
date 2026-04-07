@@ -3591,6 +3591,60 @@
       .repl__q-cat { display: none; }
     }
 
+    /* ════════════════════════════════════════════════════════════════
+       OVERDRIVE FUSED — footer — terminal sitemap
+       Renders as `$ tree selectools.dev/` output: hover-highlighted
+       paths, social/legal/version inline as # comments, blinking caret
+       at the end (the page is "still running").
+       ════════════════════════════════════════════════════════════════ */
+    .footer-term {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 50px 24px 60px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.85;
+      color: var(--text-dim);
+      border-top: 1px solid var(--border);
+      background:
+        linear-gradient(180deg, transparent, rgba(34, 211, 238, 0.02));
+    }
+    .footer-term__prompt {
+      color: var(--text-faint);
+      margin-bottom: 8px;
+    }
+    .footer-term__prompt .pr { color: var(--cyan); margin-right: 6px; }
+    .footer-term__tree { white-space: pre; overflow-x: auto; padding-bottom: 6px; }
+    .footer-term__tree a {
+      color: var(--text-dim);
+      text-decoration: none;
+      transition: color 0.2s, background 0.2s, text-shadow 0.2s;
+      padding: 0 2px;
+      border-radius: 2px;
+    }
+    .footer-term__tree a:hover {
+      color: var(--cyan);
+      background: rgba(34, 211, 238, 0.08);
+      text-shadow: 0 0 8px var(--exec-glow);
+    }
+    .footer-term__cmt {
+      color: var(--text-faint);
+      font-style: italic;
+      opacity: 0.85;
+    }
+    .footer-term__heart { color: var(--cyan); }
+    .footer-term__nichev a { color: var(--cyan); }
+    .footer-term__final {
+      margin-top: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .footer-term__final .pr { color: var(--cyan); }
+    @media (max-width: 720px) {
+      .footer-term { font-size: 11.5px; padding: 36px 16px 44px; }
+    }
+
     /* ── Reduced motion (WCAG AA) ──────────────────────────────────── */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
@@ -5033,18 +5087,25 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
 </section>
 
 <!-- ─── Footer ─────────────────────────────────────────────────────── -->
-<footer class="footer">
-  <div class="wrap">
-    <div class="footer-attribution">
-      <span>An open-source project from <a href="https://nichevlabs.com" style="color:var(--cyan)">NichevLabs</a>.</span>
-      <span class="footer-meta" style="margin-left:8px;color:var(--text-faint)">Apache-2.0 &middot; Python 3.9+ &middot; v0.20.1</span>
-    </div>
-    <div class="footer-links">
-      <a href="https://github.com/johnnichev/selectools">GitHub</a>
-      <a href="https://pypi.org/project/selectools/">PyPI</a>
-      <a href="QUICKSTART/">Docs</a>
-      <a href="CHANGELOG/">Changelog</a>
-    </div>
+<footer class="footer-term" role="contentinfo">
+  <div class="footer-term__prompt"><span class="pr">$</span>tree selectools.dev/ <span class="footer-term__cmt"># site map</span></div>
+<div class="footer-term__tree">.
+├── <a href="QUICKSTART/">docs/</a>
+│   ├── <a href="QUICKSTART/">quickstart.md</a>
+│   ├── <a href="docs/configuration/">configuration.md</a>
+│   ├── <a href="docs/providers/">providers.md</a>
+│   └── <a href="docs/api-reference/">api-reference/</a>
+├── <a href="examples/">examples/</a>      <span class="footer-term__cmt"># 88 numbered scripts</span>
+├── <a href="builder/">builder/</a>       <span class="footer-term__cmt"># visual flow editor</span>
+├── <a href="https://github.com/johnnichev/selectools">github/</a>        <span class="footer-term__cmt"># source &middot; issues &middot; discussions</span>
+├── <a href="https://pypi.org/project/selectools/">pypi/</a>          <span class="footer-term__cmt"># pip install selectools</span>
+└── <a href="CHANGELOG/">changelog/</a>     <span class="footer-term__cmt"># what shipped, what changed</span>
+
+<span class="footer-term__cmt"># selectools v0.20.1 &middot; Apache-2.0 &middot; <span class="footer-term__nichev">made by <a href="https://nichevlabs.com">NichevLabs</a></span></span>
+<span class="footer-term__cmt"># for developers who ship</span></div>
+  <div class="footer-term__final">
+    <span class="pr">$</span>
+    <span class="exec-caret" aria-hidden="true"></span>
   </div>
 </footer>
 
