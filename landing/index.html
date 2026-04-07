@@ -358,8 +358,11 @@
       overflow: hidden;
       position: relative;
       cursor: pointer;
+      /* Full width of the hero-content column on desktop, matching the
+         button row below. The container itself is constrained by the
+         hero grid (1fr 1fr split until the 1024px breakpoint), so this
+         won't span the entire viewport. */
       width: 100%;
-      max-width: 440px;
       box-shadow: 0 0 0 1px rgba(34,211,238,0.04), 0 20px 60px -20px rgba(0,0,0,0.5);
       transition:
         border-color 0.3s var(--ease),
@@ -904,6 +907,10 @@
       width: 100%;
       height: 100%;
       z-index: 1;
+      /* Match the node fade-out at the end of each scene so the lines
+         don't linger after the nodes vanish. The transition runs both
+         ways — fade-in is also covered when buildScene resets opacity. */
+      transition: opacity 0.3s var(--ease);
     }
     .hf-path {
       fill: none;
@@ -2685,6 +2692,10 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
     // Clear
     nodesEl.textContent = '';
     svg.textContent = '';
+    /* Reset SVG opacity in case the previous scene faded it out. We do
+       this BEFORE inserting new lines so the old fade-out doesn't apply
+       to the next scene's content. */
+    svg.style.opacity = '1';
     outputEl.textContent = '';
     outputEl.classList.remove('visible');
     pulses = [];
@@ -2792,6 +2803,10 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
         delay(2400, function() {
           outputEl.classList.remove('visible');
           nodeEls.forEach(function(el) { el.style.opacity = '0'; });
+          /* Fade the SVG (lines + pulse circles) on the same 0.3s curve
+             as the nodes so they vanish together — fixes the bug where
+             lines lingered visible after the nodes had already faded. */
+          svg.style.opacity = '0';
           delay(400, onDone);
         });
         return;
