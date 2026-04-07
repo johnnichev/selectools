@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="6" fill="#0f172a"/>
+  <text x="6"  y="22" font-family="JetBrains Mono, ui-monospace, monospace" font-size="20" font-weight="700" fill="#22d3ee">[</text>
+  <circle cx="16" cy="16" r="3" fill="#22d3ee">
+    <animate attributeName="opacity" values="0.5;1;0.5" dur="1.6s" repeatCount="indefinite"/>
+  </circle>
+  <text x="20" y="22" font-family="JetBrains Mono, ui-monospace, monospace" font-size="20" font-weight="700" fill="#22d3ee">]</text>
+</svg>

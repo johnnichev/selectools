@@ -6,6 +6,23 @@
   <title>Selectools — Production-Ready AI Agents in Plain Python</title>
   <meta name="description" content="Selectools is a Python library for building production-ready AI agents with tool calling, RAG, and multi-agent orchestration. 152 models, 50 evaluators, visual builder. Supports OpenAI, Anthropic, Gemini, Ollama. Free and open source." />
   <link rel="canonical" href="https://selectools.dev/" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <script>
+    /* OVERDRIVE FUSED — wordmark variant: read ?logo=1|2|3, persist
+       to localStorage, set body[data-logo] BEFORE paint to avoid FOUC */
+    (function() {
+      try {
+        var p = new URLSearchParams(window.location.search).get('logo');
+        var stored = localStorage.getItem('sel-logo');
+        var logo = (p === '1' || p === '2' || p === '3') ? p : (stored || '1');
+        if (p) localStorage.setItem('sel-logo', logo);
+        document.documentElement.setAttribute('data-logo', logo);
+        document.addEventListener('DOMContentLoaded', function() {
+          document.body.setAttribute('data-logo', logo);
+        });
+      } catch (e) { document.documentElement.setAttribute('data-logo', '1'); }
+    })();
+  </script>
   <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
   <meta name="keywords" content="python ai agent, tool calling, rag, hybrid search, openai, anthropic, gemini, ollama, ai agent framework, llm tools, python llm, multi-agent, agent graph, langchain alternative" />
   <meta name="author" content="NichevLabs" />
@@ -3645,6 +3662,95 @@
       .footer-term { font-size: 11.5px; padding: 36px 16px 44px; }
     }
 
+    /* ════════════════════════════════════════════════════════════════
+       OVERDRIVE FUSED — wordmarks (3 switchable variants)
+       The body carries data-logo="1|2|3" set on load by reading the
+       ?logo= URL param (default "1"). Each variant renders inside the
+       nav-logo slot; only the active one is displayed.
+       ════════════════════════════════════════════════════════════════ */
+    .wm { display: none; align-items: center; }
+    [data-logo="1"] .wm--1,
+    [data-logo="2"] .wm--2,
+    [data-logo="3"] .wm--3 { display: inline-flex; }
+
+    /* Variant 1 — [•] selectools */
+    .wm--1 {
+      gap: 8px;
+      font-family: var(--font-ui);
+      font-weight: 800;
+      font-size: 17px;
+      color: #fff;
+      letter-spacing: -0.03em;
+    }
+    .wm--1__brackets {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--exec-color);
+      font-size: 16px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .wm--1__brackets::before { content: "["; }
+    .wm--1__brackets::after  { content: "]"; }
+    .wm--1__brackets .exec-dot { width: 6px; height: 6px; }
+
+    /* Variant 2 — s▌electools (cursor inside the word) */
+    .wm--2 {
+      font-family: var(--font-ui);
+      font-weight: 800;
+      font-size: 17px;
+      color: #fff;
+      letter-spacing: -0.03em;
+      gap: 0;
+    }
+    .wm--2__pre,
+    .wm--2__post { display: inline-block; }
+    .wm--2__caret {
+      display: inline-block;
+      width: 0.18em;
+      height: 0.95em;
+      background: var(--exec-color);
+      box-shadow: 0 0 6px var(--exec-glow);
+      vertical-align: text-bottom;
+      animation: exec-blink 1.05s steps(2, jump-none) infinite;
+      margin: 0 1px;
+    }
+
+    /* Variant 3 — terminal banner art (3-row box-drawing) */
+    .wm--3 {
+      font-family: var(--font-mono);
+      color: var(--exec-color);
+      align-items: center;
+    }
+    .wm--3__banner {
+      display: block;
+      font-size: 5.5px;
+      line-height: 1;
+      letter-spacing: 0;
+      white-space: pre;
+      text-shadow: 0 0 6px var(--exec-glow);
+      margin: 0;
+      user-select: none;
+      filter: drop-shadow(0 0 2px rgba(34, 211, 238, 0.4));
+    }
+    @media (min-width: 720px) {
+      .wm--3__banner { font-size: 6.5px; }
+    }
+    /* Reveal animation: blocks scan-print on load */
+    .wm--3__banner.is-typing { mask-image: linear-gradient(90deg, #000 0%, #000 var(--w, 0%), transparent var(--w, 0%)); -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 var(--w, 0%), transparent var(--w, 0%)); }
+
+    /* Visually-hidden semantic h1 for screen readers across all variants */
+    .nav-logo .vh {
+      position: absolute;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
     /* ── Reduced motion (WCAG AA) ──────────────────────────────────── */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
@@ -3679,6 +3785,10 @@
       .exec-dot { animation: none; box-shadow: 0 0 0 1px var(--exec-glow-soft); }
       .exec-caret { animation: none; opacity: 1; }
       .exec-scan.in-view::after { animation: none; display: none; }
+
+      /* OVERDRIVE FUSED — wordmarks: kill blink + scan animations */
+      .wm--2__caret { animation: none !important; opacity: 1; }
+      .wm--3__banner.is-typing { mask-image: none !important; -webkit-mask-image: none !important; }
 
       /* OVERDRIVE FUSED — #faq: kill answer fade-in */
       .repl__q-answer { animation: none !important; }
@@ -3740,7 +3850,22 @@
 <!-- ─── Nav ────────────────────────────────────────────────────────── -->
 <nav id="siteNav">
   <div class="wrap">
-    <a href="#" class="nav-logo" aria-label="selectools home">selectools</a>
+    <a href="#" class="nav-logo" aria-label="selectools home">
+      <span class="vh">selectools</span>
+      <!-- Variant 1: [•] selectools -->
+      <span class="wm wm--1" aria-hidden="true">
+        <span class="wm--1__brackets"><span class="exec-dot exec-dot--sm"></span></span>
+        <span>selectools</span>
+      </span>
+      <!-- Variant 2: s▌electools -->
+      <span class="wm wm--2" aria-hidden="true">
+        <span class="wm--2__pre">s</span><span class="wm--2__caret"></span><span class="wm--2__post">electools</span>
+      </span>
+      <!-- Variant 3: terminal banner art (3-row box-drawing) -->
+      <span class="wm wm--3" aria-hidden="true"><pre class="wm--3__banner">┌─┐┌─┐┬  ┌─┐┌─┐┌┬┐┌─┐┌─┐┬  ┌─┐
+└─┐├┤ │  ├┤ │   │ │ ││ ││  └─┐
+└─┘└─┘┴─┘└─┘└─┘ ┴ └─┘└─┘┴─┘└─┘</pre></span>
+    </a>
     <div class="nav-links hide-mobile">
       <a href="#builder">Builder</a>
       <a href="#simulations">Simulations</a>
