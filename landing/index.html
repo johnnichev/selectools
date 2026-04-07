@@ -250,6 +250,10 @@
     @media (max-width: 1024px) {
       .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
       .hide-mobile { display: none; }
+      /* The .nav-links { display: flex } rule comes later in the source than
+         .hide-mobile, so without the higher-specificity .nav-links.hide-mobile
+         override here, the nav links would still show on tablet/mobile. */
+      .nav-links.hide-mobile { display: none; }
     }
     @media (max-width: 640px) {
       .section { padding: 64px 0; }
@@ -1824,13 +1828,29 @@
         grid-auto-rows: auto;
         gap: 12px;
       }
-      .bento__cell, .bento__cell--hero, .bento__cell--wide, .bento__cell--full {
-        grid-column: span 1;
-        grid-row: span 1;
+      /* !important is required to override the inline grid-row/grid-column
+         placements on the wide cells (lines ~4481, ~4489 in markup). Without
+         this, the pinned cells try to occupy invalid grid positions in the
+         1-column mobile layout and either overflow or render at 0 width. */
+      .bento__cell,
+      .bento__cell--hero,
+      .bento__cell--wide,
+      .bento__cell--full {
+        grid-column: 1 / -1 !important;
+        grid-row: auto !important;
         min-height: 0;
       }
       .bento__cell--hero .bento__title { font-size: 22px; }
       .bento__cell--hero .bento__metric-num { font-size: 44px; }
+    }
+    /* Same fix for the intermediate 1100px breakpoint — the inline styles
+       there pin to columns 4-7, which is fine in a 6-col grid but invalid
+       in the 4-col grid. Reset them so the auto-flow takes over. */
+    @media (max-width: 1100px) and (min-width: 701px) {
+      .bento__cell--wide[style] {
+        grid-column: span 4 !important;
+        grid-row: auto !important;
+      }
     }
 
     /* ════════════════════════════════════════════════════════════════
@@ -3187,6 +3207,43 @@
       .diff-pane__split-knob { width: 48px; height: 48px; font-size: 16px; }
       .diff-annotations { grid-template-columns: 1fr; }
     }
+    /* Mobile fallback: at narrow viewports, drag-to-compare is too tight to
+       read because each column shrinks below ~200px. Stack the two code
+       blocks vertically instead, both full-width. The slider, divider, and
+       knob are hidden — the comparison becomes static (LangGraph above,
+       selectools below) which is plenty for the message. */
+    @media (max-width: 700px) {
+      .diff-pane {
+        grid-template-columns: 1fr !important;
+        grid-template-rows: auto auto;
+        min-height: 0;
+      }
+      .diff-pane__col {
+        height: auto;
+      }
+      .diff-pane__col .code-body {
+        height: auto;
+        max-height: 320px;
+        overflow-y: auto;
+      }
+      .diff-pane__col--l {
+        border-right: 1px solid var(--border);
+        border-bottom: none;
+        border-radius: 14px 14px 0 0;
+      }
+      .diff-pane__col--r {
+        border-left: 1px solid rgba(34, 211, 238, 0.35);
+        border-top: 1px solid rgba(34, 211, 238, 0.35);
+        border-radius: 0 0 14px 14px;
+      }
+      .diff-pane__split-line,
+      .diff-pane__split-knob,
+      .diff-pane__range {
+        display: none;
+      }
+      .diff-labels { display: none; }
+      .diff-hint { display: none; }
+    }
 
     /* ════════════════════════════════════════════════════════════════
        OVERDRIVE FUSED — #enterprise — compliance shelf (5 exhibits)
@@ -4229,7 +4286,7 @@ result = agent.<span class="cyan">execute</span>(user_input)
   <div class="wrap">
     <span class="section-label">See the difference</span>
     <h2 class="mb-4">The same pipeline. Less ceremony.</h2>
-    <p class="section-desc mb-14">A 3-agent workflow: planner &rarr; writer &rarr; reviewer. Drag the handle to wipe LangGraph's ceremony away.</p>
+    <p class="section-desc mb-14">A 3-agent workflow: planner &rarr; writer &rarr; reviewer. Same outcome &mdash; 25 lines of ceremony, or one.</p>
 
     <div class="diff-stage" data-stage>
       <div class="diff-labels">
