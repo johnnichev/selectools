@@ -3164,6 +3164,236 @@
       .diff-annotations { grid-template-columns: 1fr; }
     }
 
+    /* ════════════════════════════════════════════════════════════════
+       OVERDRIVE FUSED — #enterprise — compliance shelf (5 exhibits)
+       Replaces the sad full-width pill row that lived inside #features.
+       Now its own standalone section with 5 distinct micro-components:
+       coverage ring, test counter, version stack, SBOM card, audit doc.
+       The pointer "stamps" each exhibit on viewport entry, staggered.
+       ════════════════════════════════════════════════════════════════ */
+    .ent-shelf {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 18px;
+      margin-top: 28px;
+    }
+    .ent-exhibit {
+      position: relative;
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px 20px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 220px;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.5s var(--exec-ease-soft), transform 0.5s var(--exec-ease-soft);
+    }
+    .ent-shelf.in-view .ent-exhibit { opacity: 1; transform: none; }
+    .ent-shelf.in-view .ent-exhibit:nth-child(1) { transition-delay: 0.05s; }
+    .ent-shelf.in-view .ent-exhibit:nth-child(2) { transition-delay: 0.18s; }
+    .ent-shelf.in-view .ent-exhibit:nth-child(3) { transition-delay: 0.31s; }
+    .ent-shelf.in-view .ent-exhibit:nth-child(4) { transition-delay: 0.44s; }
+    .ent-shelf.in-view .ent-exhibit:nth-child(5) { transition-delay: 0.57s; }
+    .ent-shelf.in-view .ent-exhibit::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 14px;
+      pointer-events: none;
+      animation: exec-stamp 0.7s var(--exec-ease-step) both;
+    }
+    .ent-shelf.in-view .ent-exhibit:nth-child(1)::after { animation-delay: 0.10s; }
+    .ent-shelf.in-view .ent-exhibit:nth-child(2)::after { animation-delay: 0.23s; }
+    .ent-shelf.in-view .ent-exhibit:nth-child(3)::after { animation-delay: 0.36s; }
+    .ent-shelf.in-view .ent-exhibit:nth-child(4)::after { animation-delay: 0.49s; }
+    .ent-shelf.in-view .ent-exhibit:nth-child(5)::after { animation-delay: 0.62s; }
+    .ent-exhibit__label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .ent-exhibit__caption {
+      margin-top: auto;
+      font-size: 12.5px;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+
+    /* Exhibit 1: Coverage ring */
+    .ent-ring {
+      width: 110px;
+      height: 110px;
+      margin: 8px auto 4px;
+      position: relative;
+    }
+    .ent-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .ent-ring__track { fill: none; stroke: var(--border); stroke-width: 8; }
+    .ent-ring__fill {
+      fill: none;
+      stroke: var(--exec-color);
+      stroke-width: 8;
+      stroke-linecap: round;
+      stroke-dasharray: 314.16; /* 2 * π * 50 */
+      stroke-dashoffset: 314.16;
+      filter: drop-shadow(0 0 8px var(--exec-glow));
+      transition: stroke-dashoffset 1.4s var(--exec-ease-soft) 0.2s;
+    }
+    .ent-shelf.in-view .ent-ring__fill { stroke-dashoffset: 15.71; /* 95% → 314.16 * 0.05 */ }
+    .ent-ring__num {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      font-family: var(--font-mono);
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--cyan);
+      font-variant-numeric: tabular-nums;
+    }
+    .ent-ring__num small { font-size: 13px; color: var(--text-faint); margin-left: 1px; }
+
+    /* Exhibit 2: Test counter */
+    .ent-counter {
+      flex: 1;
+      display: grid;
+      place-items: center;
+      padding: 10px 0;
+    }
+    .ent-counter__num {
+      font-family: var(--font-mono);
+      font-size: 42px;
+      font-weight: 700;
+      color: var(--exec-color);
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 20px var(--exec-glow-soft);
+      letter-spacing: -0.02em;
+    }
+
+    /* Exhibit 3: Version stack */
+    .ent-versions {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 6px 0;
+      justify-content: center;
+    }
+    .ent-version {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-dim);
+      transition: border-color 0.4s, color 0.4s, background 0.4s;
+    }
+    .ent-version__check { color: var(--text-faint); transition: color 0.4s; }
+    .ent-shelf.in-view .ent-version {
+      border-color: rgba(34, 211, 238, 0.3);
+      background: rgba(34, 211, 238, 0.05);
+      color: var(--text);
+    }
+    .ent-shelf.in-view .ent-version__check { color: var(--cyan); }
+    .ent-shelf.in-view .ent-version:nth-child(1) { transition-delay: 0.5s; }
+    .ent-shelf.in-view .ent-version:nth-child(2) { transition-delay: 0.6s; }
+    .ent-shelf.in-view .ent-version:nth-child(3) { transition-delay: 0.7s; }
+    .ent-shelf.in-view .ent-version:nth-child(4) { transition-delay: 0.8s; }
+    .ent-shelf.in-view .ent-version:nth-child(5) { transition-delay: 0.9s; }
+
+    /* Exhibit 4: CycloneDX SBOM card */
+    .ent-sbom {
+      flex: 1;
+      display: grid;
+      place-items: center;
+      padding: 8px 0;
+    }
+    .ent-sbom__doc {
+      width: 90px;
+      height: 110px;
+      background: linear-gradient(135deg, #1e2c44 0%, #0f1a2e 100%);
+      border: 1px solid rgba(34, 197, 94, 0.4);
+      border-radius: 6px;
+      position: relative;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(34, 197, 94, 0.08);
+      padding: 10px 8px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .ent-sbom__doc::before {
+      /* Folded corner */
+      content: "";
+      position: absolute;
+      top: 0; right: 0;
+      width: 18px;
+      height: 18px;
+      background: linear-gradient(225deg, transparent 50%, rgba(34, 197, 94, 0.25) 50%, var(--bg) 51%);
+    }
+    .ent-sbom__doc::after {
+      content: "CycloneDX";
+      position: absolute;
+      bottom: 6px;
+      left: 0; right: 0;
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 8px;
+      letter-spacing: 0.1em;
+      color: var(--green);
+      text-transform: uppercase;
+    }
+    .ent-sbom__line {
+      height: 2px;
+      background: rgba(34, 197, 94, 0.25);
+      border-radius: 999px;
+    }
+    .ent-sbom__line--s { width: 60%; }
+    .ent-sbom__line--m { width: 80%; }
+    .ent-sbom__line--l { width: 95%; }
+
+    /* Exhibit 5: Audit / markers */
+    .ent-markers {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 8px 0;
+      justify-content: center;
+    }
+    .ent-marker {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: rgba(168, 85, 247, 0.05);
+      border: 1px solid rgba(168, 85, 247, 0.18);
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+    .ent-marker--stable { background: rgba(34, 197, 94, 0.06); border-color: rgba(34, 197, 94, 0.22); color: #86efac; }
+    .ent-marker--beta { background: rgba(245, 158, 11, 0.06); border-color: rgba(245, 158, 11, 0.22); color: #fde68a; }
+    .ent-marker--dep { background: rgba(239, 68, 68, 0.06); border-color: rgba(239, 68, 68, 0.22); color: #fca5a5; }
+    .ent-marker__dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; box-shadow: 0 0 6px currentColor; }
+    .ent-marker__name { font-weight: 600; }
+    .ent-marker__count { margin-left: auto; opacity: 0.7; }
+
+    @media (max-width: 1080px) {
+      .ent-shelf { grid-template-columns: repeat(2, 1fr); }
+      .ent-exhibit { min-height: 200px; }
+    }
+    @media (max-width: 600px) {
+      .ent-shelf { grid-template-columns: 1fr; gap: 14px; }
+      .ent-counter__num { font-size: 36px; }
+    }
+
     /* ── Reduced motion (WCAG AA) ──────────────────────────────────── */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
@@ -3198,6 +3428,18 @@
       .exec-dot { animation: none; box-shadow: 0 0 0 1px var(--exec-glow-soft); }
       .exec-caret { animation: none; opacity: 1; }
       .exec-scan.in-view::after { animation: none; display: none; }
+
+      /* OVERDRIVE FUSED — #enterprise: snap exhibits visible, freeze ring at 95% */
+      .ent-exhibit { opacity: 1 !important; transform: none !important; transition: none !important; }
+      .ent-exhibit::after { animation: none !important; display: none !important; }
+      .ent-ring__fill { stroke-dashoffset: 15.71 !important; transition: none !important; }
+      .ent-version {
+        border-color: rgba(34, 211, 238, 0.3) !important;
+        background: rgba(34, 211, 238, 0.05) !important;
+        color: var(--text) !important;
+        transition: none !important;
+      }
+      .ent-version__check { color: var(--cyan) !important; }
 
       /* OVERDRIVE FUSED — #see-difference: kill clip-path transition + force show all annotations */
       .diff-pane__layer--fg, .diff-pane__split-line, .diff-pane__split-knob { transition: none !important; }
@@ -3927,12 +4169,92 @@ result = agent.<span class="fn">run</span>(<span class="str">"Find our refund po
         <p class="bento__desc">Both client and server. Connect to any MCP server, expose your tools as one.</p>
       </div>
 
-      <!-- Full-width footer cell: Enterprise -->
-      <div class="bento__cell bento__cell--full" data-accent="green">
-        <span class="bento__label"><span class="bento__dot"></span>Enterprise-ready</span>
-        <div class="bento__title">SBOM (CycloneDX) &middot; Security audit published &middot; <code style="color:var(--green)">@stable</code> / <code style="color:var(--green)">@beta</code> / <code style="color:var(--green)">@deprecated</code> markers &middot; Python 3.9 to 3.13 &middot; 95% test coverage &middot; 4612 tests</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── Enterprise-ready: compliance shelf (extracted from bento) ─── -->
+<section class="section" id="enterprise">
+  <div class="wrap">
+    <span class="section-label">Enterprise-ready</span>
+    <h2 class="mb-4">Five things your security team will ask for first.</h2>
+    <p class="section-desc mb-14">Not a checkbox row. Real artifacts: a coverage gauge, a test count, a version matrix, an SBOM, stability markers. Audited and shipped.</p>
+
+    <div class="ent-shelf">
+      <!-- Exhibit 1: Coverage ring -->
+      <div class="ent-exhibit">
+        <span class="ent-exhibit__label">test coverage</span>
+        <div class="ent-ring" aria-label="95 percent test coverage">
+          <svg viewBox="0 0 120 120" aria-hidden="true">
+            <circle class="ent-ring__track" cx="60" cy="60" r="50"/>
+            <circle class="ent-ring__fill"  cx="60" cy="60" r="50"/>
+          </svg>
+          <div class="ent-ring__num">95<small>%</small></div>
+        </div>
+        <p class="ent-exhibit__caption">Statement coverage on the public API surface.</p>
       </div>
 
+      <!-- Exhibit 2: Test counter -->
+      <div class="ent-exhibit">
+        <span class="ent-exhibit__label">tests passing</span>
+        <div class="ent-counter">
+          <span class="ent-counter__num" data-target="4612">0</span>
+        </div>
+        <p class="ent-exhibit__caption">Unit, integration, and e2e — green on every commit.</p>
+      </div>
+
+      <!-- Exhibit 3: Version stack -->
+      <div class="ent-exhibit">
+        <span class="ent-exhibit__label">python supported</span>
+        <div class="ent-versions">
+          <span class="ent-version"><span class="ent-version__check">✓</span> 3.13</span>
+          <span class="ent-version"><span class="ent-version__check">✓</span> 3.12</span>
+          <span class="ent-version"><span class="ent-version__check">✓</span> 3.11</span>
+          <span class="ent-version"><span class="ent-version__check">✓</span> 3.10</span>
+          <span class="ent-version"><span class="ent-version__check">✓</span> 3.9</span>
+        </div>
+        <p class="ent-exhibit__caption">Five major versions, one wheel.</p>
+      </div>
+
+      <!-- Exhibit 4: CycloneDX SBOM -->
+      <div class="ent-exhibit">
+        <span class="ent-exhibit__label">supply chain</span>
+        <div class="ent-sbom">
+          <div class="ent-sbom__doc" aria-hidden="true">
+            <span class="ent-sbom__line ent-sbom__line--l"></span>
+            <span class="ent-sbom__line ent-sbom__line--m"></span>
+            <span class="ent-sbom__line ent-sbom__line--s"></span>
+            <span class="ent-sbom__line ent-sbom__line--m"></span>
+            <span class="ent-sbom__line ent-sbom__line--l"></span>
+            <span class="ent-sbom__line ent-sbom__line--s"></span>
+            <span class="ent-sbom__line ent-sbom__line--m"></span>
+          </div>
+        </div>
+        <p class="ent-exhibit__caption">CycloneDX SBOM published with every release. Security audit on file.</p>
+      </div>
+
+      <!-- Exhibit 5: Stability markers -->
+      <div class="ent-exhibit">
+        <span class="ent-exhibit__label">api stability</span>
+        <div class="ent-markers">
+          <span class="ent-marker ent-marker--stable">
+            <span class="ent-marker__dot"></span>
+            <span class="ent-marker__name">@stable</span>
+            <span class="ent-marker__count">core</span>
+          </span>
+          <span class="ent-marker ent-marker--beta">
+            <span class="ent-marker__dot"></span>
+            <span class="ent-marker__name">@beta</span>
+            <span class="ent-marker__count">new</span>
+          </span>
+          <span class="ent-marker ent-marker--dep">
+            <span class="ent-marker__dot"></span>
+            <span class="ent-marker__name">@deprecated</span>
+            <span class="ent-marker__count">2 minors</span>
+          </span>
+        </div>
+        <p class="ent-exhibit__caption">Every public symbol marked. Deprecations stay live for two minor releases.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -4568,6 +4890,35 @@ const obs = new IntersectionObserver(entries => {
   entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
 }, { threshold: 0.08 });
 document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+
+/* ── #enterprise compliance shelf: stamp + counter tick ─────────── */
+(function() {
+  var shelf = document.querySelector('.ent-shelf');
+  if (!shelf) return;
+  var counter = shelf.querySelector('.ent-counter__num');
+  var io = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (!e.isIntersecting) return;
+      shelf.classList.add('in-view');
+      // Tick the counter from 0 to its target with eased ramp
+      if (counter) {
+        var target = parseInt(counter.getAttribute('data-target'), 10) || 0;
+        var dur = 1600;
+        var t0 = performance.now() + 300; // start after the stamp
+        function step(now) {
+          if (now < t0) { requestAnimationFrame(step); return; }
+          var p = Math.min(1, (now - t0) / dur);
+          var eased = 1 - Math.pow(1 - p, 3);
+          counter.textContent = Math.round(target * eased).toLocaleString();
+          if (p < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      }
+      io.disconnect();
+    });
+  }, { threshold: 0.25, rootMargin: '0px 0px -8% 0px' });
+  io.observe(shelf);
+})();
 
 /* ── #see-difference: drag-to-compare slider + auto-sweep ───────── */
 (function() {
