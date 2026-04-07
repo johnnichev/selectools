@@ -2801,6 +2801,152 @@
       .eval-tag { font-size: 10px; padding: 6px 10px; }
     }
 
+    /* ════════════════════════════════════════════════════════════════
+       OVERDRIVE FUSED — #production — interactive trace explorer
+       Code on the left stays. Right side is a clickable agent loop:
+       4 nodes (llm_call → tool_selection → tool_execution → llm_call)
+       above a single result panel that swaps content based on the
+       active node. Auto-plays once on viewport entry, then idles.
+       ════════════════════════════════════════════════════════════════ */
+    .prod-stage {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr;
+      gap: 28px;
+      align-items: stretch;
+      margin-top: 28px;
+    }
+    .prod-trace {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      padding: 4px 0;
+    }
+    .prod-trace__title {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin: 0 0 4px 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .prod-trace__nodes {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
+      align-items: center;
+      gap: 8px;
+      padding: 14px;
+      background: rgba(15, 23, 42, 0.45);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .prod-node {
+      appearance: none;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 10px 8px;
+      border-radius: 9px;
+      cursor: pointer;
+      text-align: center;
+      transition:
+        border-color 0.35s var(--exec-ease-soft),
+        background 0.35s var(--exec-ease-soft),
+        color 0.35s var(--exec-ease-soft),
+        transform 0.35s var(--exec-ease-soft),
+        box-shadow 0.35s var(--exec-ease-soft);
+      position: relative;
+      letter-spacing: 0.02em;
+      min-width: 0;
+    }
+    .prod-node:hover { color: var(--text); border-color: var(--text-faint); }
+    .prod-node:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+    .prod-node.is-active {
+      border-color: var(--exec-color);
+      background: rgba(34, 211, 238, 0.1);
+      color: var(--cyan);
+      box-shadow: 0 0 0 4px var(--exec-glow-soft), 0 0 18px var(--exec-glow-soft);
+      transform: translateY(-1px);
+    }
+    .prod-node__num {
+      display: block;
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      color: var(--text-faint);
+      margin-bottom: 4px;
+    }
+    .prod-node.is-active .prod-node__num { color: var(--cyan); opacity: 0.75; }
+    .prod-trace__arrow {
+      color: var(--border);
+      font-family: var(--font-mono);
+      font-size: 14px;
+      transition: color 0.35s var(--exec-ease-soft);
+    }
+    .prod-trace__arrow.is-passed { color: var(--exec-color); }
+
+    .prod-panel {
+      flex: 1;
+      background: #0b1220;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 220px;
+      position: relative;
+      overflow: hidden;
+    }
+    .prod-panel__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .prod-panel__label code { font-size: 11px; color: var(--cyan); }
+    .prod-panel__body {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text);
+    }
+    .prod-panel__meta {
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 1px dashed var(--border);
+      display: flex;
+      gap: 16px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+    }
+    .prod-panel__meta strong { color: var(--green); font-weight: 500; }
+    .prod-panel__state { display: none; flex-direction: column; gap: 14px; flex: 1; }
+    .prod-panel__state.is-active { display: flex; }
+    .prod-panel__state .prod-panel__body { animation: prod-fade 0.4s var(--exec-ease-soft); }
+    @keyframes prod-fade {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    @media (max-width: 880px) {
+      .prod-stage { grid-template-columns: 1fr; gap: 22px; }
+      .prod-trace__nodes {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+      .prod-trace__arrow { display: none; }
+      .prod-panel { min-height: 200px; padding: 18px; }
+    }
+
     /* ── Reduced motion (WCAG AA) ──────────────────────────────────── */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
@@ -2835,6 +2981,9 @@
       .exec-dot { animation: none; box-shadow: 0 0 0 1px var(--exec-glow-soft); }
       .exec-caret { animation: none; opacity: 1; }
       .exec-scan.in-view::after { animation: none; display: none; }
+
+      /* OVERDRIVE FUSED — #production: kill auto-play fade */
+      .prod-panel__state .prod-panel__body { animation: none !important; }
 
       /* OVERDRIVE FUSED — #eval: snap report to done, freeze marquee */
       .eval-report__bar .exec-dot { animation: none !important; background: var(--green); }
@@ -3280,22 +3429,23 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
   </div>
 </section>
 
-<!-- ─── Code Showcase ──────────────────────────────────────────────── -->
-<section class="section">
+<!-- ─── Production-ready: interactive trace explorer ──────────────── -->
+<section class="section" id="production">
   <div class="wrap">
     <span class="section-label">Production-ready</span>
     <h2 class="mb-4">Guardrails in the constructor, not an afterthought.</h2>
-    <p class="section-desc mb-14">PII redaction, audit logging, and injection defense, configured in one <code style="color:var(--cyan)">AgentConfig</code>, not bolted on with separate packages.</p>
-    <div class="grid-2 gap-8">
-      <div class="reveal">
-        <div class="code-frame code-frame-accent">
-          <div class="code-bar">
-            <div class="code-dot" style="background:rgba(239,68,68,0.8)"></div>
-            <div class="code-dot" style="background:rgba(250,204,21,0.8)"></div>
-            <div class="code-dot" style="background:rgba(34,197,94,0.8)"></div>
-            <span class="code-bar-label">agent.py</span>
-          </div>
-          <div class="code-body"><span class="kw">from</span> <span class="cls">selectools</span> <span class="kw">import</span> Agent, AgentConfig, tool
+    <p class="section-desc mb-14">PII redaction, audit logging, and injection defense, configured in one <code style="color:var(--cyan)">AgentConfig</code>. Click any step to inspect what the agent produced.</p>
+
+    <div class="prod-stage">
+      <!-- Code: full agent.py with the AgentConfig stack -->
+      <div class="code-frame code-frame-accent">
+        <div class="code-bar">
+          <div class="code-dot" style="background:rgba(239,68,68,0.8)"></div>
+          <div class="code-dot" style="background:rgba(250,204,21,0.8)"></div>
+          <div class="code-dot" style="background:rgba(34,197,94,0.8)"></div>
+          <span class="code-bar-label">agent.py</span>
+        </div>
+        <div class="code-body"><span class="kw">from</span> <span class="cls">selectools</span> <span class="kw">import</span> Agent, AgentConfig, tool
 <span class="kw">from</span> <span class="cls">selectools.providers</span> <span class="kw">import</span> OpenAIProvider
 <span class="kw">from</span> <span class="cls">selectools.guardrails</span> <span class="kw">import</span> GuardrailsPipeline, PIIGuardrail
 <span class="kw">from</span> <span class="cls">selectools.audit</span> <span class="kw">import</span> AuditLogger, PrivacyLevel
@@ -3320,32 +3470,66 @@ agent = <span class="fn">Agent</span>(
 )
 
 result = agent.<span class="fn">run</span>(<span class="str">"Find our refund policy"</span>)</div>
-        </div>
       </div>
-      <div class="reveal reveal-d1" style="display:flex;flex-direction:column;justify-content:center;gap:12px">
-        <div class="result-box">
-          <div class="result-label">result.content</div>
-          <div class="result-val">&ldquo;Our refund policy allows returns within 30 days...&rdquo;</div>
+
+      <!-- Interactive trace: click a node to inspect its output -->
+      <div class="prod-trace">
+        <p class="prod-trace__title"><span class="exec-dot exec-dot--sm" aria-hidden="true"></span> result.trace</p>
+        <div class="prod-trace__nodes" role="tablist" aria-label="Agent execution trace">
+          <button type="button" class="prod-node is-active" role="tab" aria-selected="true" data-step="0">
+            <span class="prod-node__num">01</span>llm_call
+          </button>
+          <span class="prod-trace__arrow" aria-hidden="true">→</span>
+          <button type="button" class="prod-node" role="tab" aria-selected="false" data-step="1">
+            <span class="prod-node__num">02</span>tool_selection
+          </button>
+          <span class="prod-trace__arrow" aria-hidden="true">→</span>
+          <button type="button" class="prod-node" role="tab" aria-selected="false" data-step="2">
+            <span class="prod-node__num">03</span>tool_execution
+          </button>
+          <span class="prod-trace__arrow" aria-hidden="true">→</span>
+          <button type="button" class="prod-node" role="tab" aria-selected="false" data-step="3">
+            <span class="prod-node__num">04</span>llm_call
+          </button>
         </div>
-        <div class="result-box">
-          <div class="result-label">result.reasoning</div>
-          <div class="result-val">&ldquo;User asked about refund policy &rarr; search_docs is the right tool&rdquo;</div>
-        </div>
-        <div class="result-box">
-          <div class="result-label">result.trace</div>
-          <div class="trace-flow">
-            <span class="trace-step" style="background:rgba(59,130,246,0.15);color:#93c5fd">llm_call</span>
-            <span class="trace-arrow">&rarr;</span>
-            <span class="trace-step" style="background:rgba(168,85,247,0.15);color:#c4b5fd">tool_selection</span>
-            <span class="trace-arrow">&rarr;</span>
-            <span class="trace-step" style="background:rgba(34,197,94,0.15);color:#86efac">tool_execution</span>
-            <span class="trace-arrow">&rarr;</span>
-            <span class="trace-step" style="background:rgba(59,130,246,0.15);color:#93c5fd">llm_call</span>
+
+        <div class="prod-panel" role="tabpanel">
+          <div class="prod-panel__state is-active" data-state="0">
+            <div class="prod-panel__label"><code>result.reasoning</code></div>
+            <div class="prod-panel__body">&ldquo;The user is asking about the refund policy. I should search the knowledge base for the current terms before answering.&rdquo;</div>
+            <div class="prod-panel__meta">
+              <span>step 1 of 4</span>
+              <span>llm: <strong>gpt-5-mini</strong></span>
+              <span>tokens: 124</span>
+            </div>
           </div>
-        </div>
-        <div class="result-box">
-          <div class="result-label">result.usage</div>
-          <div class="result-val">847 tokens &middot; <span style="color:var(--green)">$0.0012</span></div>
+          <div class="prod-panel__state" data-state="1">
+            <div class="prod-panel__label"><code>result.tool_calls[0]</code></div>
+            <div class="prod-panel__body"><span style="color:#fbbf24">search_docs</span>(<span style="color:#86efac">query=</span><span style="color:#86efac">"refund policy"</span>)</div>
+            <div class="prod-panel__meta">
+              <span>step 2 of 4</span>
+              <span>tool: <strong>search_docs</strong></span>
+              <span>guardrails: ✓</span>
+            </div>
+          </div>
+          <div class="prod-panel__state" data-state="2">
+            <div class="prod-panel__label"><code>result.tool_outputs[0]</code></div>
+            <div class="prod-panel__body">&ldquo;Returns within 30 days of purchase. Original packaging required. Refund issued to original payment method within 5 business days...&rdquo;</div>
+            <div class="prod-panel__meta">
+              <span>step 3 of 4</span>
+              <span>screen_tool_output: <strong>passed</strong></span>
+              <span>pii: <strong>none</strong></span>
+            </div>
+          </div>
+          <div class="prod-panel__state" data-state="3">
+            <div class="prod-panel__label"><code>result.content</code></div>
+            <div class="prod-panel__body">&ldquo;Our refund policy allows returns within 30 days of purchase, in original packaging. Refunds go back to your original payment method within 5 business days.&rdquo;</div>
+            <div class="prod-panel__meta">
+              <span>step 4 of 4</span>
+              <span>tokens: <strong>847</strong></span>
+              <span>cost: <strong>$0.0012</strong></span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -4110,6 +4294,55 @@ const obs = new IntersectionObserver(entries => {
   entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
 }, { threshold: 0.08 });
 document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+
+/* ── #production trace explorer: clickable nodes + auto-play ────── */
+(function() {
+  var stage = document.querySelector('.prod-stage');
+  if (!stage) return;
+  var nodes = stage.querySelectorAll('.prod-node');
+  var arrows = stage.querySelectorAll('.prod-trace__arrow');
+  var states = stage.querySelectorAll('.prod-panel__state');
+  if (!nodes.length || !states.length) return;
+
+  function activate(idx) {
+    nodes.forEach(function(n, i) {
+      n.classList.toggle('is-active', i === idx);
+      n.setAttribute('aria-selected', i === idx ? 'true' : 'false');
+    });
+    states.forEach(function(s, i) { s.classList.toggle('is-active', i === idx); });
+    arrows.forEach(function(a, i) { a.classList.toggle('is-passed', i < idx); });
+  }
+
+  // Click handlers — instant inspection
+  nodes.forEach(function(n, i) {
+    n.addEventListener('click', function() { activate(i); });
+  });
+
+  // Keyboard nav (left/right between nodes)
+  stage.addEventListener('keydown', function(e) {
+    var active = Array.from(nodes).findIndex(function(n) { return n.classList.contains('is-active'); });
+    if (e.key === 'ArrowRight' && active < nodes.length - 1) {
+      activate(active + 1); nodes[active + 1].focus();
+    } else if (e.key === 'ArrowLeft' && active > 0) {
+      activate(active - 1); nodes[active - 1].focus();
+    }
+  });
+
+  // Auto-play through nodes once on viewport entry, then idle
+  var io = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (!e.isIntersecting) return;
+      var i = 0;
+      var interval = setInterval(function() {
+        i++;
+        if (i >= nodes.length) { clearInterval(interval); return; }
+        activate(i);
+      }, 850);
+      io.disconnect();
+    });
+  }, { threshold: 0.35, rootMargin: '0px 0px -8% 0px' });
+  io.observe(stage);
+})();
 
 /* ── #eval report: fills in metrics on viewport entry ───────────── */
 (function() {
