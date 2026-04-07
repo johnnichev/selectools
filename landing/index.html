@@ -604,6 +604,9 @@
       font-size: 17px;
       color: #fff;
       letter-spacing: -0.03em;
+      display: inline-flex;
+      align-items: center;
+      height: 100%;
     }
     .nav-links {
       display: flex;
@@ -2885,8 +2888,8 @@
       border: 1px solid var(--border);
       color: var(--text-dim);
       font-family: var(--font-mono);
-      font-size: 11px;
-      padding: 10px 8px;
+      font-size: 10px;
+      padding: 10px 6px;
       border-radius: 9px;
       cursor: pointer;
       text-align: center;
@@ -2897,8 +2900,11 @@
         transform 0.35s var(--exec-ease-soft),
         box-shadow 0.35s var(--exec-ease-soft);
       position: relative;
-      letter-spacing: 0.02em;
+      letter-spacing: 0;
       min-width: 0;
+      overflow: hidden;
+      text-overflow: clip;
+      white-space: nowrap;
     }
     .prod-node:hover { color: var(--text); border-color: var(--text-faint); }
     .prod-node:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
@@ -3010,6 +3016,15 @@
       transition: grid-template-columns 0.6s var(--exec-ease-soft);
     }
     .diff-stage.is-dragging .diff-pane { transition: none; }
+    /* Mouse-follow hover state on desktop: subtle cyan glow tells the user
+       the pane is interactive and the slider is tracking the cursor. */
+    .diff-stage.is-hovering .diff-pane {
+      box-shadow:
+        0 20px 60px -28px rgba(0, 0, 0, 0.55),
+        0 0 0 1px rgba(34, 211, 238, 0.25),
+        0 0 32px -8px rgba(34, 211, 238, 0.18);
+      cursor: ew-resize;
+    }
     .diff-pane__col {
       position: relative;
       min-width: 0;       /* allow column to shrink below content size */
@@ -3464,7 +3479,7 @@
     .ent-marker--dep { background: rgba(239, 68, 68, 0.06); border-color: rgba(239, 68, 68, 0.22); color: #fca5a5; }
     .ent-marker__dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; box-shadow: 0 0 6px currentColor; }
     .ent-marker__name { font-weight: 600; }
-    .ent-marker__count { margin-left: auto; opacity: 0.7; }
+    .ent-marker__count { margin-left: auto; opacity: 0.7; white-space: nowrap; flex: 0 0 auto; }
 
     @media (max-width: 1080px) {
       .ent-shelf { grid-template-columns: repeat(2, 1fr); }
@@ -3786,6 +3801,7 @@
       font-family: var(--font-mono);
       color: var(--exec-color);
       align-items: center;
+      vertical-align: middle;
     }
     .wm--3__banner {
       display: block;
@@ -4362,7 +4378,7 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
 
       <div class="diff-hint">
         <span class="diff-hint__bar"></span>
-        <span>drag to compare</span>
+        <span>move your cursor across</span>
         <span class="diff-hint__bar"></span>
       </div>
 
@@ -5154,7 +5170,7 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
       <div class="repl__main">
         <div class="repl__searchbar">
           <span class="repl__prompt">docs &gt;</span>
-          <input type="text" class="repl__search" placeholder="search the docs..." aria-label="Search FAQ" />
+          <input type="text" class="repl__search" placeholder="search questions..." aria-label="Search FAQ" />
           <span class="exec-caret" aria-hidden="true"></span>
         </div>
 
@@ -5502,7 +5518,7 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
     });
   }
 
-  // User drag/keyboard input
+  // User drag/keyboard input (touch + keyboard)
   range.addEventListener('input', function() {
     stage.classList.add('is-dragging');
     setSplit(parseFloat(range.value));
@@ -5511,6 +5527,32 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
     setSplit(parseFloat(range.value));
     setTimeout(function() { stage.classList.remove('is-dragging'); }, 200);
   });
+
+  // Desktop mouse-follow: hovering over the pane scrubs the slider.
+  // The slider position tracks the cursor's X coordinate within the pane.
+  // Disabled on coarse pointers (touch) so the existing range input is the
+  // primary control there.
+  var pane = stage.querySelector('.diff-pane');
+  if (pane && window.matchMedia('(pointer: fine)').matches) {
+    var paneEntered = false;
+    pane.addEventListener('mouseenter', function() {
+      paneEntered = true;
+      stage.classList.add('is-hovering');
+    });
+    pane.addEventListener('mouseleave', function() {
+      paneEntered = false;
+      stage.classList.remove('is-hovering');
+    });
+    pane.addEventListener('mousemove', function(e) {
+      if (!paneEntered) return;
+      var rect = pane.getBoundingClientRect();
+      var x = e.clientX - rect.left;
+      var v = Math.max(0, Math.min(100, (x / rect.width) * 100));
+      stage.classList.add('is-dragging');
+      range.value = v;
+      setSplit(v);
+    });
+  }
 
   // Auto-sweep: 50 → 95 → 50 once on viewport entry
   var io = new IntersectionObserver(function(entries) {
