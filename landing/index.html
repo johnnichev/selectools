@@ -254,6 +254,11 @@
       .card h3 { font-size: 14px; margin-bottom: 6px; }
       .card p { font-size: 13px; line-height: 1.55; }
       .grid-2, .grid-3, .grid-4 { gap: 14px; }
+      /* Kill the 64px top margin between card sections on mobile. When
+         grids collapse to single column they read as one continuous
+         stack — the big gap creates a visible "end of section" break
+         mid-content, which looks broken. Match the in-grid gap instead. */
+      .mt-16 { margin-top: 14px !important; }
     }
     .card-icon {
       width: 40px; height: 40px;
@@ -341,31 +346,200 @@
       border-color: var(--cyan);
       box-shadow: 0 6px 20px rgba(34,211,238,0.18);
     }
-    .btn-pip {
-      background: var(--surface);
-      color: var(--cyan);
-      border-color: var(--border);
-      font-family: var(--font-mono);
-      font-weight: 400;
-      font-size: 13px;
-      padding: 12px 20px;
-      position: relative;
+    /* ── Terminal install component (replaces the old .btn-pip) ──── */
+    /* Inspired by the nv-context-landing install terminal: a real-looking
+       terminal window with traffic-light dots, a filename in the chrome,
+       a prompt + command + blinking caret, and a reveal-on-hover Copy
+       button. The whole thing is click-to-copy. */
+    .terminal-install {
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #0b1120;
       overflow: hidden;
+      position: relative;
+      cursor: pointer;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 0 0 1px rgba(34,211,238,0.04), 0 20px 60px -20px rgba(0,0,0,0.5);
+      transition:
+        border-color 0.3s var(--ease),
+        box-shadow 0.3s var(--ease),
+        transform 0.2s var(--ease);
     }
-    .btn-pip:hover {
-      border-color: var(--cyan);
-      box-shadow: 0 0 0 1px rgba(34,211,238,0.15), 0 6px 20px rgba(34,211,238,0.12);
+    .terminal-install:hover {
+      border-color: rgba(34,211,238,0.4);
+      box-shadow: 0 0 0 1px rgba(34,211,238,0.15), 0 24px 70px -18px rgba(34,211,238,0.18);
+      transform: translateY(-2px);
     }
-    .btn-pip svg { flex-shrink: 0; }
-    .btn-pip.copied {
-      border-color: var(--cyan);
+    .terminal-install:focus-visible {
+      outline: 2px solid var(--cyan);
+      outline-offset: 2px;
+    }
+    .terminal-install:active { transform: translateY(0); }
+    .terminal-chrome {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(51,65,85,0.5);
+      background: rgba(15,23,42,0.85);
+    }
+    .terminal-chrome .dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      border: 1px solid rgba(0,0,0,0.3);
+      flex-shrink: 0;
+    }
+    .terminal-chrome .dot.r { background: #ff5f57; }
+    .terminal-chrome .dot.y { background: #febc2e; }
+    .terminal-chrome .dot.g { background: #28c840; }
+    .terminal-chrome .file {
+      margin-left: 10px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .terminal-chrome .copy {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--text-dim);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 9px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      flex-shrink: 0;
+      opacity: 0;
+      transform: translateX(6px);
+      transition:
+        opacity 0.25s var(--ease),
+        transform 0.25s var(--ease),
+        color 0.2s var(--ease),
+        border-color 0.2s var(--ease),
+        background 0.2s var(--ease);
+    }
+    .terminal-install:hover .copy,
+    .terminal-install:focus-within .copy {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    .terminal-chrome .copy:hover {
+      color: var(--text);
+      border-color: rgba(34,211,238,0.4);
+      background: rgba(34,211,238,0.06);
+    }
+    .terminal-chrome .copy.is-copied {
       color: var(--green);
-      animation: pip-copied 0.6s var(--ease);
+      border-color: rgba(34,197,94,0.35);
+      background: rgba(34,197,94,0.08);
+      opacity: 1;
+      transform: translateX(0);
     }
-    @keyframes pip-copied {
-      0%   { box-shadow: 0 0 0 0 rgba(34,211,238,0.5); }
-      40%  { box-shadow: 0 0 0 6px rgba(34,211,238,0.0); }
-      100% { box-shadow: 0 0 0 1px rgba(34,211,238,0.15), 0 6px 20px rgba(34,211,238,0.12); }
+    .terminal-chrome .copy .copy-icon {
+      width: 11px;
+      height: 11px;
+      flex-shrink: 0;
+    }
+    .terminal-chrome .copy .copy-icon svg { width: 100%; height: 100%; display: block; }
+    .terminal-chrome .copy .check-path {
+      stroke-dasharray: 18;
+      stroke-dashoffset: 18;
+      opacity: 0;
+    }
+    .terminal-chrome .copy.is-copied .copy-square { opacity: 0; }
+    .terminal-chrome .copy.is-copied .check-path {
+      animation: terminal-check-draw 0.32s var(--ease) forwards;
+    }
+    @keyframes terminal-check-draw {
+      0%   { stroke-dashoffset: 18; opacity: 0; }
+      30%  { opacity: 1; }
+      100% { stroke-dashoffset: 0; opacity: 1; }
+    }
+    .terminal-body {
+      padding: 18px 18px 20px;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--text);
+      text-align: left;
+      overflow-x: auto;
+      white-space: nowrap;
+      -webkit-overflow-scrolling: touch;
+    }
+    .terminal-body .prompt {
+      color: var(--cyan);
+      font-weight: 600;
+      margin-right: 10px;
+      user-select: none;
+    }
+    .terminal-body .cmd { color: var(--text); }
+    .terminal-body .caret {
+      display: inline-block;
+      width: 7px;
+      height: 1em;
+      vertical-align: -2px;
+      background: var(--cyan);
+      margin-left: 4px;
+      animation: terminal-caret-blink 1.4s var(--ease) infinite;
+    }
+    @keyframes terminal-caret-blink {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.2; }
+    }
+    /* Reveal-on-hover disabled for touch — always show Copy button */
+    @media (pointer: coarse) {
+      .terminal-chrome .copy {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+    /* Tighter terminal on small screens */
+    @media (max-width: 640px), (pointer: coarse) {
+      .terminal-install { max-width: 100%; }
+      .terminal-body {
+        padding: 14px 14px 16px;
+        font-size: 12.5px;
+      }
+      .terminal-chrome { padding: 9px 12px; }
+      .terminal-chrome .file { font-size: 10.5px; margin-left: 8px; }
+      .terminal-chrome .copy { font-size: 10px; padding: 3px 7px; }
+    }
+    /* Stop hover lift on touch devices */
+    @media (hover: none) {
+      .terminal-install:hover {
+        transform: none;
+      }
+    }
+    /* Tiny copy toast shown after copying */
+    .copy-toast {
+      position: fixed;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 18px;
+      background: rgba(15,23,42,0.96);
+      border: 1px solid rgba(34,211,238,0.35);
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--cyan);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      z-index: 200;
+      pointer-events: none;
+      animation: copy-toast-in 0.25s var(--ease);
+    }
+    @keyframes copy-toast-in {
+      from { opacity: 0; transform: translate(-50%, 8px); }
+      to   { opacity: 1; transform: translate(-50%, 0); }
     }
 
     /* ── Nav ───────────────────────────────────────────────────────── */
@@ -458,15 +632,33 @@
       -webkit-backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--border);
       padding: 20px 24px 28px;
-      transform: translateY(-110%);
-      transition: transform 0.3s var(--ease);
       z-index: 99;
-      display: none;
       max-height: calc(100vh - 56px);
       overflow-y: auto;
+      /* Closed state: fully invisible + not interactive. Using opacity +
+         visibility (instead of transform: translateY(-110%) alone) guarantees
+         no "peek" artifact from the drawer's border-bottom or sub-pixel
+         rendering issues. The transform adds a subtle slide hint. */
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-8px);
+      transition:
+        opacity 0.25s var(--ease),
+        transform 0.25s var(--ease),
+        visibility 0s linear 0.25s;
     }
     .nav-drawer.open {
+      opacity: 1;
+      visibility: visible;
       transform: translateY(0);
+      /* On open, visibility flips to visible immediately (delay: 0s) so the
+         fade-in is actually visible. On close, it delays until opacity
+         reaches 0 (delay: 0.25s) so the element stays interactive until the
+         animation is done. */
+      transition:
+        opacity 0.25s var(--ease),
+        transform 0.25s var(--ease),
+        visibility 0s linear 0s;
     }
     .nav-drawer a {
       display: block;
@@ -491,7 +683,6 @@
 
     @media (max-width: 1024px) {
       .nav-burger { display: block; }
-      .nav-drawer { display: block; }
     }
     /* Touch-input override: catches Galaxy S23 + iOS Safari in "Desktop Site"
        mode, where Chrome reports a viewport of ~1280px (wider than the
@@ -500,7 +691,6 @@
        reliable signal that defeats the Desktop Site toggle. */
     @media (pointer: coarse) {
       .nav-burger { display: block; }
-      .nav-drawer { display: block; }
       .nav-links.hide-mobile { display: none; }
       .hero-grid { grid-template-columns: 1fr; }
       .hero-flow { display: none; }
@@ -1337,12 +1527,10 @@
     .sim-evt-bubble.ev-fallback { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2); }
     .sim-evt-bubble.ev-other { background: rgba(100,116,139,0.08); border: 1px solid rgba(100,116,139,0.2); color: var(--text-dim); font-size: 12px; }
 
-    /* ── Nav: scroll hide + progress bar ───────────────────────────── */
+    /* ── Nav: scroll background + progress bar (always fixed) ─────── */
     nav {
-      transition: transform 0.3s var(--ease), background 0.3s var(--ease);
-      will-change: transform;
+      transition: background 0.3s var(--ease);
     }
-    nav.nav-hidden { transform: translateY(-100%); }
     nav.nav-scrolled { background: rgba(15,23,42,0.95); }
     .nav-progress {
       position: absolute;
@@ -1393,6 +1581,9 @@
       .nav-progress { display: none; }
       .hero::before, .hero::after { animation: none; }
       .sim-status[data-state="running"] { animation: none; }
+      /* Terminal install: kill caret blink and hover lift */
+      .terminal-body .caret { animation: none; opacity: 1; }
+      .terminal-install:hover { transform: none; }
     }
   </style>
 </head>
@@ -1445,12 +1636,30 @@
         <p class="hero-sub">
           Multi-agent graphs, tool calling, RAG, 50 evaluators, and a drag-drop visual builder. All in one <code>pip install</code>. No DSL to learn. No SaaS to pay for. No vendor to depend on.
         </p>
-        <div class="hero-actions">
-          <button onclick="copyPip()" class="btn btn-pip" id="pipBtn" style="flex:1;justify-content:center">
-            <span>pip install selectools</span>
-            <svg id="copy-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-            <svg id="check-icon" width="16" height="16" fill="none" stroke="#22c55e" stroke-width="2" viewBox="0 0 24 24" style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
-          </button>
+        <div class="terminal-install" id="pipTerminal" role="button" tabindex="0" aria-label="Click to copy: pip install selectools">
+          <div class="terminal-chrome">
+            <span class="dot r" aria-hidden="true"></span>
+            <span class="dot y" aria-hidden="true"></span>
+            <span class="dot g" aria-hidden="true"></span>
+            <span class="file">~/your-project</span>
+            <button type="button" class="copy" id="pipCopyBtn" aria-label="Copy pip install command">
+              <span class="copy-icon" aria-hidden="true">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <g class="copy-square">
+                    <rect x="4" y="4" width="9" height="9" rx="1.5"/>
+                    <path d="M3 11V3.5A1.5 1.5 0 0 1 4.5 2H11"/>
+                  </g>
+                  <path class="check-path" d="M3 8.5 L6.5 12 L13 4.5"/>
+                </svg>
+              </span>
+              <span class="copy-label">Copy</span>
+            </button>
+          </div>
+          <div class="terminal-body">
+            <span class="prompt">$</span><span class="cmd">pip install selectools</span><span class="caret" aria-hidden="true"></span>
+          </div>
+        </div>
+        <div class="hero-actions" style="margin-top:20px">
           <a href="builder/" class="btn btn-cyan" style="flex:1;justify-content:center">Try the Builder &rarr;</a>
           <a href="QUICKSTART/" class="btn btn-primary" style="flex:1;justify-content:center">Read the Docs</a>
         </div>
@@ -2221,26 +2430,85 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
 </footer>
 
 <script>
-function copyPip() {
-  navigator.clipboard.writeText('pip install selectools');
-  var btn = document.getElementById('pipBtn');
-  var label = btn.querySelector('span');
-  var copyIcon = document.getElementById('copy-icon');
-  var checkIcon = document.getElementById('check-icon');
-  var originalText = label.textContent;
+/* ── Terminal install: click-to-copy with toast + button state ───── */
+(function() {
+  var CMD = 'pip install selectools';
+  var terminal = document.getElementById('pipTerminal');
+  var btn = document.getElementById('pipCopyBtn');
+  if (!terminal) return;
+  var label = btn ? btn.querySelector('.copy-label') : null;
+  var resetTimer = null;
+  var toastTimer = null;
 
-  btn.classList.add('copied');
-  label.textContent = 'Copied!';
-  copyIcon.style.display = 'none';
-  checkIcon.style.display = '';
+  function showToast() {
+    var existing = document.querySelector('.copy-toast');
+    if (existing) existing.remove();
+    var t = document.createElement('div');
+    t.className = 'copy-toast';
+    t.textContent = 'Copied to clipboard';
+    document.body.appendChild(t);
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function() {
+      t.style.transition = 'opacity 0.3s var(--ease)';
+      t.style.opacity = '0';
+      setTimeout(function() { t.remove(); }, 300);
+    }, 1600);
+  }
 
-  setTimeout(function() {
-    btn.classList.remove('copied');
-    label.textContent = originalText;
-    copyIcon.style.display = '';
-    checkIcon.style.display = 'none';
-  }, 2000);
-}
+  function flashCopied() {
+    if (!btn || !label) return;
+    btn.classList.add('is-copied');
+    label.textContent = 'Copied';
+    if (resetTimer) clearTimeout(resetTimer);
+    resetTimer = setTimeout(function() {
+      btn.classList.remove('is-copied');
+      label.textContent = 'Copy';
+    }, 2000);
+  }
+
+  function doCopy() {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(CMD).then(function() {
+        flashCopied();
+        showToast();
+      }).catch(function() {
+        /* Clipboard can fail in insecure contexts — fall back to legacy exec */
+        legacyCopy();
+      });
+    } else {
+      legacyCopy();
+    }
+  }
+
+  function legacyCopy() {
+    var ta = document.createElement('textarea');
+    ta.value = CMD;
+    ta.style.position = 'fixed';
+    ta.style.top = '-1000px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); flashCopied(); showToast(); }
+    catch (e) {}
+    ta.remove();
+  }
+
+  terminal.addEventListener('click', doCopy);
+  terminal.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      doCopy();
+    }
+  });
+
+  if (btn) {
+    btn.addEventListener('click', function(e) {
+      /* Stop the click from bubbling to the terminal container,
+         otherwise doCopy fires twice and the toast double-renders */
+      e.stopPropagation();
+      doCopy();
+    });
+  }
+})();
 
 const obs = new IntersectionObserver(entries => {
   entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
@@ -2963,20 +3231,12 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
   });
 })();
 
-/* ── Scroll progress bar (nav stays fixed, no hide-on-scroll) ─────── */
+/* ── Scroll progress bar (nav stays fixed on all viewports) ───────── */
 (function() {
-  var prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  /* Touch devices and reduced-motion users get a fully-fixed nav. The
-     hide-on-scroll-down behavior only runs on desktop (pointer: fine), where
-     the user has more vertical real estate and the auto-hide feels like a
-     thoughtful progressive enhancement rather than a disorienting glitch. */
-  var allowHide = !prefersReduced &&
-    window.matchMedia('(pointer: fine)').matches;
   var nav = document.getElementById('siteNav');
   var bar = document.getElementById('navProgress');
   if (!nav || !bar) return;
 
-  var lastY = 0;
   var ticking = false;
 
   function update() {
@@ -2990,12 +3250,6 @@ document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
     if (y > 80) nav.classList.add('nav-scrolled');
     else nav.classList.remove('nav-scrolled');
 
-    if (allowHide) {
-      if (y > lastY && y > 240) nav.classList.add('nav-hidden');
-      else nav.classList.remove('nav-hidden');
-    }
-
-    lastY = y;
     ticking = false;
   }
 
