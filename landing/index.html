@@ -50,28 +50,122 @@
     "alternateName": "selectools",
     "description": "Production-ready Python library for building AI agents with tool calling, RAG, and multi-agent orchestration. Supports OpenAI, Anthropic, Gemini, and Ollama.",
     "applicationCategory": "DeveloperApplication",
+    "applicationSubCategory": "AI Agent Framework",
     "operatingSystem": "Any",
     "programmingLanguage": "Python",
+    "softwareRequirements": "Python 3.9, 3.10, 3.11, 3.12, or 3.13",
     "url": "https://selectools.dev/",
     "downloadUrl": "https://pypi.org/project/selectools/",
+    "installUrl": "https://pypi.org/project/selectools/",
     "softwareVersion": "0.20.1",
+    "datePublished": "2026-04-01",
+    "dateModified": "2026-04-07",
+    "inLanguage": "en",
+    "isAccessibleForFree": true,
     "license": "https://opensource.org/licenses/Apache-2.0",
     "author": {
       "@type": "Organization",
       "name": "NichevLabs",
+      "url": "https://nichevlabs.com",
+      "logo": "https://selectools.dev/favicon.svg"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "NichevLabs",
       "url": "https://nichevlabs.com"
     },
+    "maintainer": {
+      "@type": "Person",
+      "name": "John Nichev",
+      "email": "support@nichevlabs.com",
+      "url": "https://github.com/johnnichev"
+    },
     "codeRepository": "https://github.com/johnnichev/selectools",
-    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "image": "https://selectools.dev/assets/og-image.png",
+    "screenshot": "https://selectools.dev/assets/og-image.png",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD",
+      "availability": "https://schema.org/InStock",
+      "url": "https://pypi.org/project/selectools/"
+    },
     "featureList": [
-      "Multi-provider LLM support (OpenAI, Anthropic, Gemini, Ollama)",
-      "Tool calling with 24 pre-built tools",
-      "Hybrid RAG search (BM25 + vector + reranking)",
-      "Multi-agent orchestration with AgentGraph",
-      "50 built-in evaluators for agent testing",
-      "Enterprise security: guardrails, audit logging, PII redaction",
-      "Visual drag-and-drop agent builder",
-      "Composable pipelines with @step decorator"
+      "Multi-provider LLM support (OpenAI, Anthropic, Gemini, Ollama, with FallbackProvider)",
+      "Tool calling with 33 pre-built tools across 9 categories",
+      "Hybrid RAG search (BM25 + vector + reciprocal rank fusion + cross-encoder reranking)",
+      "Multi-agent orchestration with AgentGraph (routing, parallel, checkpointing)",
+      "50 built-in evaluators for agent testing (30 deterministic + 20 LLM-as-judge)",
+      "Enterprise security: 15 guardrail patterns, audit logging, PII redaction",
+      "Visual drag-and-drop agent builder with 8 node types and 7 templates",
+      "Composable pipelines with @step decorator and @pipeline operator",
+      "Token-level streaming with native tool call support",
+      "Compatibility matrix across Python 3.9 to 3.13 (95% coverage, 4612 tests)"
+    ],
+    "keywords": "python, ai agent, llm, tool calling, rag, hybrid search, multi-agent, langchain alternative, openai, anthropic, gemini, ollama, agent framework, mcp, model context protocol"
+  }
+  </script>
+
+  <!-- Organization schema for NichevLabs (knowledge graph signal) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "NichevLabs",
+    "url": "https://nichevlabs.com",
+    "logo": "https://selectools.dev/favicon.svg",
+    "description": "Open-source developer tools for AI engineering teams.",
+    "founder": {
+      "@type": "Person",
+      "name": "John Nichev",
+      "url": "https://github.com/johnnichev"
+    },
+    "sameAs": [
+      "https://github.com/johnnichev",
+      "https://pypi.org/user/johnnichev/"
+    ]
+  }
+  </script>
+
+  <!-- HowTo schema: install and run your first agent (AI Overview trigger) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "How to install Selectools and run your first AI agent in Python",
+    "description": "Install the selectools Python library and run a working AI agent with tool calling in under 5 minutes. No API key required for the local provider.",
+    "totalTime": "PT5M",
+    "estimatedCost": { "@type": "MonetaryAmount", "currency": "USD", "value": "0" },
+    "supply": [
+      { "@type": "HowToSupply", "name": "Python 3.9 or newer" },
+      { "@type": "HowToSupply", "name": "pip" }
+    ],
+    "tool": [
+      { "@type": "HowToTool", "name": "Terminal" },
+      { "@type": "HowToTool", "name": "Text editor (any)" }
+    ],
+    "step": [
+      {
+        "@type": "HowToStep",
+        "position": 1,
+        "name": "Install the package",
+        "text": "Run pip install selectools in your terminal. The base install has only 4 dependencies (openai, anthropic, google-genai, numpy) and works without an API key when you use the LocalProvider.",
+        "url": "https://selectools.dev/QUICKSTART/#step-1-install"
+      },
+      {
+        "@type": "HowToStep",
+        "position": 2,
+        "name": "Create a Python file with your first agent",
+        "text": "Create my_agent.py. Import Agent and tool from selectools, define a Python function as a tool with the @tool() decorator, then create an Agent with tools=[your_tool] and provider=LocalProvider() for testing without API keys.",
+        "url": "https://selectools.dev/QUICKSTART/#step-2-build-your-first-agent-no-api-key-needed"
+      },
+      {
+        "@type": "HowToStep",
+        "position": 3,
+        "name": "Run the agent",
+        "text": "Call agent.run('your prompt') to execute. The result has .content (the answer), .trace (structured execution timeline), and .usage (token counts and dollar cost). Switch from LocalProvider to OpenAIProvider, AnthropicProvider, GeminiProvider, or OllamaProvider when ready for production.",
+        "url": "https://selectools.dev/QUICKSTART/#step-3-run-it"
+      }
     ]
   }
   </script>
@@ -150,6 +244,38 @@
         "acceptedAnswer": {
           "@type": "Answer",
           "text": "Yes. 4,612 tests at 95% coverage, published security audit, SBOM (CycloneDX), formal deprecation policy, @stable/@beta markers on every public API, compatibility matrix for Python 3.9-3.13. Migration guides for 4 frameworks. Apache-2.0 licensed."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is Selectools free?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. Selectools is free and open source under the Apache-2.0 license. There is no paid tier, no seat licensing, no usage-based pricing, and no SaaS account. You only pay for the LLM provider tokens you use directly with OpenAI, Anthropic, Google, or your own Ollama instance."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How does Selectools compare to CrewAI?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Selectools and CrewAI both target multi-agent orchestration, but with different design philosophies. CrewAI is role-and-task focused (each agent has a role, goal, and backstory). Selectools is graph-and-pipeline focused (compose agents with AgentGraph for routing, @step for pipelines, SupervisorAgent for coordination). Selectools also includes 50 evaluators, hybrid RAG, guardrails, and a visual builder built-in, where CrewAI typically requires additional packages. Both are free and open source."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How does Selectools compare to AutoGen?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Selectools is a Python library that you import and use directly in your code. Microsoft AutoGen is a multi-agent conversation framework with agent-as-actor patterns. Selectools focuses on production deployment (built-in audit logging, PII redaction, trace storage, structured retries, eval framework, visual builder). AutoGen focuses on conversational agent patterns. Both support multi-agent workflows. Selectools has a single Agent class and AgentGraph for orchestration; AutoGen uses GroupChat and ConversableAgent."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What is the difference between Selectools and LangGraph?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "LangGraph is a graph-based orchestration layer built on LangChain that uses StateGraph and TypedDict. Selectools is a standalone library where AgentGraph.chain(planner, writer, reviewer).run('prompt') replaces what would take 25 lines in LangGraph. Selectools has zero langchain-core dependency, includes 50 evaluators where LangGraph requires LangSmith ($39/seat/month), and ships with a free visual builder where LangGraph Studio is paid."
         }
       }
     ]

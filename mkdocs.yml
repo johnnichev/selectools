@@ -66,6 +66,8 @@ plugins:
 
 not_in_nav: |
   README.md
+  CLAUDE.md
+  RELEASE_GUIDE.md
 
 markdown_extensions:
   - admonition

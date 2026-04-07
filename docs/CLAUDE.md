@@ -1,3 +1,12 @@
+---
+search:
+  exclude: true
+hide:
+  - navigation
+  - toc
+robots: noindex,nofollow
+---
+
 # docs/ — Documentation Conventions
 
 ## Engine
