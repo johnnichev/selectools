@@ -2947,6 +2947,223 @@
       .prod-panel { min-height: 200px; padding: 18px; }
     }
 
+    /* ════════════════════════════════════════════════════════════════
+       OVERDRIVE FUSED — #see-difference — drag-to-compare slider
+       LangGraph (25 lines) and selectools (1 line) stacked in the
+       same container. A range slider drags the split point left/right.
+       Annotations fade in as the slider passes their thresholds.
+       Auto-sweeps once on viewport entry, then idles awaiting drag.
+       ════════════════════════════════════════════════════════════════ */
+    .diff-stage {
+      position: relative;
+      margin-top: 28px;
+      --split: 50%;
+    }
+    .diff-pane {
+      position: relative;
+      border-radius: 14px;
+      overflow: hidden;
+      isolation: isolate;
+      min-height: 480px;
+      box-shadow: 0 20px 60px -28px rgba(0, 0, 0, 0.55);
+    }
+    .diff-pane__layer {
+      position: absolute;
+      inset: 0;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .diff-pane__layer--bg { z-index: 1; }
+    .diff-pane__layer--fg {
+      z-index: 2;
+      border-color: rgba(34, 211, 238, 0.35);
+      box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.08);
+      clip-path: inset(0 calc(100% - var(--split)) 0 0);
+      transition: clip-path 0.6s var(--exec-ease-soft);
+    }
+    .diff-stage.is-dragging .diff-pane__layer--fg { transition: none; }
+    .diff-pane__layer .code-frame {
+      height: 100%;
+      margin: 0;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+    }
+    .diff-pane__layer .code-body {
+      height: calc(100% - 44px);
+      overflow-y: auto;
+    }
+    .diff-pane__layer--bg .code-frame { background: #0b1220; }
+    .diff-pane__layer--fg .code-frame { background: #0a1220; }
+
+    /* The split handle line */
+    .diff-pane__split-line {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: var(--split);
+      width: 2px;
+      background: var(--exec-color);
+      box-shadow: 0 0 12px var(--exec-glow), 0 0 0 1px rgba(11, 18, 32, 0.6);
+      transform: translateX(-1px);
+      pointer-events: none;
+      z-index: 3;
+      transition: left 0.6s var(--exec-ease-soft);
+    }
+    .diff-stage.is-dragging .diff-pane__split-line { transition: none; }
+    .diff-pane__split-knob {
+      position: absolute;
+      top: 50%;
+      left: var(--split);
+      width: 40px;
+      height: 40px;
+      transform: translate(-50%, -50%);
+      border-radius: 999px;
+      background: var(--bg);
+      border: 2px solid var(--exec-color);
+      box-shadow: 0 0 24px var(--exec-glow), 0 4px 12px rgba(0, 0, 0, 0.4);
+      pointer-events: none;
+      z-index: 4;
+      display: grid;
+      place-items: center;
+      color: var(--cyan);
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 700;
+      transition: left 0.6s var(--exec-ease-soft);
+    }
+    .diff-pane__split-knob::before { content: "‹"; transform: translateX(-2px); }
+    .diff-pane__split-knob::after  { content: "›"; transform: translateX(2px); }
+    .diff-stage.is-dragging .diff-pane__split-knob { transition: none; }
+
+    /* The actual range input — covers the entire pane, invisible thumb */
+    .diff-pane__range {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      border: none;
+      cursor: ew-resize;
+      z-index: 5;
+      -webkit-appearance: none;
+      appearance: none;
+      opacity: 0;
+    }
+    .diff-pane__range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 60px;
+      height: 100%;
+      cursor: ew-resize;
+    }
+    .diff-pane__range::-moz-range-thumb {
+      width: 60px;
+      height: 100%;
+      cursor: ew-resize;
+      border: none;
+      background: transparent;
+    }
+    .diff-pane__range:focus-visible { outline: none; }
+    .diff-pane__range:focus-visible ~ .diff-pane__split-knob {
+      box-shadow: 0 0 0 4px var(--exec-glow-soft), 0 0 24px var(--exec-glow);
+    }
+
+    /* Side labels — sit above the pane */
+    .diff-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      color: var(--text-faint);
+    }
+    .diff-labels__l { color: var(--text-dim); }
+    .diff-labels__r { color: var(--cyan); }
+
+    /* Drag hint below the pane */
+    .diff-hint {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 14px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+      letter-spacing: 0.04em;
+    }
+    .diff-hint__bar {
+      flex: 1;
+      max-width: 60px;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* Annotations — pop in as slider passes their thresholds */
+    .diff-annotations {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 22px;
+    }
+    .diff-anno {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.45);
+      opacity: 0.35;
+      transform: translateY(4px);
+      transition:
+        opacity 0.45s var(--exec-ease-soft),
+        transform 0.45s var(--exec-ease-soft),
+        border-color 0.45s var(--exec-ease-soft),
+        background 0.45s var(--exec-ease-soft);
+    }
+    .diff-anno.is-shown {
+      opacity: 1;
+      transform: none;
+      border-color: rgba(34, 211, 238, 0.35);
+      background: rgba(34, 211, 238, 0.06);
+    }
+    .diff-anno__num {
+      flex: 0 0 auto;
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      background: rgba(34, 211, 238, 0.12);
+      color: var(--cyan);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      display: grid;
+      place-items: center;
+      font-weight: 600;
+    }
+    .diff-anno.is-shown .diff-anno__num {
+      background: var(--exec-color);
+      color: var(--bg);
+      box-shadow: 0 0 0 3px var(--exec-glow-soft);
+    }
+    .diff-anno__text {
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.55;
+    }
+    .diff-anno__text code { color: var(--cyan); font-size: 12px; }
+
+    @media (max-width: 880px) {
+      .diff-pane { min-height: 420px; }
+      .diff-pane__split-knob { width: 48px; height: 48px; font-size: 16px; }
+      .diff-annotations { grid-template-columns: 1fr; }
+    }
+
     /* ── Reduced motion (WCAG AA) ──────────────────────────────────── */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
@@ -2981,6 +3198,16 @@
       .exec-dot { animation: none; box-shadow: 0 0 0 1px var(--exec-glow-soft); }
       .exec-caret { animation: none; opacity: 1; }
       .exec-scan.in-view::after { animation: none; display: none; }
+
+      /* OVERDRIVE FUSED — #see-difference: kill clip-path transition + force show all annotations */
+      .diff-pane__layer--fg, .diff-pane__split-line, .diff-pane__split-knob { transition: none !important; }
+      .diff-anno {
+        opacity: 1 !important;
+        transform: none !important;
+        border-color: rgba(34, 211, 238, 0.35) !important;
+        background: rgba(34, 211, 238, 0.06) !important;
+      }
+      .diff-anno__num { background: var(--exec-color) !important; color: var(--bg) !important; }
 
       /* OVERDRIVE FUSED — #production: kill auto-play fade */
       .prod-panel__state .prod-panel__body { animation: none !important; }
@@ -3369,22 +3596,30 @@ result = agent.<span class="cyan">execute</span>(user_input)
   </div>
 </section>
 
-<!-- ─── Code Comparison ────────────────────────────────────────────── -->
-<section class="section">
+<!-- ─── See the difference: drag-to-compare slider ────────────────── -->
+<section class="section" id="see-difference">
   <div class="wrap">
     <span class="section-label">See the difference</span>
     <h2 class="mb-4">The same pipeline. Less ceremony.</h2>
-    <p class="section-desc mb-14">A 3-agent workflow: planner &rarr; writer &rarr; reviewer. One framework wraps it in a DSL. The other stays out of your way.</p>
-    <div class="grid-2 gap-8">
-      <div class="reveal">
-        <div class="code-frame">
-          <div class="code-bar">
-            <div class="code-dot" style="background:rgba(239,68,68,0.35)"></div>
-            <div class="code-dot" style="background:rgba(250,204,21,0.35)"></div>
-            <div class="code-dot" style="background:rgba(34,197,94,0.35)"></div>
-            <span class="code-bar-label">LangGraph &middot; 25 lines</span>
-          </div>
-          <div class="code-body code-dim"><span class="kw">from</span> langgraph.graph <span class="kw">import</span> StateGraph, START, END
+    <p class="section-desc mb-14">A 3-agent workflow: planner &rarr; writer &rarr; reviewer. Drag the handle to wipe LangGraph's ceremony away.</p>
+
+    <div class="diff-stage" data-stage>
+      <div class="diff-labels">
+        <span class="diff-labels__l">← LangGraph &middot; 25 lines</span>
+        <span class="diff-labels__r">selectools &middot; 1 line →</span>
+      </div>
+
+      <div class="diff-pane">
+        <!-- Background layer: LangGraph (always full) -->
+        <div class="diff-pane__layer diff-pane__layer--bg">
+          <div class="code-frame">
+            <div class="code-bar">
+              <div class="code-dot" style="background:rgba(239,68,68,0.35)"></div>
+              <div class="code-dot" style="background:rgba(250,204,21,0.35)"></div>
+              <div class="code-dot" style="background:rgba(34,197,94,0.35)"></div>
+              <span class="code-bar-label">LangGraph &middot; 25 lines</span>
+            </div>
+            <div class="code-body code-dim"><span class="kw">from</span> langgraph.graph <span class="kw">import</span> StateGraph, START, END
 <span class="kw">from</span> typing_extensions <span class="kw">import</span> TypedDict
 
 <span class="kw">class</span> <span class="cls">State</span>(TypedDict):
@@ -3404,26 +3639,65 @@ g.add_edge(<span class="str">"writer"</span>, <span class="str">"reviewer"</span
 g.add_edge(<span class="str">"reviewer"</span>, END)
 app = g.<span class="fn">compile</span>()
 result = app.<span class="fn">invoke</span>({<span class="str">"text"</span>: <span class="str">"prompt"</span>})</div>
-        </div>
-      </div>
-      <div class="reveal reveal-d1">
-        <div class="code-frame code-frame-accent">
-          <div class="code-bar">
-            <div class="code-dot" style="background:rgba(239,68,68,0.8)"></div>
-            <div class="code-dot" style="background:rgba(250,204,21,0.8)"></div>
-            <div class="code-dot" style="background:rgba(34,197,94,0.8)"></div>
-            <span class="code-bar-label">selectools &middot; 1 line</span>
           </div>
-          <div class="code-body"><span class="kw">from</span> <span class="cls">selectools</span> <span class="kw">import</span> AgentGraph
-
-result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planner, writer, reviewer).<span class="fn">run</span>(<span class="str">"prompt"</span>)</div>
         </div>
-        <ul class="check-list" style="margin-top:20px">
-          <li>Plain Python. No StateGraph, no TypedDict, no compile()</li>
-          <li>HITL resumes at yield point, not by restarting the node</li>
-          <li>Zero extra deps. No langchain-core required</li>
-          <li>Deploy: <code style="color:var(--cyan)">selectools serve agent.yaml</code></li>
-        </ul>
+
+        <!-- Foreground layer: selectools (clip-path tied to --split) -->
+        <div class="diff-pane__layer diff-pane__layer--fg">
+          <div class="code-frame code-frame-accent">
+            <div class="code-bar">
+              <div class="code-dot" style="background:rgba(239,68,68,0.8)"></div>
+              <div class="code-dot" style="background:rgba(250,204,21,0.8)"></div>
+              <div class="code-dot" style="background:rgba(34,197,94,0.8)"></div>
+              <span class="code-bar-label">selectools &middot; 1 line</span>
+            </div>
+            <div class="code-body"><span class="kw">from</span> <span class="cls">selectools</span> <span class="kw">import</span> AgentGraph
+
+result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planner, writer, reviewer).<span class="fn">run</span>(<span class="str">"prompt"</span>)
+
+<span class="cmt"># That's it. No StateGraph. No TypedDict.</span>
+<span class="cmt"># No add_node, no add_edge, no compile().</span>
+<span class="cmt"># Just three callables and a chain.</span>
+
+<span class="cmt"># Need branching? AgentGraph.router(...)</span>
+<span class="cmt"># Need parallel? AgentGraph.parallel(...)</span>
+<span class="cmt"># Need HITL? yield and resume — no node restart.</span>
+<span class="cmt"># Need to deploy? selectools serve agent.yaml</span></div>
+          </div>
+        </div>
+
+        <!-- Range input (invisible, drives --split via JS) -->
+        <input type="range" class="diff-pane__range"
+               min="0" max="100" value="50" step="0.5"
+               aria-label="Drag to compare LangGraph and selectools" />
+        <div class="diff-pane__split-line" aria-hidden="true"></div>
+        <div class="diff-pane__split-knob" aria-hidden="true"></div>
+      </div>
+
+      <div class="diff-hint">
+        <span class="diff-hint__bar"></span>
+        <span>drag to compare</span>
+        <span class="diff-hint__bar"></span>
+      </div>
+
+      <!-- Annotations: pop in as the slider passes their thresholds -->
+      <div class="diff-annotations">
+        <div class="diff-anno" data-threshold="20">
+          <span class="diff-anno__num">01</span>
+          <span class="diff-anno__text">Plain Python. No <code>StateGraph</code>, no <code>TypedDict</code>, no <code>compile()</code>.</span>
+        </div>
+        <div class="diff-anno" data-threshold="40">
+          <span class="diff-anno__num">02</span>
+          <span class="diff-anno__text">HITL resumes at yield point, not by restarting the node.</span>
+        </div>
+        <div class="diff-anno" data-threshold="60">
+          <span class="diff-anno__num">03</span>
+          <span class="diff-anno__text">Zero extra deps. No <code>langchain-core</code> required.</span>
+        </div>
+        <div class="diff-anno" data-threshold="80">
+          <span class="diff-anno__num">04</span>
+          <span class="diff-anno__text">Deploy with <code>selectools serve agent.yaml</code>.</span>
+        </div>
       </div>
     </div>
   </div>
@@ -4294,6 +4568,72 @@ const obs = new IntersectionObserver(entries => {
   entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
 }, { threshold: 0.08 });
 document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+
+/* ── #see-difference: drag-to-compare slider + auto-sweep ───────── */
+(function() {
+  var stage = document.querySelector('.diff-stage');
+  if (!stage) return;
+  var range = stage.querySelector('.diff-pane__range');
+  var annos = stage.querySelectorAll('.diff-anno');
+  if (!range) return;
+
+  function setSplit(v) {
+    stage.style.setProperty('--split', v + '%');
+    annos.forEach(function(a) {
+      var t = parseFloat(a.getAttribute('data-threshold')) || 0;
+      a.classList.toggle('is-shown', v >= t);
+    });
+  }
+
+  // User drag/keyboard input
+  range.addEventListener('input', function() {
+    stage.classList.add('is-dragging');
+    setSplit(parseFloat(range.value));
+  });
+  range.addEventListener('change', function() {
+    setSplit(parseFloat(range.value));
+    setTimeout(function() { stage.classList.remove('is-dragging'); }, 200);
+  });
+
+  // Auto-sweep: 50 → 95 → 50 once on viewport entry
+  var io = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (!e.isIntersecting) return;
+      var start = 50, end = 95, mid = 50;
+      var t0 = performance.now();
+      function step(now) {
+        var elapsed = now - t0;
+        var v;
+        if (elapsed < 1100) {
+          // 50 → 95
+          var p = elapsed / 1100;
+          v = start + (end - start) * (1 - Math.pow(1 - p, 3));
+        } else if (elapsed < 1400) {
+          // hold at 95
+          v = end;
+        } else if (elapsed < 2400) {
+          // 95 → 50
+          var p2 = (elapsed - 1400) / 1000;
+          v = end + (mid - end) * (1 - Math.pow(1 - p2, 3));
+        } else {
+          v = mid;
+          range.value = v;
+          setSplit(v);
+          return;
+        }
+        range.value = v;
+        setSplit(v);
+        requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+      io.disconnect();
+    });
+  }, { threshold: 0.35, rootMargin: '0px 0px -8% 0px' });
+  io.observe(stage);
+
+  // Init at 50
+  setSplit(50);
+})();
 
 /* ── #production trace explorer: clickable nodes + auto-play ────── */
 (function() {
