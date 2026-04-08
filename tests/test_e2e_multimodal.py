@@ -150,3 +150,65 @@ class TestMultimodalRealProviders:
             "red" in result.content.lower()
         ), f"Gemini did not see the red test image. Got: {result.content[:200]}"
         assert result.usage.total_tokens > 0
+
+
+class TestMultimodalRealProvidersAsync:
+    """Async path coverage for the v0.21.0 content_parts fix.
+
+    The fix lives in each provider's ``_format_messages`` which is shared
+    between sync ``complete()`` and async ``acomplete()`` / ``astream()``,
+    but the sync tests above don't actually exercise the async code paths.
+    These tests prove the fix flows through ``agent.arun()`` for every
+    multimodal-capable provider.
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        not os.environ.get("OPENAI_API_KEY"),
+        reason="OPENAI_API_KEY not set",
+    )
+    async def test_openai_async_accepts_image(self, tiny_red_png: str) -> None:
+        agent = Agent(
+            tools=[_noop],
+            provider=OpenAIProvider(),
+            config=AgentConfig(model="gpt-4o-mini", max_tokens=50),
+        )
+        msg = image_message(tiny_red_png, prompt="What color is this image? One word.")
+        result = await agent.arun([msg])
+        assert (
+            "red" in result.content.lower()
+        ), f"OpenAI async did not see the red test image. Got: {result.content[:200]}"
+
+    @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        not os.environ.get("ANTHROPIC_API_KEY"),
+        reason="ANTHROPIC_API_KEY not set",
+    )
+    async def test_anthropic_async_accepts_image(self, tiny_red_png: str) -> None:
+        agent = Agent(
+            tools=[_noop],
+            provider=AnthropicProvider(),
+            config=AgentConfig(model="claude-haiku-4-5", max_tokens=50),
+        )
+        msg = image_message(tiny_red_png, prompt="What color is this image? One word.")
+        result = await agent.arun([msg])
+        assert (
+            "red" in result.content.lower()
+        ), f"Anthropic async did not see the red test image. Got: {result.content[:200]}"
+
+    @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        not (os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")),
+        reason="GOOGLE_API_KEY / GEMINI_API_KEY not set",
+    )
+    async def test_gemini_async_accepts_image(self, tiny_red_png: str) -> None:
+        agent = Agent(
+            tools=[_noop],
+            provider=GeminiProvider(),
+            config=AgentConfig(model="gemini-2.5-flash", max_tokens=50),
+        )
+        msg = image_message(tiny_red_png, prompt="What color is this image? One word.")
+        result = await agent.arun([msg])
+        assert (
+            "red" in result.content.lower()
+        ), f"Gemini async did not see the red test image. Got: {result.content[:200]}"
