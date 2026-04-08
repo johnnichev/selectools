@@ -77,6 +77,8 @@ nav .w{max-width:960px;margin:0 auto;padding:0 20px;display:flex;align-items:cen
 @keyframes ex-row-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 @media(max-width:640px){.ex-row{grid-template-columns:32px 1fr 20px;gap:8px 12px}.ex-row__num{grid-column:1;grid-row:1 / 3;align-self:start}.ex-row__perm{display:none}.ex-row__file{grid-column:2;grid-row:1}.ex-row__chev{grid-column:3;grid-row:1 / 3;align-self:start}.ex-row__size{grid-column:2;grid-row:2;display:inline;margin-right:8px;color:var(--ft)}.ex-row__key{grid-column:2;grid-row:2;display:inline;margin-right:8px}.ex-row__desc{grid-column:2;grid-row:2;display:inline;color:var(--dm)}}
 @media(prefers-reduced-motion:reduce){.ex-row--enter{animation:none}.ex-row__chev{transition-duration:0.01s}}
+.ex-rail__seg:focus-visible{outline:2px solid var(--cy);outline-offset:2px}
+.ex-row:focus-visible{outline:2px solid var(--cy);outline-offset:2px}
 .eb{padding:0 18px 18px}.eg{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
 .ex-cat-prefix{font-family:var(--mono);font-size:11px;color:var(--ft);padding:0 0 10px;user-select:text}
 .ex-cat-prefix__glyph{color:var(--gn);margin-right:6px}
@@ -106,7 +108,7 @@ a.ec1:hover{background:rgba(59,130,246,0.2);color:#bfdbfe}
 </head>
 <body>
 <nav><div class="w">
-  <a href="../" class="nl"><span class="exec-dot"></span>&nbsp;selectools <span>examples</span></a>
+  <a href="../" class="nl"><span class="exec-dot" aria-hidden="true"></span>&nbsp;selectools <span>examples</span></a>
   <div class="nr"><a href="../builder/">Builder</a><a href="../QUICKSTART/">Docs</a><a href="https://github.com/johnnichev/selectools" target="_blank">GitHub</a></div>
 </div></nav>
 <header class="ex-term">
