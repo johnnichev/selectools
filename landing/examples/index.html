@@ -46,15 +46,15 @@ nav .w{max-width:960px;margin:0 auto;padding:0 20px;display:flex;align-items:cen
 .ex-search__glyph{position:absolute;left:14px;color:var(--ft);font-size:14px;pointer-events:none}
 .ex-search__kbd{position:absolute;right:12px;font-family:var(--mono);font-size:11px;color:var(--ft);background:rgba(100,116,139,0.15);padding:2px 6px;border-radius:4px;pointer-events:none}
 .ex-search .si{padding-left:36px;padding-right:36px}
-.ex-rail{display:flex;gap:2px;height:40px;border-radius:8px;overflow:hidden;border:1px solid var(--bd);background:rgba(30,41,59,0.4)}
-.ex-rail__seg{flex:var(--seg-weight,1) 1 0;min-width:44px;height:100%;display:flex;align-items:center;justify-content:center;gap:6px;font-family:var(--mono);font-size:12px;color:var(--dm);background:transparent;border:none;cursor:pointer;transition:background .15s,color .15s;position:relative;padding:0 8px;white-space:nowrap}
-.ex-rail__seg--all{flex:0 0 72px}
+.ex-rail{display:flex;gap:2px;height:40px;border-radius:8px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;border:1px solid var(--bd);background:rgba(30,41,59,0.4)}
+.ex-rail__seg{flex:0 0 auto;scroll-snap-align:start;height:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-family:var(--mono);font-size:12px;color:var(--dm);background:transparent;border:none;cursor:pointer;transition:background .15s,color .15s;position:relative;padding:0 12px;white-space:nowrap}
+.ex-rail__seg--all{min-width:64px}
 .ex-rail__seg:hover{background:rgba(34,211,238,0.08);color:var(--tx)}
 .ex-rail__seg.on{background:rgba(34,211,238,0.12);color:var(--cy);box-shadow:inset 0 -2px 0 var(--exec-color)}
 .ex-rail__name{font-size:12px}
 .ex-rail__count{font-size:11px;color:var(--cy);opacity:0.75}
 .ex-rail.in-view .ex-rail__seg{animation:exec-stamp 0.6s var(--exec-ease-soft) both;animation-delay:calc(var(--seg-index,0) * 80ms)}
-@media(max-width:640px){.ex-rail{overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;height:44px}.ex-rail__seg{flex:0 0 auto;min-width:80px;scroll-snap-align:start}}
+@media(max-width:640px){.ex-rail{height:44px}}
 @media(prefers-reduced-motion:reduce){.ex-rail.in-view .ex-rail__seg{animation:none}}
 .rc{font-family:var(--mono);font-size:11px;color:var(--ft);padding:2px 0}
 .el{max-width:960px;margin:0 auto;padding:0 20px 60px;display:flex;flex-direction:column;gap:2px}
