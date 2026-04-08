@@ -286,6 +286,10 @@ nav .w{{max-width:960px;margin:0 auto;padding:0 20px;display:flex;align-items:ce
 .ct{{max-width:960px;margin:0 auto;padding:0 20px 16px;display:flex;flex-direction:column;gap:10px;position:sticky;top:52px;z-index:40;background:var(--bg);padding-top:10px}}
 .si{{flex:1;background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:10px 14px;color:var(--tx);font-family:var(--font);font-size:14px;outline:none}}
 .si:focus{{border-color:var(--cy);box-shadow:0 0 0 2px rgba(34,211,238,0.12)}}.si::placeholder{{color:var(--ft)}}
+.ex-search{{position:relative;display:flex;align-items:center}}
+.ex-search__glyph{{position:absolute;left:14px;color:var(--ft);font-size:14px;pointer-events:none}}
+.ex-search__kbd{{position:absolute;right:12px;font-family:var(--mono);font-size:11px;color:var(--ft);background:rgba(100,116,139,0.15);padding:2px 6px;border-radius:4px;pointer-events:none}}
+.ex-search .si{{padding-left:36px;padding-right:36px}}
 .ex-rail{{display:flex;gap:2px;height:40px;border-radius:8px;overflow:hidden;border:1px solid var(--bd);background:rgba(30,41,59,0.4)}}
 .ex-rail__seg{{flex:var(--seg-weight,1) 1 0;min-width:44px;height:100%;display:flex;align-items:center;justify-content:center;gap:6px;font-family:var(--mono);font-size:12px;color:var(--dm);background:transparent;border:none;cursor:pointer;transition:background .15s,color .15s;position:relative;padding:0 8px;white-space:nowrap}}
 .ex-rail__seg--all{{flex:0 0 72px}}
@@ -354,9 +358,13 @@ a.ec1:hover{{background:rgba(59,130,246,0.2);color:#bfdbfe}}
   </div>
 </header>
 <div class="ct">
-  <input class="si" type="text" placeholder="Search examples\u2026" oninput="flt();syncPrompt()" id="si" />
+  <div class="ex-search">
+    <span class="ex-search__glyph" aria-hidden="true">⌕</span>
+    <input class="si" type="text" placeholder="search by name or keyword\u2026" oninput="flt();syncPrompt()" id="si" autocomplete="off" />
+    <kbd class="ex-search__kbd" aria-hidden="true">/</kbd>
+  </div>
   <div class="ex-rail" id="ex-rail" role="tablist" aria-label="Filter examples by category">{chr(10).join(rail_segs)}</div>
-  <div class="rc" id="rc">{total} examples</div>
+  <div class="rc" id="rc"># {total} files match</div>
 </div>
 <div class="el" id="el">
 {chr(10).join(cards)}
@@ -373,6 +381,7 @@ function cpSrc(b){{const f=b.closest('.ec').dataset.file;navigator.clipboard.wri
 function syncPrompt(){{const q=document.getElementById('si').value;document.getElementById('ex-grep').textContent=q?' | grep -i '+q:'';document.getElementById('ex-flags').textContent=ac==='all'?'':' --tags '+ac}}
 function typeLine(target,text,perChar,done){{let i=0;const tick=()=>{{if(i<=text.length){{target.textContent=text.slice(0,i);i++;setTimeout(tick,perChar)}}else if(done){{done()}}}};tick()}}
 (function bootPrompt(){{const cmd=document.getElementById('ex-cmd');if(!cmd)return;const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;if(reduced){{cmd.textContent='ls examples/';syncPrompt();return}}typeLine(cmd,'ls examples/',35,syncPrompt)}})();
+document.addEventListener('keydown',(e)=>{{if(e.key!=='/')return;const t=e.target;if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable))return;e.preventDefault();const si=document.getElementById('si');if(si)si.focus()}});
 </script>
 </body>
 </html>"""

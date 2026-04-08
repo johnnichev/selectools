@@ -42,6 +42,10 @@ nav .w{max-width:960px;margin:0 auto;padding:0 20px;display:flex;align-items:cen
 .ct{max-width:960px;margin:0 auto;padding:0 20px 16px;display:flex;flex-direction:column;gap:10px;position:sticky;top:52px;z-index:40;background:var(--bg);padding-top:10px}
 .si{flex:1;background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:10px 14px;color:var(--tx);font-family:var(--font);font-size:14px;outline:none}
 .si:focus{border-color:var(--cy);box-shadow:0 0 0 2px rgba(34,211,238,0.12)}.si::placeholder{color:var(--ft)}
+.ex-search{position:relative;display:flex;align-items:center}
+.ex-search__glyph{position:absolute;left:14px;color:var(--ft);font-size:14px;pointer-events:none}
+.ex-search__kbd{position:absolute;right:12px;font-family:var(--mono);font-size:11px;color:var(--ft);background:rgba(100,116,139,0.15);padding:2px 6px;border-radius:4px;pointer-events:none}
+.ex-search .si{padding-left:36px;padding-right:36px}
 .ex-rail{display:flex;gap:2px;height:40px;border-radius:8px;overflow:hidden;border:1px solid var(--bd);background:rgba(30,41,59,0.4)}
 .ex-rail__seg{flex:var(--seg-weight,1) 1 0;min-width:44px;height:100%;display:flex;align-items:center;justify-content:center;gap:6px;font-family:var(--mono);font-size:12px;color:var(--dm);background:transparent;border:none;cursor:pointer;transition:background .15s,color .15s;position:relative;padding:0 8px;white-space:nowrap}
 .ex-rail__seg--all{flex:0 0 72px}
@@ -110,7 +114,11 @@ a.ec1:hover{background:rgba(59,130,246,0.2);color:#bfdbfe}
   </div>
 </header>
 <div class="ct">
-  <input class="si" type="text" placeholder="Search examples…" oninput="flt();syncPrompt()" id="si" />
+  <div class="ex-search">
+    <span class="ex-search__glyph" aria-hidden="true">⌕</span>
+    <input class="si" type="text" placeholder="search by name or keyword…" oninput="flt();syncPrompt()" id="si" autocomplete="off" />
+    <kbd class="ex-search__kbd" aria-hidden="true">/</kbd>
+  </div>
   <div class="ex-rail" id="ex-rail" role="tablist" aria-label="Filter examples by category"><button class="ex-rail__seg ex-rail__seg--all on" data-cat="all" role="tab" aria-selected="true" style="--seg-index:0"><span class="ex-rail__name">all</span><span class="ex-rail__count">88</span></button>
 <button class="ex-rail__seg" data-cat="agent" role="tab" aria-selected="false" style="--seg-weight:21;--seg-index:1"><span class="ex-rail__name">agent</span><span class="ex-rail__count">21</span></button>
 <button class="ex-rail__seg" data-cat="audit" role="tab" aria-selected="false" style="--seg-weight:1;--seg-index:2"><span class="ex-rail__name">audit</span><span class="ex-rail__count">1</span></button>
@@ -129,7 +137,7 @@ a.ec1:hover{background:rgba(59,130,246,0.2);color:#bfdbfe}
 <button class="ex-rail__seg" data-cat="streaming" role="tab" aria-selected="false" style="--seg-weight:4;--seg-index:15"><span class="ex-rail__name">streaming</span><span class="ex-rail__count">4</span></button>
 <button class="ex-rail__seg" data-cat="structured" role="tab" aria-selected="false" style="--seg-weight:2;--seg-index:16"><span class="ex-rail__name">structured</span><span class="ex-rail__count">2</span></button>
 <button class="ex-rail__seg" data-cat="tools" role="tab" aria-selected="false" style="--seg-weight:11;--seg-index:17"><span class="ex-rail__name">tools</span><span class="ex-rail__count">11</span></button></div>
-  <div class="rc" id="rc">88 examples</div>
+  <div class="rc" id="rc"># 88 files match</div>
 </div>
 <div class="el" id="el">
 <div class="ec" data-cats="tools" data-title="hello world — your first selectools agent" data-file="01_hello_world.py"><div class="eh" onclick="toggle(this)"><div class="en">01</div><div class="ei"><div class="et">Hello World — Your first Selectools agent</div><div class="ed">No API key needed. Runs entirely offline with the built-in LocalProvider.</div></div><div class="em"><span class="enk">No Key</span><span class="eln">46L</span></div><div class="ev">&#9660;</div></div><div class="eb" style="display:none"><div class="eg"><a href="../modules/TOOLS/" class="ec1">Tools</a></div><div class="ea"><button class="eab" onclick="cpSrc(this)">Copy</button><a href="https://github.com/johnnichev/selectools/blob/main/examples/01_hello_world.py" class="eab" target="_blank">GitHub</a><a href="../modules/TOOLS/" class="eab">Docs</a></div><pre class="ep"></pre></div></div>
@@ -233,6 +241,7 @@ function cpSrc(b){const f=b.closest('.ec').dataset.file;navigator.clipboard.writ
 function syncPrompt(){const q=document.getElementById('si').value;document.getElementById('ex-grep').textContent=q?' | grep -i '+q:'';document.getElementById('ex-flags').textContent=ac==='all'?'':' --tags '+ac}
 function typeLine(target,text,perChar,done){let i=0;const tick=()=>{if(i<=text.length){target.textContent=text.slice(0,i);i++;setTimeout(tick,perChar)}else if(done){done()}};tick()}
 (function bootPrompt(){const cmd=document.getElementById('ex-cmd');if(!cmd)return;const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;if(reduced){cmd.textContent='ls examples/';syncPrompt();return}typeLine(cmd,'ls examples/',35,syncPrompt)})();
+document.addEventListener('keydown',(e)=>{if(e.key!=='/')return;const t=e.target;if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable))return;e.preventDefault();const si=document.getElementById('si');if(si)si.focus()});
 </script>
 </body>
 </html>
