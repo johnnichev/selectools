@@ -199,7 +199,6 @@ def build_gallery(examples: list[dict]) -> str:
     cards = []
     for ex in examples:
         cats_str = " ".join(ex["categories"])
-        # Category tags link to their doc pages
         cat_parts = []
         for c in ex["categories"]:
             label = c.replace("-", " ").title()
@@ -208,30 +207,38 @@ def build_gallery(examples: list[dict]) -> str:
             else:
                 cat_parts.append(f'<span class="ec1">{label}</span>')
         cats_html = "".join(cat_parts)
-        key_badge = (
-            '<span class="ek">API Key</span>'
-            if ex["needs_key"]
-            else '<span class="enk">No Key</span>'
-        )
+        key_class = "ex-row__key--paid" if ex["needs_key"] else "ex-row__key--free"
+        key_label = "api-key" if ex["needs_key"] else "no-key"
         graph_btn = ""
         if ex["has_graph"]:
             graph_btn = f'<a href="../{BUILDER_URL}" class="eab ebu">Open in Builder</a>'
-        # Doc link — use first category with a doc page
         doc_btn = ""
         for c in ex["categories"]:
             if c in CAT_DOCS:
                 doc_btn = f'<a href="../{CAT_DOCS[c]}" class="eab">Docs</a>'
                 break
 
+        # Strip the leading "NN_" from the displayed filename (column 1 already shows the number)
+        display_file = re.sub(r"^\d+_", "", ex["file"])
+
+        # Per-row enter animation: only the first 30 rows get .ex-row--enter
+        row_index = ex["num"] - 1
+        enter_class = " ex-row--enter" if row_index < 30 else ""
+        enter_style = f' style="--row-index:{row_index}"' if row_index < 30 else ""
+
         cards.append(
             f'<div class="ec" data-cats="{cats_str}" '
             f'data-title="{html.escape(ex["title"].lower())}" data-file="{ex["file"]}">'
-            f'<div class="eh" onclick="toggle(this)">'
-            f'<div class="en">{ex["num"]:02d}</div>'
-            f'<div class="ei"><div class="et">{html.escape(ex["title"])}</div>'
-            f'<div class="ed">{html.escape(ex["desc"])}</div></div>'
-            f'<div class="em">{key_badge}<span class="eln">{ex["lines"]}L</span></div>'
-            f'<div class="ev">&#9660;</div></div>'
+            f'<div class="ex-row eh{enter_class}" onclick="toggle(this)" '
+            f'role="button" tabindex="0" aria-expanded="false"{enter_style}>'
+            f'<span class="ex-row__num">{ex["num"]:02d}</span>'
+            f'<span class="ex-row__perm">-rw-r--r--</span>'
+            f'<span class="ex-row__size">{ex["lines"]}L</span>'
+            f'<span class="ex-row__key {key_class}">{key_label}</span>'
+            f'<span class="ex-row__file">{html.escape(display_file)}</span>'
+            f'<span class="ex-row__desc">{html.escape(ex["desc"] or ex["title"])}</span>'
+            f'<span class="ex-row__chev ev">▾</span>'
+            f"</div>"
             f'<div class="eb" style="display:none">'
             f'<div class="eg">{cats_html}</div>'
             f'<div class="ea">'
@@ -304,15 +311,23 @@ nav .w{{max-width:960px;margin:0 auto;padding:0 20px;display:flex;align-items:ce
 .el{{max-width:960px;margin:0 auto;padding:0 20px 60px;display:flex;flex-direction:column;gap:2px}}
 .ec{{border:1px solid var(--bd);border-radius:8px;overflow:hidden;background:var(--sf);background-image:var(--gr);transition:border-color .15s}}
 .ec:hover{{border-color:rgba(34,211,238,0.2)}}.ec.op{{border-color:rgba(34,211,238,0.3)}}
-.eh{{display:flex;align-items:center;gap:14px;padding:14px 18px;cursor:pointer;user-select:none}}
-.en{{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--cy);min-width:24px;flex-shrink:0}}
-.ei{{flex:1;min-width:0}}.et{{font-weight:600;font-size:13px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
-.ed{{font-size:12px;color:var(--dm);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
-.em{{display:flex;gap:8px;align-items:center;flex-shrink:0}}
-.ek{{font-family:var(--mono);font-size:10px;color:var(--ft);background:rgba(100,116,139,0.15);padding:2px 8px;border-radius:100px}}
-.enk{{font-family:var(--mono);font-size:10px;color:var(--gn);background:rgba(34,197,94,0.1);padding:2px 8px;border-radius:100px}}
-.eln{{font-family:var(--mono);font-size:10px;color:var(--ft)}}
-.ev{{font-size:10px;color:var(--ft);transition:transform .2s}}.ec.op .ev{{transform:rotate(180deg)}}
+.ex-row{{display:grid;grid-template-columns:32px 112px 54px 72px minmax(180px,1.5fr) minmax(0,3fr) 20px;align-items:center;gap:16px;padding:12px 18px;font-family:var(--mono);font-size:12px;cursor:pointer;user-select:none;transition:background-color .15s,border-left-color .15s;border-left:2px solid transparent}}
+.ex-row:hover{{background:rgba(34,211,238,0.04);border-left-color:var(--cy)}}
+.ec.op .ex-row{{background:rgba(34,211,238,0.06)}}
+.ex-row__num{{color:var(--cy);font-weight:500}}
+.ex-row__perm{{color:var(--ft)}}
+.ex-row__size{{color:var(--ft);text-align:right}}
+.ex-row__key{{font-size:10px;padding:2px 8px;border-radius:100px;text-align:center}}
+.ex-row__key--free{{color:var(--gn);background:rgba(34,197,94,0.1)}}
+.ex-row__key--paid{{color:var(--ft);background:rgba(100,116,139,0.15)}}
+.ex-row__file{{color:var(--cy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+.ex-row__desc{{color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+.ex-row__chev{{font-size:10px;color:var(--ft);transition:transform 0.22s var(--exec-ease-soft);text-align:center}}
+.ec.op .ex-row__chev{{transform:rotate(180deg)}}
+.ex-row--enter{{animation:ex-row-in 0.35s var(--exec-ease-soft) both;animation-delay:calc(var(--row-index,0) * 14ms)}}
+@keyframes ex-row-in{{from{{opacity:0;transform:translateY(4px)}}to{{opacity:1;transform:none}}}}
+@media(max-width:640px){{.ex-row{{grid-template-columns:32px 1fr 20px;gap:8px 12px}}.ex-row__num{{grid-column:1;grid-row:1 / 3;align-self:start}}.ex-row__perm{{display:none}}.ex-row__file{{grid-column:2;grid-row:1}}.ex-row__chev{{grid-column:3;grid-row:1 / 3;align-self:start}}.ex-row__size{{grid-column:2;grid-row:2;display:inline;margin-right:8px;color:var(--ft)}}.ex-row__key{{grid-column:2;grid-row:2;display:inline;margin-right:8px}}.ex-row__desc{{grid-column:2;grid-row:2;display:inline;color:var(--dm)}}}}
+@media(prefers-reduced-motion:reduce){{.ex-row--enter{{animation:none}}.ex-row__chev{{transition-duration:0.01s}}}}
 .eb{{padding:0 18px 18px}}.eg{{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}}
 .ec1{{font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(59,130,246,0.1);color:#93c5fd;text-decoration:none;transition:background .12s}}
 a.ec1:hover{{background:rgba(59,130,246,0.2);color:#bfdbfe}}
@@ -376,12 +391,13 @@ function flt(){{const q=document.getElementById('si').value.toLowerCase();let c=
 document.querySelectorAll('.ex-rail__seg').forEach(b=>{{b.addEventListener('click',()=>{{document.querySelectorAll('.ex-rail__seg').forEach(x=>{{x.classList.remove('on');x.setAttribute('aria-selected','false')}});b.classList.add('on');b.setAttribute('aria-selected','true');ac=b.dataset.cat;b.style.animation='none';requestAnimationFrame(()=>{{b.style.animation='exec-stamp 0.6s var(--exec-ease-soft)'}});flt();syncPrompt()}});}});
 (function(){{const r=document.getElementById('ex-rail');if(!r)return;const io=new IntersectionObserver((ents)=>{{ents.forEach(e=>{{if(e.isIntersecting){{r.classList.add('in-view');io.disconnect()}}}})}},{{rootMargin:'0px 0px -20% 0px'}});io.observe(r)}})();
 function hl(s){{s=s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');s=s.replace(/\\b(from|import|def|class|return|if|elif|else|for|while|with|as|try|except|finally|raise|yield|async|await|and|or|not|in|is|True|False|None|lambda|pass|break|continue)\\b/g,'<span class="kw">$1</span>');s=s.replace(/(#[^\\n]*)/g,'<span class="cmt">$1</span>');s=s.replace(/(@\\w+(?:\\([^)]*\\))?)/g,'<span class="dec">$1</span>');return s}}
-function toggle(h){{const c=h.closest('.ec'),b=c.querySelector('.eb'),p=c.querySelector('.ep');c.classList.toggle('op');const open=c.classList.contains('op');b.style.display=open?'':'none';if(open&&!p.dataset.loaded){{p.innerHTML=hl(SRC[c.dataset.file]||'');p.dataset.loaded='1'}}}}
+function toggle(h){{const c=h.closest('.ec'),b=c.querySelector('.eb'),p=c.querySelector('.ep');c.classList.toggle('op');const open=c.classList.contains('op');b.style.display=open?'':'none';h.setAttribute('aria-expanded',open?'true':'false');if(open&&!p.dataset.loaded){{p.innerHTML=hl(SRC[c.dataset.file]||'');p.dataset.loaded='1'}}}}
 function cpSrc(b){{const f=b.closest('.ec').dataset.file;navigator.clipboard.writeText(SRC[f]||'');b.textContent='Copied!';setTimeout(()=>b.textContent='Copy',1500)}}
 function syncPrompt(){{const q=document.getElementById('si').value;document.getElementById('ex-grep').textContent=q?' | grep -i '+q:'';document.getElementById('ex-flags').textContent=ac==='all'?'':' --tags '+ac}}
 function typeLine(target,text,perChar,done){{let i=0;const tick=()=>{{if(i<=text.length){{target.textContent=text.slice(0,i);i++;setTimeout(tick,perChar)}}else if(done){{done()}}}};tick()}}
 (function bootPrompt(){{const cmd=document.getElementById('ex-cmd');if(!cmd)return;const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;if(reduced){{cmd.textContent='ls examples/';syncPrompt();return}}typeLine(cmd,'ls examples/',35,syncPrompt)}})();
 document.addEventListener('keydown',(e)=>{{if(e.key!=='/')return;const t=e.target;if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable))return;e.preventDefault();const si=document.getElementById('si');if(si)si.focus()}});
+document.querySelectorAll('.ex-row').forEach(r=>{{r.addEventListener('keydown',(e)=>{{if(e.key==='Enter'||e.key===' '){{e.preventDefault();toggle(r)}}}})}});
 </script>
 </body>
 </html>"""
