@@ -1321,13 +1321,6 @@
          instead of wrapping to 3-4 lines as reported on Galaxy S23. */
       min-width: 800px;
     }
-    /* Yes/No verdict cells should never wrap — they're 2-3 chars and wrapping
-       them looks broken. Only let the long descriptive cells wrap. */
-    .cmp-table .yes,
-    .cmp-table .no,
-    .cmp-table .mid {
-      white-space: nowrap;
-    }
     .cmp-hint {
       display: none;
       font-family: var(--font-mono);
@@ -1362,22 +1355,24 @@
     .cmp-table .mid { color: var(--amber); }
     .cmp-table .cap { color: var(--text); }
 
-    /* Light polish: pill-shaped backgrounds for verdict cells, subtle row
-       hover, and a tinted "winner" column (col 2 = selectools). The pill
-       backgrounds make the verdict scannable without enlarging the type. */
-    .cmp-table .yes,
-    .cmp-table .no,
-    .cmp-table .mid {
+    /* Pill-shaped verdict badges. The .yes/.no/.mid classes live on the <td>
+       (so the whole cell carries the color + column tint), but the pill-shape
+       styling targets an inner <span class="pill"> so the <td> stays in proper
+       table layout. Applying display:inline-block to a <td> removes it from
+       the table's layout engine and collapses the tbody into an inline flow —
+       that was the bug that broke both comparison tables. */
+    .cmp-table .pill {
       display: inline-block;
       padding: 3px 10px;
       border-radius: 999px;
       font-size: 11px;
       font-weight: 600;
       letter-spacing: 0.02em;
+      white-space: nowrap;
     }
-    .cmp-table .yes { background: rgba(34, 197, 94, 0.10); border: 1px solid rgba(34, 197, 94, 0.25); }
-    .cmp-table .no  { background: rgba(100, 116, 139, 0.08); border: 1px solid rgba(100, 116, 139, 0.18); }
-    .cmp-table .mid { background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.22); }
+    .cmp-table .yes .pill { background: rgba(34, 197, 94, 0.10); border: 1px solid rgba(34, 197, 94, 0.25); }
+    .cmp-table .no  .pill { background: rgba(100, 116, 139, 0.08); border: 1px solid rgba(100, 116, 139, 0.18); }
+    .cmp-table .mid .pill { background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.22); }
 
     /* Subtle row hover (mouse only) — helps the eye follow a single feature
        across all comparison columns. Coarse pointers skip this. */
@@ -5351,17 +5346,17 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
           <tr><th class="cap">Feature</th><th>selectools</th><th>LangGraph Studio</th><th>n8n</th><th>Flowise</th><th>Dify</th><th>Rivet</th></tr>
         </thead>
         <tbody>
-          <tr><td class="cap">Price</td><td class="yes">Free, forever</td><td class="no">Paid (LangSmith)</td><td class="mid">&euro;20/mo cloud</td><td class="yes">Free self-host</td><td class="yes">Free self-host</td><td class="yes">Free</td></tr>
-          <tr><td class="cap">Install</td><td class="yes"><code style="font-size:11px">pip install</code></td><td class="mid">macOS desktop app</td><td class="no">Docker</td><td class="no">Docker</td><td class="no">Docker</td><td class="mid">Desktop app</td></tr>
-          <tr><td class="cap">Self-hosted</td><td class="yes">Yes</td><td class="no">No (desktop only)</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="no">No</td></tr>
-          <tr><td class="cap">No CDN/build step</td><td class="yes">Yes</td><td class="mid">N/A</td><td class="no">No (React)</td><td class="no">No (React)</td><td class="no">No (React)</td><td class="no">No (Electron)</td></tr>
-          <tr><td class="cap">Code export (Python)</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
-          <tr><td class="cap">Code export (YAML)</td><td class="yes">Yes</td><td class="no">No</td><td class="mid">JSON only</td><td class="mid">JSON only</td><td class="mid">YAML</td><td class="no">No</td></tr>
-          <tr><td class="cap">AI generation</td><td class="yes">Yes (NL to graph)</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
-          <tr><td class="cap">Live test from browser</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
-          <tr><td class="cap">Runs on GitHub Pages</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
-          <tr><td class="cap">Per-node cost preview</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
-          <tr><td class="cap">Built-in evals</td><td class="yes">50 evaluators</td><td class="mid">LangSmith (paid)</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+          <tr><td class="cap">Price</td><td class="yes"><span class="pill">Free, forever</span></td><td class="no"><span class="pill">Paid (LangSmith)</span></td><td class="mid"><span class="pill">&euro;20/mo cloud</span></td><td class="yes"><span class="pill">Free self-host</span></td><td class="yes"><span class="pill">Free self-host</span></td><td class="yes"><span class="pill">Free</span></td></tr>
+          <tr><td class="cap">Install</td><td class="yes"><span class="pill"><code style="font-size:11px">pip install</code></span></td><td class="mid"><span class="pill">macOS desktop app</span></td><td class="no"><span class="pill">Docker</span></td><td class="no"><span class="pill">Docker</span></td><td class="no"><span class="pill">Docker</span></td><td class="mid"><span class="pill">Desktop app</span></td></tr>
+          <tr><td class="cap">Self-hosted</td><td class="yes"><span class="pill">Yes</span></td><td class="no"><span class="pill">No (desktop only)</span></td><td class="yes"><span class="pill">Yes</span></td><td class="yes"><span class="pill">Yes</span></td><td class="yes"><span class="pill">Yes</span></td><td class="no"><span class="pill">No</span></td></tr>
+          <tr><td class="cap">No CDN/build step</td><td class="yes"><span class="pill">Yes</span></td><td class="mid"><span class="pill">N/A</span></td><td class="no"><span class="pill">No (React)</span></td><td class="no"><span class="pill">No (React)</span></td><td class="no"><span class="pill">No (React)</span></td><td class="no"><span class="pill">No (Electron)</span></td></tr>
+          <tr><td class="cap">Code export (Python)</td><td class="yes"><span class="pill">Yes</span></td><td class="no"><span class="pill">No</span></td><td class="no"><span class="pill">No</span></td><td class="no"><span class="pill">No</span></td><td class="no"><span class="pill">No</span></td><td class="no"><span class="pill">No</span></td></tr>
+          <tr><td class="cap">Code export (YAML)</td><td class="yes"><span class="pill">Yes</span></td><td class="no"><span class="pill">No</span></td><td class="mid"><span class="pill">JSON only</span></td><td class="mid"><span class="pill">JSON only</span></td><td class="mid"><span class="pill">YAML</span></td><td class="no"><span class="pill">No</span></td></tr>
+          <tr><td class="cap">AI generation</td><td class="yes"><span class="pill">Yes (NL to graph)</span></td><td class="no"><span class="pill">No</span></td><td class="no"><span class="pill">No</span></td><td class="no"><span class="pill">No</span></td><td class="no"><span class="pill">No</span></td><td class="no"><span class="pill">No</span></td></tr>
+          <tr><td class="cap">Live test from browser</td><td class="yes"><span class="pill">Yes</span></td><td class="yes"><span class="pill">Yes</span></td><td class="yes"><span class="pill">Yes</span></td><td class="yes"><span class="pill">Yes</span></td><td class="yes"><span class="pill">Yes</span></td><td class="yes"><span class="pill">Yes</span></td></tr>
+          <tr><td class="cap">Runs on GitHub Pages</td><td class="yes"><span class="pill">Yes</span></td><td class="no"><span class="pill">No</span></td><td class="no"><span class="pill">No</span></td><td class="no"><span class="pill">No</span></td><td class="no"><span class="pill">No</span></td><td class="no"><span class="pill">No</span></td></tr>
+          <tr><td class="cap">Per-node cost preview</td><td class="yes"><span class="pill">Yes</span></td><td class="no"><span class="pill">No</span></td><td class="no"><span class="pill">No</span></td><td class="no"><span class="pill">No</span></td><td class="no"><span class="pill">No</span></td><td class="no"><span class="pill">No</span></td></tr>
+          <tr><td class="cap">Built-in evals</td><td class="yes"><span class="pill">50 evaluators</span></td><td class="mid"><span class="pill">LangSmith (paid)</span></td><td class="no"><span class="pill">No</span></td><td class="no"><span class="pill">No</span></td><td class="no"><span class="pill">No</span></td><td class="no"><span class="pill">No</span></td></tr>
         </tbody>
       </table>
       </div>
@@ -5386,21 +5381,21 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
             <tr><th class="cap">Capability</th><th>Selectools</th><th>LangChain</th><th>CrewAI</th></tr>
           </thead>
           <tbody>
-            <tr><td class="cap">Execution traces</td><td class="yes">Built-in</td><td class="no">LangSmith (paid)</td><td class="no">Limited logging</td></tr>
-            <tr><td class="cap">Guardrails</td><td class="yes">Built-in (5 types)</td><td class="no">NeMo (separate)</td><td class="no">Not built-in</td></tr>
-            <tr><td class="cap">Agent evaluation</td><td class="yes">Built-in (50 evals)</td><td class="no">LangSmith (paid)</td><td class="no">Not built-in</td></tr>
-            <tr><td class="cap">Cost tracking</td><td class="yes">Automatic per-call</td><td class="no">Manual</td><td class="no">Not built-in</td></tr>
-            <tr><td class="cap">Injection defense</td><td class="yes">15 patterns + coherence</td><td class="no">Not included</td><td class="no">Not included</td></tr>
-            <tr><td class="cap">Visual builder</td><td class="yes">Built-in + GitHub Pages</td><td class="no">LangGraph Studio (paid)</td><td class="no">Not built-in</td></tr>
-            <tr><td class="cap">Multi-agent</td><td class="yes">AgentGraph + Supervisor</td><td class="yes">LangGraph</td><td class="yes">Core feature</td></tr>
-            <tr><td class="cap">HITL resume</td><td class="yes">Exact yield point</td><td class="mid">Restarts node</td><td class="no">Not built-in</td></tr>
-            <tr><td class="cap">Composable pipelines</td><td class="yes">@step + | + parallel</td><td class="mid">LCEL (complex)</td><td class="no">Not built-in</td></tr>
-            <tr><td class="cap">Setup</td><td class="yes">1 package</td><td class="no">5+ packages</td><td class="yes">1 package</td></tr>
-            <tr><td class="cap">Deploy CLI</td><td class="yes"><code style="font-size:11px">selectools serve</code></td><td class="no">LangServe (separate)</td><td class="no">Enterprise only</td></tr>
-            <tr><td class="cap">Enterprise signals</td><td class="yes">SBOM + audit + 95% coverage</td><td class="no">Not built-in</td><td class="no">Not built-in</td></tr>
-            <tr><td class="cap">Migration guides</td><td class="yes">4 frameworks</td><td class="no">Not available</td><td class="no">Not available</td></tr>
-            <tr><td class="cap">AI-agent docs (llms.txt)</td><td class="yes">Full index + content</td><td class="no">Not available</td><td class="no">Not available</td></tr>
-            <tr><td class="cap">Community</td><td class="mid">Growing</td><td class="yes">Massive</td><td class="yes">Large</td></tr>
+            <tr><td class="cap">Execution traces</td><td class="yes"><span class="pill">Built-in</span></td><td class="no"><span class="pill">LangSmith (paid)</span></td><td class="no"><span class="pill">Limited logging</span></td></tr>
+            <tr><td class="cap">Guardrails</td><td class="yes"><span class="pill">Built-in (5 types)</span></td><td class="no"><span class="pill">NeMo (separate)</span></td><td class="no"><span class="pill">Not built-in</span></td></tr>
+            <tr><td class="cap">Agent evaluation</td><td class="yes"><span class="pill">Built-in (50 evals)</span></td><td class="no"><span class="pill">LangSmith (paid)</span></td><td class="no"><span class="pill">Not built-in</span></td></tr>
+            <tr><td class="cap">Cost tracking</td><td class="yes"><span class="pill">Automatic per-call</span></td><td class="no"><span class="pill">Manual</span></td><td class="no"><span class="pill">Not built-in</span></td></tr>
+            <tr><td class="cap">Injection defense</td><td class="yes"><span class="pill">15 patterns + coherence</span></td><td class="no"><span class="pill">Not included</span></td><td class="no"><span class="pill">Not included</span></td></tr>
+            <tr><td class="cap">Visual builder</td><td class="yes"><span class="pill">Built-in + GitHub Pages</span></td><td class="no"><span class="pill">LangGraph Studio (paid)</span></td><td class="no"><span class="pill">Not built-in</span></td></tr>
+            <tr><td class="cap">Multi-agent</td><td class="yes"><span class="pill">AgentGraph + Supervisor</span></td><td class="yes"><span class="pill">LangGraph</span></td><td class="yes"><span class="pill">Core feature</span></td></tr>
+            <tr><td class="cap">HITL resume</td><td class="yes"><span class="pill">Exact yield point</span></td><td class="mid"><span class="pill">Restarts node</span></td><td class="no"><span class="pill">Not built-in</span></td></tr>
+            <tr><td class="cap">Composable pipelines</td><td class="yes"><span class="pill">@step + | + parallel</span></td><td class="mid"><span class="pill">LCEL (complex)</span></td><td class="no"><span class="pill">Not built-in</span></td></tr>
+            <tr><td class="cap">Setup</td><td class="yes"><span class="pill">1 package</span></td><td class="no"><span class="pill">5+ packages</span></td><td class="yes"><span class="pill">1 package</span></td></tr>
+            <tr><td class="cap">Deploy CLI</td><td class="yes"><span class="pill"><code style="font-size:11px">selectools serve</code></span></td><td class="no"><span class="pill">LangServe (separate)</span></td><td class="no"><span class="pill">Enterprise only</span></td></tr>
+            <tr><td class="cap">Enterprise signals</td><td class="yes"><span class="pill">SBOM + audit + 95% coverage</span></td><td class="no"><span class="pill">Not built-in</span></td><td class="no"><span class="pill">Not built-in</span></td></tr>
+            <tr><td class="cap">Migration guides</td><td class="yes"><span class="pill">4 frameworks</span></td><td class="no"><span class="pill">Not available</span></td><td class="no"><span class="pill">Not available</span></td></tr>
+            <tr><td class="cap">AI-agent docs (llms.txt)</td><td class="yes"><span class="pill">Full index + content</span></td><td class="no"><span class="pill">Not available</span></td><td class="no"><span class="pill">Not available</span></td></tr>
+            <tr><td class="cap">Community</td><td class="mid"><span class="pill">Growing</span></td><td class="yes"><span class="pill">Massive</span></td><td class="yes"><span class="pill">Large</span></td></tr>
           </tbody>
         </table>
         </div>
