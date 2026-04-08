@@ -299,7 +299,7 @@ a.ec1:hover{{background:rgba(59,130,246,0.2);color:#bfdbfe}}
 </head>
 <body>
 <nav><div class="w">
-  <a href="../" class="nl">selectools <span>examples</span></a>
+  <a href="../" class="nl"><span class="exec-dot"></span>&nbsp;selectools <span>examples</span></a>
   <div class="nr"><a href="../builder/">Builder</a><a href="../QUICKSTART/">Docs</a><a href="{REPO_URL}" target="_blank">GitHub</a></div>
 </div></nav>
 <div class="ph"><h1>{total} Example Scripts</h1><p>Runnable Python examples covering agents, RAG, multi-agent graphs, evals, streaming, guardrails, and more. {no_key} run without an API key.</p></div>
