@@ -171,7 +171,7 @@ class _ProviderCallerMixin:
                             summary=f"{self._effective_model} → {len(response_text)} chars",
                         )
                     )
-                return response_msg
+                return response_msg  # type: ignore[no-any-return]
             except ProviderError as exc:
                 last_error = str(exc)
                 if self.config.verbose:
@@ -418,7 +418,7 @@ class _ProviderCallerMixin:
                             summary=f"{self._effective_model} → {len(response_text)} chars",
                         )
                     )
-                return response_msg
+                return response_msg  # type: ignore[no-any-return]
             except ProviderError as exc:
                 last_error = str(exc)
                 if self.config.verbose:

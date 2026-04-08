@@ -1631,10 +1631,14 @@ class SimpleStepObserver(AgentObserver):
             messages_compressed=messages_compressed,
         )
 
-    def on_graph_start(self, run_id, graph_name, entry_node, state):
+    def on_graph_start(
+        self, run_id: str, graph_name: str, entry_node: str, state: Dict[str, Any]
+    ) -> None:
         self._cb("graph_start", run_id, graph_name=graph_name, entry_node=entry_node, state=state)
 
-    def on_graph_end(self, run_id, graph_name, steps, total_duration_ms):
+    def on_graph_end(
+        self, run_id: str, graph_name: str, steps: int, total_duration_ms: float
+    ) -> None:
         self._cb(
             "graph_end",
             run_id,
@@ -1643,37 +1647,39 @@ class SimpleStepObserver(AgentObserver):
             total_duration_ms=total_duration_ms,
         )
 
-    def on_graph_error(self, run_id, graph_name, node_name, error):
+    def on_graph_error(
+        self, run_id: str, graph_name: str, node_name: str, error: Exception
+    ) -> None:
         self._cb("graph_error", run_id, graph_name=graph_name, node_name=node_name, error=error)
 
-    def on_node_start(self, run_id, node_name, step):
+    def on_node_start(self, run_id: str, node_name: str, step: int) -> None:
         self._cb("node_start", run_id, node_name=node_name, step=step)
 
-    def on_node_end(self, run_id, node_name, step, duration_ms):
+    def on_node_end(self, run_id: str, node_name: str, step: int, duration_ms: float) -> None:
         self._cb("node_end", run_id, node_name=node_name, step=step, duration_ms=duration_ms)
 
-    def on_graph_routing(self, run_id, from_node, to_node):
+    def on_graph_routing(self, run_id: str, from_node: str, to_node: str) -> None:
         self._cb("graph_routing", run_id, from_node=from_node, to_node=to_node)
 
-    def on_graph_interrupt(self, run_id, node_name, interrupt_id):
+    def on_graph_interrupt(self, run_id: str, node_name: str, interrupt_id: str) -> None:
         self._cb("graph_interrupt", run_id, node_name=node_name, interrupt_id=interrupt_id)
 
-    def on_graph_resume(self, run_id, node_name, interrupt_id):
+    def on_graph_resume(self, run_id: str, node_name: str, interrupt_id: str) -> None:
         self._cb("graph_resume", run_id, node_name=node_name, interrupt_id=interrupt_id)
 
-    def on_parallel_start(self, run_id, group_name, child_nodes):
+    def on_parallel_start(self, run_id: str, group_name: str, child_nodes: List[str]) -> None:
         self._cb("parallel_start", run_id, group_name=group_name, child_nodes=child_nodes)
 
-    def on_parallel_end(self, run_id, group_name, child_count):
+    def on_parallel_end(self, run_id: str, group_name: str, child_count: int) -> None:
         self._cb("parallel_end", run_id, group_name=group_name, child_count=child_count)
 
-    def on_stall_detected(self, run_id, node_name, stall_count):
+    def on_stall_detected(self, run_id: str, node_name: str, stall_count: int) -> None:
         self._cb("stall_detected", run_id, node_name=node_name, stall_count=stall_count)
 
-    def on_loop_detected(self, run_id, node_name, loop_count):
+    def on_loop_detected(self, run_id: str, node_name: str, loop_count: int) -> None:
         self._cb("loop_detected", run_id, node_name=node_name, loop_count=loop_count)
 
-    def on_supervisor_replan(self, run_id, stall_count, new_plan):
+    def on_supervisor_replan(self, run_id: str, stall_count: int, new_plan: str) -> None:
         self._cb("supervisor_replan", run_id, stall_count=stall_count, new_plan=new_plan)
 
     def on_eval_start(self, suite_name: str, total_cases: int, model: str) -> None:

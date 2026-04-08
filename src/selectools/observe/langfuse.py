@@ -49,6 +49,9 @@ class LangfuseObserver(AgentObserver):
             secret_key=secret_key or os.getenv("LANGFUSE_SECRET_KEY"),
             host=host or os.getenv("LANGFUSE_HOST"),
         )
+        # One root span per agent run. In Langfuse 3.x each root span is
+        # also a trace — update_trace on the root span sets trace-level
+        # fields (name, output, metadata, tags).
         self._traces: Dict[str, Any] = {}
         self._generations: Dict[str, Any] = {}
         self._llm_counter: int = 0
@@ -61,21 +64,27 @@ class LangfuseObserver(AgentObserver):
         messages: Any,
         system_prompt: str,
     ) -> None:
-        """Create a Langfuse trace for the agent run."""
-        trace = self._langfuse.trace(
-            id=run_id,
+        """Create a Langfuse root span for the agent run.
+
+        In Langfuse 3.x the root-level ``Langfuse.trace()`` helper was
+        removed. A top-level ``start_span`` creates the trace implicitly
+        and returns a ``LangfuseSpan`` from which child spans and
+        generations can be started.
+        """
+        root = self._langfuse.start_span(
             name="agent.run",
+            input=str(messages)[:2000] if messages else "",
             metadata={"system_prompt_length": len(system_prompt) if system_prompt else 0},
         )
-        self._traces[run_id] = trace
+        self._traces[run_id] = root
 
     def on_run_end(self, run_id: str, result: Any) -> None:
-        """Update the trace with final results and flush.
+        """Update the root span + trace and flush.
 
-        Also cleans up any orphaned generations/spans (LLM/tool) that were
+        Also cleans up any orphaned child spans (LLM/tool) that were
         started but never ended due to abnormal exits.
         """
-        # Clean up orphaned child generations/spans first
+        # Clean up orphaned child spans first
         prefix = f"{run_id}:"
         orphaned_keys = [k for k in self._generations if k.startswith(prefix)]
         for key in orphaned_keys:
@@ -86,22 +95,31 @@ class LangfuseObserver(AgentObserver):
                         output="ERROR: Orphaned — run ended before span closed",
                         level="ERROR",
                     )
+                    orphan.end()
                 except Exception:
-                    logger.debug("Failed to update orphaned Langfuse span %s", key)
+                    logger.debug("Failed to close orphaned Langfuse span %s", key)
 
-        trace = self._traces.pop(run_id, None)
-        if trace is None:
+        root = self._traces.pop(run_id, None)
+        if root is None:
             return
+
+        output = getattr(result, "content", str(result))
         metadata: Dict[str, Any] = {}
         if hasattr(result, "usage") and result.usage:
             metadata["total_tokens"] = getattr(result.usage, "total_tokens", 0)
             metadata["total_cost_usd"] = getattr(result.usage, "total_cost_usd", 0.0)
         if hasattr(result, "iterations"):
             metadata["iterations"] = result.iterations
-        trace.update(
-            output=getattr(result, "content", str(result)),
-            metadata=metadata,
-        )
+
+        try:
+            # Update trace-level fields (name, output, metadata).
+            root.update_trace(output=output, metadata=metadata)
+            # Also set the root span's own output and metadata, then end it.
+            root.update(output=output, metadata=metadata)
+            root.end()
+        except Exception:
+            logger.warning("Failed to finalize Langfuse root span", exc_info=True)
+
         try:
             self._langfuse.flush()
         except Exception:
@@ -116,12 +134,17 @@ class LangfuseObserver(AgentObserver):
         model: str,
         system_prompt: str,
     ) -> None:
-        """Create a Langfuse generation for an LLM call."""
+        """Create a Langfuse generation for an LLM call.
+
+        In Langfuse 3.x, child spans / generations are started **from
+        the parent span** via ``root.start_generation(...)``. This
+        automatically attaches them to the same trace.
+        """
         self._llm_counter += 1
-        trace = self._traces.get(run_id)
-        if trace is None:
+        root = self._traces.get(run_id)
+        if root is None:
             return
-        gen = trace.generation(
+        gen = root.start_generation(
             name="llm.call",
             model=model or "unknown",
             input=str(messages)[:2000] if messages else "",
@@ -134,7 +157,7 @@ class LangfuseObserver(AgentObserver):
         content: str,
         usage: Any,
     ) -> None:
-        """Update the most recent generation for this run."""
+        """Update the most recent generation for this run, then end it."""
         prefix = f"{run_id}:llm:"
         matching = [k for k in self._generations if k.startswith(prefix)]
         if not matching:
@@ -143,14 +166,24 @@ class LangfuseObserver(AgentObserver):
         gen = self._generations.pop(key, None)
         if gen is None:
             return
+
+        # Langfuse 3.x generation update takes ``usage_details`` (new name,
+        # same shape as the 2.x ``usage`` dict) and ``cost_details``.
         update_kwargs: Dict[str, Any] = {"output": (content or "")[:2000]}
         if usage:
-            update_kwargs["usage"] = {
+            update_kwargs["usage_details"] = {
                 "input": getattr(usage, "prompt_tokens", 0) or 0,
                 "output": getattr(usage, "completion_tokens", 0) or 0,
                 "total": getattr(usage, "total_tokens", 0) or 0,
             }
-        gen.update(**update_kwargs)
+            cost_usd = getattr(usage, "cost_usd", None) or getattr(usage, "total_cost_usd", None)
+            if cost_usd:
+                update_kwargs["cost_details"] = {"total": float(cost_usd)}
+        try:
+            gen.update(**update_kwargs)
+            gen.end()
+        except Exception:
+            logger.debug("Failed to update/end Langfuse generation", exc_info=True)
 
     # ── Tool execution ────────────────────────────────────────────────
 
@@ -161,11 +194,11 @@ class LangfuseObserver(AgentObserver):
         tool_name: str,
         tool_args: Dict[str, Any],
     ) -> None:
-        """Create a Langfuse span for tool execution."""
-        trace = self._traces.get(run_id)
-        if trace is None:
+        """Create a Langfuse child span for tool execution."""
+        root = self._traces.get(run_id)
+        if root is None:
             return
-        span = trace.span(
+        span = root.start_span(
             name=f"tool.{tool_name}",
             input=str(tool_args)[:1000] if tool_args else "",
         )
@@ -179,15 +212,19 @@ class LangfuseObserver(AgentObserver):
         result: str,
         duration_ms: float,
     ) -> None:
-        """Update the tool span with results."""
+        """Update the tool span with results and end it."""
         key = f"{run_id}:tool:{call_id}"
         span = self._generations.pop(key, None)
         if span is None:
             return
-        span.update(
-            output=(result or "")[:2000],
-            metadata={"duration_ms": duration_ms},
-        )
+        try:
+            span.update(
+                output=(result or "")[:2000],
+                metadata={"duration_ms": duration_ms},
+            )
+            span.end()
+        except Exception:
+            logger.debug("Failed to update/end Langfuse tool span", exc_info=True)
 
     def on_tool_error(
         self,
@@ -198,16 +235,20 @@ class LangfuseObserver(AgentObserver):
         tool_args: Dict[str, Any],
         duration_ms: float,
     ) -> None:
-        """Record an error on the tool span."""
+        """Record an error on the tool span and end it."""
         key = f"{run_id}:tool:{call_id}"
         span = self._generations.pop(key, None)
         if span is None:
             return
-        span.update(
-            output=f"ERROR: {error}",
-            level="ERROR",
-            metadata={"duration_ms": duration_ms},
-        )
+        try:
+            span.update(
+                output=f"ERROR: {error}",
+                level="ERROR",
+                metadata={"duration_ms": duration_ms},
+            )
+            span.end()
+        except Exception:
+            logger.debug("Failed to record error on Langfuse tool span", exc_info=True)
 
     # ── Cleanup ───────────────────────────────────────────────────────
 

@@ -81,7 +81,7 @@ class GraphState:
     @property
     def last_output(self) -> str:
         """The most recent node output (alias for data[STATE_KEY_LAST_OUTPUT])."""
-        return self.data.get(STATE_KEY_LAST_OUTPUT, "")
+        return self.data.get(STATE_KEY_LAST_OUTPUT, "")  # type: ignore[no-any-return]
 
     @last_output.setter
     def last_output(self, value: str) -> None:

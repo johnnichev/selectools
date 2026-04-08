@@ -314,7 +314,7 @@ class SQLiteCheckpointStore:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.row_factory = sqlite3.Row
             self._local.conn = conn
-        return self._local.conn
+        return self._local.conn  # type: ignore[no-any-return]
 
     def _init_db(self) -> None:
         conn = self._conn()

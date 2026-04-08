@@ -150,7 +150,7 @@ class PostgresCheckpointStore:
                     f"DELETE FROM {self._table} WHERE checkpoint_id = %s",  # nosec B608
                     (checkpoint_id,),
                 )
-                return cur.rowcount > 0
+                return cur.rowcount > 0  # type: ignore[no-any-return]
 
     def close(self) -> None:
         """Close the database connection."""

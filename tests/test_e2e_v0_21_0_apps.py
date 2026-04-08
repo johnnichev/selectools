@@ -444,3 +444,120 @@ class TestApp3_KnowledgeBaseLibrarian:
         assert "VANTA-NORTH" in result.content.upper(), (
             f"Librarian did not retrieve the HTML anchor phrase. " f"Got: {result.content[:300]}"
         )
+
+
+# ===========================================================================
+# App 3b: Knowledge Base Librarian (FAISS variant)
+# ===========================================================================
+#
+# Same persona as App 3 but backed by FAISSVectorStore instead of Qdrant.
+# This means the "all four document loaders fed into a single RAG pipeline"
+# coverage is also available on machines without Docker/Qdrant — a real
+# concern for CI environments that don't run containers.
+
+
+@pytest.fixture
+def faiss_librarian_agent(tmp_path: Path):
+    """Build a real FAISS-backed librarian agent with heterogeneous sources."""
+    _openai_or_skip()  # fail fast if no creds
+    pytest.importorskip("faiss", reason="faiss-cpu not installed")
+
+    # 1. CSV source — product catalog with unique anchor phrase
+    csv_path = tmp_path / "products.csv"
+    csv_path.write_text(
+        "sku,description\n"
+        '"SKY-001","The Skylake SKY-001 is an edge router shipping with the internal codename OSPREY-88."\n'
+        '"SKY-002","The Skylake SKY-002 is a development kit."\n',
+        encoding="utf-8",
+    )
+
+    # 2. JSON source — release notes with a distinct anchor phrase
+    json_path = tmp_path / "releases.json"
+    json_path.write_text(
+        json.dumps(
+            [
+                {
+                    "version": "4.2.1",
+                    "body": (
+                        "Skylake 4.2.1 was released on the summer solstice "
+                        "and is internally referenced as the CRESCENT release."
+                    ),
+                },
+                {"version": "4.2.0", "body": "Skylake 4.2.0 was a bug-fix release."},
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    # 3. HTML source — marketing blurb with a third anchor phrase
+    html_path = tmp_path / "about.html"
+    html_path.write_text(
+        "<html><body><article>"
+        "<p>Skylake was founded in Helsinki in 2023.</p>"
+        "<p>The team operates under the office code AURORA-SOUTH.</p>"
+        "</article></body></html>",
+        encoding="utf-8",
+    )
+
+    # 4. Load via all three loaders
+    csv_docs = DocumentLoader.from_csv(str(csv_path), text_column="description")
+    json_docs = DocumentLoader.from_json(
+        str(json_path), text_field="body", metadata_fields=["version"]
+    )
+    html_docs = DocumentLoader.from_html(str(html_path))
+    all_docs = csv_docs + json_docs + html_docs
+    assert len(all_docs) >= 5  # 2 csv + 2 json + 1 html
+
+    embedder = _openai_embedder()
+
+    # 5. Real FAISS store — no external server required
+    store = FAISSVectorStore(embedder=embedder)
+    store.add_documents(all_docs)
+
+    provider, model = _openai_or_skip()
+    rag_tool = RAGTool(vector_store=store, top_k=4)
+
+    return Agent(
+        tools=[rag_tool.search_knowledge_base],
+        provider=provider,
+        config=AgentConfig(
+            model=model,
+            system_prompt=(
+                "You are the Skylake knowledge base librarian. Always use "
+                "search_knowledge_base to answer. Quote anchor phrases from "
+                "the docs verbatim when asked for them. Keep answers short."
+            ),
+            max_tokens=200,
+            max_iterations=4,
+        ),
+    )
+
+
+class TestApp3b_KnowledgeBaseLibrarianFAISS:
+    """Same shape as App 3 but backed by FAISS — runnable without Docker."""
+
+    def test_librarian_retrieves_from_csv_source(self, faiss_librarian_agent: Agent) -> None:
+        """Asks a question whose answer lives in the CSV-loaded docs."""
+        result = faiss_librarian_agent.run(
+            "What is the internal codename for the SKY-001 router? Quote it verbatim."
+        )
+        assert result.content
+        assert (
+            "OSPREY" in result.content.upper()
+        ), f"FAISS librarian did not retrieve the CSV anchor phrase. Got: {result.content[:300]}"
+
+    def test_librarian_retrieves_from_json_source(self, faiss_librarian_agent: Agent) -> None:
+        """Asks a question whose answer lives in the JSON-loaded docs."""
+        result = faiss_librarian_agent.run("What is the internal reference name for Skylake 4.2.1?")
+        assert result.content
+        assert (
+            "CRESCENT" in result.content.upper()
+        ), f"FAISS librarian did not retrieve the JSON anchor phrase. Got: {result.content[:300]}"
+
+    def test_librarian_retrieves_from_html_source(self, faiss_librarian_agent: Agent) -> None:
+        """Asks a question whose answer lives in the HTML-loaded docs."""
+        result = faiss_librarian_agent.run("What is the Skylake office code?")
+        assert result.content
+        assert (
+            "AURORA-SOUTH" in result.content.upper()
+        ), f"FAISS librarian did not retrieve the HTML anchor phrase. Got: {result.content[:300]}"

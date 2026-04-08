@@ -48,6 +48,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+> **Note on the three "latent" bugs below.** The `@tool()` method-binding
+> bug and both of the multimodal `content_parts` provider bugs were
+> **pre-existing in earlier releases but never surfaced** because no test
+> in the suite actually exercised them end-to-end: the RAG workflow tests
+> only asserted `isinstance(agent, Agent)` without ever calling
+> `agent.run()`, and the multimodal tier-2 tests only asserted
+> `result.content` was non-empty (which passed on "I cannot see images"
+> style replies). Running real-LLM simulations during v0.21.0 release
+> prep surfaced all three at once. They are all fixed in this release.
+
 #### RAG — `@tool()` on class methods (shipping blocker caught by real-call simulations)
 - `@tool()` applied to a method (`def f(self, query: str)`) produced a class-level `Tool` whose `function` was the *unbound* method. When the agent executor called `tool.function(**llm_kwargs)` Python raised `TypeError: missing 1 required positional argument: 'self'` and the LLM saw "Tool Execution Failed", giving up after a few iterations. This fundamentally broke the canonical RAG pattern documented across selectools:
   ```python

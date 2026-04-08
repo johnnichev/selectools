@@ -212,3 +212,84 @@ class TestMultimodalRealProvidersAsync:
         assert (
             "red" in result.content.lower()
         ), f"Gemini async did not see the red test image. Got: {result.content[:200]}"
+
+
+# ``image_message(url, ...)`` for HTTP URLs uses the ``image_url`` ContentPart
+# path, which the OpenAI provider handles by forwarding the URL verbatim and
+# the Anthropic / Gemini providers handle via a {"type": "url", ...} source
+# or a ``types.FileData`` part. The sync + async tests above only exercise
+# the ``image_base64`` path (file -> base64), so we need a separate class
+# that explicitly covers URL delivery. We use a GitHub-hosted PNG because:
+#   1. github.githubassets.com serves bot User-Agents without blocking
+#      (Wikipedia's CDN does NOT, which is documented in MULTIMODAL.md)
+#   2. The favicon is tiny (a few hundred bytes) so the request is cheap
+#   3. It's part of GitHub's own infrastructure, so it won't disappear
+_GITHUB_FAVICON_URL = "https://github.githubassets.com/favicons/favicon.png"
+
+
+class TestMultimodalRealProvidersImageUrl:
+    """Real URL-path coverage for image_message(url, ...).
+
+    Locks in the ``ContentPart(type="image_url", image_url=...)`` code path
+    for OpenAI (forwards URL verbatim), Anthropic (passes as URL source),
+    and Gemini (passes as ``types.FileData``). Without this class, any
+    future provider change that broke URL handling would go unnoticed by
+    the file-based multimodal tests.
+    """
+
+    @pytest.mark.skipif(
+        not os.environ.get("OPENAI_API_KEY"),
+        reason="OPENAI_API_KEY not set",
+    )
+    def test_openai_accepts_image_url(self) -> None:
+        agent = Agent(
+            tools=[_noop],
+            provider=OpenAIProvider(),
+            config=AgentConfig(model="gpt-4o-mini", max_tokens=40),
+        )
+        msg = image_message(_GITHUB_FAVICON_URL, prompt="One word: what brand is this icon?")
+        try:
+            result = agent.run([msg])
+        except Exception as exc:  # pragma: no cover — network hiccup only
+            pytest.skip(f"Network / provider unavailable: {exc}")
+        assert (
+            "github" in result.content.lower()
+        ), f"OpenAI did not fetch the image URL correctly. Got: {result.content[:200]}"
+
+    @pytest.mark.skipif(
+        not os.environ.get("ANTHROPIC_API_KEY"),
+        reason="ANTHROPIC_API_KEY not set",
+    )
+    def test_anthropic_accepts_image_url(self) -> None:
+        agent = Agent(
+            tools=[_noop],
+            provider=AnthropicProvider(),
+            config=AgentConfig(model="claude-haiku-4-5", max_tokens=40),
+        )
+        msg = image_message(_GITHUB_FAVICON_URL, prompt="One word: what brand is this icon?")
+        try:
+            result = agent.run([msg])
+        except Exception as exc:  # pragma: no cover — network hiccup only
+            pytest.skip(f"Network / provider unavailable: {exc}")
+        assert (
+            "github" in result.content.lower()
+        ), f"Anthropic did not fetch the image URL correctly. Got: {result.content[:200]}"
+
+    @pytest.mark.skipif(
+        not (os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")),
+        reason="GOOGLE_API_KEY / GEMINI_API_KEY not set",
+    )
+    def test_gemini_accepts_image_url(self) -> None:
+        agent = Agent(
+            tools=[_noop],
+            provider=GeminiProvider(),
+            config=AgentConfig(model="gemini-2.5-flash", max_tokens=40),
+        )
+        msg = image_message(_GITHUB_FAVICON_URL, prompt="One word: what brand is this icon?")
+        try:
+            result = agent.run([msg])
+        except Exception as exc:  # pragma: no cover — network hiccup only
+            pytest.skip(f"Network / provider unavailable: {exc}")
+        assert (
+            "github" in result.content.lower()
+        ), f"Gemini did not fetch the image URL correctly. Got: {result.content[:200]}"

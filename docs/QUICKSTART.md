@@ -557,7 +557,7 @@ print(f"Steps taken: {result.steps}")
 
 - **3 new vector stores**: FAISS, Qdrant, pgvector -- see [RAG Pipeline](modules/RAG.md#faiss-v0210)
 - **4 new document loaders**: `from_csv`, `from_json`, `from_html`, `from_url` -- see [RAG Pipeline](modules/RAG.md#loading-from-csv-v0210)
-- **9 new toolbox tools**: code execution, web search, GitHub, database queries -- see [Toolbox](modules/TOOLBOX.md#code-tools-2--v0210)
+- **9 new toolbox tools**: code execution, web search, GitHub, database queries -- see [Toolbox](modules/TOOLBOX.md#code-tools-2-v0210)
 - **Azure OpenAI provider**: use Azure-hosted OpenAI models -- see [Providers](modules/PROVIDERS.md#azure-openai-provider-v0210)
 - **OTel + Langfuse observers**: ship traces to OpenTelemetry or Langfuse -- see [Providers](modules/PROVIDERS.md#observability-integrations-v0210)
 - **Multimodal messages**: `ContentPart`, `image_message()`, `text_content()` -- see [Streaming](modules/STREAMING.md#multimodal-messages-v0210)

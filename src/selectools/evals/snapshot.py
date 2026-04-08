@@ -19,7 +19,7 @@ class SnapshotDiff:
 
     @property
     def is_changed(self) -> bool:
-        return self.expected != self.actual
+        return self.expected != self.actual  # type: ignore[no-any-return]
 
 
 @dataclass
@@ -120,7 +120,7 @@ class SnapshotStore:
         path = self._dir / f"{safe_name}.snapshot.json"
         if not path.exists():
             return None
-        return json.loads(path.read_text())
+        return json.loads(path.read_text())  # type: ignore[no-any-return]
 
     def compare(self, report: Any, suite_name: str = "default") -> SnapshotResult:
         """Compare current report against stored snapshot.

@@ -33,11 +33,12 @@ class TestLangfuseObserver:
                 mod.LangfuseObserver()
 
     def test_run_start_creates_trace(self):
+        """Langfuse 3.x: root span is created via client.start_span(...)."""
         obs, client = self._make_observer()
-        mock_trace = MagicMock()
-        client.trace.return_value = mock_trace
+        mock_root = MagicMock()
+        client.start_span.return_value = mock_root
         obs.on_run_start("run1", [], "system prompt")
-        client.trace.assert_called_once()
+        client.start_span.assert_called_once()
         assert "run1" in obs._traces
 
     def test_run_end_updates_and_flushes(self):
@@ -67,13 +68,14 @@ class TestLangfuseObserver:
         obs.on_run_end("run1", MagicMock())  # Should not raise
 
     def test_llm_start_creates_generation(self):
+        """Langfuse 3.x: child generation via root.start_generation(...)."""
         obs, _ = self._make_observer()
-        mock_trace = MagicMock()
+        mock_root = MagicMock()
         mock_gen = MagicMock()
-        mock_trace.generation.return_value = mock_gen
-        obs._traces["run1"] = mock_trace
+        mock_root.start_generation.return_value = mock_gen
+        obs._traces["run1"] = mock_root
         obs.on_llm_start("run1", [{"role": "user", "content": "hi"}], "gpt-4o", "prompt")
-        mock_trace.generation.assert_called_once()
+        mock_root.start_generation.assert_called_once()
         assert "run1:llm:1" in obs._generations
 
     def test_llm_start_no_trace(self):
@@ -99,11 +101,12 @@ class TestLangfuseObserver:
         mock_gen.update.assert_called_once()
 
     def test_tool_start_creates_span(self):
+        """Langfuse 3.x: child span via root.start_span(...)."""
         obs, _ = self._make_observer()
-        mock_trace = MagicMock()
+        mock_root = MagicMock()
         mock_span = MagicMock()
-        mock_trace.span.return_value = mock_span
-        obs._traces["run1"] = mock_trace
+        mock_root.start_span.return_value = mock_span
+        obs._traces["run1"] = mock_root
         obs.on_tool_start("run1", "call1", "search", {"q": "test"})
         assert "run1:tool:call1" in obs._generations
 
@@ -136,11 +139,11 @@ class TestLangfuseObserver:
     def test_multi_iteration_llm_no_overwrite(self):
         """Regression: Bug 8 — multiple LLM calls must not overwrite generations."""
         obs, _ = self._make_observer()
-        mock_trace = MagicMock()
+        mock_root = MagicMock()
         gen1 = MagicMock()
         gen2 = MagicMock()
-        mock_trace.generation.side_effect = [gen1, gen2]
-        obs._traces["run1"] = mock_trace
+        mock_root.start_generation.side_effect = [gen1, gen2]
+        obs._traces["run1"] = mock_root
 
         obs.on_llm_start("run1", [], "gpt-4o", "prompt")
         assert "run1:llm:1" in obs._generations
@@ -161,11 +164,11 @@ class TestLangfuseObserver:
     def test_concurrent_llm_generations_resolved_correctly(self):
         """Regression: Bug 8 — on_llm_end picks the highest-numbered generation."""
         obs, _ = self._make_observer()
-        mock_trace = MagicMock()
+        mock_root = MagicMock()
         gen1 = MagicMock()
         gen2 = MagicMock()
-        mock_trace.generation.side_effect = [gen1, gen2]
-        obs._traces["run1"] = mock_trace
+        mock_root.start_generation.side_effect = [gen1, gen2]
+        obs._traces["run1"] = mock_root
 
         obs.on_llm_start("run1", [], "gpt-4o", "prompt")
         obs.on_llm_start("run1", [], "gpt-4o", "prompt")

@@ -82,7 +82,7 @@ class _OpenAICompatibleBase(ABC):
         handle the case where arguments may already be a ``dict``.
         """
         try:
-            return json.loads(tc.function.arguments)
+            return json.loads(tc.function.arguments)  # type: ignore[no-any-return]
         except json.JSONDecodeError:
             return {}
 
@@ -557,7 +557,7 @@ class _OpenAICompatibleBase(ABC):
         OpenAI always supplies ``tc_delta.id``.  Ollama may not.
         Returns None when no ID is present; callers must handle None.
         """
-        return tc_delta.id  # type: ignore[return-value]  # may be None
+        return tc_delta.id  # type: ignore[return-value,no-any-return]  # may be None, id typed as Any
 
 
 __all__ = ["_OpenAICompatibleBase"]

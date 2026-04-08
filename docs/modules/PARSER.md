@@ -121,8 +121,6 @@ TOOL_CALL
 ```
 ````
 
-```
-
 #### Mixed with Text
 
 ```
@@ -202,7 +200,7 @@ def parse(self, text: str) -> ParseResult:
 
     # No tool call found
     return ParseResult(tool_call=None, raw_text=text)
-````
+```
 
 ---
 

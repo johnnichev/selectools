@@ -4993,14 +4993,14 @@ result = agent.<span class="fn">run</span>(<span class="str">"Find our refund po
       <div class="bento__cell" data-accent="cyan">
         <span class="bento__label"><span class="bento__dot"></span>Retrieval</span>
         <div class="bento__title">Hybrid RAG</div>
-        <p class="bento__desc">BM25 + vector + RRF fusion + cross-encoder reranking. 4 store backends.</p>
+        <p class="bento__desc">BM25 + vector + RRF fusion + cross-encoder reranking. 7 store backends (in-memory, SQLite, Chroma, Pinecone, FAISS, Qdrant, pgvector). CSV / JSON / HTML / URL loaders.</p>
       </div>
 
       <!-- Standard: Audit Logging -->
       <div class="bento__cell" data-accent="cyan">
         <span class="bento__label"><span class="bento__dot"></span>Compliance</span>
-        <div class="bento__title">Audit logging</div>
-        <p class="bento__desc">JSONL trail, 4 privacy levels, daily rotation. Ready for the compliance review.</p>
+        <div class="bento__title">Audit + observability</div>
+        <p class="bento__desc">JSONL audit trail with 4 privacy levels and daily rotation. Plus <code style="color:var(--purple)">OTelObserver</code> (GenAI semantic conventions) and <code style="color:var(--purple)">LangfuseObserver</code> for shipping traces to Datadog, Jaeger, Langfuse Cloud, or your OTLP backend. Ready for the compliance review.</p>
       </div>
 
       <!-- Standard: Memory -->
@@ -5014,7 +5014,7 @@ result = agent.<span class="fn">run</span>(<span class="str">"Find our refund po
       <div class="bento__cell" data-accent="amber">
         <span class="bento__label"><span class="bento__dot"></span>Toolbox</span>
         <div class="bento__title">33 built-in tools</div>
-        <p class="bento__desc">File I/O, web, code, data, datetime, GitHub, search, db. Ready to wire into any agent.</p>
+        <p class="bento__desc">File I/O, web, data, datetime, text, plus v0.21.0 additions: Python + shell execution, DuckDuckGo search, GitHub REST API, SQLite + Postgres queries. Ready to wire into any agent.</p>
       </div>
 
       <!-- Standard: Auto-Failover -->
