@@ -240,6 +240,7 @@ def build_gallery(examples: list[dict]) -> str:
             f'<span class="ex-row__chev ev">▾</span>'
             f"</div>"
             f'<div class="eb" style="display:none">'
+            f'<div class="ex-cat-prefix"><span class="ex-cat-prefix__glyph" aria-hidden="true">$</span>cat examples/{ex["file"]}</div>'
             f'<div class="eg">{cats_html}</div>'
             f'<div class="ea">'
             f'<button class="eab" onclick="cpSrc(this)">Copy</button>'
@@ -329,6 +330,8 @@ nav .w{{max-width:960px;margin:0 auto;padding:0 20px;display:flex;align-items:ce
 @media(max-width:640px){{.ex-row{{grid-template-columns:32px 1fr 20px;gap:8px 12px}}.ex-row__num{{grid-column:1;grid-row:1 / 3;align-self:start}}.ex-row__perm{{display:none}}.ex-row__file{{grid-column:2;grid-row:1}}.ex-row__chev{{grid-column:3;grid-row:1 / 3;align-self:start}}.ex-row__size{{grid-column:2;grid-row:2;display:inline;margin-right:8px;color:var(--ft)}}.ex-row__key{{grid-column:2;grid-row:2;display:inline;margin-right:8px}}.ex-row__desc{{grid-column:2;grid-row:2;display:inline;color:var(--dm)}}}}
 @media(prefers-reduced-motion:reduce){{.ex-row--enter{{animation:none}}.ex-row__chev{{transition-duration:0.01s}}}}
 .eb{{padding:0 18px 18px}}.eg{{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}}
+.ex-cat-prefix{{font-family:var(--mono);font-size:11px;color:var(--ft);padding:0 0 10px;user-select:text}}
+.ex-cat-prefix__glyph{{color:var(--gn);margin-right:6px}}
 .ec1{{font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(59,130,246,0.1);color:#93c5fd;text-decoration:none;transition:background .12s}}
 a.ec1:hover{{background:rgba(59,130,246,0.2);color:#bfdbfe}}
 .ea{{display:flex;gap:8px;margin-bottom:12px}}
