@@ -5,6 +5,54 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.0] - 2026-04-08
+
+### Added
+
+#### Vector Stores
+- **`FAISSVectorStore`** (`selectools.rag.stores.FAISSVectorStore`): in-process vector index using Facebook AI Similarity Search. Supports cosine, L2, and inner-product metrics; persistence via `save()`/`load()`; thread-safe writes. Optional dep: `faiss-cpu>=1.7.0`.
+- **`QdrantVectorStore`** (`selectools.rag.stores.QdrantVectorStore`): connector for Qdrant. REST + gRPC support, auto-creates collections, payload filtering, cosine by default. Optional dep: `qdrant-client>=1.7.0`.
+- **`PgVectorStore`** (`selectools.rag.stores.PgVectorStore`): PostgreSQL vector store using the `pgvector` extension. JSONB metadata, parameterized queries, auto-`CREATE TABLE`. Uses existing `[postgres]` extras (`psycopg2-binary`).
+
+#### Document Loaders
+- `DocumentLoader.from_csv(path, text_column=..., metadata_columns=..., delimiter=...)` — one document per row, stdlib `csv.DictReader`.
+- `DocumentLoader.from_json(path, text_field=..., metadata_fields=..., jq_filter=...)` — single objects or arrays, with simple dot-path filtering.
+- `DocumentLoader.from_html(path, selector=..., strip_tags=...)` — optional `beautifulsoup4` for CSS selectors, regex fallback otherwise.
+- `DocumentLoader.from_url(url, selector=..., headers=..., timeout=...)` — fetches via stdlib `urllib.request` and delegates to `from_html`.
+
+#### Toolbox
+- **Code execution** (`selectools.toolbox.code_tools`): `execute_python(code, timeout)` and `execute_shell(command, timeout)`. Subprocess-isolated, 10 KB output truncation, shell metacharacter blocklist for SSRF/injection mitigation.
+- **Web search** (`selectools.toolbox.search_tools`): `web_search(query, num_results)` via DuckDuckGo HTML (no API key) and `scrape_url(url, selector)` with SSRF guards.
+- **GitHub** (`selectools.toolbox.github_tools`): `github_search_repos`, `github_get_file`, `github_list_issues` against GitHub REST API v3. Uses `GITHUB_TOKEN` env var when present (5000 req/hr vs 60).
+- **Database** (`selectools.toolbox.db_tools`): `query_sqlite` with `PRAGMA query_only = ON`, `query_postgres` via psycopg2. Read-only enforcement at the validator level.
+
+#### Multimodal Messages
+- `ContentPart` dataclass for multipart messages (`text`, `image_url`, `image_base64`, `audio`).
+- `Message.content` now accepts `str | list[ContentPart]`. Existing `content: str` paths unchanged (backward compatible).
+- `image_message(image, prompt)` and `text_content(message)` helpers exported from package root.
+- All four providers (OpenAI, Anthropic, Gemini, Ollama) format multimodal content into their native shape.
+
+#### Observability
+- **`OTelObserver`** (`selectools.observe.OTelObserver`): maps the 45 selectools observer events to OpenTelemetry spans following the GenAI semantic conventions. Async variant `AsyncOTelObserver` for `arun()`/`astream()`. Optional dep: `opentelemetry-api>=1.20.0`.
+- **`LangfuseObserver`** (`selectools.observe.LangfuseObserver`): sends traces, generations, and spans to Langfuse Cloud or self-hosted instances. Reads `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`/`LANGFUSE_HOST` env vars. Optional dep: `langfuse>=2.0.0`.
+
+#### Providers
+- **`AzureOpenAIProvider`** (`selectools.AzureOpenAIProvider`): wraps the OpenAI SDK's `AzureOpenAI` client. Supports `AZURE_OPENAI_ENDPOINT`/`AZURE_OPENAI_API_KEY` env vars, AAD token auth, and Azure deployment-name to model-id mapping. Inherits all behavior from `OpenAIProvider`.
+
+#### Optional Dependencies
+- New `[observe]` extras group: `opentelemetry-api>=1.20.0`, `langfuse>=2.0.0`.
+- `[rag]` extras now also include: `qdrant-client>=1.7.0`, `faiss-cpu>=1.7.0`, `beautifulsoup4>=4.12.0`.
+
+### Changed
+- `stability.beta()` and `stability.stable()` decorators now accept arbitrary objects via an `Any` overload, in addition to classes and callables. Lets `@beta` mark `Tool` instances produced by `@tool()`.
+
+### Stats
+- **4,960 tests** (188 new across 7 spec subsystems)
+- **88 examples** (12 new: `77_faiss_vector_store.py` through `88_langfuse_observer.py`)
+- **5 providers** (added Azure OpenAI)
+- **7 vector stores** (added FAISS, Qdrant, pgvector)
+- **152 models**
+
 ## [0.20.1] - 2026-04-03
 
 ### Added

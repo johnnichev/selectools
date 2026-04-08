@@ -1,6 +1,6 @@
 # Selectools
 
-> Selectools is a production-ready Python library for building AI agents with tool calling, RAG, and multi-agent orchestration. One pip install. No DSL. Supports OpenAI, Anthropic, Gemini, Ollama. v0.20.1, 4612 tests at 95% coverage, Apache-2.0.
+> Selectools is a production-ready Python library for building AI agents with tool calling, RAG, and multi-agent orchestration. One pip install. No DSL. Supports OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama. v0.21.0, 4960 tests at 95% coverage, Apache-2.0.
 
 Selectools uses a single `Agent` class with native tool calling. No chains, no expression language, no complex abstractions. It includes built-in features that other frameworks charge for or split into separate packages: 50 evaluators, hybrid RAG search (BM25 + vector), guardrails, audit logging, multi-agent orchestration, and a visual drag-drop builder. Free, local, MIT-compatible.
 
@@ -76,9 +76,13 @@ result = agent.run("Find our refund policy")
 - [Reasoning Strategies](https://selectools.dev/modules/REASONING_STRATEGIES/): ReAct, CoT, Plan-Then-Act
 - [Builder Docs](https://selectools.dev/modules/builder/): Visual builder reference
 - [Templates](https://selectools.dev/modules/TEMPLATES/): YAML agent configuration
-- [OTel Observer](https://selectools.dev/modules/PROVIDERS/#observability-integrations-v0210): OpenTelemetry agent trace export
-- [Langfuse Observer](https://selectools.dev/modules/PROVIDERS/#langfuseobserver): Langfuse agent trace export
-- [Multimodal Messages](https://selectools.dev/modules/STREAMING/#multimodal-messages-v0210): ContentPart, image_message(), text_content()
+- [FAISS](https://selectools.dev/modules/FAISS/): In-process FAISS vector index with disk persistence (v0.21.0)
+- [Qdrant](https://selectools.dev/modules/QDRANT/): Qdrant vector database connector with REST + gRPC (v0.21.0)
+- [pgvector](https://selectools.dev/modules/PGVECTOR/): PostgreSQL-backed vector store using the pgvector extension (v0.21.0)
+- [Azure OpenAI](https://selectools.dev/modules/AZURE_OPENAI/): Azure OpenAI Service provider with AAD auth and deployment routing (v0.21.0)
+- [OpenTelemetry](https://selectools.dev/modules/OTEL/): GenAI semantic-convention spans for agent runs, LLM calls, tool executions (v0.21.0)
+- [Langfuse](https://selectools.dev/modules/LANGFUSE/): Send traces, generations, and spans to Langfuse Cloud or self-hosted (v0.21.0)
+- [Multimodal Messages](https://selectools.dev/modules/MULTIMODAL/): ContentPart, image_message(), text_content() (v0.21.0)
 - [Stability Markers](https://selectools.dev/modules/STABILITY/): @stable, @beta, @deprecated
 - [Changelog](https://selectools.dev/CHANGELOG/): Release history
 - [Examples Gallery](https://selectools.dev/examples/): 88 runnable scripts with categories

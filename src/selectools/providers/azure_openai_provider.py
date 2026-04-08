@@ -114,7 +114,11 @@ class AzureOpenAIProvider(OpenAIProvider):
         #   _client, _async_client, default_model, api_key
         self._client = AzureOpenAI(**client_kwargs)
         self._async_client = AsyncAzureOpenAI(**client_kwargs)
-        self.default_model = azure_deployment or os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+        self.default_model = (
+            azure_deployment
+            if azure_deployment is not None
+            else os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+        )
         self.api_key = resolved_key
 
     # -- template method overrides -------------------------------------------

@@ -30,6 +30,41 @@ result = AgentGraph.chain(planner, writer, reviewer).run("Write a blog post")
 # selectools serve agent.yaml
 ```
 
+## What's New in v0.21
+
+### v0.21.0 — Connector Expansion
+
+Seven new subsystems land at once: three vector stores, four document loaders, eight new toolbox tools, multimodal messages, an Azure OpenAI provider, and two observability backends.
+
+```python
+# New vector stores
+from selectools.rag.stores import FAISSVectorStore, QdrantVectorStore, PgVectorStore
+
+# New provider
+from selectools import AzureOpenAIProvider
+
+# New observers
+from selectools.observe import OTelObserver, LangfuseObserver
+
+# Multimodal messages
+from selectools import image_message
+agent.run([image_message("./screenshot.png", "What does this UI show?")])
+```
+
+- **Vector stores**: `FAISSVectorStore` (in-process, persistable), `QdrantVectorStore` (REST + gRPC), `PgVectorStore` (PostgreSQL pgvector extension)
+- **Document loaders**: `DocumentLoader.from_csv`, `from_json`, `from_html`, `from_url`
+- **Toolbox**: `execute_python`, `execute_shell`, `web_search`, `scrape_url`, `github_search_repos`, `github_get_file`, `github_list_issues`, `query_sqlite`, `query_postgres`
+- **Multimodal**: `Message.content` accepts `list[ContentPart]`; image input works on OpenAI, Anthropic, Gemini, and Ollama vision models
+- **Azure OpenAI**: deployment-name routing, AAD token auth, env-var fallback (`AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`)
+- **OpenTelemetry**: `OTelObserver` emits GenAI semantic-convention spans (Jaeger, Tempo, Datadog, Honeycomb, Grafana)
+- **Langfuse**: `LangfuseObserver` ships traces, generations, and spans to Langfuse Cloud or self-hosted
+
+```bash
+pip install "selectools[rag]"      # FAISS + Qdrant + beautifulsoup4 (HTML CSS selectors)
+pip install "selectools[observe]"  # OpenTelemetry + Langfuse
+pip install "selectools[postgres]" # pgvector (uses psycopg2-binary)
+```
+
 ## What's New in v0.20
 
 ### v0.20.1 — Visual Agent Builder + GitHub Pages
@@ -95,7 +130,7 @@ Path("trace.html").write_text(trace_to_html(result.trace))
 - **Trace HTML viewer** — `trace_to_html(trace)` renders a standalone waterfall timeline
 - **Deprecation policy** — 2-minor-version window, programmatic introspection via `.__stability__`
 - **Security audit** — all 41 `# nosec` annotations reviewed and published in `docs/SECURITY.md`
-- **Quality infrastructure** — property-based tests (Hypothesis), thread-safety smoke suite, 5 new production simulations (4612 tests total)
+- **Quality infrastructure** — property-based tests (Hypothesis), thread-safety smoke suite, 5 new production simulations (4960 tests total)
 
 ### v0.19.1 — Advanced Agent Patterns
 
@@ -451,7 +486,7 @@ report.to_html("report.html")
 - **76 Examples**: Multi-agent graphs, RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, eval framework, advanced agent patterns, stability markers, HTML trace viewer, and more
 - **Built-in Eval Framework**: 50 evaluators (30 deterministic + 21 LLM-as-judge), A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing
 - **AgentObserver Protocol**: 45 lifecycle events with `run_id` correlation, `LoggingObserver`, `SimpleStepObserver`, OTel export
-- **4612 Tests**: Unit, integration, regression, and E2E with real API calls
+- **4960 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 
@@ -791,6 +826,7 @@ See [docs/modules/STREAMING.md](docs/modules/STREAMING.md) for full documentatio
 | Provider | Streaming | Vision | Native Tools | Cost |
 |---|---|---|---|---|
 | **OpenAI** | Yes | Yes | Yes | Paid |
+| **Azure OpenAI** | Yes | Yes | Yes | Paid (Azure billing) |
 | **Anthropic** | Yes | Yes | Yes | Paid |
 | **Gemini** | Yes | Yes | Yes | Free tier |
 | **Ollama** | Yes | No | No | Free (local) |
@@ -821,11 +857,18 @@ from selectools.embeddings import (
 
 ```python
 from selectools.rag import VectorStore
+from selectools.rag.stores import FAISSVectorStore, QdrantVectorStore, PgVectorStore
 
+# Built-in / factory-style
 store = VectorStore.create("memory", embedder=embedder)           # Fast, no persistence
 store = VectorStore.create("sqlite", embedder=embedder, db_path="docs.db")  # Persistent
 store = VectorStore.create("chroma", embedder=embedder, persist_directory="./chroma")
 store = VectorStore.create("pinecone", embedder=embedder, index_name="my-index")
+
+# v0.21.0 — direct imports
+store = FAISSVectorStore(embedder=embedder)                       # In-process, save/load to disk
+store = QdrantVectorStore(embedder=embedder, url="http://localhost:6333")  # REST + gRPC
+store = PgVectorStore(embedder=embedder, connection_string="postgresql://...")
 ```
 
 ## Agent Configuration
@@ -1065,7 +1108,7 @@ pytest tests/ -x -q          # All tests
 pytest tests/ -k "not e2e"   # Skip E2E (no API keys needed)
 ```
 
-4612 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, orchestration, pipelines, agent patterns, stability markers, trace viewer, and E2E integration with real API calls.
+4960 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, orchestration, pipelines, agent patterns, stability markers, trace viewer, and E2E integration with real API calls.
 
 ## License
 
