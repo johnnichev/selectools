@@ -1,6 +1,6 @@
 # Selectools
 
-> Selectools is a production-ready Python library for building AI agents with tool calling, RAG, and multi-agent orchestration. One pip install. No DSL. Supports OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama. v0.21.0, 4960 tests at 95% coverage, Apache-2.0.
+> Selectools is a production-ready Python library for building AI agents with tool calling, RAG, and multi-agent orchestration. One pip install. No DSL. Supports OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama. v0.21.0, 5203 tests at 95% coverage, Apache-2.0.
 
 Selectools uses a single `Agent` class with native tool calling. No chains, no expression language, no complex abstractions. It includes built-in features that other frameworks charge for or split into separate packages: 50 evaluators, hybrid RAG search (BM25 + vector), guardrails, audit logging, multi-agent orchestration, and a visual drag-drop builder. Free, local, MIT-compatible.
 

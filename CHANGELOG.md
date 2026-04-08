@@ -46,8 +46,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `stability.beta()` and `stability.stable()` decorators now accept arbitrary objects via an `Any` overload, in addition to classes and callables. Lets `@beta` mark `Tool` instances produced by `@tool()`.
 
+### Fixed
+
+#### RAG — `@tool()` on class methods (shipping blocker caught by real-call simulations)
+- `@tool()` applied to a method (`def f(self, query: str)`) produced a class-level `Tool` whose `function` was the *unbound* method. When the agent executor called `tool.function(**llm_kwargs)` Python raised `TypeError: missing 1 required positional argument: 'self'` and the LLM saw "Tool Execution Failed", giving up after a few iterations. This fundamentally broke the canonical RAG pattern documented across selectools:
+  ```python
+  rag_tool = RAGTool(vector_store=store)
+  agent = Agent(tools=[rag_tool.search_knowledge_base], provider=...)
+  ```
+  `RAGTool`, `SemanticSearchTool`, and `HybridSearchTool` were all affected. The existing `tests/rag/test_rag_workflow.py` coverage never caught it because those tests built the agent and then only asserted `isinstance(agent, Agent)` — they never called `agent.run()`.
+- **Fix:** new `_BoundMethodTool` descriptor in `selectools/tools/decorators.py`. `@tool()` detects when the first parameter is `self` and returns a descriptor that binds per-instance on attribute access via `functools.partial(original_fn, instance)`. Class-level access falls through to a template `Tool` so introspection (`MyClass.method.name`, `.description`, `.parameters`) still works.
+
+#### Qdrant — migrated to `query_points()` API
+- `QdrantVectorStore.search()` called `self.client.search(query_vector=…)`, which was removed from `qdrant-client >=1.13`. Users on any recent `qdrant-client` would have hit `AttributeError: 'QdrantClient' object has no attribute 'search'` on their first query. The existing mock-based unit tests didn't catch it because they mocked `QdrantClient` and accepted whatever attribute the test asked for.
+- **Fix:** migrated to `client.query_points(query=…)` and unwrap `response.points`. Also: return `[]` on 404 when the collection has been dropped by `clear()`, to match `FAISSVectorStore` semantics (search-after-clear returns `[]`, doesn't raise).
+
+#### Multimodal — Gemini and Anthropic providers silently dropped images
+- `GeminiProvider._format_messages` only handled the legacy `message.image_base64` attribute. The new `image_message()` helper puts the image in `message.content_parts` and explicitly sets `message.image_base64 = None`, so Gemini received only the text prompt and replied "I cannot see images." Every Gemini vision user would have hit this.
+- `AnthropicProvider` had the exact same bug — Claude replied "I don't see any image attached." Every Claude vision user would have hit this.
+- OpenAI was unaffected because `providers/_openai_compat.py` already iterates `content_parts`.
+- **Fix:** both providers now iterate `message.content_parts` and convert each `ContentPart` to the provider's native image shape (`types.Part(inline_data=…)` for Gemini, `{type: image, source: {type: base64, …}}` for Anthropic), with the legacy path preserved as a fallback for pre-0.21.0 callers.
+
+#### Internal
+- Pre-existing mypy error in `providers/azure_openai_provider.py:117` where `str | None` from `os.getenv` wasn't narrowed correctly — fixed with an explicit `is not None` check.
+
+### Tests
+- **+345 new tests** across 13 new e2e test files (`tests/test_e2e_*.py`, `tests/rag/test_e2e_*.py`, `tests/tools/test_e2e_*.py`, `tests/providers/test_e2e_azure_openai.py`) and full-release simulations:
+  - **Tier 1** — real backends with no external services (28 tests): real `faiss-cpu` C++ bindings, real `subprocess.run` for code tools, real `sqlite3` for db tools, real local files + HTTP for document loaders, real `opentelemetry-sdk` with `InMemorySpanExporter` for OTel.
+  - **Tier 2** — real API calls using credentials in `.env` (8 tests): real OpenAI `gpt-4o-mini` + Anthropic `claude-haiku-4-5` + Gemini `gemini-2.5-flash` multimodal with an in-memory 4x4 PNG; real DuckDuckGo search; real GitHub REST API (unauthenticated).
+  - **Tier 3** — skip-cleanly when external services or credentials are missing (7 tests): Qdrant, pgvector, Azure OpenAI, Langfuse.
+  - **Integration simulations** (4 tests in `test_e2e_v0_21_0_simulations.py`): FAISS RAG + real OpenAI agent + OTel; Gemini multimodal + `execute_python` tool; Anthropic `query_sqlite` + `execute_python` chaining; Qdrant RAG + real OpenAI agent.
+  - **App-shaped simulations** (7 tests in `test_e2e_v0_21_0_apps.py`): "Skylake" documentation Q&A bot with real CSV → FAISS → OpenAI agent + ConversationMemory multi-turn; sales data analyst bot with real SQLite + Claude chaining query + Python compute; knowledge base librarian that ingests from `from_csv` + `from_json` + `from_html` into real Qdrant and answers anchor-phrase questions with Gemini.
+
 ### Stats
-- **4,960 tests** (188 new across 7 spec subsystems)
+- **5,203 tests** — up from 4,612 in v0.20.1
 - **88 examples** (12 new: `77_faiss_vector_store.py` through `88_langfuse_observer.py`)
 - **5 providers** (added Azure OpenAI)
 - **7 vector stores** (added FAISS, Qdrant, pgvector)

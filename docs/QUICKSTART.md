@@ -192,6 +192,14 @@ result = agent.ask("How long does shipping take for premium members?")
 print(result.content)
 ```
 
+!!! tip "Other loaders and stores (v0.21.0)"
+    - Load documents directly from **CSV**, **JSON**, **HTML**, or a **URL**:
+      `DocumentLoader.from_csv(...)`, `from_json(...)`, `from_html(...)`, `from_url(...)`
+    - Swap the in-memory store for a production-grade backend without changing the rest of your code:
+      `FAISSVectorStore` ([docs](modules/FAISS.md)) for in-process search with disk persistence,
+      `QdrantVectorStore` ([docs](modules/QDRANT.md)) for a self-hosted or Qdrant Cloud server,
+      `PgVectorStore` ([docs](modules/PGVECTOR.md)) when you already run PostgreSQL.
+
 ## Step 6: Get Structured Output
 
 Get typed, validated results from the LLM:

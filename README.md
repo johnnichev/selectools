@@ -130,7 +130,7 @@ Path("trace.html").write_text(trace_to_html(result.trace))
 - **Trace HTML viewer** — `trace_to_html(trace)` renders a standalone waterfall timeline
 - **Deprecation policy** — 2-minor-version window, programmatic introspection via `.__stability__`
 - **Security audit** — all 41 `# nosec` annotations reviewed and published in `docs/SECURITY.md`
-- **Quality infrastructure** — property-based tests (Hypothesis), thread-safety smoke suite, 5 new production simulations (4960 tests total)
+- **Quality infrastructure** — property-based tests (Hypothesis), thread-safety smoke suite, 5 new production simulations (4612 tests total)
 
 ### v0.19.1 — Advanced Agent Patterns
 
@@ -457,14 +457,14 @@ report.to_html("report.html")
 
 ## What's Included
 
-- **5 LLM Providers**: OpenAI, Anthropic, Gemini, Ollama + FallbackProvider (auto-failover)
+- **5 LLM Providers**: OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama + FallbackProvider (auto-failover)
 - **Structured Output**: Pydantic / JSON Schema `response_format` with auto-retry
 - **Execution Traces**: `result.trace` with typed timeline of every agent step
 - **Reasoning Visibility**: `result.reasoning` explains *why* the agent chose a tool
 - **Batch Processing**: `agent.batch()` / `agent.abatch()` for concurrent classification
 - **Tool Policy Engine**: Declarative allow/review/deny rules with human-in-the-loop
 - **4 Embedding Providers**: OpenAI, Anthropic/Voyage, Gemini (free!), Cohere
-- **4 Vector Stores**: In-memory, SQLite, Chroma, Pinecone
+- **7 Vector Stores**: In-memory, SQLite, Chroma, Pinecone, FAISS, Qdrant, pgvector
 - **Hybrid Search**: BM25 + vector fusion with Cohere/Jina reranking
 - **Advanced Chunking**: Semantic + contextual chunking for better retrieval
 - **Dynamic Tool Loading**: Plugin system with hot-reload support
@@ -486,16 +486,18 @@ report.to_html("report.html")
 - **76 Examples**: Multi-agent graphs, RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, eval framework, advanced agent patterns, stability markers, HTML trace viewer, and more
 - **Built-in Eval Framework**: 50 evaluators (30 deterministic + 21 LLM-as-judge), A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing
 - **AgentObserver Protocol**: 45 lifecycle events with `run_id` correlation, `LoggingObserver`, `SimpleStepObserver`, OTel export
-- **4960 Tests**: Unit, integration, regression, and E2E with real API calls
+- **5203 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 
 ```bash
 pip install selectools                    # Core + basic RAG
-pip install selectools[rag]               # + Chroma, Pinecone, Voyage, Cohere, PyPDF
+pip install selectools[rag]               # + Chroma, Pinecone, FAISS, Qdrant, Voyage, Cohere, PyPDF, BeautifulSoup
+pip install selectools[observe]           # + OpenTelemetry, Langfuse observers
+pip install selectools[postgres]          # + psycopg2 (enables pgvector)
 pip install selectools[cache]             # + Redis cache
 pip install selectools[mcp]               # + MCP client/server
-pip install selectools[rag,cache,mcp]    # Everything
+pip install "selectools[rag,observe,cache,mcp]"  # Everything
 ```
 
 Add your provider's API key to a `.env` file in your project root:
@@ -1108,7 +1110,7 @@ pytest tests/ -x -q          # All tests
 pytest tests/ -k "not e2e"   # Skip E2E (no API keys needed)
 ```
 
-4960 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, orchestration, pipelines, agent patterns, stability markers, trace viewer, and E2E integration with real API calls.
+5203 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, orchestration, pipelines, agent patterns, stability markers, trace viewer, and E2E integration with real API calls.
 
 ## License
 

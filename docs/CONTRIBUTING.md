@@ -2,9 +2,9 @@
 
 Thank you for your interest in contributing to Selectools! We welcome contributions from the community.
 
-**Current Version:** v0.19.2
-**Test Status:** 4612 tests passing (100%)
-**Python:** 3.9+
+**Current Version:** v0.21.0
+**Test Status:** 5203 tests passing (95% coverage)
+**Python:** 3.9 – 3.13
 
 ## Getting Started
 
@@ -74,7 +74,7 @@ Similar to `npm run` scripts, here are the common commands for this project:
 ### Testing
 
 ```bash
-# Run all tests (4612 tests)
+# Run all tests (5203 tests)
 pytest tests/ -v
 
 # Run tests quietly (summary only)
@@ -146,13 +146,13 @@ python scripts/test_memory_with_openai.py
 
 ```bash
 # Release a new version (recommended)
-python scripts/release.py --version 0.5.1
+python scripts/release.py --version 0.20.2
 
 # Dry run (see what would happen)
-python scripts/release.py --version 0.5.1 --dry-run
+python scripts/release.py --version 0.20.2 --dry-run
 
 # Or use the bash script
-./scripts/release.sh 0.5.1
+./scripts/release.sh 0.20.2
 ```
 
 See `scripts/README.md` for detailed release instructions.
@@ -263,14 +263,14 @@ selectools/
 │   │   └── stubs.py            # LocalProvider / test stubs
 │   ├── embeddings/             # Embedding providers
 │   ├── rag/                    # RAG: vector stores, chunking, loaders
-│   └── toolbox/                # 24 pre-built tools
-├── tests/                      # Test suite (4612 tests)
+│   └── toolbox/                # 33 pre-built tools
+├── tests/                      # Test suite (5203 tests, 95% coverage)
 │   ├── agent/                  # Agent tests
 │   ├── rag/                    # RAG tests
 │   ├── tools/                  # Tool tests
 │   ├── core/                   # Core framework tests
 │   └── integration/            # E2E tests (require API keys)
-├── examples/                   # 61 numbered examples (01–61)
+├── examples/                   # 88 numbered examples
 ├── docs/                       # Detailed documentation
 │   ├── QUICKSTART.md           # 5-minute getting started
 │   ├── ARCHITECTURE.md         # Architecture overview
@@ -317,7 +317,8 @@ git checkout -b fix/your-bug-fix
 3. **Test your changes**
 
 ```bash
-python tests/test_framework.py
+pytest tests/ -x -q                  # All tests
+pytest tests/ -k "not e2e" -x -q     # Skip E2E (no API keys needed)
 ```
 
 4. **Commit with clear messages**
@@ -370,7 +371,7 @@ We especially welcome contributions in these areas:
 - Add comparison guides (vs LangChain, LlamaIndex)
 
 ### 🧪 **Testing**
-- Increase test coverage (currently 4612 tests passing!)
+- Increase test coverage (currently 5203 tests passing!)
 - Add performance benchmarks
 - Improve E2E test stability with retry/rate-limit handling
 
@@ -436,10 +437,11 @@ class YourProvider(Provider):
 2. **Add tests**
 
 ```python
-# tests/test_framework.py
+# tests/providers/test_your_provider.py
 
-def test_your_provider():
-    # Add test cases
+def test_your_provider_complete():
+    provider = YourProvider(api_key="fake-key")
+    # Add test cases — see existing tests/providers/ for patterns
     pass
 ```
 
@@ -450,38 +452,58 @@ def test_your_provider():
 
 ## Adding a New Tool
 
-To contribute a new pre-built tool:
+To contribute a new pre-built tool to `src/selectools/toolbox/`:
 
-1. **Create the tool**
+1. **Create the tool** with the `@tool` decorator
 
 ```python
-# src/selectools/tools/your_tool.py
+# src/selectools/toolbox/your_tools.py
 
-from ..tools import Tool, ToolParameter
+from selectools import tool
 
-def your_tool_implementation(param1: str, param2: int = 10) -> str:
-    """Implementation of your tool."""
-    # Your logic here
-    return result
 
-def create_your_tool() -> Tool:
-    """Factory function to create the tool."""
-    return Tool(
-        name="your_tool",
-        description="Clear description of what the tool does",
-        parameters=[
-            ToolParameter(name="param1", param_type=str, description="Description", required=True),
-            ToolParameter(name="param2", param_type=int, description="Description", required=False),
-        ],
-        function=your_tool_implementation,
-    )
+@tool()
+def your_tool(param1: str, param2: int = 10) -> str:
+    """One-line description of what the tool does.
+
+    Longer multi-line docstring becomes the tool's description in the
+    LLM-facing schema. Be specific about what the tool does and when
+    to use it.
+
+    Args:
+        param1: What this parameter is for.
+        param2: Optional. What this parameter is for. Default 10.
+
+    Returns:
+        Description of the return value.
+    """
+    # Your implementation here
+    return f"Result: {param1} with {param2}"
 ```
 
-2. **Add tests and examples**
+The `@tool()` decorator (note the parentheses — they're required) introspects
+the function signature and docstring to build the JSON schema automatically.
+No manual `Tool` / `ToolParameter` construction needed.
 
-3. **Update documentation**
+2. **Use the tool with an Agent**
 
-## Adding RAG Features (New in v0.8.0!)
+```python
+from selectools import Agent
+from selectools.toolbox.your_tools import your_tool
+
+agent = Agent(tools=[your_tool], provider=OpenAIProvider())
+result = agent.run("Use your_tool with param1='hello'")
+```
+
+3. **Add tests** in `tests/toolbox/test_your_tools.py`
+
+4. **Add an example** in `examples/NN_your_feature.py` (zero-padded number)
+
+5. **Update documentation**:
+   - Add the tool to `docs/modules/TOOLBOX.md`
+   - Bump the tool count in `docs/llms.txt`, `landing/index.html`, and `CONTRIBUTING.md`
+
+## Adding RAG Features
 
 ### Adding a New Vector Store
 
