@@ -21,9 +21,6 @@ import pytest
 pytest.importorskip("opentelemetry", reason="opentelemetry-api not installed")
 pytest.importorskip("opentelemetry.sdk", reason="opentelemetry-sdk not installed")
 
-from opentelemetry import trace  # noqa: E402
-from opentelemetry.sdk.trace import TracerProvider  # noqa: E402
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor  # noqa: E402
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (  # noqa: E402
     InMemorySpanExporter,
 )
@@ -34,21 +31,11 @@ from tests.conftest import SharedFakeProvider  # noqa: E402
 
 pytestmark = pytest.mark.e2e
 
-
-# OpenTelemetry only allows ONE global TracerProvider per process. Set it up
-# exactly once at module import time, reuse the same exporter across tests,
-# and clear its span buffer in the fixture so tests stay isolated.
-_EXPORTER = InMemorySpanExporter()
-_PROVIDER = TracerProvider()
-_PROVIDER.add_span_processor(SimpleSpanProcessor(_EXPORTER))
-trace.set_tracer_provider(_PROVIDER)
-
-
-@pytest.fixture
-def otel_exporter() -> InMemorySpanExporter:
-    """Return the shared in-memory exporter, cleared for this test."""
-    _EXPORTER.clear()
-    return _EXPORTER
+# The ``otel_exporter`` fixture comes from tests/conftest.py and installs a
+# single process-wide TracerProvider + InMemorySpanExporter. Do NOT add a
+# local fixture with the same name here — that breaks test isolation when
+# another e2e file also wants OTel span capture (only the first file to
+# call ``trace.set_tracer_provider`` wins, so the others see empty spans).
 
 
 @tool()

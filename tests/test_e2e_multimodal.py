@@ -99,6 +99,12 @@ class TestMultimodalRealProviders:
         )
         result = agent.run([msg])
         assert result.content, "Empty response from OpenAI"
+        # Critical assertion: prove the image actually reached the model
+        # (without this the provider could silently drop the image and
+        # the test would still pass on "I can't see an image" style replies)
+        assert (
+            "red" in result.content.lower()
+        ), f"OpenAI did not see the red test image. Got: {result.content[:200]}"
         assert result.usage.total_tokens > 0
 
     @pytest.mark.skipif(
@@ -118,6 +124,9 @@ class TestMultimodalRealProviders:
         )
         result = agent.run([msg])
         assert result.content, "Empty response from Anthropic"
+        assert (
+            "red" in result.content.lower()
+        ), f"Anthropic did not see the red test image. Got: {result.content[:200]}"
         assert result.usage.total_tokens > 0
 
     @pytest.mark.skipif(
@@ -137,4 +146,7 @@ class TestMultimodalRealProviders:
         )
         result = agent.run([msg])
         assert result.content, "Empty response from Gemini"
+        assert (
+            "red" in result.content.lower()
+        ), f"Gemini did not see the red test image. Got: {result.content[:200]}"
         assert result.usage.total_tokens > 0

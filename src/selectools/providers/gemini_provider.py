@@ -335,17 +335,46 @@ class GeminiProvider(Provider):
 
             elif role == Role.USER.value:
                 role = "user"
-                if message.content:
-                    parts.append(types.Part(text=message.content))
-                if message.image_base64:
-                    parts.append(
-                        types.Part(
-                            inline_data=types.Blob(
-                                mime_type="image/png",
-                                data=base64.b64decode(message.image_base64),
+                # Prefer the v0.21.0 multimodal ``content_parts`` path: when
+                # the message was built via ``image_message()`` the image
+                # lives in a ContentPart (not in the legacy
+                # ``message.image_base64`` attribute, which is explicitly
+                # None for multimodal messages). Fall back to the legacy
+                # path for pre-0.21 callers.
+                if getattr(message, "content_parts", None):
+                    for cp in message.content_parts:  # type: ignore[union-attr]
+                        if cp.type == "text" and cp.text:
+                            parts.append(types.Part(text=cp.text))
+                        elif cp.type == "image_url" and cp.image_url:
+                            parts.append(
+                                types.Part(
+                                    file_data=types.FileData(
+                                        file_uri=cp.image_url,
+                                        mime_type=cp.media_type or "image/png",
+                                    )
+                                )
+                            )
+                        elif cp.type == "image_base64" and cp.image_base64:
+                            parts.append(
+                                types.Part(
+                                    inline_data=types.Blob(
+                                        mime_type=cp.media_type or "image/png",
+                                        data=base64.b64decode(cp.image_base64),
+                                    )
+                                )
+                            )
+                else:
+                    if message.content:
+                        parts.append(types.Part(text=message.content))
+                    if message.image_base64:
+                        parts.append(
+                            types.Part(
+                                inline_data=types.Blob(
+                                    mime_type="image/png",
+                                    data=base64.b64decode(message.image_base64),
+                                )
                             )
                         )
-                    )
 
             elif role == Role.SYSTEM.value:
                 # Gemini handles system instructions via config, not messages.

@@ -379,16 +379,16 @@ class TestHybridSearchTool:
         assert hybrid_tool.search_knowledge_base.name == "search_knowledge_base"
 
     def test_tool_search_returns_string(self, hybrid_tool: Any) -> None:
-        result = hybrid_tool.search_knowledge_base.function(hybrid_tool, "selectools library")
+        result = hybrid_tool.search_knowledge_base.function("selectools library")
         assert isinstance(result, str)
         assert "selectools" in result.lower()
 
     def test_tool_search_includes_source(self, hybrid_tool: Any) -> None:
-        result = hybrid_tool.search_knowledge_base.function(hybrid_tool, "install selectools")
+        result = hybrid_tool.search_knowledge_base.function("install selectools")
         assert "install.md" in result
 
     def test_tool_search_includes_page(self, hybrid_tool: Any) -> None:
-        result = hybrid_tool.search_knowledge_base.function(hybrid_tool, "install selectools")
+        result = hybrid_tool.search_knowledge_base.function("install selectools")
         assert "page 1" in result
 
     def test_tool_search_no_results(self) -> None:
@@ -400,7 +400,7 @@ class TestHybridSearchTool:
         searcher.add_documents([Document(text="Python programming")])
 
         ht = HybridSearchTool(searcher=searcher, score_threshold=999.0)
-        result = ht.search_knowledge_base.function(ht, "Python")
+        result = ht.search_knowledge_base.function("Python")
         assert "No relevant information found" in result
 
     def test_tool_structured_search(self, hybrid_tool: Any) -> None:
@@ -418,7 +418,7 @@ class TestHybridSearchTool:
         searcher.add_documents([Document(text="Python programming")])
 
         ht = HybridSearchTool(searcher=searcher, include_scores=False)
-        result = ht.search_knowledge_base.function(ht, "Python")
+        result = ht.search_knowledge_base.function("Python")
         assert "Relevance:" not in result
 
 
