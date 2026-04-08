@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Selectools: Production-Ready AI Agents in Plain Python</title>
-  <meta name="description" content="Selectools is a Python library for building production-ready AI agents with tool calling, RAG, and multi-agent orchestration. 152 models, 50 evaluators, visual builder. Supports OpenAI, Anthropic, Gemini, Ollama. Free and open source." />
+  <meta name="description" content="Selectools is a Python library for building production-ready AI agents with tool calling, RAG, and multi-agent orchestration. 152 models, 50 evaluators, visual builder. Supports OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama. Free and open source." />
   <link rel="canonical" href="https://selectools.dev/" />
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="icon" type="image/x-icon" href="favicon.ico" sizes="any" />
@@ -28,14 +28,14 @@
   <meta name="twitter:title" content="Selectools: AI Agents That Are Just Python" />
   <meta name="twitter:image" content="https://selectools.dev/assets/og-image.png" />
   <meta name="twitter:image:alt" content="Selectools — Production-ready AI agents in plain Python" />
-  <meta name="twitter:description" content="Multi-agent orchestration, RAG, 50 evaluators, visual builder. One pip install. OpenAI, Anthropic, Gemini, Ollama." />
+  <meta name="twitter:description" content="Multi-agent orchestration, RAG, 50 evaluators, visual builder. One pip install. OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama." />
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "Selectools",
     "alternateName": "selectools",
-    "description": "Production-ready Python library for building AI agents with tool calling, RAG, and multi-agent orchestration. Supports OpenAI, Anthropic, Gemini, and Ollama.",
+    "description": "Production-ready Python library for building AI agents with tool calling, RAG, and multi-agent orchestration. Supports OpenAI, Azure OpenAI, Anthropic, Gemini, and Ollama.",
     "applicationCategory": "DeveloperApplication",
     "applicationSubCategory": "AI Agent Framework",
     "operatingSystem": "Any",
@@ -44,7 +44,7 @@
     "url": "https://selectools.dev/",
     "downloadUrl": "https://pypi.org/project/selectools/",
     "installUrl": "https://pypi.org/project/selectools/",
-    "softwareVersion": "0.20.1",
+    "softwareVersion": "0.21.0",
     "datePublished": "2026-04-01",
     "dateModified": "2026-04-07",
     "inLanguage": "en",
@@ -78,7 +78,7 @@
       "url": "https://pypi.org/project/selectools/"
     },
     "featureList": [
-      "Multi-provider LLM support (OpenAI, Anthropic, Gemini, Ollama, with FallbackProvider)",
+      "Multi-provider LLM support (OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama, with FallbackProvider)",
       "Tool calling with 33 pre-built tools across 9 categories",
       "Hybrid RAG search (BM25 + vector + reciprocal rank fusion + cross-encoder reranking)",
       "Multi-agent orchestration with AgentGraph (routing, parallel, checkpointing)",
@@ -166,7 +166,7 @@
         "name": "What is Selectools?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Selectools is an open-source Python library for building production-ready AI agents with tool calling, RAG (retrieval-augmented generation), and multi-agent orchestration. It supports OpenAI, Anthropic, Gemini, and Ollama providers with a single unified API. Install with: pip install selectools."
+          "text": "Selectools is an open-source Python library for building production-ready AI agents with tool calling, RAG (retrieval-augmented generation), and multi-agent orchestration. It supports OpenAI, Azure OpenAI, Anthropic, Gemini, and Ollama providers with a single unified API. Install with: pip install selectools."
         }
       },
       {
@@ -182,7 +182,7 @@
         "name": "What LLM providers does Selectools support?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Selectools supports 5 LLM providers: OpenAI (GPT-4, GPT-5, o-series), Anthropic (Claude), Google Gemini, Ollama (local models), and a FallbackProvider for automatic failover with circuit breaker. It includes pricing data for 152 models across all providers."
+          "text": "Selectools supports 5 LLM providers: OpenAI (GPT-4, GPT-5, o-series), Azure OpenAI Service, Anthropic (Claude), Google Gemini, and Ollama (local models), plus a FallbackProvider for automatic failover with circuit breaker. It includes pricing data for 152 models across all providers."
         }
       },
       {
@@ -198,7 +198,7 @@
         "name": "How do I install Selectools?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Install with pip: pip install selectools. For optional features: pip install selectools[serve] for the visual builder with Starlette, pip install selectools[rag] for Chroma/Pinecone vector stores."
+          "text": "Install with pip: pip install selectools. For optional features: pip install selectools[serve] for the visual builder with Starlette, pip install selectools[rag] for Chroma/Pinecone/FAISS/Qdrant vector stores plus beautifulsoup4 for HTML loading, pip install selectools[observe] for OpenTelemetry and Langfuse observers, or pip install selectools[postgres] to enable the pgvector store."
         }
       },
       {
@@ -214,7 +214,7 @@
         "name": "Does Selectools support RAG?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Yes. Selectools includes a full RAG pipeline with BM25 keyword search + vector semantic search, reciprocal rank fusion, cross-encoder reranking, and 4 vector store backends (memory, SQLite, Chroma, Pinecone)."
+          "text": "Yes. Selectools includes a full RAG pipeline with BM25 keyword search + vector semantic search, reciprocal rank fusion, cross-encoder reranking, and 7 vector store backends (memory, SQLite, Chroma, Pinecone, FAISS, Qdrant, pgvector). Documents can be loaded from files, directories, PDFs, CSVs, JSON, HTML, or URLs."
         }
       },
       {
@@ -238,7 +238,7 @@
         "name": "Is Selectools free?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Yes. Selectools is free and open source under the Apache-2.0 license. There is no paid tier, no seat licensing, no usage-based pricing, and no SaaS account. You only pay for the LLM provider tokens you use directly with OpenAI, Anthropic, Google, or your own Ollama instance."
+          "text": "Yes. Selectools is free and open source under the Apache-2.0 license. There is no paid tier, no seat licensing, no usage-based pricing, and no SaaS account. You only pay for the LLM provider tokens you use directly with OpenAI, Azure OpenAI, Anthropic, Google, or your own Ollama instance."
         }
       },
       {
@@ -4428,6 +4428,7 @@
           <span class="hero-providers-label">Works with</span>
           <div class="hero-providers-list">
             <span class="provider">OpenAI</span>
+            <span class="provider">Azure OpenAI</span>
             <span class="provider">Anthropic</span>
             <span class="provider">Gemini</span>
             <span class="provider">Ollama</span>
@@ -4454,7 +4455,7 @@
     <div class="status-item"><span class="status-val">88</span> examples</div>
     <div class="status-item"><span class="status-val">50</span> evaluators</div>
     <div class="status-item"><span class="status-val">4</span> providers</div>
-    <div class="status-item"><span class="status-val">v0.20.1</span></div>
+    <div class="status-item"><span class="status-val">v0.21.0</span></div>
   </div>
 </div>
 
@@ -5020,7 +5021,7 @@ result = agent.<span class="fn">run</span>(<span class="str">"Find our refund po
       <div class="bento__cell" data-accent="amber">
         <span class="bento__label"><span class="bento__dot"></span>Providers</span>
         <div class="bento__title">Auto-failover</div>
-        <p class="bento__desc">OpenAI, Anthropic, Gemini, Ollama. Circuit breaker with health checks.</p>
+        <p class="bento__desc">OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama. Circuit breaker with health checks.</p>
       </div>
 
       <!-- Standard: Streaming -->
@@ -5688,7 +5689,7 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
               <span class="repl__q-cat">getting-started</span>
             </summary>
             <div class="repl__q-answer">
-              Selectools is an open-source Python library for building production-ready AI agents with tool calling, RAG (retrieval-augmented generation), and multi-agent orchestration. It supports OpenAI, Anthropic, Gemini, and Ollama providers with a single unified API. Install with: <code>pip install selectools</code>.
+              Selectools is an open-source Python library for building production-ready AI agents with tool calling, RAG (retrieval-augmented generation), and multi-agent orchestration. It supports OpenAI, Azure OpenAI, Anthropic, Gemini, and Ollama providers with a single unified API. Install with: <code>pip install selectools</code>.
             </div>
           </details>
 
@@ -5710,7 +5711,7 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
               <span class="repl__q-cat">providers</span>
             </summary>
             <div class="repl__q-answer">
-              Five providers: OpenAI (GPT-4, GPT-5, o-series), Anthropic (Claude), Google Gemini, Ollama (local models), and a FallbackProvider for automatic failover with circuit breaker. Includes pricing data for 152 models. For testing without any API key, use the built-in <code>LocalProvider</code>.
+              Five providers: OpenAI (GPT-4, GPT-5, o-series), Azure OpenAI Service, Anthropic (Claude), Google Gemini, and Ollama (local models), plus a FallbackProvider for automatic failover with circuit breaker. Includes pricing data for 152 models. For testing without any API key, use the built-in <code>LocalProvider</code>.
             </div>
           </details>
 
@@ -5732,7 +5733,7 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
               <span class="repl__q-cat">getting-started</span>
             </summary>
             <div class="repl__q-answer">
-              <code>pip install selectools</code>. For the visual builder with Starlette server: <code>pip install selectools[serve]</code>. For Chroma/Pinecone vector stores: <code>pip install selectools[rag]</code>. Requires Python 3.9+.
+              <code>pip install selectools</code>. For the visual builder with Starlette server: <code>pip install selectools[serve]</code>. For Chroma/Pinecone/FAISS/Qdrant vector stores (plus beautifulsoup4 for HTML loading): <code>pip install selectools[rag]</code>. For OpenTelemetry + Langfuse observers: <code>pip install selectools[observe]</code>. For pgvector: <code>pip install selectools[postgres]</code>. Requires Python 3.9+.
             </div>
           </details>
 
@@ -5754,7 +5755,7 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
               <span class="repl__q-cat">advanced</span>
             </summary>
             <div class="repl__q-answer">
-              Yes. The built-in RAG pipeline includes BM25 keyword search + vector semantic search, reciprocal rank fusion (RRF), cross-encoder reranking, semantic and contextual chunking, and 4 vector store backends (memory, SQLite, Chroma, Pinecone).
+              Yes. The built-in RAG pipeline includes BM25 keyword search + vector semantic search, reciprocal rank fusion (RRF), cross-encoder reranking, semantic and contextual chunking, and 7 vector store backends (memory, SQLite, Chroma, Pinecone, FAISS, Qdrant, pgvector). Documents can be loaded from files, directories, PDFs, CSVs, JSON, HTML, or URLs.
             </div>
           </details>
 
@@ -5813,7 +5814,7 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
 ├── <a href="https://pypi.org/project/selectools/">pypi/</a>          <span class="footer-term__cmt"># pip install selectools</span>
 └── <a href="CHANGELOG/">changelog/</a>     <span class="footer-term__cmt"># what shipped, what changed</span>
 
-<span class="footer-term__cmt"># selectools v0.20.1 &middot; Apache-2.0 &middot; <span class="footer-term__nichev">made by <a href="https://nichevlabs.com">NichevLabs</a></span></span>
+<span class="footer-term__cmt"># selectools v0.21.0 &middot; Apache-2.0 &middot; <span class="footer-term__nichev">made by <a href="https://nichevlabs.com">NichevLabs</a></span></span>
 <span class="footer-term__cmt"># for developers who ship</span></div>
   <div class="footer-term__final">
     <span class="pr">$</span>
