@@ -244,7 +244,7 @@ def build_gallery(examples: list[dict]) -> str:
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
 *,*::before,*::after{{box-sizing:border-box;margin:0;padding:0}}
-:root{{--bg:#0f172a;--sf:#1e293b;--bd:#334155;--tx:#e2e8f0;--dm:#94a3b8;--ft:#64748b;--cy:#22d3ee;--bl:#3b82f6;--gn:#22c55e;--font:'Plus Jakarta Sans',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace;--gr:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.018'/%3E%3C/svg%3E")}}
+:root{{--bg:#0f172a;--sf:#1e293b;--bd:#334155;--tx:#e2e8f0;--dm:#94a3b8;--ft:#64748b;--cy:#22d3ee;--bl:#3b82f6;--gn:#22c55e;--font:'Plus Jakarta Sans',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace;--gr:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.018'/%3E%3C/svg%3E");--exec-color:#22d3ee;--exec-glow:rgba(34,211,238,0.55);--exec-glow-soft:rgba(34,211,238,0.18);--exec-pulse-dur:1.6s;--exec-step-dur:0.55s;--exec-ease-step:cubic-bezier(0.4,0,0.2,1);--exec-ease-soft:cubic-bezier(0.16,1,0.3,1);--exec-blink-dur:1.05s}}
 html{{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}}
 body{{background:var(--bg);color:var(--tx);font-family:var(--font);font-size:14px}}
 nav{{position:sticky;top:0;z-index:50;background:rgba(15,23,42,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--bd);height:52px}}
@@ -282,6 +282,19 @@ a.ec1:hover{{background:rgba(59,130,246,0.2);color:#bfdbfe}}
 .ep{{font-family:var(--mono);font-size:12px;line-height:1.65;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:16px;overflow-x:auto;max-height:500px;overflow-y:auto;white-space:pre;margin:0}}
 .ep .kw{{color:#c084fc}}.ep .cmt{{color:var(--ft)}}.ep .num{{color:#fb923c}}.ep .dec{{color:#fbbf24}}
 @media(max-width:640px){{.em,.ed{{display:none}}.nr{{gap:12px}}}}
+.sr-only{{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}}
+.exec-dot{{display:inline-block;width:8px;height:8px;border-radius:999px;background:var(--exec-color);box-shadow:0 0 0 0 var(--exec-glow);animation:exec-pulse var(--exec-pulse-dur) var(--exec-ease-soft) infinite;vertical-align:middle}}
+.exec-dot--lg{{width:10px;height:10px}}
+.exec-dot--sm{{width:6px;height:6px}}
+@keyframes exec-pulse{{0%{{box-shadow:0 0 0 0 var(--exec-glow)}}60%{{box-shadow:0 0 0 8px rgba(34,211,238,0)}}100%{{box-shadow:0 0 0 0 rgba(34,211,238,0)}}}}
+.exec-caret{{display:inline-block;width:0.55em;height:1.1em;vertical-align:text-bottom;background:var(--exec-color);box-shadow:0 0 6px var(--exec-glow);animation:exec-blink var(--exec-blink-dur) steps(2,jump-none) infinite;margin-left:2px}}
+.exec-caret--thin{{width:2px;box-shadow:0 0 4px var(--exec-glow-soft)}}
+@keyframes exec-blink{{0%,49%{{opacity:1}}50%,100%{{opacity:0}}}}
+.exec-scan{{position:relative;overflow:hidden}}
+.exec-scan.in-view::after{{content:"";position:absolute;top:0;left:-25%;width:25%;height:100%;background:linear-gradient(90deg,rgba(34,211,238,0) 0%,rgba(34,211,238,0.18) 40%,rgba(34,211,238,0.55) 50%,rgba(34,211,238,0.18) 60%,rgba(34,211,238,0) 100%);pointer-events:none;animation:exec-scan-sweep 1.4s var(--exec-ease-step) 0.2s 1 forwards}}
+@keyframes exec-scan-sweep{{0%{{transform:translateX(0)}}100%{{transform:translateX(520%)}}}}
+@keyframes exec-stamp{{0%{{transform:scale(0.92);box-shadow:0 0 0 0 var(--exec-glow)}}40%{{transform:scale(1.02);box-shadow:0 0 0 6px var(--exec-glow-soft)}}100%{{transform:scale(1);box-shadow:0 0 0 1px rgba(34,211,238,0.18)}}}}
+@media(prefers-reduced-motion:reduce){{.exec-dot{{animation:none;box-shadow:0 0 6px var(--exec-glow)}}.exec-caret{{animation:none;opacity:1}}.exec-scan.in-view::after{{animation:none;display:none}}}}
   </style>
 </head>
 <body>
