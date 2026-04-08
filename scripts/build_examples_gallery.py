@@ -267,7 +267,7 @@ html{{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}}
 body{{background:var(--bg);color:var(--tx);font-family:var(--font);font-size:14px}}
 nav{{position:sticky;top:0;z-index:50;background:rgba(15,23,42,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--bd);height:52px}}
 nav .w{{max-width:960px;margin:0 auto;padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:100%}}
-.nl{{font-weight:800;font-size:15px;color:#fff;text-decoration:none}}.nl span{{color:var(--dm);font-weight:500;margin-left:8px;font-size:13px}}
+.wm{{display:inline-flex;align-items:center}}.wm--3{{font-family:var(--mono);color:var(--exec-color);align-items:center;vertical-align:middle}}.wm--3__banner{{display:block;font-size:5.5px;line-height:1;letter-spacing:0;white-space:pre;text-shadow:0 0 6px var(--exec-glow);margin:0;user-select:none;filter:drop-shadow(0 0 2px rgba(34,211,238,0.4))}}@media(min-width:720px){{.wm--3__banner{{font-size:6.5px}}}}.nav-logo{{display:inline-flex;align-items:center;gap:8px;text-decoration:none}}.nav-logo__sub{{font-size:13px;color:var(--dm);font-weight:500}}.vh{{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}}
 .nr{{display:flex;gap:20px;font-size:13px;color:var(--dm)}}.nr a{{color:inherit;text-decoration:none}}.nr a:hover{{color:#fff}}
 .ex-term{{max-width:960px;margin:32px auto 24px;background:#0b1220;border:1px solid var(--bd);border-radius:14px;box-shadow:0 20px 60px -28px rgba(0,0,0,0.55),0 0 0 1px rgba(34,211,238,0.05);overflow:hidden}}
 .ex-term__bar{{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--bd);background:rgba(15,23,42,0.7)}}
@@ -360,7 +360,7 @@ a.ec1:hover{{background:rgba(59,130,246,0.2);color:#bfdbfe}}
 </head>
 <body>
 <nav><div class="w">
-  <a href="../" class="nl"><span class="exec-dot" aria-hidden="true"></span>&nbsp;selectools <span>examples</span></a>
+  <a href="../" class="nav-logo" aria-label="selectools examples"><span class="vh">selectools</span><span class="wm wm--3" aria-hidden="true"><pre class="wm--3__banner">┌─┐┌─┐┬  ┌─┐┌─┐┌┬┐┌─┐┌─┐┬  ┌─┐{chr(10)}└─┐├┤ │  ├┤ │   │ │ ││ ││  └─┐{chr(10)}└─┘└─┘┴─┘└─┘└─┘ ┴ └─┘└─┘┴─┘└─┘</pre></span><span class="nav-logo__sub">examples</span></a>
   <div class="nr"><a href="../builder/">Builder</a><a href="../QUICKSTART/">Docs</a><a href="{REPO_URL}" target="_blank">GitHub</a></div>
 </div></nav>
 <header class="ex-term">

@@ -30,7 +30,39 @@
   background: var(--md-primary-fg-color);
   border-bottom: 1px solid rgba(255,255,255,0.06);
 }
-.md-header__title { font-weight: 700; }
+
+/* Wordmark logo — terminal box-drawing art matching landing page */
+.wm { display: inline-flex; align-items: center; }
+.wm--3 {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  color: #22d3ee;
+  align-items: center;
+  vertical-align: middle;
+}
+.wm--3__banner {
+  display: block;
+  font-size: 5.5px;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: pre;
+  text-shadow: 0 0 6px rgba(34, 211, 238, 0.55);
+  margin: 0;
+  user-select: none;
+  filter: drop-shadow(0 0 2px rgba(34, 211, 238, 0.4));
+}
+@media (min-width: 720px) { .wm--3__banner { font-size: 6.5px; } }
+
+/* Size the logo container to fit the wordmark */
+.md-header__button.md-logo {
+  padding: 4px 8px 4px 0;
+}
+
+/* Hide site-name text — wordmark logo serves as primary brand mark.
+   Page title still appears on scroll (second .md-header__topic). */
+.md-header__title > .md-header__topic:first-child {
+  opacity: 0;
+  pointer-events: none;
+}
 
 /* Tabs */
 .md-tabs {
