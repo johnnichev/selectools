@@ -7,22 +7,8 @@
   <meta name="description" content="Selectools is a Python library for building production-ready AI agents with tool calling, RAG, and multi-agent orchestration. 152 models, 50 evaluators, visual builder. Supports OpenAI, Anthropic, Gemini, Ollama. Free and open source." />
   <link rel="canonical" href="https://selectools.dev/" />
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <script>
-    /* OVERDRIVE FUSED — wordmark variant: read ?logo=1|2|3, persist
-       to localStorage, set body[data-logo] BEFORE paint to avoid FOUC */
-    (function() {
-      try {
-        var p = new URLSearchParams(window.location.search).get('logo');
-        var stored = localStorage.getItem('sel-logo');
-        var logo = (p === '1' || p === '2' || p === '3') ? p : (stored || '1');
-        if (p) localStorage.setItem('sel-logo', logo);
-        document.documentElement.setAttribute('data-logo', logo);
-        document.addEventListener('DOMContentLoaded', function() {
-          document.body.setAttribute('data-logo', logo);
-        });
-      } catch (e) { document.documentElement.setAttribute('data-logo', '1'); }
-    })();
-  </script>
+  <link rel="icon" type="image/x-icon" href="favicon.ico" sizes="any" />
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
   <meta name="keywords" content="python ai agent, tool calling, rag, hybrid search, openai, anthropic, gemini, ollama, ai agent framework, llm tools, python llm, multi-agent, agent graph, langchain alternative" />
   <meta name="author" content="NichevLabs" />
@@ -33,6 +19,7 @@
   <meta property="og:site_name" content="Selectools" />
   <meta property="og:locale" content="en_US" />
   <meta property="og:image" content="https://selectools.dev/assets/og-image.png" />
+  <meta property="og:image:secure_url" content="https://selectools.dev/assets/og-image.png" />
   <meta property="og:image:type" content="image/png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
@@ -3907,61 +3894,12 @@
     }
 
     /* ════════════════════════════════════════════════════════════════
-       OVERDRIVE FUSED — wordmarks (3 switchable variants)
-       The body carries data-logo="1|2|3" set on load by reading the
-       ?logo= URL param (default "1"). Each variant renders inside the
-       nav-logo slot; only the active one is displayed.
+       OVERDRIVE FUSED — wordmark (terminal banner art)
+       Single variant: 3-row box-drawing wordmark in the nav-logo slot.
        ════════════════════════════════════════════════════════════════ */
-    .wm { display: none; align-items: center; }
-    [data-logo="1"] .wm--1,
-    [data-logo="2"] .wm--2,
-    [data-logo="3"] .wm--3 { display: inline-flex; }
+    .wm { display: inline-flex; align-items: center; }
 
-    /* Variant 1 — [•] selectools */
-    .wm--1 {
-      gap: 8px;
-      font-family: var(--font-ui);
-      font-weight: 800;
-      font-size: 17px;
-      color: #fff;
-      letter-spacing: -0.03em;
-    }
-    .wm--1__brackets {
-      font-family: var(--font-mono);
-      font-weight: 600;
-      color: var(--exec-color);
-      font-size: 16px;
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-    }
-    .wm--1__brackets::before { content: "["; }
-    .wm--1__brackets::after  { content: "]"; }
-    .wm--1__brackets .exec-dot { width: 6px; height: 6px; }
-
-    /* Variant 2 — s▌electools (cursor inside the word) */
-    .wm--2 {
-      font-family: var(--font-ui);
-      font-weight: 800;
-      font-size: 17px;
-      color: #fff;
-      letter-spacing: -0.03em;
-      gap: 0;
-    }
-    .wm--2__pre,
-    .wm--2__post { display: inline-block; }
-    .wm--2__caret {
-      display: inline-block;
-      width: 0.18em;
-      height: 0.95em;
-      background: var(--exec-color);
-      box-shadow: 0 0 6px var(--exec-glow);
-      vertical-align: text-bottom;
-      animation: exec-blink 1.05s steps(2, jump-none) infinite;
-      margin: 0 1px;
-    }
-
-    /* Variant 3 — terminal banner art (3-row box-drawing) */
+    /* Terminal banner art (3-row box-drawing) */
     .wm--3 {
       font-family: var(--font-mono);
       color: var(--exec-color);
@@ -4351,8 +4289,7 @@
       .exec-caret { animation: none; opacity: 1; }
       .exec-scan.in-view::after { animation: none; display: none; }
 
-      /* OVERDRIVE FUSED — wordmarks: kill blink + scan animations */
-      .wm--2__caret { animation: none !important; opacity: 1; }
+      /* OVERDRIVE FUSED — wordmark: kill scan animation */
       .wm--3__banner.is-typing { mask-image: none !important; -webkit-mask-image: none !important; }
 
       /* OVERDRIVE FUSED — #faq: kill answer fade-in */
@@ -4417,16 +4354,7 @@
   <div class="wrap">
     <a href="#" class="nav-logo" aria-label="selectools home">
       <span class="vh">selectools</span>
-      <!-- Variant 1: [•] selectools -->
-      <span class="wm wm--1" aria-hidden="true">
-        <span class="wm--1__brackets"><span class="exec-dot exec-dot--sm"></span></span>
-        <span>selectools</span>
-      </span>
-      <!-- Variant 2: s▌electools -->
-      <span class="wm wm--2" aria-hidden="true">
-        <span class="wm--2__pre">s</span><span class="wm--2__caret"></span><span class="wm--2__post">electools</span>
-      </span>
-      <!-- Variant 3: terminal banner art (3-row box-drawing) -->
+      <!-- Wordmark: terminal banner art (3-row box-drawing) -->
       <span class="wm wm--3" aria-hidden="true"><pre class="wm--3__banner">┌─┐┌─┐┬  ┌─┐┌─┐┌┬┐┌─┐┌─┐┬  ┌─┐
 └─┐├┤ │  ├┤ │   │ │ ││ ││  └─┐
 └─┘└─┘┴─┘└─┘└─┘ ┴ └─┘└─┘┴─┘└─┘</pre></span>
