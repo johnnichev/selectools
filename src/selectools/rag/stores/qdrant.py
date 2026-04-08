@@ -285,9 +285,15 @@ class QdrantVectorStore(VectorStore):
         except Exception as exc:
             # Be consistent with the other vector stores: searching an
             # empty/uninitialised store returns an empty list rather than
-            # raising. Qdrant 404s when the collection has been dropped
-            # by ``clear()`` or has never been created.
-            if "404" in str(exc) or "not found" in str(exc).lower():
+            # raising. Qdrant raises ``UnexpectedResponse`` with
+            # ``status_code=404`` when the collection has been dropped by
+            # ``clear()`` or has never been created. Use the typed attr
+            # first and fall back to string matching so we stay resilient
+            # across qdrant-client versions that wrap/rename the exception.
+            if getattr(exc, "status_code", None) == 404:
+                return []
+            msg = str(exc).lower()
+            if "404" in msg or "not found" in msg:
                 return []
             raise
 

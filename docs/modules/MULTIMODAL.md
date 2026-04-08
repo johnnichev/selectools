@@ -77,6 +77,15 @@ msg = image_message("./screenshots/error.png", "What's the error in this UI?")
 The helper detects whether the input is a URL or a local path and chooses the
 right `ContentPart.type` (`image_url` vs `image_base64`).
 
+!!! warning "URL reachability"
+    When you pass an `http://` / `https://` URL, **the provider's backend fetches
+    the image**, not selectools. OpenAI, Anthropic Claude, and Google Gemini each
+    download the URL server-side. Some hosts block bot User-Agents (Wikimedia
+    Commons, many corporate CDNs) and will return 400 / 403 errors. If you hit
+    "Unable to download the file" or "Cannot fetch content from the provided URL",
+    download the image locally and pass a file path instead — that triggers the
+    base64 path which is host-independent.
+
 ---
 
 ## Provider Compatibility
