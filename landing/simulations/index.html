@@ -68,14 +68,32 @@
       height: 56px;
     }
     .nav-brand {
-      font-weight: 700;
-      font-size: 16px;
-      color: #fff;
-      display: flex;
+      display: inline-flex;
       align-items: center;
       gap: 8px;
+      text-decoration: none;
     }
-    .nav-brand span { color: var(--cyan); }
+    .nav-brand__sub { font-size: 13px; color: var(--text-dim); font-weight: 500; }
+    .wm { display: inline-flex; align-items: center; }
+    .wm--3 {
+      font-family: var(--font-mono);
+      color: var(--cyan);
+      align-items: center;
+      vertical-align: middle;
+    }
+    .wm--3__banner {
+      display: block;
+      font-size: 5.5px;
+      line-height: 1;
+      letter-spacing: 0;
+      white-space: pre;
+      text-shadow: 0 0 6px rgba(34, 211, 238, 0.55);
+      margin: 0;
+      user-select: none;
+      filter: drop-shadow(0 0 2px rgba(34, 211, 238, 0.4));
+    }
+    @media (min-width: 720px) { .wm--3__banner { font-size: 6.5px; } }
+    .vh { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
     .nav-links {
       display: flex;
       align-items: center;
@@ -742,8 +760,11 @@
 <nav>
   <div class="nav-inner">
     <a href="https://selectools.dev/" class="nav-brand">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-      selectools <span>simulations</span>
+      <span class="vh">selectools</span>
+      <span class="wm wm--3" aria-hidden="true"><pre class="wm--3__banner">┌─┐┌─┐┬  ┌─┐┌─┐┌┬┐┌─┐┌─┐┬  ┌─┐
+└─┐├┤ │  ├┤ │   │ │ ││ ││  └─┐
+└─┘└─┘┴─┘└─┘└─┘ ┴ └─┘└─┘┴─┘└─┘</pre></span>
+      <span class="nav-brand__sub">simulations</span>
     </a>
     <ul class="nav-links">
       <li><a href="https://selectools.dev/">Home</a></li>
