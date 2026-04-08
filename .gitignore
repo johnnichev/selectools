@@ -54,3 +54,5 @@ mypy_output.txt
 
 # Hypothesis test artifacts
 .hypothesis/
+
+.playwright-mcp/

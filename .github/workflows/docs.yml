@@ -44,6 +44,20 @@ jobs:
           mkdir -p site/simulations
           cp landing/simulations/index.html site/simulations/index.html 2>/dev/null || true
 
+      - name: Copy landing favicon and assets
+        # Landing index.html references /favicon.svg, /favicon.ico,
+        # /apple-touch-icon.png, and /assets/og-image.png. Without these
+        # the X/Twitter share preview 404s and the browser tab falls back
+        # to the MkDocs Material favicon. Merge into the existing
+        # site/assets dir rather than replacing it (Material ships its
+        # own assets there).
+        run: |
+          cp landing/favicon.svg site/favicon.svg
+          cp landing/favicon.ico site/favicon.ico
+          cp landing/apple-touch-icon.png site/apple-touch-icon.png
+          mkdir -p site/assets
+          cp -R landing/assets/. site/assets/
+
       - name: Install selectools (for builder assembly)
         run: pip install -e .
 
