@@ -251,8 +251,28 @@ nav{{position:sticky;top:0;z-index:50;background:rgba(15,23,42,0.85);backdrop-fi
 nav .w{{max-width:960px;margin:0 auto;padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:100%}}
 .nl{{font-weight:800;font-size:15px;color:#fff;text-decoration:none}}.nl span{{color:var(--dm);font-weight:500;margin-left:8px;font-size:13px}}
 .nr{{display:flex;gap:20px;font-size:13px;color:var(--dm)}}.nr a{{color:inherit;text-decoration:none}}.nr a:hover{{color:#fff}}
-.ph{{max-width:960px;margin:0 auto;padding:48px 20px 24px}}
-.ph h1{{font-size:28px;letter-spacing:-0.03em;margin-bottom:8px;font-weight:800}}.ph p{{color:var(--dm);font-size:15px;max-width:600px;line-height:1.6}}
+.ex-term{{max-width:960px;margin:32px auto 24px;background:#0b1220;border:1px solid var(--bd);border-radius:14px;box-shadow:0 20px 60px -28px rgba(0,0,0,0.55),0 0 0 1px rgba(34,211,238,0.05);overflow:hidden}}
+.ex-term__bar{{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--bd);background:rgba(15,23,42,0.7)}}
+.ex-term__dot{{width:11px;height:11px;border-radius:999px}}
+.ex-term__dot--r{{background:rgba(239,68,68,0.85)}}
+.ex-term__dot--y{{background:rgba(250,204,21,0.85)}}
+.ex-term__dot--g{{background:rgba(34,197,94,0.85)}}
+.ex-term__name{{margin-left:8px;font-family:var(--mono);font-size:12px;color:var(--ft)}}
+.ex-term__shell{{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ft);letter-spacing:0.08em}}
+.ex-term__body{{padding:22px 22px 24px;font-family:var(--mono)}}
+.ex-prompt{{font-family:var(--mono);font-size:13px;line-height:1.75;white-space:pre;overflow-x:auto}}
+.ex-prompt__user{{color:var(--cy)}}
+.ex-prompt__at{{color:var(--ft)}}
+.ex-prompt__host{{color:var(--cy)}}
+.ex-prompt__colon{{color:var(--ft)}}
+.ex-prompt__path{{color:#fbbf24}}
+.ex-prompt__glyph{{color:var(--gn);margin:0 6px}}
+.ex-prompt__cmd{{color:var(--tx)}}
+.ex-prompt__flags{{color:#fbbf24}}
+.ex-prompt__grep{{color:var(--ft)}}
+.ex-subtitle{{margin-top:14px;font-family:var(--font);font-size:14px;color:var(--dm);max-width:600px;line-height:1.6}}
+@media(max-width:640px){{.ex-prompt__user,.ex-prompt__at,.ex-prompt__host,.ex-prompt__colon,.ex-prompt__path{{display:none}}.ex-prompt__glyph{{margin-left:0}}}}
+@media(prefers-reduced-motion:reduce){{.ex-prompt .exec-caret{{animation:none;opacity:1}}}}
 .ct{{max-width:960px;margin:0 auto;padding:0 20px 16px;display:flex;flex-direction:column;gap:10px;position:sticky;top:52px;z-index:40;background:var(--bg);padding-top:10px}}
 .si{{flex:1;background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:10px 14px;color:var(--tx);font-family:var(--font);font-size:14px;outline:none}}
 .si:focus{{border-color:var(--cy);box-shadow:0 0 0 2px rgba(34,211,238,0.12)}}.si::placeholder{{color:var(--ft)}}
@@ -302,9 +322,22 @@ a.ec1:hover{{background:rgba(59,130,246,0.2);color:#bfdbfe}}
   <a href="../" class="nl"><span class="exec-dot"></span>&nbsp;selectools <span>examples</span></a>
   <div class="nr"><a href="../builder/">Builder</a><a href="../QUICKSTART/">Docs</a><a href="{REPO_URL}" target="_blank">GitHub</a></div>
 </div></nav>
-<div class="ph"><h1>{total} Example Scripts</h1><p>Runnable Python examples covering agents, RAG, multi-agent graphs, evals, streaming, guardrails, and more. {no_key} run without an API key.</p></div>
+<header class="ex-term">
+  <div class="ex-term__bar">
+    <span class="ex-term__dot ex-term__dot--r" aria-hidden="true"></span>
+    <span class="ex-term__dot ex-term__dot--y" aria-hidden="true"></span>
+    <span class="ex-term__dot ex-term__dot--g" aria-hidden="true"></span>
+    <span class="ex-term__name">~/selectools/examples</span>
+    <span class="ex-term__shell">zsh</span>
+  </div>
+  <div class="ex-term__body">
+    <div class="ex-prompt" aria-hidden="true"><span class="ex-prompt__user">selectools</span><span class="ex-prompt__at">@</span><span class="ex-prompt__host">examples.dev</span><span class="ex-prompt__colon">:</span><span class="ex-prompt__path">~/selectools/examples</span><span class="ex-prompt__glyph">$</span><span class="ex-prompt__cmd" id="ex-cmd"></span><span class="ex-prompt__flags" id="ex-flags"></span><span class="ex-prompt__grep" id="ex-grep"></span><span class="exec-caret"></span></div>
+    <h1 class="sr-only">Selectools examples — {total} runnable Python scripts</h1>
+    <p class="ex-subtitle">{total} runnable scripts covering agents, RAG, multi-agent graphs, evals, streaming, and guardrails. {no_key} run without an API key.</p>
+  </div>
+</header>
 <div class="ct">
-  <input class="si" type="text" placeholder="Search examples\u2026" oninput="flt()" id="si" />
+  <input class="si" type="text" placeholder="Search examples\u2026" oninput="flt();syncPrompt()" id="si" />
   <div class="cr">{chr(10).join(cat_btns)}</div>
   <div class="rc" id="rc">{total} examples</div>
 </div>
@@ -314,11 +347,14 @@ a.ec1:hover{{background:rgba(59,130,246,0.2);color:#bfdbfe}}
 <script>
 const SRC={sources_json};
 let ac='all';
-function flt(){{const q=document.getElementById('si').value.toLowerCase();let c=0;document.querySelectorAll('.ec').forEach(d=>{{const t=d.dataset.title,f=d.dataset.file,cats=d.dataset.cats;const cm=ac==='all'||cats.includes(ac);const sm=!q||t.includes(q)||f.includes(q)||cats.includes(q);const s=cm&&sm;d.style.display=s?'':'none';if(s)c++}});document.getElementById('rc').textContent=c+' example'+(c!==1?'s':'')}}
+function flt(){{const q=document.getElementById('si').value.toLowerCase();let c=0;document.querySelectorAll('.ec').forEach(d=>{{const t=d.dataset.title,f=d.dataset.file,cats=d.dataset.cats;const cm=ac==='all'||cats.includes(ac);const sm=!q||t.includes(q)||f.includes(q)||cats.includes(q);const s=cm&&sm;d.style.display=s?'':'none';if(s)c++}});document.getElementById('rc').textContent='# '+c+' files match'}}
 document.querySelectorAll('.cb').forEach(b=>{{b.addEventListener('click',()=>{{document.querySelectorAll('.cb').forEach(x=>x.classList.remove('on'));b.classList.add('on');ac=b.dataset.cat;flt()}});}});
 function hl(s){{s=s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');s=s.replace(/\\b(from|import|def|class|return|if|elif|else|for|while|with|as|try|except|finally|raise|yield|async|await|and|or|not|in|is|True|False|None|lambda|pass|break|continue)\\b/g,'<span class="kw">$1</span>');s=s.replace(/(#[^\\n]*)/g,'<span class="cmt">$1</span>');s=s.replace(/(@\\w+(?:\\([^)]*\\))?)/g,'<span class="dec">$1</span>');return s}}
 function toggle(h){{const c=h.closest('.ec'),b=c.querySelector('.eb'),p=c.querySelector('.ep');c.classList.toggle('op');const open=c.classList.contains('op');b.style.display=open?'':'none';if(open&&!p.dataset.loaded){{p.innerHTML=hl(SRC[c.dataset.file]||'');p.dataset.loaded='1'}}}}
 function cpSrc(b){{const f=b.closest('.ec').dataset.file;navigator.clipboard.writeText(SRC[f]||'');b.textContent='Copied!';setTimeout(()=>b.textContent='Copy',1500)}}
+function syncPrompt(){{const q=document.getElementById('si').value;document.getElementById('ex-grep').textContent=q?' | grep -i '+q:'';document.getElementById('ex-flags').textContent=ac==='all'?'':' --tags '+ac}}
+function typeLine(target,text,perChar,done){{let i=0;const tick=()=>{{if(i<=text.length){{target.textContent=text.slice(0,i);i++;setTimeout(tick,perChar)}}else if(done){{done()}}}};tick()}}
+(function bootPrompt(){{const cmd=document.getElementById('ex-cmd');if(!cmd)return;const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;if(reduced){{cmd.textContent='ls examples/';syncPrompt();return}}typeLine(cmd,'ls examples/',35,syncPrompt)}})();
 </script>
 </body>
 </html>"""
