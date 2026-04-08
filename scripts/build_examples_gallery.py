@@ -175,12 +175,22 @@ def build_gallery(examples: list[dict]) -> str:
     total = len(examples)
     no_key = sum(1 for e in examples if not e["needs_key"])
 
-    cat_btns = [f'<button class="cb on" data-cat="all">All ({total})</button>']
-    for c in all_cats:
+    rail_segs = [
+        f'<button class="ex-rail__seg ex-rail__seg--all on" data-cat="all" '
+        f'role="tab" aria-selected="true" style="--seg-index:0">'
+        f'<span class="ex-rail__name">all</span>'
+        f'<span class="ex-rail__count">{total}</span>'
+        f"</button>"
+    ]
+    for idx, c in enumerate(all_cats, start=1):
         n = sum(1 for e in examples if c in e["categories"])
-        icon = CAT_ICONS.get(c, "")
-        label = c.replace("-", " ").title()
-        cat_btns.append(f'<button class="cb" data-cat="{c}">{icon} {label} ({n})</button>')
+        rail_segs.append(
+            f'<button class="ex-rail__seg" data-cat="{c}" role="tab" '
+            f'aria-selected="false" style="--seg-weight:{n};--seg-index:{idx}">'
+            f'<span class="ex-rail__name">{c}</span>'
+            f'<span class="ex-rail__count">{n}</span>'
+            f"</button>"
+        )
 
     # Build a JSON object of raw sources for lazy rendering
     sources_dict = {ex["file"]: ex["source"] for ex in examples}
@@ -276,9 +286,16 @@ nav .w{{max-width:960px;margin:0 auto;padding:0 20px;display:flex;align-items:ce
 .ct{{max-width:960px;margin:0 auto;padding:0 20px 16px;display:flex;flex-direction:column;gap:10px;position:sticky;top:52px;z-index:40;background:var(--bg);padding-top:10px}}
 .si{{flex:1;background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:10px 14px;color:var(--tx);font-family:var(--font);font-size:14px;outline:none}}
 .si:focus{{border-color:var(--cy);box-shadow:0 0 0 2px rgba(34,211,238,0.12)}}.si::placeholder{{color:var(--ft)}}
-.cr{{display:flex;flex-wrap:wrap;gap:6px}}
-.cb{{font-family:var(--font);font-size:12px;font-weight:500;padding:6px 14px;border-radius:100px;border:1px solid rgba(51,65,85,0.6);background:rgba(30,41,59,0.7);color:var(--dm);cursor:pointer;transition:all .15s;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}}
-.cb:hover{{background:rgba(51,65,85,0.5);border-color:var(--dm);color:var(--tx)}}.cb.on{{background:rgba(34,211,238,0.12);border-color:rgba(34,211,238,0.35);color:var(--cy);box-shadow:0 0 12px rgba(34,211,238,0.08)}}
+.ex-rail{{display:flex;gap:2px;height:40px;border-radius:8px;overflow:hidden;border:1px solid var(--bd);background:rgba(30,41,59,0.4)}}
+.ex-rail__seg{{flex:var(--seg-weight,1) 1 0;min-width:56px;height:100%;display:flex;align-items:center;justify-content:center;gap:6px;font-family:var(--mono);font-size:12px;color:var(--dm);background:transparent;border:none;cursor:pointer;transition:background .15s,color .15s;position:relative;padding:0 8px;white-space:nowrap}}
+.ex-rail__seg--all{{flex:0 0 72px}}
+.ex-rail__seg:hover{{background:rgba(34,211,238,0.08);color:var(--tx)}}
+.ex-rail__seg.on{{background:rgba(34,211,238,0.12);color:var(--cy);box-shadow:inset 0 -2px 0 var(--exec-color)}}
+.ex-rail__name{{font-size:12px}}
+.ex-rail__count{{font-size:11px;color:var(--cy);opacity:0.75}}
+.ex-rail.in-view .ex-rail__seg{{animation:exec-stamp 0.6s var(--exec-ease-soft) both;animation-delay:calc(var(--seg-index,0) * 80ms)}}
+@media(max-width:640px){{.ex-rail{{overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;height:44px}}.ex-rail__seg{{flex:0 0 auto;min-width:80px;scroll-snap-align:start}}}}
+@media(prefers-reduced-motion:reduce){{.ex-rail.in-view .ex-rail__seg{{animation:none}}}}
 .rc{{font-family:var(--mono);font-size:11px;color:var(--ft);padding:2px 0}}
 .el{{max-width:960px;margin:0 auto;padding:0 20px 60px;display:flex;flex-direction:column;gap:2px}}
 .ec{{border:1px solid var(--bd);border-radius:8px;overflow:hidden;background:var(--sf);background-image:var(--gr);transition:border-color .15s}}
@@ -338,7 +355,7 @@ a.ec1:hover{{background:rgba(59,130,246,0.2);color:#bfdbfe}}
 </header>
 <div class="ct">
   <input class="si" type="text" placeholder="Search examples\u2026" oninput="flt();syncPrompt()" id="si" />
-  <div class="cr">{chr(10).join(cat_btns)}</div>
+  <div class="ex-rail" id="ex-rail" role="tablist" aria-label="Filter examples by category">{chr(10).join(rail_segs)}</div>
   <div class="rc" id="rc">{total} examples</div>
 </div>
 <div class="el" id="el">
@@ -348,7 +365,8 @@ a.ec1:hover{{background:rgba(59,130,246,0.2);color:#bfdbfe}}
 const SRC={sources_json};
 let ac='all';
 function flt(){{const q=document.getElementById('si').value.toLowerCase();let c=0;document.querySelectorAll('.ec').forEach(d=>{{const t=d.dataset.title,f=d.dataset.file,cats=d.dataset.cats;const cm=ac==='all'||cats.includes(ac);const sm=!q||t.includes(q)||f.includes(q)||cats.includes(q);const s=cm&&sm;d.style.display=s?'':'none';if(s)c++}});document.getElementById('rc').textContent='# '+c+' files match'}}
-document.querySelectorAll('.cb').forEach(b=>{{b.addEventListener('click',()=>{{document.querySelectorAll('.cb').forEach(x=>x.classList.remove('on'));b.classList.add('on');ac=b.dataset.cat;flt()}});}});
+document.querySelectorAll('.ex-rail__seg').forEach(b=>{{b.addEventListener('click',()=>{{document.querySelectorAll('.ex-rail__seg').forEach(x=>{{x.classList.remove('on');x.setAttribute('aria-selected','false')}});b.classList.add('on');b.setAttribute('aria-selected','true');ac=b.dataset.cat;b.style.animation='none';requestAnimationFrame(()=>{{b.style.animation='exec-stamp 0.6s var(--exec-ease-soft)'}});flt();syncPrompt()}});}});
+(function(){{const r=document.getElementById('ex-rail');if(!r)return;const io=new IntersectionObserver((ents)=>{{ents.forEach(e=>{{if(e.isIntersecting){{r.classList.add('in-view');io.disconnect()}}}})}},{{rootMargin:'0px 0px -20% 0px'}});io.observe(r)}})();
 function hl(s){{s=s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');s=s.replace(/\\b(from|import|def|class|return|if|elif|else|for|while|with|as|try|except|finally|raise|yield|async|await|and|or|not|in|is|True|False|None|lambda|pass|break|continue)\\b/g,'<span class="kw">$1</span>');s=s.replace(/(#[^\\n]*)/g,'<span class="cmt">$1</span>');s=s.replace(/(@\\w+(?:\\([^)]*\\))?)/g,'<span class="dec">$1</span>');return s}}
 function toggle(h){{const c=h.closest('.ec'),b=c.querySelector('.eb'),p=c.querySelector('.ep');c.classList.toggle('op');const open=c.classList.contains('op');b.style.display=open?'':'none';if(open&&!p.dataset.loaded){{p.innerHTML=hl(SRC[c.dataset.file]||'');p.dataset.loaded='1'}}}}
 function cpSrc(b){{const f=b.closest('.ec').dataset.file;navigator.clipboard.writeText(SRC[f]||'');b.textContent='Copied!';setTimeout(()=>b.textContent='Copy',1500)}}
