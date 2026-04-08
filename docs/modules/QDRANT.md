@@ -18,12 +18,13 @@ similarity by default, and lets you filter searches on metadata via Qdrant's pay
 indexing.
 
 ```python title="qdrant_quick.py"
-from selectools.embeddings import OpenAIEmbedder
+from selectools.embeddings import OpenAIEmbeddingProvider
 from selectools.rag import Document
 from selectools.rag.stores import QdrantVectorStore
 
+embedder = OpenAIEmbeddingProvider()
 store = QdrantVectorStore(
-    embedder=OpenAIEmbedder(),
+    embedder=embedder,
     collection_name="my_docs",
     url="http://localhost:6333",
 )
@@ -33,7 +34,9 @@ store.add_documents([
     Document(text="It supports REST and gRPC.", metadata={"category": "infra"}),
 ])
 
-results = store.search("vector search", top_k=2)
+# search() takes a query embedding, not a string — embed the query first
+query_vec = embedder.embed_query("vector search")
+results = store.search(query_vec, top_k=2)
 ```
 
 !!! tip "See Also"

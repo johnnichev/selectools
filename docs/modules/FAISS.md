@@ -17,17 +17,20 @@ vector index that lives entirely in memory but can be persisted to disk. It's id
 when you want zero-server RAG with millions of vectors and have plenty of RAM.
 
 ```python title="faiss_quick.py"
-from selectools.embeddings import OpenAIEmbedder
+from selectools.embeddings import OpenAIEmbeddingProvider
 from selectools.rag import Document
 from selectools.rag.stores import FAISSVectorStore
 
-store = FAISSVectorStore(embedder=OpenAIEmbedder())
+embedder = OpenAIEmbeddingProvider()
+store = FAISSVectorStore(embedder=embedder)
 store.add_documents([
     Document(text="Selectools is a Python AI agent framework."),
     Document(text="FAISS does fast similarity search."),
 ])
 
-results = store.search("agent framework", top_k=2)
+# search() takes a query embedding, not a string — embed the query first
+query_vec = embedder.embed_query("agent framework")
+results = store.search(query_vec, top_k=2)
 for r in results:
     print(r.score, r.document.text)
 

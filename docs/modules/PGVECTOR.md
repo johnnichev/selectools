@@ -19,12 +19,13 @@ the right choice when you already run Postgres and want vectors next to the rest
 your application data without standing up a separate vector service.
 
 ```python title="pgvector_quick.py"
-from selectools.embeddings import OpenAIEmbedder
+from selectools.embeddings import OpenAIEmbeddingProvider
 from selectools.rag import Document
 from selectools.rag.stores import PgVectorStore
 
+embedder = OpenAIEmbeddingProvider()
 store = PgVectorStore(
-    embedder=OpenAIEmbedder(),
+    embedder=embedder,
     connection_string="postgresql://user:pass@localhost:5432/mydb",
     table_name="selectools_documents",
 )
@@ -34,7 +35,9 @@ store.add_documents([
     Document(text="It supports cosine, L2, and inner-product distance."),
 ])
 
-results = store.search("postgres vector search", top_k=2)
+# search() takes a query embedding, not a string — embed the query first
+query_vec = embedder.embed_query("postgres vector search")
+results = store.search(query_vec, top_k=2)
 ```
 
 !!! tip "See Also"
