@@ -37,6 +37,22 @@ class RAGTool:
         >>> # Use with agent
         >>> agent = Agent(tools=[rag_tool.search_knowledge_base], provider=OpenAIProvider())
         >>> response = agent.run("What are the main features?")
+
+    Notes:
+        - **Thread safety.** The underlying vector store handles its own
+          locking (FAISS, Qdrant, pgvector are all documented as thread-safe
+          for concurrent reads). Mutating ``top_k`` / ``score_threshold`` /
+          ``include_scores`` on a ``RAGTool`` instance after it has been
+          attached to an ``Agent`` is not thread-safe — if you need a
+          different ``top_k`` at runtime, build a new ``RAGTool`` rather
+          than mutating a shared instance.
+        - **Cross-process serialization.** ``RAGTool`` instances and their
+          bound ``search_knowledge_base`` tool cannot be serialized across
+          process boundaries, for the same reason function-based ``@tool()``
+          tools cannot: the decorator replaces the function in the module
+          namespace, breaking the qualified-name lookup that serializers
+          rely on. ``Agent`` instances are not designed for cross-process
+          transport — build the ``Agent`` in each process instead.
     """
 
     def __init__(

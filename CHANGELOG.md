@@ -5,6 +5,96 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.0] - 2026-04-08
+
+### Added
+
+#### Vector Stores
+- **`FAISSVectorStore`** (`selectools.rag.stores.FAISSVectorStore`): in-process vector index using Facebook AI Similarity Search. Supports cosine, L2, and inner-product metrics; persistence via `save()`/`load()`; thread-safe writes. Optional dep: `faiss-cpu>=1.7.0`.
+- **`QdrantVectorStore`** (`selectools.rag.stores.QdrantVectorStore`): connector for Qdrant. REST + gRPC support, auto-creates collections, payload filtering, cosine by default. Optional dep: `qdrant-client>=1.7.0`.
+- **`PgVectorStore`** (`selectools.rag.stores.PgVectorStore`): PostgreSQL vector store using the `pgvector` extension. JSONB metadata, parameterized queries, auto-`CREATE TABLE`. Uses existing `[postgres]` extras (`psycopg2-binary`).
+
+#### Document Loaders
+- `DocumentLoader.from_csv(path, text_column=..., metadata_columns=..., delimiter=...)` — one document per row, stdlib `csv.DictReader`.
+- `DocumentLoader.from_json(path, text_field=..., metadata_fields=..., jq_filter=...)` — single objects or arrays, with simple dot-path filtering.
+- `DocumentLoader.from_html(path, selector=..., strip_tags=...)` — optional `beautifulsoup4` for CSS selectors, regex fallback otherwise.
+- `DocumentLoader.from_url(url, selector=..., headers=..., timeout=...)` — fetches via stdlib `urllib.request` and delegates to `from_html`.
+
+#### Toolbox
+- **Code execution** (`selectools.toolbox.code_tools`): `execute_python(code, timeout)` and `execute_shell(command, timeout)`. Subprocess-isolated, 10 KB output truncation, shell metacharacter blocklist for SSRF/injection mitigation.
+- **Web search** (`selectools.toolbox.search_tools`): `web_search(query, num_results)` via DuckDuckGo HTML (no API key) and `scrape_url(url, selector)` with SSRF guards.
+- **GitHub** (`selectools.toolbox.github_tools`): `github_search_repos`, `github_get_file`, `github_list_issues` against GitHub REST API v3. Uses `GITHUB_TOKEN` env var when present (5000 req/hr vs 60).
+- **Database** (`selectools.toolbox.db_tools`): `query_sqlite` with `PRAGMA query_only = ON`, `query_postgres` via psycopg2. Read-only enforcement at the validator level.
+
+#### Multimodal Messages
+- `ContentPart` dataclass for multipart messages (`text`, `image_url`, `image_base64`, `audio`).
+- `Message.content` now accepts `str | list[ContentPart]`. Existing `content: str` paths unchanged (backward compatible).
+- `image_message(image, prompt)` and `text_content(message)` helpers exported from package root.
+- All four providers (OpenAI, Anthropic, Gemini, Ollama) format multimodal content into their native shape.
+
+#### Observability
+- **`OTelObserver`** (`selectools.observe.OTelObserver`): maps the 45 selectools observer events to OpenTelemetry spans following the GenAI semantic conventions. Async variant `AsyncOTelObserver` for `arun()`/`astream()`. Optional dep: `opentelemetry-api>=1.20.0`.
+- **`LangfuseObserver`** (`selectools.observe.LangfuseObserver`): sends traces, generations, and spans to Langfuse Cloud or self-hosted instances. Reads `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`/`LANGFUSE_HOST` env vars. Optional dep: `langfuse>=2.0.0`.
+
+#### Providers
+- **`AzureOpenAIProvider`** (`selectools.AzureOpenAIProvider`): wraps the OpenAI SDK's `AzureOpenAI` client. Supports `AZURE_OPENAI_ENDPOINT`/`AZURE_OPENAI_API_KEY` env vars, AAD token auth, and Azure deployment-name to model-id mapping. Inherits all behavior from `OpenAIProvider`.
+
+#### Optional Dependencies
+- New `[observe]` extras group: `opentelemetry-api>=1.20.0`, `langfuse>=2.0.0`.
+- `[rag]` extras now also include: `qdrant-client>=1.7.0`, `faiss-cpu>=1.7.0`, `beautifulsoup4>=4.12.0`.
+
+### Changed
+- `stability.beta()` and `stability.stable()` decorators now accept arbitrary objects via an `Any` overload, in addition to classes and callables. Lets `@beta` mark `Tool` instances produced by `@tool()`.
+
+### Fixed
+
+> **Note on the three "latent" bugs below.** The `@tool()` method-binding
+> bug and both of the multimodal `content_parts` provider bugs were
+> **pre-existing in earlier releases but never surfaced** because no test
+> in the suite actually exercised them end-to-end: the RAG workflow tests
+> only asserted `isinstance(agent, Agent)` without ever calling
+> `agent.run()`, and the multimodal tier-2 tests only asserted
+> `result.content` was non-empty (which passed on "I cannot see images"
+> style replies). Running real-LLM simulations during v0.21.0 release
+> prep surfaced all three at once. They are all fixed in this release.
+
+#### RAG — `@tool()` on class methods (shipping blocker caught by real-call simulations)
+- `@tool()` applied to a method (`def f(self, query: str)`) produced a class-level `Tool` whose `function` was the *unbound* method. When the agent executor called `tool.function(**llm_kwargs)` Python raised `TypeError: missing 1 required positional argument: 'self'` and the LLM saw "Tool Execution Failed", giving up after a few iterations. This fundamentally broke the canonical RAG pattern documented across selectools:
+  ```python
+  rag_tool = RAGTool(vector_store=store)
+  agent = Agent(tools=[rag_tool.search_knowledge_base], provider=...)
+  ```
+  `RAGTool`, `SemanticSearchTool`, and `HybridSearchTool` were all affected. The existing `tests/rag/test_rag_workflow.py` coverage never caught it because those tests built the agent and then only asserted `isinstance(agent, Agent)` — they never called `agent.run()`.
+- **Fix:** new `_BoundMethodTool` descriptor in `selectools/tools/decorators.py`. `@tool()` detects when the first parameter is `self` and returns a descriptor that binds per-instance on attribute access via `functools.partial(original_fn, instance)`. Class-level access falls through to a template `Tool` so introspection (`MyClass.method.name`, `.description`, `.parameters`) still works.
+
+#### Qdrant — migrated to `query_points()` API
+- `QdrantVectorStore.search()` called `self.client.search(query_vector=…)`, which was removed from `qdrant-client >=1.13`. Users on any recent `qdrant-client` would have hit `AttributeError: 'QdrantClient' object has no attribute 'search'` on their first query. The existing mock-based unit tests didn't catch it because they mocked `QdrantClient` and accepted whatever attribute the test asked for.
+- **Fix:** migrated to `client.query_points(query=…)` and unwrap `response.points`. Also: return `[]` on 404 when the collection has been dropped by `clear()`, to match `FAISSVectorStore` semantics (search-after-clear returns `[]`, doesn't raise).
+
+#### Multimodal — Gemini and Anthropic providers silently dropped images
+- `GeminiProvider._format_messages` only handled the legacy `message.image_base64` attribute. The new `image_message()` helper puts the image in `message.content_parts` and explicitly sets `message.image_base64 = None`, so Gemini received only the text prompt and replied "I cannot see images." Every Gemini vision user would have hit this.
+- `AnthropicProvider` had the exact same bug — Claude replied "I don't see any image attached." Every Claude vision user would have hit this.
+- OpenAI was unaffected because `providers/_openai_compat.py` already iterates `content_parts`.
+- **Fix:** both providers now iterate `message.content_parts` and convert each `ContentPart` to the provider's native image shape (`types.Part(inline_data=…)` for Gemini, `{type: image, source: {type: base64, …}}` for Anthropic), with the legacy path preserved as a fallback for pre-0.21.0 callers.
+
+#### Internal
+- Pre-existing mypy error in `providers/azure_openai_provider.py:117` where `str | None` from `os.getenv` wasn't narrowed correctly — fixed with an explicit `is not None` check.
+
+### Tests
+- **+345 new tests** across 13 new e2e test files (`tests/test_e2e_*.py`, `tests/rag/test_e2e_*.py`, `tests/tools/test_e2e_*.py`, `tests/providers/test_e2e_azure_openai.py`) and full-release simulations:
+  - **Tier 1** — real backends with no external services (28 tests): real `faiss-cpu` C++ bindings, real `subprocess.run` for code tools, real `sqlite3` for db tools, real local files + HTTP for document loaders, real `opentelemetry-sdk` with `InMemorySpanExporter` for OTel.
+  - **Tier 2** — real API calls using credentials in `.env` (8 tests): real OpenAI `gpt-4o-mini` + Anthropic `claude-haiku-4-5` + Gemini `gemini-2.5-flash` multimodal with an in-memory 4x4 PNG; real DuckDuckGo search; real GitHub REST API (unauthenticated).
+  - **Tier 3** — skip-cleanly when external services or credentials are missing (7 tests): Qdrant, pgvector, Azure OpenAI, Langfuse.
+  - **Integration simulations** (4 tests in `test_e2e_v0_21_0_simulations.py`): FAISS RAG + real OpenAI agent + OTel; Gemini multimodal + `execute_python` tool; Anthropic `query_sqlite` + `execute_python` chaining; Qdrant RAG + real OpenAI agent.
+  - **App-shaped simulations** (7 tests in `test_e2e_v0_21_0_apps.py`): "Skylake" documentation Q&A bot with real CSV → FAISS → OpenAI agent + ConversationMemory multi-turn; sales data analyst bot with real SQLite + Claude chaining query + Python compute; knowledge base librarian that ingests from `from_csv` + `from_json` + `from_html` into real Qdrant and answers anchor-phrase questions with Gemini.
+
+### Stats
+- **5,203 tests** — up from 4,612 in v0.20.1
+- **88 examples** (12 new: `77_faiss_vector_store.py` through `88_langfuse_observer.py`)
+- **5 providers** (added Azure OpenAI)
+- **7 vector stores** (added FAISS, Qdrant, pgvector)
+- **152 models**
+
 ## [0.20.1] - 2026-04-03
 
 ### Added

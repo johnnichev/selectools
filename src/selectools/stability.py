@@ -41,9 +41,13 @@ def stable(obj: _C) -> _C: ...
 def stable(obj: _F) -> _F: ...
 
 
-def stable(obj: Union[_F, _C]) -> Union[_F, _C]:
+@overload
+def stable(obj: Any) -> Any: ...
+
+
+def stable(obj: Any) -> Any:
     """Set stability marker to 'stable' (API is frozen)."""
-    obj.__stability__ = "stable"  # type: ignore[union-attr]
+    obj.__stability__ = "stable"
     return obj
 
 
@@ -58,9 +62,13 @@ def beta(obj: _C) -> _C: ...
 def beta(obj: _F) -> _F: ...
 
 
-def beta(obj: Union[_F, _C]) -> Union[_F, _C]:
+@overload
+def beta(obj: Any) -> Any: ...
+
+
+def beta(obj: Any) -> Any:
     """Set stability marker to 'beta' (API may change in minor releases)."""
-    obj.__stability__ = "beta"  # type: ignore[union-attr]
+    obj.__stability__ = "beta"
     return obj
 
 

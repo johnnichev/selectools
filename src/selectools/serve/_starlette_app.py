@@ -100,7 +100,7 @@ def _make_routes(auth_token: Optional[str]) -> list:  # type: ignore[type-arg]
             return _login_redirect()
         return JSONResponse(_provider_health)
 
-    async def eval_dashboard(request: Request) -> HTMLResponse:
+    async def eval_dashboard(request: Request) -> Response:
         if not _is_authed(request, auth_token):
             return _login_redirect()
         return HTMLResponse(

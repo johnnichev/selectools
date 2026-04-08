@@ -2,7 +2,7 @@
 
 > This file concatenates all selectools documentation pages for AI agent consumption.
 
-> 32 pages included. Generated from docs/ source files.
+> 39 pages included. Generated from docs/ source files.
 
 
 
@@ -18097,3 +18097,957 @@ results = searcher.search("refund policy", top_k=10)
 - **LlamaParse** for complex document parsing (tables, PDFs)
 
 If your primary need is sophisticated document retrieval with many data sources, LlamaIndex is purpose-built for that. If you need agents + RAG + evals + deployment in one package, selectools combines all of these.
+
+============================================================
+
+## FILE: docs/modules/FAISS.md
+
+============================================================
+
+---
+description: "In-process FAISS vector index for fast local similarity search with disk persistence"
+tags:
+  - rag
+  - vector-stores
+  - faiss
+---
+
+# FAISS Vector Store
+
+**Import:** `from selectools.rag.stores import FAISSVectorStore`
+**Stability:** beta
+**Added in:** v0.21.0
+
+`FAISSVectorStore` wraps Facebook AI's FAISS library to provide a fast, in-process
+vector index that lives entirely in memory but can be persisted to disk. It's ideal
+when you want zero-server RAG with millions of vectors and have plenty of RAM.
+
+```python title="faiss_quick.py"
+from selectools.embeddings import OpenAIEmbedder
+from selectools.rag import Document
+from selectools.rag.stores import FAISSVectorStore
+
+store = FAISSVectorStore(embedder=OpenAIEmbedder())
+store.add_documents([
+    Document(text="Selectools is a Python AI agent framework."),
+    Document(text="FAISS does fast similarity search."),
+])
+
+results = store.search("agent framework", top_k=2)
+for r in results:
+    print(r.score, r.document.text)
+
+store.save("faiss_index")  # writes index + documents
+```
+
+!!! tip "See Also"
+    - [Qdrant](QDRANT.md) - Self-hosted vector store with REST + gRPC
+    - [pgvector](PGVECTOR.md) - PostgreSQL-backed vector store
+    - [RAG](RAG.md) - High-level retrieval pipeline
+
+---
+
+## Install
+
+```bash
+pip install "selectools[rag]"
+```
+
+`faiss-cpu>=1.7.0` is part of the `[rag]` optional extras. If you want GPU acceleration,
+install `faiss-gpu` separately.
+
+---
+
+## Constructor
+
+```python
+FAISSVectorStore(
+    embedder: EmbeddingProvider | None = None,
+    dimension: int | None = None,
+)
+```
+
+| Parameter | Description |
+|---|---|
+| `embedder` | Any `selectools.embeddings.EmbeddingProvider`. May be `None` when loading a persisted index that already contains pre-computed vectors. |
+| `dimension` | Vector dimension. If `None`, inferred from the first batch of `add_documents()`. |
+
+---
+
+## Persistence
+
+```python
+store.save("path/to/index")   # writes index file + sidecar JSON for documents
+loaded = FAISSVectorStore.load("path/to/index", embedder=OpenAIEmbedder())
+```
+
+`save()` persists both the FAISS index and the parallel `Document` list so search
+results can return original text/metadata after reload.
+
+---
+
+## Thread Safety
+
+FAISS itself is not thread-safe for writes. `FAISSVectorStore` wraps every mutation
+in a `threading.Lock`, so concurrent `add_documents()` and `search()` calls from
+multiple agent threads are safe.
+
+---
+
+## API Reference
+
+| Method | Description |
+|---|---|
+| `add_documents(docs)` | Embed and add documents to the index |
+| `search(query, top_k)` | Cosine similarity search; returns `List[SearchResult]` |
+| `delete(ids)` | Remove documents by ID |
+| `clear()` | Wipe the index |
+| `save(path)` | Persist index + documents to disk |
+| `load(path, embedder)` | Class method: rehydrate a persisted store |
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 77 | [`77_faiss_vector_store.py`](https://github.com/johnnichev/selectools/blob/main/examples/77_faiss_vector_store.py) | FAISS quickstart with embeddings + persistence |
+
+
+============================================================
+
+## FILE: docs/modules/QDRANT.md
+
+============================================================
+
+---
+description: "Connector for the Qdrant vector database with REST + gRPC support and payload filtering"
+tags:
+  - rag
+  - vector-stores
+  - qdrant
+---
+
+# Qdrant Vector Store
+
+**Import:** `from selectools.rag.stores import QdrantVectorStore`
+**Stability:** beta
+**Added in:** v0.21.0
+
+`QdrantVectorStore` wraps the official `qdrant-client` to give you a self-hosted or
+Qdrant Cloud-backed vector store. It auto-creates collections, supports cosine
+similarity by default, and lets you filter searches on metadata via Qdrant's payload
+indexing.
+
+```python title="qdrant_quick.py"
+from selectools.embeddings import OpenAIEmbedder
+from selectools.rag import Document
+from selectools.rag.stores import QdrantVectorStore
+
+store = QdrantVectorStore(
+    embedder=OpenAIEmbedder(),
+    collection_name="my_docs",
+    url="http://localhost:6333",
+)
+
+store.add_documents([
+    Document(text="Qdrant is a vector search engine.", metadata={"category": "infra"}),
+    Document(text="It supports REST and gRPC.", metadata={"category": "infra"}),
+])
+
+results = store.search("vector search", top_k=2)
+```
+
+!!! tip "See Also"
+    - [FAISS](FAISS.md) - In-process vector index, no server required
+    - [pgvector](PGVECTOR.md) - PostgreSQL-backed vector store
+    - [RAG](RAG.md) - Higher-level retrieval pipeline
+
+---
+
+## Install
+
+```bash
+pip install "selectools[rag]"
+```
+
+`qdrant-client>=1.7.0` is part of the `[rag]` extras.
+
+You also need a running Qdrant instance. The simplest way:
+
+```bash
+docker run -p 6333:6333 -p 6334:6334 qdrant/qdrant
+```
+
+Or sign up for [Qdrant Cloud](https://cloud.qdrant.io/) and get a managed instance.
+
+---
+
+## Constructor
+
+```python
+QdrantVectorStore(
+    embedder: EmbeddingProvider,
+    collection_name: str = "selectools",
+    url: str = "http://localhost:6333",
+    api_key: str | None = None,
+    prefer_grpc: bool = True,
+    **qdrant_kwargs,
+)
+```
+
+| Parameter | Description |
+|---|---|
+| `embedder` | Any `EmbeddingProvider`. Used to compute vectors for both `add_documents()` and `search()`. |
+| `collection_name` | Qdrant collection. Auto-created on first `add_documents()` if it doesn't exist. |
+| `url` | Qdrant server URL. Use `https://...` for cloud. |
+| `api_key` | Optional API key for Qdrant Cloud or authenticated servers. |
+| `prefer_grpc` | When `True` (default) the client uses gRPC for lower-latency vector ops. |
+| `**qdrant_kwargs` | Additional arguments forwarded to `qdrant_client.QdrantClient`. |
+
+---
+
+## Cloud Configuration
+
+```python
+import os
+
+store = QdrantVectorStore(
+    embedder=OpenAIEmbedder(),
+    collection_name="prod_docs",
+    url="https://my-cluster.qdrant.io",
+    api_key=os.environ["QDRANT_API_KEY"],
+)
+```
+
+---
+
+## Metadata Filtering
+
+Document metadata is stored as Qdrant payload, so you can filter searches at the
+database level. Use `qdrant_client.models.Filter` constructs and pass them via
+`**search_kwargs` (the store forwards them to the underlying client).
+
+---
+
+## API Reference
+
+| Method | Description |
+|---|---|
+| `add_documents(docs)` | Embed documents and upsert into the collection |
+| `search(query, top_k)` | Cosine similarity search |
+| `delete(ids)` | Delete documents by ID |
+| `clear()` | Delete the entire collection |
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 78 | [`78_qdrant_vector_store.py`](https://github.com/johnnichev/selectools/blob/main/examples/78_qdrant_vector_store.py) | Qdrant quickstart with metadata filtering |
+
+
+============================================================
+
+## FILE: docs/modules/PGVECTOR.md
+
+============================================================
+
+---
+description: "PostgreSQL-backed vector store using the pgvector extension"
+tags:
+  - rag
+  - vector-stores
+  - postgres
+  - pgvector
+---
+
+# pgvector Store
+
+**Import:** `from selectools.rag.stores import PgVectorStore`
+**Stability:** beta
+**Added in:** v0.21.0
+
+`PgVectorStore` lets you store and search document embeddings inside a PostgreSQL
+database using the [pgvector](https://github.com/pgvector/pgvector) extension. It's
+the right choice when you already run Postgres and want vectors next to the rest of
+your application data without standing up a separate vector service.
+
+```python title="pgvector_quick.py"
+from selectools.embeddings import OpenAIEmbedder
+from selectools.rag import Document
+from selectools.rag.stores import PgVectorStore
+
+store = PgVectorStore(
+    embedder=OpenAIEmbedder(),
+    connection_string="postgresql://user:pass@localhost:5432/mydb",
+    table_name="selectools_documents",
+)
+
+store.add_documents([
+    Document(text="pgvector adds vector types to Postgres."),
+    Document(text="It supports cosine, L2, and inner-product distance."),
+])
+
+results = store.search("postgres vector search", top_k=2)
+```
+
+!!! tip "See Also"
+    - [Qdrant](QDRANT.md) - Self-hosted vector database with REST + gRPC
+    - [FAISS](FAISS.md) - In-process vector index, no server required
+    - [Sessions](SESSIONS.md) - Postgres-backed agent sessions
+
+---
+
+## Install
+
+```bash
+pip install "selectools[postgres]"
+```
+
+The `[postgres]` extras already include `psycopg2-binary>=2.9.0`. You also need
+the pgvector extension installed in your database:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+---
+
+## Constructor
+
+```python
+PgVectorStore(
+    embedder: EmbeddingProvider,
+    connection_string: str,
+    table_name: str = "selectools_documents",
+    dimensions: int | None = None,
+)
+```
+
+| Parameter | Description |
+|---|---|
+| `embedder` | Embedding provider used to compute vectors. |
+| `connection_string` | Standard libpq connection string. |
+| `table_name` | Table to store documents in. Validated as a SQL identifier (letters, digits, underscores) to prevent injection. |
+| `dimensions` | Vector dimensions. Auto-detected from `embedder.embed_query("test")` on first use if not specified. |
+
+---
+
+## Schema
+
+`PgVectorStore` creates the following table on first use (idempotent):
+
+```sql
+CREATE TABLE IF NOT EXISTS selectools_documents (
+    id        TEXT PRIMARY KEY,
+    text      TEXT NOT NULL,
+    metadata  JSONB,
+    embedding vector(N)
+);
+```
+
+The `N` is the embedding dimension. An index on the `embedding` column accelerates
+cosine similarity queries.
+
+---
+
+## Search
+
+`search()` runs a parameterized query using pgvector's `<=>` cosine distance
+operator:
+
+```sql
+SELECT id, text, metadata, embedding <=> %s AS distance
+FROM selectools_documents
+ORDER BY distance ASC
+LIMIT %s;
+```
+
+All queries are parameterized — there's no SQL injection risk from user input.
+
+---
+
+## Connection Pooling
+
+`PgVectorStore` opens a single `psycopg2.connect()` per instance. If you need
+pooling for high concurrency, manage it externally (e.g. PgBouncer) and pass the
+pooler URL as the connection string.
+
+---
+
+## API Reference
+
+| Method | Description |
+|---|---|
+| `add_documents(docs)` | Embed and upsert documents (`INSERT ... ON CONFLICT DO UPDATE`) |
+| `search(query, top_k)` | Cosine similarity search |
+| `delete(ids)` | Delete documents by ID |
+| `clear()` | `TRUNCATE` the table |
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 79 | [`79_pgvector_store.py`](https://github.com/johnnichev/selectools/blob/main/examples/79_pgvector_store.py) | pgvector quickstart with auto-table creation |
+
+
+============================================================
+
+## FILE: docs/modules/MULTIMODAL.md
+
+============================================================
+
+---
+description: "Multimodal messages — pass images and other content parts to vision-capable LLMs"
+tags:
+  - core
+  - messages
+  - multimodal
+  - vision
+---
+
+# Multimodal Messages
+
+**Import:** `from selectools import ContentPart, image_message, Message`
+**Stability:** beta
+**Added in:** v0.21.0
+
+`Message.content` now accepts a list of `ContentPart` objects in addition to a plain
+string. This unlocks vision and other multimodal inputs across every provider that
+supports them: GPT-4o, Claude 3.5/3.7, Gemini, and Ollama vision models.
+
+```python title="multimodal_quick.py"
+from selectools import Agent, OpenAIProvider, image_message
+
+agent = Agent(provider=OpenAIProvider(model="gpt-4o"))
+
+# Helper for the common "image + prompt" case
+result = agent.run([
+    image_message("https://example.com/diagram.png", "What does this diagram show?")
+])
+print(result.content)
+```
+
+!!! tip "See Also"
+    - [Providers](PROVIDERS.md) - Which providers support multimodal input
+    - [Models](MODELS.md) - Vision-capable model identifiers
+
+---
+
+## ContentPart Anatomy
+
+```python
+from selectools import ContentPart, Message, Role
+
+msg = Message(
+    role=Role.USER,
+    content=[
+        ContentPart(type="text", text="Compare these two screenshots."),
+        ContentPart(type="image_url", image_url="https://example.com/before.png"),
+        ContentPart(type="image_url", image_url="https://example.com/after.png"),
+    ],
+)
+```
+
+| Field | Used when |
+|---|---|
+| `type` | One of `"text"`, `"image_url"`, `"image_base64"`, `"audio"` |
+| `text` | Set when `type == "text"` |
+| `image_url` | Public URL for an image (most providers) |
+| `image_base64` | Inline base64 payload for an image |
+| `media_type` | MIME type, e.g. `"image/png"` or `"audio/wav"` |
+
+---
+
+## Helper: `image_message`
+
+For the common "single image + prompt" case, use the `image_message` helper:
+
+```python
+from selectools import image_message
+
+# From a URL
+msg = image_message("https://example.com/photo.jpg", "Describe what you see.")
+
+# From a local file path (auto-encoded as base64)
+msg = image_message("./screenshots/error.png", "What's the error in this UI?")
+```
+
+The helper detects whether the input is a URL or a local path and chooses the
+right `ContentPart.type` (`image_url` vs `image_base64`).
+
+---
+
+## Provider Compatibility
+
+| Provider | Format used internally |
+|---|---|
+| OpenAI | `[{"type": "text", ...}, {"type": "image_url", "image_url": {"url": ...}}]` |
+| Anthropic | `[{"type": "text", ...}, {"type": "image", "source": {"type": "base64", ...}}]` |
+| Gemini | `types.Part` objects with `inline_data` |
+| Ollama | `images` parameter (list of base64 strings) |
+
+You don't need to format any of this yourself — selectools handles the conversion
+in each provider's `_format_messages()`.
+
+---
+
+## Backward Compatibility
+
+`Message(role=..., content="plain text")` continues to work everywhere. The
+`list[ContentPart]` path is opt-in and existing code is unaffected.
+
+```python
+# Still works exactly as before
+msg = Message(role=Role.USER, content="What is 2 + 2?")
+```
+
+---
+
+## API Reference
+
+| Symbol | Description |
+|---|---|
+| `ContentPart` | Dataclass for a single part of a multimodal message |
+| `Message.content` | Now `str \| list[ContentPart]` |
+| `image_message(image, prompt)` | Convenience constructor for image + text |
+| `text_content(message)` | Extract concatenated text from a (possibly multimodal) Message |
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 81 | [`81_multimodal_messages.py`](https://github.com/johnnichev/selectools/blob/main/examples/81_multimodal_messages.py) | Image input with `image_message` and raw `ContentPart` |
+
+
+============================================================
+
+## FILE: docs/modules/OTEL.md
+
+============================================================
+
+---
+description: "OpenTelemetry observer — emit GenAI semantic-convention spans for agent runs, LLM calls, and tool executions"
+tags:
+  - observability
+  - opentelemetry
+  - tracing
+---
+
+# OpenTelemetry Observer
+
+**Import:** `from selectools.observe import OTelObserver`
+**Stability:** beta
+**Added in:** v0.21.0
+
+`OTelObserver` maps the 45 selectools observer events to OpenTelemetry spans,
+following the [OpenTelemetry GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/).
+Once attached, every agent run, LLM call, and tool execution becomes a span you
+can ship to Jaeger, Tempo, Honeycomb, Datadog, Grafana, or any other OTLP-capable
+backend.
+
+```python title="otel_quick.py"
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+
+from selectools import Agent, AgentConfig, OpenAIProvider, tool
+from selectools.observe import OTelObserver
+
+# 1. Configure your OTel SDK once at process start
+trace.set_tracer_provider(TracerProvider())
+trace.get_tracer_provider().add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
+
+# 2. Attach the observer
+@tool()
+def search(query: str) -> str:
+    return f"Results for {query}"
+
+agent = Agent(
+    tools=[search],
+    provider=OpenAIProvider(),
+    config=AgentConfig(observers=[OTelObserver()]),
+)
+
+result = agent.run("Find articles about Python")
+# Spans now flow to your OTel exporter
+```
+
+!!! tip "See Also"
+    - [Langfuse](LANGFUSE.md) - Alternative observer focused on LLM tracing
+    - [Trace Store](TRACE_STORE.md) - Persist agent traces to disk or SQLite
+    - [Audit](AUDIT.md) - JSONL audit logs
+
+---
+
+## Install
+
+```bash
+pip install "selectools[observe]"
+```
+
+The `[observe]` extras include `opentelemetry-api>=1.20.0`. **selectools does not
+ship `opentelemetry-sdk` or any exporters** — bring your own. Common choices:
+
+```bash
+pip install opentelemetry-sdk opentelemetry-exporter-otlp     # OTLP
+pip install opentelemetry-sdk opentelemetry-exporter-jaeger   # Jaeger
+```
+
+This separation lets you reuse whatever exporter the rest of your stack already
+uses without selectools pinning a transitive dependency.
+
+---
+
+## Span Hierarchy
+
+Each agent run becomes a span tree:
+
+```
+agent.run                              ← root span
+├── gen_ai.llm.call                    ← per LLM round-trip
+│   └── gen_ai.tool.execution          ← per tool call
+├── gen_ai.llm.call
+└── ...
+```
+
+| Span name | Attributes |
+|---|---|
+| `agent.run` | `gen_ai.system="selectools"`, `gen_ai.usage.total_tokens`, `gen_ai.usage.cost_usd` |
+| `gen_ai.llm.call` | `gen_ai.request.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` |
+| `gen_ai.tool.execution` | `gen_ai.tool.name`, `gen_ai.tool.duration_ms`, `gen_ai.tool.success` |
+
+---
+
+## Constructor
+
+```python
+OTelObserver(tracer_name: str = "selectools")
+```
+
+| Parameter | Description |
+|---|---|
+| `tracer_name` | Name passed to `trace.get_tracer()`. Use this to scope spans by service in multi-app processes. |
+
+---
+
+## Async
+
+For `agent.arun()` / `agent.astream()` use the async variant:
+
+```python
+from selectools.observe.otel import AsyncOTelObserver
+agent = Agent(..., config=AgentConfig(observers=[AsyncOTelObserver()]))
+```
+
+---
+
+## API Reference
+
+| Symbol | Description |
+|---|---|
+| `OTelObserver(tracer_name)` | Sync observer for `agent.run()` / `agent.stream()` |
+| `AsyncOTelObserver(tracer_name)` | Async observer for `agent.arun()` / `agent.astream()` |
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 87 | [`87_otel_observer.py`](https://github.com/johnnichev/selectools/blob/main/examples/87_otel_observer.py) | Wire selectools traces into an OTLP exporter |
+
+
+============================================================
+
+## FILE: docs/modules/AZURE_OPENAI.md
+
+============================================================
+
+---
+description: "Azure OpenAI Service provider — use selectools agents with Azure-deployed GPT-4 / GPT-4o models"
+tags:
+  - providers
+  - azure
+  - openai
+---
+
+# Azure OpenAI Provider
+
+**Import:** `from selectools import AzureOpenAIProvider`
+**Stability:** beta
+**Added in:** v0.21.0
+
+`AzureOpenAIProvider` lets selectools talk to OpenAI models deployed on Azure
+OpenAI Service. It extends `OpenAIProvider` and uses the OpenAI SDK's built-in
+`AzureOpenAI` client, so you get every feature of the regular OpenAI provider
+(streaming, tool calling, structured output, multimodal) without having to
+maintain a separate code path.
+
+```python title="azure_openai_quick.py"
+from selectools import Agent, AzureOpenAIProvider, tool
+
+@tool()
+def get_time() -> str:
+    """Return the current time."""
+    from datetime import datetime
+    return datetime.utcnow().isoformat()
+
+provider = AzureOpenAIProvider(
+    azure_endpoint="https://my-resource.openai.azure.com",
+    api_key="<your-azure-key>",
+    azure_deployment="gpt-4o",  # your Azure deployment name
+)
+
+agent = Agent(tools=[get_time], provider=provider)
+print(agent.run("What time is it?").content)
+```
+
+!!! tip "See Also"
+    - [Providers](PROVIDERS.md) - All available LLM providers
+    - [Fallback Provider](PROVIDERS.md#fallback) - Use Azure as a fallback for the public OpenAI API
+
+---
+
+## Install
+
+No new dependencies. Azure support uses the same `openai>=1.30.0` package that
+ships as a core selectools dependency.
+
+```bash
+pip install selectools  # Azure already supported
+```
+
+---
+
+## Constructor
+
+```python
+AzureOpenAIProvider(
+    azure_endpoint: str | None = None,
+    api_key: str | None = None,
+    api_version: str = "2024-10-21",
+    azure_deployment: str | None = None,
+    azure_ad_token: str | None = None,
+)
+```
+
+| Parameter | Description |
+|---|---|
+| `azure_endpoint` | Azure resource endpoint (`https://<name>.openai.azure.com`). Falls back to `AZURE_OPENAI_ENDPOINT` env var. |
+| `api_key` | Azure API key. Falls back to `AZURE_OPENAI_API_KEY`. Optional when `azure_ad_token` is set. |
+| `api_version` | Azure OpenAI API version string. Defaults to a recent stable release. |
+| `azure_deployment` | The deployment name to use as the default model (Azure uses deployment names, not OpenAI model IDs). Falls back to `AZURE_OPENAI_DEPLOYMENT`. |
+| `azure_ad_token` | An Azure Active Directory token for AAD-based auth. When set, `api_key` is not required. |
+
+---
+
+## Environment Variables
+
+`AzureOpenAIProvider()` with no arguments works if you set the standard Azure
+env vars:
+
+```bash
+export AZURE_OPENAI_ENDPOINT="https://my-resource.openai.azure.com"
+export AZURE_OPENAI_API_KEY="..."
+export AZURE_OPENAI_DEPLOYMENT="gpt-4o"
+```
+
+```python
+provider = AzureOpenAIProvider()  # Reads everything from env
+```
+
+---
+
+## Azure Deployments vs Model IDs
+
+In the public OpenAI API you pass model IDs like `"gpt-4o"`. In Azure OpenAI you
+pass **deployment names** that you create in the Azure Portal. selectools maps
+the `azure_deployment` parameter to the `model` argument internally, so the rest
+of your agent code is unchanged:
+
+```python
+# Same Agent code, swappable providers
+agent = Agent(provider=OpenAIProvider(model="gpt-4o"))           # Public OpenAI
+agent = Agent(provider=AzureOpenAIProvider(azure_deployment="gpt-4o"))  # Azure
+```
+
+---
+
+## AAD Token Auth
+
+For enterprise deployments using Azure Active Directory:
+
+```python
+from azure.identity import DefaultAzureCredential
+
+credential = DefaultAzureCredential()
+token = credential.get_token("https://cognitiveservices.azure.com/.default").token
+
+provider = AzureOpenAIProvider(
+    azure_endpoint="https://my-resource.openai.azure.com",
+    azure_deployment="gpt-4o",
+    azure_ad_token=token,
+)
+```
+
+---
+
+## Inheritance
+
+`AzureOpenAIProvider` extends `OpenAIProvider`, so it inherits everything:
+
+- `complete()` / `acomplete()`
+- `stream()` / `astream()`
+- Tool calling, structured output, multimodal messages
+- Token usage and cost tracking via `selectools.pricing`
+
+Only `__init__` is overridden — to use the `AzureOpenAI` client class instead of
+the regular `OpenAI` one.
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 86 | [`86_azure_openai.py`](https://github.com/johnnichev/selectools/blob/main/examples/86_azure_openai.py) | Azure OpenAI agent with deployment-name routing |
+
+
+============================================================
+
+## FILE: docs/modules/LANGFUSE.md
+
+============================================================
+
+---
+description: "Langfuse observer — send agent traces, generations, and spans to Langfuse Cloud or self-hosted"
+tags:
+  - observability
+  - langfuse
+  - tracing
+---
+
+# Langfuse Observer
+
+**Import:** `from selectools.observe import LangfuseObserver`
+**Stability:** beta
+**Added in:** v0.21.0
+
+`LangfuseObserver` ships selectools traces to [Langfuse](https://langfuse.com), an
+open-source LLM observability platform. Each agent run becomes a Langfuse trace,
+each LLM call becomes a generation (with input/output/tokens/cost), and each tool
+call becomes a span. Works with both Langfuse Cloud and self-hosted instances.
+
+```python title="langfuse_quick.py"
+import os
+from selectools import Agent, AgentConfig, OpenAIProvider, tool
+from selectools.observe import LangfuseObserver
+
+os.environ["LANGFUSE_PUBLIC_KEY"] = "pk-lf-..."
+os.environ["LANGFUSE_SECRET_KEY"] = "sk-lf-..."
+# os.environ["LANGFUSE_HOST"] = "https://my-langfuse.example.com"  # self-hosted
+
+@tool()
+def search(query: str) -> str:
+    return f"Results for {query}"
+
+agent = Agent(
+    tools=[search],
+    provider=OpenAIProvider(),
+    config=AgentConfig(observers=[LangfuseObserver()]),
+)
+
+result = agent.run("Find articles about Python")
+# View the trace in your Langfuse dashboard
+```
+
+!!! tip "See Also"
+    - [OpenTelemetry](OTEL.md) - Alternative observer for OTLP backends
+    - [Trace Store](TRACE_STORE.md) - Persist traces locally as JSONL or SQLite
+
+---
+
+## Install
+
+```bash
+pip install "selectools[observe]"
+```
+
+The `[observe]` extras include `langfuse>=2.0.0`.
+
+---
+
+## Constructor
+
+```python
+LangfuseObserver(
+    public_key: str | None = None,
+    secret_key: str | None = None,
+    host: str | None = None,
+)
+```
+
+| Parameter | Description |
+|---|---|
+| `public_key` | Langfuse public key. Falls back to `LANGFUSE_PUBLIC_KEY` env var. |
+| `secret_key` | Langfuse secret key. Falls back to `LANGFUSE_SECRET_KEY` env var. |
+| `host` | Langfuse host URL. Defaults to Langfuse Cloud. Set this to point at a self-hosted instance. Falls back to `LANGFUSE_HOST` env var. |
+
+The observer auto-flushes after every `run_end`, so traces are visible in your
+Langfuse dashboard within seconds of an agent finishing.
+
+---
+
+## What Gets Recorded
+
+| Selectools event | Langfuse object | Fields |
+|---|---|---|
+| `on_run_start` | Trace | `id=run_id`, `name="agent.run"`, input messages |
+| `on_llm_start` | Generation | `model`, `input` (messages) |
+| `on_llm_end` | Generation update | `output`, `usage.input/output/total`, `cost_usd` |
+| `on_tool_start` | Span | `name=tool_name`, `input=tool_args` |
+| `on_tool_end` | Span update | `output`, `duration_ms` |
+| `on_run_end` | Trace update | `output`, total tokens, total cost |
+
+---
+
+## Self-Hosted Langfuse
+
+```python
+observer = LangfuseObserver(
+    public_key="pk-lf-local-...",
+    secret_key="sk-lf-local-...",
+    host="https://langfuse.internal.example.com",
+)
+```
+
+Or via env vars:
+
+```bash
+export LANGFUSE_PUBLIC_KEY="pk-lf-..."
+export LANGFUSE_SECRET_KEY="sk-lf-..."
+export LANGFUSE_HOST="https://langfuse.internal.example.com"
+```
+
+---
+
+## API Reference
+
+| Symbol | Description |
+|---|---|
+| `LangfuseObserver(public_key, secret_key, host)` | Observer for `agent.run()` / `agent.stream()` |
+
+---
+
+## Related Examples
+
+| # | Script | Description |
+|---|--------|-------------|
+| 88 | [`88_langfuse_observer.py`](https://github.com/johnnichev/selectools/blob/main/examples/88_langfuse_observer.py) | Langfuse trace + generation + span hierarchy |

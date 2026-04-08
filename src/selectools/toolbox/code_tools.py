@@ -11,6 +11,7 @@ import os
 import subprocess  # nosec B404 — code execution tool
 import tempfile
 
+from ..stability import beta
 from ..tools import tool
 
 _MAX_OUTPUT_BYTES = 10 * 1024  # 10 KB
@@ -29,6 +30,7 @@ def _truncate(text: str, max_bytes: int = _MAX_OUTPUT_BYTES) -> str:
     return truncated + "\n... (output truncated to 10 KB)"
 
 
+@beta
 @tool(description="Execute Python code and return stdout + stderr")
 def execute_python(code: str, timeout: int = 30) -> str:
     """
@@ -95,6 +97,7 @@ def execute_python(code: str, timeout: int = 30) -> str:
             os.unlink(tmp_path)
 
 
+@beta
 @tool(description="Execute a shell command and return output")
 def execute_shell(command: str, timeout: int = 30) -> str:
     """

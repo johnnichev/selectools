@@ -71,6 +71,56 @@ def pytest_collection_modifyitems(config: Any, items: List[Any]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Shared OpenTelemetry fixture
+# ---------------------------------------------------------------------------
+# OpenTelemetry's SDK only allows ONE global TracerProvider per process. If
+# two test files each create their own the second one is silently rejected
+# and OTelObserver spans flow to whichever provider was installed first —
+# causing the "wrong exporter" tests to see an empty span list.
+#
+# This fixture installs a single InMemorySpanExporter+TracerProvider once
+# per session and hands it to every e2e test that needs to assert on OTel
+# spans. The per-test fixture clears the exporter so tests stay isolated.
+
+_otel_exporter_singleton: Any = None
+
+
+@pytest.fixture
+def otel_exporter() -> Any:
+    """Return a shared InMemorySpanExporter, cleared for this test.
+
+    Installs a TracerProvider + SimpleSpanProcessor + InMemorySpanExporter
+    on first use and reuses them for every subsequent call. Subsequent test
+    files that also want an OTel exporter must use this fixture rather than
+    calling ``trace.set_tracer_provider`` themselves.
+    """
+    global _otel_exporter_singleton
+    if _otel_exporter_singleton is None:
+        try:
+            from opentelemetry import trace
+            from opentelemetry.sdk.trace import TracerProvider
+            from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+            from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+        except ImportError:
+            pytest.skip("opentelemetry-sdk not installed")
+
+        _otel_exporter_singleton = InMemorySpanExporter()
+        provider = TracerProvider()
+        provider.add_span_processor(SimpleSpanProcessor(_otel_exporter_singleton))
+        try:
+            trace.set_tracer_provider(provider)
+        except Exception:
+            # Another test file may have installed a provider already. In
+            # that case this fixture can't guarantee span capture — the
+            # tests that depend on it should be updated to use only this
+            # fixture, not their own provider.
+            pass
+
+    _otel_exporter_singleton.clear()
+    return _otel_exporter_singleton
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 

@@ -4,6 +4,7 @@ Decorators for tool definition and registration.
 
 from __future__ import annotations
 
+import functools
 import inspect
 import sys
 from typing import Any, Callable, Dict, List, Optional, Union, get_args, get_origin, get_type_hints
@@ -112,6 +113,80 @@ def _infer_parameters_from_callable(
     return parameters
 
 
+def _build_tool_from_fn(func: Callable[..., Any], tool_kwargs: Dict[str, Any]) -> Tool:
+    """Build a Tool instance from a callable and the kwargs ``@tool()`` received.
+
+    Extracted as a helper so it can be reused both for top-level function
+    tools and for per-instance bound method tools (see ``_BoundMethodTool``).
+    """
+    tool_name = tool_kwargs.get("name") or func.__name__
+    tool_description = tool_kwargs.get("description") or inspect.getdoc(func) or f"Tool {tool_name}"
+    parameters = _infer_parameters_from_callable(
+        func,
+        tool_kwargs.get("param_metadata"),
+        tool_kwargs.get("injected_kwargs"),
+    )
+    return Tool(
+        name=tool_name,
+        description=tool_description,
+        parameters=parameters,
+        function=func,
+        injected_kwargs=tool_kwargs.get("injected_kwargs"),
+        config_injector=tool_kwargs.get("config_injector"),
+        streaming=tool_kwargs.get("streaming", False),
+        screen_output=tool_kwargs.get("screen_output", False),
+        terminal=tool_kwargs.get("terminal", False),
+        requires_approval=tool_kwargs.get("requires_approval", False),
+        cacheable=tool_kwargs.get("cacheable", False),
+        cache_ttl=tool_kwargs.get("cache_ttl", 300),
+    )
+
+
+class _BoundMethodTool:
+    """Descriptor that binds a ``@tool``-decorated method to its instance.
+
+    Applying ``@tool()`` to a regular function returns a ``Tool`` whose
+    ``function`` attribute is the raw callable — the agent executor calls
+    ``tool.function(**llm_args)`` and everything works.
+
+    Applying ``@tool()`` to a method (``def f(self, ...)``) is trickier:
+    the LLM does not know about ``self``, so ``function(**llm_args)`` would
+    call the method without its receiver and raise
+    ``TypeError: missing 1 required positional argument: 'self'``.
+
+    This descriptor solves it by returning a **per-instance** ``Tool`` from
+    ``__get__``: the Tool's ``function`` is ``functools.partial(original_fn,
+    instance)``, so the agent executor can invoke it with only the LLM's
+    kwargs and the method still receives its receiver.
+
+    Class-level access (``RAGTool.search_knowledge_base``) returns the
+    descriptor itself, which proxies attribute lookups to a template ``Tool``
+    so introspection (``.name``, ``.description``, ``.parameters``) keeps
+    working.
+    """
+
+    def __init__(self, original_fn: Callable[..., Any], tool_kwargs: Dict[str, Any]) -> None:
+        self._original_fn = original_fn
+        self._tool_kwargs = tool_kwargs
+        # Template Tool used for class-level introspection. ``self`` is
+        # already skipped by ``_infer_parameters_from_callable`` so the
+        # parameters field is correct for LLM schema generation.
+        self._template = _build_tool_from_fn(original_fn, tool_kwargs)
+
+    def __getattr__(self, name: str) -> Any:
+        # Forward attribute lookups to the template Tool so that
+        # ``MyClass.my_method.name`` / ``.description`` / ``.parameters``
+        # still work at the class level.
+        return getattr(self._template, name)
+
+    def __get__(self, instance: Any, owner: Optional[type] = None) -> Any:
+        if instance is None:
+            return self
+        bound_fn = functools.partial(self._original_fn, instance)
+        functools.update_wrapper(bound_fn, self._original_fn)
+        return _build_tool_from_fn(bound_fn, self._tool_kwargs)
+
+
 @stable
 def tool(
     *,
@@ -126,7 +201,7 @@ def tool(
     requires_approval: bool = False,
     cacheable: bool = False,
     cache_ttl: int = 300,
-) -> Callable[[Callable[..., Any]], Tool]:
+) -> Callable[[Callable[..., Any]], Any]:
     """
     Decorator to convert a function into a Tool.
 
@@ -163,26 +238,32 @@ def tool(
         >>> print(tool_instance.name)
         'add'
     """
+    tool_kwargs: Dict[str, Any] = {
+        "name": name,
+        "description": description,
+        "param_metadata": param_metadata,
+        "injected_kwargs": injected_kwargs,
+        "config_injector": config_injector,
+        "streaming": streaming,
+        "screen_output": screen_output,
+        "terminal": terminal,
+        "requires_approval": requires_approval,
+        "cacheable": cacheable,
+        "cache_ttl": cache_ttl,
+    }
 
-    def decorator(func: Callable[..., Any]) -> Tool:
-        tool_name = name or func.__name__
-        tool_description = description or inspect.getdoc(func) or f"Tool {tool_name}"
-        parameters = _infer_parameters_from_callable(func, param_metadata, injected_kwargs)
+    def decorator(func: Callable[..., Any]) -> Any:
+        # Detect method: first parameter is named ``self``. If so, return a
+        # descriptor that produces a per-instance bound Tool on attribute
+        # access. Otherwise (regular function) build a plain Tool.
+        try:
+            sig_params = list(inspect.signature(func).parameters.values())
+            is_method = bool(sig_params and sig_params[0].name == "self")
+        except (TypeError, ValueError):
+            is_method = False
 
-        tool_instance = Tool(
-            name=tool_name,
-            description=tool_description,
-            parameters=parameters,
-            function=func,
-            injected_kwargs=injected_kwargs,
-            config_injector=config_injector,
-            streaming=streaming,
-            screen_output=screen_output,
-            terminal=terminal,
-            requires_approval=requires_approval,
-            cacheable=cacheable,
-            cache_ttl=cache_ttl,
-        )
-        return tool_instance
+        if is_method:
+            return _BoundMethodTool(func, tool_kwargs)
+        return _build_tool_from_fn(func, tool_kwargs)
 
     return decorator

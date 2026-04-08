@@ -407,8 +407,10 @@ class TestRAGTools:
         # Create RAG tool
         rag_tool = RAGTool(vector_store=vector_store, top_k=2, score_threshold=0.5)
 
-        # Search - call the underlying function of the decorated tool (pass self explicitly)
-        result = rag_tool.search_knowledge_base.function(rag_tool, "programming")
+        # Search via the Tool's function — @tool() on a method now returns
+        # a descriptor that binds self on attribute access, so we pass only
+        # the LLM-visible kwargs.
+        result = rag_tool.search_knowledge_base.function("programming")
 
         assert isinstance(result, str)
         assert len(result) > 0
@@ -430,9 +432,7 @@ class TestRAGTools:
         # Create tool with high threshold — orthogonal vectors have similarity ~0
         rag_tool = RAGTool(vector_store=vector_store, top_k=1, score_threshold=0.5)
 
-        result = rag_tool.search_knowledge_base.function(
-            rag_tool, "completely unrelated query xyz123"
-        )
+        result = rag_tool.search_knowledge_base.function("completely unrelated query xyz123")
 
         assert "No relevant information found" in result
 

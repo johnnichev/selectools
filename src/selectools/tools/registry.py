@@ -106,6 +106,6 @@ class ToolRegistry:
 
             # Register it
             self.register(tool_instance)
-            return tool_instance
+            return tool_instance  # type: ignore[no-any-return]
 
         return decorator

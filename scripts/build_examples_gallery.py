@@ -175,12 +175,22 @@ def build_gallery(examples: list[dict]) -> str:
     total = len(examples)
     no_key = sum(1 for e in examples if not e["needs_key"])
 
-    cat_btns = [f'<button class="cb on" data-cat="all">All ({total})</button>']
-    for c in all_cats:
+    rail_segs = [
+        f'<button class="ex-rail__seg ex-rail__seg--all on" data-cat="all" '
+        f'role="tab" aria-selected="true" style="--seg-index:0">'
+        f'<span class="ex-rail__name">all</span>'
+        f'<span class="ex-rail__count">{total}</span>'
+        f"</button>"
+    ]
+    for idx, c in enumerate(all_cats, start=1):
         n = sum(1 for e in examples if c in e["categories"])
-        icon = CAT_ICONS.get(c, "")
-        label = c.replace("-", " ").title()
-        cat_btns.append(f'<button class="cb" data-cat="{c}">{icon} {label} ({n})</button>')
+        rail_segs.append(
+            f'<button class="ex-rail__seg" data-cat="{c}" role="tab" '
+            f'aria-selected="false" style="--seg-weight:{n};--seg-index:{idx}">'
+            f'<span class="ex-rail__name">{c}</span>'
+            f'<span class="ex-rail__count">{n}</span>'
+            f"</button>"
+        )
 
     # Build a JSON object of raw sources for lazy rendering
     sources_dict = {ex["file"]: ex["source"] for ex in examples}
@@ -244,21 +254,48 @@ def build_gallery(examples: list[dict]) -> str:
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
 *,*::before,*::after{{box-sizing:border-box;margin:0;padding:0}}
-:root{{--bg:#0f172a;--sf:#1e293b;--bd:#334155;--tx:#e2e8f0;--dm:#94a3b8;--ft:#64748b;--cy:#22d3ee;--bl:#3b82f6;--gn:#22c55e;--font:'Plus Jakarta Sans',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace;--gr:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.018'/%3E%3C/svg%3E")}}
+:root{{--bg:#0f172a;--sf:#1e293b;--bd:#334155;--tx:#e2e8f0;--dm:#94a3b8;--ft:#64748b;--cy:#22d3ee;--bl:#3b82f6;--gn:#22c55e;--font:'Plus Jakarta Sans',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace;--gr:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.018'/%3E%3C/svg%3E");--exec-color:#22d3ee;--exec-glow:rgba(34,211,238,0.55);--exec-glow-soft:rgba(34,211,238,0.18);--exec-pulse-dur:1.6s;--exec-step-dur:0.55s;--exec-ease-step:cubic-bezier(0.4,0,0.2,1);--exec-ease-soft:cubic-bezier(0.16,1,0.3,1);--exec-blink-dur:1.05s}}
 html{{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}}
 body{{background:var(--bg);color:var(--tx);font-family:var(--font);font-size:14px}}
 nav{{position:sticky;top:0;z-index:50;background:rgba(15,23,42,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--bd);height:52px}}
 nav .w{{max-width:960px;margin:0 auto;padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:100%}}
 .nl{{font-weight:800;font-size:15px;color:#fff;text-decoration:none}}.nl span{{color:var(--dm);font-weight:500;margin-left:8px;font-size:13px}}
 .nr{{display:flex;gap:20px;font-size:13px;color:var(--dm)}}.nr a{{color:inherit;text-decoration:none}}.nr a:hover{{color:#fff}}
-.ph{{max-width:960px;margin:0 auto;padding:48px 20px 24px}}
-.ph h1{{font-size:28px;letter-spacing:-0.03em;margin-bottom:8px;font-weight:800}}.ph p{{color:var(--dm);font-size:15px;max-width:600px;line-height:1.6}}
+.ex-term{{max-width:960px;margin:32px auto 24px;background:#0b1220;border:1px solid var(--bd);border-radius:14px;box-shadow:0 20px 60px -28px rgba(0,0,0,0.55),0 0 0 1px rgba(34,211,238,0.05);overflow:hidden}}
+.ex-term__bar{{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--bd);background:rgba(15,23,42,0.7)}}
+.ex-term__dot{{width:11px;height:11px;border-radius:999px}}
+.ex-term__dot--r{{background:rgba(239,68,68,0.85)}}
+.ex-term__dot--y{{background:rgba(250,204,21,0.85)}}
+.ex-term__dot--g{{background:rgba(34,197,94,0.85)}}
+.ex-term__name{{margin-left:8px;font-family:var(--mono);font-size:12px;color:var(--ft)}}
+.ex-term__shell{{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ft);letter-spacing:0.08em}}
+.ex-term__body{{padding:22px 22px 24px;font-family:var(--mono)}}
+.ex-prompt{{font-family:var(--mono);font-size:13px;line-height:1.75;white-space:pre;overflow-x:auto}}
+.ex-prompt__user{{color:var(--cy)}}
+.ex-prompt__at{{color:var(--ft)}}
+.ex-prompt__host{{color:var(--cy)}}
+.ex-prompt__colon{{color:var(--ft)}}
+.ex-prompt__path{{color:#fbbf24}}
+.ex-prompt__glyph{{color:var(--gn);margin:0 6px}}
+.ex-prompt__cmd{{color:var(--tx)}}
+.ex-prompt__flags{{color:#fbbf24}}
+.ex-prompt__grep{{color:var(--ft)}}
+.ex-subtitle{{margin-top:14px;font-family:var(--font);font-size:14px;color:var(--dm);max-width:600px;line-height:1.6}}
+@media(max-width:640px){{.ex-prompt__user,.ex-prompt__at,.ex-prompt__host,.ex-prompt__colon,.ex-prompt__path{{display:none}}.ex-prompt__glyph{{margin-left:0}}}}
+@media(prefers-reduced-motion:reduce){{.ex-prompt .exec-caret{{animation:none;opacity:1}}}}
 .ct{{max-width:960px;margin:0 auto;padding:0 20px 16px;display:flex;flex-direction:column;gap:10px;position:sticky;top:52px;z-index:40;background:var(--bg);padding-top:10px}}
 .si{{flex:1;background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:10px 14px;color:var(--tx);font-family:var(--font);font-size:14px;outline:none}}
 .si:focus{{border-color:var(--cy);box-shadow:0 0 0 2px rgba(34,211,238,0.12)}}.si::placeholder{{color:var(--ft)}}
-.cr{{display:flex;flex-wrap:wrap;gap:6px}}
-.cb{{font-family:var(--font);font-size:12px;font-weight:500;padding:6px 14px;border-radius:100px;border:1px solid rgba(51,65,85,0.6);background:rgba(30,41,59,0.7);color:var(--dm);cursor:pointer;transition:all .15s;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}}
-.cb:hover{{background:rgba(51,65,85,0.5);border-color:var(--dm);color:var(--tx)}}.cb.on{{background:rgba(34,211,238,0.12);border-color:rgba(34,211,238,0.35);color:var(--cy);box-shadow:0 0 12px rgba(34,211,238,0.08)}}
+.ex-rail{{display:flex;gap:2px;height:40px;border-radius:8px;overflow:hidden;border:1px solid var(--bd);background:rgba(30,41,59,0.4)}}
+.ex-rail__seg{{flex:var(--seg-weight,1) 1 0;min-width:56px;height:100%;display:flex;align-items:center;justify-content:center;gap:6px;font-family:var(--mono);font-size:12px;color:var(--dm);background:transparent;border:none;cursor:pointer;transition:background .15s,color .15s;position:relative;padding:0 8px;white-space:nowrap}}
+.ex-rail__seg--all{{flex:0 0 72px}}
+.ex-rail__seg:hover{{background:rgba(34,211,238,0.08);color:var(--tx)}}
+.ex-rail__seg.on{{background:rgba(34,211,238,0.12);color:var(--cy);box-shadow:inset 0 -2px 0 var(--exec-color)}}
+.ex-rail__name{{font-size:12px}}
+.ex-rail__count{{font-size:11px;color:var(--cy);opacity:0.75}}
+.ex-rail.in-view .ex-rail__seg{{animation:exec-stamp 0.6s var(--exec-ease-soft) both;animation-delay:calc(var(--seg-index,0) * 80ms)}}
+@media(max-width:640px){{.ex-rail{{overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;height:44px}}.ex-rail__seg{{flex:0 0 auto;min-width:80px;scroll-snap-align:start}}}}
+@media(prefers-reduced-motion:reduce){{.ex-rail.in-view .ex-rail__seg{{animation:none}}}}
 .rc{{font-family:var(--mono);font-size:11px;color:var(--ft);padding:2px 0}}
 .el{{max-width:960px;margin:0 auto;padding:0 20px 60px;display:flex;flex-direction:column;gap:2px}}
 .ec{{border:1px solid var(--bd);border-radius:8px;overflow:hidden;background:var(--sf);background-image:var(--gr);transition:border-color .15s}}
@@ -282,17 +319,43 @@ a.ec1:hover{{background:rgba(59,130,246,0.2);color:#bfdbfe}}
 .ep{{font-family:var(--mono);font-size:12px;line-height:1.65;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:16px;overflow-x:auto;max-height:500px;overflow-y:auto;white-space:pre;margin:0}}
 .ep .kw{{color:#c084fc}}.ep .cmt{{color:var(--ft)}}.ep .num{{color:#fb923c}}.ep .dec{{color:#fbbf24}}
 @media(max-width:640px){{.em,.ed{{display:none}}.nr{{gap:12px}}}}
+.sr-only{{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}}
+.exec-dot{{display:inline-block;width:8px;height:8px;border-radius:999px;background:var(--exec-color);box-shadow:0 0 0 0 var(--exec-glow);animation:exec-pulse var(--exec-pulse-dur) var(--exec-ease-soft) infinite;vertical-align:middle}}
+.exec-dot--lg{{width:10px;height:10px}}
+.exec-dot--sm{{width:6px;height:6px}}
+@keyframes exec-pulse{{0%{{box-shadow:0 0 0 0 var(--exec-glow)}}60%{{box-shadow:0 0 0 8px rgba(34,211,238,0)}}100%{{box-shadow:0 0 0 0 rgba(34,211,238,0)}}}}
+.exec-caret{{display:inline-block;width:0.55em;height:1.1em;vertical-align:text-bottom;background:var(--exec-color);box-shadow:0 0 6px var(--exec-glow);animation:exec-blink var(--exec-blink-dur) steps(2,jump-none) infinite;margin-left:2px}}
+.exec-caret--thin{{width:2px;box-shadow:0 0 4px var(--exec-glow-soft)}}
+@keyframes exec-blink{{0%,49%{{opacity:1}}50%,100%{{opacity:0}}}}
+.exec-scan{{position:relative;overflow:hidden}}
+.exec-scan.in-view::after{{content:"";position:absolute;top:0;left:-25%;width:25%;height:100%;background:linear-gradient(90deg,rgba(34,211,238,0) 0%,rgba(34,211,238,0.18) 40%,rgba(34,211,238,0.55) 50%,rgba(34,211,238,0.18) 60%,rgba(34,211,238,0) 100%);pointer-events:none;animation:exec-scan-sweep 1.4s var(--exec-ease-step) 0.2s 1 forwards}}
+@keyframes exec-scan-sweep{{0%{{transform:translateX(0)}}100%{{transform:translateX(520%)}}}}
+@keyframes exec-stamp{{0%{{transform:scale(0.92);box-shadow:0 0 0 0 var(--exec-glow)}}40%{{transform:scale(1.02);box-shadow:0 0 0 6px var(--exec-glow-soft)}}100%{{transform:scale(1);box-shadow:0 0 0 1px rgba(34,211,238,0.18)}}}}
+@media(prefers-reduced-motion:reduce){{.exec-dot{{animation:none;box-shadow:0 0 6px var(--exec-glow)}}.exec-caret{{animation:none;opacity:1}}.exec-scan.in-view::after{{animation:none;display:none}}}}
   </style>
 </head>
 <body>
 <nav><div class="w">
-  <a href="../" class="nl">selectools <span>examples</span></a>
+  <a href="../" class="nl"><span class="exec-dot"></span>&nbsp;selectools <span>examples</span></a>
   <div class="nr"><a href="../builder/">Builder</a><a href="../QUICKSTART/">Docs</a><a href="{REPO_URL}" target="_blank">GitHub</a></div>
 </div></nav>
-<div class="ph"><h1>{total} Example Scripts</h1><p>Runnable Python examples covering agents, RAG, multi-agent graphs, evals, streaming, guardrails, and more. {no_key} run without an API key.</p></div>
+<header class="ex-term">
+  <div class="ex-term__bar">
+    <span class="ex-term__dot ex-term__dot--r" aria-hidden="true"></span>
+    <span class="ex-term__dot ex-term__dot--y" aria-hidden="true"></span>
+    <span class="ex-term__dot ex-term__dot--g" aria-hidden="true"></span>
+    <span class="ex-term__name">~/selectools/examples</span>
+    <span class="ex-term__shell">zsh</span>
+  </div>
+  <div class="ex-term__body">
+    <div class="ex-prompt" aria-hidden="true"><span class="ex-prompt__user">selectools</span><span class="ex-prompt__at">@</span><span class="ex-prompt__host">examples.dev</span><span class="ex-prompt__colon">:</span><span class="ex-prompt__path">~/selectools/examples</span><span class="ex-prompt__glyph">$</span><span class="ex-prompt__cmd" id="ex-cmd"></span><span class="ex-prompt__flags" id="ex-flags"></span><span class="ex-prompt__grep" id="ex-grep"></span><span class="exec-caret"></span></div>
+    <h1 class="sr-only">Selectools examples — {total} runnable Python scripts</h1>
+    <p class="ex-subtitle">{total} runnable scripts covering agents, RAG, multi-agent graphs, evals, streaming, and guardrails. {no_key} run without an API key.</p>
+  </div>
+</header>
 <div class="ct">
-  <input class="si" type="text" placeholder="Search examples\u2026" oninput="flt()" id="si" />
-  <div class="cr">{chr(10).join(cat_btns)}</div>
+  <input class="si" type="text" placeholder="Search examples\u2026" oninput="flt();syncPrompt()" id="si" />
+  <div class="ex-rail" id="ex-rail" role="tablist" aria-label="Filter examples by category">{chr(10).join(rail_segs)}</div>
   <div class="rc" id="rc">{total} examples</div>
 </div>
 <div class="el" id="el">
@@ -301,11 +364,15 @@ a.ec1:hover{{background:rgba(59,130,246,0.2);color:#bfdbfe}}
 <script>
 const SRC={sources_json};
 let ac='all';
-function flt(){{const q=document.getElementById('si').value.toLowerCase();let c=0;document.querySelectorAll('.ec').forEach(d=>{{const t=d.dataset.title,f=d.dataset.file,cats=d.dataset.cats;const cm=ac==='all'||cats.includes(ac);const sm=!q||t.includes(q)||f.includes(q)||cats.includes(q);const s=cm&&sm;d.style.display=s?'':'none';if(s)c++}});document.getElementById('rc').textContent=c+' example'+(c!==1?'s':'')}}
-document.querySelectorAll('.cb').forEach(b=>{{b.addEventListener('click',()=>{{document.querySelectorAll('.cb').forEach(x=>x.classList.remove('on'));b.classList.add('on');ac=b.dataset.cat;flt()}});}});
+function flt(){{const q=document.getElementById('si').value.toLowerCase();let c=0;document.querySelectorAll('.ec').forEach(d=>{{const t=d.dataset.title,f=d.dataset.file,cats=d.dataset.cats;const cm=ac==='all'||cats.includes(ac);const sm=!q||t.includes(q)||f.includes(q)||cats.includes(q);const s=cm&&sm;d.style.display=s?'':'none';if(s)c++}});document.getElementById('rc').textContent='# '+c+' files match'}}
+document.querySelectorAll('.ex-rail__seg').forEach(b=>{{b.addEventListener('click',()=>{{document.querySelectorAll('.ex-rail__seg').forEach(x=>{{x.classList.remove('on');x.setAttribute('aria-selected','false')}});b.classList.add('on');b.setAttribute('aria-selected','true');ac=b.dataset.cat;b.style.animation='none';requestAnimationFrame(()=>{{b.style.animation='exec-stamp 0.6s var(--exec-ease-soft)'}});flt();syncPrompt()}});}});
+(function(){{const r=document.getElementById('ex-rail');if(!r)return;const io=new IntersectionObserver((ents)=>{{ents.forEach(e=>{{if(e.isIntersecting){{r.classList.add('in-view');io.disconnect()}}}})}},{{rootMargin:'0px 0px -20% 0px'}});io.observe(r)}})();
 function hl(s){{s=s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');s=s.replace(/\\b(from|import|def|class|return|if|elif|else|for|while|with|as|try|except|finally|raise|yield|async|await|and|or|not|in|is|True|False|None|lambda|pass|break|continue)\\b/g,'<span class="kw">$1</span>');s=s.replace(/(#[^\\n]*)/g,'<span class="cmt">$1</span>');s=s.replace(/(@\\w+(?:\\([^)]*\\))?)/g,'<span class="dec">$1</span>');return s}}
 function toggle(h){{const c=h.closest('.ec'),b=c.querySelector('.eb'),p=c.querySelector('.ep');c.classList.toggle('op');const open=c.classList.contains('op');b.style.display=open?'':'none';if(open&&!p.dataset.loaded){{p.innerHTML=hl(SRC[c.dataset.file]||'');p.dataset.loaded='1'}}}}
 function cpSrc(b){{const f=b.closest('.ec').dataset.file;navigator.clipboard.writeText(SRC[f]||'');b.textContent='Copied!';setTimeout(()=>b.textContent='Copy',1500)}}
+function syncPrompt(){{const q=document.getElementById('si').value;document.getElementById('ex-grep').textContent=q?' | grep -i '+q:'';document.getElementById('ex-flags').textContent=ac==='all'?'':' --tags '+ac}}
+function typeLine(target,text,perChar,done){{let i=0;const tick=()=>{{if(i<=text.length){{target.textContent=text.slice(0,i);i++;setTimeout(tick,perChar)}}else if(done){{done()}}}};tick()}}
+(function bootPrompt(){{const cmd=document.getElementById('ex-cmd');if(!cmd)return;const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;if(reduced){{cmd.textContent='ls examples/';syncPrompt();return}}typeLine(cmd,'ls examples/',35,syncPrompt)}})();
 </script>
 </body>
 </html>"""

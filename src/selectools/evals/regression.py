@@ -50,7 +50,7 @@ class BaselineStore:
         path = self._dir / f"{safe_name}.json"
         if not path.exists():
             return None
-        return json.loads(path.read_text())
+        return json.loads(path.read_text())  # type: ignore[no-any-return]
 
     def compare(self, current: Any) -> RegressionResult:
         """Compare current report against stored baseline.

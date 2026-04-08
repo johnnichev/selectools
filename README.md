@@ -30,6 +30,41 @@ result = AgentGraph.chain(planner, writer, reviewer).run("Write a blog post")
 # selectools serve agent.yaml
 ```
 
+## What's New in v0.21
+
+### v0.21.0 — Connector Expansion
+
+Seven new subsystems land at once: three vector stores, four document loaders, eight new toolbox tools, multimodal messages, an Azure OpenAI provider, and two observability backends.
+
+```python
+# New vector stores
+from selectools.rag.stores import FAISSVectorStore, QdrantVectorStore, PgVectorStore
+
+# New provider
+from selectools import AzureOpenAIProvider
+
+# New observers
+from selectools.observe import OTelObserver, LangfuseObserver
+
+# Multimodal messages
+from selectools import image_message
+agent.run([image_message("./screenshot.png", "What does this UI show?")])
+```
+
+- **Vector stores**: `FAISSVectorStore` (in-process, persistable), `QdrantVectorStore` (REST + gRPC), `PgVectorStore` (PostgreSQL pgvector extension)
+- **Document loaders**: `DocumentLoader.from_csv`, `from_json`, `from_html`, `from_url`
+- **Toolbox**: `execute_python`, `execute_shell`, `web_search`, `scrape_url`, `github_search_repos`, `github_get_file`, `github_list_issues`, `query_sqlite`, `query_postgres`
+- **Multimodal**: `Message.content` accepts `list[ContentPart]`; image input works on OpenAI, Anthropic, Gemini, and Ollama vision models
+- **Azure OpenAI**: deployment-name routing, AAD token auth, env-var fallback (`AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`)
+- **OpenTelemetry**: `OTelObserver` emits GenAI semantic-convention spans (Jaeger, Tempo, Datadog, Honeycomb, Grafana)
+- **Langfuse**: `LangfuseObserver` ships traces, generations, and spans to Langfuse Cloud or self-hosted
+
+```bash
+pip install "selectools[rag]"      # FAISS + Qdrant + beautifulsoup4 (HTML CSS selectors)
+pip install "selectools[observe]"  # OpenTelemetry + Langfuse
+pip install "selectools[postgres]" # pgvector (uses psycopg2-binary)
+```
+
 ## What's New in v0.20
 
 ### v0.20.1 — Visual Agent Builder + GitHub Pages
@@ -384,7 +419,7 @@ report.to_html("report.html")
 | 5+ packages (`langchain-core`, `langgraph`, `langsmith`...) | 1 package: `pip install selectools` |
 | `langserve` for deployment | `selectools serve agent.yaml` |
 
-> Full migration guide with code examples: **[Coming from LangChain](docs/MIGRATION.md)**
+> Full migration guide with code examples: **[Coming from LangChain](https://github.com/johnnichev/selectools/blob/main/docs/MIGRATION.md)**
 
 ## Why Selectools
 
@@ -422,14 +457,14 @@ report.to_html("report.html")
 
 ## What's Included
 
-- **5 LLM Providers**: OpenAI, Anthropic, Gemini, Ollama + FallbackProvider (auto-failover)
+- **5 LLM Providers**: OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama + FallbackProvider (auto-failover)
 - **Structured Output**: Pydantic / JSON Schema `response_format` with auto-retry
 - **Execution Traces**: `result.trace` with typed timeline of every agent step
 - **Reasoning Visibility**: `result.reasoning` explains *why* the agent chose a tool
 - **Batch Processing**: `agent.batch()` / `agent.abatch()` for concurrent classification
 - **Tool Policy Engine**: Declarative allow/review/deny rules with human-in-the-loop
 - **4 Embedding Providers**: OpenAI, Anthropic/Voyage, Gemini (free!), Cohere
-- **4 Vector Stores**: In-memory, SQLite, Chroma, Pinecone
+- **7 Vector Stores**: In-memory, SQLite, Chroma, Pinecone, FAISS, Qdrant, pgvector
 - **Hybrid Search**: BM25 + vector fusion with Cohere/Jina reranking
 - **Advanced Chunking**: Semantic + contextual chunking for better retrieval
 - **Dynamic Tool Loading**: Plugin system with hot-reload support
@@ -451,16 +486,18 @@ report.to_html("report.html")
 - **76 Examples**: Multi-agent graphs, RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, eval framework, advanced agent patterns, stability markers, HTML trace viewer, and more
 - **Built-in Eval Framework**: 50 evaluators (30 deterministic + 21 LLM-as-judge), A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing
 - **AgentObserver Protocol**: 45 lifecycle events with `run_id` correlation, `LoggingObserver`, `SimpleStepObserver`, OTel export
-- **4612 Tests**: Unit, integration, regression, and E2E with real API calls
+- **5203 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 
 ```bash
 pip install selectools                    # Core + basic RAG
-pip install selectools[rag]               # + Chroma, Pinecone, Voyage, Cohere, PyPDF
+pip install selectools[rag]               # + Chroma, Pinecone, FAISS, Qdrant, Voyage, Cohere, PyPDF, BeautifulSoup
+pip install selectools[observe]           # + OpenTelemetry, Langfuse observers
+pip install selectools[postgres]          # + psycopg2 (enables pgvector)
 pip install selectools[cache]             # + Redis cache
 pip install selectools[mcp]               # + MCP client/server
-pip install selectools[rag,cache,mcp]    # Everything
+pip install "selectools[rag,observe,cache,mcp]"  # Everything
 ```
 
 Add your provider's API key to a `.env` file in your project root:
@@ -472,7 +509,7 @@ OPENAI_API_KEY=sk-...
 
 ## Quick Start
 
-> **New to Selectools?** Follow the [5-minute Quickstart tutorial](docs/QUICKSTART.md) — no API key needed.
+> **New to Selectools?** Follow the [5-minute Quickstart tutorial](https://github.com/johnnichev/selectools/blob/main/docs/QUICKSTART.md) — no API key needed.
 
 ### Tool Calling Agent (No API Key)
 
@@ -596,7 +633,7 @@ searcher = HybridSearcher(
 results = searcher.search("GDPR compliance", top_k=5)
 ```
 
-See [docs/modules/HYBRID_SEARCH.md](docs/modules/HYBRID_SEARCH.md) for full documentation.
+See [docs/modules/HYBRID_SEARCH.md](https://github.com/johnnichev/selectools/blob/main/docs/modules/HYBRID_SEARCH.md) for full documentation.
 
 ### Advanced Chunking
 
@@ -613,7 +650,7 @@ contextual = ContextualChunker(base_chunker=semantic, provider=provider)
 enriched_docs = contextual.split_documents(documents)
 ```
 
-See [docs/modules/ADVANCED_CHUNKING.md](docs/modules/ADVANCED_CHUNKING.md) for full documentation.
+See [docs/modules/ADVANCED_CHUNKING.md](https://github.com/johnnichev/selectools/blob/main/docs/modules/ADVANCED_CHUNKING.md) for full documentation.
 
 ### Dynamic Tool Loading
 
@@ -634,7 +671,7 @@ agent.replace_tool(updated[0])
 agent.remove_tool("deprecated_search")
 ```
 
-See [docs/modules/DYNAMIC_TOOLS.md](docs/modules/DYNAMIC_TOOLS.md) for full documentation.
+See [docs/modules/DYNAMIC_TOOLS.md](https://github.com/johnnichev/selectools/blob/main/docs/modules/DYNAMIC_TOOLS.md) for full documentation.
 
 ### Response Caching
 
@@ -784,13 +821,14 @@ agent = Agent(
 - Fallback chain: `astream` -> `acomplete` -> `complete` via executor
 - Context propagation with `contextvars` for tracing/auth
 
-See [docs/modules/STREAMING.md](docs/modules/STREAMING.md) for full documentation.
+See [docs/modules/STREAMING.md](https://github.com/johnnichev/selectools/blob/main/docs/modules/STREAMING.md) for full documentation.
 
 ## Providers
 
 | Provider | Streaming | Vision | Native Tools | Cost |
 |---|---|---|---|---|
 | **OpenAI** | Yes | Yes | Yes | Paid |
+| **Azure OpenAI** | Yes | Yes | Yes | Paid (Azure billing) |
 | **Anthropic** | Yes | Yes | Yes | Paid |
 | **Gemini** | Yes | Yes | Yes | Free tier |
 | **Ollama** | Yes | No | No | Free (local) |
@@ -821,11 +859,18 @@ from selectools.embeddings import (
 
 ```python
 from selectools.rag import VectorStore
+from selectools.rag.stores import FAISSVectorStore, QdrantVectorStore, PgVectorStore
 
+# Built-in / factory-style
 store = VectorStore.create("memory", embedder=embedder)           # Fast, no persistence
 store = VectorStore.create("sqlite", embedder=embedder, db_path="docs.db")  # Persistent
 store = VectorStore.create("chroma", embedder=embedder, persist_directory="./chroma")
 store = VectorStore.create("pinecone", embedder=embedder, index_name="my-index")
+
+# v0.21.0 — direct imports
+store = FAISSVectorStore(embedder=embedder)                       # In-process, save/load to disk
+store = QdrantVectorStore(embedder=embedder, url="http://localhost:6333")  # REST + gRPC
+store = PgVectorStore(embedder=embedder, connection_string="postgresql://...")
 ```
 
 ## Agent Configuration
@@ -1024,39 +1069,39 @@ python examples/14_rag_basic.py     # Needs OPENAI_API_KEY
 
 **[Read the full documentation](https://selectools.dev)** — hosted on GitHub Pages with search, dark mode, and easy navigation.
 
-Also available in [`docs/`](docs/README.md):
+Also available in [`docs/`](https://github.com/johnnichev/selectools/blob/main/docs/README.md):
 
 | Module | Description |
 |---|---|
-| [AGENT](docs/modules/AGENT.md) | Agent loop, structured output, traces, reasoning, batch, policy |
-| [STREAMING](docs/modules/STREAMING.md) | E2E streaming, parallel execution, routing |
-| [TOOLS](docs/modules/TOOLS.md) | Tool definition, validation, registry |
-| [DYNAMIC_TOOLS](docs/modules/DYNAMIC_TOOLS.md) | ToolLoader, plugins, hot-reload |
-| [HYBRID_SEARCH](docs/modules/HYBRID_SEARCH.md) | BM25, fusion, reranking |
-| [ADVANCED_CHUNKING](docs/modules/ADVANCED_CHUNKING.md) | Semantic & contextual chunking |
-| [RAG](docs/modules/RAG.md) | Complete RAG pipeline |
-| [EMBEDDINGS](docs/modules/EMBEDDINGS.md) | Embedding providers |
-| [VECTOR_STORES](docs/modules/VECTOR_STORES.md) | Storage backends |
-| [PROVIDERS](docs/modules/PROVIDERS.md) | LLM provider adapters + FallbackProvider |
-| [MEMORY](docs/modules/MEMORY.md) | Conversation memory + tool-pair trimming |
-| [USAGE](docs/modules/USAGE.md) | Cost tracking & analytics |
-| [MODELS](docs/modules/MODELS.md) | Model registry & pricing |
-| [SESSIONS](docs/modules/SESSIONS.md) | Persistent session stores (JSON, SQLite, Redis) |
-| [ENTITY_MEMORY](docs/modules/ENTITY_MEMORY.md) | Entity extraction and tracking |
-| [KNOWLEDGE_GRAPH](docs/modules/KNOWLEDGE_GRAPH.md) | Triple extraction and storage |
-| [KNOWLEDGE](docs/modules/KNOWLEDGE.md) | Cross-session knowledge memory |
-| [GUARDRAILS](docs/modules/GUARDRAILS.md) | Input/output validation pipeline |
-| [AUDIT](docs/modules/AUDIT.md) | JSONL audit logging |
-| [SECURITY](docs/modules/SECURITY.md) | Screening & coherence checking |
-| [EVALS](docs/modules/EVALS.md) | 50 evaluators, A/B testing, regression |
-| [MCP](docs/modules/MCP.md) | MCP client/server integration |
-| [BUDGET](docs/modules/BUDGET.md) | Token/cost budget limits |
-| [CANCELLATION](docs/modules/CANCELLATION.md) | Cooperative cancellation |
-| [ORCHESTRATION](docs/modules/ORCHESTRATION.md) | AgentGraph, routing, parallel, HITL |
-| [SUPERVISOR](docs/modules/SUPERVISOR.md) | SupervisorAgent, 4 strategies |
-| [PATTERNS](docs/modules/PATTERNS.md) | PlanAndExecute, Reflective, Debate, TeamLead |
-| [PARSER](docs/modules/PARSER.md) | Tool call parsing |
-| [PROMPT](docs/modules/PROMPT.md) | System prompt generation |
+| [AGENT](https://github.com/johnnichev/selectools/blob/main/docs/modules/AGENT.md) | Agent loop, structured output, traces, reasoning, batch, policy |
+| [STREAMING](https://github.com/johnnichev/selectools/blob/main/docs/modules/STREAMING.md) | E2E streaming, parallel execution, routing |
+| [TOOLS](https://github.com/johnnichev/selectools/blob/main/docs/modules/TOOLS.md) | Tool definition, validation, registry |
+| [DYNAMIC_TOOLS](https://github.com/johnnichev/selectools/blob/main/docs/modules/DYNAMIC_TOOLS.md) | ToolLoader, plugins, hot-reload |
+| [HYBRID_SEARCH](https://github.com/johnnichev/selectools/blob/main/docs/modules/HYBRID_SEARCH.md) | BM25, fusion, reranking |
+| [ADVANCED_CHUNKING](https://github.com/johnnichev/selectools/blob/main/docs/modules/ADVANCED_CHUNKING.md) | Semantic & contextual chunking |
+| [RAG](https://github.com/johnnichev/selectools/blob/main/docs/modules/RAG.md) | Complete RAG pipeline |
+| [EMBEDDINGS](https://github.com/johnnichev/selectools/blob/main/docs/modules/EMBEDDINGS.md) | Embedding providers |
+| [VECTOR_STORES](https://github.com/johnnichev/selectools/blob/main/docs/modules/VECTOR_STORES.md) | Storage backends |
+| [PROVIDERS](https://github.com/johnnichev/selectools/blob/main/docs/modules/PROVIDERS.md) | LLM provider adapters + FallbackProvider |
+| [MEMORY](https://github.com/johnnichev/selectools/blob/main/docs/modules/MEMORY.md) | Conversation memory + tool-pair trimming |
+| [USAGE](https://github.com/johnnichev/selectools/blob/main/docs/modules/USAGE.md) | Cost tracking & analytics |
+| [MODELS](https://github.com/johnnichev/selectools/blob/main/docs/modules/MODELS.md) | Model registry & pricing |
+| [SESSIONS](https://github.com/johnnichev/selectools/blob/main/docs/modules/SESSIONS.md) | Persistent session stores (JSON, SQLite, Redis) |
+| [ENTITY_MEMORY](https://github.com/johnnichev/selectools/blob/main/docs/modules/ENTITY_MEMORY.md) | Entity extraction and tracking |
+| [KNOWLEDGE_GRAPH](https://github.com/johnnichev/selectools/blob/main/docs/modules/KNOWLEDGE_GRAPH.md) | Triple extraction and storage |
+| [KNOWLEDGE](https://github.com/johnnichev/selectools/blob/main/docs/modules/KNOWLEDGE.md) | Cross-session knowledge memory |
+| [GUARDRAILS](https://github.com/johnnichev/selectools/blob/main/docs/modules/GUARDRAILS.md) | Input/output validation pipeline |
+| [AUDIT](https://github.com/johnnichev/selectools/blob/main/docs/modules/AUDIT.md) | JSONL audit logging |
+| [SECURITY](https://github.com/johnnichev/selectools/blob/main/docs/modules/SECURITY.md) | Screening & coherence checking |
+| [EVALS](https://github.com/johnnichev/selectools/blob/main/docs/modules/EVALS.md) | 50 evaluators, A/B testing, regression |
+| [MCP](https://github.com/johnnichev/selectools/blob/main/docs/modules/MCP.md) | MCP client/server integration |
+| [BUDGET](https://github.com/johnnichev/selectools/blob/main/docs/modules/BUDGET.md) | Token/cost budget limits |
+| [CANCELLATION](https://github.com/johnnichev/selectools/blob/main/docs/modules/CANCELLATION.md) | Cooperative cancellation |
+| [ORCHESTRATION](https://github.com/johnnichev/selectools/blob/main/docs/modules/ORCHESTRATION.md) | AgentGraph, routing, parallel, HITL |
+| [SUPERVISOR](https://github.com/johnnichev/selectools/blob/main/docs/modules/SUPERVISOR.md) | SupervisorAgent, 4 strategies |
+| [PATTERNS](https://github.com/johnnichev/selectools/blob/main/docs/modules/PATTERNS.md) | PlanAndExecute, Reflective, Debate, TeamLead |
+| [PARSER](https://github.com/johnnichev/selectools/blob/main/docs/modules/PARSER.md) | Tool call parsing |
+| [PROMPT](https://github.com/johnnichev/selectools/blob/main/docs/modules/PROMPT.md) | System prompt generation |
 
 ## Tests
 
@@ -1065,7 +1110,7 @@ pytest tests/ -x -q          # All tests
 pytest tests/ -k "not e2e"   # Skip E2E (no API keys needed)
 ```
 
-4612 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, orchestration, pipelines, agent patterns, stability markers, trace viewer, and E2E integration with real API calls.
+5203 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, orchestration, pipelines, agent patterns, stability markers, trace viewer, and E2E integration with real API calls.
 
 ## License
 
@@ -1077,4 +1122,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). We welcome contributions for new tools, 
 
 ---
 
-[Roadmap](ROADMAP.md) | [Changelog](CHANGELOG.md) | [Documentation](docs/README.md)
+[Roadmap](ROADMAP.md) | [Changelog](CHANGELOG.md) | [Documentation](https://github.com/johnnichev/selectools/blob/main/docs/README.md)

@@ -114,7 +114,7 @@ def load_template(
     if build_fn is None:
         raise ValueError(f"Template {name!r} has no build() function")
 
-    return build_fn(provider=provider, **overrides)
+    return build_fn(provider=provider, **overrides)  # type: ignore[no-any-return]
 
 
 def list_templates() -> List[str]:
@@ -212,7 +212,7 @@ def _resolve_provider(name: str) -> "Provider":
     mod_path, cls_name = providers[name]
     mod = importlib.import_module(mod_path)
     cls = getattr(mod, cls_name)
-    return cls()
+    return cls()  # type: ignore[no-any-return]
 
 
 def _resolve_tools(tool_specs: List[Any], base_dir: Optional[Path] = None) -> list:

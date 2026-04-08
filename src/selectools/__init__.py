@@ -1,9 +1,9 @@
 """Public exports for the selectools package."""
 
-__version__ = "0.20.1"
+__version__ = "0.21.0"
 
 # Import submodules (lazy loading for optional dependencies)
-from . import embeddings, evals, guardrails, models, patterns, rag, toolbox
+from . import embeddings, evals, guardrails, models, observe, patterns, rag, toolbox
 from .agent import Agent, AgentConfig
 from .agent.config_groups import (
     BudgetConfig,
@@ -117,6 +117,7 @@ from .policy import PolicyDecision, PolicyResult, ToolPolicy
 from .pricing import PRICING, calculate_cost, calculate_embedding_cost, get_model_pricing
 from .prompt import REASONING_STRATEGIES, PromptBuilder
 from .providers.anthropic_provider import AnthropicProvider
+from .providers.azure_openai_provider import AzureOpenAIProvider
 from .providers.fallback import FallbackProvider
 from .providers.gemini_provider import GeminiProvider
 from .providers.ollama_provider import OllamaProvider
@@ -145,6 +146,9 @@ __all__ = [
     "ToolMetrics",
     "ConversationMemory",
     "Message",
+    "ContentPart",
+    "image_message",
+    "text_content",
     "Role",
     "Tool",
     "ToolParameter",
@@ -153,6 +157,7 @@ __all__ = [
     "PromptBuilder",
     "REASONING_STRATEGIES",
     "OpenAIProvider",
+    "AzureOpenAIProvider",
     "AnthropicProvider",
     "GeminiProvider",
     "OllamaProvider",
@@ -263,6 +268,7 @@ __all__ = [
     "KnowledgeGraphMemory",
     # Submodules (for lazy loading)
     "embeddings",
+    "observe",
     "rag",
     "toolbox",
     # Orchestration

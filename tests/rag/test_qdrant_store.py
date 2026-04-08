@@ -383,7 +383,9 @@ class TestQdrantSearch:
             "_st_meta": {"source": "test.txt"},
         }
         scored_point.score = 0.95
-        qdrant_store.client.search.return_value = [scored_point]
+        _resp = MagicMock()
+        _resp.points = [scored_point]
+        qdrant_store.client.query_points.return_value = _resp
 
         query_emb = [0.1] * 128
         results = qdrant_store.search(query_emb, top_k=5)
@@ -396,21 +398,25 @@ class TestQdrantSearch:
 
     def test_search_passes_correct_parameters(self, qdrant_store: Any) -> None:
         """Search forwards collection name, vector, limit, and payload flag."""
-        qdrant_store.client.search.return_value = []
+        _resp = MagicMock()
+        _resp.points = []
+        qdrant_store.client.query_points.return_value = _resp
 
         query_emb = [0.5] * 128
         qdrant_store.search(query_emb, top_k=10)
 
-        qdrant_store.client.search.assert_called_once()
-        call_kwargs = qdrant_store.client.search.call_args[1]
+        qdrant_store.client.query_points.assert_called_once()
+        call_kwargs = qdrant_store.client.query_points.call_args[1]
         assert call_kwargs["collection_name"] == "test_collection"
-        assert call_kwargs["query_vector"] == query_emb
+        assert call_kwargs["query"] == query_emb
         assert call_kwargs["limit"] == 10
         assert call_kwargs["with_payload"] is True
 
     def test_search_empty_results(self, qdrant_store: Any) -> None:
         """Search returns empty list when no matches found."""
-        qdrant_store.client.search.return_value = []
+        _resp = MagicMock()
+        _resp.points = []
+        qdrant_store.client.query_points.return_value = _resp
 
         results = qdrant_store.search([0.1] * 128)
         assert results == []
@@ -423,7 +429,9 @@ class TestQdrantSearch:
             "_st_meta": {"author": "Alice"},
         }
         scored_point.score = 0.8
-        qdrant_store.client.search.return_value = [scored_point]
+        _resp = MagicMock()
+        _resp.points = [scored_point]
+        qdrant_store.client.query_points.return_value = _resp
 
         results = qdrant_store.search([0.1] * 128)
 
@@ -441,7 +449,9 @@ class TestQdrantSearch:
             "author": "Bob",
         }
         scored_point.score = 0.7
-        qdrant_store.client.search.return_value = [scored_point]
+        _resp = MagicMock()
+        _resp.points = [scored_point]
+        qdrant_store.client.query_points.return_value = _resp
 
         results = qdrant_store.search([0.1] * 128)
 
@@ -454,7 +464,9 @@ class TestQdrantSearch:
         scored_point = MagicMock()
         scored_point.payload = None
         scored_point.score = 0.5
-        qdrant_store.client.search.return_value = [scored_point]
+        _resp = MagicMock()
+        _resp.points = [scored_point]
+        qdrant_store.client.query_points.return_value = _resp
 
         results = qdrant_store.search([0.1] * 128)
 
@@ -466,7 +478,9 @@ class TestQdrantSearch:
         self, qdrant_store: Any, mock_qdrant_client_module: MagicMock
     ) -> None:
         """Simple dict filters are converted to Qdrant Filter objects."""
-        qdrant_store.client.search.return_value = []
+        _resp = MagicMock()
+        _resp.points = []
+        qdrant_store.client.query_points.return_value = _resp
 
         qdrant_store.search(
             [0.1] * 128,
@@ -474,17 +488,19 @@ class TestQdrantSearch:
             filter={"category": "ai"},
         )
 
-        call_kwargs = qdrant_store.client.search.call_args[1]
+        call_kwargs = qdrant_store.client.query_points.call_args[1]
         # Filter should have been converted (not None)
         assert call_kwargs["query_filter"] is not None
 
     def test_search_with_no_filter(self, qdrant_store: Any) -> None:
         """Search with no filter passes None as query_filter."""
-        qdrant_store.client.search.return_value = []
+        _resp = MagicMock()
+        _resp.points = []
+        qdrant_store.client.query_points.return_value = _resp
 
         qdrant_store.search([0.1] * 128, top_k=5)
 
-        call_kwargs = qdrant_store.client.search.call_args[1]
+        call_kwargs = qdrant_store.client.query_points.call_args[1]
         assert call_kwargs["query_filter"] is None
 
     def test_search_multiple_results_ordering(self, qdrant_store: Any) -> None:
@@ -502,7 +518,9 @@ class TestQdrantSearch:
             pt.score = score
             points.append(pt)
 
-        qdrant_store.client.search.return_value = points
+        _resp = MagicMock()
+        _resp.points = points
+        qdrant_store.client.query_points.return_value = _resp
 
         results = qdrant_store.search([0.1] * 128, top_k=3)
 

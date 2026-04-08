@@ -34,7 +34,7 @@ import inspect
 import time
 from dataclasses import dataclass, field
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 from selectools.stability import beta
 
@@ -436,7 +436,7 @@ class Pipeline:
 
         return StepResult(output=current, trace=trace, steps_run=steps_run)
 
-    async def astream(self, input: Any, **kwargs: Any):
+    async def astream(self, input: Any, **kwargs: Any) -> AsyncIterator[Any]:
         """Stream the pipeline — runs all steps, yields chunks from the last step.
 
         Earlier steps run to completion. The final step's output is yielded

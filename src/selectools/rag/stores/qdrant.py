@@ -270,16 +270,35 @@ class QdrantVectorStore(VectorStore):
         # Build Qdrant filter from simple dict or pass-through native filter
         qdrant_filter = self._build_filter(filter)
 
-        results = self.client.search(
-            collection_name=self.collection_name,
-            query_vector=query_embedding,
-            limit=top_k,
-            query_filter=qdrant_filter,
-            with_payload=True,
-        )
+        # qdrant-client >=1.13 removed `client.search()` in favour of
+        # `client.query_points()`. The new API takes `query=` instead of
+        # `query_vector=` and returns a `QueryResponse` whose `.points`
+        # attribute holds the list of `ScoredPoint`s.
+        try:
+            response = self.client.query_points(
+                collection_name=self.collection_name,
+                query=query_embedding,
+                limit=top_k,
+                query_filter=qdrant_filter,
+                with_payload=True,
+            )
+        except Exception as exc:
+            # Be consistent with the other vector stores: searching an
+            # empty/uninitialised store returns an empty list rather than
+            # raising. Qdrant raises ``UnexpectedResponse`` with
+            # ``status_code=404`` when the collection has been dropped by
+            # ``clear()`` or has never been created. Use the typed attr
+            # first and fall back to string matching so we stay resilient
+            # across qdrant-client versions that wrap/rename the exception.
+            if getattr(exc, "status_code", None) == 404:
+                return []
+            msg = str(exc).lower()
+            if "404" in msg or "not found" in msg:
+                return []
+            raise
 
         search_results: List[SearchResult] = []
-        for scored_point in results:
+        for scored_point in response.points:
             payload = scored_point.payload or {}
 
             # Extract document text and metadata from namespaced keys.

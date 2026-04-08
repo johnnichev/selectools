@@ -502,8 +502,8 @@ def trace_to_json(trace: "AgentTrace") -> str:
     def _default(obj: Any) -> Any:
         if hasattr(obj, "value"):  # enum → string value
             return obj.value
-        if dataclasses.is_dataclass(obj):
-            return dataclasses.asdict(obj)  # type: ignore[call-overload]
+        if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+            return dataclasses.asdict(obj)
         return str(obj)
 
     return json.dumps(dataclasses.asdict(trace), default=_default)  # type: ignore[arg-type]

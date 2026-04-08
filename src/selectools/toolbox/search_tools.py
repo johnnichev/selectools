@@ -16,6 +16,7 @@ import urllib.request
 from typing import Optional
 from urllib.parse import urlparse
 
+from ..stability import beta
 from ..tools import tool
 
 # Private IP networks that must be blocked to prevent SSRF
@@ -92,6 +93,7 @@ def _strip_html_tags(text: str) -> str:
     return text.strip()
 
 
+@beta
 @tool(description="Search the web using DuckDuckGo (no API key needed)")
 def web_search(query: str, num_results: int = 5) -> str:
     """
@@ -169,6 +171,7 @@ def web_search(query: str, num_results: int = 5) -> str:
         return f"Error performing web search: {e}"
 
 
+@beta
 @tool(description="Fetch a URL and extract text content")
 def scrape_url(url: str, selector: Optional[str] = None) -> str:
     """

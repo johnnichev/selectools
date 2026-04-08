@@ -78,7 +78,7 @@ class OpenAIProvider(_OpenAICompatibleBase):
         return ProviderError(f"OpenAI {operation} failed: {exc}")
 
     def _parse_tool_call_id(self, tc: Any) -> str:
-        return tc.id
+        return tc.id  # type: ignore[no-any-return]
 
     def _build_astream_args(self, args: Dict[str, Any]) -> Dict[str, Any]:
         args["stream_options"] = {"include_usage": True}

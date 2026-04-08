@@ -13,7 +13,7 @@ import json
 import os
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, Iterator, List, Optional
 from urllib.parse import parse_qs, urlparse
 
 if TYPE_CHECKING:
@@ -133,14 +133,14 @@ class AgentRouter:
         )
         return response.to_dict()
 
-    def handle_stream(self, body: Dict[str, Any]):
+    def handle_stream(self, body: Dict[str, Any]) -> Iterator[str]:
         """Handle POST /stream as SSE. Yields SSE-formatted strings."""
         prompt = body.get("prompt", "")
         if not prompt:
             yield 'data: {"error": "prompt is required"}\n\n'
             return
 
-        async def _stream():
+        async def _stream() -> AsyncIterator[str]:
             chunks = []
             async for item in self.agent.astream(prompt):
                 from ..types import AgentResult, StreamChunk
@@ -264,7 +264,7 @@ class AgentServer:
                 self.send_header("Location", "/login")
                 self.end_headers()
 
-            def do_GET(self):  # noqa: N802
+            def do_GET(self) -> None:  # noqa: N802
                 path = urlparse(self.path).path.rstrip("/")
                 if path in ("/health", f"{router.prefix}/health"):
                     self._json_response(router.handle_health())
@@ -288,7 +288,7 @@ class AgentServer:
                 else:
                     self._json_response({"error": "not found"}, 404)
 
-            def do_POST(self):  # noqa: N802
+            def do_POST(self) -> None:  # noqa: N802
                 path = urlparse(self.path).path.rstrip("/")
                 content_length = int(self.headers.get("Content-Length", 0))
                 body_bytes = self.rfile.read(content_length) if content_length else b"{}"
@@ -333,27 +333,27 @@ class AgentServer:
                 else:
                     self._json_response({"error": "not found"}, 404)
 
-            def do_OPTIONS(self):  # noqa: N802
+            def do_OPTIONS(self) -> None:  # noqa: N802
                 self.send_response(200)
                 self.send_header("Access-Control-Allow-Origin", "*")
                 self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
                 self.send_header("Access-Control-Allow-Headers", "Content-Type")
                 self.end_headers()
 
-            def _json_response(self, data, status=200):
+            def _json_response(self, data: Any, status: int = 200) -> None:
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Access-Control-Allow-Origin", "*")
                 self.end_headers()
                 self.wfile.write(json.dumps(data).encode("utf-8"))
 
-            def _html_response(self, html):
+            def _html_response(self, html: str) -> None:
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(html.encode("utf-8"))
 
-            def log_message(self, format, *args):
+            def log_message(self, format: str, *args: Any) -> None:
                 pass  # Suppress default logging
 
         server = HTTPServer((self.host, actual_port), Handler)

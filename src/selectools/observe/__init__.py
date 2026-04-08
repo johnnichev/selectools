@@ -32,3 +32,17 @@ __all__ = [
     "SQLiteTraceStore",
     "JSONLTraceStore",
 ]
+
+try:
+    from .otel import OTelObserver  # noqa: F401
+
+    __all__.append("OTelObserver")
+except ImportError:
+    pass
+
+try:
+    from .langfuse import LangfuseObserver  # noqa: F401
+
+    __all__.append("LangfuseObserver")
+except ImportError:
+    pass

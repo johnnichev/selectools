@@ -212,7 +212,7 @@ class AgentConfig:
         )
 
         # Auto-unpack dicts into config objects (for YAML / dict-based config)
-        def _unpack(val, cls):
+        def _unpack(val: Any, cls: type) -> Any:
             if isinstance(val, dict):
                 return cls(**val)
             if val is not None and not isinstance(val, cls):

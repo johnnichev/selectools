@@ -44,7 +44,7 @@ class _MCPToolsContext:
 
         self._client = MCPClient(self._config)
         self._client.__enter__()
-        return self._client.list_tools_sync()
+        return self._client.list_tools_sync()  # type: ignore[no-any-return]
 
     def __exit__(self, *args: Any) -> None:
         if self._client:
@@ -55,7 +55,7 @@ class _MCPToolsContext:
 
         self._client = MCPClient(self._config)
         await self._client.__aenter__()
-        return await self._client.list_tools()
+        return await self._client.list_tools()  # type: ignore[no-any-return]
 
     async def __aexit__(self, *args: Any) -> None:
         if self._client:

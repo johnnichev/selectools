@@ -275,20 +275,49 @@ class AnthropicProvider(Provider):
                     }
                 )
             else:
-                # User or Assistant
-                if message.image_base64:
-                    content.append(
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "image/png",
-                                "data": message.image_base64,
-                            },
-                        }
-                    )
-                if message.content:
-                    content.append({"type": "text", "text": message.content})
+                # User or Assistant.
+                # Prefer the v0.21.0 multimodal ``content_parts`` path: when
+                # the message was built via ``image_message()`` the image
+                # lives in a ContentPart (not in the legacy
+                # ``message.image_base64`` attribute, which is explicitly
+                # None for multimodal messages). Fall back to the legacy
+                # path for pre-0.21 callers.
+                if getattr(message, "content_parts", None):
+                    for cp in message.content_parts:  # type: ignore[union-attr]
+                        if cp.type == "text" and cp.text:
+                            content.append({"type": "text", "text": cp.text})
+                        elif cp.type == "image_url" and cp.image_url:
+                            content.append(
+                                {
+                                    "type": "image",
+                                    "source": {"type": "url", "url": cp.image_url},
+                                }
+                            )
+                        elif cp.type == "image_base64" and cp.image_base64:
+                            content.append(
+                                {
+                                    "type": "image",
+                                    "source": {
+                                        "type": "base64",
+                                        "media_type": cp.media_type or "image/png",
+                                        "data": cp.image_base64,
+                                    },
+                                }
+                            )
+                else:
+                    if message.image_base64:
+                        content.append(
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": "image/png",
+                                    "data": message.image_base64,
+                                },
+                            }
+                        )
+                    if message.content:
+                        content.append({"type": "text", "text": message.content})
 
                 # Check for outgoing tool calls (from Assistant)
                 if message.tool_calls:

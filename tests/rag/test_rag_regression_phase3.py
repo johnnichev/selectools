@@ -534,8 +534,10 @@ class TestSemanticSearchToolTruncation:
         ]
 
         tool_obj = SemanticSearchTool(vector_store=mock_store, top_k=1)
-        # semantic_search is a Tool object; call the underlying function directly.
-        return tool_obj.semantic_search.function(tool_obj, "query")
+        # semantic_search is a @tool-decorated method; accessing it on an
+        # instance returns a Tool whose function has `self` pre-bound via
+        # the _BoundMethodTool descriptor, so we pass only the LLM kwarg.
+        return tool_obj.semantic_search.function("query")
 
     def test_short_text_no_ellipsis(self):
         """Text under 200 chars must NOT end with '...' (L2)."""

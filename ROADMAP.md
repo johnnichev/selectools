@@ -67,7 +67,7 @@ v0.20.1 ✅ Builder Polish + Starlette + GitHub Pages
 UI polish (20 features) → _static/ architecture split → Starlette ASGI app
 → Serverless mode (client-side AI/runs) → GitHub Pages deployment → Design system
 
-v0.21.0 🟡 Connector Expansion + Multimodal + Observability
+v0.21.0 ✅ Connector Expansion + Multimodal + Observability
 FAISS → Qdrant → pgvector vector stores
 → Azure OpenAI provider → Multimodal messages (images, audio)
 → CSV/JSON/HTML/URL document loaders
@@ -314,9 +314,11 @@ UI polish (20 features), `_static/` architecture split, Starlette ASGI app, serv
 
 ---
 
-## v0.21.0: Connector Expansion + Multimodal + Observability 🟡
+## v0.21.0: Connector Expansion + Multimodal + Observability ✅
 
-Close integration gaps, add multimodal support (images/audio), and ship enterprise-grade observability (OTel + Langfuse). Full spec: `.private/plans/07-v0.21.0-connector-expansion.md`
+**Shipped:** FAISS + Qdrant + pgvector vector stores, CSV/JSON/HTML/URL document loaders, Azure OpenAI provider, OpenTelemetry + Langfuse observers, multimodal `ContentPart` + `image_message()` across OpenAI/Anthropic/Gemini/Ollama, new code/search/github/db toolbox modules (9 tools). 5215 tests (95% coverage), 88 examples, 5 LLM providers, 7 vector stores, 152 models.
+
+Close integration gaps, add multimodal support (images/audio), and ship enterprise-grade observability (OTel + Langfuse). Full spec: `.private/07-v0.21.0-connector-expansion.md`
 
 ### Current Inventory
 

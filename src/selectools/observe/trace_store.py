@@ -15,7 +15,7 @@ import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Dict, Iterator, List, Optional, Protocol, runtime_checkable
 
 from ..trace import AgentTrace
 
@@ -100,7 +100,7 @@ class InMemoryTraceStore:
             entry = self._store.get(run_id)
         if entry is None:
             raise ValueError(f"Trace {run_id!r} not found")
-        return entry["trace"]
+        return entry["trace"]  # type: ignore[no-any-return]
 
     def list(self, limit: int = 50, offset: int = 0) -> List[TraceSummary]:
         with self._lock:
@@ -183,7 +183,7 @@ class SQLiteTraceStore:
             conn = sqlite3.connect(self._db_path)
             conn.execute("PRAGMA journal_mode=WAL")
             self._local.conn = conn
-        return self._local.conn
+        return self._local.conn  # type: ignore[no-any-return]
 
     def _init_db(self) -> None:
         self._conn().executescript(_TRACE_TABLE)
@@ -346,7 +346,7 @@ class JSONLTraceStore:
                     f.write(json.dumps(entry, default=str) + "\n")
             return True
 
-    def _iter_entries(self):
+    def _iter_entries(self) -> Iterator[Dict[str, Any]]:
         if not self._path.exists():
             return
         with open(self._path, encoding="utf-8") as f:

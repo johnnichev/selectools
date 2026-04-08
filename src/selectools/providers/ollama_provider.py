@@ -110,9 +110,9 @@ class OllamaProvider(_OpenAICompatibleBase):
         """Ollama may return arguments as a dict or a JSON string."""
         try:
             if isinstance(tc.function.arguments, str):
-                return json.loads(tc.function.arguments)
+                return json.loads(tc.function.arguments)  # type: ignore[no-any-return]
             else:
-                return tc.function.arguments
+                return tc.function.arguments  # type: ignore[no-any-return]
         except (json.JSONDecodeError, TypeError):
             return {}
 

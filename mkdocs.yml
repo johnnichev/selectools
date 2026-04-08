@@ -110,9 +110,11 @@ nav:
     - Toolbox (33 Built-in): modules/TOOLBOX.md
     - Dynamic Tools: modules/DYNAMIC_TOOLS.md
     - Streaming: modules/STREAMING.md
+    - Multimodal Messages: modules/MULTIMODAL.md
     - Memory: modules/MEMORY.md
     - Sessions: modules/SESSIONS.md
     - Providers: modules/PROVIDERS.md
+    - Azure OpenAI: modules/AZURE_OPENAI.md
     - Models & Pricing: modules/MODELS.md
     - Usage & Cost: modules/USAGE.md
   - Features:
@@ -121,6 +123,9 @@ nav:
     - Chunking: modules/ADVANCED_CHUNKING.md
     - Embeddings: modules/EMBEDDINGS.md
     - Vector Stores: modules/VECTOR_STORES.md
+    - FAISS: modules/FAISS.md
+    - Qdrant: modules/QDRANT.md
+    - pgvector: modules/PGVECTOR.md
     - Guardrails: modules/GUARDRAILS.md
     - Eval Framework: modules/EVALS.md
     - Orchestration: modules/ORCHESTRATION.md
@@ -151,6 +156,8 @@ nav:
     - Screening: modules/SECURITY.md
     - Error Handling: modules/EXCEPTIONS.md
     - Trace Store: modules/TRACE_STORE.md
+    - OpenTelemetry: modules/OTEL.md
+    - Langfuse: modules/LANGFUSE.md
     - Stability Markers: modules/STABILITY.md
     - Changelog: CHANGELOG.md
     - Architecture Decisions:

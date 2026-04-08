@@ -15,6 +15,7 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
+from ..stability import beta
 from ..tools import tool
 
 _API_BASE = "https://api.github.com"
@@ -48,6 +49,7 @@ def _github_request(path: str, params: dict[str, str] | None = None) -> Any:
         return json.loads(resp.read().decode("utf-8"))
 
 
+@beta
 @tool(description="Search GitHub repositories")
 def github_search_repos(query: str, max_results: int = 5) -> str:
     """
@@ -105,6 +107,7 @@ def github_search_repos(query: str, max_results: int = 5) -> str:
         return f"Error searching GitHub: {e}"
 
 
+@beta
 @tool(description="Get file contents from a GitHub repository")
 def github_get_file(repo: str, path: str, ref: str = "main") -> str:
     """
@@ -177,6 +180,7 @@ def github_get_file(repo: str, path: str, ref: str = "main") -> str:
         return f"Error fetching file: {e}"
 
 
+@beta
 @tool(description="List issues in a GitHub repository")
 def github_list_issues(repo: str, state: str = "open", max_results: int = 10) -> str:
     """

@@ -82,7 +82,7 @@ pip install selectools
 
     ---
 
-    Hybrid search (BM25 + vector) with reranking, 4 vector store backends, semantic chunking.
+    Hybrid search (BM25 + vector) with reranking, **7 vector store backends** (In-memory, SQLite, Chroma, Pinecone, FAISS, Qdrant, pgvector), semantic chunking, and CSV / JSON / HTML / URL document loaders.
 
     [:octicons-arrow-right-24: RAG module](modules/RAG.md)
 
