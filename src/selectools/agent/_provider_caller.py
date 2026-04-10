@@ -6,7 +6,7 @@ import asyncio
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, cast
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, cast
 
 # Module-level singleton for running sync provider calls in an async context.
 # Creating a new ThreadPoolExecutor per call (inside a retry loop) wastes
@@ -30,7 +30,7 @@ def _get_async_provider_executor() -> ThreadPoolExecutor:
 from ..cache import CacheKeyBuilder
 from ..providers.base import ProviderError
 from ..trace import StepType, TraceStep
-from ..types import Message, Role
+from ..types import Message, Role, ToolCall
 
 if TYPE_CHECKING:
     from ..trace import AgentTrace
@@ -118,10 +118,16 @@ class _ProviderCallerMixin:
                     )
 
                 if self.config.stream and getattr(self.provider, "supports_streaming", False):
-                    response_text = self._streaming_call(stream_handler=stream_handler)
+                    response_text, streamed_tool_calls = self._streaming_call(
+                        stream_handler=stream_handler
+                    )
                     if run_id:
                         self._notify_observers("on_llm_end", run_id, response_text, None)
-                    return Message(role=Role.ASSISTANT, content=response_text)
+                    return Message(
+                        role=Role.ASSISTANT,
+                        content=response_text,
+                        tool_calls=streamed_tool_calls or None,
+                    )
 
                 response_msg, usage_stats = self.provider.complete(
                     model=self._effective_model,
@@ -214,11 +220,14 @@ class _ProviderCallerMixin:
             role=Role.ASSISTANT, content=f"Provider error: {last_error or 'unknown error'}"
         )
 
-    def _streaming_call(self, stream_handler: Optional[Callable[[str], None]] = None) -> str:
+    def _streaming_call(
+        self, stream_handler: Optional[Callable[[str], None]] = None
+    ) -> Tuple[str, List[ToolCall]]:
         if not getattr(self.provider, "supports_streaming", False):
             raise ProviderError(f"Provider {self.provider.name} does not support streaming.")
 
         aggregated: List[str] = []
+        tool_calls: List[ToolCall] = []
         for chunk in self.provider.stream(
             model=self._effective_model,
             system_prompt=self._system_prompt,
@@ -228,12 +237,15 @@ class _ProviderCallerMixin:
             max_tokens=self.config.max_tokens,
             timeout=self.config.request_timeout,
         ):
-            if isinstance(chunk, str) and chunk:
-                aggregated.append(chunk)
-                if stream_handler:
-                    stream_handler(chunk)
+            if isinstance(chunk, str):
+                if chunk:
+                    aggregated.append(chunk)
+                    if stream_handler:
+                        stream_handler(chunk)
+            elif isinstance(chunk, ToolCall):
+                tool_calls.append(chunk)
 
-        return "".join(aggregated)
+        return "".join(aggregated), tool_calls
 
     def _is_rate_limit_error(self, message: str) -> bool:
         lowered = message.lower()
@@ -341,11 +353,17 @@ class _ProviderCallerMixin:
                     )
 
                 if self.config.stream and getattr(self.provider, "supports_streaming", False):
-                    response_text = await self._astreaming_call(stream_handler=stream_handler)
+                    response_text, streamed_tool_calls = await self._astreaming_call(
+                        stream_handler=stream_handler
+                    )
                     if run_id:
                         self._notify_observers("on_llm_end", run_id, response_text, None)
                         await self._anotify_observers("on_llm_end", run_id, response_text, None)
-                    return Message(role=Role.ASSISTANT, content=response_text)
+                    return Message(
+                        role=Role.ASSISTANT,
+                        content=response_text,
+                        tool_calls=streamed_tool_calls or None,
+                    )
 
                 # Check if provider has async support
                 if hasattr(self.provider, "acomplete") and getattr(
@@ -469,12 +487,15 @@ class _ProviderCallerMixin:
             role=Role.ASSISTANT, content=f"Provider error: {last_error or 'unknown error'}"
         )
 
-    async def _astreaming_call(self, stream_handler: Optional[Callable[[str], None]] = None) -> str:
+    async def _astreaming_call(
+        self, stream_handler: Optional[Callable[[str], None]] = None
+    ) -> Tuple[str, List[ToolCall]]:
         """Async version of _streaming_call."""
         if not getattr(self.provider, "supports_streaming", False):
             raise ProviderError(f"Provider {self.provider.name} does not support streaming.")
 
         aggregated: List[str] = []
+        tool_calls: List[ToolCall] = []
 
         if hasattr(self.provider, "astream") and getattr(self.provider, "supports_async", False):
             stream = self.provider.astream(  # type: ignore[attr-defined]
@@ -487,10 +508,13 @@ class _ProviderCallerMixin:
                 timeout=self.config.request_timeout,
             )
             async for chunk in stream:
-                if isinstance(chunk, str) and chunk:
-                    aggregated.append(chunk)
-                    if stream_handler:
-                        stream_handler(chunk)
+                if isinstance(chunk, str):
+                    if chunk:
+                        aggregated.append(chunk)
+                        if stream_handler:
+                            stream_handler(chunk)
+                elif isinstance(chunk, ToolCall):
+                    tool_calls.append(chunk)
         else:
             for chunk in self.provider.stream(
                 model=self._effective_model,
@@ -501,9 +525,12 @@ class _ProviderCallerMixin:
                 max_tokens=self.config.max_tokens,
                 timeout=self.config.request_timeout,
             ):
-                if isinstance(chunk, str) and chunk:
-                    aggregated.append(chunk)
-                    if stream_handler:
-                        stream_handler(chunk)
+                if isinstance(chunk, str):
+                    if chunk:
+                        aggregated.append(chunk)
+                        if stream_handler:
+                            stream_handler(chunk)
+                elif isinstance(chunk, ToolCall):
+                    tool_calls.append(chunk)
 
-        return "".join(aggregated)
+        return "".join(aggregated), tool_calls

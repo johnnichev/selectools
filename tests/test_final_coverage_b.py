@@ -1684,8 +1684,9 @@ class TestProviderCallerCacheKey:
             result = await agent._astreaming_call(stream_handler=lambda c: chunks.append(c))
             return result
 
-        result = asyncio.run(_run())
-        assert result == "chunk1chunk2"
+        text, tool_calls = asyncio.run(_run())
+        assert text == "chunk1chunk2"
+        assert tool_calls == []
         assert chunks == ["chunk1", "chunk2"]
 
     def test_astreaming_call_no_streaming_support(self):
