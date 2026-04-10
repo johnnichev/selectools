@@ -413,19 +413,303 @@ Individual stores/loaders remain installable a la carte: `pip install selectools
 
 ---
 
-## Backlog (Unscheduled)
+## Backlog (Unscheduled — Priority Ordered)
 
-| Feature                                                                   | Notes                                           | Target  |
-| ------------------------------------------------------------------------- | ----------------------------------------------- | ------- |
-| AWS Bedrock provider                                                      | boto3 wrapper, enterprise gateway               | v0.22.0 |
-| Google A2A protocol                                                       | Cross-framework agent interop (Linux Foundation) | v0.22.0 |
-| Durable execution / webhooks                                              | Task queue, resume from checkpoint               | v0.22.0 |
-| Code execution sandbox (Docker/E2B)                                       | Sandboxed code execution for untrusted input     | v0.22.0 |
-| Prompt registry / versioning                                              | Version, A/B test, rollback prompts              | v0.22.0 |
-| Time-travel debugging / state replay                                      | Rewind, edit, replay from any checkpoint         | v1.x    |
-| Voice / real-time audio agents                                            | WebRTC, STT/TTS, sub-500ms latency              | v1.x    |
-| Rate Limiting & Quotas                                                    | Per-tool and per-user quotas                     | Future  |
-| CRM & Business Tools                                                     | HubSpot, Salesforce integrations                 | Future  |
-| Niche Loaders (Slack, Confluence, Jira, Discord, Email, Docx, Excel, XML) | Community-driven                                 | Future  |
-| Niche Vector Stores (Weaviate, Redis Vector, Milvus, OpenSearch, Lance)   | As demand dictates                               | Future  |
-| Niche Toolbox (Email, Calendar, Browser, Financial)                       | As demand dictates                               | Future  |
+> **Research basis:** Competitive analysis of Agno (39k stars), PraisonAI (6.9k stars),
+> and Superagent (6.5k stars) conducted 2026-04-10. Full findings in memory files.
+>
+> **Strategic thesis:** selectools wins on depth (50 evals, 7 vector stores, graph
+> orchestration, pattern agents, 5,203 tests). Close the breadth gap cheaply, own the
+> "production-ready" narrative, adopt the emerging A2A standard.
+
+---
+
+### P0 — Ship Next (High Impact, Low-Medium Effort)
+
+#### Tool-Call Loop Detection
+**Source:** PraisonAI's "doom loop detection"
+**Gap:** selectools has graph-level loop/stall detection in AgentGraph, but no tool-call-level detection. An agent calling the same tool with the same args 20 times burns budget with no progress — `max_iterations` is too blunt.
+**Spec:** Three parallel detectors running per tool execution:
+- **Generic Repeat** — identical tool + identical args N times in a row
+- **Poll No Progress** — tools matching polling patterns ("status", "check", "poll") returning unchanged results consecutively
+- **Ping Pong** — alternating oscillation between two tools without advancement
+Two-tier response: warn at `warn_threshold` (default 10) → block at `critical_threshold` (default 20).
+```python
+# Target API
+from selectools.agent.loop_detection import LoopDetectionConfig
+agent = Agent(tools, provider=provider, config=AgentConfig(
+    loop_detection=LoopDetectionConfig(
+        enabled=True,
+        history_size=30,
+        warn_threshold=10,
+        critical_threshold=20,
+        detectors={"generic_repeat": True, "poll_no_progress": True, "ping_pong": True}
+    )
+))
+```
+**Implementation:** New `agent/loop_detection.py`. Hook into `_process_response()` tool execution path. stdlib only (`hashlib`, `json`). Zero overhead when disabled.
+**Effort:** Low (1-2 days). Pure Python, no deps.
+
+#### Agentic Memory (Memory-as-Tool)
+**Source:** Agno's `enable_agentic_memory=True`
+**Gap:** selectools memory is always-on and passive — ConversationMemory stores everything, EntityMemory extracts automatically. The agent has no agency over what it remembers. For long-running agents, not every turn is worth persisting.
+**Spec:** Two memory tools injected when `agentic_memory=True`:
+- `remember(key, value, importance=0.8)` — agent explicitly stores a fact
+- `recall(query, limit=5)` — agent explicitly retrieves relevant memories
+Backed by existing `KnowledgeMemory` (already has importance scores, TTL, 4 backends).
+```python
+# Target API
+agent = Agent(tools, provider=provider, config=AgentConfig(
+    memory=MemoryConfig(agentic_memory=True, store=SQLiteKnowledgeStore("memory.db"))
+))
+# Agent now has remember() and recall() as tools alongside user tools
+```
+**Implementation:** New `agent/memory_tools.py` that wraps KnowledgeMemory as Tool objects. Inject into tool list during `_prepare_run()` when `agentic_memory=True`.
+**Effort:** Low (1-2 days). Wraps existing KnowledgeMemory.
+
+#### Agent-as-API (Production Serve)
+**Source:** Agno's `AgentOS` — one line generates production FastAPI app
+**Gap:** selectools serve/ has builder UI + playground, but no auto-generated production REST API. Users who want to deploy a selectools agent as an API must write their own FastAPI wrapper.
+**Spec:** Auto-generate production endpoints from any Agent:
+- `POST /v1/chat` — single-turn completion (JSON request/response)
+- `POST /v1/chat/stream` — streaming completion (SSE)
+- `POST /v1/sessions` — create session
+- `GET /v1/sessions/{id}` — get session history
+- `DELETE /v1/sessions/{id}` — delete session
+- `GET /v1/health` — health check
+Per-user isolation via `user_id` header. Optional API key auth.
+```python
+# Target API
+from selectools.serve import AgentAPI
+app = AgentAPI(agents=[my_agent, my_other_agent], auth_key="sk-...")
+# Starlette ASGI app — run with: uvicorn app:app
+```
+Or via CLI: `selectools serve agent.yaml --api --port 8000`
+**Implementation:** New `serve/api.py` building on existing Starlette infrastructure in `_starlette_app.py`. Standardized JSON schema for requests/responses. Session management via existing SessionStore backends.
+**Effort:** Medium (3-5 days). Starlette already exists, plumbing is there.
+
+---
+
+### P1 — Ship Soon (High Impact, Medium Effort)
+
+#### LiteLLM Provider Wrapper
+**Source:** PraisonAI (24+ providers via litellm), Agno (40+ native providers)
+**Gap:** selectools has 5 native providers (OpenAI, Anthropic, Gemini, Ollama, Azure OpenAI). Enterprise users need DeepSeek, Mistral, Groq, Together, Cohere, Fireworks, Bedrock, and more.
+**Spec:** A `LiteLLMProvider` that delegates to the `litellm` library, instantly supporting 100+ models.
+```python
+# Target API
+from selectools.providers.litellm_provider import LiteLLMProvider
+provider = LiteLLMProvider(model="deepseek/deepseek-chat")
+provider = LiteLLMProvider(model="groq/llama-3.1-70b")
+provider = LiteLLMProvider(model="bedrock/anthropic.claude-3-sonnet")
+agent = Agent(tools, provider=provider)
+```
+Must implement full Provider protocol: complete/acomplete/stream/astream, tool calling, structured output. Optional dep: `litellm>=1.0.0`.
+**Implementation:** New `providers/litellm_provider.py`. Map selectools Message/ToolCall to litellm format. Register in `[providers]` extras group.
+**Effort:** Medium (2-3 days). litellm handles the hard provider-specific work.
+**Note:** Native providers remain for maximum control; LiteLLM is the "long tail" solution.
+
+#### Cost-Optimized Model Router
+**Source:** PraisonAI's "Model Router" / "RouterAgent"
+**Gap:** selectools has FallbackProvider for reliability (try primary → secondary on failure) and pricing.py with cost data for 152 models, but no cost-optimized routing. Users manually pick models.
+**Spec:** A `RouterProvider` that wraps multiple providers and routes based on task complexity + cost:
+- Classify input complexity (simple factual → complex reasoning → code generation)
+- Map to cheapest model capable of handling that complexity class
+- Fall back to more expensive model if cheap model fails quality threshold
+```python
+# Target API
+from selectools.providers import RouterProvider, OpenAIProvider, AnthropicProvider
+router = RouterProvider(
+    providers={
+        "fast": OpenAIProvider(model="gpt-4o-mini"),  # $0.15/1M input
+        "smart": AnthropicProvider(model="claude-sonnet-4-6"),  # $3/1M input
+        "power": OpenAIProvider(model="gpt-5.4-pro"),  # $10/1M input
+    },
+    strategy="cost_optimized",  # or "quality_first", "balanced"
+)
+agent = Agent(tools, provider=router)
+```
+**Implementation:** New `providers/router.py`. Complexity classifier can be rule-based (tool count, input length, keyword detection) or LLM-based. Builds on FallbackProvider architecture.
+**Effort:** Medium (3-5 days). Routing logic is the novel part.
+
+#### A2A Protocol (Agent-to-Agent Communication)
+**Source:** PraisonAI, Google-backed emerging standard
+**Gap:** selectools has MCP for tool interop but no agent-to-agent communication protocol. Already in existing backlog for v0.22.0.
+**Spec:** Two HTTP endpoints on existing Starlette serve infrastructure:
+- `GET /.well-known/agent.json` — Agent Card (auto-generated from AgentConfig: name, description, capabilities, tools list)
+- `POST /a2a` — JSON-RPC message handler (receive tasks, return results)
+Task lifecycle: submitted → working → input-required → completed/failed/cancelled.
+Message format: JSON-RPC with multimodal content parts (text, file, data).
+Optional bearer token authentication on POST endpoint.
+```python
+# Target API — serving
+from selectools.serve import A2AServer
+server = A2AServer(agent=my_agent, auth_token="sk-...")
+server.serve(port=8000)
+
+# Target API — consuming
+from selectools.a2a import A2AClient
+client = A2AClient("https://other-agent.example.com")
+card = await client.discover()  # reads /.well-known/agent.json
+result = await client.send_task("Research quantum computing trends")
+```
+**Implementation:** New `a2a/` module with server.py + client.py. Server builds on serve/_starlette_app.py. Agent Card auto-generated from AgentConfig metadata.
+**Effort:** Medium (3-5 days). Two routes + JSON-RPC message handler.
+
+#### Expanded Toolbox (40 → 80+ tools)
+**Source:** Agno has 131 built-in tools across 15 categories
+**Gap:** selectools has 40+ tools across 10 categories. Missing enterprise-critical categories: communication (Slack, Discord, Email), project management (Notion, Linear, Jira), cloud (AWS S3, GCS), media (image generation).
+**Priority additions (by user demand):**
+
+| Category | Tools to add | Deps | Effort |
+|---|---|---|---|
+| **Slack** | send_message, read_channel, search | `slack-sdk` | Small |
+| **Discord** | send_message, read_channel | `discord.py` | Small |
+| **Email** | send_email, read_inbox | `smtplib`/`imaplib` (stdlib) | Small |
+| **Notion** | create_page, search, update_page | `requests` | Small |
+| **Linear** | create_issue, list_issues, update_issue | `requests` | Small |
+| **AWS S3** | list_objects, get_object, put_object | `boto3` | Small |
+| **Browser** | scrape_page, screenshot, click | `playwright` | Medium |
+| **Image Gen** | generate_image (DALL-E) | `openai` (existing) | Small |
+| **Calculator** | evaluate_expression, unit_convert | stdlib `ast` | Small |
+| **PDF** | extract_text, extract_tables | `pdfplumber` | Small |
+
+**Implementation:** New files in `src/selectools/toolbox/`. Follow existing @tool pattern. All deps optional with lazy imports. Register in `get_tools_by_category()`.
+**Effort:** Medium total (1 day per category, parallelizable).
+
+---
+
+### P2 — Important but Not Urgent
+
+#### Tool Result Compression
+**Source:** Agno's `compress_tool_results=True`
+**Gap:** selectools has CompressConfig for prompt compression but doesn't compress individual tool results. Verbose tool outputs (e.g., web scrape returning 10KB HTML) waste context.
+**Spec:** When enabled, tool results exceeding a character threshold are summarized by a fast LLM before being added to the conversation.
+```python
+config = AgentConfig(tool=ToolConfig(compress_results=True, compress_threshold=2000))
+```
+**Implementation:** Add compression step in `_process_response()` after tool execution, before appending to messages. Use CompressConfig's existing compression logic.
+**Effort:** Low (1 day).
+
+#### Session History Search
+**Source:** Agno's cross-session query capability
+**Gap:** selectools session stores support save/load by session_id but can't search across sessions. An agent can't "remember what we discussed last Tuesday."
+**Spec:** Add `search(query, user_id, limit)` method to SessionStore protocol. SQLiteSessionStore and RedisSessionStore implement full-text or embedding-based search.
+```python
+store = SQLiteSessionStore("sessions.db")
+results = store.search("billing discrepancy", user_id="user-123", limit=5)
+# Returns: list of (session_id, relevance_score, matched_messages)
+```
+**Implementation:** Add FTS5 index to SQLiteSessionStore. Add `SEARCH` command to RedisSessionStore. Protocol change requires @beta marker.
+**Effort:** Medium (2-3 days).
+
+#### Memory Tiering with Auto-Promotion
+**Source:** PraisonAI's 4-tier memory with importance scoring
+**Gap:** selectools has ConversationMemory, EntityMemory, KnowledgeMemory, KnowledgeGraphMemory as separate systems. They don't compose into a unified lifecycle with auto-promotion.
+**Spec:** A `UnifiedMemory` that orchestrates all four:
+- Short-term (ConversationMemory): rolling window, items auto-expire
+- Long-term (KnowledgeMemory): items above `importance_threshold` auto-promoted from STM
+- Entity (EntityMemory): structured entity tracking
+- Episodic: date-based interaction history with configurable retention
+Context compaction: auto-summarize when hitting 70% of token limit.
+Importance scoring: LLM-based or rule-based (names=0.9, preferences=0.75, locations=0.6).
+```python
+config = AgentConfig(memory=MemoryConfig(
+    unified=True,
+    importance_threshold=0.7,
+    short_term_limit=100,
+    long_term_limit=1000,
+    episodic_retention_days=30,
+    auto_promote=True,
+))
+```
+**Implementation:** New `unified_memory.py` orchestrating existing memory backends.
+**Effort:** High (5-7 days). Requires importance scoring + lifecycle management.
+
+#### Agent-Level Human-in-the-Loop
+**Source:** Agno's approval workflows
+**Gap:** selectools has InterruptRequest in graphs + ConfirmAction in ToolConfig. But a standalone Agent can't pause mid-execution for approval on arbitrary conditions (e.g., confidence below threshold, cost above limit).
+**Spec:** Extend InterruptRequest to work outside of AgentGraph:
+```python
+config = AgentConfig(tool=ToolConfig(
+    require_approval=["execute_shell", "send_email"],  # named tools
+    approval_handler=my_callback,  # sync/async callable
+))
+```
+**Implementation:** Lift InterruptRequest + checkpoint machinery from orchestration to agent level. Integrate with tool execution path.
+**Effort:** Medium (3-4 days).
+
+#### Planning-as-Config Flag
+**Source:** PraisonAI's `planning=True`
+**Gap:** selectools has PlanAndExecuteAgent as a separate pattern class. Users can't add planning to any existing agent with a config flag.
+**Spec:** When `planning=True`, the agent auto-decomposes complex inputs before executing:
+```python
+config = AgentConfig(planning=PlanningConfig(
+    enabled=True, llm="gpt-4o", auto_approve=True, reasoning=True
+))
+agent = Agent(tools, provider=provider, config=config)
+# Agent internally: plan → approve → execute steps → synthesize
+```
+**Implementation:** Wrap existing PlanAndExecuteAgent logic into a mixin that activates via config. Reuses planner/executor infrastructure.
+**Effort:** Low-Medium (2-3 days).
+
+---
+
+### P3 — Future / Watch
+
+#### Shadow Git Checkpoints
+**Source:** PraisonAI
+File-level workspace snapshots via hidden git repo, independent of user's git history. Relevant if selectools moves toward coding agent use cases.
+**Effort:** Medium.
+
+#### Multi-Channel Bot Gateway
+**Source:** PraisonAI (Telegram, Discord, Slack, WhatsApp routing)
+Single routing layer for deploying agents to messaging platforms. Better as separate package.
+**Effort:** High.
+
+#### ML-Based Guard Models
+**Source:** Superagent's open-weight 0.6B-4B parameter models
+Prompt injection detection running locally, no API calls. Could wrap their models as a GuardrailProvider.
+**Effort:** High (integration medium, but model hosting is the challenge).
+
+#### Learning System
+**Source:** Agno
+Decision logging + preference tracking for continuous agent improvement over time.
+**Effort:** High.
+
+#### More Database Backends
+**Source:** Agno (MongoDB, Firestore, DynamoDB, SurrealDB)
+selectools has SQLite, PostgreSQL, Redis. NoSQL/cloud databases on demand.
+**Effort:** Medium per backend.
+
+#### Reasoning-as-Tool
+**Source:** Agno's three reasoning modes
+Reasoning step as composable tool (not just prompt strategy). Explicit min/max reasoning steps.
+**Effort:** Medium.
+
+#### Cron / Scheduled Agents
+**Source:** PraisonAI
+Background scheduling for periodic agent tasks (monitoring, reporting, cleanup).
+**Effort:** Medium.
+
+#### Episodic Memory
+**Source:** PraisonAI
+Date-based interaction history with configurable retention period and automatic cleanup.
+**Effort:** Medium.
+
+---
+
+### Previously Planned (Retained)
+
+| Feature                          | Notes                                            | Target  |
+| -------------------------------- | ------------------------------------------------ | ------- |
+| AWS Bedrock provider             | boto3 wrapper, enterprise gateway (or via LiteLLM) | v0.22.0 |
+| Durable execution / webhooks     | Task queue, resume from checkpoint               | v0.22.0 |
+| Code execution sandbox (Docker/E2B) | Sandboxed code execution for untrusted input   | v0.22.0 |
+| Prompt registry / versioning     | Version, A/B test, rollback prompts              | v0.22.0 |
+| Time-travel debugging / state replay | Rewind, edit, replay from any checkpoint      | v1.x    |
+| Voice / real-time audio agents   | WebRTC, STT/TTS, sub-500ms latency              | v1.x    |
+| Rate Limiting & Quotas           | Per-tool and per-user quotas                     | Future  |
+| CRM & Business Tools             | HubSpot, Salesforce integrations                 | Future  |
+| Niche Loaders                    | Slack, Confluence, Jira, Discord, Email, Docx    | Future  |
+| Niche Vector Stores              | Weaviate, Redis Vector, Milvus, OpenSearch, Lance | Future  |
