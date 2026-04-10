@@ -15,7 +15,7 @@ import copy
 import json
 import threading
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple
 from unittest.mock import MagicMock
 
 import pytest
@@ -2267,3 +2267,40 @@ def test_bug01_astreaming_sync_fallback_preserves_tool_calls() -> None:
     result = asyncio.run(agent.arun([Message(role=Role.USER, content="echo hello")]))
     assert "Done" in result.content, f"Expected tool to execute; got: {result.content!r}"
     assert provider.call_count >= 2, "Agent should have looped after tool execution"
+
+
+# ---- BUG-02: typing.Literal crashes @tool() ----
+# Source: Agno #6720. _unwrap_type() did not handle typing.Literal, producing
+# "Unsupported parameter type" at @tool() registration time.
+
+
+def test_bug02_literal_str_produces_enum():
+    @tool()
+    def set_mode(mode: Literal["fast", "slow", "auto"]) -> str:
+        return f"mode={mode}"
+
+    assert set_mode.name == "set_mode"
+    params = {p.name: p for p in set_mode.parameters}
+    assert "mode" in params
+    assert params["mode"].enum == ["fast", "slow", "auto"]
+    assert params["mode"].param_type is str
+
+
+def test_bug02_literal_int_produces_enum():
+    @tool()
+    def set_level(level: Literal[1, 2, 3]) -> str:
+        return f"level={level}"
+
+    params = {p.name: p for p in set_level.parameters}
+    assert params["level"].enum == [1, 2, 3]
+    assert params["level"].param_type is int
+
+
+def test_bug02_optional_literal_works():
+    @tool()
+    def filter_by(tag: Optional[Literal["red", "blue"]] = None) -> str:
+        return f"tag={tag}"
+
+    params = {p.name: p for p in filter_by.parameters}
+    assert params["tag"].enum == ["red", "blue"]
+    assert params["tag"].required is False

@@ -7,10 +7,51 @@ from __future__ import annotations
 import functools
 import inspect
 import sys
-from typing import Any, Callable, Dict, List, Optional, Union, get_args, get_origin, get_type_hints
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Union,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
 from ..stability import stable
 from .base import ParamMetadata, Tool, ToolParameter
+
+
+def _literal_info(type_hint: Any) -> Optional[Tuple[Any, List[Any]]]:
+    """Return (base_type, enum_values) for Literal[...] hints, else None.
+
+    Unwraps Optional[Literal[...]] as well. Base type is inferred from the
+    first literal value (e.g. Literal["a", "b"] -> str).
+    """
+    origin = get_origin(type_hint)
+    if origin is Union:
+        args = get_args(type_hint)
+        non_none = [a for a in args if a is not type(None)]
+        if len(non_none) == 1:
+            return _literal_info(non_none[0])
+    if sys.version_info >= (3, 10):
+        import types as _types  # noqa: PLC0415
+
+        if isinstance(type_hint, _types.UnionType):
+            args = get_args(type_hint)
+            non_none = [a for a in args if a is not type(None)]
+            if len(non_none) == 1:
+                return _literal_info(non_none[0])
+    if origin is Literal:
+        values = list(get_args(type_hint))
+        if not values:
+            return None
+        base_type = type(values[0])
+        return base_type, values
+    return None
 
 
 def _unwrap_type(type_hint: Any) -> Any:
@@ -86,14 +127,19 @@ def _infer_parameters_from_callable(
         if name in injected_names:
             continue
 
-        # Get type hint (default to str if missing)
-        raw_type = type_hints.get(name, str)
-        param_type = _unwrap_type(raw_type)
-
         # detailed metadata
         meta = param_metadata.get(name, {})
         description = meta.get("description", f"Parameter {name}")
-        enum_values = meta.get("enum")
+        enum_values: Optional[List[Any]] = meta.get("enum")
+
+        raw_type = type_hints.get(name, str)
+        lit = _literal_info(raw_type)
+        if lit is not None:
+            param_type, literal_values = lit
+            if enum_values is None:
+                enum_values = literal_values
+        else:
+            param_type = _unwrap_type(raw_type)
 
         # Check for optional/default values
         is_optional = param.default != inspect.Parameter.empty
