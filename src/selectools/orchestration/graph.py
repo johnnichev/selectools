@@ -703,10 +703,46 @@ class AgentGraph:
                         )
 
                 elif isinstance(node, SubgraphNode):
-                    result, state = await self._aexecute_subgraph(node, state, trace, run_id)
+                    result, state, subgraph_interrupted = await self._aexecute_subgraph(
+                        node, state, trace, run_id
+                    )
                     node_results.setdefault(current, []).append(result)
                     if result.usage:
                         usage = _merge_usage(usage, result.usage)
+
+                    if subgraph_interrupted:
+                        # BUG-05: propagate HITL interrupt from a nested graph
+                        # through the same checkpoint/pause path used for
+                        # non-subgraph interrupts. Mirrors the BUG-04 parallel
+                        # interrupt propagation.
+                        interrupt_key = state.metadata.get(_STATE_KEY_PENDING_INTERRUPT, "")
+                        if checkpoint_store:
+                            ckpt_id = checkpoint_store.save(run_id, state, step)
+                        else:
+                            ckpt_id = f"{run_id}_{step}"
+
+                        self._notify("on_graph_interrupt", run_id, current, ckpt_id)
+                        self._trace_step(
+                            trace,
+                            StepType.GRAPH_INTERRUPT,
+                            node_name=current,
+                            interrupt_key=interrupt_key,
+                            checkpoint_id=ckpt_id,
+                        )
+                        duration_ms = (time.time() - graph_start_time) * 1000
+                        self._notify("on_graph_end", run_id, self.name, step, duration_ms)
+                        return GraphResult(
+                            content=state.data.get(STATE_KEY_LAST_OUTPUT, ""),
+                            state=state,
+                            node_results=node_results,
+                            trace=trace,
+                            total_usage=usage,
+                            interrupted=True,
+                            interrupt_id=ckpt_id,
+                            steps=step,
+                            stalls=stall_count,
+                            loops_detected=loop_count,
+                        )
 
                 else:
                     # Retry loop for RETRY policy
@@ -991,10 +1027,39 @@ class AgentGraph:
                         break
 
                 elif isinstance(node, SubgraphNode):
-                    result, state = await self._aexecute_subgraph(node, state, trace, run_id)
+                    result, state, subgraph_interrupted = await self._aexecute_subgraph(
+                        node, state, trace, run_id
+                    )
                     node_results.setdefault(current, []).append(result)
                     if result.usage:
                         usage = _merge_usage(usage, result.usage)
+
+                    if subgraph_interrupted:
+                        # BUG-05: propagate HITL interrupt from a nested graph
+                        # through the same checkpoint/pause path used for
+                        # non-subgraph interrupts. Mirrors the BUG-04 parallel
+                        # interrupt propagation.
+                        interrupt_key = state.metadata.get(_STATE_KEY_PENDING_INTERRUPT, "")
+                        if checkpoint_store:
+                            ckpt_id = checkpoint_store.save(run_id, state, step)
+                        else:
+                            ckpt_id = f"{run_id}_{step}"
+                        self._notify("on_graph_interrupt", run_id, current, ckpt_id)
+                        self._trace_step(
+                            trace,
+                            StepType.GRAPH_INTERRUPT,
+                            node_name=current,
+                            interrupt_key=interrupt_key,
+                            checkpoint_id=ckpt_id,
+                        )
+                        duration_ms = (time.time() - graph_start) * 1000
+                        self._notify("on_graph_end", run_id, self.name, step, duration_ms)
+                        yield GraphEvent(
+                            type=GraphEventType.GRAPH_INTERRUPT,
+                            node_name=current,
+                            interrupt_id=ckpt_id,
+                        )
+                        break
 
                 else:
                     result, state, interrupted = await self._aexecute_node(
@@ -1386,8 +1451,16 @@ class AgentGraph:
         state: GraphState,
         trace: AgentTrace,
         run_id: str,
-    ) -> Tuple[AgentResult, GraphState]:
-        """Execute a nested AgentGraph as a node."""
+    ) -> Tuple[AgentResult, GraphState, bool]:
+        """Execute a nested AgentGraph as a node.
+
+        Returns (result, new_state, interrupted). If the subgraph yields an
+        InterruptRequest, ``interrupted`` is True and the pending interrupt
+        marker plus any stored interrupt responses are propagated onto the
+        parent state (namespaced under the subgraph node name) so the outer
+        loop can checkpoint and pause (BUG-05 / Agno #4921). Mirrors the
+        BUG-04 parallel-group interrupt propagation pattern.
+        """
         # Build subgraph input state
         sub_state = GraphState.from_prompt(
             state.data.get(STATE_KEY_LAST_OUTPUT, "")
@@ -1401,6 +1474,25 @@ class AgentGraph:
 
         # Run the subgraph
         sub_result = await node.graph.arun(sub_state, _interrupt_response=None)
+
+        if sub_result.interrupted:
+            # BUG-05: propagate HITL interrupt from nested graph. The parent
+            # must pause too, so copy the pending interrupt key and any
+            # stored interrupt responses onto the parent state. We namespace
+            # with the subgraph node name to avoid colliding with the
+            # parent's direct-child interrupt keys.
+            pending_key = sub_result.state.metadata.get(_STATE_KEY_PENDING_INTERRUPT, "")
+            if pending_key:
+                state.metadata[_STATE_KEY_PENDING_INTERRUPT] = f"{node.name}/{pending_key}"
+            for k, v in sub_result.state._interrupt_responses.items():
+                state._interrupt_responses.setdefault(f"{node.name}/{k}", v)
+
+            synthetic = AgentResult(
+                message=Message(role=Role.ASSISTANT, content=sub_result.content),
+                iterations=sub_result.steps,
+                usage=sub_result.total_usage,
+            )
+            return synthetic, state, True
 
         # Map subgraph output keys back to parent
         for sub_key, parent_key in node.output_map.items():
@@ -1417,7 +1509,7 @@ class AgentGraph:
             iterations=sub_result.steps,
             usage=sub_result.total_usage,
         )
-        return synthetic, state
+        return synthetic, state, False
 
     # ------------------------------------------------------------------
     # Routing

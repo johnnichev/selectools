@@ -2423,3 +2423,58 @@ def test_bug04_parallel_group_propagates_hitl():
     # Our HITL child is named "hitl" and yields once at index 0.
     pending = result.state.metadata.get("__pending_interrupt_key__")
     assert pending == "hitl_0", f"Expected pending interrupt key 'hitl_0', got: {pending!r}"
+
+
+# ---- BUG-05: HITL lost in subgraphs ----
+# Source: Agno #4921. InterruptRequest raised inside a subgraph was silently
+# dropped by the parent graph, losing the subgraph's pause state.
+
+
+def test_bug05_subgraph_propagates_hitl_interrupt():
+    """When a subgraph interrupts, the parent graph must pause too.
+
+    BUG-05: _aexecute_subgraph never inspected sub_result.interrupted. If the
+    nested graph yielded InterruptRequest and paused, the parent treated the
+    subgraph node as completed and kept executing — no checkpoint, no pause,
+    HITL broken in nested-graph contexts. Mirrors BUG-04 for parallel groups.
+    Cross-referenced from Agno #4921.
+    """
+    from selectools.orchestration import (
+        AgentGraph,
+        GraphState,
+        InMemoryCheckpointStore,
+        InterruptRequest,
+    )
+
+    def _hitl_generator(state: GraphState):
+        response = yield InterruptRequest(prompt="ok?")
+        state.data["approval"] = response
+        state.data["inner_done"] = True
+        return state
+
+    # Inner graph with an HITL gate
+    inner = AgentGraph(name="bug05_inner")
+    inner.add_node("gate", _hitl_generator)
+    inner.set_entry("gate")
+    inner.add_edge("gate", AgentGraph.END)
+
+    # Parent graph that wraps the inner graph as a SubgraphNode
+    outer = AgentGraph(name="bug05_outer")
+    outer.add_subgraph("nested", graph=inner)
+    outer.set_entry("nested")
+    outer.add_edge("nested", AgentGraph.END)
+
+    store = InMemoryCheckpointStore()
+    result = outer.run("start", checkpoint_store=store)
+
+    assert result.interrupted, f"Expected parent graph to pause; got: {result}"
+    assert result.interrupt_id is not None
+    # The subgraph's pending interrupt key is propagated into the parent
+    # state so the parent's checkpoint/resume machinery can find it. We
+    # namespace with the subgraph node name to avoid collisions with the
+    # parent's own direct-child interrupt keys.
+    pending = result.state.metadata.get("__pending_interrupt_key__")
+    assert pending is not None, "Expected parent state to carry subgraph pending key"
+    assert pending.startswith(
+        "nested/"
+    ), f"Expected pending key to be namespaced under subgraph node; got: {pending!r}"
