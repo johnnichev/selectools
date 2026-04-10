@@ -1457,9 +1457,10 @@ class AgentGraph:
         Returns (result, new_state, interrupted). If the subgraph yields an
         InterruptRequest, ``interrupted`` is True and the pending interrupt
         marker plus any stored interrupt responses are propagated onto the
-        parent state (namespaced under the subgraph node name) so the outer
-        loop can checkpoint and pause (BUG-05 / Agno #4921). Mirrors the
-        BUG-04 parallel-group interrupt propagation pattern.
+        parent state using FLAT keys (matching BUG-04's parallel-group
+        pattern) so the outer loop can checkpoint and pause, and so a
+        subsequent ``graph.resume()`` can route the stored response back
+        into the subgraph's generator on re-execution (BUG-05 / Agno #4921).
         """
         # Build subgraph input state
         sub_state = GraphState.from_prompt(
@@ -1472,20 +1473,27 @@ class AgentGraph:
             if parent_key in state.data:
                 sub_state.data[sub_key] = state.data[parent_key]
 
+        # BUG-05 resume path: forward any parent-stored interrupt responses
+        # DOWN into sub_state so the subgraph's generator can find its
+        # stored response when re-executed. Without this, a resumed
+        # subgraph re-interrupts forever (silent infinite loop) because
+        # GraphState.from_prompt() builds a fresh, empty _interrupt_responses.
+        for k, v in state._interrupt_responses.items():
+            sub_state._interrupt_responses.setdefault(k, v)
+
         # Run the subgraph
         sub_result = await node.graph.arun(sub_state, _interrupt_response=None)
 
         if sub_result.interrupted:
-            # BUG-05: propagate HITL interrupt from nested graph. The parent
-            # must pause too, so copy the pending interrupt key and any
-            # stored interrupt responses onto the parent state. We namespace
-            # with the subgraph node name to avoid colliding with the
-            # parent's direct-child interrupt keys.
+            # BUG-05: propagate HITL interrupt from nested graph using FLAT
+            # keys so the parent's resume machinery can route the stored
+            # response back into the subgraph on re-execution. Mirrors the
+            # BUG-04 parallel-group propagation in _aexecute_parallel.
             pending_key = sub_result.state.metadata.get(_STATE_KEY_PENDING_INTERRUPT, "")
             if pending_key:
-                state.metadata[_STATE_KEY_PENDING_INTERRUPT] = f"{node.name}/{pending_key}"
+                state.metadata[_STATE_KEY_PENDING_INTERRUPT] = pending_key
             for k, v in sub_result.state._interrupt_responses.items():
-                state._interrupt_responses.setdefault(f"{node.name}/{k}", v)
+                state._interrupt_responses.setdefault(k, v)
 
             synthetic = AgentResult(
                 message=Message(role=Role.ASSISTANT, content=sub_result.content),

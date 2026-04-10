@@ -2469,12 +2469,65 @@ def test_bug05_subgraph_propagates_hitl_interrupt():
 
     assert result.interrupted, f"Expected parent graph to pause; got: {result}"
     assert result.interrupt_id is not None
-    # The subgraph's pending interrupt key is propagated into the parent
-    # state so the parent's checkpoint/resume machinery can find it. We
-    # namespace with the subgraph node name to avoid collisions with the
-    # parent's own direct-child interrupt keys.
+    # The subgraph's pending interrupt key is propagated FLAT into the
+    # parent state (matching BUG-04's parallel-group approach) so the
+    # parent's resume machinery can route the stored response back into
+    # the subgraph's generator on re-execution.
     pending = result.state.metadata.get("__pending_interrupt_key__")
-    assert pending is not None, "Expected parent state to carry subgraph pending key"
-    assert pending.startswith(
-        "nested/"
-    ), f"Expected pending key to be namespaced under subgraph node; got: {pending!r}"
+    assert (
+        pending == "gate_0"
+    ), f"Expected flat pending key 'gate_0' from subgraph generator node; got: {pending!r}"
+
+
+# ---- BUG-05 Part 2: Subgraph HITL resume ----
+# Follow-up: the initial BUG-05 fix used namespaced keys ('{node}/{key}')
+# which caused a silent infinite loop on graph.resume() — the subgraph's
+# generator looked for its unprefixed key and never found the stored
+# response. Flat keys + down-propagation of parent._interrupt_responses
+# into sub_state fix this.
+
+
+def test_bug05_subgraph_resume_completes():
+    """After a subgraph HITL interrupt, graph.resume() must propagate the
+    response into the subgraph's generator and complete execution.
+
+    Regression for the silent infinite loop where namespaced keys prevented
+    the subgraph's generator from seeing the stored response on resume.
+    """
+    from selectools.orchestration import (
+        AgentGraph,
+        GraphState,
+        InMemoryCheckpointStore,
+        InterruptRequest,
+    )
+
+    def _hitl_generator(state: GraphState):
+        response = yield InterruptRequest(prompt="ok?")
+        state.data["approval"] = response
+        state.data["inner_done"] = True
+        return state
+
+    inner = AgentGraph(name="bug05_resume_inner")
+    inner.add_node("gate", _hitl_generator)
+    inner.set_entry("gate")
+    inner.add_edge("gate", AgentGraph.END)
+
+    outer = AgentGraph(name="bug05_resume_outer")
+    outer.add_subgraph("nested", graph=inner)
+    outer.set_entry("nested")
+    outer.add_edge("nested", AgentGraph.END)
+
+    store = InMemoryCheckpointStore()
+
+    # Phase 1: run and expect pause
+    paused = outer.run("start", checkpoint_store=store)
+    assert paused.interrupted, "Expected subgraph to pause"
+    assert paused.interrupt_id is not None
+
+    # Phase 2: resume and expect completion (the silent-loop repro)
+    resumed = outer.resume(paused.interrupt_id, response="approve", checkpoint_store=store)
+    assert not resumed.interrupted, (
+        f"Expected resume to complete; got interrupted={resumed.interrupted}. "
+        "This regression catches the silent infinite loop where namespaced "
+        "keys prevented the subgraph generator from seeing the response."
+    )
