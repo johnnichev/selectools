@@ -25,7 +25,8 @@ from selectools.observer import AgentObserver
 from selectools.policy import PolicyDecision, ToolPolicy
 from selectools.providers.base import Provider, ProviderError
 from selectools.providers.fallback import FallbackProvider
-from selectools.tools import Tool, tool
+from selectools.providers.stubs import LocalProvider
+from selectools.tools import Tool, ToolParameter, tool
 from selectools.types import AgentResult, Message, Role, ToolCall
 from selectools.usage import UsageStats
 
@@ -2086,3 +2087,183 @@ class TestEarlyExitSessionSave:
         result = await agent.arun("hello")
         assert "Maximum iterations" in result.content
         assert len(store.saves) >= 1, "Session was not saved on async max_iterations exit"
+
+
+# ---- BUG-01: Streaming drops ToolCall objects ----
+#
+# Source: Agno #6757 pattern — competitor bug where tool function names become
+# empty strings in streaming responses.
+#
+# Selectools variant: _streaming_call and _astreaming_call previously filtered
+# chunks with `isinstance(chunk, str)`, dropping ToolCall objects entirely. Tools
+# were never executed when AgentConfig(stream=True). These tests cover all three
+# structurally-identical collection sites:
+#   1. sync  run()  → _streaming_call (provider.stream)
+#   2. async arun() → _astreaming_call native branch (provider.astream)
+#   3. async arun() → _astreaming_call sync-fallback branch (provider.stream
+#      iterated from async code when supports_async=False)
+
+
+class _Bug01StreamingToolProvider(LocalProvider):
+    """Sync provider that yields a ToolCall during streaming."""
+
+    name = "bug01_streaming_tool_stub"
+    supports_streaming = True
+    supports_async = False
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.call_count = 0
+
+    def stream(
+        self,
+        *,
+        model: str,
+        system_prompt: str,
+        messages: List[Message],
+        tools: Optional[List[Any]] = None,
+        temperature: float = 0.0,
+        max_tokens: int = 1000,
+        timeout: Optional[float] = None,
+    ):
+        self.call_count += 1
+        if self.call_count == 1:
+            yield "I will call a tool. "
+            yield ToolCall(tool_name="echo", parameters={"text": "hello"})
+        else:
+            yield "Done. Got: hello"
+
+
+class _Bug01AsyncStreamingToolProvider(LocalProvider):
+    """Async provider that yields a ToolCall during streaming via astream()."""
+
+    name = "bug01_async_streaming_tool_stub"
+    supports_streaming = True
+    supports_async = True
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.call_count = 0
+
+    async def astream(
+        self,
+        *,
+        model: str,
+        system_prompt: str,
+        messages: List[Message],
+        tools: Optional[List[Any]] = None,
+        temperature: float = 0.0,
+        max_tokens: int = 1000,
+        timeout: Optional[float] = None,
+    ):
+        self.call_count += 1
+        if self.call_count == 1:
+            yield "I will call a tool. "
+            yield ToolCall(tool_name="echo", parameters={"text": "hello"})
+        else:
+            yield "Done. Got: hello"
+
+
+class _Bug01SyncFallbackStreamingProvider(LocalProvider):
+    """Provider with supports_streaming=True but supports_async=False.
+
+    This forces _astreaming_call into the sync-fallback branch (provider.stream
+    iterated from inside async code), which has historically been a blind spot
+    for the ToolCall collection fix (BUG-01).
+    """
+
+    name = "bug01_sync_fallback_stream_stub"
+    supports_streaming = True
+    supports_async = False
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.call_count = 0
+
+    def stream(
+        self,
+        *,
+        model: str,
+        system_prompt: str,
+        messages: List[Message],
+        tools: Optional[List[Any]] = None,
+        temperature: float = 0.0,
+        max_tokens: int = 1000,
+        timeout: Optional[float] = None,
+    ):
+        self.call_count += 1
+        if self.call_count == 1:
+            yield "I will call a tool. "
+            yield ToolCall(tool_name="echo", parameters={"text": "hello"})
+        else:
+            yield "Done. Got: hello"
+
+
+def _bug01_make_echo_tool() -> Tool:
+    return Tool(
+        name="echo",
+        description="Echo text",
+        parameters=[
+            ToolParameter(
+                name="text",
+                param_type=str,
+                description="Text to echo",
+                required=True,
+            )
+        ],
+        function=lambda text: text,
+    )
+
+
+def test_bug01_streaming_preserves_tool_calls() -> None:
+    """BUG-01: when stream=True, ToolCall objects from provider.stream() must execute.
+
+    Regresses Agno #6757 — streaming path previously dropped ToolCall chunks via
+    an isinstance(chunk, str) filter, so tools were silently never invoked.
+    """
+    provider = _Bug01StreamingToolProvider()
+    agent = Agent(
+        tools=[_bug01_make_echo_tool()],
+        provider=provider,
+        config=AgentConfig(stream=True, max_iterations=3),
+    )
+    result = agent.run([Message(role=Role.USER, content="echo hello")])
+    assert "Done" in result.content, f"Expected tool to execute; got: {result.content!r}"
+    assert provider.call_count >= 2, "Agent should have looped after tool execution"
+
+
+@pytest.mark.asyncio
+async def test_bug01_astreaming_preserves_tool_calls() -> None:
+    """BUG-01: native async astream path must collect ToolCall chunks.
+
+    Regresses Agno #6757 — covers the _astreaming_call native branch where the
+    provider exposes both supports_streaming=True and supports_async=True.
+    """
+    provider = _Bug01AsyncStreamingToolProvider()
+    agent = Agent(
+        tools=[_bug01_make_echo_tool()],
+        provider=provider,
+        config=AgentConfig(stream=True, max_iterations=3),
+    )
+    result = await agent.arun([Message(role=Role.USER, content="echo hello")])
+    assert "Done" in result.content, f"Expected tool to execute; got: {result.content!r}"
+    assert provider.call_count >= 2, "Agent should have looped after tool execution"
+
+
+def test_bug01_astreaming_sync_fallback_preserves_tool_calls() -> None:
+    """BUG-01 (I2): async code path with sync-fallback provider must collect ToolCalls.
+
+    When a provider exposes sync `stream` but no `astream`, _astreaming_call
+    falls back to iterating the sync stream from async context. This branch
+    had no behavior coverage — a copy-paste bug in the collection logic would
+    not be caught.
+    """
+    provider = _Bug01SyncFallbackStreamingProvider()
+    agent = Agent(
+        tools=[_bug01_make_echo_tool()],
+        provider=provider,
+        config=AgentConfig(stream=True, max_iterations=3),
+    )
+    result = asyncio.run(agent.arun([Message(role=Role.USER, content="echo hello")]))
+    assert "Done" in result.content, f"Expected tool to execute; got: {result.content!r}"
+    assert provider.call_count >= 2, "Agent should have looped after tool execution"

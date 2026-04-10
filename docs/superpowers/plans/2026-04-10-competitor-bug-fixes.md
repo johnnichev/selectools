@@ -85,28 +85,37 @@
 - `src/selectools/_async_utils.py` — Safe `run_sync()` helper for BUG-03
 
 **New regression tests (one per bug):**
-- `tests/regressions/test_bug01_streaming_tool_calls.py`
-- `tests/regressions/test_bug02_literal_types.py`
-- `tests/regressions/test_bug03_asyncio_reentry.py`
-- `tests/regressions/test_bug04_parallel_hitl.py`
-- `tests/regressions/test_bug05_subgraph_hitl.py`
-- `tests/regressions/test_bug06_memory_thread_safety.py`
-- `tests/regressions/test_bug07_think_tag_stripping.py`
-- `tests/regressions/test_bug08_rag_batch_limits.py`
-- `tests/regressions/test_bug09_mcp_concurrent.py`
-- `tests/regressions/test_bug10_tool_arg_coercion.py`
-- `tests/regressions/test_bug11_union_types.py`
-- `tests/regressions/test_bug12_multi_interrupt.py`
-- `tests/regressions/test_bug13_graphstate_serialization.py`
-- `tests/regressions/test_bug14_session_namespace.py`
-- `tests/regressions/test_bug15_summary_cap.py`
-- `tests/regressions/test_bug16_cancelled_extraction.py`
-- `tests/regressions/test_bug17_trace_thread_safety.py`
-- `tests/regressions/test_bug18_observer_exceptions.py`
-- `tests/regressions/test_bug19_clone_isolation.py`
-- `tests/regressions/test_bug20_observer_thread_safety.py`
-- `tests/regressions/test_bug21_vector_dedup.py`
-- `tests/regressions/test_bug22_optional_not_required.py`
+
+Per `tests/CLAUDE.md`, all regression tests are appended to the canonical file
+`tests/agent/test_regression.py` as new top-level test functions named
+`test_bug{NN}_*`. No new files or subdirectories are created — the
+`tests/regressions/` layout was rejected in code review (I1). Each bug adds:
+
+- `test_bug01_*` — streaming tool calls (Task 1)
+- `test_bug02_*` — literal types (Task 2)
+- `test_bug03_*` — asyncio reentry (Task 3)
+- `test_bug04_*` — parallel HITL (Task 4)
+- `test_bug05_*` — subgraph HITL (Task 5)
+- `test_bug06_*` — memory thread safety (Task 6)
+- `test_bug07_*` — think tag stripping (Task 7)
+- `test_bug08_*` — RAG batch limits (Task 8)
+- `test_bug09_*` — MCP concurrent (Task 9)
+- `test_bug10_*` — tool arg coercion (Task 10)
+- `test_bug11_*` — union types (Task 11)
+- `test_bug12_*` — multi-interrupt (Task 12)
+- `test_bug13_*` — GraphState serialization (Task 13)
+- `test_bug14_*` — session namespace (Task 14)
+- `test_bug15_*` — summary cap (Task 15)
+- `test_bug16_*` — cancelled extraction (Task 16)
+- `test_bug17_*` — trace thread safety (Task 17)
+- `test_bug18_*` — observer exceptions (Task 18)
+- `test_bug19_*` — clone isolation (Task 19)
+- `test_bug20_*` — observer thread safety (Task 20)
+- `test_bug21_*` — vector dedup (Task 21)
+- `test_bug22_*` — optional-not-required (Task 22)
+
+Helper classes for each bug should be prefixed with `_Bug{NN}` to stay out of
+pytest collection and to avoid colliding with helpers from other bugs.
 
 ---
 
@@ -115,7 +124,7 @@
 ### Task 1: BUG-01 — Streaming drops ToolCall objects
 
 **Files:**
-- Create: `tests/regressions/test_bug01_streaming_tool_calls.py`
+- Modify: `tests/agent/test_regression.py` — add test function `test_bug01_streaming_preserves_tool_calls` (and async/sync-fallback siblings)
 - Modify: `src/selectools/agent/_provider_caller.py:217-236` (sync `_streaming_call`)
 - Modify: `src/selectools/agent/_provider_caller.py:472-509` (async `_astreaming_call`)
 
@@ -286,7 +295,7 @@ Cross-referenced from Agno #6757."
 ### Task 2: BUG-02 — `typing.Literal` crashes `@tool()` creation
 
 **Files:**
-- Create: `tests/regressions/test_bug02_literal_types.py`
+- Modify: `tests/agent/test_regression.py` — add test function `test_bug02_literal_types`
 - Modify: `src/selectools/tools/decorators.py:10,16-46,98-111`
 
 - [ ] **Step 1: Write the failing test**
@@ -445,7 +454,7 @@ Cross-referenced from Agno #6720."
 
 **Files:**
 - Create: `src/selectools/_async_utils.py`
-- Create: `tests/regressions/test_bug03_asyncio_reentry.py`
+- Modify: `tests/agent/test_regression.py` — add test function `test_bug03_asyncio_reentry`
 - Modify: `src/selectools/orchestration/graph.py:479` (`AgentGraph.run`)
 - Modify: `src/selectools/orchestration/graph.py:1059` (`AgentGraph.resume`)
 - Modify: `src/selectools/orchestration/supervisor.py:240` (`SupervisorAgent.run`)
@@ -643,7 +652,7 @@ Cross-referenced from PraisonAI #1165."
 ### Task 4: BUG-04 — HITL lost in parallel groups
 
 **Files:**
-- Create: `tests/regressions/test_bug04_parallel_hitl.py`
+- Modify: `tests/agent/test_regression.py` — add test function `test_bug04_parallel_hitl`
 - Modify: `src/selectools/orchestration/graph.py:1237-1288` (`_aexecute_parallel`)
 
 - [ ] **Step 1: Write the failing test**
@@ -813,7 +822,7 @@ Cross-referenced from Agno #4921."
 ### Task 5: BUG-05 — HITL lost in subgraphs
 
 **Files:**
-- Create: `tests/regressions/test_bug05_subgraph_hitl.py`
+- Modify: `tests/agent/test_regression.py` — add test function `test_bug05_subgraph_hitl`
 - Modify: `src/selectools/orchestration/graph.py:1295-1332` (`_aexecute_subgraph`)
 
 - [ ] **Step 1: Write the failing test**
@@ -968,7 +977,7 @@ Cross-referenced from Agno #4921."
 ### Task 6: BUG-06 — ConversationMemory missing threading.Lock
 
 **Files:**
-- Create: `tests/regressions/test_bug06_memory_thread_safety.py`
+- Modify: `tests/agent/test_regression.py` — add test function `test_bug06_memory_thread_safety`
 - Modify: `src/selectools/memory.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -1137,7 +1146,7 @@ Cross-referenced from PraisonAI #1164 / #1260."
 ### Task 7: BUG-07 — `<think>` tag content leaks
 
 **Files:**
-- Create: `tests/regressions/test_bug07_think_tag_stripping.py`
+- Modify: `tests/agent/test_regression.py` — add test function `test_bug07_think_tag_stripping`
 - Modify: `src/selectools/providers/anthropic_provider.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -1215,7 +1224,7 @@ git commit -m "fix(anthropic): strip <think> reasoning tags from output (BUG-07)
 ### Task 8: BUG-08 — RAG store batch size limits
 
 **Files:**
-- Create: `tests/regressions/test_bug08_rag_batch_limits.py`
+- Modify: `tests/agent/test_regression.py` — add test function `test_bug08_rag_batch_limits`
 - Modify: `src/selectools/rag/stores/{chroma,pinecone,qdrant}.py`
 
 - [ ] **Step 1: Write failing test**
@@ -1272,7 +1281,7 @@ git commit -m "fix(rag): chunk large upserts in Chroma/Pinecone/Qdrant (BUG-08)"
 ### Task 9: BUG-09 — MCP concurrent tool call lock
 
 **Files:**
-- Create: `tests/regressions/test_bug09_mcp_concurrent.py`
+- Modify: `tests/agent/test_regression.py` — add test function `test_bug09_mcp_concurrent`
 - Modify: `src/selectools/mcp/client.py`
 
 - [ ] **Step 1: Write failing test** (see original spec for the async test with mocked session)
@@ -1292,7 +1301,7 @@ git commit -m "fix(mcp): serialize concurrent tool calls on shared session (BUG-
 ### Task 10: BUG-10 — Tool argument type coercion
 
 **Files:**
-- Create: `tests/regressions/test_bug10_tool_arg_coercion.py`
+- Modify: `tests/agent/test_regression.py` — add test function `test_bug10_tool_arg_coercion`
 - Modify: `src/selectools/tools/base.py:326-344`
 
 - [ ] **Step 1: Write failing test** (str→int, str→float, str→bool coercion)
@@ -1332,7 +1341,7 @@ git commit -m "fix(tools): coerce string args to int/float/bool (BUG-10)"
 ### Task 11: BUG-11 — `Union[str, int]` fallback
 
 **Files:**
-- Create: `tests/regressions/test_bug11_union_types.py`
+- Modify: `tests/agent/test_regression.py` — add test function `test_bug11_union_types`
 - Modify: `src/selectools/tools/decorators.py:26-31`
 
 - [ ] **Step 1: Write failing test**
@@ -1362,7 +1371,7 @@ git commit -m "fix(tools): support Union[str, int] via str fallback (BUG-11)"
 ### Task 12: BUG-12 — Multi-interrupt generator nodes
 
 **Files:**
-- Create: `tests/regressions/test_bug12_multi_interrupt.py`
+- Modify: `tests/agent/test_regression.py` — add test function `test_bug12_multi_interrupt`
 - Modify: `src/selectools/orchestration/graph.py:1139-1166`
 
 - [ ] **Step 1: Write failing test** — two-gate generator, both interrupts must fire
@@ -1390,7 +1399,7 @@ git commit -m "fix(orchestration): handle multi-interrupt generator nodes (BUG-1
 ### Task 13: BUG-13 — GraphState.to_dict() JSON validation
 
 **Files:**
-- Create: `tests/regressions/test_bug13_graphstate_serialization.py`
+- Modify: `tests/agent/test_regression.py` — add test function `test_bug13_graphstate_serialization`
 - Modify: `src/selectools/orchestration/state.py:91,117`
 
 - [ ] **Step 1: Write failing test** — non-serializable object should raise clearly
@@ -1427,7 +1436,7 @@ git commit -m "fix(state): fail fast on non-serializable GraphState.data (BUG-13
 ### Task 14: BUG-14 — Session namespace isolation
 
 **Files:**
-- Create: `tests/regressions/test_bug14_session_namespace.py`
+- Modify: `tests/agent/test_regression.py` — add test function `test_bug14_session_namespace`
 - Modify: `src/selectools/sessions.py` (all 3 stores)
 
 - [ ] **Step 1: Write failing test**
@@ -1461,7 +1470,7 @@ git commit -m "fix(sessions): add namespace parameter for session isolation (BUG
 ### Task 15: BUG-15 — Summary growth cap
 
 **Files:**
-- Create: `tests/regressions/test_bug15_summary_cap.py`
+- Modify: `tests/agent/test_regression.py` — add test function `test_bug15_summary_cap`
 - Modify: `src/selectools/agent/_memory_manager.py:99-100`
 
 - [ ] **Step 1: Write failing test**
@@ -1630,4 +1639,4 @@ Write `docs/superpowers/plans/2026-04-10-bug-fix-summary.md` with:
 - **Spec coverage:** All 22 bugs from the cross-reference report have a corresponding task (Tasks 1-22) + final verification (Task 23). ✓
 - **No placeholders:** Every task has exact file paths, exact line numbers, complete code snippets for the fix, and explicit bash commands. Tasks 16-22 are lighter because those bugs are small and mechanical — each still specifies the file, the test, the fix, and the commit. ✓
 - **Type consistency:** `run_sync` has a single signature across all 8 sync wrapper replacements. The new `_literal_info` helper is consistent with `_unwrap_type`. The 4-tuple return from `run_child` and 3-tuple from `_aexecute_subgraph` are consistent with their callers. ✓
-- **Test isolation:** All 22 regression tests live under `tests/regressions/` and are independently runnable — no inter-test dependencies. ✓
+- **Test isolation:** All 22 regression tests live in `tests/agent/test_regression.py` as `test_bug{NN}_*` functions and are independently runnable — no inter-test dependencies. ✓
