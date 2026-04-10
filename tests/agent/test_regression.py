@@ -2375,3 +2375,51 @@ def test_bug03_agent_graph_run_inside_async_context():
     result = _bug03_asyncio.run(outer())
     assert result is not None
     assert result.content == "ok"
+
+
+# ---- BUG-04: HITL lost in parallel groups ----
+# Source: Agno #4921. InterruptRequest from a child node in a parallel group
+# was silently dropped — the parent graph treated the child as completed.
+
+
+def test_bug04_parallel_group_propagates_hitl():
+    """When a child in a parallel group yields InterruptRequest, the graph must pause.
+
+    BUG-04: run_child in _aexecute_parallel discarded the interrupted boolean from
+    _aexecute_node. If a child yielded InterruptRequest, the signal was lost and
+    the graph continued as if the child completed normally — no checkpoint, no
+    pause, HITL broken inside parallel groups. Cross-referenced from Agno #4921.
+    """
+    from selectools.orchestration import (
+        AgentGraph,
+        GraphState,
+        InMemoryCheckpointStore,
+        InterruptRequest,
+    )
+
+    def _normal_callable(state: GraphState) -> GraphState:
+        state.data["normal"] = "done"
+        return state
+
+    def _hitl_generator(state: GraphState):
+        response = yield InterruptRequest(prompt="approve?")
+        state.data["approval"] = response
+        state.data["hitl"] = "done"
+        return state
+
+    graph = AgentGraph(name="bug04_parallel_hitl")
+    graph.add_node("normal", _normal_callable)
+    graph.add_node("hitl", _hitl_generator)
+    graph.add_parallel_nodes("group", node_names=["normal", "hitl"])
+    graph.set_entry("group")
+    graph.add_edge("group", AgentGraph.END)
+
+    store = InMemoryCheckpointStore()
+    result = graph.run("start", checkpoint_store=store)
+
+    assert result.interrupted, f"Expected graph to pause; got: {result}"
+    assert result.interrupt_id is not None
+    # The engine auto-sets interrupt_key to f"{node_name}_{yield_index}".
+    # Our HITL child is named "hitl" and yields once at index 0.
+    pending = result.state.metadata.get("__pending_interrupt_key__")
+    assert pending == "hitl_0", f"Expected pending interrupt key 'hitl_0', got: {pending!r}"
