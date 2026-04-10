@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from ..cancellation import CancellationToken
     from ..observer import AgentObserver
 
+from .._async_utils import run_sync
 from ..stability import beta
 from ..types import Message, Role
 
@@ -77,7 +78,7 @@ class DebateAgent:
 
     def run(self, prompt: str) -> DebateResult:
         """Execute synchronously."""
-        return asyncio.run(self.arun(prompt))
+        return run_sync(self.arun(prompt))
 
     async def arun(self, prompt: str) -> DebateResult:
         """Execute asynchronously: agents debate → judge concludes."""

@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from ..cancellation import CancellationToken
     from ..observer import AgentObserver
 
+from .._async_utils import run_sync
 from ..orchestration.graph import GraphResult
 from ..orchestration.state import GraphState
 from ..orchestration.supervisor import _safe_json_parse
@@ -107,7 +108,7 @@ class PlanAndExecuteAgent:
 
     def run(self, prompt: str) -> GraphResult:
         """Execute synchronously."""
-        return asyncio.run(self.arun(prompt))
+        return run_sync(self.arun(prompt))
 
     async def arun(self, prompt: str) -> GraphResult:
         """Execute asynchronously: plan → execute → aggregate."""

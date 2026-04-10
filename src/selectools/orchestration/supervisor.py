@@ -45,6 +45,7 @@ if TYPE_CHECKING:
     from ..types import AgentResult
     from .checkpoint import CheckpointStore
 
+from .._async_utils import run_sync
 from ..stability import beta
 from ..types import Message, Role
 from ..usage import UsageStats
@@ -237,7 +238,7 @@ class SupervisorAgent:
 
     def run(self, prompt: str) -> GraphResult:
         """Execute the supervisor synchronously."""
-        return asyncio.run(self.arun(prompt))
+        return run_sync(self.arun(prompt))
 
     async def arun(self, prompt: str) -> GraphResult:
         """Execute the supervisor asynchronously."""

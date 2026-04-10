@@ -36,6 +36,7 @@ from typing import (
     Union,
 )
 
+from .._async_utils import run_sync
 from ..exceptions import GraphExecutionError
 from ..stability import beta
 from ..trace import AgentTrace, StepType, TraceStep
@@ -476,7 +477,7 @@ class AgentGraph:
         Returns:
             GraphResult with final state, trace, and usage.
         """
-        return asyncio.run(
+        return run_sync(
             self.arun(
                 prompt_or_state,
                 checkpoint_store=checkpoint_store,
@@ -1056,7 +1057,7 @@ class AgentGraph:
         Returns:
             GraphResult — may be interrupted again if there are multiple yields.
         """
-        return asyncio.run(self.aresume(interrupt_id, response, checkpoint_store))
+        return run_sync(self.aresume(interrupt_id, response, checkpoint_store))
 
     async def aresume(
         self,

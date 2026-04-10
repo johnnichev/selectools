@@ -2304,3 +2304,74 @@ def test_bug02_optional_literal_works():
     params = {p.name: p for p in filter_by.parameters}
     assert params["tag"].enum == ["red", "blue"]
     assert params["tag"].required is False
+
+
+# ---- BUG-03: asyncio.run() crashes in existing event loops ----
+# Source: PraisonAI #1165. Sync wrappers that called asyncio.run() crashed
+# when invoked from within an existing event loop (Jupyter, FastAPI, async tests).
+
+import asyncio as _bug03_asyncio
+
+from selectools._async_utils import run_sync as _bug03_run_sync
+
+
+def test_bug03_run_sync_outside_event_loop():
+    """run_sync from plain sync code — no loop running — uses asyncio.run directly."""
+
+    async def coro():
+        return 42
+
+    assert _bug03_run_sync(coro()) == 42
+
+
+def test_bug03_run_sync_inside_running_loop():
+    """The critical case: calling run_sync from WITHIN an async function.
+
+    Bare asyncio.run() would crash here with RuntimeError. run_sync must
+    detect the running loop and offload to a worker thread.
+    """
+
+    async def outer():
+        async def inner():
+            return "hello"
+
+        return _bug03_run_sync(inner())
+
+    result = _bug03_asyncio.run(outer())
+    assert result == "hello"
+
+
+def test_bug03_run_sync_propagates_exceptions():
+    """Exceptions in the coroutine must propagate to the sync caller."""
+
+    async def failing():
+        raise ValueError("boom")
+
+    with pytest.raises(ValueError, match="boom"):
+        _bug03_run_sync(failing())
+
+
+def test_bug03_agent_graph_run_inside_async_context():
+    """End-to-end: AgentGraph.run() must work inside an async function.
+
+    This regresses the shipped bug where calling graph.run() from within
+    an async test or FastAPI handler crashed with 'asyncio.run() cannot
+    be called when another event loop is running'.
+    """
+    from selectools.orchestration.graph import AgentGraph
+    from selectools.orchestration.state import STATE_KEY_LAST_OUTPUT, GraphState
+
+    def _trivial_callable(state: GraphState) -> GraphState:
+        state.data[STATE_KEY_LAST_OUTPUT] = "ok"
+        return state
+
+    async def outer():
+        graph = AgentGraph(name="bug03_inner_graph")
+        graph.add_node("root", _trivial_callable)
+        graph.set_entry("root")
+        graph.add_edge("root", AgentGraph.END)
+        return graph.run("hello")
+
+    result = _bug03_asyncio.run(outer())
+    assert result is not None
+    assert result.content == "ok"

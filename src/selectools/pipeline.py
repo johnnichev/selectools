@@ -36,6 +36,7 @@ from dataclasses import dataclass, field
 from functools import wraps
 from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
+from selectools._async_utils import run_sync
 from selectools.stability import beta
 
 
@@ -483,7 +484,7 @@ class Pipeline:
         fn = s.fn if isinstance(s, Step) else s
         filtered = _filter_kwargs(fn, kwargs)
         if asyncio.iscoroutinefunction(fn):
-            return asyncio.run(fn(current, **filtered))
+            return run_sync(fn(current, **filtered))
         return fn(current, **filtered)
 
     async def _aexecute_step(self, s: Any, current: Any, kwargs: Dict[str, Any]) -> Any:
