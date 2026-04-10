@@ -131,7 +131,7 @@ pytest collection and to avoid colliding with helpers from other bugs.
 - [ ] **Step 1: Write the failing regression test**
 
 ```python
-# tests/regressions/test_bug01_streaming_tool_calls.py
+# Append to tests/agent/test_regression.py (BUG-01)
 """BUG-01: Streaming run()/arun() silently drops ToolCall objects.
 
 Source: Agno #6757 pattern — competitor bug where tool function names
@@ -198,7 +198,7 @@ def test_streaming_preserves_tool_calls():
 - [ ] **Step 2: Run the test to confirm it fails**
 
 ```bash
-pytest tests/regressions/test_bug01_streaming_tool_calls.py -v
+pytest tests/agent/test_regression.py -v -k \"bug01\"
 ```
 Expected: FAIL — tool never executes; content does not contain "Done".
 
@@ -262,7 +262,7 @@ grep -n "_streaming_call\|_astreaming_call" src/selectools/agent/_provider_calle
 - [ ] **Step 6: Run the regression test to verify fix**
 
 ```bash
-pytest tests/regressions/test_bug01_streaming_tool_calls.py -v
+pytest tests/agent/test_regression.py -v -k \"bug01\"
 ```
 Expected: PASS.
 
@@ -276,7 +276,7 @@ Expected: All tests pass.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add tests/regressions/test_bug01_streaming_tool_calls.py src/selectools/agent/_provider_caller.py
+git add tests/agent/test_regression.py src/selectools/agent/_provider_caller.py
 git commit -m "fix(streaming): collect ToolCall objects during streaming
 
 BUG-01: _streaming_call and _astreaming_call filtered chunks with
@@ -301,7 +301,7 @@ Cross-referenced from Agno #6757."
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# tests/regressions/test_bug02_literal_types.py
+# Append to tests/agent/test_regression.py (BUG-02)
 """BUG-02: typing.Literal crashes @tool() creation.
 
 Source: Agno #6720 — get_json_schema_for_arg() does not handle
@@ -353,7 +353,7 @@ def test_optional_literal_works():
 - [ ] **Step 2: Run the test to confirm it fails**
 
 ```bash
-pytest tests/regressions/test_bug02_literal_types.py -v
+pytest tests/agent/test_regression.py -v -k \"bug02\"
 ```
 Expected: FAIL — ToolValidationError on `@tool()` application.
 
@@ -420,7 +420,7 @@ Modify `_infer_parameters_from_callable` around line 90-111:
 - [ ] **Step 5: Run the regression test**
 
 ```bash
-pytest tests/regressions/test_bug02_literal_types.py -v
+pytest tests/agent/test_regression.py -v -k \"bug02\"
 ```
 Expected: PASS.
 
@@ -434,7 +434,7 @@ Expected: All tests pass.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add tests/regressions/test_bug02_literal_types.py src/selectools/tools/decorators.py
+git add tests/agent/test_regression.py src/selectools/tools/decorators.py
 git commit -m "fix(tools): support typing.Literal in @tool() parameters
 
 BUG-02: @tool() crashed on Literal[...] parameters because
@@ -467,7 +467,7 @@ Cross-referenced from Agno #6720."
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# tests/regressions/test_bug03_asyncio_reentry.py
+# Append to tests/agent/test_regression.py (BUG-03)
 """BUG-03: asyncio.run() in sync wrappers crashes inside running event loops.
 
 Source: PraisonAI #1165 — asyncio.run() called from sync context reachable
@@ -504,7 +504,7 @@ def test_run_sync_inside_running_loop():
 - [ ] **Step 2: Run the test to confirm it fails**
 
 ```bash
-pytest tests/regressions/test_bug03_asyncio_reentry.py -v
+pytest tests/agent/test_regression.py -v -k \"bug03\"
 ```
 Expected: FAIL — `ModuleNotFoundError: _async_utils`.
 
@@ -554,7 +554,7 @@ def run_sync(coro: Awaitable[T]) -> T:
 - [ ] **Step 4: Run the two unit tests for run_sync**
 
 ```bash
-pytest tests/regressions/test_bug03_asyncio_reentry.py -v
+pytest tests/agent/test_regression.py -v -k \"bug03\"
 ```
 Expected: PASS.
 
@@ -614,7 +614,7 @@ Modify `src/selectools/pipeline.py:486`. Relative import: `from ._async_utils im
 - [ ] **Step 10: Run the regression test**
 
 ```bash
-pytest tests/regressions/test_bug03_asyncio_reentry.py -v
+pytest tests/agent/test_regression.py -v -k \"bug03\"
 ```
 Expected: All tests PASS.
 
@@ -628,7 +628,7 @@ Expected: All tests pass.
 - [ ] **Step 12: Commit**
 
 ```bash
-git add src/selectools/_async_utils.py tests/regressions/test_bug03_asyncio_reentry.py \
+git add src/selectools/_async_utils.py tests/agent/test_regression.py (test_bug03_*) \
   src/selectools/orchestration/graph.py src/selectools/orchestration/supervisor.py \
   src/selectools/patterns/ src/selectools/pipeline.py
 git commit -m "fix(async): safe run_sync helper for 8 sync wrappers
@@ -658,7 +658,7 @@ Cross-referenced from PraisonAI #1165."
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# tests/regressions/test_bug04_parallel_hitl.py
+# Append to tests/agent/test_regression.py (BUG-04)
 """BUG-04: InterruptRequest from a child node in a parallel group is silently
 dropped. The parent graph treats the child as completed.
 
@@ -711,7 +711,7 @@ def test_parallel_group_propagates_hitl():
 - [ ] **Step 2: Run the test to confirm it fails**
 
 ```bash
-pytest tests/regressions/test_bug04_parallel_hitl.py -v
+pytest tests/agent/test_regression.py -v -k \"bug04\"
 ```
 Expected: FAIL — `result.interrupted` is False.
 
@@ -788,7 +788,7 @@ grep -n "_aexecute_parallel" src/selectools/orchestration/graph.py
 - [ ] **Step 6: Run the regression test**
 
 ```bash
-pytest tests/regressions/test_bug04_parallel_hitl.py -v
+pytest tests/agent/test_regression.py -v -k \"bug04\"
 ```
 Expected: PASS.
 
@@ -802,7 +802,7 @@ Expected: All tests pass.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add tests/regressions/test_bug04_parallel_hitl.py src/selectools/orchestration/graph.py
+git add tests/agent/test_regression.py src/selectools/orchestration/graph.py
 git commit -m "fix(orchestration): propagate HITL interrupts from parallel groups
 
 BUG-04: run_child in _aexecute_parallel discarded the interrupted
@@ -828,7 +828,7 @@ Cross-referenced from Agno #4921."
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# tests/regressions/test_bug05_subgraph_hitl.py
+# Append to tests/agent/test_regression.py (BUG-05)
 """BUG-05: InterruptRequest raised inside a subgraph is silently dropped
 by the parent graph. The subgraph's pause state is lost.
 
@@ -876,7 +876,7 @@ def test_subgraph_propagates_hitl_interrupt():
 - [ ] **Step 2: Run the test to confirm it fails**
 
 ```bash
-pytest tests/regressions/test_bug05_subgraph_hitl.py -v
+pytest tests/agent/test_regression.py -v -k \"bug05\"
 ```
 Expected: FAIL — `result.interrupted` is False.
 
@@ -944,7 +944,7 @@ Update to unpack the 3-tuple and propagate the interrupted flag up.
 - [ ] **Step 5: Run the regression test**
 
 ```bash
-pytest tests/regressions/test_bug05_subgraph_hitl.py -v
+pytest tests/agent/test_regression.py -v -k \"bug05\"
 ```
 Expected: PASS.
 
@@ -958,7 +958,7 @@ Expected: All tests pass.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add tests/regressions/test_bug05_subgraph_hitl.py src/selectools/orchestration/graph.py
+git add tests/agent/test_regression.py src/selectools/orchestration/graph.py
 git commit -m "fix(orchestration): propagate HITL interrupts from subgraphs
 
 BUG-05: _aexecute_subgraph never checked sub_result.interrupted.
@@ -983,7 +983,7 @@ Cross-referenced from Agno #4921."
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# tests/regressions/test_bug06_memory_thread_safety.py
+# Append to tests/agent/test_regression.py (BUG-06)
 """BUG-06: ConversationMemory has no threading.Lock. Concurrent mutation
 from multiple threads races on the _messages list.
 
@@ -1049,7 +1049,7 @@ def test_concurrent_add_with_trim_no_crash():
 - [ ] **Step 2: Run the test to confirm it fails**
 
 ```bash
-pytest tests/regressions/test_bug06_memory_thread_safety.py -v
+pytest tests/agent/test_regression.py -v -k \"bug06\"
 ```
 Expected: FAIL or intermittent — race condition produces wrong count or errors.
 
@@ -1110,7 +1110,7 @@ Example for `add`:
 - [ ] **Step 6: Run the regression test**
 
 ```bash
-pytest tests/regressions/test_bug06_memory_thread_safety.py -v
+pytest tests/agent/test_regression.py -v -k \"bug06\"
 ```
 Expected: PASS.
 
@@ -1124,7 +1124,7 @@ Expected: All tests pass.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add tests/regressions/test_bug06_memory_thread_safety.py src/selectools/memory.py
+git add tests/agent/test_regression.py src/selectools/memory.py
 git commit -m "fix(memory): add threading.RLock to ConversationMemory
 
 BUG-06: ConversationMemory was the only shared-state class in
@@ -1152,7 +1152,7 @@ Cross-referenced from PraisonAI #1164 / #1260."
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# tests/regressions/test_bug07_think_tag_stripping.py
+# Append to tests/agent/test_regression.py (BUG-07)
 """BUG-07: <think>...</think> content leaks into conversation history.
 
 Source: Agno #6878.
@@ -1183,7 +1183,7 @@ def test_no_think_tags_unchanged():
 - [ ] **Step 2: Confirm failure**
 
 ```bash
-pytest tests/regressions/test_bug07_think_tag_stripping.py -v
+pytest tests/agent/test_regression.py -v -k \"bug07\"
 ```
 
 - [ ] **Step 3: Add stripping helper**
@@ -1214,8 +1214,8 @@ Apply `_strip_reasoning_tags` at the point where accumulated text is finalized i
 - [ ] **Step 5: Run test, commit**
 
 ```bash
-pytest tests/regressions/test_bug07_think_tag_stripping.py -v
-git add tests/regressions/test_bug07_think_tag_stripping.py src/selectools/providers/anthropic_provider.py
+pytest tests/agent/test_regression.py -v -k \"bug07\"
+git add tests/agent/test_regression.py src/selectools/providers/anthropic_provider.py
 git commit -m "fix(anthropic): strip <think> reasoning tags from output (BUG-07)"
 ```
 
@@ -1230,7 +1230,7 @@ git commit -m "fix(anthropic): strip <think> reasoning tags from output (BUG-07)
 - [ ] **Step 1: Write failing test**
 
 ```python
-# tests/regressions/test_bug08_rag_batch_limits.py
+# Append to tests/agent/test_regression.py (BUG-08)
 from unittest.mock import MagicMock
 
 
@@ -1271,8 +1271,8 @@ Apply the same pattern to `pinecone.py` (batch_size=100) and `qdrant.py` (batch_
 - [ ] **Step 3: Run test, commit**
 
 ```bash
-pytest tests/regressions/test_bug08_rag_batch_limits.py -v
-git add tests/regressions/test_bug08_rag_batch_limits.py src/selectools/rag/stores/chroma.py src/selectools/rag/stores/pinecone.py src/selectools/rag/stores/qdrant.py
+pytest tests/agent/test_regression.py -v -k \"bug08\"
+git add tests/agent/test_regression.py src/selectools/rag/stores/chroma.py src/selectools/rag/stores/pinecone.py src/selectools/rag/stores/qdrant.py
 git commit -m "fix(rag): chunk large upserts in Chroma/Pinecone/Qdrant (BUG-08)"
 ```
 
