@@ -2612,3 +2612,50 @@ def test_bug06_state_restoration_compat():
     # The restored memory must still be thread-safe — verify by adding another message
     restored.add(Message(role=Role.USER, content="after_restore"))
     assert len(restored.get_history()) == 3
+
+
+# ---- BUG-07: <think> reasoning tag content leaks into history ----
+# Source: Agno #6878. Claude-compatible endpoints emit reasoning as
+# <think>...</think> blocks in text content. These were being preserved
+# in conversation history and sent back to the model on subsequent turns,
+# polluting context.
+
+
+def test_bug07_strip_simple_think_tags():
+    from selectools.providers.anthropic_provider import _strip_reasoning_tags
+
+    text = "<think>This is my reasoning.</think>The answer is 42."
+    assert _strip_reasoning_tags(text) == "The answer is 42."
+
+
+def test_bug07_strip_multiline_think_tags():
+    from selectools.providers.anthropic_provider import _strip_reasoning_tags
+
+    text = "<think>\nLine 1\nLine 2\n</think>\nFinal answer."
+    assert _strip_reasoning_tags(text).strip() == "Final answer."
+
+
+def test_bug07_strip_multiple_think_blocks():
+    from selectools.providers.anthropic_provider import _strip_reasoning_tags
+
+    text = "<think>first</think>Hello<think>second</think> world"
+    assert _strip_reasoning_tags(text) == "Hello world"
+
+
+def test_bug07_no_think_tags_unchanged():
+    from selectools.providers.anthropic_provider import _strip_reasoning_tags
+
+    text = "Plain text with no tags"
+    assert _strip_reasoning_tags(text) == text
+
+
+def test_bug07_empty_string_unchanged():
+    from selectools.providers.anthropic_provider import _strip_reasoning_tags
+
+    assert _strip_reasoning_tags("") == ""
+
+
+def test_bug07_only_think_tag_returns_empty():
+    from selectools.providers.anthropic_provider import _strip_reasoning_tags
+
+    assert _strip_reasoning_tags("<think>just reasoning</think>") == ""
