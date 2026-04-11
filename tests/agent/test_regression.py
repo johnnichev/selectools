@@ -2531,3 +2531,84 @@ def test_bug05_subgraph_resume_completes():
         "This regression catches the silent infinite loop where namespaced "
         "keys prevented the subgraph generator from seeing the response."
     )
+
+
+# ---- BUG-06: ConversationMemory missing threading.Lock ----
+# Source: PraisonAI #1164, #1260. ConversationMemory had no lock; concurrent
+# add() from multiple threads could race on _messages and lose messages or
+# corrupt the list.
+
+
+def test_bug06_concurrent_add_preserves_all_messages():
+    """10 threads x 100 adds = 1000 messages should all be preserved."""
+    from selectools.memory import ConversationMemory
+    from selectools.types import Message, Role
+
+    memory = ConversationMemory(max_messages=10000)
+    n_threads = 10
+    n_adds = 100
+    errors: list = []
+
+    def worker(thread_id: int) -> None:
+        try:
+            for i in range(n_adds):
+                memory.add(Message(role=Role.USER, content=f"t{thread_id}-m{i}"))
+        except Exception as e:
+            errors.append(e)
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(n_threads)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors, f"Worker errors: {errors}"
+    history = memory.get_history()
+    assert (
+        len(history) == n_threads * n_adds
+    ), f"Expected {n_threads * n_adds} messages, got {len(history)}"
+
+
+def test_bug06_concurrent_add_with_trim_no_crash():
+    """Low max_messages triggers _enforce_limits concurrently — must not crash."""
+    from selectools.memory import ConversationMemory
+    from selectools.types import Message, Role
+
+    memory = ConversationMemory(max_messages=50)
+    errors: list = []
+
+    def worker(thread_id: int) -> None:
+        try:
+            for i in range(200):
+                memory.add(Message(role=Role.USER, content=f"t{thread_id}-m{i}"))
+        except Exception as e:
+            errors.append(e)
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(5)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors, f"Worker errors: {errors}"
+    assert len(memory.get_history()) <= 50
+
+
+def test_bug06_state_restoration_compat():
+    """ConversationMemory must round-trip through to_dict/from_dict without
+    the lock interfering — locks are not serializable, so __getstate__ /
+    __setstate__ must exclude the lock and recreate it on restore."""
+    from selectools.memory import ConversationMemory
+    from selectools.types import Message, Role
+
+    memory = ConversationMemory(max_messages=100)
+    memory.add(Message(role=Role.USER, content="hello"))
+    memory.add(Message(role=Role.ASSISTANT, content="hi"))
+
+    d = memory.to_dict()
+    restored = ConversationMemory.from_dict(d)
+    assert len(restored.get_history()) == 2
+    assert restored.get_history()[0].content == "hello"
+    # The restored memory must still be thread-safe — verify by adding another message
+    restored.add(Message(role=Role.USER, content="after_restore"))
+    assert len(restored.get_history()) == 3
