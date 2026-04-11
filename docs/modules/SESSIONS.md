@@ -60,6 +60,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
 7. [Observer Events](#observer-events)
 8. [Choosing a Backend](#choosing-a-backend)
 9. [Best Practices](#best-practices)
+10. [Namespace Isolation](#namespace-isolation)
 
 ---
 
@@ -528,6 +529,32 @@ def test_agent_with_sessions():
     history = agent2.memory.get_history()
     assert len(history) > 0
 ```
+
+---
+
+## Namespace Isolation
+
+All session stores (`JsonFileSessionStore`, `SQLiteSessionStore`,
+`RedisSessionStore`) accept an optional `namespace` parameter on `save`,
+`load`, `delete`, and `exists`. Use it to isolate session data when
+multiple agents share the same `session_id`.
+
+```python
+from selectools.sessions import JsonFileSessionStore
+
+store = JsonFileSessionStore(directory="./sessions")
+
+# Two agents can use the same session_id without collision
+store.save("session_123", agent_a_memory, namespace="agent_a")
+store.save("session_123", agent_b_memory, namespace="agent_b")
+
+mem_a = store.load("session_123", namespace="agent_a")
+mem_b = store.load("session_123", namespace="agent_b")
+```
+
+When `namespace` is `None` (the default), the bare `session_id` is used
+as the storage key — preserving backward compatibility with sessions
+saved before this feature.
 
 ---
 

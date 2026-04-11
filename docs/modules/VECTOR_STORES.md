@@ -47,6 +47,7 @@ for r in results:
 4. [Choosing a Store](#choosing-a-store)
 5. [Implementation Details](#implementation-details)
 6. [Best Practices](#best-practices)
+7. [Search Result Deduplication](#search-result-deduplication)
 
 ---
 
@@ -609,6 +610,34 @@ import os
 os.environ["PINECONE_API_KEY"] = "your-key"
 os.environ["PINECONE_ENVIRONMENT"] = "your-env"
 ```
+
+---
+
+## Search Result Deduplication
+
+All vector stores (`InMemoryVectorStore`, `SQLiteVectorStore`,
+`ChromaVectorStore`, `FAISSVectorStore`, `PineconeVectorStore`,
+`QdrantVectorStore`, `PgVectorStore`) accept an optional `dedup`
+parameter on `search()`. When `dedup=True`, duplicate documents (by
+text content) are removed from search results.
+
+```python
+results = store.search(
+    query_embedding=embedding,
+    top_k=10,
+    dedup=True,  # Remove duplicate document texts from results
+)
+```
+
+This is useful when:
+
+- The same document text was added multiple times with different IDs
+- Hybrid search produces overlapping results from semantic + keyword paths
+- You want guaranteed-unique top-K results for downstream LLM context
+
+Default is `dedup=False` to preserve backward-compatible behavior. When
+enabled, stores over-fetch by 4x internally so the final deduped result
+list still contains up to `top_k` unique documents.
 
 ---
 

@@ -56,7 +56,8 @@ print(result.content)
 7. [Tool Registry](#tool-registry)
 8. [Streaming Tools](#streaming-tools)
 9. [Injected Parameters](#injected-parameters)
-10. [Implementation Details](#implementation-details)
+10. [Type Hint Support](#type-hint-support)
+11. [Implementation Details](#implementation-details)
 
 ---
 
@@ -745,6 +746,89 @@ def check_permissions(resource: str, user_id: int, role: str) -> str:
 ```
 
 The `config_injector` is called during execution to get current values.
+
+---
+
+## Type Hint Support
+
+Selectools inspects the type hints on `@tool()`-decorated functions to
+build the JSON schema the LLM sees, validate incoming arguments, and
+coerce values that arrive in the wrong shape. The sections below cover
+the advanced type hints supported beyond the basic `str`/`int`/`float`/
+`bool`/`list`/`dict` mapping shown in [Schema Generation](#schema-generation).
+
+### Literal Types
+
+`@tool()` supports `typing.Literal[...]` parameters. The values are
+auto-extracted into the `enum` field of the parameter schema, signalling
+the LLM that only these specific values are valid.
+
+```python
+from typing import Literal
+from selectools.tools import tool
+
+@tool()
+def set_mode(mode: Literal["fast", "slow", "auto"]) -> str:
+    return f"mode={mode}"
+
+# The LLM sees: parameter "mode" with enum=["fast", "slow", "auto"]
+```
+
+Supports `str`, `int`, `float`, and `bool` literal values. Also works
+with `Optional[Literal[...]]` — wrapping in `Optional` makes the
+parameter not-required and adds `None` as a valid value.
+
+### Optional Parameters Without Defaults
+
+`Optional[T]` parameters are correctly treated as not-required, even
+when they have no default value:
+
+```python
+from typing import Optional
+
+@tool()
+def search(query: str, filter: Optional[str]) -> str:
+    """Search with an optional filter."""
+    if filter:
+        return f"{query} where {filter}"
+    return query
+```
+
+Previously, `filter` would be marked `required=True` because it had no
+default value, even though the type hint said `None` was valid. Now the
+type hint takes precedence: `Optional[T]` (i.e. `Union[T, None]`) is
+always optional.
+
+### Multi-Type Unions
+
+`Union[str, int]` and similar multi-type unions are supported in
+`@tool()` parameters. They default to `str` in the schema, with runtime
+coercion handling the actual value type.
+
+```python
+from typing import Union
+
+@tool()
+def lookup(key: Union[str, int]) -> str:
+    return f"key={key}"
+```
+
+### Argument Type Coercion
+
+Tool arguments from LLMs are coerced to the declared parameter type
+when safe. Some smaller models (especially via Ollama) return numeric
+values as strings in JSON; selectools accepts `{"count": "42"}` for
+an `int` parameter and coerces it before validation.
+
+Supported coercions:
+
+- `str` → `int` (via `int(value)`)
+- `str` → `float` (via `float(value)`)
+- `str` → `bool` (`"true"` / `"1"` / `"yes"` / `"on"` → `True`;
+  `"false"` / `"0"` / `"no"` / `"off"` → `False`)
+
+Invalid coercions still raise `ToolValidationError` with a clear
+message.
 
 ---
 
