@@ -2902,3 +2902,76 @@ def test_bug11_union_with_none_still_works() -> None:
 
     params = {p.name: p for p in opt_param.parameters}
     assert params["tag"].param_type is str  # Optional unwraps to str
+
+
+# ---- BUG-13: GraphState.to_dict() doesn't validate non-serializable data ----
+# Source: Agno #7365. to_dict() claimed to be JSON-safe but only deep-copied
+# data, silently corrupting checkpoints when non-serializable objects were
+# present in state.data.
+
+
+def test_bug13_to_dict_is_json_serializable():
+    import json
+
+    from selectools.orchestration.state import GraphState
+
+    state = GraphState.from_prompt("hello")
+    state.data["count"] = 42
+    state.data["nested"] = {"a": [1, 2, 3]}
+
+    d = state.to_dict()
+    # Must survive JSON round-trip without data loss
+    serialized = json.dumps(d)
+    restored = json.loads(serialized)
+    assert restored["data"]["count"] == 42
+    assert restored["data"]["nested"] == {"a": [1, 2, 3]}
+
+
+def test_bug13_to_dict_rejects_non_serializable_data():
+    """Fail fast with ValueError instead of silently corrupting checkpoints."""
+    from selectools.orchestration.state import GraphState
+
+    class NotSerializable:
+        pass
+
+    state = GraphState.from_prompt("hello")
+    state.data["bad"] = NotSerializable()
+
+    with pytest.raises((ValueError, TypeError)):
+        state.to_dict()
+
+
+# ---- BUG-15: Unbounded summary growth ----
+# Source: Agno #5011. Session summaries grew unboundedly via string
+# concatenation until they exceeded the model's context window.
+
+
+def test_bug15_summary_helper_caps_at_max_chars():
+    from selectools.agent._memory_manager import _MAX_SUMMARY_CHARS, _append_summary
+
+    # Start with a summary already at the cap
+    existing = "X" * _MAX_SUMMARY_CHARS
+    new_chunk = "new summary chunk with recent context"
+    result = _append_summary(existing, new_chunk)
+
+    assert (
+        len(result) <= _MAX_SUMMARY_CHARS
+    ), f"Summary exceeded cap: {len(result)} > {_MAX_SUMMARY_CHARS}"
+    # The NEWEST content must be preserved (recent context matters most)
+    assert "new summary chunk" in result
+
+
+def test_bug15_summary_helper_empty_existing():
+    from selectools.agent._memory_manager import _MAX_SUMMARY_CHARS, _append_summary
+
+    assert _append_summary(None, "first summary") == "first summary"
+    assert _append_summary("", "first summary") == "first summary"
+
+
+def test_bug15_summary_helper_preserves_under_cap():
+    """When combined length is under the cap, nothing is truncated."""
+    from selectools.agent._memory_manager import _append_summary
+
+    result = _append_summary("existing summary", "new chunk")
+    assert "existing summary" in result
+    assert "new chunk" in result

@@ -12,9 +12,29 @@ if TYPE_CHECKING:
     from ..memory import ConversationMemory
 
 
+_MAX_SUMMARY_CHARS = 4000  # ~1000 tokens, well under any provider's context window
+
+
 def _format_messages_as_text(messages: List[Message]) -> str:
     """Render a list of messages as 'ROLE: content' lines joined by newlines."""
     return "\n".join(f"{m.role.value.upper()}: {m.content or ''}" for m in messages)
+
+
+def _append_summary(existing: Optional[str], new_chunk: str) -> str:
+    """Append a new summary chunk to an existing summary, truncating oldest content.
+
+    When the combined length exceeds ``_MAX_SUMMARY_CHARS``, the oldest content is
+    dropped to keep the most recent context. Prevents unbounded growth of session
+    summaries that would eventually exceed the model's context window
+    (BUG-15, Agno #5011).
+    """
+    if not existing:
+        combined = new_chunk
+    else:
+        combined = f"{existing} {new_chunk}"
+    if len(combined) > _MAX_SUMMARY_CHARS:
+        combined = combined[-_MAX_SUMMARY_CHARS:]
+    return combined
 
 
 class _MemoryManagerMixin:
@@ -95,11 +115,7 @@ class _MemoryManagerMixin:
             summary_msg = result[0] if isinstance(result, tuple) else result
             summary_text = summary_msg.content or ""
             if summary_text:
-                existing = self.memory.summary
-                if existing:
-                    self.memory.summary = existing + " " + summary_text
-                else:
-                    self.memory.summary = summary_text
+                self.memory.summary = _append_summary(self.memory.summary, summary_text)
                 self._notify_observers("on_memory_summarize", run_id, self.memory.summary)
         except Exception:  # nosec B110
             pass  # never crash the agent for a summarization failure
