@@ -48,26 +48,32 @@ class SearchResult:
 
 
 def _dedup_search_results(results: List["SearchResult"]) -> List["SearchResult"]:
-    """
-    Post-filter search results so each unique document text appears at most once.
+    """Post-filter search results so each unique ``(text, source)`` pair appears once.
 
     Keeps the first occurrence (highest-scoring when the input is already
     sorted by descending similarity). Used by vector store ``search()`` methods
     when called with ``dedup=True``.
 
+    Dedup key is ``(document.text, document.metadata.get("source"))`` so that
+    two documents with identical text but different source metadata — a
+    common case when the same snippet is ingested from multiple files — are
+    preserved as distinct citations. When no ``source`` key is present the
+    fallback is text-only (BUG-24 / LlamaIndex #21033).
+
     Args:
         results: Ordered list of SearchResult objects.
 
     Returns:
-        New list with duplicate-text results removed.
+        New list with duplicate ``(text, source)`` results removed.
     """
     seen: set = set()
     out: List["SearchResult"] = []
     for r in results:
-        text = r.document.text
-        if text in seen:
+        source = r.document.metadata.get("source") if r.document.metadata else None
+        key = (r.document.text, source)
+        if key in seen:
             continue
-        seen.add(text)
+        seen.add(key)
         out.append(r)
     return out
 

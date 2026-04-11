@@ -3559,3 +3559,72 @@ def test_bug23_reranker_top_k_none_returns_all():
     assert (
         call_kwargs["top_n"] == 3
     ), f"top_k=None must default to len(results); got top_n={call_kwargs['top_n']}"
+
+
+# ---- BUG-24: _dedup_search_results keyed only on document.text ----
+# Source: LlamaIndex #21033. Sync recursive retrieval dedup keyed on node.hash
+# while async used (hash, ref_doc_id); legitimately-distinct nodes were dropped.
+# Selectools' _dedup_search_results keyed only on r.document.text — two
+# documents with identical text but different sources (same snippet ingested
+# from two files — common in legal/academic/regulatory corpora) collapse into
+# one result, and the citation for the second source is lost.
+
+
+def test_bug24_dedup_preserves_distinct_sources():
+    """Identical text from different sources must NOT collapse into one result."""
+    from selectools.rag.vector_store import Document, SearchResult, _dedup_search_results
+
+    results = [
+        SearchResult(
+            document=Document(text="same snippet", metadata={"source": "file_a.pdf"}),
+            score=0.9,
+        ),
+        SearchResult(
+            document=Document(text="same snippet", metadata={"source": "file_b.pdf"}),
+            score=0.85,
+        ),
+    ]
+
+    deduped = _dedup_search_results(results)
+
+    assert len(deduped) == 2, (
+        f"Two distinct source documents with identical text must BOTH be preserved; "
+        f"got {len(deduped)} results (citation for second source lost)"
+    )
+    sources = {r.document.metadata["source"] for r in deduped}
+    assert sources == {"file_a.pdf", "file_b.pdf"}, f"Expected both sources; got {sources}"
+
+
+def test_bug24_dedup_collapses_same_text_same_source():
+    """Same text AND same source (true dup) still collapses — backward compat."""
+    from selectools.rag.vector_store import Document, SearchResult, _dedup_search_results
+
+    results = [
+        SearchResult(
+            document=Document(text="snippet", metadata={"source": "file_a.pdf"}),
+            score=0.9,
+        ),
+        SearchResult(
+            document=Document(text="snippet", metadata={"source": "file_a.pdf"}),
+            score=0.85,
+        ),
+    ]
+
+    deduped = _dedup_search_results(results)
+    assert (
+        len(deduped) == 1
+    ), f"True duplicate (same text + same source) must still collapse; got {len(deduped)}"
+    assert deduped[0].score == 0.9, "Must keep first (highest-scoring) occurrence"
+
+
+def test_bug24_dedup_handles_missing_metadata():
+    """Documents without metadata must still dedupe by text alone."""
+    from selectools.rag.vector_store import Document, SearchResult, _dedup_search_results
+
+    results = [
+        SearchResult(document=Document(text="x"), score=0.9),
+        SearchResult(document=Document(text="x"), score=0.8),
+        SearchResult(document=Document(text="y"), score=0.7),
+    ]
+    deduped = _dedup_search_results(results)
+    assert len(deduped) == 2, "text-only dedup still works when metadata absent"
