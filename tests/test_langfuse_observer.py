@@ -9,6 +9,8 @@ import pytest
 
 class TestLangfuseObserver:
     def _make_observer(self):
+        import threading
+
         mock_langfuse_mod = MagicMock()
         mock_client = MagicMock()
         mock_langfuse_mod.Langfuse.return_value = mock_client
@@ -20,6 +22,7 @@ class TestLangfuseObserver:
             obs._traces = {}
             obs._generations = {}
             obs._llm_counter = 0
+            obs._lock = threading.Lock()
         return obs, mock_client
 
     def test_import_error(self):

@@ -12,6 +12,7 @@ Usage::
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from typing import Any, Dict, List, Optional
 
@@ -47,6 +48,7 @@ class OTelObserver(AgentObserver):
         self._llm_starts: Dict[str, float] = {}
         self._llm_counter: int = 0
         self._tool_counter: int = 0
+        self._lock = threading.Lock()
 
     # ── Run lifecycle ─────────────────────────────────────────────────
 
@@ -65,7 +67,8 @@ class OTelObserver(AgentObserver):
                 "selectools.run_id": run_id,
             },
         )
-        self._spans[run_id] = span
+        with self._lock:
+            self._spans[run_id] = span
 
     def on_run_end(self, run_id: str, result: Any) -> None:
         """End the root span with usage metadata.
@@ -75,24 +78,29 @@ class OTelObserver(AgentObserver):
         """
         # Clean up orphaned child spans first
         prefix = f"{run_id}:"
-        orphaned_keys = [k for k in self._spans if k.startswith(prefix)]
-        for key in orphaned_keys:
-            orphan = self._spans.pop(key, None)
-            self._llm_starts.pop(key, None)
-            if orphan is not None:
-                try:
-                    status = self._trace_mod.StatusCode.ERROR
-                    orphan.set_status(status, "Span orphaned — run ended before span closed")
-                except Exception:
-                    # StatusCode may not be available in all OTel versions;
-                    # setting an attribute is a safe fallback.
-                    orphan.set_attribute("error", True)
-                    orphan.set_attribute(
-                        "selectools.error", "Span orphaned — run ended before span closed"
-                    )
-                orphan.end()
+        with self._lock:
+            orphaned_keys = [k for k in self._spans if k.startswith(prefix)]
+            orphans = []
+            for key in orphaned_keys:
+                orphan = self._spans.pop(key, None)
+                self._llm_starts.pop(key, None)
+                if orphan is not None:
+                    orphans.append(orphan)
+            span = self._spans.pop(run_id, None)
 
-        span = self._spans.pop(run_id, None)
+        for orphan in orphans:
+            try:
+                status = self._trace_mod.StatusCode.ERROR
+                orphan.set_status(status, "Span orphaned — run ended before span closed")
+            except Exception:
+                # StatusCode may not be available in all OTel versions;
+                # setting an attribute is a safe fallback.
+                orphan.set_attribute("error", True)
+                orphan.set_attribute(
+                    "selectools.error", "Span orphaned — run ended before span closed"
+                )
+            orphan.end()
+
         if span is None:
             return
         if hasattr(result, "usage") and result.usage:
@@ -118,8 +126,10 @@ class OTelObserver(AgentObserver):
         system_prompt: str,
     ) -> None:
         """Start a child span for an LLM call."""
-        self._llm_counter += 1
-        parent = self._spans.get(run_id)
+        with self._lock:
+            self._llm_counter += 1
+            counter = self._llm_counter
+            parent = self._spans.get(run_id)
         ctx = self._trace_mod.set_span_in_context(parent) if parent else None
         span = self._tracer.start_span(
             "gen_ai.chat",
@@ -129,9 +139,10 @@ class OTelObserver(AgentObserver):
                 "gen_ai.system": "selectools",
             },
         )
-        key = f"{run_id}:llm:{self._llm_counter}"
-        self._spans[key] = span
-        self._llm_starts[key] = time.time()
+        key = f"{run_id}:llm:{counter}"
+        with self._lock:
+            self._spans[key] = span
+            self._llm_starts[key] = time.time()
 
     def on_llm_end(
         self,
@@ -141,15 +152,16 @@ class OTelObserver(AgentObserver):
     ) -> None:
         """End the most recent LLM call span for this run."""
         prefix = f"{run_id}:llm:"
-        # Find the highest-numbered LLM span for this run_id
-        matching = [k for k in self._spans if k.startswith(prefix)]
-        if not matching:
-            return
-        key = max(matching, key=lambda k: int(k.rsplit(":", 1)[1]))
-        span = self._spans.pop(key, None)
+        with self._lock:
+            # Find the highest-numbered LLM span for this run_id
+            matching = [k for k in self._spans if k.startswith(prefix)]
+            if not matching:
+                return
+            key = max(matching, key=lambda k: int(k.rsplit(":", 1)[1]))
+            span = self._spans.pop(key, None)
+            start = self._llm_starts.pop(key, None)
         if span is None:
             return
-        start = self._llm_starts.pop(key, None)
         if start:
             span.set_attribute("selectools.duration_ms", (time.time() - start) * 1000)
         if usage:
@@ -169,7 +181,8 @@ class OTelObserver(AgentObserver):
         tool_args: Dict[str, Any],
     ) -> None:
         """Start a child span for tool execution."""
-        parent = self._spans.get(run_id)
+        with self._lock:
+            parent = self._spans.get(run_id)
         ctx = self._trace_mod.set_span_in_context(parent) if parent else None
         span = self._tracer.start_span(
             "tool.execute",
@@ -179,7 +192,8 @@ class OTelObserver(AgentObserver):
                 "selectools.tool.call_id": call_id or "",
             },
         )
-        self._spans[f"{run_id}:tool:{call_id}"] = span
+        with self._lock:
+            self._spans[f"{run_id}:tool:{call_id}"] = span
 
     def on_tool_end(
         self,
@@ -191,7 +205,8 @@ class OTelObserver(AgentObserver):
     ) -> None:
         """End the tool execution span."""
         key = f"{run_id}:tool:{call_id}"
-        span = self._spans.pop(key, None)
+        with self._lock:
+            span = self._spans.pop(key, None)
         if span is None:
             return
         span.set_attribute("selectools.tool.duration_ms", duration_ms)
@@ -209,7 +224,8 @@ class OTelObserver(AgentObserver):
     ) -> None:
         """Record an error on the tool span."""
         key = f"{run_id}:tool:{call_id}"
-        span = self._spans.pop(key, None)
+        with self._lock:
+            span = self._spans.pop(key, None)
         if span is None:
             return
         span.set_attribute("error", True)

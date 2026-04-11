@@ -3134,3 +3134,83 @@ def test_bug14_delete_respects_namespace():
         assert store.load("shared_id", namespace="ns_a") is None
         # ns_b must still be there
         assert store.load("shared_id", namespace="ns_b") is not None
+
+
+# ---- BUG-17: AgentTrace.add() not thread-safe ----
+# Source: Agno #5847. AgentTrace.add() is list.append with no lock; parallel
+# graph branches share the trace object and can race in executor threads.
+
+
+def test_bug17_agent_trace_concurrent_add():
+    """10 threads x 100 adds = 1000 steps should all be preserved."""
+    import threading
+
+    from selectools.trace import AgentTrace, StepType, TraceStep
+
+    trace = AgentTrace(run_id="bug17-test")
+    errors: list = []
+
+    def worker(thread_id: int) -> None:
+        try:
+            for i in range(100):
+                trace.add(TraceStep(type=StepType.LLM_CALL, summary=f"t{thread_id}-s{i}"))
+        except Exception as e:
+            errors.append(e)
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(10)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors, f"Worker errors: {errors}"
+    assert len(trace.steps) == 1000, f"Expected 1000 steps, got {len(trace.steps)}"
+
+
+def test_bug17_agent_trace_has_lock():
+    """Verify the lock attribute exists and is a threading.Lock."""
+    import threading
+
+    from selectools.trace import AgentTrace
+
+    trace = AgentTrace(run_id="bug17-test")
+    assert hasattr(trace, "_lock"), "AgentTrace should have a _lock attribute"
+    # Verify it's actually a Lock (not just something truthy)
+    assert hasattr(trace._lock, "acquire") and hasattr(trace._lock, "release")
+
+
+# ---- BUG-20: OTel/Langfuse observer dicts mutated without locks ----
+# Source: PraisonAI #1260. Observer counters and span dicts were mutated by
+# concurrent LLM callbacks (from Agent.batch() thread pool) without locks.
+
+
+def test_bug20_otel_observer_has_lock():
+    """OTelObserver must have a lock protecting its internal dicts."""
+    pytest.importorskip("opentelemetry")  # OTel is an optional dep
+
+    from selectools.observe.otel import OTelObserver
+
+    obs = OTelObserver()
+    assert hasattr(obs, "_lock"), "OTelObserver should have a _lock attribute"
+    assert hasattr(obs._lock, "acquire") and hasattr(obs._lock, "release")
+
+
+def test_bug20_langfuse_observer_has_lock():
+    """LangfuseObserver must have a lock protecting its internal dicts."""
+    pytest.importorskip("langfuse")  # Langfuse is an optional dep
+
+    from selectools.observe.langfuse import LangfuseObserver
+
+    # LangfuseObserver may require credentials — catch construction errors
+    try:
+        obs = LangfuseObserver()
+    except Exception:
+        # If construction requires env vars, just verify the class has lock init code
+        import inspect
+
+        source = inspect.getsource(LangfuseObserver.__init__)
+        assert "_lock" in source, "LangfuseObserver.__init__ should initialize a _lock"
+        return
+
+    assert hasattr(obs, "_lock"), "LangfuseObserver should have a _lock attribute"
+    assert hasattr(obs._lock, "acquire") and hasattr(obs._lock, "release")
