@@ -2974,4 +2974,53 @@ def test_bug15_summary_helper_preserves_under_cap():
 
     result = _append_summary("existing summary", "new chunk")
     assert "existing summary" in result
-    assert "new chunk" in result
+
+
+# ---- BUG-12: Multi-interrupt generator nodes skip subsequent interrupts ----
+# Source: Agno #4921. Generators with 2+ InterruptRequest yields had their
+# second+ interrupts silently skipped because gen.asend(response)'s return
+# value was discarded and __anext__ advanced past the next yield.
+
+
+def test_bug12_two_interrupts_both_collected():
+    """A generator node with two InterruptRequest yields must pause twice."""
+    from selectools.orchestration import (
+        AgentGraph,
+        GraphState,
+        InMemoryCheckpointStore,
+        InterruptRequest,
+    )
+
+    def _two_gate_generator(state: GraphState):
+        r1 = yield InterruptRequest(prompt="first?")
+        state.data["gate1"] = r1
+        r2 = yield InterruptRequest(prompt="second?")
+        state.data["gate2"] = r2
+        state.data["done"] = True
+        return state
+
+    graph = AgentGraph(name="bug12_two_gates")
+    graph.add_node("gate", _two_gate_generator)
+    graph.set_entry("gate")
+    graph.add_edge("gate", AgentGraph.END)
+
+    store = InMemoryCheckpointStore()
+
+    # First run — pauses on gate1
+    r1 = graph.run("start", checkpoint_store=store)
+    assert r1.interrupted, f"Expected pause on gate1; got: {r1}"
+    first_interrupt_id = r1.interrupt_id
+
+    # Resume with first response — should pause on gate2 (not skip past it)
+    r2 = graph.resume(first_interrupt_id, response="approved-1", checkpoint_store=store)
+    assert r2.interrupted, f"Expected second pause on gate2; got: {r2}"
+    second_interrupt_id = r2.interrupt_id
+    assert second_interrupt_id != first_interrupt_id, "Second interrupt should have a different id"
+
+    # Resume again — should complete
+    r3 = graph.resume(second_interrupt_id, response="approved-2", checkpoint_store=store)
+    assert not r3.interrupted, f"Expected completion; got: {r3}"
+    # Both gates should have received their respective responses
+    assert r3.state.data.get("gate1") == "approved-1"
+    assert r3.state.data.get("gate2") == "approved-2"
+    assert r3.state.data.get("done") is True

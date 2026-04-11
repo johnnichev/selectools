@@ -1261,25 +1261,51 @@ class AgentGraph:
         trace: AgentTrace,
         run_id: str,
     ) -> Tuple[AgentResult, GraphState, bool]:
-        """Execute an async generator node with HITL support."""
+        """Execute an async generator node with HITL support.
+
+        BUG-12 (Agno #4921): Generators yielding 2+ InterruptRequests must
+        pause on every interrupt. Previously the return value of
+        ``gen.asend(response)`` was discarded and the enclosing ``async for``
+        loop advanced past the next yield via ``__anext__()`` — sending
+        ``None`` as the response to whatever was waiting. The fix is a single
+        fetch-per-iteration loop where each item (whether from ``asend`` or
+        ``__anext__``) is dispatched in the same code path. ``interrupt_index``
+        is only incremented when an ``InterruptRequest`` is actually yielded
+        so resume keys remain stable across restarts.
+        """
         gen = node.agent(state)
         interrupt_index = 0
 
-        async for value in gen:
+        try:
+            value = await gen.__anext__()
+        except StopAsyncIteration:
+            result = _make_synthetic_result(state)
+            return result, state, False
+
+        while True:
             if isinstance(value, InterruptRequest):
                 interrupt_key = f"{node.name}_{interrupt_index}"
 
                 if interrupt_key in state._interrupt_responses:
-                    # Resume path: inject stored response into generator
+                    # Resume path: inject stored response and capture the
+                    # NEXT yielded value (which could be another
+                    # InterruptRequest). Do NOT fall through to __anext__ —
+                    # that would advance past the value we just got back.
+                    #
+                    # Note: we do NOT delete the response after consuming.
+                    # Generators are re-run from scratch on every resume, so
+                    # all previously-resolved interrupts must remain in
+                    # _interrupt_responses to let the generator deterministically
+                    # replay past them (BUG-12).
+                    response = state._interrupt_responses[interrupt_key]
+                    interrupt_index += 1
                     try:
-                        await gen.asend(state._interrupt_responses[interrupt_key])
-                        del state._interrupt_responses[interrupt_key]
-                        interrupt_index += 1
-                        continue
+                        value = await gen.asend(response)
                     except StopAsyncIteration:
                         break
+                    continue
                 else:
-                    # First-pass: store interrupt key and signal pause
+                    # First-pass: store interrupt key and signal pause.
                     value.interrupt_key = interrupt_key
                     state.metadata[_STATE_KEY_PENDING_INTERRUPT] = interrupt_key
                     self._notify("on_graph_interrupt", run_id, node.name, interrupt_key)
@@ -1292,7 +1318,14 @@ class AgentGraph:
                     synthetic = _make_synthetic_result(state)
                     return synthetic, state, True
 
-            interrupt_index = 0
+            # Non-interrupt yield (data or final value). Advance; do NOT
+            # reset interrupt_index — the key-mapping must remain stable
+            # across interleaved data/interrupt yields so resume keys
+            # continue to line up with yield order.
+            try:
+                value = await gen.__anext__()
+            except StopAsyncIteration:
+                break
 
         result = _make_synthetic_result(state)
         return result, state, False
@@ -1304,22 +1337,39 @@ class AgentGraph:
         trace: AgentTrace,
         run_id: str,
     ) -> Tuple[AgentResult, GraphState, bool]:
-        """Execute a sync generator node with HITL support."""
+        """Execute a sync generator node with HITL support.
+
+        See BUG-12 note on :meth:`_aexecute_generator_node` — the iteration
+        refactor applies equally to the sync path: one fetch per loop
+        iteration, ``send()``'s return value is dispatched in the same
+        branch as ``next()``'s, and ``interrupt_index`` is never reset on
+        non-interrupt yields.
+        """
         gen = node.agent(state)
         interrupt_index = 0
 
-        for value in gen:
+        try:
+            value = next(gen)
+        except StopIteration:
+            result = _make_synthetic_result(state)
+            return result, state, False
+
+        while True:
             if isinstance(value, InterruptRequest):
                 interrupt_key = f"{node.name}_{interrupt_index}"
 
                 if interrupt_key in state._interrupt_responses:
+                    # Keep the response around (do NOT delete) — see
+                    # BUG-12 note on the async path. Generators restart
+                    # from scratch on every resume and must replay past
+                    # previously-resolved interrupts deterministically.
+                    response = state._interrupt_responses[interrupt_key]
+                    interrupt_index += 1
                     try:
-                        gen.send(state._interrupt_responses[interrupt_key])
-                        del state._interrupt_responses[interrupt_key]
-                        interrupt_index += 1
-                        continue
+                        value = gen.send(response)
                     except StopIteration:
                         break
+                    continue
                 else:
                     value.interrupt_key = interrupt_key
                     state.metadata[_STATE_KEY_PENDING_INTERRUPT] = interrupt_key
@@ -1333,7 +1383,11 @@ class AgentGraph:
                     synthetic = _make_synthetic_result(state)
                     return synthetic, state, True
 
-            interrupt_index = 0
+            # Non-interrupt yield. Advance without resetting interrupt_index.
+            try:
+                value = next(gen)
+            except StopIteration:
+                break
 
         result = _make_synthetic_result(state)
         return result, state, False
