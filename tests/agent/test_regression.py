@@ -3671,3 +3671,99 @@ def test_bug26_gemini_usage_fix_pattern_in_source():
     assert (
         source.count("candidates_token_count is not None") >= 2
     ), "Both sync (complete) and stream paths must use `is not None` guard on candidates_token_count"
+
+
+# ---- BUG-25: In-memory _matches_filter silently mishandles operator-dict values ----
+# Source: LlamaIndex #20246/#20237. Qdrant silently returned an empty filter
+# for unsupported operators (CONTAINS, ANY, ALL), matching ALL documents
+# (security-adjacent: permission-filter bypass).
+# Selectools' in-memory _matches_filter has the mirror-image bug: when a user
+# passes {"user_id": {"$in": [1, 2]}}, the equality check fails for every doc
+# → zero results with NO indication of user error. Either direction is wrong.
+# Fix: raise NotImplementedError when filter_value is a dict with $-prefixed
+# keys (operator syntax), so users get a clear error instead of silent
+# zero-matching. Literal dict metadata values without $-prefixed keys still
+# pass through (backward compat for nested-metadata use cases).
+
+
+def _bug25_make_embedder():
+    import numpy as np
+
+    embedder = MagicMock()
+    embedder.embed_query.return_value = np.array([0.1] * 8, dtype=np.float32)
+    embedder.embed_texts.return_value = np.array([[0.1] * 8, [0.2] * 8], dtype=np.float32)
+    return embedder
+
+
+def test_bug25_memory_filter_operator_dict_raises():
+    """InMemoryVectorStore.search with {$in: [...]} must raise NotImplementedError."""
+    from selectools.rag.stores.memory import InMemoryVectorStore
+    from selectools.rag.vector_store import Document
+
+    store = InMemoryVectorStore(embedder=_bug25_make_embedder())
+    store.add_documents(
+        [
+            Document(text="doc a", metadata={"user_id": 1}),
+            Document(text="doc b", metadata={"user_id": 2}),
+        ]
+    )
+
+    query_vec = store.embedder.embed_query("q")
+    with pytest.raises(NotImplementedError, match=r"\$in|operator"):
+        store.search(query_vec, top_k=5, filter={"user_id": {"$in": [1, 2]}})
+
+
+def test_bug25_bm25_filter_operator_dict_raises():
+    """BM25.search with {$in: [...]} must raise NotImplementedError."""
+    from selectools.rag.bm25 import BM25
+    from selectools.rag.vector_store import Document
+
+    bm25 = BM25()
+    bm25.add_documents(
+        [
+            Document(text="doc alpha", metadata={"user_id": 1}),
+            Document(text="doc beta", metadata={"user_id": 2}),
+        ]
+    )
+    with pytest.raises(NotImplementedError, match=r"\$in|operator"):
+        bm25.search("doc", top_k=5, filter={"user_id": {"$in": [1, 2]}})
+
+
+def test_bug25_memory_filter_literal_dict_still_works():
+    """Literal dict metadata values (no `$` keys) must still match — backward compat."""
+    from selectools.rag.stores.memory import InMemoryVectorStore
+    from selectools.rag.vector_store import Document
+
+    store = InMemoryVectorStore(embedder=_bug25_make_embedder())
+    store.add_documents(
+        [
+            Document(text="doc a", metadata={"config": {"theme": "dark"}}),
+            Document(text="doc b", metadata={"config": {"theme": "light"}}),
+        ]
+    )
+
+    query_vec = store.embedder.embed_query("q")
+    results = store.search(query_vec, top_k=5, filter={"config": {"theme": "dark"}})
+    matched = [r for r in results if r.document.text == "doc a"]
+    assert (
+        len(matched) == 1
+    ), f"Literal dict metadata match (no $-prefixed keys) must still work; got {len(matched)}"
+
+
+def test_bug25_memory_filter_simple_equality_still_works():
+    """Simple equality filter (non-dict value) must still work."""
+    from selectools.rag.stores.memory import InMemoryVectorStore
+    from selectools.rag.vector_store import Document
+
+    store = InMemoryVectorStore(embedder=_bug25_make_embedder())
+    store.add_documents(
+        [
+            Document(text="doc a", metadata={"user_id": 1}),
+            Document(text="doc b", metadata={"user_id": 2}),
+        ]
+    )
+
+    query_vec = store.embedder.embed_query("q")
+    results = store.search(query_vec, top_k=5, filter={"user_id": 1})
+    matched = [r for r in results if r.document.metadata.get("user_id") == 1]
+    assert len(matched) == 1, f"Simple equality filter must still work; got {len(matched)}"

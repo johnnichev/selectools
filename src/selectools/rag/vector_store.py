@@ -47,6 +47,34 @@ class SearchResult:
     score: float
 
 
+def _validate_filter(filter: Optional[Dict[str, Any]]) -> None:
+    """Raise ``NotImplementedError`` if ``filter`` uses operator-dict syntax.
+
+    BUG-25 / LlamaIndex #20246: in-memory and BM25 filter matchers compare
+    metadata values with ``!=``. If a user passes an operator dict like
+    ``{"user_id": {"$in": [1, 2]}}`` expecting Mongo-style operator semantics,
+    the equality check fails for every document and returns zero results with
+    no indication of user error. We detect operator intent (a dict value with
+    one or more ``$``-prefixed keys) and raise a clear error instead of
+    silently returning the wrong result.
+
+    Literal dict metadata values (no ``$``-prefixed keys) still pass through
+    for backward compatibility with nested-metadata matching.
+    """
+    if not filter:
+        return
+    for _key, value in filter.items():
+        if isinstance(value, dict) and any(
+            isinstance(k, str) and k.startswith("$") for k in value.keys()
+        ):
+            bad = next(k for k in value.keys() if isinstance(k, str) and k.startswith("$"))
+            raise NotImplementedError(
+                f"In-memory filter does not support operator syntax {bad!r}. "
+                f"Use a vector store backend that supports operators "
+                f"(Chroma, Pinecone, Qdrant, pgvector) or use equality-only filters."
+            )
+
+
 def _dedup_search_results(results: List["SearchResult"]) -> List["SearchResult"]:
     """Post-filter search results so each unique ``(text, source)`` pair appears once.
 
@@ -204,4 +232,10 @@ class VectorStore(ABC):
             )
 
 
-__all__ = ["Document", "SearchResult", "VectorStore", "_dedup_search_results"]
+__all__ = [
+    "Document",
+    "SearchResult",
+    "VectorStore",
+    "_dedup_search_results",
+    "_validate_filter",
+]

@@ -15,7 +15,13 @@ except ImportError as e:
         "numpy required for in-memory vector store. Install with: pip install numpy"
     ) from e
 
-from ..vector_store import Document, SearchResult, VectorStore, _dedup_search_results
+from ..vector_store import (
+    Document,
+    SearchResult,
+    VectorStore,
+    _dedup_search_results,
+    _validate_filter,
+)
 
 
 class InMemoryVectorStore(VectorStore):
@@ -133,6 +139,8 @@ class InMemoryVectorStore(VectorStore):
         Returns:
             List of SearchResult objects, sorted by similarity
         """
+        _validate_filter(filter)
+
         with self._lock:
             embeddings_snapshot = self.embeddings
             documents_snapshot = list(self.documents)
