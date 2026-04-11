@@ -2704,6 +2704,7 @@ def test_bug08_pinecone_batches_large_upsert():
 
 def test_bug08_qdrant_batches_large_upsert():
     """QdrantVectorStore should chunk large add_documents calls."""
+    pytest.importorskip("qdrant_client", reason="qdrant-client not installed")
     from selectools.rag.stores.qdrant import QdrantVectorStore
     from selectools.rag.vector_store import Document
 
@@ -3299,7 +3300,7 @@ def test_bug19_clone_isolates_observer_list():
         pass
 
     obs = _Obs()
-    provider = LocalProvider(responses=["hello"])
+    provider = LocalProvider()
     agent = Agent(
         tools=[_bug19_noop],
         provider=provider,
@@ -3333,7 +3334,7 @@ def test_bug19_clone_without_observers_does_not_crash():
     def _bug19_noop2() -> str:
         return "ok"
 
-    provider = LocalProvider(responses=["hello"])
+    provider = LocalProvider()
     agent = Agent(
         tools=[_bug19_noop2],
         provider=provider,
