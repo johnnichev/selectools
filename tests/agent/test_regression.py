@@ -3503,3 +3503,59 @@ def test_bug21_dedup_default_is_false_backward_compat() -> None:
     assert (
         len(results) == 2
     ), f"Default dedup=False should preserve duplicates; got {len(results)} results"
+
+
+# ---- BUG-23: Reranker top_k=0 falsy fallback ----
+# Source: LlamaIndex #20880 (same class: alpha = query.alpha or 0.5 swallowed 0.0).
+# CohereReranker used `top_n=top_k or len(results)` which silently promotes
+# top_k=0 (user explicitly asking for no results) to len(results) (everything).
+# Same round-1 pitfall #22 class, new instance in the rag/ module.
+
+
+def test_bug23_reranker_top_k_zero_returns_empty():
+    """CohereReranker must honor top_k=0, not swallow it with `or len(results)`."""
+    from selectools.rag.reranker import CohereReranker
+    from selectools.rag.vector_store import Document, SearchResult
+
+    reranker = CohereReranker.__new__(CohereReranker)
+    reranker.client = MagicMock()
+    reranker.model = "rerank-v3.5"
+    mock_response = MagicMock()
+    mock_response.results = []
+    reranker.client.rerank.return_value = mock_response
+
+    results = [
+        SearchResult(document=Document(text=f"doc{i}"), score=0.9 - i * 0.1) for i in range(3)
+    ]
+
+    out = reranker.rerank("query", results, top_k=0)
+
+    assert out == [], f"top_k=0 must return empty list; got {len(out)} results"
+    call_kwargs = reranker.client.rerank.call_args.kwargs
+    assert call_kwargs["top_n"] == 0, (
+        f"top_k=0 must pass top_n=0 to Cohere API (not len(results)); "
+        f"got top_n={call_kwargs['top_n']}"
+    )
+
+
+def test_bug23_reranker_top_k_none_returns_all():
+    """top_k=None must still default to len(results) — backward compat."""
+    from selectools.rag.reranker import CohereReranker
+    from selectools.rag.vector_store import Document, SearchResult
+
+    reranker = CohereReranker.__new__(CohereReranker)
+    reranker.client = MagicMock()
+    reranker.model = "rerank-v3.5"
+    mock_response = MagicMock()
+    mock_response.results = []
+    reranker.client.rerank.return_value = mock_response
+
+    results = [
+        SearchResult(document=Document(text=f"doc{i}"), score=0.9 - i * 0.1) for i in range(3)
+    ]
+
+    reranker.rerank("query", results, top_k=None)
+    call_kwargs = reranker.client.rerank.call_args.kwargs
+    assert (
+        call_kwargs["top_n"] == 3
+    ), f"top_k=None must default to len(results); got top_n={call_kwargs['top_n']}"
