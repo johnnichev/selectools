@@ -2659,3 +2659,78 @@ def test_bug07_only_think_tag_returns_empty():
     from selectools.providers.anthropic_provider import _strip_reasoning_tags
 
     assert _strip_reasoning_tags("<think>just reasoning</think>") == ""
+
+
+# ---- BUG-08: RAG vector store batch size limits ----
+# Source: Agno #7030. ChromaDB, Pinecone, and Qdrant have internal batch
+# limits on upsert (Chroma ~5461, Pinecone 100/upsert). The stores called
+# upsert with the entire document list and crashed on large ingestions.
+
+
+def test_bug08_chroma_batches_large_upsert():
+    """ChromaVectorStore should chunk large add_documents into _batch_size groups."""
+    from selectools.rag.stores.chroma import ChromaVectorStore
+    from selectools.rag.vector_store import Document
+
+    store = ChromaVectorStore.__new__(ChromaVectorStore)
+    store.collection = MagicMock()
+    store._batch_size = 100  # small batch for test
+    store.embedder = MagicMock()
+    store.embedder.embed_texts.return_value = [[0.1] * 16 for _ in range(250)]
+
+    docs = [Document(text=f"doc {i}", metadata={}) for i in range(250)]
+    store.add_documents(docs)
+    # 250 docs / 100 batch = 3 upsert calls (100, 100, 50)
+    assert store.collection.upsert.call_count == 3
+
+
+def test_bug08_pinecone_batches_large_upsert():
+    """PineconeVectorStore should chunk large add_documents calls."""
+    from selectools.rag.stores.pinecone import PineconeVectorStore
+    from selectools.rag.vector_store import Document
+
+    store = PineconeVectorStore.__new__(PineconeVectorStore)
+    store.index = MagicMock()
+    store.namespace = ""
+    store._batch_size = 100  # small batch for test
+    store.embedder = MagicMock()
+    store.embedder.embed_texts.return_value = [[0.1] * 16 for _ in range(250)]
+
+    docs = [Document(text=f"doc {i}", metadata={}) for i in range(250)]
+    store.add_documents(docs)
+    # 250 docs / 100 batch = 3 upsert calls (100, 100, 50)
+    assert store.index.upsert.call_count == 3
+
+
+def test_bug08_qdrant_batches_large_upsert():
+    """QdrantVectorStore should chunk large add_documents calls."""
+    from selectools.rag.stores.qdrant import QdrantVectorStore
+    from selectools.rag.vector_store import Document
+
+    store = QdrantVectorStore.__new__(QdrantVectorStore)
+    store.client = MagicMock()
+    store.collection_name = "test"
+    store._batch_size = 100
+    store._collection_exists = True  # skip auto-create round-trip
+    store.embedder = MagicMock()
+    store.embedder.embed_texts.return_value = [[0.1] * 16 for _ in range(250)]
+
+    docs = [Document(text=f"doc {i}", metadata={}) for i in range(250)]
+    store.add_documents(docs)
+    assert store.client.upsert.call_count == 3
+
+
+def test_bug08_chroma_small_ingestion_single_call():
+    """ChromaVectorStore: ingestion below batch size should still result in one upsert."""
+    from selectools.rag.stores.chroma import ChromaVectorStore
+    from selectools.rag.vector_store import Document
+
+    store = ChromaVectorStore.__new__(ChromaVectorStore)
+    store.collection = MagicMock()
+    store._batch_size = 5000
+    store.embedder = MagicMock()
+    store.embedder.embed_texts.return_value = [[0.1] * 16 for _ in range(10)]
+
+    docs = [Document(text=f"doc {i}", metadata={}) for i in range(10)]
+    store.add_documents(docs)
+    assert store.collection.upsert.call_count == 1

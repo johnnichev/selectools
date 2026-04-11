@@ -44,6 +44,9 @@ class PineconeVectorStore(VectorStore):
 
     embedder: "EmbeddingProvider"
 
+    # Pinecone caps a single upsert at 100 vectors / 2MB payload.
+    _batch_size: int = 100
+
     def __init__(
         self,
         embedder: "EmbeddingProvider",  # noqa: F821
@@ -123,8 +126,11 @@ class PineconeVectorStore(VectorStore):
 
             vectors.append((doc_id, embedding, metadata))
 
-        # Upsert to Pinecone (batch operation)
-        self.index.upsert(vectors=vectors, namespace=self.namespace)
+        # Upsert to Pinecone in batches.  Pinecone rejects single upserts
+        # larger than 100 vectors (or 2MB payload), so chunk the call.
+        for start in range(0, len(vectors), self._batch_size):
+            end = start + self._batch_size
+            self.index.upsert(vectors=vectors[start:end], namespace=self.namespace)
 
         return ids
 

@@ -73,6 +73,10 @@ class QdrantVectorStore(VectorStore):
 
     embedder: "EmbeddingProvider"
 
+    # Qdrant has no hard cap, but very large upserts can exceed gRPC payload
+    # limits and stress the server.  1000 points/batch is a safe default.
+    _batch_size: int = 1000
+
     def __init__(
         self,
         embedder: "EmbeddingProvider",  # noqa: F821
@@ -233,11 +237,14 @@ class QdrantVectorStore(VectorStore):
                 )
             )
 
-        # Upsert in a single batch
-        self.client.upsert(
-            collection_name=self.collection_name,
-            points=points,
-        )
+        # Upsert in chunks. Very large single upserts can exceed gRPC payload
+        # limits and stress the server, so cap each call at ``_batch_size``.
+        for start in range(0, len(points), self._batch_size):
+            end = start + self._batch_size
+            self.client.upsert(
+                collection_name=self.collection_name,
+                points=points[start:end],
+            )
 
         return ids
 

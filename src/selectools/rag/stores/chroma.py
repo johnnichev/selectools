@@ -44,6 +44,10 @@ class ChromaVectorStore(VectorStore):
 
     embedder: "EmbeddingProvider"
 
+    # ChromaDB has an internal SQLite parameter limit (~5461) on a single
+    # upsert. Stay safely below it so large ingestions don't crash.
+    _batch_size: int = 5000
+
     def __init__(
         self,
         embedder: "EmbeddingProvider",  # noqa: F821
@@ -114,9 +118,18 @@ class ChromaVectorStore(VectorStore):
         texts = [doc.text for doc in documents]
         metadatas = [doc.metadata for doc in documents]
 
-        # Upsert to Chroma collection (idempotent — avoids duplicate-ID errors on
-        # re-indexing the same documents).
-        self.collection.upsert(ids=ids, embeddings=embeddings, documents=texts, metadatas=metadatas)  # type: ignore
+        # Upsert to Chroma collection in batches (idempotent — avoids
+        # duplicate-ID errors on re-indexing the same documents).  ChromaDB
+        # rejects single upsert calls that exceed its internal SQLite
+        # parameter limit (~5461 docs), so chunk large ingestions.
+        for start in range(0, len(ids), self._batch_size):
+            end = start + self._batch_size
+            self.collection.upsert(
+                ids=ids[start:end],
+                embeddings=embeddings[start:end],  # type: ignore[arg-type]
+                documents=texts[start:end],
+                metadatas=metadatas[start:end],  # type: ignore[arg-type]
+            )
 
         return ids
 
