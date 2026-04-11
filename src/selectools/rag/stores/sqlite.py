@@ -18,7 +18,7 @@ except ImportError as e:
         "numpy required for SQLite vector store. Install with: pip install numpy"
     ) from e
 
-from ..vector_store import Document, SearchResult, VectorStore
+from ..vector_store import Document, SearchResult, VectorStore, _dedup_search_results
 
 
 class SQLiteVectorStore(VectorStore):
@@ -149,6 +149,7 @@ class SQLiteVectorStore(VectorStore):
         query_embedding: List[float],
         top_k: int = 5,
         filter: Optional[Dict[str, Any]] = None,
+        dedup: bool = False,
     ) -> List[SearchResult]:
         """
         Search for similar documents using cosine similarity.
@@ -157,6 +158,7 @@ class SQLiteVectorStore(VectorStore):
             query_embedding: Query embedding vector
             top_k: Number of results to return
             filter: Optional metadata filter
+            dedup: If True, drop duplicate-text results (keeps highest-scoring).
 
         Returns:
             List of SearchResult objects, sorted by similarity
@@ -228,6 +230,8 @@ class SQLiteVectorStore(VectorStore):
             )
 
         results.sort(key=lambda x: x.score, reverse=True)
+        if dedup:
+            results = _dedup_search_results(results)
         return results[:top_k]
 
     def delete(self, ids: List[str]) -> None:

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 if TYPE_CHECKING:
     from ...embeddings.provider import EmbeddingProvider
 
-from ..vector_store import Document, SearchResult, VectorStore
+from ..vector_store import Document, SearchResult, VectorStore, _dedup_search_results
 
 
 class PineconeVectorStore(VectorStore):
@@ -139,6 +139,7 @@ class PineconeVectorStore(VectorStore):
         query_embedding: List[float],
         top_k: int = 5,
         filter: Optional[Dict[str, Any]] = None,
+        dedup: bool = False,
     ) -> List[SearchResult]:
         """
         Search for similar documents.
@@ -147,14 +148,17 @@ class PineconeVectorStore(VectorStore):
             query_embedding: Query embedding vector
             top_k: Number of results to return
             filter: Optional metadata filter (Pinecone filter format)
+            dedup: If True, drop duplicate-text results (keeps highest-scoring).
 
         Returns:
             List of SearchResult objects, sorted by similarity
         """
-        # Query Pinecone
+        # Query Pinecone. Over-fetch when dedup is requested so we still
+        # return top_k unique results after post-filtering.
+        fetch_k = top_k * 4 if dedup else top_k
         query_response = self.index.query(
             vector=query_embedding,
-            top_k=top_k,
+            top_k=fetch_k,
             namespace=self.namespace,
             filter=filter,
             include_metadata=True,
@@ -183,7 +187,9 @@ class PineconeVectorStore(VectorStore):
             doc = Document(text=text, metadata=meta)
             search_results.append(SearchResult(document=doc, score=match.score))
 
-        return search_results
+        if dedup:
+            search_results = _dedup_search_results(search_results)
+        return search_results[:top_k]
 
     def delete(self, ids: List[str]) -> None:
         """

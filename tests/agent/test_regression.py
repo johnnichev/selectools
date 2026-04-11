@@ -3416,3 +3416,89 @@ def test_bug22_non_optional_without_default_still_required():
 
     params = {p.name: p for p in echo.parameters}
     assert params["text"].required is True
+
+
+# ---- BUG-21: Vector store search result deduplication ----
+# Source: Agno #7047. Vector stores returned duplicate documents when the
+# same content was added multiple times (e.g. SQLite store uses uuid4 IDs,
+# so re-adding the same text creates new rows with new IDs but duplicate
+# content). Now opt-in via dedup=True — default remains False for
+# backward compatibility.
+
+
+def _bug21_make_mock_embedder() -> MagicMock:
+    """Build a mock embedder that returns the same vector for the same text."""
+    embedder = MagicMock()
+    embedder.model = "mock-embedding-model"
+    embedder.dimension = 4
+
+    def _embed(text: str) -> List[float]:
+        h = hash(text) % 1000
+        return [float(h + i) / 1000.0 for i in range(4)]
+
+    def _embed_texts(texts: List[str]) -> List[List[float]]:
+        return [_embed(t) for t in texts]
+
+    def _embed_query(query: str) -> List[float]:
+        return _embed(query)
+
+    embedder.embed_text.side_effect = _embed
+    embedder.embed_texts.side_effect = _embed_texts
+    embedder.embed_query.side_effect = _embed_query
+    return embedder
+
+
+def test_bug21_memory_store_search_dedup_opt_in() -> None:
+    """InMemoryVectorStore.search(dedup=True) should remove duplicate texts."""
+    from selectools.rag.stores.memory import InMemoryVectorStore
+    from selectools.rag.vector_store import Document
+
+    embedder = _bug21_make_mock_embedder()
+    store = InMemoryVectorStore(embedder=embedder)
+    same_text = "the quick brown fox"
+    store.add_documents(
+        [
+            Document(text=same_text, metadata={"source": "a"}),
+            Document(text=same_text, metadata={"source": "b"}),
+            Document(text="different doc", metadata={"source": "c"}),
+        ]
+    )
+
+    query_vec = embedder.embed_query(same_text)
+
+    # Without dedup: duplicates preserved (default behavior).
+    results_no_dedup = store.search(query_vec, top_k=10)
+    texts_no_dedup = [r.document.text for r in results_no_dedup]
+    assert (
+        texts_no_dedup.count(same_text) >= 2
+    ), f"Without dedup, expected 2+ copies of {same_text!r}; got: {texts_no_dedup}"
+
+    # With dedup=True: only the first occurrence of each text survives.
+    results_dedup = store.search(query_vec, top_k=10, dedup=True)
+    texts_dedup = [r.document.text for r in results_dedup]
+    assert (
+        texts_dedup.count(same_text) == 1
+    ), f"With dedup=True, expected 1 copy of {same_text!r}; got: {texts_dedup}"
+    # The "different doc" should still be present.
+    assert "different doc" in texts_dedup
+
+
+def test_bug21_dedup_default_is_false_backward_compat() -> None:
+    """Default behavior (no dedup arg) must preserve duplicates."""
+    from selectools.rag.stores.memory import InMemoryVectorStore
+    from selectools.rag.vector_store import Document
+
+    embedder = _bug21_make_mock_embedder()
+    store = InMemoryVectorStore(embedder=embedder)
+    store.add_documents(
+        [
+            Document(text="hello", metadata={"i": 0}),
+            Document(text="hello", metadata={"i": 1}),
+        ]
+    )
+
+    query_vec = embedder.embed_query("hello")
+    results = store.search(query_vec, top_k=10)
+    assert (
+        len(results) == 2
+    ), f"Default dedup=False should preserve duplicates; got {len(results)} results"

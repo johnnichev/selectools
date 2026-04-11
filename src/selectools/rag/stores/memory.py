@@ -15,7 +15,7 @@ except ImportError as e:
         "numpy required for in-memory vector store. Install with: pip install numpy"
     ) from e
 
-from ..vector_store import Document, SearchResult, VectorStore
+from ..vector_store import Document, SearchResult, VectorStore, _dedup_search_results
 
 
 class InMemoryVectorStore(VectorStore):
@@ -119,6 +119,7 @@ class InMemoryVectorStore(VectorStore):
         query_embedding: List[float],
         top_k: int = 5,
         filter: Optional[Dict[str, Any]] = None,
+        dedup: bool = False,
     ) -> List[SearchResult]:
         """
         Search for similar documents using cosine similarity.
@@ -127,6 +128,7 @@ class InMemoryVectorStore(VectorStore):
             query_embedding: Query embedding vector
             top_k: Number of results to return
             filter: Optional metadata filter
+            dedup: If True, drop duplicate-text results (keeps first).
 
         Returns:
             List of SearchResult objects, sorted by similarity
@@ -151,16 +153,17 @@ class InMemoryVectorStore(VectorStore):
         # Cosine similarity = dot product / (norm1 * norm2)
         similarities = np.dot(embeddings_snapshot, query_vec) / (doc_norms * query_norm + 1e-8)
 
-        # Get top-k indices (overfetch when filter present to compensate for filtering)
-        fetch_k = min(top_k * 4, len(similarities)) if filter else top_k
+        # Over-fetch when filter or dedup is present to compensate for drops.
+        fetch_k = min(top_k * 4, len(similarities)) if (filter or dedup) else top_k
         if len(similarities) <= fetch_k:
             top_indices = np.argsort(similarities)[::-1]
         else:
             top_indices = np.argpartition(similarities, -fetch_k)[-fetch_k:]
             top_indices = top_indices[np.argsort(similarities[top_indices])][::-1]
 
-        # Build results with optional filtering
-        results = []
+        # Build results with optional filtering and dedup.
+        results: List[SearchResult] = []
+        seen_texts: set = set()
         for idx in top_indices:
             doc = documents_snapshot[idx]
 
@@ -168,9 +171,15 @@ class InMemoryVectorStore(VectorStore):
             if filter and not self._matches_filter(doc, filter):
                 continue
 
+            # Apply text dedup if requested (keeps highest-scoring occurrence).
+            if dedup:
+                if doc.text in seen_texts:
+                    continue
+                seen_texts.add(doc.text)
+
             results.append(SearchResult(document=doc, score=float(similarities[idx])))
 
-            # Stop if we have enough results after filtering
+            # Stop if we have enough results after filtering/dedup
             if len(results) >= top_k:
                 break
 

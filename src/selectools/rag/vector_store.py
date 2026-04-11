@@ -47,6 +47,31 @@ class SearchResult:
     score: float
 
 
+def _dedup_search_results(results: List["SearchResult"]) -> List["SearchResult"]:
+    """
+    Post-filter search results so each unique document text appears at most once.
+
+    Keeps the first occurrence (highest-scoring when the input is already
+    sorted by descending similarity). Used by vector store ``search()`` methods
+    when called with ``dedup=True``.
+
+    Args:
+        results: Ordered list of SearchResult objects.
+
+    Returns:
+        New list with duplicate-text results removed.
+    """
+    seen: set = set()
+    out: List["SearchResult"] = []
+    for r in results:
+        text = r.document.text
+        if text in seen:
+            continue
+        seen.add(text)
+        out.append(r)
+    return out
+
+
 class VectorStore(ABC):
     """
     Abstract base class for vector store implementations.
@@ -80,6 +105,7 @@ class VectorStore(ABC):
         query_embedding: List[float],
         top_k: int = 5,
         filter: Optional[Dict[str, Any]] = None,
+        dedup: bool = False,
     ) -> List[SearchResult]:
         """
         Search for similar documents.
@@ -88,6 +114,9 @@ class VectorStore(ABC):
             query_embedding: Query embedding vector
             top_k: Number of results to return
             filter: Optional metadata filter (e.g., {"source": "manual.pdf"})
+            dedup: If True, post-filter results so each unique document text
+                appears at most once (keeps the first — highest-scoring —
+                occurrence). Default False for backward compatibility.
 
         Returns:
             List of SearchResult objects, sorted by similarity (highest first)
@@ -169,4 +198,4 @@ class VectorStore(ABC):
             )
 
 
-__all__ = ["Document", "SearchResult", "VectorStore"]
+__all__ = ["Document", "SearchResult", "VectorStore", "_dedup_search_results"]

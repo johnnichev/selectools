@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from ...embeddings.provider import EmbeddingProvider
 
 from ...stability import beta
-from ..vector_store import Document, SearchResult, VectorStore
+from ..vector_store import Document, SearchResult, VectorStore, _dedup_search_results
 
 logger = logging.getLogger(__name__)
 
@@ -253,6 +253,7 @@ class QdrantVectorStore(VectorStore):
         query_embedding: List[float],
         top_k: int = 5,
         filter: Optional[Dict[str, Any]] = None,
+        dedup: bool = False,
     ) -> List[SearchResult]:
         """
         Search for similar documents using cosine similarity.
@@ -267,6 +268,7 @@ class QdrantVectorStore(VectorStore):
                   ``FieldCondition`` with ``MatchValue``.
                 * **Qdrant native** — a pre-built ``models.Filter`` object for
                   complex queries (range, geo, nested, etc.).
+            dedup: If True, drop duplicate-text results (keeps highest-scoring).
 
         Returns:
             List of :class:`SearchResult` objects sorted by descending
@@ -281,11 +283,13 @@ class QdrantVectorStore(VectorStore):
         # `client.query_points()`. The new API takes `query=` instead of
         # `query_vector=` and returns a `QueryResponse` whose `.points`
         # attribute holds the list of `ScoredPoint`s.
+        # Over-fetch when dedup is requested so we still return top_k uniques.
+        fetch_k = top_k * 4 if dedup else top_k
         try:
             response = self.client.query_points(
                 collection_name=self.collection_name,
                 query=query_embedding,
-                limit=top_k,
+                limit=fetch_k,
                 query_filter=qdrant_filter,
                 with_payload=True,
             )
@@ -323,7 +327,9 @@ class QdrantVectorStore(VectorStore):
             doc = Document(text=text, metadata=metadata)
             search_results.append(SearchResult(document=doc, score=scored_point.score))
 
-        return search_results
+        if dedup:
+            search_results = _dedup_search_results(search_results)
+        return search_results[:top_k]
 
     def delete(self, ids: List[str]) -> None:
         """
