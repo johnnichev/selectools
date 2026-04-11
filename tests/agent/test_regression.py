@@ -3628,3 +3628,46 @@ def test_bug24_dedup_handles_missing_metadata():
     ]
     deduped = _dedup_search_results(results)
     assert len(deduped) == 2, "text-only dedup still works when metadata absent"
+
+
+# ---- BUG-26: Gemini usage metadata `or 0` swallows legitimate zero ----
+# Source: LangChain #36500. `token_usage.get("total_tokens") or fallback`
+# silently replaces provider-reported 0 (cached completions, empty responses).
+# Round-1 pitfall #22 instance not yet swept in providers/.
+# gemini_provider.py lines 158-159 (sync) and 505-506 (stream) used the same
+# `(usage.prompt_token_count or 0) if usage else 0` pattern. If the API
+# returns prompt_token_count=None alongside a real candidates_token_count,
+# the `or 0` conflates "unknown" with "zero" and under-reports total_tokens.
+
+
+def test_bug26_gemini_usage_no_or_zero_pattern_in_source():
+    """gemini_provider.py must not use the `or 0` pattern on token fields (pitfall #22)."""
+    import inspect
+
+    from selectools.providers import gemini_provider
+
+    source = inspect.getsource(gemini_provider)
+    # Allow the fix pattern but forbid the bug pattern on token_count fields
+    assert "prompt_token_count or 0" not in source, (
+        "gemini_provider.py uses `prompt_token_count or 0` — this conflates "
+        "None (unknown) with 0 (legitimate cached-prompt value). "
+        "Use `x if x is not None else 0` instead (pitfall #22)."
+    )
+    assert (
+        "candidates_token_count or 0" not in source
+    ), "gemini_provider.py uses `candidates_token_count or 0` — same pitfall #22 class."
+
+
+def test_bug26_gemini_usage_fix_pattern_in_source():
+    """gemini_provider.py must use the `is not None` guard on token fields."""
+    import inspect
+
+    from selectools.providers import gemini_provider
+
+    source = inspect.getsource(gemini_provider)
+    assert (
+        source.count("prompt_token_count is not None") >= 2
+    ), "Both sync (complete) and stream paths must use `is not None` guard on prompt_token_count"
+    assert (
+        source.count("candidates_token_count is not None") >= 2
+    ), "Both sync (complete) and stream paths must use `is not None` guard on candidates_token_count"
