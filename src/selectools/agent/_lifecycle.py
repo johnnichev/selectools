@@ -3,11 +3,28 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import threading
 from typing import TYPE_CHECKING, Any, Optional, cast
 
 if TYPE_CHECKING:
     from ..memory import ConversationMemory
+
+logger = logging.getLogger(__name__)
+
+
+def _log_task_exception(task: "asyncio.Task[Any]") -> None:
+    """Done-callback that logs exceptions from fire-and-forget observer tasks.
+
+    Without this callback, exceptions raised inside a non-blocking async
+    observer become unhandled-exception warnings on the event loop (Python
+    3.12+) and are otherwise silently lost. BUG-18 / Agno #6236.
+    """
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is not None:
+        logger.warning("Async observer raised: %s", exc, exc_info=exc)
 
 
 class _LifecycleMixin:
@@ -45,7 +62,8 @@ class _LifecycleMixin:
                 if obs.blocking:
                     await handler(*args)
                 else:
-                    asyncio.ensure_future(handler(*args))
+                    task = asyncio.ensure_future(handler(*args))
+                    task.add_done_callback(_log_task_exception)
             except Exception:  # noqa: BLE001 # nosec B110
                 pass
 

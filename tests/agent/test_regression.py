@@ -3214,3 +3214,131 @@ def test_bug20_langfuse_observer_has_lock():
 
     assert hasattr(obs, "_lock"), "LangfuseObserver should have a _lock attribute"
     assert hasattr(obs._lock, "acquire") and hasattr(obs._lock, "release")
+
+
+# ---- BUG-18: Async observer exceptions silently lost ----
+# Source: Agno #6236. ``asyncio.ensure_future(handler())`` with no done-callback
+# let coroutine exceptions vanish into unhandled-exception warnings (Python
+# 3.12+) and users had no visibility that their observer had failed.
+
+
+def test_bug18_async_observer_exception_logged(caplog):
+    """An async observer that raises should not crash the agent, and the
+    exception should surface via ``logging.warning`` instead of being lost."""
+    import asyncio as _bug18_asyncio
+    import logging as _bug18_logging
+
+    from selectools.agent._lifecycle import _LifecycleMixin
+    from selectools.observer import AsyncAgentObserver
+
+    class _FailingObserver(AsyncAgentObserver):
+        blocking = False
+
+        async def a_on_run_start(self, run_id, messages, system_prompt):
+            raise RuntimeError("observer boom")
+
+    class _Host(_LifecycleMixin):
+        def __init__(self, observers):
+            self.config = MagicMock()
+            self.config.observers = observers
+
+    host = _Host([_FailingObserver()])
+
+    async def _runner():
+        await host._anotify_observers("on_run_start", "bug18-run", [], "sys")
+        # Give the event loop a tick so the fire-and-forget task finishes
+        # and its done-callback logs the exception.
+        await _bug18_asyncio.sleep(0.05)
+
+    with caplog.at_level(_bug18_logging.WARNING, logger="selectools.agent._lifecycle"):
+        _bug18_asyncio.run(_runner())
+
+    matches = [
+        r
+        for r in caplog.records
+        if "observer" in r.getMessage().lower() or "boom" in r.getMessage().lower()
+    ]
+    assert matches, (
+        "Expected the failing async observer's RuntimeError to be logged via "
+        f"logger.warning; got records: {[r.getMessage() for r in caplog.records]}"
+    )
+
+
+def test_bug18_lifecycle_has_done_callback_helper():
+    """Guard against regression: the helper function must exist and be wired
+    into the ``_anotify_observers`` dispatch path."""
+    import inspect
+
+    from selectools.agent import _lifecycle
+
+    assert hasattr(
+        _lifecycle, "_log_task_exception"
+    ), "BUG-18 fix requires a module-level _log_task_exception helper"
+    source = inspect.getsource(_lifecycle._LifecycleMixin._anotify_observers)
+    assert (
+        "add_done_callback" in source
+    ), "_anotify_observers must attach add_done_callback to fire-and-forget tasks"
+
+
+# ---- BUG-19: ``_clone_for_isolation`` shallow-copies config ----
+# Source: PraisonAI #1260. ``Agent.batch()`` clones agents via ``copy.copy``;
+# without also copying ``config`` and ``config.observers``, batch clones
+# shared the same observer list and were vulnerable to cross-clone bleed
+# when one worker mutated config state mid-run.
+
+
+def test_bug19_clone_isolates_observer_list():
+    """Batch clones must not share the same observer list with the source."""
+    from selectools.agent.core import Agent, AgentConfig
+
+    @tool()
+    def _bug19_noop() -> str:
+        return "ok"
+
+    class _Obs(AgentObserver):
+        pass
+
+    obs = _Obs()
+    provider = LocalProvider(responses=["hello"])
+    agent = Agent(
+        tools=[_bug19_noop],
+        provider=provider,
+        config=AgentConfig(observers=[obs]),
+    )
+
+    assert hasattr(agent, "_clone_for_isolation"), "_clone_for_isolation must exist"
+    clone = agent._clone_for_isolation()
+
+    assert (
+        clone.config is not agent.config
+    ), "Clone should have its own config instance, not share the source config"
+    assert (
+        clone.config.observers is not agent.config.observers
+    ), "Clone should have its own observer list, not share the source list"
+    assert clone.config.observers == [
+        obs
+    ], "Clone observer list should contain the same observer instances"
+
+    clone.config.observers.append(_Obs())
+    assert (
+        len(agent.config.observers) == 1
+    ), "Mutating the clone's observer list must not affect the source agent"
+
+
+def test_bug19_clone_without_observers_does_not_crash():
+    """The clone path must still work when no observers are configured."""
+    from selectools.agent.core import Agent, AgentConfig
+
+    @tool()
+    def _bug19_noop2() -> str:
+        return "ok"
+
+    provider = LocalProvider(responses=["hello"])
+    agent = Agent(
+        tools=[_bug19_noop2],
+        provider=provider,
+        config=AgentConfig(),
+    )
+    clone = agent._clone_for_isolation()
+    assert clone.config is not None
+    assert clone.config.observers == []

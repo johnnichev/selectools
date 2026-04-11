@@ -1122,8 +1122,22 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             self._system_prompt = saved_system_prompt
 
     def _clone_for_isolation(self) -> "Agent":
-        """Create a lightweight clone for batch processing with isolated state."""
+        """Create a lightweight clone for batch processing with isolated state.
+
+        BUG-19 / PraisonAI #1260: the shallow ``copy.copy(self)`` left batch
+        clones sharing the same ``self.config`` object, including the
+        ``config.observers`` list. Mutating config state (e.g. appending an
+        observer, swapping the list) on one clone would bleed into sibling
+        clones running in other threads. We shallow-copy the config and
+        duplicate the observer list so each clone has an independent list;
+        individual observer instances remain shared because BUG-17/BUG-20
+        already made them thread-safe.
+        """
         clone = copy.copy(self)
+        if self.config is not None:
+            clone.config = copy.copy(self.config)
+            if getattr(self.config, "observers", None):
+                clone.config.observers = list(self.config.observers)
         clone._history = []
         clone.usage = AgentUsage()
         clone.memory = None
