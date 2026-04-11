@@ -5,16 +5,27 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.22.0] - 2026-04-10 — Competitor-Informed Bug Fixes
+## [0.22.0] - 2026-04-11 — Competitor-Informed Bug Fixes
 
 ### Methodology
 
-22 bugs identified by cross-referencing 95+ closed bug reports from
-[Agno](https://github.com/agno-agi/agno) (39k stars) and 60+ from
-[PraisonAI](https://github.com/MervinPraison/PraisonAI) (6.9k stars) against
-selectools v0.21.0 source code. Each fix includes a TDD regression test in
-`tests/agent/test_regression.py` that empirically fails without the fix and
-passes after. Test suite grew from 5,015 to 5,020 with 57 new regression tests.
+**Round 1** (BUG-01 – BUG-22): 22 bugs identified by cross-referencing 95+
+closed bug reports from [Agno](https://github.com/agno-agi/agno) (39k stars)
+and 60+ from [PraisonAI](https://github.com/MervinPraison/PraisonAI) (6.9k
+stars) against selectools v0.21.0 source code.
+
+**Round 2** (BUG-23 – BUG-26): 4 additional bugs surfaced by a second
+competitive bug-mining pass across **LangChain** (~92k), **LangGraph**
+(~10k), **CrewAI** (~25k), **n8n** (~70k), **LlamaIndex** (~37k) and
+**AutoGen** (~35k) — ~270k combined stars. The LlamaIndex and LangChain
+pass had the research subagents grep selectools source to match competitor
+fix diffs directly, which converted generic "worth checking" patterns into
+concrete confirmed-live bugs. Remaining top-15 unverified candidates from
+this round are parked for v0.23.0.
+
+Each fix includes a TDD regression test in `tests/agent/test_regression.py`
+that empirically fails without the fix and passes after. Test suite grew
+from 5,015 to 5,030 with 65 new regression tests (57 round-1 + 8 round-2).
 
 ### Fixed — High Severity (Shipping Blockers)
 
@@ -205,16 +216,61 @@ passes after. Test suite grew from 5,015 to 5,020 with 57 new regression tests.
   `T | None`) and marks `is_optional=True`. Cross-referenced from
   [Agno #7066](https://github.com/agno-agi/agno/issues/7066).
 
+### Fixed — Round 2 (LangChain + LangGraph + CrewAI + n8n + LlamaIndex + AutoGen)
+
+- **BUG-23: Reranker `top_k=0` silently returned all results.**
+  `CohereReranker.rerank` used `top_n=top_k or len(results)` so a user
+  passing `top_k=0` to disable reranking got the full list instead of
+  nothing. Round-1 pitfall #22 (zero/falsy confusion) in a new module. Fix
+  uses the `is not None` guard pattern. Cross-referenced from
+  [LlamaIndex #20880](https://github.com/run-llama/llama_index/pull/20880).
+
+- **BUG-24: `_dedup_search_results` keyed only on document text.** Two
+  search results with identical text but different `metadata["source"]`
+  values (same snippet ingested from two different files — common in
+  legal, academic, and regulatory corpora) collapsed into one result and
+  the citation for the second source was lost. Dedup key is now
+  `(text, metadata.get("source"))` with a text-only fallback when no
+  `source` key is present. Cross-referenced from
+  [LlamaIndex #21033](https://github.com/run-llama/llama_index/pull/21034).
+
+- **BUG-25: In-memory metadata filter silently mishandled operator-dict values.**
+  `InMemoryVectorStore._matches_filter` and `BM25._matches_filter` compared
+  metadata values with `!=`. A user passing `{"user_id": {"$in": [1, 2]}}`
+  expecting Mongo-style operator semantics got zero results with no
+  indication of user error. (Mirror-image of LlamaIndex's bug where Qdrant
+  silently dropped unrecognised operators and returned ALL docs — both
+  directions are wrong.) New shared `_validate_filter` helper in
+  `rag/vector_store.py` detects dict values with `$`-prefixed keys and
+  raises `NotImplementedError` pointing users to backend-specific stores.
+  Literal dict values without `$`-prefixed keys still pass through for
+  backward compatibility. Cross-referenced from
+  [LlamaIndex #20246](https://github.com/run-llama/llama_index/pull/20246).
+
+- **BUG-26: Gemini provider `(usage.prompt_token_count or 0)` pattern.**
+  `gemini_provider.py` used the `or 0` fallback on both `prompt_token_count`
+  and `candidates_token_count` in sync `complete()` and the stream path.
+  If the Gemini API returned `prompt_token_count=None` alongside a real
+  `candidates_token_count`, the `or 0` conflated "unknown" with "zero" and
+  under-reported `total_tokens`. Round-1 pitfall #22 instance not yet
+  swept in `providers/`. Fix uses `x if x is not None else 0` guard on both
+  paths. Grep confirmed no other provider has the `or 0` pattern on token
+  fields. Cross-referenced from
+  [LangChain #36500](https://github.com/langchain-ai/langchain/pull/36500).
+
 ### Stats
 
-- **5,020 tests** (up from 5,015 baseline; +57 new regression tests in
-  `tests/agent/test_regression.py`)
-- **20 fix commits + 3 docs commits** on `v0.22.0-competitor-bug-fixes` branch
-- **Cross-referenced bug sources**: Agno (16 bugs), PraisonAI (5 bugs),
-  CLAUDE.md pitfall #23 (1 bug)
+- **5,031 tests** (up from 5,015 baseline; +65 new regression tests in
+  `tests/agent/test_regression.py` = 57 round-1 + 8 round-2)
+- **24 fix commits + 3 docs commits** on `v0.22.0-competitor-bug-fixes` branch
+- **Cross-referenced bug sources**: Agno (16), PraisonAI (5), LlamaIndex (3),
+  LangChain (1), CLAUDE.md pitfall #23 (1)
 - **Thread safety story now end-to-end correct**: ConversationMemory,
   AgentTrace, OTel/Langfuse observers, MCPClient, FallbackProvider, batch
   clone isolation
+- **RAG citation and permission-filter correctness**: dedup preserves
+  distinct sources; in-memory filters surface operator-dict user errors
+  instead of silent empty results
 
 ## [0.21.0] - 2026-04-08
 
