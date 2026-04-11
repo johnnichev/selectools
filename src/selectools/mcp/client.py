@@ -44,6 +44,11 @@ class MCPClient:
         self._failure_count = 0
         self._circuit_open_until: float = 0
 
+        # Concurrency: serialize tool dispatches on the shared session.
+        # Lazy-init in _call_tool because asyncio.Lock binds to the running
+        # loop and MCPClient may be constructed outside any loop.
+        self._tool_lock: Optional[asyncio.Lock] = None
+
     @property
     def connected(self) -> bool:
         """Whether the client is currently connected."""
@@ -167,60 +172,71 @@ class MCPClient:
         return await self._fetch_tools()
 
     async def _call_tool(self, name: str, arguments: Dict[str, Any]) -> str:
-        """Call an MCP tool and return the text result."""
-        if self.circuit_open:
-            raise ConnectionError(
-                f"MCP server '{self.config.name}' circuit breaker is open. "
-                f"Server will be retried after cooldown."
-            )
+        """Call an MCP tool and return the text result.
 
-        last_error: Optional[Exception] = None
-        for attempt in range(self.config.max_retries + 1):
-            try:
-                if not self._session:
-                    if self.config.auto_reconnect:
-                        await self.connect()
-                    else:
-                        raise RuntimeError("Not connected and auto_reconnect is disabled.")
+        Serializes concurrent calls on a per-client lock so that the shared
+        stdio pipe / HTTP session is not interleaved by parallel tool
+        dispatches and the circuit breaker counters cannot race.
+        """
+        if self._tool_lock is None:
+            self._tool_lock = asyncio.Lock()
 
-                result = await self._session.call_tool(name, arguments)
-                self._failure_count = 0  # Reset on success
+        async with self._tool_lock:
+            if self.circuit_open:
+                raise ConnectionError(
+                    f"MCP server '{self.config.name}' circuit breaker is open. "
+                    f"Server will be retried after cooldown."
+                )
 
-                # Extract text from result content
-                texts: List[str] = []
-                for content in result.content:
-                    if hasattr(content, "text"):
-                        texts.append(content.text)
-                    elif hasattr(content, "data"):
-                        texts.append(f"[Binary content: {type(content).__name__}]")
-                    else:
-                        texts.append(str(content))
-
-                if result.isError:
-                    return f"[MCP Error] {' '.join(texts)}"
-
-                return "\n".join(texts) if texts else ""
-
-            except Exception as e:
-                last_error = e
-                self._failure_count += 1
-
-                # Check circuit breaker threshold
-                if self._failure_count >= self.config.circuit_breaker_threshold:
-                    self._circuit_open_until = time.time() + self.config.circuit_breaker_cooldown
-
-                if attempt < self.config.max_retries:
-                    backoff = self.config.retry_backoff * (2**attempt)
-                    await asyncio.sleep(backoff)
-                    # Try reconnecting
-                    if self.config.auto_reconnect:
-                        try:
-                            await self.disconnect()
+            last_error: Optional[Exception] = None
+            for attempt in range(self.config.max_retries + 1):
+                try:
+                    if not self._session:
+                        if self.config.auto_reconnect:
                             await self.connect()
-                        except Exception:  # nosec B110
-                            pass
+                        else:
+                            raise RuntimeError("Not connected and auto_reconnect is disabled.")
 
-        raise last_error or RuntimeError(f"MCP call to '{name}' failed after retries")
+                    result = await self._session.call_tool(name, arguments)
+                    self._failure_count = 0  # Reset on success
+
+                    # Extract text from result content
+                    texts: List[str] = []
+                    for content in result.content:
+                        if hasattr(content, "text"):
+                            texts.append(content.text)
+                        elif hasattr(content, "data"):
+                            texts.append(f"[Binary content: {type(content).__name__}]")
+                        else:
+                            texts.append(str(content))
+
+                    if result.isError:
+                        return f"[MCP Error] {' '.join(texts)}"
+
+                    return "\n".join(texts) if texts else ""
+
+                except Exception as e:
+                    last_error = e
+                    self._failure_count += 1
+
+                    # Check circuit breaker threshold
+                    if self._failure_count >= self.config.circuit_breaker_threshold:
+                        self._circuit_open_until = (
+                            time.time() + self.config.circuit_breaker_cooldown
+                        )
+
+                    if attempt < self.config.max_retries:
+                        backoff = self.config.retry_backoff * (2**attempt)
+                        await asyncio.sleep(backoff)
+                        # Try reconnecting
+                        if self.config.auto_reconnect:
+                            try:
+                                await self.disconnect()
+                                await self.connect()
+                            except Exception:  # nosec B110
+                                pass
+
+            raise last_error or RuntimeError(f"MCP call to '{name}' failed after retries")
 
     # Context manager support
 

@@ -2734,3 +2734,82 @@ def test_bug08_chroma_small_ingestion_single_call():
     docs = [Document(text=f"doc {i}", metadata={}) for i in range(10)]
     store.add_documents(docs)
     assert store.collection.upsert.call_count == 1
+
+
+# ---- BUG-09: MCP concurrent tool calls race on shared session ----
+# Source: Agno #6073. MCPClient._call_tool had no concurrency control on
+# the shared session, risking interleaved writes and racing circuit breaker
+# state updates.
+
+
+def test_bug09_mcp_client_has_tool_lock():
+    """MCPClient.__init__ must initialize a tool lock attribute."""
+    from selectools.mcp.client import MCPClient
+    from selectools.mcp.config import MCPServerConfig
+
+    cfg = MCPServerConfig(
+        name="test",
+        transport="stdio",
+        command="echo",
+        args=[],
+        max_retries=0,
+    )
+    client = MCPClient(cfg)
+    assert hasattr(client, "_tool_lock"), "MCPClient must have a _tool_lock attribute"
+
+
+@pytest.mark.asyncio
+async def test_bug09_concurrent_call_tool_serializes():
+    """Concurrent _call_tool invocations must serialize on the shared session lock.
+
+    Without a lock, two concurrent calls would interleave inside
+    self._session.call_tool, both observing call_tool.locked() == False or
+    racing on self._failure_count. We assert that during execution, only one
+    coroutine is inside the critical section at a time.
+    """
+    import asyncio as _asyncio
+    from unittest.mock import AsyncMock
+
+    from selectools.mcp.client import MCPClient
+    from selectools.mcp.config import MCPServerConfig
+
+    cfg = MCPServerConfig(
+        name="test",
+        transport="stdio",
+        command="echo",
+        args=[],
+        max_retries=0,
+        circuit_breaker_threshold=5,
+        circuit_breaker_cooldown=60.0,
+        auto_reconnect=False,
+    )
+    client = MCPClient(cfg)
+    client._connected = True
+
+    in_flight = {"count": 0, "max": 0}
+
+    async def fake_call(name: str, arguments: Dict[str, Any]) -> Any:
+        in_flight["count"] += 1
+        in_flight["max"] = max(in_flight["max"], in_flight["count"])
+        await _asyncio.sleep(0.01)
+        in_flight["count"] -= 1
+        result = MagicMock()
+        text_part = MagicMock()
+        text_part.text = "ok"
+        result.content = [text_part]
+        result.isError = False
+        return result
+
+    client._session = MagicMock()
+    client._session.call_tool = AsyncMock(side_effect=fake_call)
+
+    tasks = [client._call_tool(f"echo_{i}", {"text": f"call-{i}"}) for i in range(10)]
+    results = await _asyncio.gather(*tasks)
+
+    assert len(results) == 10
+    assert all(r == "ok" for r in results)
+    assert client._session.call_tool.call_count == 10
+    assert in_flight["max"] == 1, (
+        f"Concurrent _call_tool calls were not serialized; "
+        f"observed up to {in_flight['max']} in-flight at once"
+    )
