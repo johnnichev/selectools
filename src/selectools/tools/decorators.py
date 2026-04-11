@@ -62,6 +62,11 @@ def _unwrap_type(type_hint: Any) -> Any:
     This allows parameters annotated as ``Optional[List[str]]`` to be
     recognised as the supported ``list`` type rather than raising
     ``ToolValidationError: Unsupported parameter type: typing.List[str]``.
+
+    BUG-11: Multi-type unions like ``Union[str, int]`` previously fell
+    through to ``_validate_tool_definition`` which rejected them. We now
+    default such unions to ``str`` — runtime values are then coerced by
+    ``Tool._coerce_value`` (BUG-10) so int/float/bool inputs still work.
     """
     origin = get_origin(type_hint)
     if origin is Union:
@@ -70,6 +75,10 @@ def _unwrap_type(type_hint: Any) -> Any:
         non_none_args = [a for a in args if a is not type(None)]
         if len(non_none_args) == 1:
             return _unwrap_type(non_none_args[0])
+        if len(non_none_args) > 1:
+            # Multi-type union (e.g. Union[str, int]) — default to str.
+            # Runtime values are coerced by tools/base.py::_coerce_value.
+            return str
     # Handle Python 3.10+ X | Y syntax (types.UnionType)
     if sys.version_info >= (3, 10):
         import types  # noqa: PLC0415
@@ -79,6 +88,9 @@ def _unwrap_type(type_hint: Any) -> Any:
             non_none_args = [a for a in args if a is not type(None)]
             if len(non_none_args) == 1:
                 return _unwrap_type(non_none_args[0])
+            if len(non_none_args) > 1:
+                # Multi-type union (e.g. str | int) — default to str.
+                return str
     # Strip generic parameters from collection types: List[str] → list,
     # Dict[str, Any] → dict, list[str] → list (Python 3.9+ native syntax).
     _SUPPORTED_ORIGINS = {list, dict}

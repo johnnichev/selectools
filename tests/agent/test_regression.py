@@ -15,7 +15,7 @@ import copy
 import json
 import threading
 import time
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 from unittest.mock import MagicMock
 
 import pytest
@@ -2813,3 +2813,92 @@ async def test_bug09_concurrent_call_tool_serializes():
         f"Concurrent _call_tool calls were not serialized; "
         f"observed up to {in_flight['max']} in-flight at once"
     )
+
+
+# ---- BUG-10: Tool argument type coercion ----
+# Source: PraisonAI #410. LLMs sometimes return numeric values as strings
+# in JSON; selectools rejected instead of coercing.
+
+
+def test_bug10_int_param_coerces_from_string() -> None:
+    from selectools.tools import tool as _bug10_tool
+
+    @_bug10_tool()
+    def add(a: int, b: int) -> int:
+        """Add two integers."""
+        return a + b
+
+    # LLM returns strings — should coerce
+    assert add.execute({"a": "5", "b": "10"}) == "15"
+
+
+def test_bug10_float_param_coerces_from_string() -> None:
+    from selectools.tools import tool as _bug10_tool
+
+    @_bug10_tool()
+    def divide(a: float, b: float) -> float:
+        """Divide two floats."""
+        return a / b
+
+    assert divide.execute({"a": "10.0", "b": "4.0"}) == "2.5"
+
+
+def test_bug10_bool_param_coerces_from_string() -> None:
+    from selectools.tools import tool as _bug10_tool
+
+    @_bug10_tool()
+    def toggle(enabled: bool) -> str:
+        """Toggle a switch."""
+        return "on" if enabled else "off"
+
+    assert toggle.execute({"enabled": "true"}) == "on"
+    assert toggle.execute({"enabled": "false"}) == "off"
+    assert toggle.execute({"enabled": "1"}) == "on"
+    assert toggle.execute({"enabled": "0"}) == "off"
+
+
+def test_bug10_invalid_coercion_still_raises() -> None:
+    from selectools.exceptions import ToolValidationError
+    from selectools.tools import tool as _bug10_tool
+
+    @_bug10_tool()
+    def add_one(a: int) -> int:
+        """Add one to an integer."""
+        return a + 1
+
+    with pytest.raises(ToolValidationError):
+        add_one.execute({"a": "not a number"})
+
+
+# ---- BUG-11: Union[str, int] crashes @tool() ----
+# Source: Agno #6720. _unwrap_type only unwrapped Optional; multi-type
+# Unions fell through to validation which rejected them.
+
+
+def test_bug11_union_str_int_defaults_to_str() -> None:
+    from selectools.tools import tool as _bug11_tool
+
+    @_bug11_tool()
+    def lookup(key: Union[str, int]) -> str:
+        """Look up by key."""
+        return f"key={key}"
+
+    # Should create without crashing
+    assert lookup.name == "lookup"
+    # str values should work at runtime
+    assert lookup.execute({"key": "abc"}) == "key=abc"
+    # Numeric string also works — param_type is str, str("123") == "123"
+    assert lookup.execute({"key": "123"}) == "key=123"
+
+
+def test_bug11_union_with_none_still_works() -> None:
+    """Union[str, None] (Optional[str]) must continue to work as before."""
+    from selectools.tools import tool as _bug11_tool
+
+    @_bug11_tool()
+    def opt_param(tag: Optional[str] = None) -> str:
+        """Tag a value."""
+        return f"tag={tag}"
+
+    params = {p.name: p for p in opt_param.parameters}
+    assert params["tag"].param_type is str  # Optional unwraps to str
