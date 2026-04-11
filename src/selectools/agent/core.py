@@ -545,6 +545,8 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         final_response = Message(role=Role.ASSISTANT, content=reason)
         self._history.append(final_response)
         self._memory_add(final_response, ctx.run_id)
+        self._extract_entities(ctx.run_id)
+        self._extract_kg_triples(ctx.run_id)
         self._session_save(ctx.run_id)
         result = AgentResult(
             message=final_response,

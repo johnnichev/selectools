@@ -154,9 +154,20 @@ def _infer_parameters_from_callable(
             param_type = _unwrap_type(raw_type)
 
         # Check for optional/default values
-        is_optional = param.default != inspect.Parameter.empty
-        # Optional type hint (e.g. Optional[str]) handling could be added here
-        # For now we rely on the default value check
+        has_default = param.default != inspect.Parameter.empty
+        # BUG-22: also treat Optional[T] as optional even without a default,
+        # since the type hint signals None is a valid value. Some LLMs refuse
+        # to call a tool where a "required" parameter has no way to express None.
+        is_optional_type = False
+        raw_origin = get_origin(raw_type)
+        if raw_origin is Union and type(None) in get_args(raw_type):
+            is_optional_type = True
+        if sys.version_info >= (3, 10):
+            import types as _types  # noqa: PLC0415
+
+            if isinstance(raw_type, _types.UnionType) and type(None) in get_args(raw_type):
+                is_optional_type = True
+        is_optional = has_default or is_optional_type
 
         parameters.append(
             ToolParameter(

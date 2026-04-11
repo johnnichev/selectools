@@ -3342,3 +3342,77 @@ def test_bug19_clone_without_observers_does_not_crash():
     clone = agent._clone_for_isolation()
     assert clone.config is not None
     assert clone.config.observers == []
+
+
+# ---- BUG-16: _build_cancelled_result missing entity/KG extraction ----
+# Source: CLAUDE.md pitfall #23. Early-exit builders must persist state.
+# _build_cancelled_result saved the session but missed entity/KG extraction.
+
+
+def test_bug16_build_cancelled_result_calls_extraction():
+    """Verify _build_cancelled_result invokes entity and KG extraction.
+
+    We use source inspection rather than a live run because triggering a
+    cancelled result requires a complex multi-turn agent setup. The presence
+    of the extraction calls in the method body is the structural invariant.
+    """
+    import inspect
+
+    from selectools.agent.core import Agent
+
+    source = inspect.getsource(Agent._build_cancelled_result)
+    assert "_extract_entities" in source, (
+        "_build_cancelled_result must call _extract_entities to avoid "
+        "silently losing entity memory on cancellation"
+    )
+    assert "_extract_kg_triples" in source, (
+        "_build_cancelled_result must call _extract_kg_triples to avoid "
+        "silently losing knowledge graph state on cancellation"
+    )
+
+
+# ---- BUG-22: Optional[T] without default treated as required ----
+# Source: Agno #7066. Optional[str] without a default value was marked
+# required, breaking LLMs that expect None-able params to be optional.
+
+
+def test_bug22_optional_without_default_is_not_required():
+    from typing import Optional
+
+    from selectools.tools import tool as _bug22_tool
+
+    @_bug22_tool()
+    def search(query: str, filter: Optional[str]) -> str:
+        return f"q={query},f={filter}"
+
+    params = {p.name: p for p in search.parameters}
+    assert params["query"].required is True  # plain str, no default -> required
+    assert (
+        params["filter"].required is False
+    ), "Optional[T] without a default value should be marked required=False"
+
+
+def test_bug22_optional_with_default_still_not_required():
+    """Regression guard: Optional[T] with a default value remains optional."""
+    from typing import Optional
+
+    from selectools.tools import tool as _bug22_tool
+
+    @_bug22_tool()
+    def greet(name: Optional[str] = None) -> str:
+        return f"hello {name or 'stranger'}"
+
+    params = {p.name: p for p in greet.parameters}
+    assert params["name"].required is False
+
+
+def test_bug22_non_optional_without_default_still_required():
+    """Regression guard: plain str without a default remains required."""
+    from selectools.tools import tool as _bug22_tool
+
+    @_bug22_tool()
+    def echo(text: str) -> str:
+        return text
+
+    params = {p.name: p for p in echo.parameters}
+    assert params["text"].required is True
