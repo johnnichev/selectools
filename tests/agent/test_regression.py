@@ -3024,3 +3024,113 @@ def test_bug12_two_interrupts_both_collected():
     assert r3.state.data.get("gate1") == "approved-1"
     assert r3.state.data.get("gate2") == "approved-2"
     assert r3.state.data.get("done") is True
+
+
+# ---- BUG-14: Session namespace isolation ----
+# Source: Agno #6275. Sessions were keyed solely by session_id; two agents
+# with the same session_id would overwrite each other's ConversationMemory.
+# Adding an optional namespace parameter isolates by {namespace}:{session_id}.
+
+
+def test_bug14_jsonfile_different_namespaces_isolated():
+    """Same session_id with different namespaces must not collide."""
+    import tempfile
+
+    from selectools.memory import ConversationMemory
+    from selectools.sessions import JsonFileSessionStore
+    from selectools.types import Message, Role
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = JsonFileSessionStore(directory=tmpdir)
+
+        mem_a = ConversationMemory()
+        mem_a.add(Message(role=Role.USER, content="hello from A"))
+        store.save("shared_id", mem_a, namespace="agent_a")
+
+        mem_b = ConversationMemory()
+        mem_b.add(Message(role=Role.USER, content="hello from B"))
+        store.save("shared_id", mem_b, namespace="agent_b")
+
+        loaded_a = store.load("shared_id", namespace="agent_a")
+        loaded_b = store.load("shared_id", namespace="agent_b")
+
+        assert loaded_a is not None, "agent_a session not found"
+        assert loaded_b is not None, "agent_b session not found"
+        assert loaded_a.get_history()[0].content == "hello from A"
+        assert loaded_b.get_history()[0].content == "hello from B"
+
+
+def test_bug14_jsonfile_no_namespace_backward_compat():
+    """Sessions saved without namespace must load without namespace (back-compat)."""
+    import tempfile
+
+    from selectools.memory import ConversationMemory
+    from selectools.sessions import JsonFileSessionStore
+    from selectools.types import Message, Role
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = JsonFileSessionStore(directory=tmpdir)
+
+        mem = ConversationMemory()
+        mem.add(Message(role=Role.USER, content="unnamespaced"))
+        store.save("plain_id", mem)  # No namespace
+
+        loaded = store.load("plain_id")
+        assert loaded is not None
+        assert loaded.get_history()[0].content == "unnamespaced"
+
+
+def test_bug14_sqlite_different_namespaces_isolated():
+    """Same as BUG-14 jsonfile test but for SQLiteSessionStore."""
+    import os
+    import tempfile
+
+    from selectools.memory import ConversationMemory
+    from selectools.sessions import SQLiteSessionStore
+    from selectools.types import Message, Role
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "sessions.db")
+        store = SQLiteSessionStore(db_path=db_path)
+
+        mem_a = ConversationMemory()
+        mem_a.add(Message(role=Role.USER, content="sqlite A"))
+        store.save("shared_id", mem_a, namespace="agent_a")
+
+        mem_b = ConversationMemory()
+        mem_b.add(Message(role=Role.USER, content="sqlite B"))
+        store.save("shared_id", mem_b, namespace="agent_b")
+
+        loaded_a = store.load("shared_id", namespace="agent_a")
+        loaded_b = store.load("shared_id", namespace="agent_b")
+
+        assert loaded_a is not None
+        assert loaded_b is not None
+        assert loaded_a.get_history()[0].content == "sqlite A"
+        assert loaded_b.get_history()[0].content == "sqlite B"
+
+
+def test_bug14_delete_respects_namespace():
+    """Deleting one namespace must not affect another."""
+    import tempfile
+
+    from selectools.memory import ConversationMemory
+    from selectools.sessions import JsonFileSessionStore
+    from selectools.types import Message, Role
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = JsonFileSessionStore(directory=tmpdir)
+
+        mem_a = ConversationMemory()
+        mem_a.add(Message(role=Role.USER, content="A"))
+        store.save("shared_id", mem_a, namespace="ns_a")
+
+        mem_b = ConversationMemory()
+        mem_b.add(Message(role=Role.USER, content="B"))
+        store.save("shared_id", mem_b, namespace="ns_b")
+
+        store.delete("shared_id", namespace="ns_a")
+
+        assert store.load("shared_id", namespace="ns_a") is None
+        # ns_b must still be there
+        assert store.load("shared_id", namespace="ns_b") is not None

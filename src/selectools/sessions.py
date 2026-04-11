@@ -18,6 +18,19 @@ from .memory import ConversationMemory
 from .stability import beta, stable
 
 
+def _make_key(session_id: str, namespace: Optional[str]) -> str:
+    """Derive storage key from session_id and optional namespace.
+
+    When namespace is None/empty, returns the bare session_id for
+    backward compatibility. When namespace is set, returns
+    ``"{namespace}:{session_id}"`` so distinct agents (or agent + team)
+    sharing the same session_id do not overwrite each other.
+    """
+    if namespace:
+        return f"{namespace}:{session_id}"
+    return session_id
+
+
 @dataclass
 class SessionMetadata:
     """Lightweight summary of a stored session.
@@ -39,11 +52,27 @@ class SessionMetadata:
 class SessionStore(Protocol):
     """Protocol for persistent session backends."""
 
-    def save(self, session_id: str, memory: ConversationMemory) -> None:
-        """Persist a conversation memory snapshot."""
+    def save(
+        self,
+        session_id: str,
+        memory: ConversationMemory,
+        namespace: Optional[str] = None,
+    ) -> None:
+        """Persist a conversation memory snapshot.
+
+        Args:
+            session_id: Unique identifier for the session.
+            memory: Conversation memory snapshot to persist.
+            namespace: Optional qualifier (e.g. an agent or team name) that
+                isolates sessions that would otherwise collide under the
+                same ``session_id``. When ``None`` the bare session_id is
+                used (backward-compatible default).
+        """
         ...
 
-    def load(self, session_id: str) -> Optional[ConversationMemory]:
+    def load(
+        self, session_id: str, namespace: Optional[str] = None
+    ) -> Optional[ConversationMemory]:
         """Load a session, or return ``None`` if it does not exist."""
         ...
 
@@ -51,11 +80,11 @@ class SessionStore(Protocol):
         """Return metadata for every stored session."""
         ...
 
-    def delete(self, session_id: str) -> bool:
+    def delete(self, session_id: str, namespace: Optional[str] = None) -> bool:
         """Delete a session.  Returns ``True`` if it existed."""
         ...
 
-    def exists(self, session_id: str) -> bool:
+    def exists(self, session_id: str, namespace: Optional[str] = None) -> bool:
         """Check whether a session exists."""
         ...
 
@@ -100,12 +129,16 @@ class JsonFileSessionStore:
         self._lock = threading.Lock()
         os.makedirs(directory, exist_ok=True)
 
-    def _path(self, session_id: str) -> str:
+    def _path(self, session_id: str, namespace: Optional[str] = None) -> str:
         if not session_id:
             raise ValueError("session_id must not be empty")
-        safe_id = os.path.basename(session_id)
-        if safe_id != session_id or ".." in session_id or "\x00" in session_id:
-            raise ValueError(f"Invalid session_id: {session_id!r}")
+        key = _make_key(session_id, namespace)
+        safe_id = os.path.basename(key)
+        if safe_id != key or ".." in key or "\x00" in key or "/" in key:
+            raise ValueError(
+                f"Invalid session_id/namespace: session_id={session_id!r}, "
+                f"namespace={namespace!r}"
+            )
         return os.path.join(self._directory, f"{safe_id}.json")
 
     def _is_expired(self, data: Dict[str, Any]) -> bool:
@@ -116,8 +149,13 @@ class JsonFileSessionStore:
 
     # -- public API --------------------------------------------------------
 
-    def save(self, session_id: str, memory: ConversationMemory) -> None:
-        path = self._path(session_id)
+    def save(
+        self,
+        session_id: str,
+        memory: ConversationMemory,
+        namespace: Optional[str] = None,
+    ) -> None:
+        path = self._path(session_id, namespace)
         now = time.time()
         existing_created: Optional[float] = None
         with self._lock:
@@ -130,6 +168,7 @@ class JsonFileSessionStore:
                     pass
             payload = {
                 "session_id": session_id,
+                "namespace": namespace,
                 "created_at": existing_created if existing_created is not None else now,
                 "updated_at": now,
                 "memory": memory.to_dict(),
@@ -141,8 +180,10 @@ class JsonFileSessionStore:
                 os.fsync(f.fileno())
             os.replace(tmp_path, path)
 
-    def load(self, session_id: str) -> Optional[ConversationMemory]:
-        path = self._path(session_id)
+    def load(
+        self, session_id: str, namespace: Optional[str] = None
+    ) -> Optional[ConversationMemory]:
+        path = self._path(session_id, namespace)
         with self._lock:
             if not os.path.exists(path):
                 return None
@@ -187,16 +228,16 @@ class JsonFileSessionStore:
                 )
         return results
 
-    def delete(self, session_id: str) -> bool:
-        path = self._path(session_id)
+    def delete(self, session_id: str, namespace: Optional[str] = None) -> bool:
+        path = self._path(session_id, namespace)
         with self._lock:
             if os.path.exists(path):
                 os.remove(path)
                 return True
         return False
 
-    def exists(self, session_id: str) -> bool:
-        path = self._path(session_id)
+    def exists(self, session_id: str, namespace: Optional[str] = None) -> bool:
+        path = self._path(session_id, namespace)
         with self._lock:
             if not os.path.exists(path):
                 return False
@@ -274,15 +315,21 @@ class SQLiteSessionStore:
 
     # -- public API --------------------------------------------------------
 
-    def save(self, session_id: str, memory: ConversationMemory) -> None:
+    def save(
+        self,
+        session_id: str,
+        memory: ConversationMemory,
+        namespace: Optional[str] = None,
+    ) -> None:
         now = time.time()
         memory_json = json.dumps(memory.to_dict(), ensure_ascii=False)
         msg_count = len(memory)
+        key = _make_key(session_id, namespace)
         conn = self._conn()
         try:
             row = conn.execute(
                 "SELECT created_at FROM sessions WHERE session_id = ?",
-                (session_id,),
+                (key,),
             ).fetchone()
             created_at = row[0] if row else now
             conn.execute(
@@ -294,25 +341,28 @@ class SQLiteSessionStore:
                     message_count = excluded.message_count,
                     updated_at = excluded.updated_at
                 """,
-                (session_id, memory_json, msg_count, created_at, now),
+                (key, memory_json, msg_count, created_at, now),
             )
             conn.commit()
         finally:
             conn.close()
 
-    def load(self, session_id: str) -> Optional[ConversationMemory]:
+    def load(
+        self, session_id: str, namespace: Optional[str] = None
+    ) -> Optional[ConversationMemory]:
+        key = _make_key(session_id, namespace)
         conn = self._conn()
         try:
             row = conn.execute(
                 "SELECT memory_json, updated_at FROM sessions WHERE session_id = ?",
-                (session_id,),
+                (key,),
             ).fetchone()
         finally:
             conn.close()
         if row is None:
             return None
         if self._is_expired_ts(row[1]):
-            self.delete(session_id)
+            self.delete(session_id, namespace=namespace)
             return None
         return ConversationMemory.from_dict(json.loads(row[0]))
 
@@ -337,21 +387,23 @@ class SQLiteSessionStore:
             self.delete(sid)
         return results
 
-    def delete(self, session_id: str) -> bool:
+    def delete(self, session_id: str, namespace: Optional[str] = None) -> bool:
+        key = _make_key(session_id, namespace)
         conn = self._conn()
         try:
-            cursor = conn.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+            cursor = conn.execute("DELETE FROM sessions WHERE session_id = ?", (key,))
             conn.commit()
             return int(cursor.rowcount) > 0
         finally:
             conn.close()
 
-    def exists(self, session_id: str) -> bool:
+    def exists(self, session_id: str, namespace: Optional[str] = None) -> bool:
+        key = _make_key(session_id, namespace)
         conn = self._conn()
         try:
             row = conn.execute(
                 "SELECT updated_at FROM sessions WHERE session_id = ?",
-                (session_id,),
+                (key,),
             ).fetchone()
         finally:
             conn.close()
@@ -415,20 +467,38 @@ class RedisSessionStore:
                 f"session_id too long ({len(session_id)} chars, max 512): {session_id!r}"
             )
 
-    def _key(self, session_id: str) -> str:
-        self._validate_session_id(session_id)
-        return f"{self._prefix}{session_id}"
+    @staticmethod
+    def _validate_namespace(namespace: Optional[str]) -> None:
+        if namespace is None:
+            return
+        if not namespace:
+            raise ValueError("namespace must not be empty when provided")
+        if "\x00" in namespace:
+            raise ValueError(f"namespace must not contain null bytes: {namespace!r}")
+        if len(namespace) > 512:
+            raise ValueError(f"namespace too long ({len(namespace)} chars, max 512): {namespace!r}")
 
-    def _meta_key(self, session_id: str) -> str:
+    def _key(self, session_id: str, namespace: Optional[str] = None) -> str:
         self._validate_session_id(session_id)
-        return f"{self._prefix}__meta__{session_id}"
+        self._validate_namespace(namespace)
+        return f"{self._prefix}{_make_key(session_id, namespace)}"
+
+    def _meta_key(self, session_id: str, namespace: Optional[str] = None) -> str:
+        self._validate_session_id(session_id)
+        self._validate_namespace(namespace)
+        return f"{self._prefix}__meta__{_make_key(session_id, namespace)}"
 
     # -- public API --------------------------------------------------------
 
-    def save(self, session_id: str, memory: ConversationMemory) -> None:
+    def save(
+        self,
+        session_id: str,
+        memory: ConversationMemory,
+        namespace: Optional[str] = None,
+    ) -> None:
         now = time.time()
-        key = self._key(session_id)
-        meta_key = self._meta_key(session_id)
+        key = self._key(session_id, namespace)
+        meta_key = self._meta_key(session_id, namespace)
 
         existing_meta = self._client.get(meta_key)
         created_at = now
@@ -442,6 +512,7 @@ class RedisSessionStore:
         meta_json = json.dumps(
             {
                 "session_id": session_id,
+                "namespace": namespace,
                 "message_count": len(memory),
                 "created_at": created_at,
                 "updated_at": now,
@@ -457,8 +528,10 @@ class RedisSessionStore:
             pipe.set(meta_key, meta_json)
         pipe.execute()
 
-    def load(self, session_id: str) -> Optional[ConversationMemory]:
-        raw = self._client.get(self._key(session_id))
+    def load(
+        self, session_id: str, namespace: Optional[str] = None
+    ) -> Optional[ConversationMemory]:
+        raw = self._client.get(self._key(session_id, namespace))
         if raw is None:
             return None
         return ConversationMemory.from_dict(json.loads(raw))
@@ -496,14 +569,14 @@ class RedisSessionStore:
                 break
         return results
 
-    def delete(self, session_id: str) -> bool:
-        key = self._key(session_id)
-        meta_key = self._meta_key(session_id)
+    def delete(self, session_id: str, namespace: Optional[str] = None) -> bool:
+        key = self._key(session_id, namespace)
+        meta_key = self._meta_key(session_id, namespace)
         removed = self._client.delete(key, meta_key)
         return int(removed) > 0
 
-    def exists(self, session_id: str) -> bool:
-        return bool(self._client.exists(self._key(session_id)))
+    def exists(self, session_id: str, namespace: Optional[str] = None) -> bool:
+        return bool(self._client.exists(self._key(session_id, namespace)))
 
     def branch(self, source_id: str, new_id: str) -> None:
         """Copy session *source_id* to a new session *new_id*."""
