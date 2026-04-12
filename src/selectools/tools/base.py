@@ -94,6 +94,11 @@ class ToolParameter:
     description: str
     required: bool = True
     enum: Optional[List[str]] = None
+    # BUG-29 / Pydantic AI #4544: element type for `list[T]` / `dict[K, V]`
+    # parameters, so `to_schema()` can emit `items` / `additionalProperties`.
+    # Bare `list` / `dict` without generic args leave this as None and fall
+    # back to the original (untyped) schema for backward compatibility.
+    element_type: Optional[type] = None
 
     def to_schema(self) -> JsonSchema:
         """
@@ -109,6 +114,16 @@ class ToolParameter:
         }
         if self.enum:
             schema["enum"] = self.enum
+        # BUG-29: emit element-type info for typed collections so OpenAI strict
+        # mode accepts the schema and the LLM knows what to put in the array /
+        # dict values. Bare `list` / `dict` without generic args emit the plain
+        # type-only schema as before (backward compat).
+        if self.element_type is not None:
+            inner = {"type": _python_type_to_json(self.element_type)}
+            if self.param_type is list:
+                schema["items"] = inner
+            elif self.param_type is dict:
+                schema["additionalProperties"] = inner
         return schema
 
 

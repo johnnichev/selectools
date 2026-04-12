@@ -3876,3 +3876,97 @@ def test_bug28_azure_model_family_overrides_deployment_family_mismatch():
     # Deployment name looks like gpt-4 but it's actually a gpt-5 family deployment
     provider._model_family = "gpt-5"
     assert provider._get_token_key("gpt-4-anything") == "max_completion_tokens"
+
+
+# ---- BUG-29: Bare `list`/`dict` tool params emit schemas with no items/properties ----
+# Source: Pydantic AI PRs #4544, #4474, #4479, #4461, #3712. OpenAI strict mode
+# REJECTS `{"type": "array"}` with no `items`. Non-strict mode, the LLM has
+# no way to know what the array should contain, so it will guess or refuse.
+# Same for `dict[str, str]` → `{"type": "object"}` with no `properties` /
+# `additionalProperties`. Selectools' `_unwrap_type` strips generic args
+# entirely (list[str] → list), losing the element-type info before `to_schema`
+# can emit it.
+
+
+def test_bug29_list_str_param_schema_has_items_type():
+    """`list[str]` tool param must emit JSON schema with `items: {type: string}`."""
+    from selectools.tools import tool
+
+    @tool()
+    def f(items: list[str]) -> str:
+        """A tool with a typed list parameter."""
+        return ",".join(items)
+
+    schema = f.schema()
+    params = schema["parameters"]["properties"]
+    assert "items" in params["items"], (
+        "`list[str]` parameter must emit an inner `items` schema with "
+        "element type. Got: " + repr(params["items"])
+    )
+    assert (
+        params["items"]["items"]["type"] == "string"
+    ), f"`list[str]` element type must be `string`, got: {params['items']['items']}"
+
+
+def test_bug29_list_int_param_schema_has_items_integer():
+    """`list[int]` must emit `items: {type: integer}`."""
+    from selectools.tools import tool
+
+    @tool()
+    def f(values: list[int]) -> int:
+        """Sum a list of integers."""
+        return sum(values)
+
+    schema = f.schema()
+    params = schema["parameters"]["properties"]
+    assert params["values"]["items"]["type"] == "integer"
+
+
+def test_bug29_dict_str_str_param_schema_has_additional_properties():
+    """`dict[str, str]` must emit `additionalProperties: {type: string}`."""
+    from selectools.tools import tool
+
+    @tool()
+    def f(config: dict[str, str]) -> str:
+        """A tool with a typed dict parameter."""
+        return ",".join(f"{k}={v}" for k, v in config.items())
+
+    schema = f.schema()
+    params = schema["parameters"]["properties"]
+    assert "additionalProperties" in params["config"], (
+        "`dict[str, str]` parameter must emit `additionalProperties` describing "
+        "the value type. Got: " + repr(params["config"])
+    )
+    assert params["config"]["additionalProperties"]["type"] == "string"
+
+
+def test_bug29_bare_list_still_works_without_items():
+    """Bare `list` (no type param) must still emit a valid schema — backward compat."""
+    from selectools.tools import tool
+
+    @tool()
+    def f(stuff: list) -> str:
+        """A tool with a bare list parameter."""
+        return str(stuff)
+
+    schema = f.schema()
+    params = schema["parameters"]["properties"]
+    assert params["stuff"]["type"] == "array", "Bare list still emits type=array"
+
+
+def test_bug29_optional_list_str_still_preserves_items():
+    """`Optional[list[str]]` must still emit `items: {type: string}`."""
+    from typing import Optional
+
+    from selectools.tools import tool
+
+    @tool()
+    def f(tags: Optional[list[str]] = None) -> str:
+        """A tool with an optional typed list parameter."""
+        return ",".join(tags or [])
+
+    schema = f.schema()
+    params = schema["parameters"]["properties"]
+    assert (
+        params["tags"]["items"]["type"] == "string"
+    ), "Optional[list[str]] must preserve element type through Optional unwrap"

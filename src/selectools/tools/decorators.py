@@ -99,6 +99,47 @@ def _unwrap_type(type_hint: Any) -> Any:
     return type_hint
 
 
+def _collection_element_type(type_hint: Any) -> Optional[type]:
+    """Extract the element type from ``list[T]`` / ``dict[K, V]`` annotations.
+
+    BUG-29 / Pydantic AI #4544: ``_unwrap_type`` strips generic args (``list[str]``
+    → ``list``) so OpenAI strict mode receives ``{"type": "array"}`` with no
+    ``items``. This helper walks Optional/Union unwraps parallel to ``_unwrap_type``
+    and returns the element type for lists or the value type for dicts, so
+    ``ToolParameter`` can emit ``items`` / ``additionalProperties`` in its
+    schema. Returns ``None`` for bare ``list`` / ``dict`` (no generic args) or
+    when the element type is not one of the supported primitives.
+    """
+    # Unwrap Optional[T] / Union[T, None] just like _unwrap_type does.
+    origin = get_origin(type_hint)
+    if origin is Union:
+        args = get_args(type_hint)
+        non_none_args = [a for a in args if a is not type(None)]
+        if len(non_none_args) == 1:
+            return _collection_element_type(non_none_args[0])
+        return None
+    if sys.version_info >= (3, 10):
+        import types as _types  # noqa: PLC0415
+
+        if isinstance(type_hint, _types.UnionType):
+            args = get_args(type_hint)
+            non_none_args = [a for a in args if a is not type(None)]
+            if len(non_none_args) == 1:
+                return _collection_element_type(non_none_args[0])
+            return None
+    # Extract element type from parametrized list[T] / dict[K, V].
+    if origin is list:
+        args = get_args(type_hint)
+        if args and isinstance(args[0], type) and args[0] in (str, int, float, bool):
+            return args[0]  # type: ignore[no-any-return]
+    if origin is dict:
+        args = get_args(type_hint)
+        # dict[K, V] → element (value) type is the second generic arg
+        if len(args) >= 2 and isinstance(args[1], type) and args[1] in (str, int, float, bool):
+            return args[1]  # type: ignore[no-any-return]
+    return None
+
+
 def _infer_parameters_from_callable(
     func: Callable[..., Any],
     param_metadata: Optional[Dict[str, ParamMetadata]] = None,
@@ -146,12 +187,17 @@ def _infer_parameters_from_callable(
 
         raw_type = type_hints.get(name, str)
         lit = _literal_info(raw_type)
+        element_type: Optional[type] = None
         if lit is not None:
             param_type, literal_values = lit
             if enum_values is None:
                 enum_values = literal_values
         else:
             param_type = _unwrap_type(raw_type)
+            # BUG-29: extract element type for list[T] / dict[K, V] so the
+            # emitted JSON schema carries items/additionalProperties.
+            if param_type in (list, dict):
+                element_type = _collection_element_type(raw_type)
 
         # Check for optional/default values
         has_default = param.default != inspect.Parameter.empty
@@ -176,6 +222,7 @@ def _infer_parameters_from_callable(
                 description=description,
                 required=not is_optional,
                 enum=enum_values,
+                element_type=element_type,
             )
         )
 
