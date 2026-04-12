@@ -3970,3 +3970,74 @@ def test_bug29_optional_list_str_still_preserves_items():
     assert (
         params["tags"]["items"]["type"] == "string"
     ), "Optional[list[str]] must preserve element type through Optional unwrap"
+
+
+# ---- BUG-30: pipeline.parallel() passes same input ref to every branch ----
+# Source: Haystack PR #10549. Haystack's Pipeline.run() needed
+# `_deepcopy_with_exceptions(component_inputs)` because branches that
+# mutated their input polluted sibling branches. Selectools' `_parallel_sync`
+# and `_parallel_async` pass the SAME `input` object to every branch. If any
+# branch mutates its input (list append, dict key set, dataclass attribute),
+# the next branch (sync) or interleaved sibling (async under gather) sees the
+# mutation. Async is worst: branches interleave at await points → non-
+# deterministic state corruption.
+
+
+def test_bug30_parallel_sync_branches_do_not_share_input_mutation():
+    """Sync parallel: mutation in one branch must not affect siblings."""
+    from selectools.pipeline import parallel
+
+    def branch_a(state: dict) -> dict:
+        state["seen_by"] = "A"
+        return dict(state)
+
+    def branch_b(state: dict) -> dict:
+        return {"saw_seen_by": state.get("seen_by", "NONE"), "id": state["id"]}
+
+    group = parallel(branch_a, branch_b)
+    result = group.fn({"id": 42})
+
+    assert result["branch_a"]["seen_by"] == "A"
+    assert (
+        result["branch_b"]["saw_seen_by"] == "NONE"
+    ), f"branch_b must not see branch_a's mutation; got {result['branch_b']}"
+
+
+def test_bug30_parallel_async_branches_do_not_share_input_mutation():
+    """Async parallel: asyncio.gather + mutation must not corrupt siblings."""
+    import asyncio
+
+    from selectools.pipeline import parallel
+
+    async def branch_a(state: dict) -> dict:
+        await asyncio.sleep(0.01)
+        state["seen_by"] = "A"
+        return dict(state)
+
+    async def branch_b(state: dict) -> dict:
+        await asyncio.sleep(0.005)  # runs first inside gather
+        return {"saw_seen_by": state.get("seen_by", "NONE"), "id": state["id"]}
+
+    group = parallel(branch_a, branch_b)
+    result = asyncio.run(group.fn({"id": 42}))
+
+    assert result["branch_a"]["seen_by"] == "A"
+    assert result["branch_b"]["saw_seen_by"] == "NONE", (
+        "Async branches must receive independent input copies; " f"got {result['branch_b']}"
+    )
+
+
+def test_bug30_parallel_preserves_top_level_key_equality():
+    """Branches still see the same initial values (only isolation, not reset)."""
+    from selectools.pipeline import parallel
+
+    def read_a(state: dict) -> int:
+        return state["id"]
+
+    def read_b(state: dict) -> int:
+        return state["id"]
+
+    group = parallel(read_a, read_b)
+    result = group.fn({"id": 99})
+    assert result["read_a"] == 99
+    assert result["read_b"] == 99
