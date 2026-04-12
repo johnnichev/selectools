@@ -3829,3 +3829,50 @@ def test_bug27_fallback_still_non_retriable_for_400_401_404():
     assert not _is_retriable(Exception("400 Bad Request"))
     assert not _is_retriable(Exception("401 Unauthorized"))
     assert not _is_retriable(Exception("404 Not Found"))
+
+
+# ---- BUG-28: Azure deployment names bypass GPT-5 family detection ----
+# Source: LiteLLM #13515. Azure deployments use user-chosen names (e.g.,
+# "prod-chat", "my-reasoning"), NOT model family prefixes like "gpt-5".
+# OpenAIProvider._get_token_key(model).startswith("gpt-5") is called with the
+# deployment name, so an Azure deployment of gpt-5-mini under deployment name
+# "prod-chat" receives `max_tokens` instead of `max_completion_tokens` and hits
+# `BadRequestError: Unsupported parameter: 'max_tokens'`. This is the Azure
+# variant of round-1 pitfall #3 — OpenAIProvider was fixed but AzureOpenAIProvider
+# bypasses family detection entirely.
+
+
+def test_bug28_azure_deployment_name_honors_model_family_hint():
+    """Azure provider must use explicit model_family for token-key detection."""
+    from selectools.providers.azure_openai_provider import AzureOpenAIProvider
+
+    provider = AzureOpenAIProvider.__new__(AzureOpenAIProvider)
+    provider._model_family = "gpt-5"
+    assert provider._get_token_key("prod-chat") == "max_completion_tokens", (
+        "When model_family='gpt-5' is set, Azure deployment 'prod-chat' "
+        "must use max_completion_tokens, not max_tokens"
+    )
+
+
+def test_bug28_azure_no_model_family_falls_back_to_deployment_name():
+    """Backward compat: model_family=None uses deployment-name prefix match."""
+    from selectools.providers.azure_openai_provider import AzureOpenAIProvider
+
+    provider = AzureOpenAIProvider.__new__(AzureOpenAIProvider)
+    provider._model_family = None
+    assert (
+        provider._get_token_key("gpt-5-mini") == "max_completion_tokens"
+    ), "Deployment name matching a family prefix still works"
+    assert (
+        provider._get_token_key("gpt-4") == "max_tokens"
+    ), "Deployment name not matching any family prefix still uses max_tokens"
+
+
+def test_bug28_azure_model_family_overrides_deployment_family_mismatch():
+    """model_family must win over deployment name when both present."""
+    from selectools.providers.azure_openai_provider import AzureOpenAIProvider
+
+    provider = AzureOpenAIProvider.__new__(AzureOpenAIProvider)
+    # Deployment name looks like gpt-4 but it's actually a gpt-5 family deployment
+    provider._model_family = "gpt-5"
+    assert provider._get_token_key("gpt-4-anything") == "max_completion_tokens"
