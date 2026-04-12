@@ -821,6 +821,26 @@ class _ToolExecutorMixin:
         if self.config.verbose:
             print(f"[agent] Iteration {ctx.iteration}: tool={tool_name} params={parameters}")
 
+        # --- Malformed tool-call arguments (BUG-31 / Pydantic AI #4609) ---
+        # Providers surface parse errors on the ToolCall so the LLM learns
+        # its JSON was the problem instead of silently retrying with the
+        # same malformed call.
+        if tool_call.parse_error is not None:
+            error_message = (
+                f"Tool call for '{tool_name}' had malformed arguments: "
+                f"{tool_call.parse_error}. Retry with properly escaped JSON."
+            )
+            self._append_tool_result(error_message, tool_name, tool_call.id, run_id=ctx.run_id)
+            ctx.trace.add(
+                TraceStep(
+                    type=StepType.ERROR,
+                    tool_name=tool_name,
+                    error=error_message,
+                    summary=f"Malformed arguments for {tool_name}",
+                )
+            )
+            return False
+
         # --- Tool lookup ---
         tool = self._tools_by_name.get(tool_name)
         if not tool:
@@ -1004,6 +1024,23 @@ class _ToolExecutorMixin:
 
         if self.config.verbose:
             print(f"[agent] Iteration {ctx.iteration}: tool={tool_name} params={parameters}")
+
+        # --- Malformed tool-call arguments (BUG-31 / Pydantic AI #4609) ---
+        if tool_call.parse_error is not None:
+            error_message = (
+                f"Tool call for '{tool_name}' had malformed arguments: "
+                f"{tool_call.parse_error}. Retry with properly escaped JSON."
+            )
+            self._append_tool_result(error_message, tool_name, tool_call.id, run_id=ctx.run_id)
+            ctx.trace.add(
+                TraceStep(
+                    type=StepType.ERROR,
+                    tool_name=tool_name,
+                    error=error_message,
+                    summary=f"Malformed arguments for {tool_name}",
+                )
+            )
+            return False
 
         # --- Tool lookup ---
         tool = self._tools_by_name.get(tool_name)

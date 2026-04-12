@@ -166,22 +166,28 @@ class TestOllamaProviderTemplateMethods:
         provider = self._get_provider()
         tc = MagicMock()
         tc.function.arguments = '{"x": 42}'
-        result = provider._parse_tool_call_arguments(tc)
-        assert result == {"x": 42}
+        # BUG-31: _parse_tool_call_arguments now returns (params, parse_error).
+        params, parse_error = provider._parse_tool_call_arguments(tc)
+        assert params == {"x": 42}
+        assert parse_error is None
 
     def test_parse_tool_call_arguments_dict(self) -> None:
         provider = self._get_provider()
         tc = MagicMock()
         tc.function.arguments = {"x": 42}
-        result = provider._parse_tool_call_arguments(tc)
-        assert result == {"x": 42}
+        params, parse_error = provider._parse_tool_call_arguments(tc)
+        assert params == {"x": 42}
+        assert parse_error is None
 
     def test_parse_tool_call_arguments_invalid_json(self) -> None:
         provider = self._get_provider()
         tc = MagicMock()
         tc.function.arguments = "not json"
-        result = provider._parse_tool_call_arguments(tc)
-        assert result == {}
+        # BUG-31: malformed JSON now surfaces parse_error instead of silently
+        # returning {} with no diagnostic.
+        params, parse_error = provider._parse_tool_call_arguments(tc)
+        assert params == {}
+        assert parse_error is not None and "invalid JSON" in parse_error
 
     def test_format_tool_call_id_with_id(self) -> None:
         provider = self._get_provider()
@@ -956,7 +962,12 @@ class TestOpenAICompatMisc:
         return provider
 
     def test_parse_tool_call_arguments_default_json_decode_error(self) -> None:
-        """Default _parse_tool_call_arguments (OpenAI path) handles invalid JSON."""
+        """Default _parse_tool_call_arguments (OpenAI path) handles invalid JSON.
+
+        BUG-31: now returns (params, parse_error) — params is empty and
+        parse_error carries a preview so the tool executor can surface a
+        retry message to the LLM.
+        """
         from selectools.providers.openai_provider import OpenAIProvider
 
         provider = OpenAIProvider.__new__(OpenAIProvider)
@@ -964,8 +975,9 @@ class TestOpenAICompatMisc:
         provider.api_key = "test"
         tc = MagicMock()
         tc.function.arguments = "not json at all"
-        result = provider._parse_tool_call_arguments(tc)
-        assert result == {}
+        params, parse_error = provider._parse_tool_call_arguments(tc)
+        assert params == {}
+        assert parse_error is not None and "invalid JSON" in parse_error
 
     def test_parse_response_no_usage(self) -> None:
         """Parse response when usage is None."""

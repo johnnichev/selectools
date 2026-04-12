@@ -4140,3 +4140,102 @@ def test_bug32_five_executor_sites_use_contextvar_helper():
             f"{label} still has raw `loop.run_in_executor(` call(s) that bypass "
             f"contextvar propagation: {code_lines}"
         )
+
+
+# ---- BUG-31: Silent `return {}` on malformed tool-call JSON ----
+# Source: Pydantic AI PRs #4609, #4588, #4459, #4656, #4480, #4484.
+# Providers caught json.JSONDecodeError and returned {} → the tool then
+# failed with "Missing required parameter", so the LLM learned it forgot
+# a parameter but NOT that its JSON was malformed. Same LLM reproduces
+# the same malformed JSON next iteration. 7 sites: 5 in _openai_compat.py
+# + 2 in anthropic_provider.py.
+
+
+def test_bug31_parse_tool_args_valid_json():
+    """Valid JSON object must parse cleanly with no error."""
+    from selectools.providers._openai_compat import _parse_tool_args
+
+    params, error = _parse_tool_args('{"x": 1, "y": "foo"}')
+    assert params == {"x": 1, "y": "foo"}
+    assert error is None
+
+
+def test_bug31_parse_tool_args_empty_string_is_empty_success():
+    """Empty string → empty dict, no error — backward compat."""
+    from selectools.providers._openai_compat import _parse_tool_args
+
+    params, error = _parse_tool_args("")
+    assert params == {}
+    assert error is None
+
+
+def test_bug31_parse_tool_args_none_is_empty_success():
+    """None input → empty dict, no error."""
+    from selectools.providers._openai_compat import _parse_tool_args
+
+    params, error = _parse_tool_args(None)
+    assert params == {}
+    assert error is None
+
+
+def test_bug31_parse_tool_args_malformed_json_returns_error():
+    """Malformed JSON must populate parse_error with a helpful preview."""
+    from selectools.providers._openai_compat import _parse_tool_args
+
+    params, error = _parse_tool_args('{"x": 1')  # unterminated
+    assert params == {}
+    assert error is not None
+    assert "invalid JSON" in error
+    assert '{"x": 1' in error
+
+
+def test_bug31_parse_tool_args_non_object_returns_error():
+    """JSON value that is not an object (e.g., a list) must be rejected."""
+    from selectools.providers._openai_compat import _parse_tool_args
+
+    params, error = _parse_tool_args("[1, 2, 3]")
+    assert params == {}
+    assert error is not None
+    assert "must be a JSON object" in error
+
+
+def test_bug31_tool_call_has_parse_error_field():
+    """ToolCall dataclass must expose parse_error as an optional field."""
+    from selectools.types import ToolCall
+
+    tc = ToolCall(tool_name="foo", parameters={})
+    assert tc.parse_error is None
+
+    tc_err = ToolCall(tool_name="foo", parameters={}, parse_error="bad json")
+    assert tc_err.parse_error == "bad json"
+
+
+def test_bug31_tool_executor_surfaces_parse_error_as_retry_message():
+    """Sync tool executor must emit a clear error when tool_call.parse_error is set."""
+    import inspect
+
+    from selectools.agent import _tool_executor
+
+    source = inspect.getsource(_tool_executor._ToolExecutorMixin._execute_single_tool)
+    assert "parse_error" in source, "_execute_single_tool must check tool_call.parse_error (BUG-31)"
+    assert "malformed arguments" in source
+
+    async_source = inspect.getsource(_tool_executor._ToolExecutorMixin._aexecute_single_tool)
+    assert (
+        "parse_error" in async_source
+    ), "_aexecute_single_tool must check tool_call.parse_error (BUG-31)"
+
+
+def test_bug31_providers_no_silent_empty_dict_on_decode_error():
+    """Providers must not use the raw `except json.JSONDecodeError: return {}` or `params = {}` pattern for tool-call args."""
+    import inspect
+
+    from selectools.providers import _openai_compat, anthropic_provider
+
+    for mod in (_openai_compat, anthropic_provider):
+        source = inspect.getsource(mod)
+        # The old silent-drop pattern must be gone from these modules
+        assert (
+            "except json.JSONDecodeError:\n                                params = {}"
+            not in source
+        ), f"{mod.__name__} still has the silent `params = {{}}` on JSONDecodeError pattern"

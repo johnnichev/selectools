@@ -299,14 +299,14 @@ class AnthropicProvider(Provider):
 
                 elif event_type == "content_block_stop":
                     if current_tool_name:
-                        try:
-                            params = json.loads(current_tool_json) if current_tool_json else {}
-                        except json.JSONDecodeError:
-                            params = {}
+                        from ._openai_compat import _parse_tool_args
+
+                        params, parse_error = _parse_tool_args(current_tool_json)
                         yield ToolCall(
                             tool_name=current_tool_name,
                             parameters=params,
                             id=current_tool_id or "",
+                            parse_error=parse_error,
                         )
                         current_tool_id = None
                         current_tool_name = ""
@@ -634,14 +634,14 @@ class AnthropicProvider(Provider):
 
                 elif event_type == "content_block_stop":
                     if current_tool_name:
-                        try:
-                            params = json.loads(current_tool_json) if current_tool_json else {}
-                        except json.JSONDecodeError:
-                            params = {}
+                        from ._openai_compat import _parse_tool_args
+
+                        params, parse_error = _parse_tool_args(current_tool_json)
                         yield ToolCall(
                             tool_name=current_tool_name,
                             parameters=params,
                             id=current_tool_id or "",
+                            parse_error=parse_error,
                         )
                         current_tool_id = None
                         current_tool_name = ""

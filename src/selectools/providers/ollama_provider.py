@@ -106,15 +106,27 @@ class OllamaProvider(_OpenAICompatibleBase):
     def _parse_tool_call_id(self, tc: Any) -> str:
         return tc.id if tc.id else f"call_{uuid.uuid4().hex}"
 
-    def _parse_tool_call_arguments(self, tc: Any) -> dict:
-        """Ollama may return arguments as a dict or a JSON string."""
+    def _parse_tool_call_arguments(self, tc: Any) -> Any:
+        """Ollama may return arguments as a dict or a JSON string.
+
+        Returns ``(params, parse_error)`` per BUG-31 / Pydantic AI #4609.
+        When arguments are already a dict, parse_error is None. When they
+        are a JSON string, falls back to the shared helper so malformed
+        JSON is surfaced with a clear message instead of silently dropped.
+        """
+        from ._openai_compat import _parse_tool_args
+
         try:
             if isinstance(tc.function.arguments, str):
-                return json.loads(tc.function.arguments)  # type: ignore[no-any-return]
-            else:
-                return tc.function.arguments  # type: ignore[no-any-return]
-        except (json.JSONDecodeError, TypeError):
-            return {}
+                return _parse_tool_args(tc.function.arguments)
+            if isinstance(tc.function.arguments, dict):
+                return tc.function.arguments, None
+        except TypeError:
+            pass
+        return (
+            {},
+            f"unsupported tool_calls.function.arguments type: {type(tc.function.arguments).__name__}",
+        )
 
     # -- tool-call ID helpers (Ollama may not provide IDs) --------------------
 
