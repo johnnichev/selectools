@@ -38,6 +38,8 @@ class AzureOpenAIProvider(OpenAIProvider):
     """
 
     name = "azure-openai"
+    # Class-level default so tests that bypass __init__ via __new__ still work.
+    _model_family: str | None = None
 
     def __init__(
         self,

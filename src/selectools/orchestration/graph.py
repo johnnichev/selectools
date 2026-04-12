@@ -36,7 +36,7 @@ from typing import (
     Union,
 )
 
-from .._async_utils import run_sync
+from .._async_utils import run_in_executor_copyctx, run_sync
 from ..exceptions import GraphExecutionError
 from ..stability import beta
 from ..trace import AgentTrace, StepType, TraceStep
@@ -1233,9 +1233,13 @@ class AgentGraph:
             return await self._aexecute_generator_node(node, state, trace, run_id)
 
         elif inspect.isgeneratorfunction(agent_or_fn):
+            # BUG-32: propagate caller contextvars into the worker thread
+            # that runs the sync generator node.
             loop = asyncio.get_running_loop()
-            return await loop.run_in_executor(
-                None, self._execute_generator_node_sync, node, state, trace, run_id
+            return await run_in_executor_copyctx(
+                loop,
+                None,
+                lambda: self._execute_generator_node_sync(node, state, trace, run_id),
             )
 
         elif asyncio.iscoroutinefunction(agent_or_fn):
@@ -1247,8 +1251,9 @@ class AgentGraph:
 
         else:
             # Plain sync callable
+            # BUG-32: propagate caller contextvars into the worker thread.
             loop = asyncio.get_running_loop()
-            new_state = await loop.run_in_executor(None, agent_or_fn, state)
+            new_state = await run_in_executor_copyctx(loop, None, lambda: agent_or_fn(state))
             if new_state is None:
                 new_state = state
             result = _make_synthetic_result(new_state)

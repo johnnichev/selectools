@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, AsyncGenerator, Callable, Dict, List, Optional, Union, cast
 
+from .._async_utils import run_in_executor_copyctx
 from ..analytics import AgentAnalytics
 from ..parser import ToolCallParser
 from ..prompt import PromptBuilder
@@ -1282,8 +1283,10 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                             timeout=self.config.request_timeout,
                         )
                     else:
+                        # BUG-32: propagate caller contextvars into the worker.
                         loop = asyncio.get_running_loop()
-                        response_msg, _usage = await loop.run_in_executor(
+                        response_msg, _usage = await run_in_executor_copyctx(
+                            loop,
                             None,
                             lambda: self.provider.complete(
                                 model=self._effective_model,

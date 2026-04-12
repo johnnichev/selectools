@@ -51,6 +51,7 @@ def _get_parallel_dispatch_executor() -> ThreadPoolExecutor:
     return _parallel_dispatch_executor
 
 
+from .._async_utils import run_in_executor_copyctx
 from ..coherence import CoherenceResult, acheck_coherence, check_coherence
 from ..policy import PolicyDecision, PolicyResult, ToolPolicy
 from ..security import screen_output as screen_tool_output
@@ -316,14 +317,15 @@ class _ToolExecutorMixin:
                         timeout=self.config.approval_timeout,
                     )
                 else:
+                    # BUG-32: propagate caller contextvars (OTel / Langfuse)
+                    # into the confirm_action worker thread.
                     loop = asyncio.get_running_loop()
+                    confirm_fn = self.config.confirm_action
                     approved = await asyncio.wait_for(
-                        loop.run_in_executor(
+                        run_in_executor_copyctx(
+                            loop,
                             None,
-                            self.config.confirm_action,
-                            tool_name,
-                            tool_args,
-                            result.reason,
+                            lambda: confirm_fn(tool_name, tool_args, result.reason),
                         ),
                         timeout=self.config.approval_timeout,
                     )

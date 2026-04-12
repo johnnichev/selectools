@@ -13,9 +13,10 @@ singleton (never create a new ``ThreadPoolExecutor`` per call — pitfall #20).
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from typing import Awaitable, Optional, TypeVar
+from typing import Any, Awaitable, Callable, Optional, TypeVar
 
 T = TypeVar("T")
 
@@ -60,3 +61,37 @@ def run_sync(coro: Awaitable[T]) -> T:
     executor = _get_run_sync_executor()
     future = executor.submit(_runner)
     return future.result()
+
+
+async def run_in_executor_copyctx(
+    loop: asyncio.AbstractEventLoop,
+    executor: Optional[Any],
+    fn: Callable[[], T],
+) -> T:
+    """Run ``fn()`` on ``executor`` with the caller's contextvars propagated.
+
+    BUG-32 / Haystack PR #9717 + CrewAI #4824/#4826: calling
+    ``loop.run_in_executor(executor, fn, *args)`` does NOT inherit the
+    caller's :class:`contextvars.Context`. OTel active spans, Langfuse parent
+    span, cancellation tokens, and any user-set ``ContextVar`` drop inside
+    the executor-scheduled callable. Users see orphaned spans on every
+    sync-fallback provider call and every sync graph node.
+
+    This helper captures :func:`contextvars.copy_context` before dispatch
+    and runs ``fn`` inside it via :meth:`Context.run`, so every ``ContextVar``
+    visible to the caller is also visible to ``fn``.
+
+    Callers bind positional and keyword arguments via a closure or
+    :func:`functools.partial` before calling this helper — it takes a
+    zero-argument callable to avoid the ``*args`` double-wrapping of every
+    call site.
+
+    Example::
+
+        loop = asyncio.get_running_loop()
+        result = await run_in_executor_copyctx(
+            loop, None, lambda: provider.complete(model=..., messages=...)
+        )
+    """
+    ctx = contextvars.copy_context()
+    return await loop.run_in_executor(executor, lambda: ctx.run(fn))

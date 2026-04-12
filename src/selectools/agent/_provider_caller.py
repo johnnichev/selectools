@@ -27,6 +27,7 @@ def _get_async_provider_executor() -> ThreadPoolExecutor:
     return _async_provider_executor
 
 
+from .._async_utils import run_in_executor_copyctx
 from ..cache import CacheKeyBuilder
 from ..providers.base import ProviderError
 from ..trace import StepType, TraceStep
@@ -382,8 +383,11 @@ class _ProviderCallerMixin:
                 else:
                     # Fallback to sync in executor — reuse the module-level singleton
                     # to avoid spawning a new thread pool on every retry attempt.
+                    # BUG-32: propagate caller contextvars (OTel / Langfuse /
+                    # cancellation state) into the worker thread.
                     loop = asyncio.get_running_loop()
-                    response_msg, usage_stats = await loop.run_in_executor(
+                    response_msg, usage_stats = await run_in_executor_copyctx(
+                        loop,
                         _get_async_provider_executor(),
                         lambda: self.provider.complete(
                             model=self._effective_model,

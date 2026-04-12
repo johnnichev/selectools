@@ -4041,3 +4041,102 @@ def test_bug30_parallel_preserves_top_level_key_equality():
     result = group.fn({"id": 99})
     assert result["read_a"] == 99
     assert result["read_b"] == 99
+
+
+# ---- BUG-32: run_in_executor drops contextvars at 5 grep-verified sites ----
+# Source: Haystack PR #9717, cross-round confirmation of CrewAI #4824/#4826
+# (parked round-2 candidate).
+# `loop.run_in_executor(None, fn, *args)` does NOT inherit the caller's
+# contextvars.Context. OTel active spans, Langfuse parent span, any
+# ContextVar set by _wire_fallback_observer, cancellation tokens in
+# ContextVars all drop inside the executor-scheduled callable. Users see
+# orphaned spans on every sync-fallback provider call and every sync graph
+# node. Five grep-verified sites in selectools:
+#   - agent/_provider_caller.py:386 (sync-fallback provider)
+#   - agent/core.py:1286 (alternate sync-fallback path)
+#   - orchestration/graph.py:1237 (sync generator node)
+#   - orchestration/graph.py:1251 (plain sync callable node)
+#   - agent/_tool_executor.py:321 (sync confirm_action)
+# Fix: shared helper `run_in_executor_copyctx(loop, executor, fn)` in
+# _async_utils.py wraps each dispatch with contextvars.copy_context().run.
+
+
+@pytest.mark.asyncio
+async def test_bug32_run_in_executor_copyctx_propagates_contextvar():
+    """The helper must propagate a ContextVar set in the caller coroutine."""
+    import asyncio
+    import contextvars
+
+    from selectools._async_utils import run_in_executor_copyctx
+
+    cv: contextvars.ContextVar[str] = contextvars.ContextVar("bug32_cv", default="default")
+    cv.set("caller_value")
+
+    def _read_cv() -> str:
+        return cv.get()
+
+    loop = asyncio.get_running_loop()
+    seen = await run_in_executor_copyctx(loop, None, _read_cv)
+    assert seen == "caller_value", (
+        f"ContextVar set in caller must propagate through run_in_executor; " f"got {seen!r}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_bug32_run_in_executor_copyctx_respects_executor_arg():
+    """The helper must forward its executor argument, not swallow it."""
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+
+    from selectools._async_utils import run_in_executor_copyctx
+
+    thread_names = []
+
+    def _who_am_i() -> None:
+        import threading
+
+        thread_names.append(threading.current_thread().name)
+
+    pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="bug32-test-pool")
+    try:
+        loop = asyncio.get_running_loop()
+        await run_in_executor_copyctx(loop, pool, _who_am_i)
+    finally:
+        pool.shutdown(wait=True)
+
+    assert thread_names and thread_names[0].startswith("bug32-test-pool"), (
+        f"run_in_executor_copyctx must use the provided executor; "
+        f"thread names seen: {thread_names}"
+    )
+
+
+def test_bug32_five_executor_sites_use_contextvar_helper():
+    """All 5 grep-verified sites must import and use the copyctx helper."""
+    import inspect
+
+    from selectools.agent import _provider_caller, _tool_executor, core
+    from selectools.orchestration import graph
+
+    for mod, label in [
+        (_provider_caller, "agent/_provider_caller.py"),
+        (core, "agent/core.py"),
+        (graph, "orchestration/graph.py"),
+        (_tool_executor, "agent/_tool_executor.py"),
+    ]:
+        source = inspect.getsource(mod)
+        assert (
+            "run_in_executor_copyctx" in source
+        ), f"{label} must import run_in_executor_copyctx for BUG-32 contextvar propagation"
+        # The raw `loop.run_in_executor(` pattern should have been replaced
+        # (allow it to appear only inside comments / docstrings, not code)
+        code_lines = [
+            ln
+            for ln in source.split("\n")
+            if "loop.run_in_executor(" in ln
+            and not ln.strip().startswith("#")
+            and "run_in_executor_copyctx" not in ln
+        ]
+        assert not code_lines, (
+            f"{label} still has raw `loop.run_in_executor(` call(s) that bypass "
+            f"contextvar propagation: {code_lines}"
+        )
