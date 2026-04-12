@@ -3767,3 +3767,65 @@ def test_bug25_memory_filter_simple_equality_still_works():
     results = store.search(query_vec, top_k=5, filter={"user_id": 1})
     matched = [r for r in results if r.document.metadata.get("user_id") == 1]
     assert len(matched) == 1, f"Simple equality filter must still work; got {len(matched)}"
+
+
+# ---- BUG-27: FallbackProvider retriable-error list missing 504/408/529/522/524 ----
+# Source: LiteLLM #25530. Selectools' _RETRIABLE_STATUS_CODES regex
+# `r"\b(429|500|502|503)\b"` misses 504 (Gateway Timeout), 408 (Request Timeout),
+# 529 (Anthropic Overloaded — very common on US-West), and 522/524 (Cloudflare).
+# Substring list also misses "overloaded_error"/"Overloaded"/"rate_limit_exceeded"
+# (underscore form used by OpenAI/Mistral/Anthropic errors).
+# Production Anthropic traffic regularly returns 529 which selectools currently
+# treats as non-retriable and raises to the user instead of falling over.
+
+
+def test_bug27_fallback_retriable_anthropic_529_overloaded():
+    """Anthropic 529 Overloaded must be treated as retriable."""
+    from selectools.providers.fallback import _is_retriable
+
+    assert _is_retriable(
+        Exception("Anthropic API Error: 529 Overloaded")
+    ), "Anthropic 529 Overloaded must be retriable"
+    assert _is_retriable(
+        Exception("anthropic: overloaded_error: server is temporarily overloaded")
+    ), "`overloaded_error` string must be retriable"
+
+
+def test_bug27_fallback_retriable_gateway_timeout_504():
+    """504 Gateway Timeout must be retriable."""
+    from selectools.providers.fallback import _is_retriable
+
+    assert _is_retriable(Exception("504 Gateway Timeout")), "504 must be retriable"
+
+
+def test_bug27_fallback_retriable_request_timeout_408():
+    """408 Request Timeout must be retriable."""
+    from selectools.providers.fallback import _is_retriable
+
+    assert _is_retriable(Exception("HTTP 408 Request Timeout")), "408 must be retriable"
+
+
+def test_bug27_fallback_retriable_rate_limit_underscore_form():
+    """OpenAI/Mistral `rate_limit_exceeded` (underscore) must be retriable."""
+    from selectools.providers.fallback import _is_retriable
+
+    assert _is_retriable(
+        Exception("openai: rate_limit_exceeded: quota reached")
+    ), "`rate_limit_exceeded` (underscore form) must be retriable"
+
+
+def test_bug27_fallback_retriable_cloudflare_522_524():
+    """Cloudflare 522/524 transient errors must be retriable."""
+    from selectools.providers.fallback import _is_retriable
+
+    assert _is_retriable(Exception("Cloudflare 522 connection timed out")), "522 must be retriable"
+    assert _is_retriable(Exception("Cloudflare 524 origin timeout")), "524 must be retriable"
+
+
+def test_bug27_fallback_still_non_retriable_for_400_401_404():
+    """Non-retriable status codes must still be non-retriable — backward compat."""
+    from selectools.providers.fallback import _is_retriable
+
+    assert not _is_retriable(Exception("400 Bad Request"))
+    assert not _is_retriable(Exception("401 Unauthorized"))
+    assert not _is_retriable(Exception("404 Not Found"))

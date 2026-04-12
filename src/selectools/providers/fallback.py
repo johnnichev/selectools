@@ -33,10 +33,21 @@ if TYPE_CHECKING:
     from ..usage import UsageStats
 
 
-_RETRIABLE_SUBSTRINGS = ("timeout", "rate limit", "connection")
+_RETRIABLE_SUBSTRINGS = (
+    "timeout",
+    "rate limit",
+    "rate_limit",  # BUG-27: OpenAI/Mistral use `rate_limit_exceeded` (underscore)
+    "connection",
+    "overloaded",  # BUG-27: Anthropic `overloaded_error` / `Overloaded` (529 body)
+    "service unavailable",
+    "service_unavailable",
+)
 # HTTP status codes matched as whole words to avoid false positives on numbers
 # like "15003" or "expected 5000 tokens" matching "500".
-_RETRIABLE_STATUS_CODES = re.compile(r"\b(429|500|502|503)\b")
+# BUG-27 / LiteLLM #25530: added 408 (Request Timeout), 504 (Gateway Timeout),
+# 522/524 (Cloudflare origin timeouts), 529 (Anthropic Overloaded — very common
+# on US-West traffic). Previously treated as non-retriable and raised to user.
+_RETRIABLE_STATUS_CODES = re.compile(r"\b(408|429|500|502|503|504|522|524|529)\b")
 
 
 def _is_retriable(exc: Exception) -> bool:
