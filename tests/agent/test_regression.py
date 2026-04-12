@@ -4239,3 +4239,60 @@ def test_bug31_providers_no_silent_empty_dict_on_decode_error():
             "except json.JSONDecodeError:\n                                params = {}"
             not in source
         ), f"{mod.__name__} still has the silent `params = {{}}` on JSONDecodeError pattern"
+
+
+# ---- BUG-33: astream() does not aclose() provider generators ----
+# Source: Pydantic AI PRs #4476, #4205. `async for item in gen:` without
+# wrapping in `contextlib.aclosing(gen)` leaks the async generator when the
+# loop body raises. `gen.__aexit__` runs under GC instead of deterministically,
+# producing `RuntimeError: async generator raised StopAsyncIteration` on
+# client disconnect and orphaned HTTP connections. Two sites in selectools:
+#   - agent/core.py:1316 (arun streaming path)
+#   - agent/_provider_caller.py:505 (_astreaming_call helper)
+
+
+def test_bug33_astream_sites_use_aclosing_context_manager():
+    """Both provider.astream() call sites must use contextlib.aclosing."""
+    import inspect
+
+    from selectools.agent import _provider_caller, core
+
+    for mod, label in [
+        (core, "agent/core.py"),
+        (_provider_caller, "agent/_provider_caller.py"),
+    ]:
+        source = inspect.getsource(mod)
+        assert "aclosing" in source, (
+            f"{label} must import/use contextlib.aclosing to deterministically "
+            f"close provider.astream() generators (BUG-33)"
+        )
+
+
+@pytest.mark.asyncio
+async def test_bug33_astream_closes_provider_gen_on_inner_exception():
+    """If the caller's loop body raises, the provider gen must be closed."""
+    from selectools._async_utils import aclosing
+
+    close_count = {"n": 0}
+
+    async def fake_gen():
+        try:
+            yield "chunk1"
+            yield "chunk2"  # never reached if consumer stops
+        finally:
+            close_count["n"] += 1
+
+    gen = fake_gen()
+    try:
+        async with aclosing(gen):
+            async for item in gen:
+                if item == "chunk1":
+                    raise RuntimeError("simulated guardrail failure")
+    except RuntimeError:
+        pass
+
+    assert close_count["n"] == 1, (
+        "aclosing must run the async generator's finally block "
+        "deterministically on inner exception; got close_count="
+        f"{close_count['n']}"
+    )

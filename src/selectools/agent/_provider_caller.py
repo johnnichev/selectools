@@ -27,7 +27,7 @@ def _get_async_provider_executor() -> ThreadPoolExecutor:
     return _async_provider_executor
 
 
-from .._async_utils import run_in_executor_copyctx
+from .._async_utils import aclosing, run_in_executor_copyctx
 from ..cache import CacheKeyBuilder
 from ..providers.base import ProviderError
 from ..trace import StepType, TraceStep
@@ -502,23 +502,27 @@ class _ProviderCallerMixin:
         tool_calls: List[ToolCall] = []
 
         if hasattr(self.provider, "astream") and getattr(self.provider, "supports_async", False):
-            stream = self.provider.astream(  # type: ignore[attr-defined]
-                model=self._effective_model,
-                system_prompt=self._system_prompt,
-                messages=self._history,
-                tools=self.tools,
-                temperature=self.config.temperature,
-                max_tokens=self.config.max_tokens,
-                timeout=self.config.request_timeout,
-            )
-            async for chunk in stream:
-                if isinstance(chunk, str):
-                    if chunk:
-                        aggregated.append(chunk)
-                        if stream_handler:
-                            stream_handler(chunk)
-                elif isinstance(chunk, ToolCall):
-                    tool_calls.append(chunk)
+            # BUG-33: wrap in aclosing so stream_handler exceptions or caller
+            # disconnect deterministically close the provider generator.
+            async with aclosing(
+                self.provider.astream(  # type: ignore[attr-defined]
+                    model=self._effective_model,
+                    system_prompt=self._system_prompt,
+                    messages=self._history,
+                    tools=self.tools,
+                    temperature=self.config.temperature,
+                    max_tokens=self.config.max_tokens,
+                    timeout=self.config.request_timeout,
+                )
+            ) as stream:
+                async for chunk in stream:
+                    if isinstance(chunk, str):
+                        if chunk:
+                            aggregated.append(chunk)
+                            if stream_handler:
+                                stream_handler(chunk)
+                    elif isinstance(chunk, ToolCall):
+                        tool_calls.append(chunk)
         else:
             for chunk in self.provider.stream(
                 model=self._effective_model,

@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, AsyncGenerator, Callable, Dict, List, Optional, Union, cast
 
-from .._async_utils import run_in_executor_copyctx
+from .._async_utils import aclosing, run_in_executor_copyctx
 from ..analytics import AgentAnalytics
 from ..parser import ToolCallParser
 from ..prompt import PromptBuilder
@@ -1313,23 +1313,30 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     if response_msg.tool_calls:
                         current_tool_calls = response_msg.tool_calls
                 else:
-                    gen = self.provider.astream(
-                        model=self._effective_model,
-                        system_prompt=self._system_prompt,
-                        messages=self._history,
-                        tools=self.tools,
-                        temperature=self.config.temperature,
-                        max_tokens=self.config.max_tokens,
-                        timeout=self.config.request_timeout,
-                    )
-
-                    async for item in gen:
-                        if isinstance(item, str):
-                            yield StreamChunk(content=item)
-                            full_content += item
-                        elif isinstance(item, ToolCall):
-                            current_tool_calls.append(item)
-                            yield StreamChunk(tool_calls=[item])
+                    # BUG-33: wrap provider.astream() generator in aclosing so
+                    # that a guardrail raise, validation failure, or caller
+                    # disconnect deterministically runs the generator's
+                    # finally block and releases HTTP connections — instead
+                    # of waiting for GC and emitting `async generator raised
+                    # StopAsyncIteration` warnings.
+                    async with aclosing(
+                        self.provider.astream(
+                            model=self._effective_model,
+                            system_prompt=self._system_prompt,
+                            messages=self._history,
+                            tools=self.tools,
+                            temperature=self.config.temperature,
+                            max_tokens=self.config.max_tokens,
+                            timeout=self.config.request_timeout,
+                        )
+                    ) as gen:
+                        async for item in gen:
+                            if isinstance(item, str):
+                                yield StreamChunk(content=item)
+                                full_content += item
+                            elif isinstance(item, ToolCall):
+                                current_tool_calls.append(item)
+                                yield StreamChunk(tool_calls=[item])
 
                     self._notify_observers("on_llm_end", ctx.run_id, full_content, None)
                     await self._anotify_observers("on_llm_end", ctx.run_id, full_content, None)
