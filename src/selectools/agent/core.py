@@ -52,6 +52,11 @@ class _RunContext:
     response_format: Optional[ResponseFormat]
     user_text_for_coherence: str = ""
     iteration: int = 0
+    # BUG-34 / Pydantic AI #4956: structured-validation retries need their
+    # own budget, decoupled from the tool-iteration budget. Previously, a
+    # max_iterations=3 agent with 3 validation failures would terminate
+    # before reaching the RetryConfig.max_retries ceiling.
+    structured_retries: int = 0
     all_tool_calls: List[ToolCall] = field(default_factory=list)
     last_tool_name: Optional[str] = None
     last_tool_args: Dict[str, Any] = field(default_factory=dict)
@@ -962,7 +967,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 messages, response_format=response_format, parent_run_id=parent_run_id
             )
 
-            while ctx.iteration < self.config.max_iterations:
+            # BUG-34: structured-validation retries extend the iteration
+            # budget so max_iterations caps tool-execution iterations, not
+            # structured-validation retries. Without this, an agent with
+            # max_iterations=3 and 3 validation failures would terminate
+            # before reaching RetryConfig.max_retries.
+            while ctx.iteration < self.config.max_iterations + ctx.structured_retries:
                 ctx.iteration += 1
 
                 # Cancellation check (R2)
@@ -1016,7 +1026,14 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                                 ctx.iteration,
                                 str(exc),
                             )
-                            if ctx.iteration < self.config.max_iterations:
+                            # BUG-34: use a separate structured_retries counter
+                            # instead of the shared max_iterations budget. An
+                            # agent with a tight tool-iteration budget should
+                            # still allow the full RetryConfig.max_retries
+                            # worth of structured-validation retries.
+                            retry_budget = self.config.retry.max_retries
+                            if ctx.structured_retries < retry_budget:
+                                ctx.structured_retries += 1
                                 ctx.trace.add(
                                     TraceStep(
                                         type=StepType.STRUCTURED_RETRY,
@@ -1194,7 +1211,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
 
             await self._anotify_observers("on_run_start", ctx.run_id, messages, self._system_prompt)
 
-            while ctx.iteration < self.config.max_iterations:
+            # BUG-34: structured-validation retries extend the iteration
+            # budget so max_iterations caps tool-execution iterations, not
+            # structured-validation retries. Without this, an agent with
+            # max_iterations=3 and 3 validation failures would terminate
+            # before reaching RetryConfig.max_retries.
+            while ctx.iteration < self.config.max_iterations + ctx.structured_retries:
                 ctx.iteration += 1
 
                 # Cancellation check (R2)
@@ -1380,7 +1402,14 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                                 ctx.iteration,
                                 str(exc),
                             )
-                            if ctx.iteration < self.config.max_iterations:
+                            # BUG-34: use a separate structured_retries counter
+                            # instead of the shared max_iterations budget. An
+                            # agent with a tight tool-iteration budget should
+                            # still allow the full RetryConfig.max_retries
+                            # worth of structured-validation retries.
+                            retry_budget = self.config.retry.max_retries
+                            if ctx.structured_retries < retry_budget:
+                                ctx.structured_retries += 1
                                 ctx.trace.add(
                                     TraceStep(
                                         type=StepType.STRUCTURED_RETRY,
@@ -1579,7 +1608,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
 
             await self._anotify_observers("on_run_start", ctx.run_id, messages, self._system_prompt)
 
-            while ctx.iteration < self.config.max_iterations:
+            # BUG-34: structured-validation retries extend the iteration
+            # budget so max_iterations caps tool-execution iterations, not
+            # structured-validation retries. Without this, an agent with
+            # max_iterations=3 and 3 validation failures would terminate
+            # before reaching RetryConfig.max_retries.
+            while ctx.iteration < self.config.max_iterations + ctx.structured_retries:
                 ctx.iteration += 1
 
                 # Cancellation check (R2)
@@ -1653,7 +1687,14 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                                 ctx.iteration,
                                 str(exc),
                             )
-                            if ctx.iteration < self.config.max_iterations:
+                            # BUG-34: use a separate structured_retries counter
+                            # instead of the shared max_iterations budget. An
+                            # agent with a tight tool-iteration budget should
+                            # still allow the full RetryConfig.max_retries
+                            # worth of structured-validation retries.
+                            retry_budget = self.config.retry.max_retries
+                            if ctx.structured_retries < retry_budget:
+                                ctx.structured_retries += 1
                                 ctx.trace.add(
                                     TraceStep(
                                         type=StepType.STRUCTURED_RETRY,

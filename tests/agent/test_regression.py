@@ -4296,3 +4296,106 @@ async def test_bug33_astream_closes_provider_gen_on_inner_exception():
         "deterministically on inner exception; got close_count="
         f"{close_count['n']}"
     )
+
+
+# ---- BUG-34: max_iterations consumed by structured-retry budget ----
+# Source: Pydantic AI PRs #4956, #4940, #4692. Selectools shared ONE global
+# `max_iterations` counter between tool-execution iterations AND structured-
+# validation retries. An agent with `max_iterations=3` and an LLM that
+# fails structured validation 3 times in a row would terminate before
+# reaching the `max_retries=5` ceiling from RetryConfig. Structured
+# retries must have their own budget, checked against RetryConfig.max_retries,
+# not against max_iterations.
+
+
+def test_bug34_run_context_has_structured_retries_counter():
+    """_RunContext must carry a separate structured_retries counter."""
+    from selectools.agent.core import _RunContext
+
+    fields = {f.name for f in _RunContext.__dataclass_fields__.values()}
+    assert (
+        "structured_retries" in fields
+    ), "_RunContext must have a structured_retries field (BUG-34)"
+
+
+def test_bug34_structured_retry_budget_checked_against_retry_max_retries():
+    """Source must check ctx.structured_retries against retry.max_retries."""
+    import inspect
+
+    from selectools.agent import core
+
+    source = inspect.getsource(core)
+    # Every structured_retry branch (there are 3 — run, arun, astream) must
+    # reference the new counter, not just ctx.iteration.
+    assert (
+        source.count("ctx.structured_retries") >= 3
+    ), "All 3 structured-retry branches (run/arun/astream) must use ctx.structured_retries (BUG-34)"
+
+
+def test_bug34_structured_retry_honors_retry_budget_beyond_max_iterations():
+    """Agent with max_iterations=3 must allow structured_retries up to retry.max_retries."""
+    from selectools.agent.config_groups import RetryConfig
+    from selectools.agent.core import Agent, AgentConfig
+    from selectools.providers.base import Provider
+    from selectools.types import Message, Role
+    from selectools.usage import UsageStats
+
+    @tool()
+    def _bug34_noop() -> str:
+        return "ok"
+
+    # Invalid JSON on attempts 1-4, then valid on attempt 5
+    responses = [
+        "not json",
+        "still not json",
+        '{"partial": ',
+        "garbage",
+        '{"answer": "42"}',
+    ]
+    usage = UsageStats(1, 1, 2, 0.0, "mock", "mock")
+
+    class _StubProvider(Provider):
+        name = "stub"
+        supports_streaming = False
+        supports_async = False
+
+        def __init__(self) -> None:
+            self.call_count = 0
+
+        def complete(self, **kwargs: Any) -> Tuple[Message, UsageStats]:
+            idx = min(self.call_count, len(responses) - 1)
+            self.call_count += 1
+            return Message(role=Role.ASSISTANT, content=responses[idx]), usage
+
+        def stream(self, **kwargs: Any) -> Any:  # pragma: no cover
+            raise NotImplementedError
+
+        async def acomplete(self, **kwargs: Any) -> Any:  # pragma: no cover
+            raise NotImplementedError
+
+        async def astream(self, **kwargs: Any) -> Any:  # pragma: no cover
+            raise NotImplementedError
+
+    from pydantic import BaseModel
+
+    class _Answer(BaseModel):
+        answer: str
+
+    provider = _StubProvider()
+    agent = Agent(
+        tools=[_bug34_noop],
+        provider=provider,
+        config=AgentConfig(
+            model="stub",
+            max_iterations=3,  # small tool-iteration budget
+            retry=RetryConfig(max_retries=5),  # larger retry budget
+        ),
+    )
+
+    result = agent.run("give me an answer", response_format=_Answer)
+    assert provider.call_count == 5, (
+        f"Agent must retry 5 times before succeeding (max_retries=5 > max_iterations=3); "
+        f"provider was called {provider.call_count} times"
+    )
+    assert result.parsed is not None
+    assert result.parsed.answer == "42"
