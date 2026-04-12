@@ -20,12 +20,23 @@ competitive bug-mining pass across **LangChain** (~92k), **LangGraph**
 **AutoGen** (~35k) — ~270k combined stars. The LlamaIndex and LangChain
 pass had the research subagents grep selectools source to match competitor
 fix diffs directly, which converted generic "worth checking" patterns into
-concrete confirmed-live bugs. Remaining top-15 unverified candidates from
-this round are parked for v0.23.0.
+concrete confirmed-live bugs.
+
+**Round 3** (BUG-27 – BUG-34): 8 more confirmed-live bugs from a third
+pass across **LiteLLM** (~15k), **Pydantic AI** (~8k), and **Haystack**
+(~18k). Round 3 baked the "grep selectools source to confirm live"
+directive into every research prompt — the single highest-leverage
+methodology improvement across all three rounds. Pydantic AI yielded 4 of
+its top 5 candidates as confirmed-live (ethos match beats star count).
+This round also produced the first **cross-round compound validation**:
+Haystack grep-confirmed the CrewAI round-2 contextvars-in-executor
+candidate (parked as needs-verification) as 5 distinct live sites in
+selectools. Remaining needs-review candidates parked for v0.23.0.
 
 Each fix includes a TDD regression test in `tests/agent/test_regression.py`
 that empirically fails without the fix and passes after. Test suite grew
-from 5,015 to 5,030 with 65 new regression tests (57 round-1 + 8 round-2).
+from 5,015 to 5,064 with 104 new regression tests (57 round-1 + 8 round-2
++ 39 round-3).
 
 ### Fixed — High Severity (Shipping Blockers)
 
@@ -258,19 +269,126 @@ from 5,015 to 5,030 with 65 new regression tests (57 round-1 + 8 round-2).
   fields. Cross-referenced from
   [LangChain #36500](https://github.com/langchain-ai/langchain/pull/36500).
 
+### Fixed — Round 3 (LiteLLM + Pydantic AI + Haystack)
+
+- **BUG-27: FallbackProvider retriable-error list incomplete.**
+  `_RETRIABLE_STATUS_CODES` regex `\b(429|500|502|503)\b` missed 504
+  (Gateway Timeout), 408 (Request Timeout), 529 (Anthropic Overloaded —
+  very common on US-West), and 522/524 (Cloudflare). Substring list also
+  missed `rate_limit_exceeded` (underscore form), `overloaded`, and
+  `service_unavailable`. Production Anthropic 529 was treated as
+  non-retriable and raised to the user. Extended regex to `(408|429|500|
+  502|503|504|522|524|529)` and added underscore variants to substring
+  list. Cross-referenced from
+  [LiteLLM #25530](https://github.com/BerriAI/litellm/pull/25530).
+
+- **BUG-28: Azure deployment names bypass GPT-5 family detection.**
+  `AzureOpenAIProvider` inherited `_get_token_key(model)` from
+  `OpenAIProvider`, which checked `model.startswith("gpt-5")` against the
+  deployment name. Azure deployments use user-chosen names (`prod-chat`,
+  `my-reasoning`) that don't match family prefixes. A `gpt-5-mini`
+  deployment under name `prod-chat` received `max_tokens` instead of
+  `max_completion_tokens` → `BadRequestError: Unsupported parameter`.
+  Azure variant of round-1 pitfall #3. Added `model_family: str | None`
+  kwarg; when set, overrides deployment-name detection. Cross-referenced
+  from [LiteLLM #13515](https://github.com/BerriAI/litellm/pull/13515).
+
+- **BUG-29: Bare `list`/`dict` tool params emit schemas with no
+  `items`/`properties`.** `_unwrap_type(list[str]) → list` stripped
+  generic args before `ToolParameter.to_schema()` could emit the element
+  type, so `def f(items: list[str])` produced only `{"type": "array"}`.
+  OpenAI strict mode rejects this; non-strict mode leaves the LLM unable
+  to know what the array should contain. Added `ToolParameter.element_type`
+  and `_collection_element_type()` helper; `to_schema()` now emits
+  `items`/`additionalProperties` for typed collections. Backward
+  compatible — bare `list`/`dict` without generic args still emit the
+  plain schema. Cross-referenced from
+  [Pydantic AI #4544](https://github.com/pydantic/pydantic-ai/pull/4544).
+
+- **BUG-30: `pipeline.parallel()` branches share input reference.**
+  `_parallel_sync` and `_parallel_async` passed the SAME `input` object
+  to every branch. Under `asyncio.gather`, branches interleave at await
+  points, producing non-deterministic state corruption when any branch
+  mutated its input. Fix: `copy.deepcopy(input)` per branch. Cross-
+  referenced from
+  [Haystack #10549](https://github.com/deepset-ai/haystack/pull/10549).
+
+- **BUG-31: Silent `{}` drop on malformed tool-call JSON.** Providers
+  caught `json.JSONDecodeError` at 7 sites (5 in `_openai_compat.py`, 2
+  in `anthropic_provider.py`, + the Ollama override) and returned `{}`.
+  The tool then failed with "Missing required parameter", so the LLM
+  learned only that it forgot a parameter — NOT that its JSON was
+  malformed — and would reproduce the same bad JSON next iteration. Added
+  `_parse_tool_args()` shared helper returning `(params, parse_error)`;
+  new `ToolCall.parse_error` field; `_execute_single_tool` / async
+  variant check `parse_error` BEFORE tool lookup and emit a clear retry
+  message ("Tool call for X had malformed arguments: ..."). Ollama
+  override updated to match the new contract. Cross-referenced from
+  [Pydantic AI #4609](https://github.com/pydantic/pydantic-ai/pull/4609).
+
+- **BUG-32: `run_in_executor` drops contextvars at 5 grep-verified
+  sites.** OTel active spans, Langfuse parent span, any `ContextVar` set
+  by `_wire_fallback_observer`, and cancellation tokens all dropped
+  inside executor-scheduled callables. Users saw orphaned spans on every
+  sync-fallback provider call and every sync graph node. Five sites
+  wired: `agent/_provider_caller.py:386`, `agent/core.py:1286`,
+  `orchestration/graph.py:1237, 1251`, `agent/_tool_executor.py:321`.
+  Added `run_in_executor_copyctx(loop, executor, fn)` helper in
+  `_async_utils.py` that captures `contextvars.copy_context()` before
+  dispatch. **First cross-round compound validation**: this pattern was
+  first surfaced by CrewAI round-2 research and parked as "needs
+  verification"; Haystack round-3 research grep-confirmed 5 live sites.
+  Cross-referenced from
+  [Haystack #9717](https://github.com/deepset-ai/haystack/pull/9717) +
+  [CrewAI #4824](https://github.com/crewAIInc/crewAI/pull/4824).
+
+- **BUG-33: `astream()` provider generators leak on inner exception.**
+  `async for item in gen:` without wrapping in a context manager leaked
+  the provider generator when the loop body raised — `gen.__aexit__`
+  ran under GC, producing `RuntimeError: async generator raised
+  StopAsyncIteration` and orphaned HTTP connections. Zero uses of
+  `contextlib.aclosing` existed in selectools. Two sites: `agent/
+  core.py:1316` (arun stream path) and `agent/_provider_caller.py:505`
+  (`_astreaming_call` helper). Added a Python-3.9-compatible `aclosing`
+  class in `_async_utils.py` (stdlib `contextlib.aclosing` is 3.10+) and
+  wrapped both sites. Cross-referenced from
+  [Pydantic AI #4205](https://github.com/pydantic/pydantic-ai/pull/4205).
+
+- **BUG-34: `max_iterations` consumed by structured-retry budget.**
+  Selectools shared ONE global counter between tool-execution iterations
+  and structured-validation retries. An agent with `max_iterations=3`
+  and an LLM failing structured validation 3 times would terminate
+  before reaching `RetryConfig.max_retries=5` — the retry config was
+  effectively unused for structured retries. Fix: added
+  `_RunContext.structured_retries` counter; all 3 structured-retry
+  branches (run/arun/astream) now check
+  `ctx.structured_retries < self.config.retry.max_retries`; outer loops
+  use `while ctx.iteration < max_iterations + ctx.structured_retries`
+  so structured retries extend the tool-iteration budget rather than
+  eating into it. Cross-referenced from
+  [Pydantic AI #4956](https://github.com/pydantic/pydantic-ai/pull/4956).
+
 ### Stats
 
-- **5,031 tests** (up from 5,015 baseline; +65 new regression tests in
-  `tests/agent/test_regression.py` = 57 round-1 + 8 round-2)
-- **24 fix commits + 3 docs commits** on `v0.22.0-competitor-bug-fixes` branch
-- **Cross-referenced bug sources**: Agno (16), PraisonAI (5), LlamaIndex (3),
-  LangChain (1), CLAUDE.md pitfall #23 (1)
+- **5,064 tests** (up from 5,015 baseline; +104 new regression tests in
+  `tests/agent/test_regression.py` = 57 round-1 + 8 round-2 + 39 round-3)
+- **32 fix commits + 4 docs commits** on `v0.22.0-competitor-bug-fixes` branch
+- **Cross-referenced bug sources**: Agno (16), PraisonAI (5), LlamaIndex
+  (3), LangChain (1), LiteLLM (2), Pydantic AI (4), Haystack (2) + first
+  cross-round compound validation (CrewAI round-2 → Haystack round-3)
 - **Thread safety story now end-to-end correct**: ConversationMemory,
   AgentTrace, OTel/Langfuse observers, MCPClient, FallbackProvider, batch
   clone isolation
 - **RAG citation and permission-filter correctness**: dedup preserves
   distinct sources; in-memory filters surface operator-dict user errors
   instead of silent empty results
+- **Observability fidelity**: contextvars (OTel/Langfuse spans) now
+  propagate into every thread-pool executor call site
+- **Structured-output correctness**: bare `list`/`dict` tool params emit
+  proper JSON schemas; malformed tool-call JSON surfaces clear retry
+  messages; structured-validation retries have their own budget
+- **Async cleanup correctness**: `astream()` deterministically closes
+  provider generators on exception via backported `aclosing`
 
 ## [0.21.0] - 2026-04-08
 
