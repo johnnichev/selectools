@@ -96,13 +96,30 @@ class CohereEmbeddingProvider(EmbeddingProvider):
         if not texts:
             return []
 
-        response = self.client.embed(
-            texts=texts,
-            model=self.model,
-            input_type="search_document",
-            truncate=self.truncate,
-        )
-        return cast(List[List[float]], response.embeddings)
+        # BUG-37 / Haystack analog: Cohere embed API limits requests to 96
+        # texts. Batch automatically so callers don't hit API errors on
+        # large document sets.
+        _MAX_BATCH = 96
+        if len(texts) <= _MAX_BATCH:
+            response = self.client.embed(
+                texts=texts,
+                model=self.model,
+                input_type="search_document",
+                truncate=self.truncate,
+            )
+            return cast(List[List[float]], response.embeddings)
+
+        all_embeddings: List[List[float]] = []
+        for i in range(0, len(texts), _MAX_BATCH):
+            batch = texts[i : i + _MAX_BATCH]
+            response = self.client.embed(
+                texts=batch,
+                model=self.model,
+                input_type="search_document",
+                truncate=self.truncate,
+            )
+            all_embeddings.extend(cast(List[List[float]], response.embeddings))
+        return all_embeddings
 
     def embed_query(self, query: str) -> List[float]:
         """

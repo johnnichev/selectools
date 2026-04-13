@@ -221,8 +221,11 @@ class BM25:
         for doc in documents:
             tokens = self.tokenize(doc.text)
             tf = Counter(tokens)
+            # BUG-36: store a shallow copy — see memory.py
+            import dataclasses
+
             idx_doc = _IndexedDoc(
-                document=doc,
+                document=dataclasses.replace(doc),
                 term_freqs=dict(tf),
                 doc_len=len(tokens),
             )
@@ -253,8 +256,11 @@ class BM25:
         for doc in documents:
             tokens = self.tokenize(doc.text)
             tf = Counter(tokens)
+            # BUG-36: store a shallow copy — see memory.py
+            import dataclasses
+
             idx_doc = _IndexedDoc(
-                document=doc,
+                document=dataclasses.replace(doc),
                 term_freqs=dict(tf),
                 doc_len=len(tokens),
             )

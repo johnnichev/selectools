@@ -969,8 +969,13 @@ class TestAnthropicSystemMessages:
             from google.genai import types  # noqa: F401
 
             formatted = provider._format_contents("system prompt", messages)
-            # SYSTEM message should become user role, not cause an error
-            assert formatted[1].role == "user"
+            # SYSTEM message should become user role, not cause an error.
+            # BUG-39: consecutive same-role messages are now merged, so
+            # the SYSTEM-converted-to-user content may be coalesced with
+            # the preceding USER message. Assert the content is present
+            # in ANY user Content rather than at a fixed position.
+            all_user_text = " ".join(str(p) for c in formatted if c.role == "user" for p in c.parts)
+            assert "[Compressed context] Summary" in all_user_text
         except ImportError:
             pytest.skip("google-genai not installed")
 

@@ -231,6 +231,12 @@ class GeminiProvider(Provider):
         except Exception as exc:
             raise ProviderError(f"Gemini streaming failed: {exc}") from exc
 
+        # BUG-38 / LiteLLM finding: if google-genai streams the same
+        # function_call across multiple chunks, we must not emit a fresh
+        # ToolCall per chunk. Track seen (name, args) pairs and only yield
+        # once per unique tool invocation.
+        _seen_tool_calls: set = set()
+
         try:
             for chunk in stream:
                 try:
@@ -246,6 +252,16 @@ class GeminiProvider(Provider):
                         if candidate.content and candidate.content.parts:
                             for part in candidate.content.parts:
                                 if part.function_call:
+                                    # Dedup: skip if we've already emitted this exact call
+                                    call_name = str(part.function_call.name or "")
+                                    call_args = str(
+                                        part.function_call.args if part.function_call.args else {}
+                                    )
+                                    dedup_key = (call_name, call_args)
+                                    if dedup_key in _seen_tool_calls:
+                                        continue
+                                    _seen_tool_calls.add(dedup_key)
+
                                     tc_id = f"call_{uuid.uuid4().hex}"
                                     raw_sig = getattr(part, "thought_signature", None)
                                     sig_str = (
@@ -258,7 +274,7 @@ class GeminiProvider(Provider):
                                         else None
                                     )
                                     yield ToolCall(
-                                        tool_name=str(part.function_call.name or ""),
+                                        tool_name=call_name,
                                         parameters=(
                                             part.function_call.args
                                             if part.function_call.args
@@ -290,7 +306,7 @@ class GeminiProvider(Provider):
         # alongside TOOL functionResponse messages (Gemini 3.x requirement)
         last_assistant_tool_calls: dict[str, ToolCall] = {}
 
-        contents = []
+        contents: List[Any] = []
         for message in messages:
             role = message.role.value
             parts = []
@@ -401,7 +417,14 @@ class GeminiProvider(Provider):
                     parts.append(types.Part(text=message.content))
 
             if parts:
-                contents.append(types.Content(role=role, parts=parts))
+                # BUG-39: merge consecutive same-role Content objects so
+                # parallel tool results (which are all role="user") don't
+                # produce multiple consecutive user messages. Gemini API
+                # rejects consecutive same-role entries.
+                if contents and contents[-1].role == role:
+                    contents[-1].parts.extend(parts)
+                else:
+                    contents.append(types.Content(role=role, parts=parts))
 
         return contents
 
@@ -586,6 +609,9 @@ class GeminiProvider(Provider):
         except Exception as exc:
             raise ProviderError(f"Gemini async streaming failed: {exc}") from exc
 
+        # BUG-38: same dedup logic as sync stream() — see comment there.
+        _seen_tool_calls: set = set()
+
         try:
             async for chunk in stream:
                 try:
@@ -601,6 +627,15 @@ class GeminiProvider(Provider):
                         if candidate.content and candidate.content.parts:
                             for part in candidate.content.parts:
                                 if part.function_call:
+                                    call_name = str(part.function_call.name or "")
+                                    call_args = str(
+                                        part.function_call.args if part.function_call.args else {}
+                                    )
+                                    dedup_key = (call_name, call_args)
+                                    if dedup_key in _seen_tool_calls:
+                                        continue
+                                    _seen_tool_calls.add(dedup_key)
+
                                     tc_id = f"call_{uuid.uuid4().hex}"
                                     raw_sig = getattr(part, "thought_signature", None)
                                     sig_str = (
@@ -613,7 +648,7 @@ class GeminiProvider(Provider):
                                         else None
                                     )
                                     yield ToolCall(
-                                        tool_name=str(part.function_call.name or ""),
+                                        tool_name=call_name,
                                         parameters=(
                                             part.function_call.args
                                             if part.function_call.args
