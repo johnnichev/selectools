@@ -36,6 +36,7 @@ from typing import (
     Union,
 )
 
+from .._async_utils import run_in_executor_copyctx, run_sync
 from ..exceptions import GraphExecutionError
 from ..stability import beta
 from ..trace import AgentTrace, StepType, TraceStep
@@ -476,7 +477,7 @@ class AgentGraph:
         Returns:
             GraphResult with final state, trace, and usage.
         """
-        return asyncio.run(
+        return run_sync(
             self.arun(
                 prompt_or_state,
                 checkpoint_store=checkpoint_store,
@@ -658,7 +659,9 @@ class AgentGraph:
 
             try:
                 if isinstance(node, ParallelGroupNode):
-                    child_results, state = await self._aexecute_parallel(node, state, trace, run_id)
+                    child_results, state, parallel_interrupted = await self._aexecute_parallel(
+                        node, state, trace, run_id
+                    )
                     node_results.update(child_results)
                     # Accumulate usage from all parallel children
                     for child_list in child_results.values():
@@ -666,11 +669,80 @@ class AgentGraph:
                             if child_result.usage:
                                 usage = _merge_usage(usage, child_result.usage)
 
+                    if parallel_interrupted:
+                        # BUG-04: propagate HITL interrupt from a child in a
+                        # parallel group through the same checkpoint/pause path
+                        # used for non-parallel interrupts.
+                        interrupt_key = state.metadata.get(_STATE_KEY_PENDING_INTERRUPT, "")
+                        if checkpoint_store:
+                            ckpt_id = checkpoint_store.save(run_id, state, step)
+                        else:
+                            ckpt_id = f"{run_id}_{step}"
+
+                        self._notify("on_graph_interrupt", run_id, current, ckpt_id)
+                        self._trace_step(
+                            trace,
+                            StepType.GRAPH_INTERRUPT,
+                            node_name=current,
+                            interrupt_key=interrupt_key,
+                            checkpoint_id=ckpt_id,
+                        )
+                        duration_ms = (time.time() - graph_start_time) * 1000
+                        self._notify("on_graph_end", run_id, self.name, step, duration_ms)
+                        return GraphResult(
+                            content=state.data.get(STATE_KEY_LAST_OUTPUT, ""),
+                            state=state,
+                            node_results=node_results,
+                            trace=trace,
+                            total_usage=usage,
+                            interrupted=True,
+                            interrupt_id=ckpt_id,
+                            steps=step,
+                            stalls=stall_count,
+                            loops_detected=loop_count,
+                        )
+
                 elif isinstance(node, SubgraphNode):
-                    result, state = await self._aexecute_subgraph(node, state, trace, run_id)
+                    result, state, subgraph_interrupted = await self._aexecute_subgraph(
+                        node, state, trace, run_id
+                    )
                     node_results.setdefault(current, []).append(result)
                     if result.usage:
                         usage = _merge_usage(usage, result.usage)
+
+                    if subgraph_interrupted:
+                        # BUG-05: propagate HITL interrupt from a nested graph
+                        # through the same checkpoint/pause path used for
+                        # non-subgraph interrupts. Mirrors the BUG-04 parallel
+                        # interrupt propagation.
+                        interrupt_key = state.metadata.get(_STATE_KEY_PENDING_INTERRUPT, "")
+                        if checkpoint_store:
+                            ckpt_id = checkpoint_store.save(run_id, state, step)
+                        else:
+                            ckpt_id = f"{run_id}_{step}"
+
+                        self._notify("on_graph_interrupt", run_id, current, ckpt_id)
+                        self._trace_step(
+                            trace,
+                            StepType.GRAPH_INTERRUPT,
+                            node_name=current,
+                            interrupt_key=interrupt_key,
+                            checkpoint_id=ckpt_id,
+                        )
+                        duration_ms = (time.time() - graph_start_time) * 1000
+                        self._notify("on_graph_end", run_id, self.name, step, duration_ms)
+                        return GraphResult(
+                            content=state.data.get(STATE_KEY_LAST_OUTPUT, ""),
+                            state=state,
+                            node_results=node_results,
+                            trace=trace,
+                            total_usage=usage,
+                            interrupted=True,
+                            interrupt_id=ckpt_id,
+                            steps=step,
+                            stalls=stall_count,
+                            loops_detected=loop_count,
+                        )
 
                 else:
                     # Retry loop for RETRY policy
@@ -918,7 +990,9 @@ class AgentGraph:
                         type=GraphEventType.PARALLEL_START,
                         node_name=current,
                     )
-                    child_results, state = await self._aexecute_parallel(node, state, trace, run_id)
+                    child_results, state, parallel_interrupted = await self._aexecute_parallel(
+                        node, state, trace, run_id
+                    )
                     node_results.update(child_results)
                     for _cl in child_results.values():
                         for _cr in _cl:
@@ -926,11 +1000,66 @@ class AgentGraph:
                                 usage = _merge_usage(usage, _cr.usage)
                     yield GraphEvent(type=GraphEventType.PARALLEL_END, node_name=current)
 
+                    if parallel_interrupted:
+                        # BUG-04: propagate HITL interrupt from a child in a
+                        # parallel group through the same checkpoint/pause
+                        # path used for non-parallel interrupts.
+                        interrupt_key = state.metadata.get(_STATE_KEY_PENDING_INTERRUPT, "")
+                        if checkpoint_store:
+                            ckpt_id = checkpoint_store.save(run_id, state, step)
+                        else:
+                            ckpt_id = f"{run_id}_{step}"
+                        self._notify("on_graph_interrupt", run_id, current, ckpt_id)
+                        self._trace_step(
+                            trace,
+                            StepType.GRAPH_INTERRUPT,
+                            node_name=current,
+                            interrupt_key=interrupt_key,
+                            checkpoint_id=ckpt_id,
+                        )
+                        duration_ms = (time.time() - graph_start) * 1000
+                        self._notify("on_graph_end", run_id, self.name, step, duration_ms)
+                        yield GraphEvent(
+                            type=GraphEventType.GRAPH_INTERRUPT,
+                            node_name=current,
+                            interrupt_id=ckpt_id,
+                        )
+                        break
+
                 elif isinstance(node, SubgraphNode):
-                    result, state = await self._aexecute_subgraph(node, state, trace, run_id)
+                    result, state, subgraph_interrupted = await self._aexecute_subgraph(
+                        node, state, trace, run_id
+                    )
                     node_results.setdefault(current, []).append(result)
                     if result.usage:
                         usage = _merge_usage(usage, result.usage)
+
+                    if subgraph_interrupted:
+                        # BUG-05: propagate HITL interrupt from a nested graph
+                        # through the same checkpoint/pause path used for
+                        # non-subgraph interrupts. Mirrors the BUG-04 parallel
+                        # interrupt propagation.
+                        interrupt_key = state.metadata.get(_STATE_KEY_PENDING_INTERRUPT, "")
+                        if checkpoint_store:
+                            ckpt_id = checkpoint_store.save(run_id, state, step)
+                        else:
+                            ckpt_id = f"{run_id}_{step}"
+                        self._notify("on_graph_interrupt", run_id, current, ckpt_id)
+                        self._trace_step(
+                            trace,
+                            StepType.GRAPH_INTERRUPT,
+                            node_name=current,
+                            interrupt_key=interrupt_key,
+                            checkpoint_id=ckpt_id,
+                        )
+                        duration_ms = (time.time() - graph_start) * 1000
+                        self._notify("on_graph_end", run_id, self.name, step, duration_ms)
+                        yield GraphEvent(
+                            type=GraphEventType.GRAPH_INTERRUPT,
+                            node_name=current,
+                            interrupt_id=ckpt_id,
+                        )
+                        break
 
                 else:
                     result, state, interrupted = await self._aexecute_node(
@@ -1056,7 +1185,7 @@ class AgentGraph:
         Returns:
             GraphResult — may be interrupted again if there are multiple yields.
         """
-        return asyncio.run(self.aresume(interrupt_id, response, checkpoint_store))
+        return run_sync(self.aresume(interrupt_id, response, checkpoint_store))
 
     async def aresume(
         self,
@@ -1104,9 +1233,13 @@ class AgentGraph:
             return await self._aexecute_generator_node(node, state, trace, run_id)
 
         elif inspect.isgeneratorfunction(agent_or_fn):
+            # BUG-32: propagate caller contextvars into the worker thread
+            # that runs the sync generator node.
             loop = asyncio.get_running_loop()
-            return await loop.run_in_executor(
-                None, self._execute_generator_node_sync, node, state, trace, run_id
+            return await run_in_executor_copyctx(
+                loop,
+                None,
+                lambda: self._execute_generator_node_sync(node, state, trace, run_id),
             )
 
         elif asyncio.iscoroutinefunction(agent_or_fn):
@@ -1118,8 +1251,9 @@ class AgentGraph:
 
         else:
             # Plain sync callable
+            # BUG-32: propagate caller contextvars into the worker thread.
             loop = asyncio.get_running_loop()
-            new_state = await loop.run_in_executor(None, agent_or_fn, state)
+            new_state = await run_in_executor_copyctx(loop, None, lambda: agent_or_fn(state))
             if new_state is None:
                 new_state = state
             result = _make_synthetic_result(new_state)
@@ -1132,25 +1266,51 @@ class AgentGraph:
         trace: AgentTrace,
         run_id: str,
     ) -> Tuple[AgentResult, GraphState, bool]:
-        """Execute an async generator node with HITL support."""
+        """Execute an async generator node with HITL support.
+
+        BUG-12 (Agno #4921): Generators yielding 2+ InterruptRequests must
+        pause on every interrupt. Previously the return value of
+        ``gen.asend(response)`` was discarded and the enclosing ``async for``
+        loop advanced past the next yield via ``__anext__()`` — sending
+        ``None`` as the response to whatever was waiting. The fix is a single
+        fetch-per-iteration loop where each item (whether from ``asend`` or
+        ``__anext__``) is dispatched in the same code path. ``interrupt_index``
+        is only incremented when an ``InterruptRequest`` is actually yielded
+        so resume keys remain stable across restarts.
+        """
         gen = node.agent(state)
         interrupt_index = 0
 
-        async for value in gen:
+        try:
+            value = await gen.__anext__()
+        except StopAsyncIteration:
+            result = _make_synthetic_result(state)
+            return result, state, False
+
+        while True:
             if isinstance(value, InterruptRequest):
                 interrupt_key = f"{node.name}_{interrupt_index}"
 
                 if interrupt_key in state._interrupt_responses:
-                    # Resume path: inject stored response into generator
+                    # Resume path: inject stored response and capture the
+                    # NEXT yielded value (which could be another
+                    # InterruptRequest). Do NOT fall through to __anext__ —
+                    # that would advance past the value we just got back.
+                    #
+                    # Note: we do NOT delete the response after consuming.
+                    # Generators are re-run from scratch on every resume, so
+                    # all previously-resolved interrupts must remain in
+                    # _interrupt_responses to let the generator deterministically
+                    # replay past them (BUG-12).
+                    response = state._interrupt_responses[interrupt_key]
+                    interrupt_index += 1
                     try:
-                        await gen.asend(state._interrupt_responses[interrupt_key])
-                        del state._interrupt_responses[interrupt_key]
-                        interrupt_index += 1
-                        continue
+                        value = await gen.asend(response)
                     except StopAsyncIteration:
                         break
+                    continue
                 else:
-                    # First-pass: store interrupt key and signal pause
+                    # First-pass: store interrupt key and signal pause.
                     value.interrupt_key = interrupt_key
                     state.metadata[_STATE_KEY_PENDING_INTERRUPT] = interrupt_key
                     self._notify("on_graph_interrupt", run_id, node.name, interrupt_key)
@@ -1163,7 +1323,14 @@ class AgentGraph:
                     synthetic = _make_synthetic_result(state)
                     return synthetic, state, True
 
-            interrupt_index = 0
+            # Non-interrupt yield (data or final value). Advance; do NOT
+            # reset interrupt_index — the key-mapping must remain stable
+            # across interleaved data/interrupt yields so resume keys
+            # continue to line up with yield order.
+            try:
+                value = await gen.__anext__()
+            except StopAsyncIteration:
+                break
 
         result = _make_synthetic_result(state)
         return result, state, False
@@ -1175,22 +1342,39 @@ class AgentGraph:
         trace: AgentTrace,
         run_id: str,
     ) -> Tuple[AgentResult, GraphState, bool]:
-        """Execute a sync generator node with HITL support."""
+        """Execute a sync generator node with HITL support.
+
+        See BUG-12 note on :meth:`_aexecute_generator_node` — the iteration
+        refactor applies equally to the sync path: one fetch per loop
+        iteration, ``send()``'s return value is dispatched in the same
+        branch as ``next()``'s, and ``interrupt_index`` is never reset on
+        non-interrupt yields.
+        """
         gen = node.agent(state)
         interrupt_index = 0
 
-        for value in gen:
+        try:
+            value = next(gen)
+        except StopIteration:
+            result = _make_synthetic_result(state)
+            return result, state, False
+
+        while True:
             if isinstance(value, InterruptRequest):
                 interrupt_key = f"{node.name}_{interrupt_index}"
 
                 if interrupt_key in state._interrupt_responses:
+                    # Keep the response around (do NOT delete) — see
+                    # BUG-12 note on the async path. Generators restart
+                    # from scratch on every resume and must replay past
+                    # previously-resolved interrupts deterministically.
+                    response = state._interrupt_responses[interrupt_key]
+                    interrupt_index += 1
                     try:
-                        gen.send(state._interrupt_responses[interrupt_key])
-                        del state._interrupt_responses[interrupt_key]
-                        interrupt_index += 1
-                        continue
+                        value = gen.send(response)
                     except StopIteration:
                         break
+                    continue
                 else:
                     value.interrupt_key = interrupt_key
                     state.metadata[_STATE_KEY_PENDING_INTERRUPT] = interrupt_key
@@ -1204,7 +1388,11 @@ class AgentGraph:
                     synthetic = _make_synthetic_result(state)
                     return synthetic, state, True
 
-            interrupt_index = 0
+            # Non-interrupt yield. Advance without resetting interrupt_index.
+            try:
+                value = next(gen)
+            except StopIteration:
+                break
 
         result = _make_synthetic_result(state)
         return result, state, False
@@ -1215,8 +1403,14 @@ class AgentGraph:
         state: GraphState,
         trace: AgentTrace,
         run_id: str,
-    ) -> Tuple[Dict[str, List[AgentResult]], GraphState]:
-        """Fan out to child nodes in parallel and merge results."""
+    ) -> Tuple[Dict[str, List[AgentResult]], GraphState, bool]:
+        """Fan out to child nodes in parallel and merge results.
+
+        Returns (child_results, merged_state, interrupted). If any child yields
+        an InterruptRequest, ``interrupted`` is True and the pending interrupt
+        marker is preserved on the merged state's metadata so the outer loop
+        can checkpoint and pause (BUG-04 / Agno #4921).
+        """
         self._notify("on_parallel_start", run_id, node.name, node.child_node_names)
         self._trace_step(
             trace,
@@ -1236,20 +1430,21 @@ class AgentGraph:
 
             async def run_child(
                 child_name: str, branch_state: GraphState
-            ) -> Tuple[str, AgentResult, GraphState]:
+            ) -> Tuple[str, AgentResult, GraphState, bool]:
                 child_node = self._nodes.get(child_name)
                 if child_node is None:
                     raise GraphExecutionError(
                         self.name, child_name, KeyError(f"Child node {child_name!r} not found"), 0
                     )
                 if isinstance(child_node, GraphNode):
-                    result, new_state, _ = await self._aexecute_node(
+                    result, new_state, child_interrupted = await self._aexecute_node(
                         child_node, branch_state, trace, run_id
                     )
                 else:
                     result = _make_synthetic_result(branch_state)
                     new_state = branch_state
-                return child_name, result, new_state
+                    child_interrupted = False
+                return child_name, result, new_state, child_interrupted
 
             child_outputs = await asyncio.gather(
                 *[
@@ -1261,6 +1456,7 @@ class AgentGraph:
 
             child_results: Dict[str, List[AgentResult]] = {}
             branch_final_states: List[GraphState] = []
+            interrupted_child_state: Optional[GraphState] = None
             for i, output in enumerate(child_outputs):
                 if isinstance(output, BaseException):
                     child_name = node.child_node_names[i]
@@ -1271,9 +1467,11 @@ class AgentGraph:
                         exc = output if isinstance(output, Exception) else Exception(str(output))
                         raise GraphExecutionError(self.name, child_name, exc, 0) from output
                     continue  # SKIP: log error and proceed
-                child_name, result, new_state = output
+                child_name, result, new_state, child_interrupted = output
                 child_results.setdefault(child_name, []).append(result)
                 branch_final_states.append(new_state)
+                if child_interrupted and interrupted_child_state is None:
+                    interrupted_child_state = new_state
 
             if not branch_final_states:
                 # All children failed — return parent state unchanged
@@ -1283,9 +1481,23 @@ class AgentGraph:
             else:
                 merged = merge_states(branch_final_states, node.merge_policy)
 
+            # BUG-04: propagate HITL interrupt from parallel children. The merge
+            # policy may drop per-branch metadata, so explicitly re-plant the
+            # pending interrupt key on the merged state from the interrupted
+            # branch so the outer loop's checkpoint/pause path fires.
+            interrupted = interrupted_child_state is not None
+            if interrupted and interrupted_child_state is not None:
+                pending_key = interrupted_child_state.metadata.get(_STATE_KEY_PENDING_INTERRUPT, "")
+                if pending_key:
+                    merged.metadata[_STATE_KEY_PENDING_INTERRUPT] = pending_key
+                # Preserve stored interrupt responses so a resumed run can
+                # re-inject them into the generator without data loss.
+                for k, v in interrupted_child_state._interrupt_responses.items():
+                    merged._interrupt_responses.setdefault(k, v)
+
             self._notify("on_parallel_end", run_id, node.name, len(child_outputs))
             self._trace_step(trace, StepType.GRAPH_PARALLEL_END, node_name=node.name)
-            return child_results, merged
+            return child_results, merged, interrupted
         except BaseException:
             # Restore scatter patches so a retry/resume can reuse them
             if scatter_patches:
@@ -1298,8 +1510,17 @@ class AgentGraph:
         state: GraphState,
         trace: AgentTrace,
         run_id: str,
-    ) -> Tuple[AgentResult, GraphState]:
-        """Execute a nested AgentGraph as a node."""
+    ) -> Tuple[AgentResult, GraphState, bool]:
+        """Execute a nested AgentGraph as a node.
+
+        Returns (result, new_state, interrupted). If the subgraph yields an
+        InterruptRequest, ``interrupted`` is True and the pending interrupt
+        marker plus any stored interrupt responses are propagated onto the
+        parent state using FLAT keys (matching BUG-04's parallel-group
+        pattern) so the outer loop can checkpoint and pause, and so a
+        subsequent ``graph.resume()`` can route the stored response back
+        into the subgraph's generator on re-execution (BUG-05 / Agno #4921).
+        """
         # Build subgraph input state
         sub_state = GraphState.from_prompt(
             state.data.get(STATE_KEY_LAST_OUTPUT, "")
@@ -1311,8 +1532,34 @@ class AgentGraph:
             if parent_key in state.data:
                 sub_state.data[sub_key] = state.data[parent_key]
 
+        # BUG-05 resume path: forward any parent-stored interrupt responses
+        # DOWN into sub_state so the subgraph's generator can find its
+        # stored response when re-executed. Without this, a resumed
+        # subgraph re-interrupts forever (silent infinite loop) because
+        # GraphState.from_prompt() builds a fresh, empty _interrupt_responses.
+        for k, v in state._interrupt_responses.items():
+            sub_state._interrupt_responses.setdefault(k, v)
+
         # Run the subgraph
         sub_result = await node.graph.arun(sub_state, _interrupt_response=None)
+
+        if sub_result.interrupted:
+            # BUG-05: propagate HITL interrupt from nested graph using FLAT
+            # keys so the parent's resume machinery can route the stored
+            # response back into the subgraph on re-execution. Mirrors the
+            # BUG-04 parallel-group propagation in _aexecute_parallel.
+            pending_key = sub_result.state.metadata.get(_STATE_KEY_PENDING_INTERRUPT, "")
+            if pending_key:
+                state.metadata[_STATE_KEY_PENDING_INTERRUPT] = pending_key
+            for k, v in sub_result.state._interrupt_responses.items():
+                state._interrupt_responses.setdefault(k, v)
+
+            synthetic = AgentResult(
+                message=Message(role=Role.ASSISTANT, content=sub_result.content),
+                iterations=sub_result.steps,
+                usage=sub_result.total_usage,
+            )
+            return synthetic, state, True
 
         # Map subgraph output keys back to parent
         for sub_key, parent_key in node.output_map.items():
@@ -1329,7 +1576,7 @@ class AgentGraph:
             iterations=sub_result.steps,
             usage=sub_result.total_usage,
         )
-        return synthetic, state
+        return synthetic, state, False
 
     # ------------------------------------------------------------------
     # Routing

@@ -30,12 +30,14 @@ Usage::
 from __future__ import annotations
 
 import asyncio
+import copy
 import inspect
 import time
 from dataclasses import dataclass, field
 from functools import wraps
 from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
+from selectools._async_utils import run_sync
 from selectools.stability import beta
 
 
@@ -483,7 +485,7 @@ class Pipeline:
         fn = s.fn if isinstance(s, Step) else s
         filtered = _filter_kwargs(fn, kwargs)
         if asyncio.iscoroutinefunction(fn):
-            return asyncio.run(fn(current, **filtered))
+            return run_sync(fn(current, **filtered))
         return fn(current, **filtered)
 
     async def _aexecute_step(self, s: Any, current: Any, kwargs: Dict[str, Any]) -> Any:
@@ -544,20 +546,28 @@ def parallel(*steps_or_fns: Union[Step, Callable]) -> Step:
     names = [s.name for s in wrapped]
 
     def _parallel_sync(input: Any, **kwargs: Any) -> Dict[str, Any]:
+        # BUG-30 / Haystack PR #10549: each branch must receive its own deep
+        # copy of the input so that a mutating branch cannot pollute its
+        # siblings. Sync is sequential, so the pollution is deterministic but
+        # still wrong.
         results = {}
         for s in wrapped:
             fn = s.fn if isinstance(s, Step) else s
             filtered = _filter_kwargs(fn, kwargs)
-            results[s.name] = fn(input, **filtered)
+            results[s.name] = fn(copy.deepcopy(input), **filtered)
         return results
 
     async def _parallel_async(input: Any, **kwargs: Any) -> Dict[str, Any]:
+        # BUG-30: under asyncio.gather, branches interleave at await points,
+        # so a shared input reference produces non-deterministic state
+        # corruption. Each coroutine gets its own deep copy.
         async def _run(s: Step) -> Tuple[str, Any]:
             fn = s.fn if isinstance(s, Step) else s
             filtered = _filter_kwargs(fn, kwargs)
+            branch_input = copy.deepcopy(input)
             if asyncio.iscoroutinefunction(fn):
-                return s.name, await fn(input, **filtered)
-            return s.name, fn(input, **filtered)
+                return s.name, await fn(branch_input, **filtered)
+            return s.name, fn(branch_input, **filtered)
 
         pairs = await asyncio.gather(*[_run(s) for s in wrapped])
         return dict(pairs)

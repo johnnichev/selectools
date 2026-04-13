@@ -154,9 +154,20 @@ class GeminiProvider(Provider):
                     )
 
         # Extract usage stats from response
+        # BUG-26 / LangChain #36500: use `is not None` guard instead of `or 0`
+        # to avoid conflating None (unknown) with 0 (legitimate cached-prompt
+        # token count). Pitfall #22.
         usage = response.usage_metadata if hasattr(response, "usage_metadata") else None
-        prompt_tokens = (usage.prompt_token_count or 0) if usage else 0
-        completion_tokens = (usage.candidates_token_count or 0) if usage else 0
+        prompt_tokens = (
+            usage.prompt_token_count
+            if usage is not None and usage.prompt_token_count is not None
+            else 0
+        )
+        completion_tokens = (
+            usage.candidates_token_count
+            if usage is not None and usage.candidates_token_count is not None
+            else 0
+        )
         usage_stats = UsageStats(
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
@@ -500,10 +511,18 @@ class GeminiProvider(Provider):
                         )
                     )
 
-        # Extract usage stats
+        # Extract usage stats (BUG-26: see complete() for context)
         usage = response.usage_metadata if hasattr(response, "usage_metadata") else None
-        prompt_tokens = (usage.prompt_token_count or 0) if usage else 0
-        completion_tokens = (usage.candidates_token_count or 0) if usage else 0
+        prompt_tokens = (
+            usage.prompt_token_count
+            if usage is not None and usage.prompt_token_count is not None
+            else 0
+        )
+        completion_tokens = (
+            usage.candidates_token_count
+            if usage is not None and usage.candidates_token_count is not None
+            else 0
+        )
         usage_stats = UsageStats(
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,

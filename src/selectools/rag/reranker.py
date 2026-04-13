@@ -119,7 +119,7 @@ class CohereReranker(Reranker):
             model=self.model,
             query=query,
             documents=documents,
-            top_n=top_k or len(results),
+            top_n=top_k if top_k is not None else len(results),
         )
 
         reranked: List[SearchResult] = []

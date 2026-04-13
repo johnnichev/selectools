@@ -47,6 +47,7 @@ for r in results:
 4. [Choosing a Store](#choosing-a-store)
 5. [Implementation Details](#implementation-details)
 6. [Best Practices](#best-practices)
+7. [Search Result Deduplication](#search-result-deduplication)
 
 ---
 
@@ -609,6 +610,87 @@ import os
 os.environ["PINECONE_API_KEY"] = "your-key"
 os.environ["PINECONE_ENVIRONMENT"] = "your-env"
 ```
+
+---
+
+## Search Result Deduplication
+
+All vector stores (`InMemoryVectorStore`, `SQLiteVectorStore`,
+`ChromaVectorStore`, `FAISSVectorStore`, `PineconeVectorStore`,
+`QdrantVectorStore`, `PgVectorStore`) accept an optional `dedup`
+parameter on `search()`. When `dedup=True`, duplicate documents (by
+text content) are removed from search results.
+
+```python
+results = store.search(
+    query_embedding=embedding,
+    top_k=10,
+    dedup=True,  # Remove duplicate document texts from results
+)
+```
+
+This is useful when:
+
+- The same document text was added multiple times with different IDs
+- Hybrid search produces overlapping results from semantic + keyword paths
+- You want guaranteed-unique top-K results for downstream LLM context
+
+Default is `dedup=False` to preserve backward-compatible behavior. When
+enabled, stores over-fetch by 4x internally so the final deduped result
+list still contains up to `top_k` unique documents.
+
+### Citation-Preserving Dedup (v0.22.0)
+
+> BUG-24: dedup now keys on `(text, metadata.get("source"))`, not just text.
+
+Two documents with identical text but different `source` metadata (the same
+snippet ingested from two different files — common in legal, academic, and
+regulatory corpora) are now preserved as distinct citations:
+
+```python
+store.add_documents([
+    Document(text="SEC requires annual filings", metadata={"source": "10-K_2024.pdf"}),
+    Document(text="SEC requires annual filings", metadata={"source": "10-K_2025.pdf"}),
+])
+results = store.search(query_emb, top_k=10, dedup=True)
+# Both documents are returned — citations from different sources are preserved
+```
+
+When no `source` key is present in metadata, dedup falls back to text-only
+keying (same behavior as before).
+
+---
+
+## Metadata Filter Validation
+
+> Since v0.22.0 (BUG-25)
+
+In-memory stores (`InMemoryVectorStore`) and `BM25` only support **equality
+filters** — each metadata key is compared with `==`. If you pass an
+operator-dict filter like `{"user_id": {"$in": [1, 2]}}`, the store raises
+`NotImplementedError` instead of silently returning wrong results:
+
+```python
+# ✓ Equality filter — works everywhere
+results = store.search(query_emb, filter={"tenant_id": "acme"})
+
+# ✗ Operator-dict filter — raises NotImplementedError on in-memory/BM25
+try:
+    results = store.search(query_emb, filter={"tenant_id": {"$in": ["acme", "globex"]}})
+except NotImplementedError as e:
+    # "In-memory filter does not support operator syntax '$in'.
+    #  Use a vector store backend that supports operators
+    #  (Chroma, Pinecone, Qdrant, pgvector) or use equality-only filters."
+    print(e)
+```
+
+**Backend stores** (Chroma, Pinecone, Qdrant, pgvector) support operators
+natively via their own query DSL — pass operator-dict filters directly
+to those stores.
+
+**Literal dict metadata values** (dicts without `$`-prefixed keys, e.g.,
+`{"config": {"nested": "value"}}`) still pass through the equality check
+for backward compatibility.
 
 ---
 

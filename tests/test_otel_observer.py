@@ -25,6 +25,9 @@ class TestOTelObserver:
             obs._llm_starts = {}
             obs._llm_counter = 0
             obs._tool_counter = 0
+            import threading
+
+            obs._lock = threading.Lock()
         return obs, mock_tracer
 
     def test_import_error(self):

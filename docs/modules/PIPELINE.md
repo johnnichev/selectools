@@ -247,6 +247,14 @@ result = pipeline.run("quantum computing")
 
 When any step in the group is async, `parallel()` uses `asyncio.gather` for true concurrent execution during `arun()`. In sync `run()`, steps execute sequentially.
 
+### Branch Isolation (v0.22.0 — BUG-30)
+
+Each parallel branch receives its own **deep copy** of the input. Mutations
+in one branch do NOT affect sibling branches — even under `asyncio.gather`
+where branches interleave at `await` points. This prevents non-deterministic
+state corruption that previously occurred when any branch mutated its input
+(e.g., `data["key"] = value`).
+
 ### Parameters
 
 | Parameter | Type | Description |

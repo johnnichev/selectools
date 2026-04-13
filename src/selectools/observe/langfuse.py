@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from typing import Any, Dict, List, Optional
 
 from ..observer import AgentObserver
@@ -55,6 +56,7 @@ class LangfuseObserver(AgentObserver):
         self._traces: Dict[str, Any] = {}
         self._generations: Dict[str, Any] = {}
         self._llm_counter: int = 0
+        self._lock = threading.Lock()
 
     # ── Run lifecycle ─────────────────────────────────────────────────
 
@@ -76,7 +78,8 @@ class LangfuseObserver(AgentObserver):
             input=str(messages)[:2000] if messages else "",
             metadata={"system_prompt_length": len(system_prompt) if system_prompt else 0},
         )
-        self._traces[run_id] = root
+        with self._lock:
+            self._traces[run_id] = root
 
     def on_run_end(self, run_id: str, result: Any) -> None:
         """Update the root span + trace and flush.
@@ -86,20 +89,25 @@ class LangfuseObserver(AgentObserver):
         """
         # Clean up orphaned child spans first
         prefix = f"{run_id}:"
-        orphaned_keys = [k for k in self._generations if k.startswith(prefix)]
-        for key in orphaned_keys:
-            orphan = self._generations.pop(key, None)
-            if orphan is not None:
-                try:
-                    orphan.update(
-                        output="ERROR: Orphaned — run ended before span closed",
-                        level="ERROR",
-                    )
-                    orphan.end()
-                except Exception:
-                    logger.debug("Failed to close orphaned Langfuse span %s", key)
+        with self._lock:
+            orphaned_keys = [k for k in self._generations if k.startswith(prefix)]
+            orphans = []
+            for key in orphaned_keys:
+                orphan = self._generations.pop(key, None)
+                if orphan is not None:
+                    orphans.append((key, orphan))
+            root = self._traces.pop(run_id, None)
 
-        root = self._traces.pop(run_id, None)
+        for key, orphan in orphans:
+            try:
+                orphan.update(
+                    output="ERROR: Orphaned — run ended before span closed",
+                    level="ERROR",
+                )
+                orphan.end()
+            except Exception:
+                logger.debug("Failed to close orphaned Langfuse span %s", key)
+
         if root is None:
             return
 
@@ -140,8 +148,10 @@ class LangfuseObserver(AgentObserver):
         the parent span** via ``root.start_generation(...)``. This
         automatically attaches them to the same trace.
         """
-        self._llm_counter += 1
-        root = self._traces.get(run_id)
+        with self._lock:
+            self._llm_counter += 1
+            counter = self._llm_counter
+            root = self._traces.get(run_id)
         if root is None:
             return
         gen = root.start_generation(
@@ -149,7 +159,8 @@ class LangfuseObserver(AgentObserver):
             model=model or "unknown",
             input=str(messages)[:2000] if messages else "",
         )
-        self._generations[f"{run_id}:llm:{self._llm_counter}"] = gen
+        with self._lock:
+            self._generations[f"{run_id}:llm:{counter}"] = gen
 
     def on_llm_end(
         self,
@@ -159,11 +170,12 @@ class LangfuseObserver(AgentObserver):
     ) -> None:
         """Update the most recent generation for this run, then end it."""
         prefix = f"{run_id}:llm:"
-        matching = [k for k in self._generations if k.startswith(prefix)]
-        if not matching:
-            return
-        key = max(matching, key=lambda k: int(k.rsplit(":", 1)[1]))
-        gen = self._generations.pop(key, None)
+        with self._lock:
+            matching = [k for k in self._generations if k.startswith(prefix)]
+            if not matching:
+                return
+            key = max(matching, key=lambda k: int(k.rsplit(":", 1)[1]))
+            gen = self._generations.pop(key, None)
         if gen is None:
             return
 
@@ -195,14 +207,16 @@ class LangfuseObserver(AgentObserver):
         tool_args: Dict[str, Any],
     ) -> None:
         """Create a Langfuse child span for tool execution."""
-        root = self._traces.get(run_id)
+        with self._lock:
+            root = self._traces.get(run_id)
         if root is None:
             return
         span = root.start_span(
             name=f"tool.{tool_name}",
             input=str(tool_args)[:1000] if tool_args else "",
         )
-        self._generations[f"{run_id}:tool:{call_id}"] = span
+        with self._lock:
+            self._generations[f"{run_id}:tool:{call_id}"] = span
 
     def on_tool_end(
         self,
@@ -214,7 +228,8 @@ class LangfuseObserver(AgentObserver):
     ) -> None:
         """Update the tool span with results and end it."""
         key = f"{run_id}:tool:{call_id}"
-        span = self._generations.pop(key, None)
+        with self._lock:
+            span = self._generations.pop(key, None)
         if span is None:
             return
         try:
@@ -237,7 +252,8 @@ class LangfuseObserver(AgentObserver):
     ) -> None:
         """Record an error on the tool span and end it."""
         key = f"{run_id}:tool:{call_id}"
-        span = self._generations.pop(key, None)
+        with self._lock:
+            span = self._generations.pop(key, None)
         if span is None:
             return
         try:

@@ -282,6 +282,13 @@ class ToolCall:
     parameters: Dict[str, Any]
     id: Optional[str] = None
     thought_signature: Optional[str] = None
+    # BUG-31 / Pydantic AI #4609: providers set this to a short preview of
+    # raw malformed arguments when the LLM returns tool-call JSON that fails
+    # to parse. The tool executor surfaces it as a clear retry message
+    # ("Your previous tool-call arguments were not valid JSON: ...") instead
+    # of the silent `parameters={}` fallback that made the LLM think it had
+    # simply forgotten a required parameter.
+    parse_error: Optional[str] = None
 
 
 @stable

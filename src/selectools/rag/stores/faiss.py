@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from ...embeddings.provider import EmbeddingProvider
 
 from ...stability import beta
-from ..vector_store import Document, SearchResult, VectorStore
+from ..vector_store import Document, SearchResult, VectorStore, _dedup_search_results
 
 
 def _import_faiss() -> Any:
@@ -218,6 +218,7 @@ class FAISSVectorStore(VectorStore):
         query_embedding: List[float],
         top_k: int = 5,
         filter: Optional[Dict[str, Any]] = None,
+        dedup: bool = False,
     ) -> List[SearchResult]:
         """
         Search for similar documents using cosine similarity.
@@ -230,6 +231,7 @@ class FAISSVectorStore(VectorStore):
             top_k: Number of results to return.
             filter: Optional metadata filter dict.  All key-value pairs must
                 match for a document to be included.
+            dedup: If True, drop duplicate-text results (keeps highest-scoring).
 
         Returns:
             List of ``SearchResult`` objects sorted by descending similarity.
@@ -246,8 +248,8 @@ class FAISSVectorStore(VectorStore):
 
             n_total = self._index.ntotal
 
-            # Over-fetch when filtering to compensate for filtered-out docs
-            fetch_k = min(top_k * 4, n_total) if filter else min(top_k, n_total)
+            # Over-fetch when filtering or dedup is active to compensate for drops
+            fetch_k = min(top_k * 4, n_total) if (filter or dedup) else min(top_k, n_total)
 
             # FAISS search returns (distances, indices) arrays of shape (1, fetch_k)
             scores, indices = self._index.search(query_vec, fetch_k)
@@ -256,6 +258,7 @@ class FAISSVectorStore(VectorStore):
             docs_snapshot = list(self._documents)
 
         results: List[SearchResult] = []
+        seen_texts: set = set()
         for score, idx in zip(scores[0], indices[0]):
             # FAISS returns -1 for empty slots
             if idx < 0:
@@ -266,6 +269,12 @@ class FAISSVectorStore(VectorStore):
             # Apply metadata filter
             if filter and not self._matches_filter(doc, filter):
                 continue
+
+            # Apply text dedup if requested (keeps highest-scoring occurrence)
+            if dedup:
+                if doc.text in seen_texts:
+                    continue
+                seen_texts.add(doc.text)
 
             results.append(SearchResult(document=doc, score=float(score)))
 

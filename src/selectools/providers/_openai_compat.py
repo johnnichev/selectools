@@ -14,11 +14,53 @@ from __future__ import annotations
 
 import json
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, Iterable, List, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    cast,
+)
 
 from ..types import Message, Role, ToolCall
 from ..usage import UsageStats
 from .base import Provider, ProviderError
+
+
+def _parse_tool_args(raw: Optional[str]) -> Tuple[Dict[str, Any], Optional[str]]:
+    """Parse tool-call argument JSON, returning ``(params, parse_error)``.
+
+    BUG-31 / Pydantic AI #4609: providers used to catch ``JSONDecodeError``
+    and silently return ``{}``. The tool then failed with
+    ``"Missing required parameter"``, so the LLM learned only that it
+    forgot a parameter — never that its JSON was malformed. The same LLM
+    would reproduce the same malformed JSON on the next iteration.
+
+    This helper returns ``(params_dict, error_preview)``. On success,
+    ``error_preview`` is ``None``. On failure, ``params_dict`` is empty and
+    ``error_preview`` contains a truncated preview of the raw arguments
+    plus the parser error. The tool executor surfaces this as a clear
+    retry message so the LLM can fix its JSON.
+    """
+    if not raw:
+        return {}, None
+    try:
+        parsed = json.loads(raw)
+        if not isinstance(parsed, dict):
+            return (
+                {},
+                f"tool arguments must be a JSON object, got {type(parsed).__name__}: {raw[:200]}",
+            )
+        return parsed, None
+    except json.JSONDecodeError as exc:
+        preview = raw if len(raw) <= 200 else raw[:200] + "..."
+        return {}, f"invalid JSON ({exc.msg} at line {exc.lineno} col {exc.colno}): {preview}"
+
 
 if TYPE_CHECKING:
     from ..tools.base import Tool
@@ -74,17 +116,19 @@ class _OpenAICompatibleBase(ABC):
 
     # -- optional hooks -------------------------------------------------------
 
-    def _parse_tool_call_arguments(self, tc: Any) -> dict:
+    def _parse_tool_call_arguments(self, tc: Any) -> Tuple[Dict[str, Any], Optional[str]]:
         """Parse tool-call arguments from the SDK object.
 
         The default implementation handles the common case where arguments
-        are always a JSON string (OpenAI).  Ollama overrides this to also
+        are always a JSON string (OpenAI). Ollama overrides this to also
         handle the case where arguments may already be a ``dict``.
+
+        Returns ``(params, parse_error)``. On success, ``parse_error`` is
+        ``None``. On failure, ``params`` is empty and ``parse_error``
+        describes the malformed input so the tool executor can surface a
+        clear retry message (BUG-31 / Pydantic AI #4609).
         """
-        try:
-            return json.loads(tc.function.arguments)  # type: ignore[no-any-return]
-        except json.JSONDecodeError:
-            return {}
+        return _parse_tool_args(tc.function.arguments)
 
     def _build_astream_args(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Allow subclasses to inject extra kwargs for ``astream()``.
@@ -261,16 +305,12 @@ class _OpenAICompatibleBase(ABC):
                     finish = chunk.choices[0].finish_reason if chunk.choices else None
                     if finish in ("tool_calls", "stop") and tool_call_deltas:
                         for tc_data in tool_call_deltas.values():
-                            try:
-                                params = (
-                                    json.loads(tc_data["arguments"]) if tc_data["arguments"] else {}
-                                )
-                            except json.JSONDecodeError:
-                                params = {}
+                            params, parse_error = _parse_tool_args(tc_data["arguments"])
                             yield ToolCall(
                                 tool_name=tc_data["name"],
                                 parameters=params,
                                 id=tc_data["id"],
+                                parse_error=parse_error,
                             )
                         tool_call_deltas.clear()
 
@@ -287,14 +327,12 @@ class _OpenAICompatibleBase(ABC):
         # Some providers (e.g. Ollama) may end the stream without a finish_reason.
         if tool_call_deltas:
             for tc_data in tool_call_deltas.values():
-                try:
-                    params = json.loads(tc_data["arguments"]) if tc_data["arguments"] else {}
-                except json.JSONDecodeError:
-                    params = {}
+                params, parse_error = _parse_tool_args(tc_data["arguments"])
                 yield ToolCall(
                     tool_name=tc_data["name"],
                     parameters=params,
                     id=tc_data["id"],
+                    parse_error=parse_error,
                 )
 
     async def astream(
@@ -379,17 +417,12 @@ class _OpenAICompatibleBase(ABC):
                     if finish_reason in ("tool_calls", "stop") and tool_call_deltas:
                         for index in sorted(tool_call_deltas.keys()):
                             tc_info = tool_call_deltas[index]
-                            try:
-                                params = (
-                                    json.loads(tc_info["arguments"]) if tc_info["arguments"] else {}
-                                )
-                            except json.JSONDecodeError:
-                                params = {}
-
+                            params, parse_error = _parse_tool_args(tc_info["arguments"])
                             yield ToolCall(
                                 tool_name=tc_info["name"],
                                 parameters=params,
                                 id=tc_info["id"],
+                                parse_error=parse_error,
                             )
                         tool_call_deltas = {}  # Clear for next iteration if any
 
@@ -406,14 +439,12 @@ class _OpenAICompatibleBase(ABC):
         if tool_call_deltas:
             for index in sorted(tool_call_deltas.keys()):
                 tc_info = tool_call_deltas[index]
-                try:
-                    params = json.loads(tc_info["arguments"]) if tc_info["arguments"] else {}
-                except json.JSONDecodeError:
-                    params = {}
+                params, parse_error = _parse_tool_args(tc_info["arguments"])
                 yield ToolCall(
                     tool_name=tc_info["name"],
                     parameters=params,
                     id=tc_info["id"],
+                    parse_error=parse_error,
                 )
 
     # -- message formatting (identical for OpenAI and Ollama) -----------------
@@ -510,12 +541,13 @@ class _OpenAICompatibleBase(ABC):
 
         if message.tool_calls:
             for tc in message.tool_calls:
-                params = self._parse_tool_call_arguments(tc)
+                params, parse_error = self._parse_tool_call_arguments(tc)
                 tool_calls.append(
                     ToolCall(
                         tool_name=tc.function.name,
                         parameters=params,
                         id=self._parse_tool_call_id(tc),
+                        parse_error=parse_error,
                     )
                 )
 

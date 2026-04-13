@@ -38,6 +38,8 @@ class AzureOpenAIProvider(OpenAIProvider):
     """
 
     name = "azure-openai"
+    # Class-level default so tests that bypass __init__ via __new__ still work.
+    _model_family: str | None = None
 
     def __init__(
         self,
@@ -46,6 +48,7 @@ class AzureOpenAIProvider(OpenAIProvider):
         api_version: str = "2024-10-21",
         azure_deployment: str | None = None,
         azure_ad_token: str | None = None,
+        model_family: str | None = None,
     ):
         """Initialise the Azure OpenAI provider.
 
@@ -60,6 +63,12 @@ class AzureOpenAIProvider(OpenAIProvider):
                 Falls back to ``AZURE_OPENAI_DEPLOYMENT``.
             azure_ad_token: An Azure Active Directory token for AAD-based auth.
                 When set, *api_key* is not required.
+            model_family: Explicit model-family hint used for token-key
+                detection (``max_tokens`` vs ``max_completion_tokens``). Azure
+                deployments use user-chosen names that do not necessarily
+                match the underlying model's family prefix — set this to e.g.
+                ``"gpt-5"`` when deploying a GPT-5-family model under a custom
+                deployment name (BUG-28 / LiteLLM #13515).
 
         Raises:
             ProviderConfigurationError: If the endpoint or credentials are
@@ -120,8 +129,18 @@ class AzureOpenAIProvider(OpenAIProvider):
             else os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
         )
         self.api_key = resolved_key
+        self._model_family: str | None = model_family
 
     # -- template method overrides -------------------------------------------
+
+    def _get_token_key(self, model: str) -> str:
+        # BUG-28 / LiteLLM #13515: Azure deployments use user-chosen names
+        # like "prod-chat" or "my-reasoning" — not model family prefixes.
+        # When `model_family` was explicitly set on the provider, use it for
+        # family detection instead of the deployment name, so a gpt-5-mini
+        # deployment under name "prod-chat" still sends max_completion_tokens.
+        detect = self._model_family if self._model_family is not None else model
+        return "max_completion_tokens" if _uses_max_completion_tokens(detect) else "max_tokens"
 
     def _get_provider_name(self) -> str:
         return "azure-openai"

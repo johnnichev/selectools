@@ -14,7 +14,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
-from .vector_store import Document, SearchResult
+from .vector_store import Document, SearchResult, _validate_filter
 
 _SPLIT_RE = re.compile(r"[^a-z0-9]+")
 
@@ -292,6 +292,8 @@ class BM25:
         """
         if top_k < 1:
             raise ValueError(f"top_k must be >= 1, got {top_k}")
+
+        _validate_filter(filter)
 
         # Take an atomic snapshot of all shared index state so that concurrent
         # index_documents / add_documents / clear calls cannot race with the

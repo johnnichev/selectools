@@ -5,6 +5,391 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.22.0] - 2026-04-11 — Competitor-Informed Bug Fixes
+
+### Methodology
+
+**Round 1** (BUG-01 – BUG-22): 22 bugs identified by cross-referencing 95+
+closed bug reports from [Agno](https://github.com/agno-agi/agno) (39k stars)
+and 60+ from [PraisonAI](https://github.com/MervinPraison/PraisonAI) (6.9k
+stars) against selectools v0.21.0 source code.
+
+**Round 2** (BUG-23 – BUG-26): 4 additional bugs surfaced by a second
+competitive bug-mining pass across **LangChain** (~92k), **LangGraph**
+(~10k), **CrewAI** (~25k), **n8n** (~70k), **LlamaIndex** (~37k) and
+**AutoGen** (~35k) — ~270k combined stars. The LlamaIndex and LangChain
+pass had the research subagents grep selectools source to match competitor
+fix diffs directly, which converted generic "worth checking" patterns into
+concrete confirmed-live bugs.
+
+**Round 3** (BUG-27 – BUG-34): 8 more confirmed-live bugs from a third
+pass across **LiteLLM** (~15k), **Pydantic AI** (~8k), and **Haystack**
+(~18k). Round 3 baked the "grep selectools source to confirm live"
+directive into every research prompt — the single highest-leverage
+methodology improvement across all three rounds. Pydantic AI yielded 4 of
+its top 5 candidates as confirmed-live (ethos match beats star count).
+This round also produced the first **cross-round compound validation**:
+Haystack grep-confirmed the CrewAI round-2 contextvars-in-executor
+candidate (parked as needs-verification) as 5 distinct live sites in
+selectools. Remaining needs-review candidates parked for v0.23.0.
+
+Each fix includes a TDD regression test in `tests/agent/test_regression.py`
+that empirically fails without the fix and passes after. Test suite grew
+from 5,015 to 5,064 with 104 new regression tests (57 round-1 + 8 round-2
++ 39 round-3).
+
+### Fixed — High Severity (Shipping Blockers)
+
+- **BUG-01: Streaming `run()/arun()` silently dropped `ToolCall` objects.**
+  `_streaming_call` and `_astreaming_call` filtered chunks with
+  `isinstance(chunk, str)`, discarding `ToolCall` objects yielded by providers.
+  Any user with `AgentConfig(stream=True)` calling `run()` would find native
+  provider tool calls (Anthropic `tool_use`, OpenAI `function`) were never
+  executed. Both methods now return `Tuple[str, List[ToolCall]]`; callers
+  propagate `tool_calls` into the returned `Message`. Cross-referenced from
+  [Agno #6757](https://github.com/agno-agi/agno/issues/6757).
+
+- **BUG-02: `typing.Literal` crashed `@tool()` creation.** `_unwrap_type()`
+  returned `Literal[...]` unchanged, then `_validate_tool_definition()`
+  rejected it as an unsupported type. New `_literal_info()` helper detects
+  `Literal` (and `Optional[Literal]`), extracts enum values, infers base
+  type from the first value, and auto-populates `ToolParameter.enum`.
+  Supports str, int, float, and bool literals. Cross-referenced from
+  [Agno #6720](https://github.com/agno-agi/agno/issues/6720).
+
+- **BUG-03: `asyncio.run()` in 8 sync wrappers crashed in existing event loops.**
+  `AgentGraph.run`, `AgentGraph.resume`, `SupervisorAgent.run`, all 4 pattern
+  agents, and `Pipeline._execute_step` called bare `asyncio.run()` which
+  raised `RuntimeError` when invoked from Jupyter notebooks, FastAPI handlers,
+  or async tests. New `selectools._async_utils.run_sync()` helper detects a
+  running loop and offloads to a module-level singleton `ThreadPoolExecutor`
+  (per pitfall #20). Cross-referenced from
+  [PraisonAI #1165](https://github.com/MervinPraison/PraisonAI/issues/1165).
+
+- **BUG-04: HITL `InterruptRequest` from parallel group children was silently
+  dropped.** `run_child` in `_aexecute_parallel` discarded the `interrupted`
+  flag from `_aexecute_node`, so the graph continued as if the child completed.
+  Now `run_child` returns a 4-tuple including the interrupted flag, and the
+  first interrupting child surfaces the interrupt to the graph's outer loop
+  for proper checkpointing. `_interrupt_responses` are preserved across the
+  merge boundary. Both `arun` and `astream` callers updated. Cross-referenced
+  from [Agno #4921](https://github.com/agno-agi/agno/issues/4921).
+
+- **BUG-05: HITL `InterruptRequest` from subgraphs was silently dropped, and
+  `graph.resume()` after a subgraph interrupt entered an infinite loop.**
+  `_aexecute_subgraph` never checked `sub_result.interrupted`, so the parent
+  treated the subgraph as completed. Now `_aexecute_subgraph` returns
+  `Tuple[AgentResult, GraphState, bool]`. Uses flat-key propagation matching
+  BUG-04 (the initial namespaced approach broke `resume()`) plus
+  DOWN-propagation of `_interrupt_responses` from parent to sub_state on every
+  invocation, so the subgraph's generator can find its stored response on
+  resume. Includes an end-to-end resume regression test. Cross-referenced from
+  [Agno #4921](https://github.com/agno-agi/agno/issues/4921).
+
+- **BUG-06: `ConversationMemory` had no `threading.Lock`.** It was the only
+  shared-state class in selectools without a lock. Concurrent `add()` /
+  `add_many()` / `get_history()` from multiple threads raced on `_messages`,
+  potentially losing messages or corrupting the list during `_enforce_limits`.
+  All mutation and read methods now acquire `self._lock` (RLock for
+  re-entrance). `__getstate__`/`__setstate__` exclude the lock from
+  serialization and recreate it on restore. `branch()` deep-copy semantics
+  preserved (pitfall #24). Cross-referenced from
+  [PraisonAI #1164](https://github.com/MervinPraison/PraisonAI/issues/1164),
+  [#1260](https://github.com/MervinPraison/PraisonAI/issues/1260).
+
+### Fixed — Medium Severity
+
+- **BUG-07: `<think>` reasoning tag content leaked into conversation history.**
+  Claude-compatible endpoints emit reasoning inline as `<think>...</think>`
+  blocks. These were preserved in response text and written to history,
+  polluting context on subsequent turns. New `_strip_reasoning_tags()`
+  helper removes blocks from `complete`, `acomplete`, `stream`, `astream`.
+  Streaming uses a cross-chunk-safe state machine that correctly handles
+  tags spanning chunk boundaries. Cross-referenced from
+  [Agno #6878](https://github.com/agno-agi/agno/issues/6878).
+
+- **BUG-08: ChromaDB / Pinecone / Qdrant `add_documents()` had no batch size
+  limits and crashed on large ingestions.** ChromaDB has an internal batch
+  limit (~5461 docs); Pinecone's upsert limit is 100 vectors. Each store
+  now chunks the upsert into store-specific batches via a `_batch_size`
+  class attribute (Chroma: 5000, Pinecone: 100, Qdrant: 1000).
+  Cross-referenced from [Agno #7030](https://github.com/agno-agi/agno/issues/7030).
+
+- **BUG-09: Concurrent MCP tool calls raced on the shared session.**
+  `MCPClient._call_tool` had no concurrency control on the shared stdio
+  pipe / HTTP connection, risking interleaved writes and racing circuit
+  breaker state updates. Now serialized via a lazy-initialized
+  `asyncio.Lock` covering session I/O, circuit breaker state, and
+  auto-reconnect logic. Cross-referenced from
+  [Agno #6073](https://github.com/agno-agi/agno/issues/6073).
+
+- **BUG-10: Tool arguments from LLMs were not coerced.** Some LLMs return
+  numeric values as strings in tool call JSON. `_validate_single` rejected
+  string values for `int`/`float`/`bool` parameters with `ToolValidationError`
+  instead of coercing. New `_coerce_value()` helper attempts safe
+  str→int/float/bool coercion before validation. Invalid coercions still
+  raise clearly. Cross-referenced from
+  [PraisonAI #410](https://github.com/MervinPraison/PraisonAI/issues/410).
+
+- **BUG-11: `Union[str, int]` multi-type unions crashed `@tool()` creation.**
+  `_unwrap_type` only unwrapped `Optional` (Union with None). Multi-type
+  unions fell through to validation as unsupported. Now multi-type unions
+  default to `str`; runtime coercion (BUG-10) handles the actual values.
+  Cross-referenced from [Agno #6720](https://github.com/agno-agi/agno/issues/6720).
+
+- **BUG-12: Generator nodes with 2+ `InterruptRequest` yields silently
+  skipped subsequent interrupts.** After `gen.asend(response)` advanced past
+  the first yield, its return value was discarded and `__anext__()` advanced
+  past the next yield, sending `None` to whoever was waiting. The
+  `interrupt_index` counter was also incorrectly reset on non-interrupt
+  yields. Both sync and async generator paths now use a single dispatch
+  loop where `asend`'s return value is processed in the same code path as
+  `__anext__`'s. Resume responses are preserved across re-execution so
+  multi-gate workflows replay deterministically. Cross-referenced from
+  [Agno #4921](https://github.com/agno-agi/agno/issues/4921).
+
+- **BUG-13: `GraphState.to_dict()` did not validate `data` for JSON
+  serializability.** It claimed to return a JSON-safe representation but
+  only deep-copied `data`. Non-serializable values silently corrupted
+  checkpoints. Now round-trips `data` through `json.dumps/loads` and
+  raises `ValueError` with a clear message on failure. Cross-referenced
+  from [Agno #7365](https://github.com/agno-agi/agno/issues/7365).
+
+- **BUG-14: Sessions with the same `session_id` from different agents
+  collided.** All three session stores keyed sessions solely by `session_id`,
+  so two agents (e.g. Agent + Team sharing an ID) would overwrite each
+  other's `ConversationMemory`. All three stores (`JsonFileSessionStore`,
+  `SQLiteSessionStore`, `RedisSessionStore`) now accept an optional
+  `namespace` parameter on `save`/`load`/`delete`/`exists`. Sessions saved
+  without a namespace remain loadable for backward compatibility.
+  Cross-referenced from [Agno #6275](https://github.com/agno-agi/agno/issues/6275).
+
+- **BUG-15: `_maybe_summarize_trim` concatenated session summaries
+  unboundedly.** Each new summary was string-concatenated to the existing
+  one with no cap, eventually exceeding the model's context window over
+  long sessions. New `_append_summary()` helper caps combined length at
+  `_MAX_SUMMARY_CHARS` (4000 ≈ 1000 tokens), keeping the most recent
+  content. Cross-referenced from
+  [Agno #5011](https://github.com/agno-agi/agno/issues/5011).
+
+### Fixed — Low-Medium Severity
+
+- **BUG-16: `_build_cancelled_result` was missing `_extract_entities()` and
+  `_extract_kg_triples()` calls.** When a run was cancelled via
+  `CancellationToken`, any entities/KG triples collected during the turn
+  were silently lost. Now mirrors `_build_max_iterations_result` and
+  `_build_budget_exceeded_result` (CLAUDE.md pitfall #23).
+
+- **BUG-17: `AgentTrace.add()` was not thread-safe.** Parallel graph branches
+  share the trace object and can race when child nodes execute sync callables
+  via `run_in_executor`. Added `threading.Lock` via `__post_init__`
+  (dataclass-safe), wrapping all mutation and snapshot methods.
+  `__getstate__`/`__setstate__` handle serialization compat.
+  Cross-referenced from [Agno #5847](https://github.com/agno-agi/agno/issues/5847).
+
+- **BUG-18: Async observer exceptions silently lost.** `_anotify_observers`
+  fired callbacks via `asyncio.ensure_future(handler())` with no done-callback,
+  so coroutine exceptions became unhandled-exception warnings and were
+  effectively lost. Now attaches a done-callback that logs exceptions via
+  `logger.warning(..., exc_info=exc)` without crashing the agent loop.
+  Cross-referenced from [Agno #6236](https://github.com/agno-agi/agno/issues/6236).
+
+- **BUG-19: `_clone_for_isolation` shallow-copied the Agent so batch clones
+  shared the same `config.observers` list.** Now copies the config and
+  creates a new observer list per clone (relies on BUG-17/20 lock fixes
+  for individual observer thread-safety). Cross-referenced from
+  [PraisonAI #1260](https://github.com/MervinPraison/PraisonAI/issues/1260).
+
+- **BUG-20: `OTelObserver` and `LangfuseObserver` mutated internal dicts and
+  counters without locks.** `Agent.batch()` shares observer instances across
+  thread-pool workers; concurrent `on_llm_start`/`on_llm_end` calls raced on
+  `_llm_counter` and could lose spans or double-count. Both observers now
+  carry a `threading.Lock`. The counter is captured under the lock and
+  reused for the span-dict key, preventing duplicate-key races. I/O calls
+  on span objects happen outside the lock to avoid blocking.
+  Cross-referenced from [PraisonAI #1260](https://github.com/MervinPraison/PraisonAI/issues/1260).
+
+- **BUG-21: Vector store `search()` methods returned duplicate results.** When
+  the same document text was added multiple times (e.g. SQLite store's UUID
+  per insertion), search results contained content duplicates. All 7 vector
+  stores (Memory, SQLite, Chroma, FAISS, Pinecone, Qdrant, pgvector) now
+  accept an opt-in `dedup: bool = False` parameter on `search()`. When True,
+  post-filters by document text via shared `_dedup_search_results()` helper
+  and over-fetches 4× upstream so the final deduped result count matches
+  `top_k`. Default is False for backward compatibility. Cross-referenced
+  from [Agno #7047](https://github.com/agno-agi/agno/issues/7047).
+
+- **BUG-22: `Optional[T]` parameters without a default value were marked
+  required.** `@tool()` only checked for `param.default != inspect.Parameter.empty`
+  to determine optionality, ignoring the type hint. Some LLMs refuse to
+  call a tool when an "optional" parameter has no way to represent None.
+  Now also detects `Optional[T]` via `Union[T, None]` (and Python 3.10+
+  `T | None`) and marks `is_optional=True`. Cross-referenced from
+  [Agno #7066](https://github.com/agno-agi/agno/issues/7066).
+
+### Fixed — Round 2 (LangChain + LangGraph + CrewAI + n8n + LlamaIndex + AutoGen)
+
+- **BUG-23: Reranker `top_k=0` silently returned all results.**
+  `CohereReranker.rerank` used `top_n=top_k or len(results)` so a user
+  passing `top_k=0` to disable reranking got the full list instead of
+  nothing. Round-1 pitfall #22 (zero/falsy confusion) in a new module. Fix
+  uses the `is not None` guard pattern. Cross-referenced from
+  [LlamaIndex #20880](https://github.com/run-llama/llama_index/pull/20880).
+
+- **BUG-24: `_dedup_search_results` keyed only on document text.** Two
+  search results with identical text but different `metadata["source"]`
+  values (same snippet ingested from two different files — common in
+  legal, academic, and regulatory corpora) collapsed into one result and
+  the citation for the second source was lost. Dedup key is now
+  `(text, metadata.get("source"))` with a text-only fallback when no
+  `source` key is present. Cross-referenced from
+  [LlamaIndex #21033](https://github.com/run-llama/llama_index/pull/21034).
+
+- **BUG-25: In-memory metadata filter silently mishandled operator-dict values.**
+  `InMemoryVectorStore._matches_filter` and `BM25._matches_filter` compared
+  metadata values with `!=`. A user passing `{"user_id": {"$in": [1, 2]}}`
+  expecting Mongo-style operator semantics got zero results with no
+  indication of user error. (Mirror-image of LlamaIndex's bug where Qdrant
+  silently dropped unrecognised operators and returned ALL docs — both
+  directions are wrong.) New shared `_validate_filter` helper in
+  `rag/vector_store.py` detects dict values with `$`-prefixed keys and
+  raises `NotImplementedError` pointing users to backend-specific stores.
+  Literal dict values without `$`-prefixed keys still pass through for
+  backward compatibility. Cross-referenced from
+  [LlamaIndex #20246](https://github.com/run-llama/llama_index/pull/20246).
+
+- **BUG-26: Gemini provider `(usage.prompt_token_count or 0)` pattern.**
+  `gemini_provider.py` used the `or 0` fallback on both `prompt_token_count`
+  and `candidates_token_count` in sync `complete()` and the stream path.
+  If the Gemini API returned `prompt_token_count=None` alongside a real
+  `candidates_token_count`, the `or 0` conflated "unknown" with "zero" and
+  under-reported `total_tokens`. Round-1 pitfall #22 instance not yet
+  swept in `providers/`. Fix uses `x if x is not None else 0` guard on both
+  paths. Grep confirmed no other provider has the `or 0` pattern on token
+  fields. Cross-referenced from
+  [LangChain #36500](https://github.com/langchain-ai/langchain/pull/36500).
+
+### Fixed — Round 3 (LiteLLM + Pydantic AI + Haystack)
+
+- **BUG-27: FallbackProvider retriable-error list incomplete.**
+  `_RETRIABLE_STATUS_CODES` regex `\b(429|500|502|503)\b` missed 504
+  (Gateway Timeout), 408 (Request Timeout), 529 (Anthropic Overloaded —
+  very common on US-West), and 522/524 (Cloudflare). Substring list also
+  missed `rate_limit_exceeded` (underscore form), `overloaded`, and
+  `service_unavailable`. Production Anthropic 529 was treated as
+  non-retriable and raised to the user. Extended regex to `(408|429|500|
+  502|503|504|522|524|529)` and added underscore variants to substring
+  list. Cross-referenced from
+  [LiteLLM #25530](https://github.com/BerriAI/litellm/pull/25530).
+
+- **BUG-28: Azure deployment names bypass GPT-5 family detection.**
+  `AzureOpenAIProvider` inherited `_get_token_key(model)` from
+  `OpenAIProvider`, which checked `model.startswith("gpt-5")` against the
+  deployment name. Azure deployments use user-chosen names (`prod-chat`,
+  `my-reasoning`) that don't match family prefixes. A `gpt-5-mini`
+  deployment under name `prod-chat` received `max_tokens` instead of
+  `max_completion_tokens` → `BadRequestError: Unsupported parameter`.
+  Azure variant of round-1 pitfall #3. Added `model_family: str | None`
+  kwarg; when set, overrides deployment-name detection. Cross-referenced
+  from [LiteLLM #13515](https://github.com/BerriAI/litellm/pull/13515).
+
+- **BUG-29: Bare `list`/`dict` tool params emit schemas with no
+  `items`/`properties`.** `_unwrap_type(list[str]) → list` stripped
+  generic args before `ToolParameter.to_schema()` could emit the element
+  type, so `def f(items: list[str])` produced only `{"type": "array"}`.
+  OpenAI strict mode rejects this; non-strict mode leaves the LLM unable
+  to know what the array should contain. Added `ToolParameter.element_type`
+  and `_collection_element_type()` helper; `to_schema()` now emits
+  `items`/`additionalProperties` for typed collections. Backward
+  compatible — bare `list`/`dict` without generic args still emit the
+  plain schema. Cross-referenced from
+  [Pydantic AI #4544](https://github.com/pydantic/pydantic-ai/pull/4544).
+
+- **BUG-30: `pipeline.parallel()` branches share input reference.**
+  `_parallel_sync` and `_parallel_async` passed the SAME `input` object
+  to every branch. Under `asyncio.gather`, branches interleave at await
+  points, producing non-deterministic state corruption when any branch
+  mutated its input. Fix: `copy.deepcopy(input)` per branch. Cross-
+  referenced from
+  [Haystack #10549](https://github.com/deepset-ai/haystack/pull/10549).
+
+- **BUG-31: Silent `{}` drop on malformed tool-call JSON.** Providers
+  caught `json.JSONDecodeError` at 7 sites (5 in `_openai_compat.py`, 2
+  in `anthropic_provider.py`, + the Ollama override) and returned `{}`.
+  The tool then failed with "Missing required parameter", so the LLM
+  learned only that it forgot a parameter — NOT that its JSON was
+  malformed — and would reproduce the same bad JSON next iteration. Added
+  `_parse_tool_args()` shared helper returning `(params, parse_error)`;
+  new `ToolCall.parse_error` field; `_execute_single_tool` / async
+  variant check `parse_error` BEFORE tool lookup and emit a clear retry
+  message ("Tool call for X had malformed arguments: ..."). Ollama
+  override updated to match the new contract. Cross-referenced from
+  [Pydantic AI #4609](https://github.com/pydantic/pydantic-ai/pull/4609).
+
+- **BUG-32: `run_in_executor` drops contextvars at 5 grep-verified
+  sites.** OTel active spans, Langfuse parent span, any `ContextVar` set
+  by `_wire_fallback_observer`, and cancellation tokens all dropped
+  inside executor-scheduled callables. Users saw orphaned spans on every
+  sync-fallback provider call and every sync graph node. Five sites
+  wired: `agent/_provider_caller.py:386`, `agent/core.py:1286`,
+  `orchestration/graph.py:1237, 1251`, `agent/_tool_executor.py:321`.
+  Added `run_in_executor_copyctx(loop, executor, fn)` helper in
+  `_async_utils.py` that captures `contextvars.copy_context()` before
+  dispatch. **First cross-round compound validation**: this pattern was
+  first surfaced by CrewAI round-2 research and parked as "needs
+  verification"; Haystack round-3 research grep-confirmed 5 live sites.
+  Cross-referenced from
+  [Haystack #9717](https://github.com/deepset-ai/haystack/pull/9717) +
+  [CrewAI #4824](https://github.com/crewAIInc/crewAI/pull/4824).
+
+- **BUG-33: `astream()` provider generators leak on inner exception.**
+  `async for item in gen:` without wrapping in a context manager leaked
+  the provider generator when the loop body raised — `gen.__aexit__`
+  ran under GC, producing `RuntimeError: async generator raised
+  StopAsyncIteration` and orphaned HTTP connections. Zero uses of
+  `contextlib.aclosing` existed in selectools. Two sites: `agent/
+  core.py:1316` (arun stream path) and `agent/_provider_caller.py:505`
+  (`_astreaming_call` helper). Added a Python-3.9-compatible `aclosing`
+  class in `_async_utils.py` (stdlib `contextlib.aclosing` is 3.10+) and
+  wrapped both sites. Cross-referenced from
+  [Pydantic AI #4205](https://github.com/pydantic/pydantic-ai/pull/4205).
+
+- **BUG-34: `max_iterations` consumed by structured-retry budget.**
+  Selectools shared ONE global counter between tool-execution iterations
+  and structured-validation retries. An agent with `max_iterations=3`
+  and an LLM failing structured validation 3 times would terminate
+  before reaching `RetryConfig.max_retries=5` — the retry config was
+  effectively unused for structured retries. Fix: added
+  `_RunContext.structured_retries` counter; all 3 structured-retry
+  branches (run/arun/astream) now check
+  `ctx.structured_retries < self.config.retry.max_retries`; outer loops
+  use `while ctx.iteration < max_iterations + ctx.structured_retries`
+  so structured retries extend the tool-iteration budget rather than
+  eating into it. Cross-referenced from
+  [Pydantic AI #4956](https://github.com/pydantic/pydantic-ai/pull/4956).
+
+### Stats
+
+- **5,064 tests** (up from 5,015 baseline; +104 new regression tests in
+  `tests/agent/test_regression.py` = 57 round-1 + 8 round-2 + 39 round-3)
+- **32 fix commits + 4 docs commits** on `v0.22.0-competitor-bug-fixes` branch
+- **Cross-referenced bug sources**: Agno (16), PraisonAI (5), LlamaIndex
+  (3), LangChain (1), LiteLLM (2), Pydantic AI (4), Haystack (2) + first
+  cross-round compound validation (CrewAI round-2 → Haystack round-3)
+- **Thread safety story now end-to-end correct**: ConversationMemory,
+  AgentTrace, OTel/Langfuse observers, MCPClient, FallbackProvider, batch
+  clone isolation
+- **RAG citation and permission-filter correctness**: dedup preserves
+  distinct sources; in-memory filters surface operator-dict user errors
+  instead of silent empty results
+- **Observability fidelity**: contextvars (OTel/Langfuse spans) now
+  propagate into every thread-pool executor call site
+- **Structured-output correctness**: bare `list`/`dict` tool params emit
+  proper JSON schemas; malformed tool-call JSON surfaces clear retry
+  messages; structured-validation retries have their own budget
+- **Async cleanup correctness**: `astream()` deterministically closes
+  provider generators on exception via backported `aclosing`
+
 ## [0.21.0] - 2026-04-08
 
 ### Added

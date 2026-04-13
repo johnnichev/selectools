@@ -5,6 +5,7 @@ Conversation memory management for maintaining multi-turn dialogue history.
 from __future__ import annotations
 
 import copy
+import threading
 from dataclasses import replace
 from typing import Any, Dict, List, Optional
 
@@ -61,6 +62,7 @@ class ConversationMemory:
         self._messages: List[Message] = []
         self._summary: Optional[str] = None
         self._last_trimmed: List[Message] = []
+        self._lock = threading.RLock()
 
     def add(self, message: Message) -> None:
         """
@@ -72,8 +74,9 @@ class ConversationMemory:
         Args:
             message: The message to add to history.
         """
-        self._messages.append(message)
-        self._enforce_limits()
+        with self._lock:
+            self._messages.append(message)
+            self._enforce_limits()
 
     def add_many(self, messages: List[Message]) -> None:
         """
@@ -85,8 +88,9 @@ class ConversationMemory:
         Args:
             messages: List of messages to add to history.
         """
-        self._messages.extend(messages)
-        self._enforce_limits()
+        with self._lock:
+            self._messages.extend(messages)
+            self._enforce_limits()
 
     def get_history(self) -> List[Message]:
         """
@@ -95,7 +99,8 @@ class ConversationMemory:
         Returns:
             List of all messages in chronological order.
         """
-        return list(self._messages)
+        with self._lock:
+            return list(self._messages)
 
     def get_recent(self, n: int) -> List[Message]:
         """
@@ -109,7 +114,8 @@ class ConversationMemory:
         """
         if n < 1:
             raise ValueError("n must be at least 1")
-        return self._messages[-n:] if len(self._messages) >= n else list(self._messages)
+        with self._lock:
+            return self._messages[-n:] if len(self._messages) >= n else list(self._messages)
 
     def clear(self) -> None:
         """
@@ -118,18 +124,21 @@ class ConversationMemory:
         Useful for starting a fresh conversation while reusing the same
         memory instance.
         """
-        self._messages.clear()
-        self._last_trimmed = []
-        self._summary = None
+        with self._lock:
+            self._messages.clear()
+            self._last_trimmed = []
+            self._summary = None
 
     @property
     def summary(self) -> Optional[str]:
         """Current conversation summary produced by summarize-on-trim."""
-        return self._summary
+        with self._lock:
+            return self._summary
 
     @summary.setter
     def summary(self, value: Optional[str]) -> None:
-        self._summary = value
+        with self._lock:
+            self._summary = value
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -140,13 +149,14 @@ class ConversationMemory:
         Returns:
             Dictionary containing configuration and all messages.
         """
-        return {
-            "max_messages": self.max_messages,
-            "max_tokens": self.max_tokens,
-            "message_count": len(self._messages),
-            "messages": [msg.to_dict() for msg in self._messages],
-            "summary": self._summary,
-        }
+        with self._lock:
+            return {
+                "max_messages": self.max_messages,
+                "max_tokens": self.max_tokens,
+                "message_count": len(self._messages),
+                "messages": [msg.to_dict() for msg in self._messages],
+                "summary": self._summary,
+            }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ConversationMemory":
@@ -161,6 +171,7 @@ class ConversationMemory:
         mem._messages = [Message.from_dict(m) for m in data.get("messages", [])]
         mem._summary = data.get("summary")
         mem._last_trimmed = []
+        mem._lock = threading.RLock()
         mem._fix_tool_pair_boundary()
         return mem
 
@@ -269,18 +280,20 @@ class ConversationMemory:
             A new :class:`ConversationMemory` instance with an independent copy
             of the current state.
         """
-        branched = ConversationMemory(
-            max_messages=self.max_messages,
-            max_tokens=self.max_tokens,
-        )
-        branched._messages = [self._copy_message(msg) for msg in self._messages]
-        branched._summary = self._summary
-        branched._last_trimmed = []
-        return branched
+        with self._lock:
+            branched = ConversationMemory(
+                max_messages=self.max_messages,
+                max_tokens=self.max_tokens,
+            )
+            branched._messages = [self._copy_message(msg) for msg in self._messages]
+            branched._summary = self._summary
+            branched._last_trimmed = []
+            return branched
 
     def __len__(self) -> int:
         """Return the number of messages in history."""
-        return len(self._messages)
+        with self._lock:
+            return len(self._messages)
 
     def __bool__(self) -> bool:
         """Always return True so memory object is truthy even when empty."""
@@ -288,11 +301,28 @@ class ConversationMemory:
 
     def __repr__(self) -> str:
         """Return a string representation of the memory state."""
-        return (
-            f"ConversationMemory(max_messages={self.max_messages}, "
-            f"max_tokens={self.max_tokens}, "
-            f"current_messages={len(self._messages)})"
-        )
+        with self._lock:
+            return (
+                f"ConversationMemory(max_messages={self.max_messages}, "
+                f"max_tokens={self.max_tokens}, "
+                f"current_messages={len(self._messages)})"
+            )
+
+    def __getstate__(self) -> Dict[str, Any]:
+        """Exclude the lock from serialization.
+
+        ``threading.RLock`` cannot be serialized, so it is dropped here and
+        recreated in :meth:`__setstate__` on restore. This keeps ``copy.copy``
+        / ``copy.deepcopy`` working on ``ConversationMemory`` instances.
+        """
+        state = self.__dict__.copy()
+        state.pop("_lock", None)
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        """Restore serialized state and recreate the lock."""
+        self.__dict__.update(state)
+        self._lock = threading.RLock()
 
 
 __all__ = ["ConversationMemory"]

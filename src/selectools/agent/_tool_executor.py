@@ -51,6 +51,7 @@ def _get_parallel_dispatch_executor() -> ThreadPoolExecutor:
     return _parallel_dispatch_executor
 
 
+from .._async_utils import run_in_executor_copyctx
 from ..coherence import CoherenceResult, acheck_coherence, check_coherence
 from ..policy import PolicyDecision, PolicyResult, ToolPolicy
 from ..security import screen_output as screen_tool_output
@@ -316,14 +317,15 @@ class _ToolExecutorMixin:
                         timeout=self.config.approval_timeout,
                     )
                 else:
+                    # BUG-32: propagate caller contextvars (OTel / Langfuse)
+                    # into the confirm_action worker thread.
                     loop = asyncio.get_running_loop()
+                    confirm_fn = self.config.confirm_action
                     approved = await asyncio.wait_for(
-                        loop.run_in_executor(
+                        run_in_executor_copyctx(
+                            loop,
                             None,
-                            self.config.confirm_action,
-                            tool_name,
-                            tool_args,
-                            result.reason,
+                            lambda: confirm_fn(tool_name, tool_args, result.reason),
                         ),
                         timeout=self.config.approval_timeout,
                     )
@@ -819,6 +821,26 @@ class _ToolExecutorMixin:
         if self.config.verbose:
             print(f"[agent] Iteration {ctx.iteration}: tool={tool_name} params={parameters}")
 
+        # --- Malformed tool-call arguments (BUG-31 / Pydantic AI #4609) ---
+        # Providers surface parse errors on the ToolCall so the LLM learns
+        # its JSON was the problem instead of silently retrying with the
+        # same malformed call.
+        if tool_call.parse_error is not None:
+            error_message = (
+                f"Tool call for '{tool_name}' had malformed arguments: "
+                f"{tool_call.parse_error}. Retry with properly escaped JSON."
+            )
+            self._append_tool_result(error_message, tool_name, tool_call.id, run_id=ctx.run_id)
+            ctx.trace.add(
+                TraceStep(
+                    type=StepType.ERROR,
+                    tool_name=tool_name,
+                    error=error_message,
+                    summary=f"Malformed arguments for {tool_name}",
+                )
+            )
+            return False
+
         # --- Tool lookup ---
         tool = self._tools_by_name.get(tool_name)
         if not tool:
@@ -1002,6 +1024,23 @@ class _ToolExecutorMixin:
 
         if self.config.verbose:
             print(f"[agent] Iteration {ctx.iteration}: tool={tool_name} params={parameters}")
+
+        # --- Malformed tool-call arguments (BUG-31 / Pydantic AI #4609) ---
+        if tool_call.parse_error is not None:
+            error_message = (
+                f"Tool call for '{tool_name}' had malformed arguments: "
+                f"{tool_call.parse_error}. Retry with properly escaped JSON."
+            )
+            self._append_tool_result(error_message, tool_name, tool_call.id, run_id=ctx.run_id)
+            ctx.trace.add(
+                TraceStep(
+                    type=StepType.ERROR,
+                    tool_name=tool_name,
+                    error=error_message,
+                    summary=f"Malformed arguments for {tool_name}",
+                )
+            )
+            return False
 
         # --- Tool lookup ---
         tool = self._tools_by_name.get(tool_name)

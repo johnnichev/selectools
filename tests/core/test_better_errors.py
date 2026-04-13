@@ -322,14 +322,19 @@ class TestToolValidationTypeMismatch:
         )
 
     def test_string_instead_of_int(self) -> None:
-        """Test error when string is provided instead of int."""
+        """Test error when an unparseable string is provided instead of int.
+
+        BUG-10: numeric strings (e.g. "5") are now safely coerced. Only
+        strings that cannot be converted to int still raise.
+        """
         with pytest.raises(ToolValidationError) as exc_info:
             self.tool.validate({"x": "five", "y": 2.0, "operation": "+"})
 
         error = exc_info.value
         assert "x" in error.param_name
-        assert "must be of type int" in error.issue
-        assert "got str" in error.issue
+        # New (BUG-10) message reports the coercion failure explicitly.
+        assert "coerce" in error.issue.lower()
+        assert "int" in error.issue
 
     def test_int_instead_of_string(self) -> None:
         """Test error when int is provided instead of string."""
@@ -345,14 +350,26 @@ class TestToolValidationTypeMismatch:
         # Should not raise - int is acceptable for float
         self.tool.validate({"x": 5, "y": 2, "operation": "+"})
 
+    def test_numeric_string_coerced_to_int(self) -> None:
+        """BUG-10: numeric strings are coerced to int rather than rejected.
+
+        Some LLMs (especially smaller local models) emit numeric tool
+        arguments as JSON strings. ``validate`` now writes the coerced
+        value back into the params dict so ``execute`` uses the int.
+        """
+        params = {"x": "5", "y": 2.0, "operation": "+"}
+        self.tool.validate(params)
+        assert params["x"] == 5
+        assert isinstance(params["x"], int)
+
     def test_type_hint_in_suggestion(self) -> None:
-        """Test that type conversion hints are provided."""
+        """Test that type conversion hints are provided for unrecoverable values."""
         with pytest.raises(ToolValidationError) as exc_info:
-            self.tool.validate({"x": "5", "y": 2.0, "operation": "+"})
+            self.tool.validate({"x": "abc", "y": 2.0, "operation": "+"})
 
         error = exc_info.value
-        # Should suggest conversion
-        assert "Expected type: int" in error.suggestion or "int(" in error.suggestion
+        # Should mention the expected type in the suggestion.
+        assert "int" in error.suggestion
 
 
 # =============================================================================

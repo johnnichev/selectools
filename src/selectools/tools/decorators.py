@@ -7,10 +7,51 @@ from __future__ import annotations
 import functools
 import inspect
 import sys
-from typing import Any, Callable, Dict, List, Optional, Union, get_args, get_origin, get_type_hints
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Union,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
 from ..stability import stable
 from .base import ParamMetadata, Tool, ToolParameter
+
+
+def _literal_info(type_hint: Any) -> Optional[Tuple[Any, List[Any]]]:
+    """Return (base_type, enum_values) for Literal[...] hints, else None.
+
+    Unwraps Optional[Literal[...]] as well. Base type is inferred from the
+    first literal value (e.g. Literal["a", "b"] -> str).
+    """
+    origin = get_origin(type_hint)
+    if origin is Union:
+        args = get_args(type_hint)
+        non_none = [a for a in args if a is not type(None)]
+        if len(non_none) == 1:
+            return _literal_info(non_none[0])
+    if sys.version_info >= (3, 10):
+        import types as _types  # noqa: PLC0415
+
+        if isinstance(type_hint, _types.UnionType):
+            args = get_args(type_hint)
+            non_none = [a for a in args if a is not type(None)]
+            if len(non_none) == 1:
+                return _literal_info(non_none[0])
+    if origin is Literal:
+        values = list(get_args(type_hint))
+        if not values:
+            return None
+        base_type = type(values[0])
+        return base_type, values
+    return None
 
 
 def _unwrap_type(type_hint: Any) -> Any:
@@ -21,6 +62,11 @@ def _unwrap_type(type_hint: Any) -> Any:
     This allows parameters annotated as ``Optional[List[str]]`` to be
     recognised as the supported ``list`` type rather than raising
     ``ToolValidationError: Unsupported parameter type: typing.List[str]``.
+
+    BUG-11: Multi-type unions like ``Union[str, int]`` previously fell
+    through to ``_validate_tool_definition`` which rejected them. We now
+    default such unions to ``str`` — runtime values are then coerced by
+    ``Tool._coerce_value`` (BUG-10) so int/float/bool inputs still work.
     """
     origin = get_origin(type_hint)
     if origin is Union:
@@ -29,6 +75,10 @@ def _unwrap_type(type_hint: Any) -> Any:
         non_none_args = [a for a in args if a is not type(None)]
         if len(non_none_args) == 1:
             return _unwrap_type(non_none_args[0])
+        if len(non_none_args) > 1:
+            # Multi-type union (e.g. Union[str, int]) — default to str.
+            # Runtime values are coerced by tools/base.py::_coerce_value.
+            return str
     # Handle Python 3.10+ X | Y syntax (types.UnionType)
     if sys.version_info >= (3, 10):
         import types  # noqa: PLC0415
@@ -38,12 +88,56 @@ def _unwrap_type(type_hint: Any) -> Any:
             non_none_args = [a for a in args if a is not type(None)]
             if len(non_none_args) == 1:
                 return _unwrap_type(non_none_args[0])
+            if len(non_none_args) > 1:
+                # Multi-type union (e.g. str | int) — default to str.
+                return str
     # Strip generic parameters from collection types: List[str] → list,
     # Dict[str, Any] → dict, list[str] → list (Python 3.9+ native syntax).
     _SUPPORTED_ORIGINS = {list, dict}
     if origin in _SUPPORTED_ORIGINS:
         return origin
     return type_hint
+
+
+def _collection_element_type(type_hint: Any) -> Optional[type]:
+    """Extract the element type from ``list[T]`` / ``dict[K, V]`` annotations.
+
+    BUG-29 / Pydantic AI #4544: ``_unwrap_type`` strips generic args (``list[str]``
+    → ``list``) so OpenAI strict mode receives ``{"type": "array"}`` with no
+    ``items``. This helper walks Optional/Union unwraps parallel to ``_unwrap_type``
+    and returns the element type for lists or the value type for dicts, so
+    ``ToolParameter`` can emit ``items`` / ``additionalProperties`` in its
+    schema. Returns ``None`` for bare ``list`` / ``dict`` (no generic args) or
+    when the element type is not one of the supported primitives.
+    """
+    # Unwrap Optional[T] / Union[T, None] just like _unwrap_type does.
+    origin = get_origin(type_hint)
+    if origin is Union:
+        args = get_args(type_hint)
+        non_none_args = [a for a in args if a is not type(None)]
+        if len(non_none_args) == 1:
+            return _collection_element_type(non_none_args[0])
+        return None
+    if sys.version_info >= (3, 10):
+        import types as _types  # noqa: PLC0415
+
+        if isinstance(type_hint, _types.UnionType):
+            args = get_args(type_hint)
+            non_none_args = [a for a in args if a is not type(None)]
+            if len(non_none_args) == 1:
+                return _collection_element_type(non_none_args[0])
+            return None
+    # Extract element type from parametrized list[T] / dict[K, V].
+    if origin is list:
+        args = get_args(type_hint)
+        if args and isinstance(args[0], type) and args[0] in (str, int, float, bool):
+            return args[0]  # type: ignore[no-any-return]
+    if origin is dict:
+        args = get_args(type_hint)
+        # dict[K, V] → element (value) type is the second generic arg
+        if len(args) >= 2 and isinstance(args[1], type) and args[1] in (str, int, float, bool):
+            return args[1]  # type: ignore[no-any-return]
+    return None
 
 
 def _infer_parameters_from_callable(
@@ -86,19 +180,40 @@ def _infer_parameters_from_callable(
         if name in injected_names:
             continue
 
-        # Get type hint (default to str if missing)
-        raw_type = type_hints.get(name, str)
-        param_type = _unwrap_type(raw_type)
-
         # detailed metadata
         meta = param_metadata.get(name, {})
         description = meta.get("description", f"Parameter {name}")
-        enum_values = meta.get("enum")
+        enum_values: Optional[List[Any]] = meta.get("enum")
+
+        raw_type = type_hints.get(name, str)
+        lit = _literal_info(raw_type)
+        element_type: Optional[type] = None
+        if lit is not None:
+            param_type, literal_values = lit
+            if enum_values is None:
+                enum_values = literal_values
+        else:
+            param_type = _unwrap_type(raw_type)
+            # BUG-29: extract element type for list[T] / dict[K, V] so the
+            # emitted JSON schema carries items/additionalProperties.
+            if param_type in (list, dict):
+                element_type = _collection_element_type(raw_type)
 
         # Check for optional/default values
-        is_optional = param.default != inspect.Parameter.empty
-        # Optional type hint (e.g. Optional[str]) handling could be added here
-        # For now we rely on the default value check
+        has_default = param.default != inspect.Parameter.empty
+        # BUG-22: also treat Optional[T] as optional even without a default,
+        # since the type hint signals None is a valid value. Some LLMs refuse
+        # to call a tool where a "required" parameter has no way to express None.
+        is_optional_type = False
+        raw_origin = get_origin(raw_type)
+        if raw_origin is Union and type(None) in get_args(raw_type):
+            is_optional_type = True
+        if sys.version_info >= (3, 10):
+            import types as _types  # noqa: PLC0415
+
+            if isinstance(raw_type, _types.UnionType) and type(None) in get_args(raw_type):
+                is_optional_type = True
+        is_optional = has_default or is_optional_type
 
         parameters.append(
             ToolParameter(
@@ -107,6 +222,7 @@ def _infer_parameters_from_callable(
                 description=description,
                 required=not is_optional,
                 enum=enum_values,
+                element_type=element_type,
             )
         )
 

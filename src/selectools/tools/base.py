@@ -13,7 +13,7 @@ import json
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from ..exceptions import ToolExecutionError, ToolValidationError
 from ..stability import stable
@@ -94,6 +94,11 @@ class ToolParameter:
     description: str
     required: bool = True
     enum: Optional[List[str]] = None
+    # BUG-29 / Pydantic AI #4544: element type for `list[T]` / `dict[K, V]`
+    # parameters, so `to_schema()` can emit `items` / `additionalProperties`.
+    # Bare `list` / `dict` without generic args leave this as None and fall
+    # back to the original (untyped) schema for backward compatibility.
+    element_type: Optional[type] = None
 
     def to_schema(self) -> JsonSchema:
         """
@@ -109,6 +114,16 @@ class ToolParameter:
         }
         if self.enum:
             schema["enum"] = self.enum
+        # BUG-29: emit element-type info for typed collections so OpenAI strict
+        # mode accepts the schema and the LLM knows what to put in the array /
+        # dict values. Bare `list` / `dict` without generic args emit the plain
+        # type-only schema as before (backward compat).
+        if self.element_type is not None:
+            inner = {"type": _python_type_to_json(self.element_type)}
+            if self.param_type is list:
+                schema["items"] = inner
+            elif self.param_type is dict:
+                schema["additionalProperties"] = inner
         return schema
 
 
@@ -343,6 +358,51 @@ class Tool:
             return f"Parameter '{param.name}' must be of type {param.param_type.__name__}, got {type(value).__name__}"
         return None
 
+    def _coerce_value(
+        self, param: ToolParameter, value: ParameterValue
+    ) -> Tuple[ParameterValue, Optional[str]]:
+        """Attempt safe coercion of a parameter value to its declared type.
+
+        Returns a (coerced_value, error) tuple. ``error`` is ``None`` on
+        success. Coercion is only attempted from ``str`` to primitive types
+        (``int``, ``float``, ``bool``); other type mismatches fall through
+        unchanged so the existing validation path can report them.
+
+        BUG-10: Some LLMs (especially smaller local models via Ollama) emit
+        numeric tool arguments as JSON strings. Without this coercion the
+        agent would reject perfectly recoverable values.
+        """
+        if value is None:
+            return value, None
+        if isinstance(value, param.param_type) and not (
+            isinstance(value, bool) and param.param_type in (int, float)
+        ):
+            return value, None
+        if not isinstance(value, str):
+            return value, None
+        if param.param_type is bool:
+            lowered = value.strip().lower()
+            if lowered in ("true", "1", "yes", "on"):
+                return True, None
+            if lowered in ("false", "0", "no", "off"):
+                return False, None
+            return value, (f"Cannot coerce {value!r} to bool for parameter '{param.name}'")
+        if param.param_type is int:
+            try:
+                return int(value), None
+            except (ValueError, TypeError) as exc:
+                return value, (
+                    f"Cannot coerce {value!r} to int for parameter '{param.name}': {exc}"
+                )
+        if param.param_type is float:
+            try:
+                return float(value), None
+            except (ValueError, TypeError) as exc:
+                return value, (
+                    f"Cannot coerce {value!r} to float for parameter '{param.name}': {exc}"
+                )
+        return value, None
+
     @property
     def is_streaming(self) -> bool:
         """Return whether this tool streams results progressively."""
@@ -395,6 +455,19 @@ class Tool:
             # they will be omitted from call_args so the function default is used.
             if not param.required and params[param.name] is None:
                 continue
+
+            # BUG-10: Attempt safe coercion (str -> int/float/bool) before
+            # validation. Smaller LLMs sometimes emit numeric tool arguments
+            # as JSON strings; coercing here lets the tool execute normally.
+            coerced, coerce_error = self._coerce_value(param, params[param.name])
+            if coerce_error:
+                raise ToolValidationError(
+                    tool_name=self.name,
+                    param_name=param.name,
+                    issue=coerce_error,
+                    suggestion=f"Expected type: {param.param_type.__name__}",
+                )
+            params[param.name] = coerced
 
             # Validate parameter type
             error = self._validate_single(param, params[param.name])

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 if TYPE_CHECKING:
     from ...embeddings.provider import EmbeddingProvider
 
-from ..vector_store import Document, SearchResult, VectorStore
+from ..vector_store import Document, SearchResult, VectorStore, _dedup_search_results
 
 
 class ChromaVectorStore(VectorStore):
@@ -43,6 +43,10 @@ class ChromaVectorStore(VectorStore):
     """
 
     embedder: "EmbeddingProvider"
+
+    # ChromaDB has an internal SQLite parameter limit (~5461) on a single
+    # upsert. Stay safely below it so large ingestions don't crash.
+    _batch_size: int = 5000
 
     def __init__(
         self,
@@ -114,9 +118,18 @@ class ChromaVectorStore(VectorStore):
         texts = [doc.text for doc in documents]
         metadatas = [doc.metadata for doc in documents]
 
-        # Upsert to Chroma collection (idempotent — avoids duplicate-ID errors on
-        # re-indexing the same documents).
-        self.collection.upsert(ids=ids, embeddings=embeddings, documents=texts, metadatas=metadatas)  # type: ignore
+        # Upsert to Chroma collection in batches (idempotent — avoids
+        # duplicate-ID errors on re-indexing the same documents).  ChromaDB
+        # rejects single upsert calls that exceed its internal SQLite
+        # parameter limit (~5461 docs), so chunk large ingestions.
+        for start in range(0, len(ids), self._batch_size):
+            end = start + self._batch_size
+            self.collection.upsert(
+                ids=ids[start:end],
+                embeddings=embeddings[start:end],  # type: ignore[arg-type]
+                documents=texts[start:end],
+                metadatas=metadatas[start:end],  # type: ignore[arg-type]
+            )
 
         return ids
 
@@ -125,6 +138,7 @@ class ChromaVectorStore(VectorStore):
         query_embedding: List[float],
         top_k: int = 5,
         filter: Optional[Dict[str, Any]] = None,
+        dedup: bool = False,
     ) -> List[SearchResult]:
         """
         Search for similar documents.
@@ -133,6 +147,7 @@ class ChromaVectorStore(VectorStore):
             query_embedding: Query embedding vector
             top_k: Number of results to return
             filter: Optional metadata filter (Chroma where clause)
+            dedup: If True, drop duplicate-text results (keeps highest-scoring).
 
         Returns:
             List of SearchResult objects, sorted by similarity
@@ -145,8 +160,10 @@ class ChromaVectorStore(VectorStore):
             where = filter
 
         # Clamp n_results to the number of stored documents to avoid a ChromaDB
-        # error when the collection is smaller than top_k.
-        n_results = min(top_k, self.collection.count())
+        # error when the collection is smaller than top_k. Over-fetch when
+        # dedup is requested so we still return top_k unique results.
+        fetch_k = top_k * 4 if dedup else top_k
+        n_results = min(fetch_k, self.collection.count())
         if n_results == 0:
             return []
 
@@ -181,7 +198,9 @@ class ChromaVectorStore(VectorStore):
 
                 search_results.append(SearchResult(document=doc, score=score))
 
-        return search_results
+        if dedup:
+            search_results = _dedup_search_results(search_results)
+        return search_results[:top_k]
 
     def delete(self, ids: List[str]) -> None:
         """

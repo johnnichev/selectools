@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from ..cancellation import CancellationToken
     from ..observer import AgentObserver
 
+from .._async_utils import run_sync
 from ..orchestration.graph import AgentGraph
 from ..orchestration.state import ContextMode, GraphState
 from ..orchestration.supervisor import _safe_json_parse
@@ -123,7 +124,7 @@ class TeamLeadAgent:
 
     def run(self, prompt: str) -> TeamLeadResult:
         """Execute synchronously."""
-        return asyncio.run(self.arun(prompt))
+        return run_sync(self.arun(prompt))
 
     async def arun(self, prompt: str) -> TeamLeadResult:
         """Execute asynchronously using the configured delegation strategy."""

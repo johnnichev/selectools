@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, AsyncGenerator, Callable, Dict, List, Optional, Union, cast
 
+from .._async_utils import aclosing, run_in_executor_copyctx
 from ..analytics import AgentAnalytics
 from ..parser import ToolCallParser
 from ..prompt import PromptBuilder
@@ -51,6 +52,11 @@ class _RunContext:
     response_format: Optional[ResponseFormat]
     user_text_for_coherence: str = ""
     iteration: int = 0
+    # BUG-34 / Pydantic AI #4956: structured-validation retries need their
+    # own budget, decoupled from the tool-iteration budget. Previously, a
+    # max_iterations=3 agent with 3 validation failures would terminate
+    # before reaching the RetryConfig.max_retries ceiling.
+    structured_retries: int = 0
     all_tool_calls: List[ToolCall] = field(default_factory=list)
     last_tool_name: Optional[str] = None
     last_tool_args: Dict[str, Any] = field(default_factory=dict)
@@ -545,6 +551,8 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         final_response = Message(role=Role.ASSISTANT, content=reason)
         self._history.append(final_response)
         self._memory_add(final_response, ctx.run_id)
+        self._extract_entities(ctx.run_id)
+        self._extract_kg_triples(ctx.run_id)
         self._session_save(ctx.run_id)
         result = AgentResult(
             message=final_response,
@@ -959,7 +967,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 messages, response_format=response_format, parent_run_id=parent_run_id
             )
 
-            while ctx.iteration < self.config.max_iterations:
+            # BUG-34: structured-validation retries extend the iteration
+            # budget so max_iterations caps tool-execution iterations, not
+            # structured-validation retries. Without this, an agent with
+            # max_iterations=3 and 3 validation failures would terminate
+            # before reaching RetryConfig.max_retries.
+            while ctx.iteration < self.config.max_iterations + ctx.structured_retries:
                 ctx.iteration += 1
 
                 # Cancellation check (R2)
@@ -1013,7 +1026,14 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                                 ctx.iteration,
                                 str(exc),
                             )
-                            if ctx.iteration < self.config.max_iterations:
+                            # BUG-34: use a separate structured_retries counter
+                            # instead of the shared max_iterations budget. An
+                            # agent with a tight tool-iteration budget should
+                            # still allow the full RetryConfig.max_retries
+                            # worth of structured-validation retries.
+                            retry_budget = self.config.retry.max_retries
+                            if ctx.structured_retries < retry_budget:
+                                ctx.structured_retries += 1
                                 ctx.trace.add(
                                     TraceStep(
                                         type=StepType.STRUCTURED_RETRY,
@@ -1122,8 +1142,22 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             self._system_prompt = saved_system_prompt
 
     def _clone_for_isolation(self) -> "Agent":
-        """Create a lightweight clone for batch processing with isolated state."""
+        """Create a lightweight clone for batch processing with isolated state.
+
+        BUG-19 / PraisonAI #1260: the shallow ``copy.copy(self)`` left batch
+        clones sharing the same ``self.config`` object, including the
+        ``config.observers`` list. Mutating config state (e.g. appending an
+        observer, swapping the list) on one clone would bleed into sibling
+        clones running in other threads. We shallow-copy the config and
+        duplicate the observer list so each clone has an independent list;
+        individual observer instances remain shared because BUG-17/BUG-20
+        already made them thread-safe.
+        """
         clone = copy.copy(self)
+        if self.config is not None:
+            clone.config = copy.copy(self.config)
+            if getattr(self.config, "observers", None):
+                clone.config.observers = list(self.config.observers)
         clone._history = []
         clone.usage = AgentUsage()
         clone.memory = None
@@ -1177,7 +1211,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
 
             await self._anotify_observers("on_run_start", ctx.run_id, messages, self._system_prompt)
 
-            while ctx.iteration < self.config.max_iterations:
+            # BUG-34: structured-validation retries extend the iteration
+            # budget so max_iterations caps tool-execution iterations, not
+            # structured-validation retries. Without this, an agent with
+            # max_iterations=3 and 3 validation failures would terminate
+            # before reaching RetryConfig.max_retries.
+            while ctx.iteration < self.config.max_iterations + ctx.structured_retries:
                 ctx.iteration += 1
 
                 # Cancellation check (R2)
@@ -1266,8 +1305,10 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                             timeout=self.config.request_timeout,
                         )
                     else:
+                        # BUG-32: propagate caller contextvars into the worker.
                         loop = asyncio.get_running_loop()
-                        response_msg, _usage = await loop.run_in_executor(
+                        response_msg, _usage = await run_in_executor_copyctx(
+                            loop,
                             None,
                             lambda: self.provider.complete(
                                 model=self._effective_model,
@@ -1294,23 +1335,30 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     if response_msg.tool_calls:
                         current_tool_calls = response_msg.tool_calls
                 else:
-                    gen = self.provider.astream(
-                        model=self._effective_model,
-                        system_prompt=self._system_prompt,
-                        messages=self._history,
-                        tools=self.tools,
-                        temperature=self.config.temperature,
-                        max_tokens=self.config.max_tokens,
-                        timeout=self.config.request_timeout,
-                    )
-
-                    async for item in gen:
-                        if isinstance(item, str):
-                            yield StreamChunk(content=item)
-                            full_content += item
-                        elif isinstance(item, ToolCall):
-                            current_tool_calls.append(item)
-                            yield StreamChunk(tool_calls=[item])
+                    # BUG-33: wrap provider.astream() generator in aclosing so
+                    # that a guardrail raise, validation failure, or caller
+                    # disconnect deterministically runs the generator's
+                    # finally block and releases HTTP connections — instead
+                    # of waiting for GC and emitting `async generator raised
+                    # StopAsyncIteration` warnings.
+                    async with aclosing(
+                        self.provider.astream(
+                            model=self._effective_model,
+                            system_prompt=self._system_prompt,
+                            messages=self._history,
+                            tools=self.tools,
+                            temperature=self.config.temperature,
+                            max_tokens=self.config.max_tokens,
+                            timeout=self.config.request_timeout,
+                        )
+                    ) as gen:
+                        async for item in gen:
+                            if isinstance(item, str):
+                                yield StreamChunk(content=item)
+                                full_content += item
+                            elif isinstance(item, ToolCall):
+                                current_tool_calls.append(item)
+                                yield StreamChunk(tool_calls=[item])
 
                     self._notify_observers("on_llm_end", ctx.run_id, full_content, None)
                     await self._anotify_observers("on_llm_end", ctx.run_id, full_content, None)
@@ -1354,7 +1402,14 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                                 ctx.iteration,
                                 str(exc),
                             )
-                            if ctx.iteration < self.config.max_iterations:
+                            # BUG-34: use a separate structured_retries counter
+                            # instead of the shared max_iterations budget. An
+                            # agent with a tight tool-iteration budget should
+                            # still allow the full RetryConfig.max_retries
+                            # worth of structured-validation retries.
+                            retry_budget = self.config.retry.max_retries
+                            if ctx.structured_retries < retry_budget:
+                                ctx.structured_retries += 1
                                 ctx.trace.add(
                                     TraceStep(
                                         type=StepType.STRUCTURED_RETRY,
@@ -1553,7 +1608,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
 
             await self._anotify_observers("on_run_start", ctx.run_id, messages, self._system_prompt)
 
-            while ctx.iteration < self.config.max_iterations:
+            # BUG-34: structured-validation retries extend the iteration
+            # budget so max_iterations caps tool-execution iterations, not
+            # structured-validation retries. Without this, an agent with
+            # max_iterations=3 and 3 validation failures would terminate
+            # before reaching RetryConfig.max_retries.
+            while ctx.iteration < self.config.max_iterations + ctx.structured_retries:
                 ctx.iteration += 1
 
                 # Cancellation check (R2)
@@ -1627,7 +1687,14 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                                 ctx.iteration,
                                 str(exc),
                             )
-                            if ctx.iteration < self.config.max_iterations:
+                            # BUG-34: use a separate structured_retries counter
+                            # instead of the shared max_iterations budget. An
+                            # agent with a tight tool-iteration budget should
+                            # still allow the full RetryConfig.max_retries
+                            # worth of structured-validation retries.
+                            retry_budget = self.config.retry.max_retries
+                            if ctx.structured_retries < retry_budget:
+                                ctx.structured_retries += 1
                                 ctx.trace.add(
                                     TraceStep(
                                         type=StepType.STRUCTURED_RETRY,

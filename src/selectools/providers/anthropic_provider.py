@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, Iterable, List, cast
 
 if TYPE_CHECKING:
@@ -21,6 +22,83 @@ from ..stability import stable
 from ..types import Message, Role, ToolCall
 from ..usage import UsageStats
 from .base import Provider, ProviderError
+
+_THINK_TAG_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
+_THINK_OPEN = "<think>"
+_THINK_CLOSE = "</think>"
+
+
+def _strip_reasoning_tags(text: str) -> str:
+    """Remove <think>...</think> reasoning blocks from model output.
+
+    Claude-compatible endpoints sometimes emit reasoning inline as <think>
+    tags rather than the native thinking content blocks. These must be
+    stripped before persisting to conversation history to avoid polluting
+    context on subsequent turns (Agno #6878).
+    """
+    if not text or "<think>" not in text:
+        return text
+    return _THINK_TAG_RE.sub("", text)
+
+
+def _consume_think_buffer(buffer: str, in_think_block: bool) -> tuple[str, str, bool]:
+    """Consume a streaming text buffer, suppressing <think> reasoning blocks.
+
+    Returns ``(emit, remaining, in_think_block)`` where ``emit`` is the safe
+    text to yield to the consumer, ``remaining`` is the unprocessed tail (a
+    partial tag prefix or content inside an open block), and
+    ``in_think_block`` is the updated state flag.
+
+    The remaining buffer never includes safely emittable text, so the caller
+    can yield ``emit`` immediately and re-feed new chunks into ``remaining``.
+    """
+    emit = ""
+    while buffer:
+        if in_think_block:
+            close_idx = buffer.find(_THINK_CLOSE)
+            if close_idx == -1:
+                # Still inside the reasoning block; drop everything but
+                # keep any suffix that could be the start of </think>.
+                return emit, _retain_partial_suffix(buffer, _THINK_CLOSE), True
+            buffer = buffer[close_idx + len(_THINK_CLOSE) :]
+            in_think_block = False
+            continue
+
+        open_idx = buffer.find(_THINK_OPEN)
+        if open_idx == -1:
+            # No opening tag in buffer. Emit everything except a possible
+            # partial-prefix tail (e.g. trailing "<th") that could become
+            # a real opening tag once more text arrives.
+            safe_len = len(buffer) - _partial_prefix_len(buffer, _THINK_OPEN)
+            emit += buffer[:safe_len]
+            return emit, buffer[safe_len:], False
+
+        emit += buffer[:open_idx]
+        buffer = buffer[open_idx + len(_THINK_OPEN) :]
+        in_think_block = True
+    return emit, "", in_think_block
+
+
+def _partial_prefix_len(buffer: str, target: str) -> int:
+    """Return length of longest suffix of ``buffer`` that prefixes ``target``.
+
+    Used to hold back text that might be the start of a tag across chunks.
+    """
+    max_check = min(len(buffer), len(target) - 1)
+    for size in range(max_check, 0, -1):
+        if target.startswith(buffer[-size:]):
+            return size
+    return 0
+
+
+def _retain_partial_suffix(buffer: str, target: str) -> str:
+    """Return only the suffix of ``buffer`` that could be a prefix of ``target``.
+
+    Used while inside a <think> block to drop suppressed text but preserve
+    bytes that may complete a closing tag in the next chunk.
+    """
+    n = _partial_prefix_len(buffer, target)
+    return buffer[-n:] if n else ""
 
 
 @stable
@@ -119,6 +197,8 @@ class AnthropicProvider(Provider):
                     )
                 )
 
+        content_text = _strip_reasoning_tags(content_text)
+
         # Extract usage stats
         usage = response.usage
         usage_stats = UsageStats(
@@ -183,6 +263,8 @@ class AnthropicProvider(Provider):
         current_tool_id: str | None = None
         current_tool_name: str = ""
         current_tool_json: str = ""
+        text_buffer: str = ""
+        in_think_block: bool = False
 
         try:
             for event in stream:
@@ -197,7 +279,12 @@ class AnthropicProvider(Provider):
                     if delta_type == "text_delta":
                         text = getattr(delta, "text", None)
                         if text:
-                            yield text
+                            text_buffer += text
+                            emit, text_buffer, in_think_block = _consume_think_buffer(
+                                text_buffer, in_think_block
+                            )
+                            if emit:
+                                yield emit
                     elif delta_type == "input_json_delta":
                         partial = getattr(delta, "partial_json", None)
                         if partial:
@@ -212,18 +299,23 @@ class AnthropicProvider(Provider):
 
                 elif event_type == "content_block_stop":
                     if current_tool_name:
-                        try:
-                            params = json.loads(current_tool_json) if current_tool_json else {}
-                        except json.JSONDecodeError:
-                            params = {}
+                        from ._openai_compat import _parse_tool_args
+
+                        params, parse_error = _parse_tool_args(current_tool_json)
                         yield ToolCall(
                             tool_name=current_tool_name,
                             parameters=params,
                             id=current_tool_id or "",
+                            parse_error=parse_error,
                         )
                         current_tool_id = None
                         current_tool_name = ""
                         current_tool_json = ""
+            # Flush any trailing buffered text after stream ends.
+            if text_buffer and not in_think_block:
+                tail = _strip_reasoning_tags(text_buffer)
+                if tail:
+                    yield tail
         except ProviderError:
             raise
         except Exception as exc:
@@ -440,6 +532,8 @@ class AnthropicProvider(Provider):
                     )
                 )
 
+        content_text = _strip_reasoning_tags(content_text)
+
         # Extract usage stats
         usage = response.usage
         usage_stats = UsageStats(
@@ -504,6 +598,8 @@ class AnthropicProvider(Provider):
         current_tool_id: str | None = None
         current_tool_name: str = ""
         current_tool_json: str = ""
+        text_buffer: str = ""
+        in_think_block: bool = False
 
         try:
             async for event in stream:
@@ -518,7 +614,12 @@ class AnthropicProvider(Provider):
                     if delta_type == "text_delta":
                         text = getattr(delta, "text", None)
                         if text:
-                            yield text
+                            text_buffer += text
+                            emit, text_buffer, in_think_block = _consume_think_buffer(
+                                text_buffer, in_think_block
+                            )
+                            if emit:
+                                yield emit
                     elif delta_type == "input_json_delta":
                         partial = getattr(delta, "partial_json", None)
                         if partial:
@@ -533,18 +634,23 @@ class AnthropicProvider(Provider):
 
                 elif event_type == "content_block_stop":
                     if current_tool_name:
-                        try:
-                            params = json.loads(current_tool_json) if current_tool_json else {}
-                        except json.JSONDecodeError:
-                            params = {}
+                        from ._openai_compat import _parse_tool_args
+
+                        params, parse_error = _parse_tool_args(current_tool_json)
                         yield ToolCall(
                             tool_name=current_tool_name,
                             parameters=params,
                             id=current_tool_id or "",
+                            parse_error=parse_error,
                         )
                         current_tool_id = None
                         current_tool_name = ""
                         current_tool_json = ""
+            # Flush any trailing buffered text after stream ends.
+            if text_buffer and not in_think_block:
+                tail = _strip_reasoning_tags(text_buffer)
+                if tail:
+                    yield tail
         except ProviderError:
             raise
         except Exception as exc:

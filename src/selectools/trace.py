@@ -8,6 +8,7 @@ LLM calls, tool selections, tool executions, cache hits, and errors.
 from __future__ import annotations
 
 import json
+import threading
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
@@ -115,46 +116,75 @@ class AgentTrace:
     parent_run_id: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        """Initialize the internal lock that guards concurrent step mutations."""
+        self._lock = threading.Lock()
+
+    def __getstate__(self) -> Dict[str, Any]:
+        """Drop the lock for safe serialization and shallow/deep copies.
+
+        ``threading.Lock`` cannot be serialized, so it is dropped here and
+        recreated in :meth:`__setstate__` on restore. This keeps ``copy.copy``
+        and similar operations working on ``AgentTrace``.
+        """
+        state = self.__dict__.copy()
+        state.pop("_lock", None)
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        """Restore the lock after deserialization or copying."""
+        self.__dict__.update(state)
+        self._lock = threading.Lock()
+
     def add(self, step: TraceStep) -> None:
-        self.steps.append(step)
+        with self._lock:
+            self.steps.append(step)
 
     def filter(self, *, type: Optional[StepType] = None) -> List[TraceStep]:
-        if type is None:
-            return list(self.steps)
-        return [s for s in self.steps if s.type == type]
+        with self._lock:
+            if type is None:
+                return list(self.steps)
+            return [s for s in self.steps if s.type == type]
 
     @property
     def total_duration_ms(self) -> float:
-        return sum(s.duration_ms for s in self.steps)
+        with self._lock:
+            return sum(s.duration_ms for s in self.steps)
 
     @property
     def llm_duration_ms(self) -> float:
-        return sum(s.duration_ms for s in self.steps if s.type == "llm_call")
+        with self._lock:
+            return sum(s.duration_ms for s in self.steps if s.type == "llm_call")
 
     @property
     def tool_duration_ms(self) -> float:
-        return sum(s.duration_ms for s in self.steps if s.type == "tool_execution")
+        with self._lock:
+            return sum(s.duration_ms for s in self.steps if s.type == "tool_execution")
 
     def timeline(self) -> str:
         """Human-readable timeline string."""
+        with self._lock:
+            steps_snapshot = list(self.steps)
         lines = []
-        for i, s in enumerate(self.steps, 1):
+        for i, s in enumerate(steps_snapshot, 1):
             type_val = s.type.value if hasattr(s.type, "value") else s.type
             summary = s.summary or type_val
             lines.append(f"  {i}. [{type_val:18s}] {s.duration_ms:7.1f}ms  {summary}")
-        total = self.total_duration_ms
-        lines.append(
-            f"  Total: {total:.1f}ms (LLM: {self.llm_duration_ms:.1f}ms, Tools: {self.tool_duration_ms:.1f}ms)"
-        )
+        total = sum(s.duration_ms for s in steps_snapshot)
+        llm_ms = sum(s.duration_ms for s in steps_snapshot if s.type == "llm_call")
+        tool_ms = sum(s.duration_ms for s in steps_snapshot if s.type == "tool_execution")
+        lines.append(f"  Total: {total:.1f}ms (LLM: {llm_ms:.1f}ms, Tools: {tool_ms:.1f}ms)")
         return "\n".join(lines)
 
     def to_dict(self) -> Dict[str, Any]:
+        with self._lock:
+            steps_snapshot = list(self.steps)
         d: Dict[str, Any] = {
             "run_id": self.run_id,
             "start_time": self.start_time,
-            "total_duration_ms": self.total_duration_ms,
-            "step_count": len(self.steps),
-            "steps": [s.to_dict() for s in self.steps],
+            "total_duration_ms": sum(s.duration_ms for s in steps_snapshot),
+            "step_count": len(steps_snapshot),
+            "steps": [s.to_dict() for s in steps_snapshot],
         }
         if self.parent_run_id:
             d["parent_run_id"] = self.parent_run_id
@@ -207,9 +237,12 @@ class AgentTrace:
         No ``opentelemetry`` dependency is required — the output is plain
         dicts that any OTel SDK or collector can consume.
         """
+        with self._lock:
+            steps_snapshot = list(self.steps)
         trace_id = self.run_id
         root_start_ns = int(self.start_time * 1e9)
-        root_end_ns = root_start_ns + int(self.total_duration_ms * 1e6)
+        total_ms = sum(s.duration_ms for s in steps_snapshot)
+        root_end_ns = root_start_ns + int(total_ms * 1e6)
 
         root_span: Dict[str, Any] = {
             "trace_id": trace_id,
@@ -220,7 +253,7 @@ class AgentTrace:
             "end_time_unix_nano": root_end_ns,
             "attributes": {
                 "selectools.run_id": self.run_id,
-                "selectools.step_count": len(self.steps),
+                "selectools.step_count": len(steps_snapshot),
             },
             "status": {"code": "OK"},
         }
@@ -235,7 +268,7 @@ class AgentTrace:
 
         spans: List[Dict[str, Any]] = [root_span]
 
-        for step in self.steps:
+        for step in steps_snapshot:
             start_ns = int(step.timestamp * 1e9)
             end_ns = start_ns + int(step.duration_ms * 1e6)
             type_val = step.type.value if hasattr(step.type, "value") else step.type

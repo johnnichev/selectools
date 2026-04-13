@@ -15,7 +15,7 @@ import copy
 import json
 import threading
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 from unittest.mock import MagicMock
 
 import pytest
@@ -25,7 +25,8 @@ from selectools.observer import AgentObserver
 from selectools.policy import PolicyDecision, ToolPolicy
 from selectools.providers.base import Provider, ProviderError
 from selectools.providers.fallback import FallbackProvider
-from selectools.tools import Tool, tool
+from selectools.providers.stubs import LocalProvider
+from selectools.tools import Tool, ToolParameter, tool
 from selectools.types import AgentResult, Message, Role, ToolCall
 from selectools.usage import UsageStats
 
@@ -2086,3 +2087,2315 @@ class TestEarlyExitSessionSave:
         result = await agent.arun("hello")
         assert "Maximum iterations" in result.content
         assert len(store.saves) >= 1, "Session was not saved on async max_iterations exit"
+
+
+# ---- BUG-01: Streaming drops ToolCall objects ----
+#
+# Source: Agno #6757 pattern — competitor bug where tool function names become
+# empty strings in streaming responses.
+#
+# Selectools variant: _streaming_call and _astreaming_call previously filtered
+# chunks with `isinstance(chunk, str)`, dropping ToolCall objects entirely. Tools
+# were never executed when AgentConfig(stream=True). These tests cover all three
+# structurally-identical collection sites:
+#   1. sync  run()  → _streaming_call (provider.stream)
+#   2. async arun() → _astreaming_call native branch (provider.astream)
+#   3. async arun() → _astreaming_call sync-fallback branch (provider.stream
+#      iterated from async code when supports_async=False)
+
+
+class _Bug01StreamingToolProvider(LocalProvider):
+    """Sync provider that yields a ToolCall during streaming."""
+
+    name = "bug01_streaming_tool_stub"
+    supports_streaming = True
+    supports_async = False
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.call_count = 0
+
+    def stream(
+        self,
+        *,
+        model: str,
+        system_prompt: str,
+        messages: List[Message],
+        tools: Optional[List[Any]] = None,
+        temperature: float = 0.0,
+        max_tokens: int = 1000,
+        timeout: Optional[float] = None,
+    ):
+        self.call_count += 1
+        if self.call_count == 1:
+            yield "I will call a tool. "
+            yield ToolCall(tool_name="echo", parameters={"text": "hello"})
+        else:
+            yield "Done. Got: hello"
+
+
+class _Bug01AsyncStreamingToolProvider(LocalProvider):
+    """Async provider that yields a ToolCall during streaming via astream()."""
+
+    name = "bug01_async_streaming_tool_stub"
+    supports_streaming = True
+    supports_async = True
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.call_count = 0
+
+    async def astream(
+        self,
+        *,
+        model: str,
+        system_prompt: str,
+        messages: List[Message],
+        tools: Optional[List[Any]] = None,
+        temperature: float = 0.0,
+        max_tokens: int = 1000,
+        timeout: Optional[float] = None,
+    ):
+        self.call_count += 1
+        if self.call_count == 1:
+            yield "I will call a tool. "
+            yield ToolCall(tool_name="echo", parameters={"text": "hello"})
+        else:
+            yield "Done. Got: hello"
+
+
+class _Bug01SyncFallbackStreamingProvider(LocalProvider):
+    """Provider with supports_streaming=True but supports_async=False.
+
+    This forces _astreaming_call into the sync-fallback branch (provider.stream
+    iterated from inside async code), which has historically been a blind spot
+    for the ToolCall collection fix (BUG-01).
+    """
+
+    name = "bug01_sync_fallback_stream_stub"
+    supports_streaming = True
+    supports_async = False
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.call_count = 0
+
+    def stream(
+        self,
+        *,
+        model: str,
+        system_prompt: str,
+        messages: List[Message],
+        tools: Optional[List[Any]] = None,
+        temperature: float = 0.0,
+        max_tokens: int = 1000,
+        timeout: Optional[float] = None,
+    ):
+        self.call_count += 1
+        if self.call_count == 1:
+            yield "I will call a tool. "
+            yield ToolCall(tool_name="echo", parameters={"text": "hello"})
+        else:
+            yield "Done. Got: hello"
+
+
+def _bug01_make_echo_tool() -> Tool:
+    return Tool(
+        name="echo",
+        description="Echo text",
+        parameters=[
+            ToolParameter(
+                name="text",
+                param_type=str,
+                description="Text to echo",
+                required=True,
+            )
+        ],
+        function=lambda text: text,
+    )
+
+
+def test_bug01_streaming_preserves_tool_calls() -> None:
+    """BUG-01: when stream=True, ToolCall objects from provider.stream() must execute.
+
+    Regresses Agno #6757 — streaming path previously dropped ToolCall chunks via
+    an isinstance(chunk, str) filter, so tools were silently never invoked.
+    """
+    provider = _Bug01StreamingToolProvider()
+    agent = Agent(
+        tools=[_bug01_make_echo_tool()],
+        provider=provider,
+        config=AgentConfig(stream=True, max_iterations=3),
+    )
+    result = agent.run([Message(role=Role.USER, content="echo hello")])
+    assert "Done" in result.content, f"Expected tool to execute; got: {result.content!r}"
+    assert provider.call_count >= 2, "Agent should have looped after tool execution"
+
+
+@pytest.mark.asyncio
+async def test_bug01_astreaming_preserves_tool_calls() -> None:
+    """BUG-01: native async astream path must collect ToolCall chunks.
+
+    Regresses Agno #6757 — covers the _astreaming_call native branch where the
+    provider exposes both supports_streaming=True and supports_async=True.
+    """
+    provider = _Bug01AsyncStreamingToolProvider()
+    agent = Agent(
+        tools=[_bug01_make_echo_tool()],
+        provider=provider,
+        config=AgentConfig(stream=True, max_iterations=3),
+    )
+    result = await agent.arun([Message(role=Role.USER, content="echo hello")])
+    assert "Done" in result.content, f"Expected tool to execute; got: {result.content!r}"
+    assert provider.call_count >= 2, "Agent should have looped after tool execution"
+
+
+def test_bug01_astreaming_sync_fallback_preserves_tool_calls() -> None:
+    """BUG-01 (I2): async code path with sync-fallback provider must collect ToolCalls.
+
+    When a provider exposes sync `stream` but no `astream`, _astreaming_call
+    falls back to iterating the sync stream from async context. This branch
+    had no behavior coverage — a copy-paste bug in the collection logic would
+    not be caught.
+    """
+    provider = _Bug01SyncFallbackStreamingProvider()
+    agent = Agent(
+        tools=[_bug01_make_echo_tool()],
+        provider=provider,
+        config=AgentConfig(stream=True, max_iterations=3),
+    )
+    result = asyncio.run(agent.arun([Message(role=Role.USER, content="echo hello")]))
+    assert "Done" in result.content, f"Expected tool to execute; got: {result.content!r}"
+    assert provider.call_count >= 2, "Agent should have looped after tool execution"
+
+
+# ---- BUG-02: typing.Literal crashes @tool() ----
+# Source: Agno #6720. _unwrap_type() did not handle typing.Literal, producing
+# "Unsupported parameter type" at @tool() registration time.
+
+
+def test_bug02_literal_str_produces_enum():
+    @tool()
+    def set_mode(mode: Literal["fast", "slow", "auto"]) -> str:
+        return f"mode={mode}"
+
+    assert set_mode.name == "set_mode"
+    params = {p.name: p for p in set_mode.parameters}
+    assert "mode" in params
+    assert params["mode"].enum == ["fast", "slow", "auto"]
+    assert params["mode"].param_type is str
+
+
+def test_bug02_literal_int_produces_enum():
+    @tool()
+    def set_level(level: Literal[1, 2, 3]) -> str:
+        return f"level={level}"
+
+    params = {p.name: p for p in set_level.parameters}
+    assert params["level"].enum == [1, 2, 3]
+    assert params["level"].param_type is int
+
+
+def test_bug02_optional_literal_works():
+    @tool()
+    def filter_by(tag: Optional[Literal["red", "blue"]] = None) -> str:
+        return f"tag={tag}"
+
+    params = {p.name: p for p in filter_by.parameters}
+    assert params["tag"].enum == ["red", "blue"]
+    assert params["tag"].required is False
+
+
+# ---- BUG-03: asyncio.run() crashes in existing event loops ----
+# Source: PraisonAI #1165. Sync wrappers that called asyncio.run() crashed
+# when invoked from within an existing event loop (Jupyter, FastAPI, async tests).
+
+import asyncio as _bug03_asyncio
+
+from selectools._async_utils import run_sync as _bug03_run_sync
+
+
+def test_bug03_run_sync_outside_event_loop():
+    """run_sync from plain sync code — no loop running — uses asyncio.run directly."""
+
+    async def coro():
+        return 42
+
+    assert _bug03_run_sync(coro()) == 42
+
+
+def test_bug03_run_sync_inside_running_loop():
+    """The critical case: calling run_sync from WITHIN an async function.
+
+    Bare asyncio.run() would crash here with RuntimeError. run_sync must
+    detect the running loop and offload to a worker thread.
+    """
+
+    async def outer():
+        async def inner():
+            return "hello"
+
+        return _bug03_run_sync(inner())
+
+    result = _bug03_asyncio.run(outer())
+    assert result == "hello"
+
+
+def test_bug03_run_sync_propagates_exceptions():
+    """Exceptions in the coroutine must propagate to the sync caller."""
+
+    async def failing():
+        raise ValueError("boom")
+
+    with pytest.raises(ValueError, match="boom"):
+        _bug03_run_sync(failing())
+
+
+def test_bug03_agent_graph_run_inside_async_context():
+    """End-to-end: AgentGraph.run() must work inside an async function.
+
+    This regresses the shipped bug where calling graph.run() from within
+    an async test or FastAPI handler crashed with 'asyncio.run() cannot
+    be called when another event loop is running'.
+    """
+    from selectools.orchestration.graph import AgentGraph
+    from selectools.orchestration.state import STATE_KEY_LAST_OUTPUT, GraphState
+
+    def _trivial_callable(state: GraphState) -> GraphState:
+        state.data[STATE_KEY_LAST_OUTPUT] = "ok"
+        return state
+
+    async def outer():
+        graph = AgentGraph(name="bug03_inner_graph")
+        graph.add_node("root", _trivial_callable)
+        graph.set_entry("root")
+        graph.add_edge("root", AgentGraph.END)
+        return graph.run("hello")
+
+    result = _bug03_asyncio.run(outer())
+    assert result is not None
+    assert result.content == "ok"
+
+
+# ---- BUG-04: HITL lost in parallel groups ----
+# Source: Agno #4921. InterruptRequest from a child node in a parallel group
+# was silently dropped — the parent graph treated the child as completed.
+
+
+def test_bug04_parallel_group_propagates_hitl():
+    """When a child in a parallel group yields InterruptRequest, the graph must pause.
+
+    BUG-04: run_child in _aexecute_parallel discarded the interrupted boolean from
+    _aexecute_node. If a child yielded InterruptRequest, the signal was lost and
+    the graph continued as if the child completed normally — no checkpoint, no
+    pause, HITL broken inside parallel groups. Cross-referenced from Agno #4921.
+    """
+    from selectools.orchestration import (
+        AgentGraph,
+        GraphState,
+        InMemoryCheckpointStore,
+        InterruptRequest,
+    )
+
+    def _normal_callable(state: GraphState) -> GraphState:
+        state.data["normal"] = "done"
+        return state
+
+    def _hitl_generator(state: GraphState):
+        response = yield InterruptRequest(prompt="approve?")
+        state.data["approval"] = response
+        state.data["hitl"] = "done"
+        return state
+
+    graph = AgentGraph(name="bug04_parallel_hitl")
+    graph.add_node("normal", _normal_callable)
+    graph.add_node("hitl", _hitl_generator)
+    graph.add_parallel_nodes("group", node_names=["normal", "hitl"])
+    graph.set_entry("group")
+    graph.add_edge("group", AgentGraph.END)
+
+    store = InMemoryCheckpointStore()
+    result = graph.run("start", checkpoint_store=store)
+
+    assert result.interrupted, f"Expected graph to pause; got: {result}"
+    assert result.interrupt_id is not None
+    # The engine auto-sets interrupt_key to f"{node_name}_{yield_index}".
+    # Our HITL child is named "hitl" and yields once at index 0.
+    pending = result.state.metadata.get("__pending_interrupt_key__")
+    assert pending == "hitl_0", f"Expected pending interrupt key 'hitl_0', got: {pending!r}"
+
+
+# ---- BUG-05: HITL lost in subgraphs ----
+# Source: Agno #4921. InterruptRequest raised inside a subgraph was silently
+# dropped by the parent graph, losing the subgraph's pause state.
+
+
+def test_bug05_subgraph_propagates_hitl_interrupt():
+    """When a subgraph interrupts, the parent graph must pause too.
+
+    BUG-05: _aexecute_subgraph never inspected sub_result.interrupted. If the
+    nested graph yielded InterruptRequest and paused, the parent treated the
+    subgraph node as completed and kept executing — no checkpoint, no pause,
+    HITL broken in nested-graph contexts. Mirrors BUG-04 for parallel groups.
+    Cross-referenced from Agno #4921.
+    """
+    from selectools.orchestration import (
+        AgentGraph,
+        GraphState,
+        InMemoryCheckpointStore,
+        InterruptRequest,
+    )
+
+    def _hitl_generator(state: GraphState):
+        response = yield InterruptRequest(prompt="ok?")
+        state.data["approval"] = response
+        state.data["inner_done"] = True
+        return state
+
+    # Inner graph with an HITL gate
+    inner = AgentGraph(name="bug05_inner")
+    inner.add_node("gate", _hitl_generator)
+    inner.set_entry("gate")
+    inner.add_edge("gate", AgentGraph.END)
+
+    # Parent graph that wraps the inner graph as a SubgraphNode
+    outer = AgentGraph(name="bug05_outer")
+    outer.add_subgraph("nested", graph=inner)
+    outer.set_entry("nested")
+    outer.add_edge("nested", AgentGraph.END)
+
+    store = InMemoryCheckpointStore()
+    result = outer.run("start", checkpoint_store=store)
+
+    assert result.interrupted, f"Expected parent graph to pause; got: {result}"
+    assert result.interrupt_id is not None
+    # The subgraph's pending interrupt key is propagated FLAT into the
+    # parent state (matching BUG-04's parallel-group approach) so the
+    # parent's resume machinery can route the stored response back into
+    # the subgraph's generator on re-execution.
+    pending = result.state.metadata.get("__pending_interrupt_key__")
+    assert (
+        pending == "gate_0"
+    ), f"Expected flat pending key 'gate_0' from subgraph generator node; got: {pending!r}"
+
+
+# ---- BUG-05 Part 2: Subgraph HITL resume ----
+# Follow-up: the initial BUG-05 fix used namespaced keys ('{node}/{key}')
+# which caused a silent infinite loop on graph.resume() — the subgraph's
+# generator looked for its unprefixed key and never found the stored
+# response. Flat keys + down-propagation of parent._interrupt_responses
+# into sub_state fix this.
+
+
+def test_bug05_subgraph_resume_completes():
+    """After a subgraph HITL interrupt, graph.resume() must propagate the
+    response into the subgraph's generator and complete execution.
+
+    Regression for the silent infinite loop where namespaced keys prevented
+    the subgraph's generator from seeing the stored response on resume.
+    """
+    from selectools.orchestration import (
+        AgentGraph,
+        GraphState,
+        InMemoryCheckpointStore,
+        InterruptRequest,
+    )
+
+    def _hitl_generator(state: GraphState):
+        response = yield InterruptRequest(prompt="ok?")
+        state.data["approval"] = response
+        state.data["inner_done"] = True
+        return state
+
+    inner = AgentGraph(name="bug05_resume_inner")
+    inner.add_node("gate", _hitl_generator)
+    inner.set_entry("gate")
+    inner.add_edge("gate", AgentGraph.END)
+
+    outer = AgentGraph(name="bug05_resume_outer")
+    outer.add_subgraph("nested", graph=inner)
+    outer.set_entry("nested")
+    outer.add_edge("nested", AgentGraph.END)
+
+    store = InMemoryCheckpointStore()
+
+    # Phase 1: run and expect pause
+    paused = outer.run("start", checkpoint_store=store)
+    assert paused.interrupted, "Expected subgraph to pause"
+    assert paused.interrupt_id is not None
+
+    # Phase 2: resume and expect completion (the silent-loop repro)
+    resumed = outer.resume(paused.interrupt_id, response="approve", checkpoint_store=store)
+    assert not resumed.interrupted, (
+        f"Expected resume to complete; got interrupted={resumed.interrupted}. "
+        "This regression catches the silent infinite loop where namespaced "
+        "keys prevented the subgraph generator from seeing the response."
+    )
+
+
+# ---- BUG-06: ConversationMemory missing threading.Lock ----
+# Source: PraisonAI #1164, #1260. ConversationMemory had no lock; concurrent
+# add() from multiple threads could race on _messages and lose messages or
+# corrupt the list.
+
+
+def test_bug06_concurrent_add_preserves_all_messages():
+    """10 threads x 100 adds = 1000 messages should all be preserved."""
+    from selectools.memory import ConversationMemory
+    from selectools.types import Message, Role
+
+    memory = ConversationMemory(max_messages=10000)
+    n_threads = 10
+    n_adds = 100
+    errors: list = []
+
+    def worker(thread_id: int) -> None:
+        try:
+            for i in range(n_adds):
+                memory.add(Message(role=Role.USER, content=f"t{thread_id}-m{i}"))
+        except Exception as e:
+            errors.append(e)
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(n_threads)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors, f"Worker errors: {errors}"
+    history = memory.get_history()
+    assert (
+        len(history) == n_threads * n_adds
+    ), f"Expected {n_threads * n_adds} messages, got {len(history)}"
+
+
+def test_bug06_concurrent_add_with_trim_no_crash():
+    """Low max_messages triggers _enforce_limits concurrently — must not crash."""
+    from selectools.memory import ConversationMemory
+    from selectools.types import Message, Role
+
+    memory = ConversationMemory(max_messages=50)
+    errors: list = []
+
+    def worker(thread_id: int) -> None:
+        try:
+            for i in range(200):
+                memory.add(Message(role=Role.USER, content=f"t{thread_id}-m{i}"))
+        except Exception as e:
+            errors.append(e)
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(5)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors, f"Worker errors: {errors}"
+    assert len(memory.get_history()) <= 50
+
+
+def test_bug06_state_restoration_compat():
+    """ConversationMemory must round-trip through to_dict/from_dict without
+    the lock interfering — locks are not serializable, so __getstate__ /
+    __setstate__ must exclude the lock and recreate it on restore."""
+    from selectools.memory import ConversationMemory
+    from selectools.types import Message, Role
+
+    memory = ConversationMemory(max_messages=100)
+    memory.add(Message(role=Role.USER, content="hello"))
+    memory.add(Message(role=Role.ASSISTANT, content="hi"))
+
+    d = memory.to_dict()
+    restored = ConversationMemory.from_dict(d)
+    assert len(restored.get_history()) == 2
+    assert restored.get_history()[0].content == "hello"
+    # The restored memory must still be thread-safe — verify by adding another message
+    restored.add(Message(role=Role.USER, content="after_restore"))
+    assert len(restored.get_history()) == 3
+
+
+# ---- BUG-07: <think> reasoning tag content leaks into history ----
+# Source: Agno #6878. Claude-compatible endpoints emit reasoning as
+# <think>...</think> blocks in text content. These were being preserved
+# in conversation history and sent back to the model on subsequent turns,
+# polluting context.
+
+
+def test_bug07_strip_simple_think_tags():
+    from selectools.providers.anthropic_provider import _strip_reasoning_tags
+
+    text = "<think>This is my reasoning.</think>The answer is 42."
+    assert _strip_reasoning_tags(text) == "The answer is 42."
+
+
+def test_bug07_strip_multiline_think_tags():
+    from selectools.providers.anthropic_provider import _strip_reasoning_tags
+
+    text = "<think>\nLine 1\nLine 2\n</think>\nFinal answer."
+    assert _strip_reasoning_tags(text).strip() == "Final answer."
+
+
+def test_bug07_strip_multiple_think_blocks():
+    from selectools.providers.anthropic_provider import _strip_reasoning_tags
+
+    text = "<think>first</think>Hello<think>second</think> world"
+    assert _strip_reasoning_tags(text) == "Hello world"
+
+
+def test_bug07_no_think_tags_unchanged():
+    from selectools.providers.anthropic_provider import _strip_reasoning_tags
+
+    text = "Plain text with no tags"
+    assert _strip_reasoning_tags(text) == text
+
+
+def test_bug07_empty_string_unchanged():
+    from selectools.providers.anthropic_provider import _strip_reasoning_tags
+
+    assert _strip_reasoning_tags("") == ""
+
+
+def test_bug07_only_think_tag_returns_empty():
+    from selectools.providers.anthropic_provider import _strip_reasoning_tags
+
+    assert _strip_reasoning_tags("<think>just reasoning</think>") == ""
+
+
+# ---- BUG-08: RAG vector store batch size limits ----
+# Source: Agno #7030. ChromaDB, Pinecone, and Qdrant have internal batch
+# limits on upsert (Chroma ~5461, Pinecone 100/upsert). The stores called
+# upsert with the entire document list and crashed on large ingestions.
+
+
+def test_bug08_chroma_batches_large_upsert():
+    """ChromaVectorStore should chunk large add_documents into _batch_size groups."""
+    from selectools.rag.stores.chroma import ChromaVectorStore
+    from selectools.rag.vector_store import Document
+
+    store = ChromaVectorStore.__new__(ChromaVectorStore)
+    store.collection = MagicMock()
+    store._batch_size = 100  # small batch for test
+    store.embedder = MagicMock()
+    store.embedder.embed_texts.return_value = [[0.1] * 16 for _ in range(250)]
+
+    docs = [Document(text=f"doc {i}", metadata={}) for i in range(250)]
+    store.add_documents(docs)
+    # 250 docs / 100 batch = 3 upsert calls (100, 100, 50)
+    assert store.collection.upsert.call_count == 3
+
+
+def test_bug08_pinecone_batches_large_upsert():
+    """PineconeVectorStore should chunk large add_documents calls."""
+    from selectools.rag.stores.pinecone import PineconeVectorStore
+    from selectools.rag.vector_store import Document
+
+    store = PineconeVectorStore.__new__(PineconeVectorStore)
+    store.index = MagicMock()
+    store.namespace = ""
+    store._batch_size = 100  # small batch for test
+    store.embedder = MagicMock()
+    store.embedder.embed_texts.return_value = [[0.1] * 16 for _ in range(250)]
+
+    docs = [Document(text=f"doc {i}", metadata={}) for i in range(250)]
+    store.add_documents(docs)
+    # 250 docs / 100 batch = 3 upsert calls (100, 100, 50)
+    assert store.index.upsert.call_count == 3
+
+
+def test_bug08_qdrant_batches_large_upsert():
+    """QdrantVectorStore should chunk large add_documents calls."""
+    pytest.importorskip("qdrant_client", reason="qdrant-client not installed")
+    from selectools.rag.stores.qdrant import QdrantVectorStore
+    from selectools.rag.vector_store import Document
+
+    store = QdrantVectorStore.__new__(QdrantVectorStore)
+    store.client = MagicMock()
+    store.collection_name = "test"
+    store._batch_size = 100
+    store._collection_exists = True  # skip auto-create round-trip
+    store.embedder = MagicMock()
+    store.embedder.embed_texts.return_value = [[0.1] * 16 for _ in range(250)]
+
+    docs = [Document(text=f"doc {i}", metadata={}) for i in range(250)]
+    store.add_documents(docs)
+    assert store.client.upsert.call_count == 3
+
+
+def test_bug08_chroma_small_ingestion_single_call():
+    """ChromaVectorStore: ingestion below batch size should still result in one upsert."""
+    from selectools.rag.stores.chroma import ChromaVectorStore
+    from selectools.rag.vector_store import Document
+
+    store = ChromaVectorStore.__new__(ChromaVectorStore)
+    store.collection = MagicMock()
+    store._batch_size = 5000
+    store.embedder = MagicMock()
+    store.embedder.embed_texts.return_value = [[0.1] * 16 for _ in range(10)]
+
+    docs = [Document(text=f"doc {i}", metadata={}) for i in range(10)]
+    store.add_documents(docs)
+    assert store.collection.upsert.call_count == 1
+
+
+# ---- BUG-09: MCP concurrent tool calls race on shared session ----
+# Source: Agno #6073. MCPClient._call_tool had no concurrency control on
+# the shared session, risking interleaved writes and racing circuit breaker
+# state updates.
+
+
+def test_bug09_mcp_client_has_tool_lock():
+    """MCPClient.__init__ must initialize a tool lock attribute."""
+    from selectools.mcp.client import MCPClient
+    from selectools.mcp.config import MCPServerConfig
+
+    cfg = MCPServerConfig(
+        name="test",
+        transport="stdio",
+        command="echo",
+        args=[],
+        max_retries=0,
+    )
+    client = MCPClient(cfg)
+    assert hasattr(client, "_tool_lock"), "MCPClient must have a _tool_lock attribute"
+
+
+@pytest.mark.asyncio
+async def test_bug09_concurrent_call_tool_serializes():
+    """Concurrent _call_tool invocations must serialize on the shared session lock.
+
+    Without a lock, two concurrent calls would interleave inside
+    self._session.call_tool, both observing call_tool.locked() == False or
+    racing on self._failure_count. We assert that during execution, only one
+    coroutine is inside the critical section at a time.
+    """
+    import asyncio as _asyncio
+    from unittest.mock import AsyncMock
+
+    from selectools.mcp.client import MCPClient
+    from selectools.mcp.config import MCPServerConfig
+
+    cfg = MCPServerConfig(
+        name="test",
+        transport="stdio",
+        command="echo",
+        args=[],
+        max_retries=0,
+        circuit_breaker_threshold=5,
+        circuit_breaker_cooldown=60.0,
+        auto_reconnect=False,
+    )
+    client = MCPClient(cfg)
+    client._connected = True
+
+    in_flight = {"count": 0, "max": 0}
+
+    async def fake_call(name: str, arguments: Dict[str, Any]) -> Any:
+        in_flight["count"] += 1
+        in_flight["max"] = max(in_flight["max"], in_flight["count"])
+        await _asyncio.sleep(0.01)
+        in_flight["count"] -= 1
+        result = MagicMock()
+        text_part = MagicMock()
+        text_part.text = "ok"
+        result.content = [text_part]
+        result.isError = False
+        return result
+
+    client._session = MagicMock()
+    client._session.call_tool = AsyncMock(side_effect=fake_call)
+
+    tasks = [client._call_tool(f"echo_{i}", {"text": f"call-{i}"}) for i in range(10)]
+    results = await _asyncio.gather(*tasks)
+
+    assert len(results) == 10
+    assert all(r == "ok" for r in results)
+    assert client._session.call_tool.call_count == 10
+    assert in_flight["max"] == 1, (
+        f"Concurrent _call_tool calls were not serialized; "
+        f"observed up to {in_flight['max']} in-flight at once"
+    )
+
+
+# ---- BUG-10: Tool argument type coercion ----
+# Source: PraisonAI #410. LLMs sometimes return numeric values as strings
+# in JSON; selectools rejected instead of coercing.
+
+
+def test_bug10_int_param_coerces_from_string() -> None:
+    from selectools.tools import tool as _bug10_tool
+
+    @_bug10_tool()
+    def add(a: int, b: int) -> int:
+        """Add two integers."""
+        return a + b
+
+    # LLM returns strings — should coerce
+    assert add.execute({"a": "5", "b": "10"}) == "15"
+
+
+def test_bug10_float_param_coerces_from_string() -> None:
+    from selectools.tools import tool as _bug10_tool
+
+    @_bug10_tool()
+    def divide(a: float, b: float) -> float:
+        """Divide two floats."""
+        return a / b
+
+    assert divide.execute({"a": "10.0", "b": "4.0"}) == "2.5"
+
+
+def test_bug10_bool_param_coerces_from_string() -> None:
+    from selectools.tools import tool as _bug10_tool
+
+    @_bug10_tool()
+    def toggle(enabled: bool) -> str:
+        """Toggle a switch."""
+        return "on" if enabled else "off"
+
+    assert toggle.execute({"enabled": "true"}) == "on"
+    assert toggle.execute({"enabled": "false"}) == "off"
+    assert toggle.execute({"enabled": "1"}) == "on"
+    assert toggle.execute({"enabled": "0"}) == "off"
+
+
+def test_bug10_invalid_coercion_still_raises() -> None:
+    from selectools.exceptions import ToolValidationError
+    from selectools.tools import tool as _bug10_tool
+
+    @_bug10_tool()
+    def add_one(a: int) -> int:
+        """Add one to an integer."""
+        return a + 1
+
+    with pytest.raises(ToolValidationError):
+        add_one.execute({"a": "not a number"})
+
+
+# ---- BUG-11: Union[str, int] crashes @tool() ----
+# Source: Agno #6720. _unwrap_type only unwrapped Optional; multi-type
+# Unions fell through to validation which rejected them.
+
+
+def test_bug11_union_str_int_defaults_to_str() -> None:
+    from selectools.tools import tool as _bug11_tool
+
+    @_bug11_tool()
+    def lookup(key: Union[str, int]) -> str:
+        """Look up by key."""
+        return f"key={key}"
+
+    # Should create without crashing
+    assert lookup.name == "lookup"
+    # str values should work at runtime
+    assert lookup.execute({"key": "abc"}) == "key=abc"
+    # Numeric string also works — param_type is str, str("123") == "123"
+    assert lookup.execute({"key": "123"}) == "key=123"
+
+
+def test_bug11_union_with_none_still_works() -> None:
+    """Union[str, None] (Optional[str]) must continue to work as before."""
+    from selectools.tools import tool as _bug11_tool
+
+    @_bug11_tool()
+    def opt_param(tag: Optional[str] = None) -> str:
+        """Tag a value."""
+        return f"tag={tag}"
+
+    params = {p.name: p for p in opt_param.parameters}
+    assert params["tag"].param_type is str  # Optional unwraps to str
+
+
+# ---- BUG-13: GraphState.to_dict() doesn't validate non-serializable data ----
+# Source: Agno #7365. to_dict() claimed to be JSON-safe but only deep-copied
+# data, silently corrupting checkpoints when non-serializable objects were
+# present in state.data.
+
+
+def test_bug13_to_dict_is_json_serializable():
+    import json
+
+    from selectools.orchestration.state import GraphState
+
+    state = GraphState.from_prompt("hello")
+    state.data["count"] = 42
+    state.data["nested"] = {"a": [1, 2, 3]}
+
+    d = state.to_dict()
+    # Must survive JSON round-trip without data loss
+    serialized = json.dumps(d)
+    restored = json.loads(serialized)
+    assert restored["data"]["count"] == 42
+    assert restored["data"]["nested"] == {"a": [1, 2, 3]}
+
+
+def test_bug13_to_dict_rejects_non_serializable_data():
+    """Fail fast with ValueError instead of silently corrupting checkpoints."""
+    from selectools.orchestration.state import GraphState
+
+    class NotSerializable:
+        pass
+
+    state = GraphState.from_prompt("hello")
+    state.data["bad"] = NotSerializable()
+
+    with pytest.raises((ValueError, TypeError)):
+        state.to_dict()
+
+
+# ---- BUG-15: Unbounded summary growth ----
+# Source: Agno #5011. Session summaries grew unboundedly via string
+# concatenation until they exceeded the model's context window.
+
+
+def test_bug15_summary_helper_caps_at_max_chars():
+    from selectools.agent._memory_manager import _MAX_SUMMARY_CHARS, _append_summary
+
+    # Start with a summary already at the cap
+    existing = "X" * _MAX_SUMMARY_CHARS
+    new_chunk = "new summary chunk with recent context"
+    result = _append_summary(existing, new_chunk)
+
+    assert (
+        len(result) <= _MAX_SUMMARY_CHARS
+    ), f"Summary exceeded cap: {len(result)} > {_MAX_SUMMARY_CHARS}"
+    # The NEWEST content must be preserved (recent context matters most)
+    assert "new summary chunk" in result
+
+
+def test_bug15_summary_helper_empty_existing():
+    from selectools.agent._memory_manager import _MAX_SUMMARY_CHARS, _append_summary
+
+    assert _append_summary(None, "first summary") == "first summary"
+    assert _append_summary("", "first summary") == "first summary"
+
+
+def test_bug15_summary_helper_preserves_under_cap():
+    """When combined length is under the cap, nothing is truncated."""
+    from selectools.agent._memory_manager import _append_summary
+
+    result = _append_summary("existing summary", "new chunk")
+    assert "existing summary" in result
+
+
+# ---- BUG-12: Multi-interrupt generator nodes skip subsequent interrupts ----
+# Source: Agno #4921. Generators with 2+ InterruptRequest yields had their
+# second+ interrupts silently skipped because gen.asend(response)'s return
+# value was discarded and __anext__ advanced past the next yield.
+
+
+def test_bug12_two_interrupts_both_collected():
+    """A generator node with two InterruptRequest yields must pause twice."""
+    from selectools.orchestration import (
+        AgentGraph,
+        GraphState,
+        InMemoryCheckpointStore,
+        InterruptRequest,
+    )
+
+    def _two_gate_generator(state: GraphState):
+        r1 = yield InterruptRequest(prompt="first?")
+        state.data["gate1"] = r1
+        r2 = yield InterruptRequest(prompt="second?")
+        state.data["gate2"] = r2
+        state.data["done"] = True
+        return state
+
+    graph = AgentGraph(name="bug12_two_gates")
+    graph.add_node("gate", _two_gate_generator)
+    graph.set_entry("gate")
+    graph.add_edge("gate", AgentGraph.END)
+
+    store = InMemoryCheckpointStore()
+
+    # First run — pauses on gate1
+    r1 = graph.run("start", checkpoint_store=store)
+    assert r1.interrupted, f"Expected pause on gate1; got: {r1}"
+    first_interrupt_id = r1.interrupt_id
+
+    # Resume with first response — should pause on gate2 (not skip past it)
+    r2 = graph.resume(first_interrupt_id, response="approved-1", checkpoint_store=store)
+    assert r2.interrupted, f"Expected second pause on gate2; got: {r2}"
+    second_interrupt_id = r2.interrupt_id
+    assert second_interrupt_id != first_interrupt_id, "Second interrupt should have a different id"
+
+    # Resume again — should complete
+    r3 = graph.resume(second_interrupt_id, response="approved-2", checkpoint_store=store)
+    assert not r3.interrupted, f"Expected completion; got: {r3}"
+    # Both gates should have received their respective responses
+    assert r3.state.data.get("gate1") == "approved-1"
+    assert r3.state.data.get("gate2") == "approved-2"
+    assert r3.state.data.get("done") is True
+
+
+# ---- BUG-14: Session namespace isolation ----
+# Source: Agno #6275. Sessions were keyed solely by session_id; two agents
+# with the same session_id would overwrite each other's ConversationMemory.
+# Adding an optional namespace parameter isolates by {namespace}:{session_id}.
+
+
+def test_bug14_jsonfile_different_namespaces_isolated():
+    """Same session_id with different namespaces must not collide."""
+    import tempfile
+
+    from selectools.memory import ConversationMemory
+    from selectools.sessions import JsonFileSessionStore
+    from selectools.types import Message, Role
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = JsonFileSessionStore(directory=tmpdir)
+
+        mem_a = ConversationMemory()
+        mem_a.add(Message(role=Role.USER, content="hello from A"))
+        store.save("shared_id", mem_a, namespace="agent_a")
+
+        mem_b = ConversationMemory()
+        mem_b.add(Message(role=Role.USER, content="hello from B"))
+        store.save("shared_id", mem_b, namespace="agent_b")
+
+        loaded_a = store.load("shared_id", namespace="agent_a")
+        loaded_b = store.load("shared_id", namespace="agent_b")
+
+        assert loaded_a is not None, "agent_a session not found"
+        assert loaded_b is not None, "agent_b session not found"
+        assert loaded_a.get_history()[0].content == "hello from A"
+        assert loaded_b.get_history()[0].content == "hello from B"
+
+
+def test_bug14_jsonfile_no_namespace_backward_compat():
+    """Sessions saved without namespace must load without namespace (back-compat)."""
+    import tempfile
+
+    from selectools.memory import ConversationMemory
+    from selectools.sessions import JsonFileSessionStore
+    from selectools.types import Message, Role
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = JsonFileSessionStore(directory=tmpdir)
+
+        mem = ConversationMemory()
+        mem.add(Message(role=Role.USER, content="unnamespaced"))
+        store.save("plain_id", mem)  # No namespace
+
+        loaded = store.load("plain_id")
+        assert loaded is not None
+        assert loaded.get_history()[0].content == "unnamespaced"
+
+
+def test_bug14_sqlite_different_namespaces_isolated():
+    """Same as BUG-14 jsonfile test but for SQLiteSessionStore."""
+    import os
+    import tempfile
+
+    from selectools.memory import ConversationMemory
+    from selectools.sessions import SQLiteSessionStore
+    from selectools.types import Message, Role
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "sessions.db")
+        store = SQLiteSessionStore(db_path=db_path)
+
+        mem_a = ConversationMemory()
+        mem_a.add(Message(role=Role.USER, content="sqlite A"))
+        store.save("shared_id", mem_a, namespace="agent_a")
+
+        mem_b = ConversationMemory()
+        mem_b.add(Message(role=Role.USER, content="sqlite B"))
+        store.save("shared_id", mem_b, namespace="agent_b")
+
+        loaded_a = store.load("shared_id", namespace="agent_a")
+        loaded_b = store.load("shared_id", namespace="agent_b")
+
+        assert loaded_a is not None
+        assert loaded_b is not None
+        assert loaded_a.get_history()[0].content == "sqlite A"
+        assert loaded_b.get_history()[0].content == "sqlite B"
+
+
+def test_bug14_delete_respects_namespace():
+    """Deleting one namespace must not affect another."""
+    import tempfile
+
+    from selectools.memory import ConversationMemory
+    from selectools.sessions import JsonFileSessionStore
+    from selectools.types import Message, Role
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = JsonFileSessionStore(directory=tmpdir)
+
+        mem_a = ConversationMemory()
+        mem_a.add(Message(role=Role.USER, content="A"))
+        store.save("shared_id", mem_a, namespace="ns_a")
+
+        mem_b = ConversationMemory()
+        mem_b.add(Message(role=Role.USER, content="B"))
+        store.save("shared_id", mem_b, namespace="ns_b")
+
+        store.delete("shared_id", namespace="ns_a")
+
+        assert store.load("shared_id", namespace="ns_a") is None
+        # ns_b must still be there
+        assert store.load("shared_id", namespace="ns_b") is not None
+
+
+# ---- BUG-17: AgentTrace.add() not thread-safe ----
+# Source: Agno #5847. AgentTrace.add() is list.append with no lock; parallel
+# graph branches share the trace object and can race in executor threads.
+
+
+def test_bug17_agent_trace_concurrent_add():
+    """10 threads x 100 adds = 1000 steps should all be preserved."""
+    import threading
+
+    from selectools.trace import AgentTrace, StepType, TraceStep
+
+    trace = AgentTrace(run_id="bug17-test")
+    errors: list = []
+
+    def worker(thread_id: int) -> None:
+        try:
+            for i in range(100):
+                trace.add(TraceStep(type=StepType.LLM_CALL, summary=f"t{thread_id}-s{i}"))
+        except Exception as e:
+            errors.append(e)
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(10)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors, f"Worker errors: {errors}"
+    assert len(trace.steps) == 1000, f"Expected 1000 steps, got {len(trace.steps)}"
+
+
+def test_bug17_agent_trace_has_lock():
+    """Verify the lock attribute exists and is a threading.Lock."""
+    import threading
+
+    from selectools.trace import AgentTrace
+
+    trace = AgentTrace(run_id="bug17-test")
+    assert hasattr(trace, "_lock"), "AgentTrace should have a _lock attribute"
+    # Verify it's actually a Lock (not just something truthy)
+    assert hasattr(trace._lock, "acquire") and hasattr(trace._lock, "release")
+
+
+# ---- BUG-20: OTel/Langfuse observer dicts mutated without locks ----
+# Source: PraisonAI #1260. Observer counters and span dicts were mutated by
+# concurrent LLM callbacks (from Agent.batch() thread pool) without locks.
+
+
+def test_bug20_otel_observer_has_lock():
+    """OTelObserver must have a lock protecting its internal dicts."""
+    pytest.importorskip("opentelemetry")  # OTel is an optional dep
+
+    from selectools.observe.otel import OTelObserver
+
+    obs = OTelObserver()
+    assert hasattr(obs, "_lock"), "OTelObserver should have a _lock attribute"
+    assert hasattr(obs._lock, "acquire") and hasattr(obs._lock, "release")
+
+
+def test_bug20_langfuse_observer_has_lock():
+    """LangfuseObserver must have a lock protecting its internal dicts."""
+    pytest.importorskip("langfuse")  # Langfuse is an optional dep
+
+    from selectools.observe.langfuse import LangfuseObserver
+
+    # LangfuseObserver may require credentials — catch construction errors
+    try:
+        obs = LangfuseObserver()
+    except Exception:
+        # If construction requires env vars, just verify the class has lock init code
+        import inspect
+
+        source = inspect.getsource(LangfuseObserver.__init__)
+        assert "_lock" in source, "LangfuseObserver.__init__ should initialize a _lock"
+        return
+
+    assert hasattr(obs, "_lock"), "LangfuseObserver should have a _lock attribute"
+    assert hasattr(obs._lock, "acquire") and hasattr(obs._lock, "release")
+
+
+# ---- BUG-18: Async observer exceptions silently lost ----
+# Source: Agno #6236. ``asyncio.ensure_future(handler())`` with no done-callback
+# let coroutine exceptions vanish into unhandled-exception warnings (Python
+# 3.12+) and users had no visibility that their observer had failed.
+
+
+def test_bug18_async_observer_exception_logged(caplog):
+    """An async observer that raises should not crash the agent, and the
+    exception should surface via ``logging.warning`` instead of being lost."""
+    import asyncio as _bug18_asyncio
+    import logging as _bug18_logging
+
+    from selectools.agent._lifecycle import _LifecycleMixin
+    from selectools.observer import AsyncAgentObserver
+
+    class _FailingObserver(AsyncAgentObserver):
+        blocking = False
+
+        async def a_on_run_start(self, run_id, messages, system_prompt):
+            raise RuntimeError("observer boom")
+
+    class _Host(_LifecycleMixin):
+        def __init__(self, observers):
+            self.config = MagicMock()
+            self.config.observers = observers
+
+    host = _Host([_FailingObserver()])
+
+    async def _runner():
+        await host._anotify_observers("on_run_start", "bug18-run", [], "sys")
+        # Give the event loop a tick so the fire-and-forget task finishes
+        # and its done-callback logs the exception.
+        await _bug18_asyncio.sleep(0.05)
+
+    with caplog.at_level(_bug18_logging.WARNING, logger="selectools.agent._lifecycle"):
+        _bug18_asyncio.run(_runner())
+
+    matches = [
+        r
+        for r in caplog.records
+        if "observer" in r.getMessage().lower() or "boom" in r.getMessage().lower()
+    ]
+    assert matches, (
+        "Expected the failing async observer's RuntimeError to be logged via "
+        f"logger.warning; got records: {[r.getMessage() for r in caplog.records]}"
+    )
+
+
+def test_bug18_lifecycle_has_done_callback_helper():
+    """Guard against regression: the helper function must exist and be wired
+    into the ``_anotify_observers`` dispatch path."""
+    import inspect
+
+    from selectools.agent import _lifecycle
+
+    assert hasattr(
+        _lifecycle, "_log_task_exception"
+    ), "BUG-18 fix requires a module-level _log_task_exception helper"
+    source = inspect.getsource(_lifecycle._LifecycleMixin._anotify_observers)
+    assert (
+        "add_done_callback" in source
+    ), "_anotify_observers must attach add_done_callback to fire-and-forget tasks"
+
+
+# ---- BUG-19: ``_clone_for_isolation`` shallow-copies config ----
+# Source: PraisonAI #1260. ``Agent.batch()`` clones agents via ``copy.copy``;
+# without also copying ``config`` and ``config.observers``, batch clones
+# shared the same observer list and were vulnerable to cross-clone bleed
+# when one worker mutated config state mid-run.
+
+
+def test_bug19_clone_isolates_observer_list():
+    """Batch clones must not share the same observer list with the source."""
+    from selectools.agent.core import Agent, AgentConfig
+
+    @tool()
+    def _bug19_noop() -> str:
+        return "ok"
+
+    class _Obs(AgentObserver):
+        pass
+
+    obs = _Obs()
+    provider = LocalProvider()
+    agent = Agent(
+        tools=[_bug19_noop],
+        provider=provider,
+        config=AgentConfig(observers=[obs]),
+    )
+
+    assert hasattr(agent, "_clone_for_isolation"), "_clone_for_isolation must exist"
+    clone = agent._clone_for_isolation()
+
+    assert (
+        clone.config is not agent.config
+    ), "Clone should have its own config instance, not share the source config"
+    assert (
+        clone.config.observers is not agent.config.observers
+    ), "Clone should have its own observer list, not share the source list"
+    assert clone.config.observers == [
+        obs
+    ], "Clone observer list should contain the same observer instances"
+
+    clone.config.observers.append(_Obs())
+    assert (
+        len(agent.config.observers) == 1
+    ), "Mutating the clone's observer list must not affect the source agent"
+
+
+def test_bug19_clone_without_observers_does_not_crash():
+    """The clone path must still work when no observers are configured."""
+    from selectools.agent.core import Agent, AgentConfig
+
+    @tool()
+    def _bug19_noop2() -> str:
+        return "ok"
+
+    provider = LocalProvider()
+    agent = Agent(
+        tools=[_bug19_noop2],
+        provider=provider,
+        config=AgentConfig(),
+    )
+    clone = agent._clone_for_isolation()
+    assert clone.config is not None
+    assert clone.config.observers == []
+
+
+# ---- BUG-16: _build_cancelled_result missing entity/KG extraction ----
+# Source: CLAUDE.md pitfall #23. Early-exit builders must persist state.
+# _build_cancelled_result saved the session but missed entity/KG extraction.
+
+
+def test_bug16_build_cancelled_result_calls_extraction():
+    """Verify _build_cancelled_result invokes entity and KG extraction.
+
+    We use source inspection rather than a live run because triggering a
+    cancelled result requires a complex multi-turn agent setup. The presence
+    of the extraction calls in the method body is the structural invariant.
+    """
+    import inspect
+
+    from selectools.agent.core import Agent
+
+    source = inspect.getsource(Agent._build_cancelled_result)
+    assert "_extract_entities" in source, (
+        "_build_cancelled_result must call _extract_entities to avoid "
+        "silently losing entity memory on cancellation"
+    )
+    assert "_extract_kg_triples" in source, (
+        "_build_cancelled_result must call _extract_kg_triples to avoid "
+        "silently losing knowledge graph state on cancellation"
+    )
+
+
+# ---- BUG-22: Optional[T] without default treated as required ----
+# Source: Agno #7066. Optional[str] without a default value was marked
+# required, breaking LLMs that expect None-able params to be optional.
+
+
+def test_bug22_optional_without_default_is_not_required():
+    from typing import Optional
+
+    from selectools.tools import tool as _bug22_tool
+
+    @_bug22_tool()
+    def search(query: str, filter: Optional[str]) -> str:
+        return f"q={query},f={filter}"
+
+    params = {p.name: p for p in search.parameters}
+    assert params["query"].required is True  # plain str, no default -> required
+    assert (
+        params["filter"].required is False
+    ), "Optional[T] without a default value should be marked required=False"
+
+
+def test_bug22_optional_with_default_still_not_required():
+    """Regression guard: Optional[T] with a default value remains optional."""
+    from typing import Optional
+
+    from selectools.tools import tool as _bug22_tool
+
+    @_bug22_tool()
+    def greet(name: Optional[str] = None) -> str:
+        return f"hello {name or 'stranger'}"
+
+    params = {p.name: p for p in greet.parameters}
+    assert params["name"].required is False
+
+
+def test_bug22_non_optional_without_default_still_required():
+    """Regression guard: plain str without a default remains required."""
+    from selectools.tools import tool as _bug22_tool
+
+    @_bug22_tool()
+    def echo(text: str) -> str:
+        return text
+
+    params = {p.name: p for p in echo.parameters}
+    assert params["text"].required is True
+
+
+# ---- BUG-21: Vector store search result deduplication ----
+# Source: Agno #7047. Vector stores returned duplicate documents when the
+# same content was added multiple times (e.g. SQLite store uses uuid4 IDs,
+# so re-adding the same text creates new rows with new IDs but duplicate
+# content). Now opt-in via dedup=True — default remains False for
+# backward compatibility.
+
+
+def _bug21_make_mock_embedder() -> MagicMock:
+    """Build a mock embedder that returns the same vector for the same text."""
+    embedder = MagicMock()
+    embedder.model = "mock-embedding-model"
+    embedder.dimension = 4
+
+    def _embed(text: str) -> List[float]:
+        h = hash(text) % 1000
+        return [float(h + i) / 1000.0 for i in range(4)]
+
+    def _embed_texts(texts: List[str]) -> List[List[float]]:
+        return [_embed(t) for t in texts]
+
+    def _embed_query(query: str) -> List[float]:
+        return _embed(query)
+
+    embedder.embed_text.side_effect = _embed
+    embedder.embed_texts.side_effect = _embed_texts
+    embedder.embed_query.side_effect = _embed_query
+    return embedder
+
+
+def test_bug21_memory_store_search_dedup_opt_in() -> None:
+    """InMemoryVectorStore.search(dedup=True) should remove duplicate texts."""
+    from selectools.rag.stores.memory import InMemoryVectorStore
+    from selectools.rag.vector_store import Document
+
+    embedder = _bug21_make_mock_embedder()
+    store = InMemoryVectorStore(embedder=embedder)
+    same_text = "the quick brown fox"
+    store.add_documents(
+        [
+            Document(text=same_text, metadata={"source": "a"}),
+            Document(text=same_text, metadata={"source": "b"}),
+            Document(text="different doc", metadata={"source": "c"}),
+        ]
+    )
+
+    query_vec = embedder.embed_query(same_text)
+
+    # Without dedup: duplicates preserved (default behavior).
+    results_no_dedup = store.search(query_vec, top_k=10)
+    texts_no_dedup = [r.document.text for r in results_no_dedup]
+    assert (
+        texts_no_dedup.count(same_text) >= 2
+    ), f"Without dedup, expected 2+ copies of {same_text!r}; got: {texts_no_dedup}"
+
+    # With dedup=True: only the first occurrence of each text survives.
+    results_dedup = store.search(query_vec, top_k=10, dedup=True)
+    texts_dedup = [r.document.text for r in results_dedup]
+    assert (
+        texts_dedup.count(same_text) == 1
+    ), f"With dedup=True, expected 1 copy of {same_text!r}; got: {texts_dedup}"
+    # The "different doc" should still be present.
+    assert "different doc" in texts_dedup
+
+
+def test_bug21_dedup_default_is_false_backward_compat() -> None:
+    """Default behavior (no dedup arg) must preserve duplicates."""
+    from selectools.rag.stores.memory import InMemoryVectorStore
+    from selectools.rag.vector_store import Document
+
+    embedder = _bug21_make_mock_embedder()
+    store = InMemoryVectorStore(embedder=embedder)
+    store.add_documents(
+        [
+            Document(text="hello", metadata={"i": 0}),
+            Document(text="hello", metadata={"i": 1}),
+        ]
+    )
+
+    query_vec = embedder.embed_query("hello")
+    results = store.search(query_vec, top_k=10)
+    assert (
+        len(results) == 2
+    ), f"Default dedup=False should preserve duplicates; got {len(results)} results"
+
+
+# ---- BUG-23: Reranker top_k=0 falsy fallback ----
+# Source: LlamaIndex #20880 (same class: alpha = query.alpha or 0.5 swallowed 0.0).
+# CohereReranker used `top_n=top_k or len(results)` which silently promotes
+# top_k=0 (user explicitly asking for no results) to len(results) (everything).
+# Same round-1 pitfall #22 class, new instance in the rag/ module.
+
+
+def test_bug23_reranker_top_k_zero_returns_empty():
+    """CohereReranker must honor top_k=0, not swallow it with `or len(results)`."""
+    from selectools.rag.reranker import CohereReranker
+    from selectools.rag.vector_store import Document, SearchResult
+
+    reranker = CohereReranker.__new__(CohereReranker)
+    reranker.client = MagicMock()
+    reranker.model = "rerank-v3.5"
+    mock_response = MagicMock()
+    mock_response.results = []
+    reranker.client.rerank.return_value = mock_response
+
+    results = [
+        SearchResult(document=Document(text=f"doc{i}"), score=0.9 - i * 0.1) for i in range(3)
+    ]
+
+    out = reranker.rerank("query", results, top_k=0)
+
+    assert out == [], f"top_k=0 must return empty list; got {len(out)} results"
+    call_kwargs = reranker.client.rerank.call_args.kwargs
+    assert call_kwargs["top_n"] == 0, (
+        f"top_k=0 must pass top_n=0 to Cohere API (not len(results)); "
+        f"got top_n={call_kwargs['top_n']}"
+    )
+
+
+def test_bug23_reranker_top_k_none_returns_all():
+    """top_k=None must still default to len(results) — backward compat."""
+    from selectools.rag.reranker import CohereReranker
+    from selectools.rag.vector_store import Document, SearchResult
+
+    reranker = CohereReranker.__new__(CohereReranker)
+    reranker.client = MagicMock()
+    reranker.model = "rerank-v3.5"
+    mock_response = MagicMock()
+    mock_response.results = []
+    reranker.client.rerank.return_value = mock_response
+
+    results = [
+        SearchResult(document=Document(text=f"doc{i}"), score=0.9 - i * 0.1) for i in range(3)
+    ]
+
+    reranker.rerank("query", results, top_k=None)
+    call_kwargs = reranker.client.rerank.call_args.kwargs
+    assert (
+        call_kwargs["top_n"] == 3
+    ), f"top_k=None must default to len(results); got top_n={call_kwargs['top_n']}"
+
+
+# ---- BUG-24: _dedup_search_results keyed only on document.text ----
+# Source: LlamaIndex #21033. Sync recursive retrieval dedup keyed on node.hash
+# while async used (hash, ref_doc_id); legitimately-distinct nodes were dropped.
+# Selectools' _dedup_search_results keyed only on r.document.text — two
+# documents with identical text but different sources (same snippet ingested
+# from two files — common in legal/academic/regulatory corpora) collapse into
+# one result, and the citation for the second source is lost.
+
+
+def test_bug24_dedup_preserves_distinct_sources():
+    """Identical text from different sources must NOT collapse into one result."""
+    from selectools.rag.vector_store import Document, SearchResult, _dedup_search_results
+
+    results = [
+        SearchResult(
+            document=Document(text="same snippet", metadata={"source": "file_a.pdf"}),
+            score=0.9,
+        ),
+        SearchResult(
+            document=Document(text="same snippet", metadata={"source": "file_b.pdf"}),
+            score=0.85,
+        ),
+    ]
+
+    deduped = _dedup_search_results(results)
+
+    assert len(deduped) == 2, (
+        f"Two distinct source documents with identical text must BOTH be preserved; "
+        f"got {len(deduped)} results (citation for second source lost)"
+    )
+    sources = {r.document.metadata["source"] for r in deduped}
+    assert sources == {"file_a.pdf", "file_b.pdf"}, f"Expected both sources; got {sources}"
+
+
+def test_bug24_dedup_collapses_same_text_same_source():
+    """Same text AND same source (true dup) still collapses — backward compat."""
+    from selectools.rag.vector_store import Document, SearchResult, _dedup_search_results
+
+    results = [
+        SearchResult(
+            document=Document(text="snippet", metadata={"source": "file_a.pdf"}),
+            score=0.9,
+        ),
+        SearchResult(
+            document=Document(text="snippet", metadata={"source": "file_a.pdf"}),
+            score=0.85,
+        ),
+    ]
+
+    deduped = _dedup_search_results(results)
+    assert (
+        len(deduped) == 1
+    ), f"True duplicate (same text + same source) must still collapse; got {len(deduped)}"
+    assert deduped[0].score == 0.9, "Must keep first (highest-scoring) occurrence"
+
+
+def test_bug24_dedup_handles_missing_metadata():
+    """Documents without metadata must still dedupe by text alone."""
+    from selectools.rag.vector_store import Document, SearchResult, _dedup_search_results
+
+    results = [
+        SearchResult(document=Document(text="x"), score=0.9),
+        SearchResult(document=Document(text="x"), score=0.8),
+        SearchResult(document=Document(text="y"), score=0.7),
+    ]
+    deduped = _dedup_search_results(results)
+    assert len(deduped) == 2, "text-only dedup still works when metadata absent"
+
+
+# ---- BUG-26: Gemini usage metadata `or 0` swallows legitimate zero ----
+# Source: LangChain #36500. `token_usage.get("total_tokens") or fallback`
+# silently replaces provider-reported 0 (cached completions, empty responses).
+# Round-1 pitfall #22 instance not yet swept in providers/.
+# gemini_provider.py lines 158-159 (sync) and 505-506 (stream) used the same
+# `(usage.prompt_token_count or 0) if usage else 0` pattern. If the API
+# returns prompt_token_count=None alongside a real candidates_token_count,
+# the `or 0` conflates "unknown" with "zero" and under-reports total_tokens.
+
+
+def test_bug26_gemini_usage_no_or_zero_pattern_in_source():
+    """gemini_provider.py must not use the `or 0` pattern on token fields (pitfall #22)."""
+    import inspect
+
+    from selectools.providers import gemini_provider
+
+    source = inspect.getsource(gemini_provider)
+    # Allow the fix pattern but forbid the bug pattern on token_count fields
+    assert "prompt_token_count or 0" not in source, (
+        "gemini_provider.py uses `prompt_token_count or 0` — this conflates "
+        "None (unknown) with 0 (legitimate cached-prompt value). "
+        "Use `x if x is not None else 0` instead (pitfall #22)."
+    )
+    assert (
+        "candidates_token_count or 0" not in source
+    ), "gemini_provider.py uses `candidates_token_count or 0` — same pitfall #22 class."
+
+
+def test_bug26_gemini_usage_fix_pattern_in_source():
+    """gemini_provider.py must use the `is not None` guard on token fields."""
+    import inspect
+
+    from selectools.providers import gemini_provider
+
+    source = inspect.getsource(gemini_provider)
+    assert (
+        source.count("prompt_token_count is not None") >= 2
+    ), "Both sync (complete) and stream paths must use `is not None` guard on prompt_token_count"
+    assert (
+        source.count("candidates_token_count is not None") >= 2
+    ), "Both sync (complete) and stream paths must use `is not None` guard on candidates_token_count"
+
+
+# ---- BUG-25: In-memory _matches_filter silently mishandles operator-dict values ----
+# Source: LlamaIndex #20246/#20237. Qdrant silently returned an empty filter
+# for unsupported operators (CONTAINS, ANY, ALL), matching ALL documents
+# (security-adjacent: permission-filter bypass).
+# Selectools' in-memory _matches_filter has the mirror-image bug: when a user
+# passes {"user_id": {"$in": [1, 2]}}, the equality check fails for every doc
+# → zero results with NO indication of user error. Either direction is wrong.
+# Fix: raise NotImplementedError when filter_value is a dict with $-prefixed
+# keys (operator syntax), so users get a clear error instead of silent
+# zero-matching. Literal dict metadata values without $-prefixed keys still
+# pass through (backward compat for nested-metadata use cases).
+
+
+def _bug25_make_embedder():
+    import numpy as np
+
+    embedder = MagicMock()
+    embedder.embed_query.return_value = np.array([0.1] * 8, dtype=np.float32)
+    embedder.embed_texts.return_value = np.array([[0.1] * 8, [0.2] * 8], dtype=np.float32)
+    return embedder
+
+
+def test_bug25_memory_filter_operator_dict_raises():
+    """InMemoryVectorStore.search with {$in: [...]} must raise NotImplementedError."""
+    from selectools.rag.stores.memory import InMemoryVectorStore
+    from selectools.rag.vector_store import Document
+
+    store = InMemoryVectorStore(embedder=_bug25_make_embedder())
+    store.add_documents(
+        [
+            Document(text="doc a", metadata={"user_id": 1}),
+            Document(text="doc b", metadata={"user_id": 2}),
+        ]
+    )
+
+    query_vec = store.embedder.embed_query("q")
+    with pytest.raises(NotImplementedError, match=r"\$in|operator"):
+        store.search(query_vec, top_k=5, filter={"user_id": {"$in": [1, 2]}})
+
+
+def test_bug25_bm25_filter_operator_dict_raises():
+    """BM25.search with {$in: [...]} must raise NotImplementedError."""
+    from selectools.rag.bm25 import BM25
+    from selectools.rag.vector_store import Document
+
+    bm25 = BM25()
+    bm25.add_documents(
+        [
+            Document(text="doc alpha", metadata={"user_id": 1}),
+            Document(text="doc beta", metadata={"user_id": 2}),
+        ]
+    )
+    with pytest.raises(NotImplementedError, match=r"\$in|operator"):
+        bm25.search("doc", top_k=5, filter={"user_id": {"$in": [1, 2]}})
+
+
+def test_bug25_memory_filter_literal_dict_still_works():
+    """Literal dict metadata values (no `$` keys) must still match — backward compat."""
+    from selectools.rag.stores.memory import InMemoryVectorStore
+    from selectools.rag.vector_store import Document
+
+    store = InMemoryVectorStore(embedder=_bug25_make_embedder())
+    store.add_documents(
+        [
+            Document(text="doc a", metadata={"config": {"theme": "dark"}}),
+            Document(text="doc b", metadata={"config": {"theme": "light"}}),
+        ]
+    )
+
+    query_vec = store.embedder.embed_query("q")
+    results = store.search(query_vec, top_k=5, filter={"config": {"theme": "dark"}})
+    matched = [r for r in results if r.document.text == "doc a"]
+    assert (
+        len(matched) == 1
+    ), f"Literal dict metadata match (no $-prefixed keys) must still work; got {len(matched)}"
+
+
+def test_bug25_memory_filter_simple_equality_still_works():
+    """Simple equality filter (non-dict value) must still work."""
+    from selectools.rag.stores.memory import InMemoryVectorStore
+    from selectools.rag.vector_store import Document
+
+    store = InMemoryVectorStore(embedder=_bug25_make_embedder())
+    store.add_documents(
+        [
+            Document(text="doc a", metadata={"user_id": 1}),
+            Document(text="doc b", metadata={"user_id": 2}),
+        ]
+    )
+
+    query_vec = store.embedder.embed_query("q")
+    results = store.search(query_vec, top_k=5, filter={"user_id": 1})
+    matched = [r for r in results if r.document.metadata.get("user_id") == 1]
+    assert len(matched) == 1, f"Simple equality filter must still work; got {len(matched)}"
+
+
+# ---- BUG-27: FallbackProvider retriable-error list missing 504/408/529/522/524 ----
+# Source: LiteLLM #25530. Selectools' _RETRIABLE_STATUS_CODES regex
+# `r"\b(429|500|502|503)\b"` misses 504 (Gateway Timeout), 408 (Request Timeout),
+# 529 (Anthropic Overloaded — very common on US-West), and 522/524 (Cloudflare).
+# Substring list also misses "overloaded_error"/"Overloaded"/"rate_limit_exceeded"
+# (underscore form used by OpenAI/Mistral/Anthropic errors).
+# Production Anthropic traffic regularly returns 529 which selectools currently
+# treats as non-retriable and raises to the user instead of falling over.
+
+
+def test_bug27_fallback_retriable_anthropic_529_overloaded():
+    """Anthropic 529 Overloaded must be treated as retriable."""
+    from selectools.providers.fallback import _is_retriable
+
+    assert _is_retriable(
+        Exception("Anthropic API Error: 529 Overloaded")
+    ), "Anthropic 529 Overloaded must be retriable"
+    assert _is_retriable(
+        Exception("anthropic: overloaded_error: server is temporarily overloaded")
+    ), "`overloaded_error` string must be retriable"
+
+
+def test_bug27_fallback_retriable_gateway_timeout_504():
+    """504 Gateway Timeout must be retriable."""
+    from selectools.providers.fallback import _is_retriable
+
+    assert _is_retriable(Exception("504 Gateway Timeout")), "504 must be retriable"
+
+
+def test_bug27_fallback_retriable_request_timeout_408():
+    """408 Request Timeout must be retriable."""
+    from selectools.providers.fallback import _is_retriable
+
+    assert _is_retriable(Exception("HTTP 408 Request Timeout")), "408 must be retriable"
+
+
+def test_bug27_fallback_retriable_rate_limit_underscore_form():
+    """OpenAI/Mistral `rate_limit_exceeded` (underscore) must be retriable."""
+    from selectools.providers.fallback import _is_retriable
+
+    assert _is_retriable(
+        Exception("openai: rate_limit_exceeded: quota reached")
+    ), "`rate_limit_exceeded` (underscore form) must be retriable"
+
+
+def test_bug27_fallback_retriable_cloudflare_522_524():
+    """Cloudflare 522/524 transient errors must be retriable."""
+    from selectools.providers.fallback import _is_retriable
+
+    assert _is_retriable(Exception("Cloudflare 522 connection timed out")), "522 must be retriable"
+    assert _is_retriable(Exception("Cloudflare 524 origin timeout")), "524 must be retriable"
+
+
+def test_bug27_fallback_still_non_retriable_for_400_401_404():
+    """Non-retriable status codes must still be non-retriable — backward compat."""
+    from selectools.providers.fallback import _is_retriable
+
+    assert not _is_retriable(Exception("400 Bad Request"))
+    assert not _is_retriable(Exception("401 Unauthorized"))
+    assert not _is_retriable(Exception("404 Not Found"))
+
+
+# ---- BUG-28: Azure deployment names bypass GPT-5 family detection ----
+# Source: LiteLLM #13515. Azure deployments use user-chosen names (e.g.,
+# "prod-chat", "my-reasoning"), NOT model family prefixes like "gpt-5".
+# OpenAIProvider._get_token_key(model).startswith("gpt-5") is called with the
+# deployment name, so an Azure deployment of gpt-5-mini under deployment name
+# "prod-chat" receives `max_tokens` instead of `max_completion_tokens` and hits
+# `BadRequestError: Unsupported parameter: 'max_tokens'`. This is the Azure
+# variant of round-1 pitfall #3 — OpenAIProvider was fixed but AzureOpenAIProvider
+# bypasses family detection entirely.
+
+
+def test_bug28_azure_deployment_name_honors_model_family_hint():
+    """Azure provider must use explicit model_family for token-key detection."""
+    from selectools.providers.azure_openai_provider import AzureOpenAIProvider
+
+    provider = AzureOpenAIProvider.__new__(AzureOpenAIProvider)
+    provider._model_family = "gpt-5"
+    assert provider._get_token_key("prod-chat") == "max_completion_tokens", (
+        "When model_family='gpt-5' is set, Azure deployment 'prod-chat' "
+        "must use max_completion_tokens, not max_tokens"
+    )
+
+
+def test_bug28_azure_no_model_family_falls_back_to_deployment_name():
+    """Backward compat: model_family=None uses deployment-name prefix match."""
+    from selectools.providers.azure_openai_provider import AzureOpenAIProvider
+
+    provider = AzureOpenAIProvider.__new__(AzureOpenAIProvider)
+    provider._model_family = None
+    assert (
+        provider._get_token_key("gpt-5-mini") == "max_completion_tokens"
+    ), "Deployment name matching a family prefix still works"
+    assert (
+        provider._get_token_key("gpt-4") == "max_tokens"
+    ), "Deployment name not matching any family prefix still uses max_tokens"
+
+
+def test_bug28_azure_model_family_overrides_deployment_family_mismatch():
+    """model_family must win over deployment name when both present."""
+    from selectools.providers.azure_openai_provider import AzureOpenAIProvider
+
+    provider = AzureOpenAIProvider.__new__(AzureOpenAIProvider)
+    # Deployment name looks like gpt-4 but it's actually a gpt-5 family deployment
+    provider._model_family = "gpt-5"
+    assert provider._get_token_key("gpt-4-anything") == "max_completion_tokens"
+
+
+# ---- BUG-29: Bare `list`/`dict` tool params emit schemas with no items/properties ----
+# Source: Pydantic AI PRs #4544, #4474, #4479, #4461, #3712. OpenAI strict mode
+# REJECTS `{"type": "array"}` with no `items`. Non-strict mode, the LLM has
+# no way to know what the array should contain, so it will guess or refuse.
+# Same for `dict[str, str]` → `{"type": "object"}` with no `properties` /
+# `additionalProperties`. Selectools' `_unwrap_type` strips generic args
+# entirely (list[str] → list), losing the element-type info before `to_schema`
+# can emit it.
+
+
+def test_bug29_list_str_param_schema_has_items_type():
+    """`list[str]` tool param must emit JSON schema with `items: {type: string}`."""
+    from selectools.tools import tool
+
+    @tool()
+    def f(items: list[str]) -> str:
+        """A tool with a typed list parameter."""
+        return ",".join(items)
+
+    schema = f.schema()
+    params = schema["parameters"]["properties"]
+    assert "items" in params["items"], (
+        "`list[str]` parameter must emit an inner `items` schema with "
+        "element type. Got: " + repr(params["items"])
+    )
+    assert (
+        params["items"]["items"]["type"] == "string"
+    ), f"`list[str]` element type must be `string`, got: {params['items']['items']}"
+
+
+def test_bug29_list_int_param_schema_has_items_integer():
+    """`list[int]` must emit `items: {type: integer}`."""
+    from selectools.tools import tool
+
+    @tool()
+    def f(values: list[int]) -> int:
+        """Sum a list of integers."""
+        return sum(values)
+
+    schema = f.schema()
+    params = schema["parameters"]["properties"]
+    assert params["values"]["items"]["type"] == "integer"
+
+
+def test_bug29_dict_str_str_param_schema_has_additional_properties():
+    """`dict[str, str]` must emit `additionalProperties: {type: string}`."""
+    from selectools.tools import tool
+
+    @tool()
+    def f(config: dict[str, str]) -> str:
+        """A tool with a typed dict parameter."""
+        return ",".join(f"{k}={v}" for k, v in config.items())
+
+    schema = f.schema()
+    params = schema["parameters"]["properties"]
+    assert "additionalProperties" in params["config"], (
+        "`dict[str, str]` parameter must emit `additionalProperties` describing "
+        "the value type. Got: " + repr(params["config"])
+    )
+    assert params["config"]["additionalProperties"]["type"] == "string"
+
+
+def test_bug29_bare_list_still_works_without_items():
+    """Bare `list` (no type param) must still emit a valid schema — backward compat."""
+    from selectools.tools import tool
+
+    @tool()
+    def f(stuff: list) -> str:
+        """A tool with a bare list parameter."""
+        return str(stuff)
+
+    schema = f.schema()
+    params = schema["parameters"]["properties"]
+    assert params["stuff"]["type"] == "array", "Bare list still emits type=array"
+
+
+def test_bug29_optional_list_str_still_preserves_items():
+    """`Optional[list[str]]` must still emit `items: {type: string}`."""
+    from typing import Optional
+
+    from selectools.tools import tool
+
+    @tool()
+    def f(tags: Optional[list[str]] = None) -> str:
+        """A tool with an optional typed list parameter."""
+        return ",".join(tags or [])
+
+    schema = f.schema()
+    params = schema["parameters"]["properties"]
+    assert (
+        params["tags"]["items"]["type"] == "string"
+    ), "Optional[list[str]] must preserve element type through Optional unwrap"
+
+
+# ---- BUG-30: pipeline.parallel() passes same input ref to every branch ----
+# Source: Haystack PR #10549. Haystack's Pipeline.run() needed
+# `_deepcopy_with_exceptions(component_inputs)` because branches that
+# mutated their input polluted sibling branches. Selectools' `_parallel_sync`
+# and `_parallel_async` pass the SAME `input` object to every branch. If any
+# branch mutates its input (list append, dict key set, dataclass attribute),
+# the next branch (sync) or interleaved sibling (async under gather) sees the
+# mutation. Async is worst: branches interleave at await points → non-
+# deterministic state corruption.
+
+
+def test_bug30_parallel_sync_branches_do_not_share_input_mutation():
+    """Sync parallel: mutation in one branch must not affect siblings."""
+    from selectools.pipeline import parallel
+
+    def branch_a(state: dict) -> dict:
+        state["seen_by"] = "A"
+        return dict(state)
+
+    def branch_b(state: dict) -> dict:
+        return {"saw_seen_by": state.get("seen_by", "NONE"), "id": state["id"]}
+
+    group = parallel(branch_a, branch_b)
+    result = group.fn({"id": 42})
+
+    assert result["branch_a"]["seen_by"] == "A"
+    assert (
+        result["branch_b"]["saw_seen_by"] == "NONE"
+    ), f"branch_b must not see branch_a's mutation; got {result['branch_b']}"
+
+
+def test_bug30_parallel_async_branches_do_not_share_input_mutation():
+    """Async parallel: asyncio.gather + mutation must not corrupt siblings."""
+    import asyncio
+
+    from selectools.pipeline import parallel
+
+    async def branch_a(state: dict) -> dict:
+        await asyncio.sleep(0.01)
+        state["seen_by"] = "A"
+        return dict(state)
+
+    async def branch_b(state: dict) -> dict:
+        await asyncio.sleep(0.005)  # runs first inside gather
+        return {"saw_seen_by": state.get("seen_by", "NONE"), "id": state["id"]}
+
+    group = parallel(branch_a, branch_b)
+    result = asyncio.run(group.fn({"id": 42}))
+
+    assert result["branch_a"]["seen_by"] == "A"
+    assert result["branch_b"]["saw_seen_by"] == "NONE", (
+        "Async branches must receive independent input copies; " f"got {result['branch_b']}"
+    )
+
+
+def test_bug30_parallel_preserves_top_level_key_equality():
+    """Branches still see the same initial values (only isolation, not reset)."""
+    from selectools.pipeline import parallel
+
+    def read_a(state: dict) -> int:
+        return state["id"]
+
+    def read_b(state: dict) -> int:
+        return state["id"]
+
+    group = parallel(read_a, read_b)
+    result = group.fn({"id": 99})
+    assert result["read_a"] == 99
+    assert result["read_b"] == 99
+
+
+# ---- BUG-32: run_in_executor drops contextvars at 5 grep-verified sites ----
+# Source: Haystack PR #9717, cross-round confirmation of CrewAI #4824/#4826
+# (parked round-2 candidate).
+# `loop.run_in_executor(None, fn, *args)` does NOT inherit the caller's
+# contextvars.Context. OTel active spans, Langfuse parent span, any
+# ContextVar set by _wire_fallback_observer, cancellation tokens in
+# ContextVars all drop inside the executor-scheduled callable. Users see
+# orphaned spans on every sync-fallback provider call and every sync graph
+# node. Five grep-verified sites in selectools:
+#   - agent/_provider_caller.py:386 (sync-fallback provider)
+#   - agent/core.py:1286 (alternate sync-fallback path)
+#   - orchestration/graph.py:1237 (sync generator node)
+#   - orchestration/graph.py:1251 (plain sync callable node)
+#   - agent/_tool_executor.py:321 (sync confirm_action)
+# Fix: shared helper `run_in_executor_copyctx(loop, executor, fn)` in
+# _async_utils.py wraps each dispatch with contextvars.copy_context().run.
+
+
+@pytest.mark.asyncio
+async def test_bug32_run_in_executor_copyctx_propagates_contextvar():
+    """The helper must propagate a ContextVar set in the caller coroutine."""
+    import asyncio
+    import contextvars
+
+    from selectools._async_utils import run_in_executor_copyctx
+
+    cv: contextvars.ContextVar[str] = contextvars.ContextVar("bug32_cv", default="default")
+    cv.set("caller_value")
+
+    def _read_cv() -> str:
+        return cv.get()
+
+    loop = asyncio.get_running_loop()
+    seen = await run_in_executor_copyctx(loop, None, _read_cv)
+    assert seen == "caller_value", (
+        f"ContextVar set in caller must propagate through run_in_executor; " f"got {seen!r}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_bug32_run_in_executor_copyctx_respects_executor_arg():
+    """The helper must forward its executor argument, not swallow it."""
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+
+    from selectools._async_utils import run_in_executor_copyctx
+
+    thread_names = []
+
+    def _who_am_i() -> None:
+        import threading
+
+        thread_names.append(threading.current_thread().name)
+
+    pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="bug32-test-pool")
+    try:
+        loop = asyncio.get_running_loop()
+        await run_in_executor_copyctx(loop, pool, _who_am_i)
+    finally:
+        pool.shutdown(wait=True)
+
+    assert thread_names and thread_names[0].startswith("bug32-test-pool"), (
+        f"run_in_executor_copyctx must use the provided executor; "
+        f"thread names seen: {thread_names}"
+    )
+
+
+def test_bug32_five_executor_sites_use_contextvar_helper():
+    """All 5 grep-verified sites must import and use the copyctx helper."""
+    import inspect
+
+    from selectools.agent import _provider_caller, _tool_executor, core
+    from selectools.orchestration import graph
+
+    for mod, label in [
+        (_provider_caller, "agent/_provider_caller.py"),
+        (core, "agent/core.py"),
+        (graph, "orchestration/graph.py"),
+        (_tool_executor, "agent/_tool_executor.py"),
+    ]:
+        source = inspect.getsource(mod)
+        assert (
+            "run_in_executor_copyctx" in source
+        ), f"{label} must import run_in_executor_copyctx for BUG-32 contextvar propagation"
+        # The raw `loop.run_in_executor(` pattern should have been replaced
+        # (allow it to appear only inside comments / docstrings, not code)
+        code_lines = [
+            ln
+            for ln in source.split("\n")
+            if "loop.run_in_executor(" in ln
+            and not ln.strip().startswith("#")
+            and "run_in_executor_copyctx" not in ln
+        ]
+        assert not code_lines, (
+            f"{label} still has raw `loop.run_in_executor(` call(s) that bypass "
+            f"contextvar propagation: {code_lines}"
+        )
+
+
+# ---- BUG-31: Silent `return {}` on malformed tool-call JSON ----
+# Source: Pydantic AI PRs #4609, #4588, #4459, #4656, #4480, #4484.
+# Providers caught json.JSONDecodeError and returned {} → the tool then
+# failed with "Missing required parameter", so the LLM learned it forgot
+# a parameter but NOT that its JSON was malformed. Same LLM reproduces
+# the same malformed JSON next iteration. 7 sites: 5 in _openai_compat.py
+# + 2 in anthropic_provider.py.
+
+
+def test_bug31_parse_tool_args_valid_json():
+    """Valid JSON object must parse cleanly with no error."""
+    from selectools.providers._openai_compat import _parse_tool_args
+
+    params, error = _parse_tool_args('{"x": 1, "y": "foo"}')
+    assert params == {"x": 1, "y": "foo"}
+    assert error is None
+
+
+def test_bug31_parse_tool_args_empty_string_is_empty_success():
+    """Empty string → empty dict, no error — backward compat."""
+    from selectools.providers._openai_compat import _parse_tool_args
+
+    params, error = _parse_tool_args("")
+    assert params == {}
+    assert error is None
+
+
+def test_bug31_parse_tool_args_none_is_empty_success():
+    """None input → empty dict, no error."""
+    from selectools.providers._openai_compat import _parse_tool_args
+
+    params, error = _parse_tool_args(None)
+    assert params == {}
+    assert error is None
+
+
+def test_bug31_parse_tool_args_malformed_json_returns_error():
+    """Malformed JSON must populate parse_error with a helpful preview."""
+    from selectools.providers._openai_compat import _parse_tool_args
+
+    params, error = _parse_tool_args('{"x": 1')  # unterminated
+    assert params == {}
+    assert error is not None
+    assert "invalid JSON" in error
+    assert '{"x": 1' in error
+
+
+def test_bug31_parse_tool_args_non_object_returns_error():
+    """JSON value that is not an object (e.g., a list) must be rejected."""
+    from selectools.providers._openai_compat import _parse_tool_args
+
+    params, error = _parse_tool_args("[1, 2, 3]")
+    assert params == {}
+    assert error is not None
+    assert "must be a JSON object" in error
+
+
+def test_bug31_tool_call_has_parse_error_field():
+    """ToolCall dataclass must expose parse_error as an optional field."""
+    from selectools.types import ToolCall
+
+    tc = ToolCall(tool_name="foo", parameters={})
+    assert tc.parse_error is None
+
+    tc_err = ToolCall(tool_name="foo", parameters={}, parse_error="bad json")
+    assert tc_err.parse_error == "bad json"
+
+
+def test_bug31_tool_executor_surfaces_parse_error_as_retry_message():
+    """Sync tool executor must emit a clear error when tool_call.parse_error is set."""
+    import inspect
+
+    from selectools.agent import _tool_executor
+
+    source = inspect.getsource(_tool_executor._ToolExecutorMixin._execute_single_tool)
+    assert "parse_error" in source, "_execute_single_tool must check tool_call.parse_error (BUG-31)"
+    assert "malformed arguments" in source
+
+    async_source = inspect.getsource(_tool_executor._ToolExecutorMixin._aexecute_single_tool)
+    assert (
+        "parse_error" in async_source
+    ), "_aexecute_single_tool must check tool_call.parse_error (BUG-31)"
+
+
+def test_bug31_providers_no_silent_empty_dict_on_decode_error():
+    """Providers must not use the raw `except json.JSONDecodeError: return {}` or `params = {}` pattern for tool-call args."""
+    import inspect
+
+    from selectools.providers import _openai_compat, anthropic_provider
+
+    for mod in (_openai_compat, anthropic_provider):
+        source = inspect.getsource(mod)
+        # The old silent-drop pattern must be gone from these modules
+        assert (
+            "except json.JSONDecodeError:\n                                params = {}"
+            not in source
+        ), f"{mod.__name__} still has the silent `params = {{}}` on JSONDecodeError pattern"
+
+
+# ---- BUG-33: astream() does not aclose() provider generators ----
+# Source: Pydantic AI PRs #4476, #4205. `async for item in gen:` without
+# wrapping in `contextlib.aclosing(gen)` leaks the async generator when the
+# loop body raises. `gen.__aexit__` runs under GC instead of deterministically,
+# producing `RuntimeError: async generator raised StopAsyncIteration` on
+# client disconnect and orphaned HTTP connections. Two sites in selectools:
+#   - agent/core.py:1316 (arun streaming path)
+#   - agent/_provider_caller.py:505 (_astreaming_call helper)
+
+
+def test_bug33_astream_sites_use_aclosing_context_manager():
+    """Both provider.astream() call sites must use contextlib.aclosing."""
+    import inspect
+
+    from selectools.agent import _provider_caller, core
+
+    for mod, label in [
+        (core, "agent/core.py"),
+        (_provider_caller, "agent/_provider_caller.py"),
+    ]:
+        source = inspect.getsource(mod)
+        assert "aclosing" in source, (
+            f"{label} must import/use contextlib.aclosing to deterministically "
+            f"close provider.astream() generators (BUG-33)"
+        )
+
+
+@pytest.mark.asyncio
+async def test_bug33_astream_closes_provider_gen_on_inner_exception():
+    """If the caller's loop body raises, the provider gen must be closed."""
+    from selectools._async_utils import aclosing
+
+    close_count = {"n": 0}
+
+    async def fake_gen():
+        try:
+            yield "chunk1"
+            yield "chunk2"  # never reached if consumer stops
+        finally:
+            close_count["n"] += 1
+
+    gen = fake_gen()
+    try:
+        async with aclosing(gen):
+            async for item in gen:
+                if item == "chunk1":
+                    raise RuntimeError("simulated guardrail failure")
+    except RuntimeError:
+        pass
+
+    assert close_count["n"] == 1, (
+        "aclosing must run the async generator's finally block "
+        "deterministically on inner exception; got close_count="
+        f"{close_count['n']}"
+    )
+
+
+# ---- BUG-34: max_iterations consumed by structured-retry budget ----
+# Source: Pydantic AI PRs #4956, #4940, #4692. Selectools shared ONE global
+# `max_iterations` counter between tool-execution iterations AND structured-
+# validation retries. An agent with `max_iterations=3` and an LLM that
+# fails structured validation 3 times in a row would terminate before
+# reaching the `max_retries=5` ceiling from RetryConfig. Structured
+# retries must have their own budget, checked against RetryConfig.max_retries,
+# not against max_iterations.
+
+
+def test_bug34_run_context_has_structured_retries_counter():
+    """_RunContext must carry a separate structured_retries counter."""
+    from selectools.agent.core import _RunContext
+
+    fields = {f.name for f in _RunContext.__dataclass_fields__.values()}
+    assert (
+        "structured_retries" in fields
+    ), "_RunContext must have a structured_retries field (BUG-34)"
+
+
+def test_bug34_structured_retry_budget_checked_against_retry_max_retries():
+    """Source must check ctx.structured_retries against retry.max_retries."""
+    import inspect
+
+    from selectools.agent import core
+
+    source = inspect.getsource(core)
+    # Every structured_retry branch (there are 3 — run, arun, astream) must
+    # reference the new counter, not just ctx.iteration.
+    assert (
+        source.count("ctx.structured_retries") >= 3
+    ), "All 3 structured-retry branches (run/arun/astream) must use ctx.structured_retries (BUG-34)"
+
+
+def test_bug34_structured_retry_honors_retry_budget_beyond_max_iterations():
+    """Agent with max_iterations=3 must allow structured_retries up to retry.max_retries."""
+    from selectools.agent.config_groups import RetryConfig
+    from selectools.agent.core import Agent, AgentConfig
+    from selectools.providers.base import Provider
+    from selectools.types import Message, Role
+    from selectools.usage import UsageStats
+
+    @tool()
+    def _bug34_noop() -> str:
+        return "ok"
+
+    # Invalid JSON on attempts 1-4, then valid on attempt 5
+    responses = [
+        "not json",
+        "still not json",
+        '{"partial": ',
+        "garbage",
+        '{"answer": "42"}',
+    ]
+    usage = UsageStats(1, 1, 2, 0.0, "mock", "mock")
+
+    class _StubProvider(Provider):
+        name = "stub"
+        supports_streaming = False
+        supports_async = False
+
+        def __init__(self) -> None:
+            self.call_count = 0
+
+        def complete(self, **kwargs: Any) -> Tuple[Message, UsageStats]:
+            idx = min(self.call_count, len(responses) - 1)
+            self.call_count += 1
+            return Message(role=Role.ASSISTANT, content=responses[idx]), usage
+
+        def stream(self, **kwargs: Any) -> Any:  # pragma: no cover
+            raise NotImplementedError
+
+        async def acomplete(self, **kwargs: Any) -> Any:  # pragma: no cover
+            raise NotImplementedError
+
+        async def astream(self, **kwargs: Any) -> Any:  # pragma: no cover
+            raise NotImplementedError
+
+    from pydantic import BaseModel
+
+    class _Answer(BaseModel):
+        answer: str
+
+    provider = _StubProvider()
+    agent = Agent(
+        tools=[_bug34_noop],
+        provider=provider,
+        config=AgentConfig(
+            model="stub",
+            max_iterations=3,  # small tool-iteration budget
+            retry=RetryConfig(max_retries=5),  # larger retry budget
+        ),
+    )
+
+    result = agent.run("give me an answer", response_format=_Answer)
+    assert provider.call_count == 5, (
+        f"Agent must retry 5 times before succeeding (max_retries=5 > max_iterations=3); "
+        f"provider was called {provider.call_count} times"
+    )
+    assert result.parsed is not None
+    assert result.parsed.answer == "42"

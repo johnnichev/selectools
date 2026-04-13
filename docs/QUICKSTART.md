@@ -553,6 +553,36 @@ print(f"Steps taken: {result.steps}")
 
 ---
 
+## Running Selectools in Async Contexts
+
+Selectools sync APIs (`Agent.run()`, `AgentGraph.run()`,
+`PlanAndExecuteAgent.run()`, etc.) work correctly when called from
+within an existing event loop — Jupyter notebooks, FastAPI handlers,
+async test fixtures, and nested orchestration.
+
+```python
+# In a Jupyter notebook
+from selectools import Agent
+
+agent = Agent(tools=[my_tool], provider=provider)
+result = agent.run("hello")  # Just works, even though Jupyter has a running loop
+```
+
+```python
+# In a FastAPI handler
+@app.post("/chat")
+async def chat(request: ChatRequest):
+    # Sync API works inside async handler
+    result = agent.run(request.message)
+    return {"reply": result.content}
+```
+
+The internal helper (`selectools._async_utils.run_sync`) detects a
+running event loop and offloads to a worker thread when needed. You
+don't need to do anything special.
+
+---
+
 ## What's New in v0.21.0
 
 - **3 new vector stores**: FAISS, Qdrant, pgvector -- see [RAG Pipeline](modules/RAG.md#faiss-v0210)
@@ -601,7 +631,7 @@ You now know the core API. Here is where to go from here:
 | Track entities across turns | [Entity Memory Guide](modules/ENTITY_MEMORY.md) |
 | Build a knowledge graph | [Knowledge Graph Guide](modules/KNOWLEDGE_GRAPH.md) |
 | Add cross-session memory | [Knowledge Memory Guide](modules/KNOWLEDGE.md) |
-| See working examples | [examples/](https://github.com/johnnichev/selectools/tree/main/examples) (61 numbered scripts, 01–61) |
+| See working examples | [examples/](https://github.com/johnnichev/selectools/tree/main/examples) (94 numbered scripts, 01–94) |
 
 ---
 

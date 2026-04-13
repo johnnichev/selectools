@@ -30,6 +30,40 @@ result = AgentGraph.chain(planner, writer, reviewer).run("Write a blog post")
 # selectools serve agent.yaml
 ```
 
+## What's New in v0.22
+
+### v0.22.0 — Competitor-Informed Bug Fixes
+
+22 bugs identified by mining 95+ closed bug reports from [Agno](https://github.com/agno-agi/agno) (39k stars) and 60+ from [PraisonAI](https://github.com/MervinPraison/PraisonAI) (6.9k stars), then cross-referencing the patterns against selectools v0.21.0 source code. Six were shipping blockers. All 22 are now fixed with TDD regression tests.
+
+```python
+# BUG-02: typing.Literal now supported in @tool()
+from typing import Literal
+from selectools.tools import tool
+
+@tool()
+def set_mode(mode: Literal["fast", "slow", "auto"]) -> str:
+    return f"mode={mode}"
+
+# BUG-14: session namespace isolation
+store.save("session_123", memory_a, namespace="agent_a")
+store.save("session_123", memory_b, namespace="agent_b")  # No collision
+
+# BUG-21: opt-in vector store search dedup
+results = store.search(query_embedding=emb, top_k=10, dedup=True)
+
+# BUG-03: sync APIs now work in Jupyter / FastAPI handlers
+agent.run("hello")  # Just works inside async contexts
+```
+
+- **6 HIGH severity** (shipping blockers): streaming dropped tool calls, `typing.Literal` crashed `@tool()`, `asyncio.run()` re-entry in 8 sync wrappers, HITL silently lost in parallel groups + subgraphs, `ConversationMemory` had no thread lock
+- **9 MEDIUM severity**: `<think>` tag stripping, RAG batch limits, MCP concurrent race, str→int/float/bool argument coercion, `Union[str, int]` support, multi-interrupt generators, GraphState fail-fast validation, session namespace isolation, summary growth cap
+- **7 LOW-MED severity**: cancelled-result extraction, `AgentTrace` lock, async observer exception logging, batch clone isolation, OTel/Langfuse observer locks, vector store search dedup, `Optional[T]` without default handling
+- **+57 new regression tests** in `tests/agent/test_regression.py`, each with empirical fault-injection verification (test fails without fix, passes after)
+- **Thread safety end-to-end correct** across `ConversationMemory`, `AgentTrace`, `OTelObserver`, `LangfuseObserver`, `MCPClient`, `FallbackProvider`, batch clone isolation
+
+See `CHANGELOG.md` for the full per-bug breakdown with cross-references to every original Agno/PraisonAI issue.
+
 ## What's New in v0.21
 
 ### v0.21.0 — Connector Expansion
@@ -73,7 +107,7 @@ The first AI agent framework to ship a visual graph builder in a single `pip ins
 
 **[Try the builder in your browser →](https://selectools.dev/builder/)** — no install required.
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb) [![Examples Gallery](https://img.shields.io/badge/examples-88_scripts-06b6d4)](https://selectools.dev/examples/)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb) [![Examples Gallery](https://img.shields.io/badge/examples-94_scripts-06b6d4)](https://selectools.dev/examples/)
 
 ```bash
 pip install selectools
@@ -130,7 +164,7 @@ Path("trace.html").write_text(trace_to_html(result.trace))
 - **Trace HTML viewer** — `trace_to_html(trace)` renders a standalone waterfall timeline
 - **Deprecation policy** — 2-minor-version window, programmatic introspection via `.__stability__`
 - **Security audit** — all 41 `# nosec` annotations reviewed and published in `docs/SECURITY.md`
-- **Quality infrastructure** — property-based tests (Hypothesis), thread-safety smoke suite, 5 new production simulations (4612 tests total)
+- **Quality infrastructure** — property-based tests (Hypothesis), thread-safety smoke suite, 5 new production simulations (5271 tests total)
 
 ### v0.19.1 — Advanced Agent Patterns
 
@@ -486,7 +520,7 @@ report.to_html("report.html")
 - **76 Examples**: Multi-agent graphs, RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, eval framework, advanced agent patterns, stability markers, HTML trace viewer, and more
 - **Built-in Eval Framework**: 50 evaluators (30 deterministic + 21 LLM-as-judge), A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing
 - **AgentObserver Protocol**: 45 lifecycle events with `run_id` correlation, `LoggingObserver`, `SimpleStepObserver`, OTel export
-- **5203 Tests**: Unit, integration, regression, and E2E with real API calls
+- **5271 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 
@@ -1110,7 +1144,7 @@ pytest tests/ -x -q          # All tests
 pytest tests/ -k "not e2e"   # Skip E2E (no API keys needed)
 ```
 
-5203 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, orchestration, pipelines, agent patterns, stability markers, trace viewer, and E2E integration with real API calls.
+5271 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, orchestration, pipelines, agent patterns, stability markers, trace viewer, and E2E integration with real API calls.
 
 ## License
 

@@ -47,6 +47,65 @@ class SearchResult:
     score: float
 
 
+def _validate_filter(filter: Optional[Dict[str, Any]]) -> None:
+    """Raise ``NotImplementedError`` if ``filter`` uses operator-dict syntax.
+
+    BUG-25 / LlamaIndex #20246: in-memory and BM25 filter matchers compare
+    metadata values with ``!=``. If a user passes an operator dict like
+    ``{"user_id": {"$in": [1, 2]}}`` expecting Mongo-style operator semantics,
+    the equality check fails for every document and returns zero results with
+    no indication of user error. We detect operator intent (a dict value with
+    one or more ``$``-prefixed keys) and raise a clear error instead of
+    silently returning the wrong result.
+
+    Literal dict metadata values (no ``$``-prefixed keys) still pass through
+    for backward compatibility with nested-metadata matching.
+    """
+    if not filter:
+        return
+    for _key, value in filter.items():
+        if isinstance(value, dict) and any(
+            isinstance(k, str) and k.startswith("$") for k in value.keys()
+        ):
+            bad = next(k for k in value.keys() if isinstance(k, str) and k.startswith("$"))
+            raise NotImplementedError(
+                f"In-memory filter does not support operator syntax {bad!r}. "
+                f"Use a vector store backend that supports operators "
+                f"(Chroma, Pinecone, Qdrant, pgvector) or use equality-only filters."
+            )
+
+
+def _dedup_search_results(results: List["SearchResult"]) -> List["SearchResult"]:
+    """Post-filter search results so each unique ``(text, source)`` pair appears once.
+
+    Keeps the first occurrence (highest-scoring when the input is already
+    sorted by descending similarity). Used by vector store ``search()`` methods
+    when called with ``dedup=True``.
+
+    Dedup key is ``(document.text, document.metadata.get("source"))`` so that
+    two documents with identical text but different source metadata — a
+    common case when the same snippet is ingested from multiple files — are
+    preserved as distinct citations. When no ``source`` key is present the
+    fallback is text-only (BUG-24 / LlamaIndex #21033).
+
+    Args:
+        results: Ordered list of SearchResult objects.
+
+    Returns:
+        New list with duplicate ``(text, source)`` results removed.
+    """
+    seen: set = set()
+    out: List["SearchResult"] = []
+    for r in results:
+        source = r.document.metadata.get("source") if r.document.metadata else None
+        key = (r.document.text, source)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(r)
+    return out
+
+
 class VectorStore(ABC):
     """
     Abstract base class for vector store implementations.
@@ -80,6 +139,7 @@ class VectorStore(ABC):
         query_embedding: List[float],
         top_k: int = 5,
         filter: Optional[Dict[str, Any]] = None,
+        dedup: bool = False,
     ) -> List[SearchResult]:
         """
         Search for similar documents.
@@ -88,6 +148,9 @@ class VectorStore(ABC):
             query_embedding: Query embedding vector
             top_k: Number of results to return
             filter: Optional metadata filter (e.g., {"source": "manual.pdf"})
+            dedup: If True, post-filter results so each unique document text
+                appears at most once (keeps the first — highest-scoring —
+                occurrence). Default False for backward compatibility.
 
         Returns:
             List of SearchResult objects, sorted by similarity (highest first)
@@ -169,4 +232,10 @@ class VectorStore(ABC):
             )
 
 
-__all__ = ["Document", "SearchResult", "VectorStore"]
+__all__ = [
+    "Document",
+    "SearchResult",
+    "VectorStore",
+    "_dedup_search_results",
+    "_validate_filter",
+]

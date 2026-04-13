@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from ...embeddings.provider import EmbeddingProvider
 
 from ...stability import beta
-from ..vector_store import Document, SearchResult, VectorStore
+from ..vector_store import Document, SearchResult, VectorStore, _dedup_search_results
 
 logger = logging.getLogger(__name__)
 
@@ -313,6 +313,7 @@ class PgVectorStore(VectorStore):
         query_embedding: List[float],
         top_k: int = 5,
         filter: Optional[Dict[str, Any]] = None,
+        dedup: bool = False,
     ) -> List[SearchResult]:
         """
         Search for similar documents using cosine distance.
@@ -326,6 +327,7 @@ class PgVectorStore(VectorStore):
             filter: Optional metadata filter. Each key-value pair is matched
                 against the JSONB ``metadata`` column using the ``@>``
                 containment operator.
+            dedup: If True, drop duplicate-text results (keeps highest-scoring).
 
         Returns:
             List of :class:`SearchResult` objects sorted by similarity.
@@ -343,7 +345,9 @@ class PgVectorStore(VectorStore):
             filter_clause = "WHERE metadata @> %s::jsonb"
             params.append(filter_json)
 
-        params.extend([embedding_str, top_k])
+        # Over-fetch when dedup is requested so we still return top_k uniques.
+        fetch_k = top_k * 4 if dedup else top_k
+        params.extend([embedding_str, fetch_k])
 
         # cosine distance: 1 - (a <=> b) gives cosine similarity
         query = f"""
@@ -386,7 +390,9 @@ class PgVectorStore(VectorStore):
                 )
             )
 
-        return results
+        if dedup:
+            results = _dedup_search_results(results)
+        return results[:top_k]
 
     def delete(self, ids: List[str]) -> None:
         """

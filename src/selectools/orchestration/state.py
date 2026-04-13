@@ -10,6 +10,7 @@ STATE_KEY_LAST_OUTPUT.
 from __future__ import annotations
 
 import copy
+import json
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
@@ -88,7 +89,14 @@ class GraphState:
         self.data[STATE_KEY_LAST_OUTPUT] = value
 
     def to_dict(self) -> Dict[str, Any]:
-        """Return a JSON-safe representation. Excludes _interrupt_responses."""
+        """Return a JSON-safe representation. Excludes _interrupt_responses.
+
+        Raises:
+            ValueError: If state.data contains non-JSON-serializable values.
+                This prevents silent checkpoint corruption — any non-serializable
+                value would later fail at json.dump or produce garbage strings
+                via default=str (Agno #7365).
+        """
         from ..types import AgentResult, Message  # noqa: F811
 
         def _serialize_msg(m: Any) -> Dict[str, Any]:
@@ -112,9 +120,17 @@ class GraphState:
                 return r
             return {"content": str(r)}
 
+        try:
+            serialized_data = json.loads(json.dumps(self.data))
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"GraphState.data contains non-serializable values: {exc}. "
+                "All values in state.data must be JSON-compatible for checkpointing."
+            ) from exc
+
         return {
             "messages": [_serialize_msg(m) for m in self.messages],
-            "data": copy.deepcopy(self.data),
+            "data": serialized_data,
             "current_node": self.current_node,
             "history": [(name, _serialize_result(res)) for name, res in self.history],
             "metadata": copy.deepcopy(self.metadata),
