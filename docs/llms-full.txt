@@ -594,7 +594,7 @@ You now know the core API. Here is where to go from here:
 | Track entities across turns | [Entity Memory Guide](modules/ENTITY_MEMORY.md) |
 | Build a knowledge graph | [Knowledge Graph Guide](modules/KNOWLEDGE_GRAPH.md) |
 | Add cross-session memory | [Knowledge Memory Guide](modules/KNOWLEDGE.md) |
-| See working examples | [examples/](https://github.com/johnnichev/selectools/tree/main/examples) (61 numbered scripts, 01–61) |
+| See working examples | [examples/](https://github.com/johnnichev/selectools/tree/main/examples) (94 numbered scripts, 01–94) |
 
 ---
 

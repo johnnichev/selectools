@@ -301,6 +301,27 @@ provider = AzureOpenAIProvider(
 )
 ```
 
+**Model Family Override (v0.22.0 — BUG-28):**
+
+Azure deployments use custom names that don't match model family prefixes.
+When deploying GPT-5-family models with non-standard deployment names, pass
+`model_family` explicitly to get the correct `max_completion_tokens` vs
+`max_tokens` handling:
+
+```python
+# Deployment "prod-chat" runs gpt-5-mini, but the name doesn't match "gpt-5"
+provider = AzureOpenAIProvider(
+    azure_endpoint="https://my-resource.openai.azure.com",
+    azure_deployment="prod-chat",
+    model_family="gpt-5",            # Explicit family hint
+)
+# Now uses max_completion_tokens instead of max_tokens
+```
+
+Without `model_family`, selectools uses the deployment name for family
+detection. If the deployment name happens to start with the model family
+prefix (e.g., `gpt-5-mini`), no override is needed.
+
 > **Implementation note**: `AzureOpenAIProvider` extends `OpenAIProvider`, overriding
 > only the client initialization to use `AzureOpenAI` / `AsyncAzureOpenAI` from the
 > OpenAI SDK. All complete/stream/acomplete/astream behaviour is inherited.
@@ -858,10 +879,13 @@ provider = FallbackProvider(
 
 The provider falls through to the next on:
 
-- **Timeout errors**
-- **HTTP 5xx** (server errors)
-- **HTTP 429** (rate limits)
+- **Timeout errors** (`timeout`, `408 Request Timeout`, `504 Gateway Timeout`)
+- **HTTP 5xx** (500, 502, 503)
+- **HTTP 429** (rate limits) — matches both `rate limit` (space) and `rate_limit_exceeded` (underscore)
 - **Connection errors**
+- **Anthropic 529 Overloaded** — very common on US-West traffic (v0.22.0, BUG-27)
+- **Cloudflare 522/524** — origin connection/timeout errors (v0.22.0, BUG-27)
+- **`overloaded`/`service_unavailable`** — provider body text patterns (v0.22.0, BUG-27)
 
 ### Protocol Support
 

@@ -107,7 +107,7 @@ The first AI agent framework to ship a visual graph builder in a single `pip ins
 
 **[Try the builder in your browser →](https://selectools.dev/builder/)** — no install required.
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb) [![Examples Gallery](https://img.shields.io/badge/examples-88_scripts-06b6d4)](https://selectools.dev/examples/)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb) [![Examples Gallery](https://img.shields.io/badge/examples-94_scripts-06b6d4)](https://selectools.dev/examples/)
 
 ```bash
 pip install selectools

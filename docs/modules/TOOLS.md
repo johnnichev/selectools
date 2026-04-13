@@ -813,6 +813,36 @@ def lookup(key: Union[str, int]) -> str:
     return f"key={key}"
 ```
 
+### Typed Collection Parameters
+
+> Since v0.22.0 (BUG-29)
+
+Collection parameters (`list`, `dict`) should specify element types so the
+JSON schema includes `items` or `additionalProperties`. OpenAI strict mode
+**rejects** schemas without these fields, and non-strict mode leaves the LLM
+guessing what the array should contain.
+
+```python
+@tool()
+def process(
+    tags: list[str],           # Emits {"type": "array", "items": {"type": "string"}}
+    scores: list[int],         # Emits {"type": "array", "items": {"type": "integer"}}
+    config: dict[str, str],    # Emits {"type": "object", "additionalProperties": {"type": "string"}}
+) -> str:
+    return f"{tags}, {scores}, {config}"
+```
+
+Bare `list` or `dict` without type parameters still work (backward compatible)
+but emit the plain `{"type": "array"}` / `{"type": "object"}` schema without
+element type info. `Optional[list[str]]` also preserves the element type
+through the Optional unwrap.
+
+Supported element types: `str`, `int`, `float`, `bool`. Complex nested types
+(e.g., `list[dict[str, int]]`) fall back to the bare schema.
+
+The `ToolParameter` dataclass carries an `element_type: Optional[type]` field
+that `to_schema()` uses to emit the inner type information.
+
 ### Argument Type Coercion
 
 Tool arguments from LLMs are coerced to the declared parameter type

@@ -65,3 +65,7 @@ Apply to every public class/function in `__init__.py` exports:
 24. **`ConversationMemory.branch()` deep copy**: Use `dataclasses.replace()` on every Message. Restore `image_base64` explicitly (it's `init=False`).
 25. **SVG badge XML escaping**: Use `xml.sax.saxutils.escape()` for label/value interpolation.
 26. **`bandit` annotations**: Mark safe SQL with `# nosec B608`, safe subprocess with `# nosec B404`.
+27. **`aclosing()` for async generators**: `async for item in provider.astream(...)` MUST be wrapped in `async with aclosing(gen) as gen:` so the provider generator is deterministically closed on exception. Use `selectools._async_utils.aclosing` (Python 3.9 backport of `contextlib.aclosing`).
+28. **ContextVars propagation in `run_in_executor`**: Direct `loop.run_in_executor(None, fn)` drops `contextvars.Context` (OTel spans, Langfuse traces lost). Use `run_in_executor_copyctx(loop, executor, fn)` from `_async_utils.py`.
+29. **Malformed tool-call JSON recovery**: Provider `json.loads()` failures MUST surface via `ToolCall.parse_error`, not silent `return {}`. Use shared `_parse_tool_args()` helper. Tool executor checks `parse_error` before tool lookup.
+30. **Structured retry budget**: `RetryConfig.max_retries` controls structured-validation retries INDEPENDENTLY of `max_iterations`. Outer loop uses `max_iterations + ctx.structured_retries` so validation failures don't eat the tool budget.

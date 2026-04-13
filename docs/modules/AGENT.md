@@ -1306,6 +1306,29 @@ print(result.content)  # Raw JSON string
 5. On validation failure, the error is fed back to the LLM for a retry
 6. `result.parsed` contains the typed object; `result.content` has the raw string
 
+### Structured Retry Budget (v0.22.0 — BUG-34)
+
+Structured-validation retries now have their **own budget**, decoupled from
+`max_iterations`. Previously, a single global counter was shared between
+tool-execution iterations and structured-validation retries — an agent with
+`max_iterations=3` and an LLM that failed JSON validation 3 times would
+terminate before reaching `RetryConfig.max_retries`.
+
+```python
+agent = Agent(
+    tools=[...],
+    provider=provider,
+    config=AgentConfig(
+        max_iterations=5,                    # Tool-execution budget
+        retry=RetryConfig(max_retries=3),    # Structured-validation retry budget (independent)
+    ),
+)
+```
+
+- `max_iterations` controls how many times tools can be called
+- `RetryConfig.max_retries` controls how many structured-validation retries are allowed
+- A validation failure increments the retry counter without consuming a tool iteration
+
 ### Supported Formats
 
 - **Pydantic v2 `BaseModel`**: Full schema generation with type coercion

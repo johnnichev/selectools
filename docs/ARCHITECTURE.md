@@ -1,6 +1,6 @@
 # Selectools Architecture
 
-**Version:** 0.20.1
+**Version:** 0.22.0
 **Last Updated:** April 2026
 
 ## System Overview
@@ -85,7 +85,7 @@ Selectools is a production-ready Python framework for building AI agents with to
 graph TD
     User([User Code]) --> Agent["Agent (core.py)"]
     Agent --> Providers["Providers\nOpenAI · Anthropic · Gemini · Ollama"]
-    Agent --> Tools["Tools\n@tool · 24 built-in · ToolLoader"]
+    Agent --> Tools["Tools\n@tool · 33 built-in · ToolLoader"]
     Agent --> Safety["Safety\nGuardrails · Audit · Screening"]
     Agent --> Memory["Memory\nConversation · Entity · KG"]
     Agent --> Trace["Trace + Observer\n27 step types · 45 events"]

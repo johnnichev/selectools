@@ -270,7 +270,7 @@ selectools/
 │   ├── tools/                  # Tool tests
 │   ├── core/                   # Core framework tests
 │   └── integration/            # E2E tests (require API keys)
-├── examples/                   # 88 numbered examples
+├── examples/                   # 94 numbered examples
 ├── docs/                       # Detailed documentation
 │   ├── QUICKSTART.md           # 5-minute getting started
 │   ├── ARCHITECTURE.md         # Architecture overview
