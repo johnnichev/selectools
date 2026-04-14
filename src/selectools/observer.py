@@ -69,6 +69,20 @@ class AgentObserver:
     ) -> None:
         """Called when the agent produces its final result."""
 
+    def on_tool_loop_detected(
+        self,
+        run_id: str,
+        detector_name: str,
+        details: Dict[str, Any],
+    ) -> None:
+        """Called when the configured ``LoopDetector`` fires.
+
+        Fires once per detection. If the policy is ``RAISE``, this callback
+        runs just before ``LoopDetectedError`` is raised, so observers can
+        record the final state. Distinct from graph-level ``on_loop_detected``
+        which tracks graph-node cycles in ``AgentGraph``.
+        """
+
     # ------------------------------------------------------------------
     # LLM-level events
     # ------------------------------------------------------------------
@@ -1062,6 +1076,14 @@ class AsyncAgentObserver(AgentObserver):
         result: "AgentResult",
     ) -> None:
         """Async counterpart of :meth:`on_run_end`."""
+
+    async def a_on_tool_loop_detected(
+        self,
+        run_id: str,
+        detector_name: str,
+        details: Dict[str, Any],
+    ) -> None:
+        """Async counterpart of :meth:`on_tool_loop_detected`."""
 
     # ------------------------------------------------------------------
     # LLM-level events

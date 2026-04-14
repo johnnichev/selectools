@@ -62,6 +62,16 @@ from .knowledge_graph import (
     Triple,
     TripleStore,
 )
+from .loop_detection import (
+    BaseDetector,
+    LoopDetectedError,
+    LoopDetection,
+    LoopDetector,
+    LoopPolicy,
+    PingPongDetector,
+    RepeatDetector,
+    StallDetector,
+)
 from .memory import ConversationMemory
 from .models import (
     ALL_MODELS,
@@ -221,6 +231,15 @@ __all__ = [
     "TraceStep",
     "trace_to_html",
     "trace_to_json",
+    # Loop detection
+    "LoopDetector",
+    "LoopDetection",
+    "LoopDetectedError",
+    "LoopPolicy",
+    "BaseDetector",
+    "RepeatDetector",
+    "StallDetector",
+    "PingPongDetector",
     # Guardrails
     "guardrails",
     "Guardrail",

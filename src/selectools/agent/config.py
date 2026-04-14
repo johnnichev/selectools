@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from ..guardrails import GuardrailsPipeline
     from ..knowledge import KnowledgeMemory
     from ..knowledge_graph import KnowledgeGraphMemory
+    from ..loop_detection import LoopDetector
     from ..observer import AgentObserver
     from ..policy import ToolPolicy
     from ..providers.base import Provider
@@ -183,6 +184,7 @@ class AgentConfig:
     compress_context: bool = False
     compress_threshold: float = 0.75
     compress_keep_recent: int = 4
+    loop_detector: Optional["LoopDetector"] = None
 
     # -- Nested config groups (optional, for YAML / clean APIs) --
     # When provided, nested values take precedence over flat fields.

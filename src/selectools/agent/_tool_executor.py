@@ -372,6 +372,7 @@ class _ToolExecutorMixin:
         trace: Optional[AgentTrace] = None,
         run_id: Optional[str] = None,
         user_text_for_coherence: str = "",
+        all_tool_results: Optional[List[str]] = None,
     ) -> tuple:
         """Execute multiple tool calls concurrently using ThreadPoolExecutor.
 
@@ -485,6 +486,8 @@ class _ToolExecutorMixin:
 
         for r in results:
             all_tool_calls.append(r.tool_call)
+            if all_tool_results is not None:
+                all_tool_results.append(r.result)
             last_tool_name = r.tool_call.tool_name
             last_tool_args = r.tool_call.parameters
 
@@ -565,6 +568,7 @@ class _ToolExecutorMixin:
         trace: Optional[AgentTrace] = None,
         run_id: Optional[str] = None,
         user_text_for_coherence: str = "",
+        all_tool_results: Optional[List[str]] = None,
     ) -> tuple:
         """Execute multiple tool calls concurrently using asyncio.gather.
 
@@ -693,6 +697,8 @@ class _ToolExecutorMixin:
 
         for r in results:
             all_tool_calls.append(r.tool_call)
+            if all_tool_results is not None:
+                all_tool_results.append(r.result)
             last_tool_name = r.tool_call.tool_name
             last_tool_args = r.tool_call.parameters
 
@@ -830,6 +836,7 @@ class _ToolExecutorMixin:
                 f"Tool call for '{tool_name}' had malformed arguments: "
                 f"{tool_call.parse_error}. Retry with properly escaped JSON."
             )
+            ctx.all_tool_results.append(error_message)
             self._append_tool_result(error_message, tool_name, tool_call.id, run_id=ctx.run_id)
             ctx.trace.add(
                 TraceStep(
@@ -848,6 +855,7 @@ class _ToolExecutorMixin:
                 f"Unknown tool '{tool_name}'. "
                 f"Available tools: {', '.join(self._tools_by_name.keys())}"
             )
+            ctx.all_tool_results.append(error_message)
             self._append_tool_result(error_message, tool_name, tool_call.id, run_id=ctx.run_id)
             ctx.trace.add(
                 TraceStep(
@@ -862,6 +870,7 @@ class _ToolExecutorMixin:
         # --- Policy check ---
         policy_error = self._check_policy(tool_name, parameters, ctx.run_id)
         if policy_error:
+            ctx.all_tool_results.append(policy_error)
             self._append_tool_result(policy_error, tool_name, tool_call.id, run_id=ctx.run_id)
             ctx.trace.add(
                 TraceStep(
@@ -876,6 +885,7 @@ class _ToolExecutorMixin:
         # --- Coherence check ---
         coherence_error = self._check_coherence(ctx.user_text_for_coherence, tool_name, parameters)
         if coherence_error:
+            ctx.all_tool_results.append(coherence_error)
             self._append_tool_result(coherence_error, tool_name, tool_call.id, run_id=ctx.run_id)
             ctx.trace.add(
                 TraceStep(
@@ -899,6 +909,7 @@ class _ToolExecutorMixin:
                     summary=f"{tool_name} → cached",
                 )
             )
+            ctx.all_tool_results.append(cached_result)
             self._append_tool_result(
                 cached_result, tool_name, tool_call.id, tool_result=cached_result, run_id=ctx.run_id
             )
@@ -958,6 +969,7 @@ class _ToolExecutorMixin:
                     + self.usage.iterations[-1].total_tokens
                 )
 
+            ctx.all_tool_results.append(result)
             self._append_tool_result(
                 result, tool_name, tool_call.id, tool_result=result, run_id=ctx.run_id
             )
@@ -1002,6 +1014,7 @@ class _ToolExecutorMixin:
                 )
 
             error_message = f"Error executing tool '{tool_name}': {exc}"
+            ctx.all_tool_results.append(error_message)
             self._append_tool_result(error_message, tool_name, tool_call.id, run_id=ctx.run_id)
             return False
 
@@ -1031,6 +1044,7 @@ class _ToolExecutorMixin:
                 f"Tool call for '{tool_name}' had malformed arguments: "
                 f"{tool_call.parse_error}. Retry with properly escaped JSON."
             )
+            ctx.all_tool_results.append(error_message)
             self._append_tool_result(error_message, tool_name, tool_call.id, run_id=ctx.run_id)
             ctx.trace.add(
                 TraceStep(
@@ -1049,6 +1063,7 @@ class _ToolExecutorMixin:
                 f"Unknown tool '{tool_name}'. "
                 f"Available tools: {', '.join(self._tools_by_name.keys())}"
             )
+            ctx.all_tool_results.append(error_message)
             self._append_tool_result(error_message, tool_name, tool_call.id, run_id=ctx.run_id)
             ctx.trace.add(
                 TraceStep(
@@ -1063,6 +1078,7 @@ class _ToolExecutorMixin:
         # --- Policy check (async) ---
         policy_error = await self._acheck_policy(tool_name, parameters, ctx.run_id)
         if policy_error:
+            ctx.all_tool_results.append(policy_error)
             self._append_tool_result(policy_error, tool_name, tool_call.id, run_id=ctx.run_id)
             ctx.trace.add(
                 TraceStep(
@@ -1079,6 +1095,7 @@ class _ToolExecutorMixin:
             ctx.user_text_for_coherence, tool_name, parameters
         )
         if coherence_error:
+            ctx.all_tool_results.append(coherence_error)
             self._append_tool_result(coherence_error, tool_name, tool_call.id, run_id=ctx.run_id)
             ctx.trace.add(
                 TraceStep(
@@ -1102,6 +1119,7 @@ class _ToolExecutorMixin:
                     summary=f"{tool_name} → cached",
                 )
             )
+            ctx.all_tool_results.append(cached_result)
             self._append_tool_result(
                 cached_result, tool_name, tool_call.id, tool_result=cached_result, run_id=ctx.run_id
             )
@@ -1167,6 +1185,7 @@ class _ToolExecutorMixin:
                     + self.usage.iterations[-1].total_tokens
                 )
 
+            ctx.all_tool_results.append(result)
             self._append_tool_result(
                 result, tool_name, tool_call.id, tool_result=result, run_id=ctx.run_id
             )
@@ -1220,5 +1239,6 @@ class _ToolExecutorMixin:
                 )
 
             error_message = f"Error executing tool '{tool_name}': {exc}"
+            ctx.all_tool_results.append(error_message)
             self._append_tool_result(error_message, tool_name, tool_call.id, run_id=ctx.run_id)
             return False
