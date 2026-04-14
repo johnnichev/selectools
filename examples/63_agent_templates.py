@@ -77,7 +77,7 @@ def list_templates():
 def load_template(template_name: str, **overrides) -> AgentConfig:
     """Load a template by name, optionally overriding fields."""
     if template_name not in TEMPLATES:
-        raise ValueError(f"Unknown template: {template_name!r}. " f"Available: {list_templates()}")
+        raise ValueError(f"Unknown template: {template_name!r}. Available: {list_templates()}")
     config_dict = {**TEMPLATES[template_name], **overrides}
     valid_fields = AgentConfig.__dataclass_fields__
     filtered = {k: v for k, v in config_dict.items() if k in valid_fields}

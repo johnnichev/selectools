@@ -23,7 +23,7 @@ def tag_document(doc_id: str, tags: list[str]) -> str:
 @tool(description="Score items by category")
 def score_items(category: str, scores: list[int]) -> str:
     """Scores emits items: {type: integer} in the schema."""
-    return f"{category}: total={sum(scores)}, avg={sum(scores)/len(scores):.1f}"
+    return f"{category}: total={sum(scores)}, avg={sum(scores) / len(scores):.1f}"
 
 
 @tool(description="Update key-value settings")

@@ -1,6 +1,6 @@
 # Selectools
 
-> Selectools is a production-ready Python library for building AI agents with tool calling, RAG, and multi-agent orchestration. One pip install. No DSL. Supports OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama. v0.22.0, 5064 tests at 95% coverage, Apache-2.0.
+> Selectools is a production-ready Python library for building AI agents with tool calling, RAG, and multi-agent orchestration. One pip install. No DSL. Supports OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama. v0.22.0, 5092 tests at 95% coverage, Apache-2.0.
 
 Selectools uses a single `Agent` class with native tool calling. No chains, no expression language, no complex abstractions. It includes built-in features that other frameworks charge for or split into separate packages: 50 evaluators, hybrid RAG search (BM25 + vector), guardrails, audit logging, multi-agent orchestration, and a visual drag-drop builder. Free, local, MIT-compatible.
 
@@ -83,6 +83,7 @@ result = agent.run("Find our refund policy")
 - [OpenTelemetry](https://selectools.dev/modules/OTEL/): GenAI semantic-convention spans for agent runs, LLM calls, tool executions (v0.21.0)
 - [Langfuse](https://selectools.dev/modules/LANGFUSE/): Send traces, generations, and spans to Langfuse Cloud or self-hosted (v0.21.0)
 - [Multimodal Messages](https://selectools.dev/modules/MULTIMODAL/): ContentPart, image_message(), text_content() (v0.21.0)
+- [Loop Detection](https://selectools.dev/modules/LOOP_DETECTION/): LoopDetector flags repeat, stall, and ping-pong tool-call patterns (v0.22.0)
 - [Stability Markers](https://selectools.dev/modules/STABILITY/): @stable, @beta, @deprecated
 - [Changelog](https://selectools.dev/CHANGELOG/): Release history
-- [Examples Gallery](https://selectools.dev/examples/): 94 runnable scripts with categories
+- [Examples Gallery](https://selectools.dev/examples/): 95 runnable scripts with categories

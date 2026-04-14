@@ -32,7 +32,7 @@ def fetch_url(url: str) -> str:
             "composable pipelines, and built-in eval frameworks.</p>"
         ),
         "https://example.com/pricing": (
-            "<h1>Pricing</h1>" "<p>Starter: $9/mo. Pro: $29/mo. Enterprise: custom.</p>"
+            "<h1>Pricing</h1><p>Starter: $9/mo. Pro: $29/mo. Enterprise: custom.</p>"
         ),
     }
     return pages.get(url, f"<p>Page not found: {url}</p>")
