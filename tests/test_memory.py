@@ -563,9 +563,9 @@ class TestBranchDeepCopy:
 
         # The original must be unchanged
         original_tc = mem.get_history()[1].tool_calls[0]
-        assert (
-            original_tc.parameters["q"] == "original"
-        ), "branch() shared ToolCall.parameters dict — mutation affected original"
+        assert original_tc.parameters["q"] == "original", (
+            "branch() shared ToolCall.parameters dict — mutation affected original"
+        )
 
     def test_branch_tool_call_objects_are_different_instances(self) -> None:
         """branch() must create distinct ToolCall instances, not share references."""
@@ -580,9 +580,9 @@ class TestBranchDeepCopy:
         original_tc = mem.get_history()[0].tool_calls[0]
         branch_tc = branched.get_history()[0].tool_calls[0]
         assert original_tc is not branch_tc, "branch() must create distinct ToolCall objects"
-        assert (
-            original_tc.parameters is not branch_tc.parameters
-        ), "branch() must deep-copy ToolCall.parameters"
+        assert original_tc.parameters is not branch_tc.parameters, (
+            "branch() must deep-copy ToolCall.parameters"
+        )
 
     def test_branch_plain_messages_are_independent(self) -> None:
         """Regression: branch() shared plain Message objects by reference.
@@ -598,9 +598,9 @@ class TestBranchDeepCopy:
 
         original_msg = mem.get_history()[0]
         branch_msg = branched.get_history()[0]
-        assert (
-            original_msg is not branch_msg
-        ), "branch() must copy plain messages, not share by reference"
+        assert original_msg is not branch_msg, (
+            "branch() must copy plain messages, not share by reference"
+        )
 
         # Mutating the branch must not affect the original
         branch_msg.content = "mutated"
@@ -643,6 +643,6 @@ class TestBranchDeepCopy:
         original_b64 = mem.get_history()[0].image_base64
         branch_b64 = branched.get_history()[0].image_base64
         assert original_b64 == "iVBORw0KGgo=", "Original image_base64 must be preserved"
-        assert (
-            branch_b64 == "iVBORw0KGgo="
-        ), "branch() must preserve image_base64 (init=False field)"
+        assert branch_b64 == "iVBORw0KGgo=", (
+            "branch() must preserve image_base64 (init=False field)"
+        )

@@ -244,7 +244,7 @@ class DocumentLoader:
             from pypdf import PdfReader
         except ImportError as e:
             raise ImportError(
-                "pypdf package required for PDF loading. " "Install with: pip install pypdf"
+                "pypdf package required for PDF loading. Install with: pip install pypdf"
             ) from e
 
         file_path = Path(path)

@@ -180,9 +180,9 @@ class TestApp1_DocsQABot:
         assert result.content
         content = result.content.lower()
         # KB anchor facts that a correct retrieval would surface
-        assert (
-            "curl" in content or "skylake.sh" in content or "4.2.1" in content
-        ), f"Bot did not retrieve install instructions from KB. Got: {result.content[:300]}"
+        assert "curl" in content or "skylake.sh" in content or "4.2.1" in content, (
+            f"Bot did not retrieve install instructions from KB. Got: {result.content[:300]}"
+        )
 
     def test_bot_answers_port_question_using_memory(self, skylake_faq_agent: Agent) -> None:
         """Turn 2 (same agent): different in-KB question.
@@ -198,7 +198,7 @@ class TestApp1_DocsQABot:
         result = skylake_faq_agent.run("Got it. What port does it listen on?")  # Turn 2
         assert result.content
         assert "8742" in result.content, (
-            f"Bot did not retrieve the port fact from KB on turn 2. " f"Got: {result.content[:300]}"
+            f"Bot did not retrieve the port fact from KB on turn 2. Got: {result.content[:300]}"
         )
 
     def test_bot_refuses_out_of_kb_question(self, skylake_faq_agent: Agent) -> None:
@@ -250,7 +250,7 @@ def sales_db(tmp_path: Path) -> Path:
     db_path = tmp_path / "sales.db"
     conn = sqlite3.connect(str(db_path))
     conn.execute(
-        "CREATE TABLE orders (id INTEGER PRIMARY KEY, region TEXT, " "amount_usd REAL, month TEXT)"
+        "CREATE TABLE orders (id INTEGER PRIMARY KEY, region TEXT, amount_usd REAL, month TEXT)"
     )
     # Carefully chosen so the answer is unambiguous: region 'EU' has the
     # highest total (1000 + 2000 + 3000 = 6000) and a specific average
@@ -301,12 +301,12 @@ class TestApp2_DataAnalystBot:
         assert result.content
         content = result.content
         # The correct region is EU (total = 6000)
-        assert (
-            "EU" in content or "eu" in content.lower()
-        ), f"Bot did not identify EU as top region. Got: {content[:400]}"
+        assert "EU" in content or "eu" in content.lower(), (
+            f"Bot did not identify EU as top region. Got: {content[:400]}"
+        )
         # The average of EU orders is 2000. Accept '2000' or '2,000'.
         assert "2000" in content or "2,000" in content, (
-            f"Bot did not compute the correct average (2000). " f"Got: {content[:400]}"
+            f"Bot did not compute the correct average (2000). Got: {content[:400]}"
         )
 
 
@@ -422,11 +422,11 @@ class TestApp3_KnowledgeBaseLibrarian:
     def test_librarian_retrieves_from_csv_source(self, librarian_agent: Agent) -> None:
         """Asks a question whose answer lives in the CSV-loaded docs."""
         result = librarian_agent.run(
-            "What is the internal codename for the SKY-001 router? " "Quote it verbatim."
+            "What is the internal codename for the SKY-001 router? Quote it verbatim."
         )
         assert result.content
         assert "THUNDERCAT" in result.content.upper(), (
-            f"Librarian did not retrieve the CSV anchor phrase. " f"Got: {result.content[:300]}"
+            f"Librarian did not retrieve the CSV anchor phrase. Got: {result.content[:300]}"
         )
 
     def test_librarian_retrieves_from_json_source(self, librarian_agent: Agent) -> None:
@@ -434,7 +434,7 @@ class TestApp3_KnowledgeBaseLibrarian:
         result = librarian_agent.run("What is the internal reference name for Skylake 4.2.1?")
         assert result.content
         assert "MOONWALK" in result.content.upper(), (
-            f"Librarian did not retrieve the JSON anchor phrase. " f"Got: {result.content[:300]}"
+            f"Librarian did not retrieve the JSON anchor phrase. Got: {result.content[:300]}"
         )
 
     def test_librarian_retrieves_from_html_source(self, librarian_agent: Agent) -> None:
@@ -442,7 +442,7 @@ class TestApp3_KnowledgeBaseLibrarian:
         result = librarian_agent.run("What is the Skylake office code?")
         assert result.content
         assert "VANTA-NORTH" in result.content.upper(), (
-            f"Librarian did not retrieve the HTML anchor phrase. " f"Got: {result.content[:300]}"
+            f"Librarian did not retrieve the HTML anchor phrase. Got: {result.content[:300]}"
         )
 
 
@@ -542,22 +542,22 @@ class TestApp3b_KnowledgeBaseLibrarianFAISS:
             "What is the internal codename for the SKY-001 router? Quote it verbatim."
         )
         assert result.content
-        assert (
-            "OSPREY" in result.content.upper()
-        ), f"FAISS librarian did not retrieve the CSV anchor phrase. Got: {result.content[:300]}"
+        assert "OSPREY" in result.content.upper(), (
+            f"FAISS librarian did not retrieve the CSV anchor phrase. Got: {result.content[:300]}"
+        )
 
     def test_librarian_retrieves_from_json_source(self, faiss_librarian_agent: Agent) -> None:
         """Asks a question whose answer lives in the JSON-loaded docs."""
         result = faiss_librarian_agent.run("What is the internal reference name for Skylake 4.2.1?")
         assert result.content
-        assert (
-            "CRESCENT" in result.content.upper()
-        ), f"FAISS librarian did not retrieve the JSON anchor phrase. Got: {result.content[:300]}"
+        assert "CRESCENT" in result.content.upper(), (
+            f"FAISS librarian did not retrieve the JSON anchor phrase. Got: {result.content[:300]}"
+        )
 
     def test_librarian_retrieves_from_html_source(self, faiss_librarian_agent: Agent) -> None:
         """Asks a question whose answer lives in the HTML-loaded docs."""
         result = faiss_librarian_agent.run("What is the Skylake office code?")
         assert result.content
-        assert (
-            "AURORA-SOUTH" in result.content.upper()
-        ), f"FAISS librarian did not retrieve the HTML anchor phrase. Got: {result.content[:300]}"
+        assert "AURORA-SOUTH" in result.content.upper(), (
+            f"FAISS librarian did not retrieve the HTML anchor phrase. Got: {result.content[:300]}"
+        )

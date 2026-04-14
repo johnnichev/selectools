@@ -314,9 +314,9 @@ class TestInjectedKwargsNotVisibleToLLM:
             return f"{query} {context}"
 
         param_names = [p.name for p in query_something.parameters]
-        assert (
-            "context" not in param_names
-        ), "Injected kwarg 'context' must not appear in LLM-visible parameters"
+        assert "context" not in param_names, (
+            "Injected kwarg 'context' must not appear in LLM-visible parameters"
+        )
         assert "query" in param_names, "Non-injected param 'query' must remain visible"
 
     def test_injected_param_still_used_at_execution(self) -> None:
@@ -608,9 +608,9 @@ class TestVarArgsNotInSchema:
         def accepts_anything(*args: object) -> str:
             return str(args)
 
-        assert (
-            accepts_anything.parameters == []
-        ), "VAR_POSITIONAL (*args) must not appear in LLM-visible parameters"
+        assert accepts_anything.parameters == [], (
+            "VAR_POSITIONAL (*args) must not appear in LLM-visible parameters"
+        )
         schema = accepts_anything.schema()
         assert schema["parameters"]["properties"] == {}
         assert schema["parameters"]["required"] == []
@@ -623,9 +623,9 @@ class TestVarArgsNotInSchema:
         def accepts_kwargs(**kwargs: object) -> str:
             return str(kwargs)
 
-        assert (
-            accepts_kwargs.parameters == []
-        ), "VAR_KEYWORD (**kwargs) must not appear in LLM-visible parameters"
+        assert accepts_kwargs.parameters == [], (
+            "VAR_KEYWORD (**kwargs) must not appear in LLM-visible parameters"
+        )
 
     def test_tool_mixed_regular_and_varargs(self) -> None:
         """Regular params are inferred; *args/**kwargs are silently skipped."""

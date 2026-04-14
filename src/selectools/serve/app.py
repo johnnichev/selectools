@@ -1407,7 +1407,7 @@ class BuilderServer:
                     gh_params = _uparse.urlencode(
                         {
                             "client_id": gh_client_id,
-                            "redirect_uri": f"http://{self.headers.get('Host','localhost')}/auth/github/callback",
+                            "redirect_uri": f"http://{self.headers.get('Host', 'localhost')}/auth/github/callback",
                             "scope": "read:user user:email",
                         }
                     )

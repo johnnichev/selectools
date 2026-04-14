@@ -187,9 +187,9 @@ class TestJsonLoaderNoneTextField:
         assert docs[0].text == "valid document"
         # Crucially, no document should have text "None" (string)
         for doc in docs:
-            assert (
-                doc.text != "None"
-            ), "from_json must skip None values, not convert to 'None' string"
+            assert doc.text != "None", (
+                "from_json must skip None values, not convert to 'None' string"
+            )
 
     def test_numeric_text_field_converted(self, tmp_path: Any) -> None:
         """Numeric values in text_field should be converted to string (valid)."""

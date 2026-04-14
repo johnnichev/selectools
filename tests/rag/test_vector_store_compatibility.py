@@ -190,9 +190,9 @@ class TestVectorStoreConsistency:
             results = store.search(query_embedding, top_k=5)
 
             scores = [r.score for r in results]
-            assert scores == sorted(
-                scores, reverse=True
-            ), f"{store_name} scores not in descending order"
+            assert scores == sorted(scores, reverse=True), (
+                f"{store_name} scores not in descending order"
+            )
 
 
 # ============================================================================
@@ -230,16 +230,16 @@ class TestMetadataFilteringConsistency:
 
         # All stores should return same number of filtered results
         result_counts = {name: len(results) for name, results in results_by_store.items()}
-        assert (
-            len(set(result_counts.values())) == 1
-        ), f"Inconsistent filtered results: {result_counts}"
+        assert len(set(result_counts.values())) == 1, (
+            f"Inconsistent filtered results: {result_counts}"
+        )
 
         # Verify all results match the filter
         for store_name, results in results_by_store.items():
             for result in results:
-                assert (
-                    result.document.metadata["category"] == "programming"
-                ), f"{store_name} failed filter"
+                assert result.document.metadata["category"] == "programming", (
+                    f"{store_name} failed filter"
+                )
 
     def test_multiple_filters_consistency(
         self,

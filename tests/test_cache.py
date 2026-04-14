@@ -412,7 +412,9 @@ class TestRedisCacheImportGuard:
         """RedisCache should raise a clear ImportError when redis is not installed."""
         import selectools.cache_redis as mod
 
-        original_import = __builtins__.__import__ if hasattr(__builtins__, "__import__") else __import__  # type: ignore[union-attr]
+        original_import = (
+            __builtins__.__import__ if hasattr(__builtins__, "__import__") else __import__
+        )  # type: ignore[union-attr]
 
         def mock_import(name: str, *args: Any, **kwargs: Any) -> Any:
             if name == "redis":

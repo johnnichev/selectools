@@ -312,7 +312,6 @@ class TestOpenAIParseResponseEmptyChoices:
         return provider
 
     def test_empty_choices_raises_provider_error(self) -> None:
-
         from selectools.providers.base import ProviderError
 
         provider = self._get_provider()
@@ -370,7 +369,6 @@ class TestGeminiTimeout:
         return provider
 
     def _make_mock_response(self) -> Any:
-
         mock_response = MagicMock()
         mock_response.text = "hello"
         mock_response.candidates = []
@@ -405,9 +403,9 @@ class TestGeminiTimeout:
         call_kwargs = mock_client.models.generate_content.call_args[1]
         config = call_kwargs["config"]
         assert config.http_options is not None, "http_options must be set when timeout is given"
-        assert (
-            config.http_options.timeout == 5000
-        ), f"Expected timeout_ms=5000, got {config.http_options.timeout}"
+        assert config.http_options.timeout == 5000, (
+            f"Expected timeout_ms=5000, got {config.http_options.timeout}"
+        )
 
     def test_complete_no_timeout_does_not_set_http_options(self) -> None:
         """complete() must not set http_options when timeout=None."""
@@ -433,9 +431,9 @@ class TestGeminiTimeout:
 
         call_kwargs = mock_client.models.generate_content.call_args[1]
         config = call_kwargs["config"]
-        assert (
-            config.http_options is None
-        ), "http_options must be None when timeout is not specified"
+        assert config.http_options is None, (
+            "http_options must be None when timeout is not specified"
+        )
 
     def test_stream_passes_timeout_to_config(self) -> None:
         """stream() must set http_options with timeout_ms when timeout is given."""
@@ -468,9 +466,9 @@ class TestGeminiTimeout:
         call_kwargs = mock_client.models.generate_content_stream.call_args[1]
         config = call_kwargs["config"]
         assert config.http_options is not None
-        assert (
-            config.http_options.timeout == 2500
-        ), f"Expected timeout_ms=2500, got {config.http_options.timeout}"
+        assert config.http_options.timeout == 2500, (
+            f"Expected timeout_ms=2500, got {config.http_options.timeout}"
+        )
 
     def test_timeout_seconds_converted_to_milliseconds(self) -> None:
         """Timeout in seconds must be converted to milliseconds (SDK uses ms)."""
@@ -496,6 +494,6 @@ class TestGeminiTimeout:
 
         call_kwargs = mock_client.models.generate_content.call_args[1]
         config = call_kwargs["config"]
-        assert (
-            config.http_options.timeout == 30000
-        ), f"Expected 30000ms (30s), got {config.http_options.timeout}"
+        assert config.http_options.timeout == 30000, (
+            f"Expected 30000ms (30s), got {config.http_options.timeout}"
+        )

@@ -142,8 +142,8 @@ def test_eval_suite_semantic_cache_miss_on_empty():
             TestCase(
                 input="Any query on an empty cache",
                 name="no_cache_hit_on_empty",
-                custom_evaluator=lambda r: not any(
-                    s.type == StepType.CACHE_HIT for s in r.trace.steps
+                custom_evaluator=lambda r: (
+                    not any(s.type == StepType.CACHE_HIT for s in r.trace.steps)
                 ),
                 custom_evaluator_name="no_cache_hit_step",
             ),
@@ -183,7 +183,7 @@ def test_eval_suite_semantic_cache_stats_after_runs():
             TestCase(
                 input="ping",
                 name="second_run_hit",
-                custom_evaluator=lambda r: (cache.stats.hits >= 1 and cache.stats.misses >= 1),
+                custom_evaluator=lambda r: cache.stats.hits >= 1 and cache.stats.misses >= 1,
                 custom_evaluator_name="one_hit_one_miss",
             ),
         ],
@@ -233,15 +233,17 @@ def test_eval_suite_semantic_cache_natural_language_similarity():
             TestCase(
                 input="dummy — evaluated by cache directly",
                 name="cosine_identical",
-                custom_evaluator=lambda r: _cosine_similarity([1.0, 0.0], [1.0, 0.0])
-                == pytest.approx(1.0),
+                custom_evaluator=lambda r: (
+                    _cosine_similarity([1.0, 0.0], [1.0, 0.0]) == pytest.approx(1.0)
+                ),
                 custom_evaluator_name="cosine_sim_1_for_identical",
             ),
             TestCase(
                 input="dummy — evaluated by cache directly",
                 name="cosine_orthogonal",
-                custom_evaluator=lambda r: _cosine_similarity([1.0, 0.0], [0.0, 1.0])
-                == pytest.approx(0.0),
+                custom_evaluator=lambda r: (
+                    _cosine_similarity([1.0, 0.0], [0.0, 1.0]) == pytest.approx(0.0)
+                ),
                 custom_evaluator_name="cosine_sim_0_for_orthogonal",
             ),
         ],
@@ -333,8 +335,8 @@ def test_eval_suite_prompt_compression_disabled_by_default():
             TestCase(
                 input="Hi",
                 name="no_compression_by_default",
-                custom_evaluator=lambda r: not any(
-                    s.type == StepType.PROMPT_COMPRESSED for s in r.trace.steps
+                custom_evaluator=lambda r: (
+                    not any(s.type == StepType.PROMPT_COMPRESSED for s in r.trace.steps)
                 ),
                 custom_evaluator_name="no_prompt_compressed_step",
             ),
@@ -547,8 +549,8 @@ def test_eval_suite_v017_all_features_100_pct_accuracy():
             TestCase(
                 input="first query — expect miss",
                 name="sc_miss_on_fresh_cache",
-                custom_evaluator=lambda r: not any(
-                    s.type == StepType.CACHE_HIT for s in r.trace.steps
+                custom_evaluator=lambda r: (
+                    not any(s.type == StepType.CACHE_HIT for s in r.trace.steps)
                 ),
                 custom_evaluator_name="no_hit_on_fresh_cache",
             ),
@@ -596,6 +598,6 @@ def test_eval_suite_v017_all_features_100_pct_accuracy():
     results.append(cb_suite.run())
 
     for report in results:
-        assert report.accuracy == pytest.approx(
-            1.0
-        ), f"Suite '{report.metadata.suite_name}' failed:\n{_report_detail(report)}"
+        assert report.accuracy == pytest.approx(1.0), (
+            f"Suite '{report.metadata.suite_name}' failed:\n{_report_detail(report)}"
+        )

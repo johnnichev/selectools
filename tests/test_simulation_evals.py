@@ -187,9 +187,9 @@ class TestResearchTeamEval:
             or "bengio" in content_lower
             or "autonomous" in content_lower
         )
-        assert (
-            has_substance
-        ), f"Researcher output should reference search results. Got: {result.content[:300]}"
+        assert has_substance, (
+            f"Researcher output should reference search results. Got: {result.content[:300]}"
+        )
 
     def test_full_pipeline_writer_references_research(self):
         """Writer's final output should reference content from researcher and analyst."""
@@ -220,20 +220,20 @@ class TestResearchTeamEval:
         result = graph.run("Research the current state of AI safety")
 
         # All 3 agents should execute
-        assert (
-            len(result.node_results) == 3
-        ), f"Expected 3 nodes, got {list(result.node_results.keys())}"
+        assert len(result.node_results) == 3, (
+            f"Expected 3 nodes, got {list(result.node_results.keys())}"
+        )
 
         # Writer output should be substantive (not just "ok" or empty)
-        assert (
-            len(result.content) > 100
-        ), f"Final report should be substantive. Got {len(result.content)} chars: {result.content[:200]}"
+        assert len(result.content) > 100, (
+            f"Final report should be substantive. Got {len(result.content)} chars: {result.content[:200]}"
+        )
 
         # Final output should reference AI safety (the topic flows through)
         content_lower = result.content.lower()
-        assert (
-            "ai" in content_lower or "safety" in content_lower or "alignment" in content_lower
-        ), f"Final report should reference the research topic. Got: {result.content[:300]}"
+        assert "ai" in content_lower or "safety" in content_lower or "alignment" in content_lower, (
+            f"Final report should reference the research topic. Got: {result.content[:300]}"
+        )
 
 
 # ===========================================================================
@@ -330,9 +330,9 @@ class TestCustomerSupportEval:
             or "billing" in content_lower
             or "$" in result.content
         )
-        assert (
-            has_billing_content
-        ), f"Billing agent should reference account info. Got: {result.content[:300]}"
+        assert has_billing_content, (
+            f"Billing agent should reference account info. Got: {result.content[:300]}"
+        )
 
 
 # ===========================================================================
@@ -419,9 +419,9 @@ class TestParallelAnalysisEval:
         result = graph.run("Analyze the AI agent framework market")
 
         assert result.content, "Synthesizer should produce output"
-        assert (
-            len(result.content) > 50
-        ), f"Synthesis should be substantive. Got: {result.content[:200]}"
+        assert len(result.content) > 50, (
+            f"Synthesis should be substantive. Got: {result.content[:200]}"
+        )
 
 
 # ===========================================================================

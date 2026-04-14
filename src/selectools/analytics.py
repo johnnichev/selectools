@@ -231,7 +231,7 @@ class AgentAnalytics:
                         lines.append(f"    {param_name}: {value}")
                     else:
                         lines.append(
-                            f"    {param_name}: {value} ({count}x, " f"{len(value_counts)} unique)"
+                            f"    {param_name}: {value} ({count}x, {len(value_counts)} unique)"
                         )
 
         lines.append("")

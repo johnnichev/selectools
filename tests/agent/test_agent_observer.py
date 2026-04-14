@@ -371,7 +371,6 @@ def _agent(
 
 
 class TestRunEvents:
-
     def test_run_start_and_end_fire(self) -> None:
         agent, obs = _agent()
         agent.run("hello")
@@ -414,7 +413,6 @@ class TestRunEvents:
 
 
 class TestLLMEvents:
-
     def test_llm_start_and_end_fire(self) -> None:
         agent, obs = _agent()
         agent.run("hello")
@@ -460,7 +458,6 @@ class TestLLMEvents:
 
 
 class TestIterationEvents:
-
     def test_iteration_start_and_end_fire(self) -> None:
         agent, obs = _agent()
         agent.run("hello")
@@ -502,7 +499,6 @@ class TestIterationEvents:
 
 
 class TestToolEvents:
-
     def test_tool_start_and_end_fire(self) -> None:
         agent, obs = _agent(provider=ToolCallProvider())
         agent.run("greet someone")
@@ -545,7 +541,6 @@ class TestToolEvents:
 
 
 class TestBatchEvents:
-
     def test_batch_start_and_end_fire(self) -> None:
         agent, obs = _agent()
         agent.batch(["q1", "q2", "q3"])
@@ -588,7 +583,6 @@ class TestBatchEvents:
 
 
 class TestLLMRetryEvents:
-
     def test_retry_events_fire_on_provider_error(self) -> None:
         agent, obs = _agent(
             provider=RetryableProvider(fail_count=2),
@@ -614,7 +608,6 @@ class TestLLMRetryEvents:
 
 
 class TestProviderFallbackEvents:
-
     def test_fallback_event_fires_when_provider_fails(self) -> None:
         fb = FallbackProvider(providers=[RetrievableFailProvider(), SimpleProvider()])
         agent, obs = _agent(provider=fb)
@@ -643,7 +636,6 @@ class TestProviderFallbackEvents:
 
 
 class TestMemoryTrimEvents:
-
     def test_memory_trim_fires_when_limit_exceeded(self) -> None:
         mem = ConversationMemory(max_messages=3)
         obs = RecordingObserver()
@@ -681,7 +673,6 @@ class TestMemoryTrimEvents:
 
 
 class TestPolicyDecisionEvents:
-
     def test_policy_decision_fires_for_allowed_tool(self) -> None:
         policy = ToolPolicy(allow=["greet"])
         agent, obs = _agent(
@@ -712,7 +703,6 @@ class TestPolicyDecisionEvents:
 
 
 class TestStructuredValidateEvents:
-
     def test_structured_validate_fires_on_success(self) -> None:
         from pydantic import BaseModel
 
@@ -746,7 +736,6 @@ class TestStructuredValidateEvents:
 
 
 class TestErrorEvents:
-
     def test_error_event_fires_on_unrecoverable_error(self) -> None:
         class CrashProvider:
             name = "crash"
@@ -769,7 +758,6 @@ class TestErrorEvents:
 
 
 class TestObserverErrorIsolation:
-
     def test_observer_exception_does_not_crash_agent(self) -> None:
         class BrokenObserver(AgentObserver):
             def on_run_start(
@@ -802,7 +790,6 @@ class TestObserverErrorIsolation:
 
 
 class TestAgentResultUsage:
-
     def test_result_has_usage(self) -> None:
         agent, obs = _agent()
         result = agent.run("hello")
@@ -840,7 +827,6 @@ class TestAgentResultUsage:
 
 
 class TestLoggingObserver:
-
     def test_logging_observer_emits_json(self, caplog: pytest.LogCaptureFixture) -> None:
         with caplog.at_level(logging.INFO, logger="selectools.observer"):
             lo = LoggingObserver()
@@ -895,7 +881,6 @@ class TestLoggingObserver:
 
 
 class TestMultipleObservers:
-
     def test_multiple_observers_all_receive_events(self) -> None:
         obs1 = RecordingObserver()
         obs2 = RecordingObserver()
@@ -917,7 +902,6 @@ class TestMultipleObservers:
 
 
 class TestEventOrdering:
-
     def test_event_order_simple_run(self) -> None:
         agent, obs = _agent()
         agent.run("hello")
@@ -947,16 +931,15 @@ class TestEventOrdering:
 
 
 class TestRunIdCorrelation:
-
     def test_all_events_in_a_run_share_run_id(self) -> None:
         agent, obs = _agent(provider=ToolCallProvider())
         agent.run("greet someone")
         run_id = obs.get("run_start")[0].args["run_id"]
         for event in obs.events:
             if "run_id" in event.args:
-                assert (
-                    event.args["run_id"] == run_id
-                ), f"Event {event.name} has run_id={event.args['run_id']}, expected {run_id}"
+                assert event.args["run_id"] == run_id, (
+                    f"Event {event.name} has run_id={event.args['run_id']}, expected {run_id}"
+                )
 
     def test_different_runs_have_different_run_ids(self) -> None:
         agent, obs = _agent()

@@ -3,7 +3,7 @@
 ## Style
 
 - **Line length**: 100 characters
-- **Formatter**: Black + isort (`--profile=black --line-length=100`)
+- **Formatter + linter**: Ruff (`ruff format` + `ruff check --fix`) — config in `pyproject.toml`
 - **Type hints**: required on all public APIs — `mypy src/` must pass
 - **No `Any` types** — always use explicit types
 - **No comments** explaining what code does — only non-obvious intent

@@ -50,7 +50,9 @@ class InMemoryVectorStore(VectorStore):
     embedder: "EmbeddingProvider"
 
     def __init__(
-        self, embedder: "EmbeddingProvider", max_documents: Optional[int] = None  # noqa: F821
+        self,
+        embedder: "EmbeddingProvider",
+        max_documents: Optional[int] = None,  # noqa: F821
     ):
         """
         Initialize in-memory vector store.

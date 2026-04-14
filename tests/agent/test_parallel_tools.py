@@ -154,9 +154,9 @@ class TestParallelToolExecution:
         assert result.content == "Done."
         # Parallel: should be significantly faster than 3 * SLEEP_SECONDS
         # Allow generous margin but ensure it's not fully sequential
-        assert (
-            elapsed < SLEEP_SECONDS * 2.5
-        ), f"Parallel took {elapsed:.2f}s, expected < {SLEEP_SECONDS * 2.5:.2f}s"
+        assert elapsed < SLEEP_SECONDS * 2.5, (
+            f"Parallel took {elapsed:.2f}s, expected < {SLEEP_SECONDS * 2.5:.2f}s"
+        )
 
     def test_sequential_sync_when_disabled(self) -> None:
         """With parallel_tool_execution=False, tools run sequentially."""
@@ -173,9 +173,9 @@ class TestParallelToolExecution:
 
         assert result.content == "Done."
         # Sequential: should take at least ~3 * SLEEP_SECONDS
-        assert (
-            elapsed >= SLEEP_SECONDS * 2.5
-        ), f"Sequential took {elapsed:.2f}s, expected >= {SLEEP_SECONDS * 2.5:.2f}s"
+        assert elapsed >= SLEEP_SECONDS * 2.5, (
+            f"Sequential took {elapsed:.2f}s, expected >= {SLEEP_SECONDS * 2.5:.2f}s"
+        )
 
     # ---- Async (arun) -----------------------------------------------------
 
@@ -194,9 +194,9 @@ class TestParallelToolExecution:
         elapsed = time.time() - start
 
         assert result.content == "Done."
-        assert (
-            elapsed < SLEEP_SECONDS * 2.5
-        ), f"Parallel async took {elapsed:.2f}s, expected < {SLEEP_SECONDS * 2.5:.2f}s"
+        assert elapsed < SLEEP_SECONDS * 2.5, (
+            f"Parallel async took {elapsed:.2f}s, expected < {SLEEP_SECONDS * 2.5:.2f}s"
+        )
 
     @pytest.mark.asyncio
     async def test_sequential_async_when_disabled(self) -> None:
@@ -213,9 +213,9 @@ class TestParallelToolExecution:
         elapsed = time.time() - start
 
         assert result.content == "Done."
-        assert (
-            elapsed >= SLEEP_SECONDS * 2.5
-        ), f"Sequential async took {elapsed:.2f}s, expected >= {SLEEP_SECONDS * 2.5:.2f}s"
+        assert elapsed >= SLEEP_SECONDS * 2.5, (
+            f"Sequential async took {elapsed:.2f}s, expected >= {SLEEP_SECONDS * 2.5:.2f}s"
+        )
 
 
 class TestParallelResultOrdering:

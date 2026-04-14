@@ -44,9 +44,7 @@ pre-commit run --all-files
 ```
 
 The hooks will automatically run on staged files when you commit. They include:
-- **Black** - Code formatting
-- **isort** - Import sorting
-- **flake8** - Linting
+- **Ruff** - Formatting + linting + import sorting (replaces Black + isort + flake8)
 - **mypy** - Type checking
 - **bandit** - Security checks
 
@@ -104,9 +102,8 @@ pytest tests/ -k "not e2e" -v
 pre-commit run --all-files
 
 # Run individual tools
-black src/ tests/ examples/          # Format code
-isort src/ tests/ examples/          # Sort imports
-flake8 src/                          # Lint code
+ruff format src/ tests/ examples/    # Format code + sort imports
+ruff check src/ tests/ --fix         # Lint code + auto-fix
 mypy src/                            # Type check
 bandit -r src/                       # Security scan
 ```
@@ -183,11 +180,11 @@ We follow standard Python conventions and use automated tools to enforce consist
 
 ### Style Guidelines
 
-- **PEP 8** style guide (enforced by flake8)
+- **PEP 8** style guide (enforced by ruff)
 - **Type hints** for function signatures (checked by mypy)
 - **Docstrings** for public APIs (Google style preferred)
 - **Clear variable names** over abbreviations
-- **Line length**: 100 characters (configured in Black and isort)
+- **Line length**: 100 characters (configured in Ruff — see `pyproject.toml`)
 
 ### Automated Formatting
 
@@ -195,14 +192,11 @@ If you installed pre-commit hooks (recommended), your code will be automatically
 You can also run formatters manually:
 
 ```bash
-# Format code with Black
-black src/ tests/ examples/
-
-# Sort imports with isort
-isort src/ tests/ examples/
+# Format code + sort imports with Ruff
+ruff format src/ tests/ examples/
 
 # Check for linting issues
-flake8 src/
+ruff check src/ tests/ --fix
 
 # Type check
 mypy src/

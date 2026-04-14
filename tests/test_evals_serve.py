@@ -140,7 +140,6 @@ class TestServeEval:
             patch("selectools.evals.serve.webbrowser", create=True),
             patch("builtins.print"),
         ):
-
             mock_server = MagicMock()
             mock_server_cls.return_value = mock_server
 

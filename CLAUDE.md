@@ -16,9 +16,9 @@ See subdirectory `CLAUDE.md` files for scoped rules: `tests/`, `src/selectools/`
 ```bash
 pytest tests/ -x -q                                    # All tests
 pytest tests/ -k "not e2e" -x -q                       # Skip E2E
-black src/ tests/ --line-length=100                     # Format
-isort src/ tests/ --profile=black --line-length=100     # Sort imports
-flake8 src/ && mypy src/                                # Lint + types
+ruff format src/ tests/                                 # Format (replaces Black + isort)
+ruff check src/ tests/ --fix                            # Lint + auto-fix (replaces flake8)
+mypy src/                                               # Type check
 bandit -r src/ -ll -q -c pyproject.toml                 # Security
 cp CHANGELOG.md docs/CHANGELOG.md && mkdocs build       # Docs
 ```

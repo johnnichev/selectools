@@ -45,7 +45,7 @@ class CohereEmbeddingProvider(EmbeddingProvider):
             import cohere
         except ImportError as e:
             raise ImportError(
-                "cohere package required for Cohere embeddings. " "Install with: pip install cohere"
+                "cohere package required for Cohere embeddings. Install with: pip install cohere"
             ) from e
 
         self.client = cohere.Client(api_key=api_key)
@@ -61,7 +61,7 @@ class CohereEmbeddingProvider(EmbeddingProvider):
             return 4096
         else:
             logger.warning(
-                f"Unknown Cohere embedding model '{self.model}', " f"assuming dimension 1024"
+                f"Unknown Cohere embedding model '{self.model}', assuming dimension 1024"
             )
             return 1024
 

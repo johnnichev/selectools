@@ -423,7 +423,7 @@ class QdrantVectorStore(VectorStore):
 
     def __repr__(self) -> str:
         """Return string representation."""
-        return f"QdrantVectorStore(collection={self.collection_name!r}, " f"url={self.url!r})"
+        return f"QdrantVectorStore(collection={self.collection_name!r}, url={self.url!r})"
 
 
 __all__ = ["QdrantVectorStore"]

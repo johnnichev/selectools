@@ -115,9 +115,9 @@ class TestSemanticChunkerE2E:
         print(f"\n  Single-topic chunks: {len(single_chunks)}")
         print(f"  Diverse-topic chunks: {len(diverse_chunks)}")
 
-        assert len(single_chunks) <= len(
-            diverse_chunks
-        ), "Related text should produce fewer or equal chunks than diverse text"
+        assert len(single_chunks) <= len(diverse_chunks), (
+            "Related text should produce fewer or equal chunks than diverse text"
+        )
 
     def test_chunks_into_vector_store(self) -> None:
         """Semantic chunks should be indexable and searchable."""

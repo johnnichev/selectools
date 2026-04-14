@@ -130,9 +130,9 @@ class RAGTool:
 
             # Build context part
             if self.include_scores:
-                header = f"[Source {i+1}: {source_str}, Relevance: {result.score:.2f}]"
+                header = f"[Source {i + 1}: {source_str}, Relevance: {result.score:.2f}]"
             else:
-                header = f"[Source {i+1}: {source_str}]"
+                header = f"[Source {i + 1}: {source_str}]"
 
             context_parts.append(f"{header}\n{result.document.text}\n")
 
@@ -235,7 +235,7 @@ class SemanticSearchTool:
             preview = result.document.text[:200]
             suffix = "..." if len(result.document.text) > 200 else ""
             output_parts.append(
-                f"{i+1}. {filename} (similarity: {result.score:.2f})\n" f"   {preview}{suffix}\n"
+                f"{i + 1}. {filename} (similarity: {result.score:.2f})\n   {preview}{suffix}\n"
             )
 
         return "\n".join(output_parts)
@@ -326,9 +326,9 @@ class HybridSearchTool:
                 source_str += f" (page {page})"
 
             if self.include_scores:
-                header = f"[Source {i+1}: {source_str}, Relevance: {result.score:.4f}]"
+                header = f"[Source {i + 1}: {source_str}, Relevance: {result.score:.4f}]"
             else:
-                header = f"[Source {i+1}: {source_str}]"
+                header = f"[Source {i + 1}: {source_str}]"
 
             context_parts.append(f"{header}\n{result.document.text}\n")
 

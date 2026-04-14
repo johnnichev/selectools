@@ -176,9 +176,9 @@ async def test_memory_under_load() -> None:
 
     assert len(final_sizes) == 20
     # All memories should have enforced limits
-    assert all(
-        size is not None and size <= 30 for size in final_sizes
-    ), f"Memory limits not enforced: {final_sizes}"
+    assert all(size is not None and size <= 30 for size in final_sizes), (
+        f"Memory limits not enforced: {final_sizes}"
+    )
 
     print(f"  ✓ 20 agents × 20 messages with memory limits enforced in {elapsed:.2f}s")
 
@@ -266,7 +266,7 @@ async def test_error_handling_under_load() -> None:
     success_count = sum(1 for status, _ in results if status == "success")
 
     print(
-        f"  ✓ 100 requests with 20% failure rate: {success_count} succeeded, {100-success_count} handled gracefully"
+        f"  ✓ 100 requests with 20% failure rate: {success_count} succeeded, {100 - success_count} handled gracefully"
     )
     print(f"    Completed in {elapsed:.2f}s")
 

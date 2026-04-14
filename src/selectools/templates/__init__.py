@@ -63,7 +63,7 @@ def from_yaml(path: str, provider: Optional["Provider"] = None) -> "Agent":
         import yaml  # type: ignore[import-untyped]
     except ImportError as exc:
         raise ImportError(
-            "PyYAML is required for YAML config loading. " "Install with: pip install pyyaml"
+            "PyYAML is required for YAML config loading. Install with: pip install pyyaml"
         ) from exc
 
     config_path = Path(path)

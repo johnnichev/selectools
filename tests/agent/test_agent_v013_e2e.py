@@ -511,7 +511,7 @@ class TestToolPairMemoryE2E:
                 assert i > 0, "Tool message cannot be first in history"
                 prev = history[i - 1]
                 assert prev.role == Role.ASSISTANT, (
-                    f"Tool message at index {i} not preceded by assistant " f"(found {prev.role})"
+                    f"Tool message at index {i} not preceded by assistant (found {prev.role})"
                 )
 
 

@@ -143,7 +143,7 @@ def test_all_model_types_used_in_registry() -> None:
     missing = [member for member in ModelType if member not in types_in_registry]
 
     assert not missing, (
-        f"ModelType members not used in ALL_MODELS: " f"{', '.join(m.name for m in missing)}"
+        f"ModelType members not used in ALL_MODELS: {', '.join(m.name for m in missing)}"
     )
 
 

@@ -102,9 +102,9 @@ class TestMultimodalRealProviders:
         # Critical assertion: prove the image actually reached the model
         # (without this the provider could silently drop the image and
         # the test would still pass on "I can't see an image" style replies)
-        assert (
-            "red" in result.content.lower()
-        ), f"OpenAI did not see the red test image. Got: {result.content[:200]}"
+        assert "red" in result.content.lower(), (
+            f"OpenAI did not see the red test image. Got: {result.content[:200]}"
+        )
         assert result.usage.total_tokens > 0
 
     @pytest.mark.skipif(
@@ -124,9 +124,9 @@ class TestMultimodalRealProviders:
         )
         result = agent.run([msg])
         assert result.content, "Empty response from Anthropic"
-        assert (
-            "red" in result.content.lower()
-        ), f"Anthropic did not see the red test image. Got: {result.content[:200]}"
+        assert "red" in result.content.lower(), (
+            f"Anthropic did not see the red test image. Got: {result.content[:200]}"
+        )
         assert result.usage.total_tokens > 0
 
     @pytest.mark.skipif(
@@ -146,9 +146,9 @@ class TestMultimodalRealProviders:
         )
         result = agent.run([msg])
         assert result.content, "Empty response from Gemini"
-        assert (
-            "red" in result.content.lower()
-        ), f"Gemini did not see the red test image. Got: {result.content[:200]}"
+        assert "red" in result.content.lower(), (
+            f"Gemini did not see the red test image. Got: {result.content[:200]}"
+        )
         assert result.usage.total_tokens > 0
 
 
@@ -175,9 +175,9 @@ class TestMultimodalRealProvidersAsync:
         )
         msg = image_message(tiny_red_png, prompt="What color is this image? One word.")
         result = await agent.arun([msg])
-        assert (
-            "red" in result.content.lower()
-        ), f"OpenAI async did not see the red test image. Got: {result.content[:200]}"
+        assert "red" in result.content.lower(), (
+            f"OpenAI async did not see the red test image. Got: {result.content[:200]}"
+        )
 
     @pytest.mark.asyncio
     @pytest.mark.skipif(
@@ -192,9 +192,9 @@ class TestMultimodalRealProvidersAsync:
         )
         msg = image_message(tiny_red_png, prompt="What color is this image? One word.")
         result = await agent.arun([msg])
-        assert (
-            "red" in result.content.lower()
-        ), f"Anthropic async did not see the red test image. Got: {result.content[:200]}"
+        assert "red" in result.content.lower(), (
+            f"Anthropic async did not see the red test image. Got: {result.content[:200]}"
+        )
 
     @pytest.mark.asyncio
     @pytest.mark.skipif(
@@ -209,9 +209,9 @@ class TestMultimodalRealProvidersAsync:
         )
         msg = image_message(tiny_red_png, prompt="What color is this image? One word.")
         result = await agent.arun([msg])
-        assert (
-            "red" in result.content.lower()
-        ), f"Gemini async did not see the red test image. Got: {result.content[:200]}"
+        assert "red" in result.content.lower(), (
+            f"Gemini async did not see the red test image. Got: {result.content[:200]}"
+        )
 
 
 # ``image_message(url, ...)`` for HTTP URLs uses the ``image_url`` ContentPart
@@ -252,9 +252,9 @@ class TestMultimodalRealProvidersImageUrl:
             result = agent.run([msg])
         except Exception as exc:  # pragma: no cover — network hiccup only
             pytest.skip(f"Network / provider unavailable: {exc}")
-        assert (
-            "github" in result.content.lower()
-        ), f"OpenAI did not fetch the image URL correctly. Got: {result.content[:200]}"
+        assert "github" in result.content.lower(), (
+            f"OpenAI did not fetch the image URL correctly. Got: {result.content[:200]}"
+        )
 
     @pytest.mark.skipif(
         not os.environ.get("ANTHROPIC_API_KEY"),
@@ -271,9 +271,9 @@ class TestMultimodalRealProvidersImageUrl:
             result = agent.run([msg])
         except Exception as exc:  # pragma: no cover — network hiccup only
             pytest.skip(f"Network / provider unavailable: {exc}")
-        assert (
-            "github" in result.content.lower()
-        ), f"Anthropic did not fetch the image URL correctly. Got: {result.content[:200]}"
+        assert "github" in result.content.lower(), (
+            f"Anthropic did not fetch the image URL correctly. Got: {result.content[:200]}"
+        )
 
     @pytest.mark.skipif(
         not (os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")),
@@ -290,6 +290,6 @@ class TestMultimodalRealProvidersImageUrl:
             result = agent.run([msg])
         except Exception as exc:  # pragma: no cover — network hiccup only
             pytest.skip(f"Network / provider unavailable: {exc}")
-        assert (
-            "github" in result.content.lower()
-        ), f"Gemini did not fetch the image URL correctly. Got: {result.content[:200]}"
+        assert "github" in result.content.lower(), (
+            f"Gemini did not fetch the image URL correctly. Got: {result.content[:200]}"
+        )
