@@ -39,7 +39,7 @@ except LoopDetectedError as exc:
 
 !!! tip "See Also"
     - [Agent](AGENT.md) — `AgentConfig.loop_detector` field
-    - [Observer](OBSERVER.md) — `on_tool_loop_detected` callback
+    - [Agent](AGENT.md) — `AgentObserver` protocol includes `on_tool_loop_detected`
     - [Cancellation](CANCELLATION.md) — cooperative agent stopping
 
 **Added in:** v0.22.0
@@ -195,7 +195,7 @@ detector = LoopDetector(detectors=[MyDetector(), RepeatDetector()])
 ## See Also
 
 - [Agent](AGENT.md) — `AgentConfig` reference
-- [Observer](OBSERVER.md) — lifecycle callbacks
+- [Agent](AGENT.md) — `AgentObserver` protocol (lifecycle callbacks)
 
 ## Related Examples
 
