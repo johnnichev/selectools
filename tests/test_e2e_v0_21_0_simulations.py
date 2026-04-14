@@ -177,7 +177,7 @@ class TestScenario1_RAGWithOpenAI:
 
         # 8. Assert the agent actually retrieved from OUR docs
         assert "ZOOPLANKTON" in result.content.upper(), (
-            f"Agent did not return the anchor word from the CSV. " f"Got: {result.content[:300]}"
+            f"Agent did not return the anchor word from the CSV. Got: {result.content[:300]}"
         )
         assert result.usage.total_tokens > 0
 
@@ -238,9 +238,9 @@ class TestScenario2_MultimodalWithGemini:
         #    (b) called execute_python and got 42
         content_lower = result.content.lower()
         assert "red" in content_lower, f"Gemini did not describe the image: {result.content[:300]}"
-        assert (
-            "42" in result.content
-        ), f"Gemini did not use execute_python to compute 7*6: {result.content[:300]}"
+        assert "42" in result.content, (
+            f"Gemini did not use execute_python to compute 7*6: {result.content[:300]}"
+        )
         assert result.usage.total_tokens > 0
 
         # 5. OTel should have captured the run
@@ -289,9 +289,9 @@ class TestScenario3_ToolboxWithAnthropic:
         )
 
         # 4. Assert the agent called the tool and got 'carol' (the oldest at 47)
-        assert (
-            "carol" in result.content.lower()
-        ), f"Anthropic did not find carol via query_sqlite: {result.content[:300]}"
+        assert "carol" in result.content.lower(), (
+            f"Anthropic did not find carol via query_sqlite: {result.content[:300]}"
+        )
         assert result.usage.total_tokens > 0
 
 
@@ -362,9 +362,9 @@ class TestScenario4_RAGWithQdrant:
                 "expansion? Use search_knowledge_base and quote it verbatim."
             )
 
-            assert (
-                "FLAMINGO" in result.content.upper()
-            ), f"OpenAI+Qdrant RAG did not retrieve the anchor: {result.content[:300]}"
+            assert "FLAMINGO" in result.content.upper(), (
+                f"OpenAI+Qdrant RAG did not retrieve the anchor: {result.content[:300]}"
+            )
             assert result.usage.total_tokens > 0
             assert len(otel_exporter.get_finished_spans()) > 0
         finally:

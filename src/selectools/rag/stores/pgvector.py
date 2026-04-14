@@ -133,7 +133,7 @@ class PgVectorStore(VectorStore):
             )
         if name[0].isdigit():
             raise ValueError(
-                f"Invalid table name: {name!r}. " "Table name must not start with a digit."
+                f"Invalid table name: {name!r}. Table name must not start with a digit."
             )
         return name
 

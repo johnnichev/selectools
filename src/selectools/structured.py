@@ -97,7 +97,7 @@ def parse_and_validate(
     raw_json = extract_json(text)
     if raw_json is None:
         raise ValueError(
-            "No JSON object found in the response. " "Please respond with a valid JSON object."
+            "No JSON object found in the response. Please respond with a valid JSON object."
         )
 
     try:

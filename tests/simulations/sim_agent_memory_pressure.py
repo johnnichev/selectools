@@ -37,9 +37,9 @@ class TestAgentMemoryPressure:
             role = Role.USER if i % 2 == 0 else Role.ASSISTANT
             memory.add(Message(role=role, content=f"Message number {i}. " + "x" * 50))
             current_len = len(memory.get_history())
-            assert (
-                current_len <= max_msgs
-            ), f"Memory exceeded max_messages at message {i}: {current_len} > {max_msgs}"
+            assert current_len <= max_msgs, (
+                f"Memory exceeded max_messages at message {i}: {current_len} > {max_msgs}"
+            )
             trim_events.append(current_len)
 
         # Must have trimmed at some point (not all 150 messages retained)

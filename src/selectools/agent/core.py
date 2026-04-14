@@ -58,6 +58,7 @@ class _RunContext:
     # before reaching the RetryConfig.max_retries ceiling.
     structured_retries: int = 0
     all_tool_calls: List[ToolCall] = field(default_factory=list)
+    all_tool_results: List[str] = field(default_factory=list)
     last_tool_name: Optional[str] = None
     last_tool_args: Dict[str, Any] = field(default_factory=dict)
     reasoning_history: List[str] = field(default_factory=list)
@@ -236,9 +237,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             ValueError: If a tool with the same name already exists.
         """
         if tool.name in self._tools_by_name:
-            raise ValueError(
-                f"Tool '{tool.name}' already exists. " f"Use replace_tool() to update it."
-            )
+            raise ValueError(f"Tool '{tool.name}' already exists. Use replace_tool() to update it.")
         self.tools.append(tool)
         self._tools_by_name[tool.name] = tool
         self._system_prompt = self.prompt_builder.build(self.tools)
@@ -256,7 +255,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         for t in tools:
             if t.name in self._tools_by_name:
                 raise ValueError(
-                    f"Tool '{t.name}' already exists. " f"Use replace_tool() to update it."
+                    f"Tool '{t.name}' already exists. Use replace_tool() to update it."
                 )
         for t in tools:
             self.tools.append(t)
@@ -279,8 +278,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         """
         if tool_name not in self._tools_by_name:
             raise KeyError(
-                f"Tool '{tool_name}' not found. "
-                f"Available: {', '.join(self._tools_by_name.keys())}"
+                f"Tool '{tool_name}' not found. Available: {', '.join(self._tools_by_name.keys())}"
             )
         if len(self.tools) <= 1:
             raise ValueError("Agent requires at least one tool.")
@@ -462,6 +460,80 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         )
         self._notify_observers("on_run_end", ctx.run_id, result)
         return result
+
+    def _check_loop_detection(self, ctx: _RunContext) -> None:
+        """Run the configured LoopDetector against the current tool-call history.
+
+        Called after each tool-execution round in run(), arun(), and astream().
+        On detection, records a trace step, notifies observers, and then either
+        raises ``LoopDetectedError`` (policy=RAISE) or injects a corrective
+        system message into history (policy=INJECT_MESSAGE).
+        """
+        detector = self.config.loop_detector
+        if detector is None:
+            return
+        detection = detector.check(ctx.all_tool_calls, ctx.all_tool_results)
+        if detection is None:
+            return
+
+        from ..loop_detection import LoopPolicy
+
+        ctx.trace.add(
+            TraceStep(
+                type=StepType.GRAPH_LOOP_DETECTED,
+                summary=detection.message,
+                error=detection.message,
+            )
+        )
+        self._notify_observers(
+            "on_tool_loop_detected",
+            ctx.run_id,
+            detection.detector_name,
+            dict(detection.details),
+        )
+        if detector.policy == LoopPolicy.RAISE:
+            raise detection.as_error()
+        else:
+            notice = Message(role=Role.SYSTEM, content=detector.inject_message)
+            self._history.append(notice)
+            self._memory_add(notice, ctx.run_id)
+
+    async def _acheck_loop_detection(self, ctx: _RunContext) -> None:
+        """Async variant of _check_loop_detection (also fires async observers)."""
+        detector = self.config.loop_detector
+        if detector is None:
+            return
+        detection = detector.check(ctx.all_tool_calls, ctx.all_tool_results)
+        if detection is None:
+            return
+
+        from ..loop_detection import LoopPolicy
+
+        ctx.trace.add(
+            TraceStep(
+                type=StepType.GRAPH_LOOP_DETECTED,
+                summary=detection.message,
+                error=detection.message,
+            )
+        )
+        self._notify_observers(
+            "on_tool_loop_detected",
+            ctx.run_id,
+            detection.detector_name,
+            dict(detection.details),
+        )
+        await self._anotify_observers(
+            "on_tool_loop_detected",
+            ctx.run_id,
+            detection.detector_name,
+            dict(detection.details),
+        )
+        if detector.policy == LoopPolicy.RAISE:
+            raise detection.as_error()
+        else:
+            notice = Message(role=Role.SYSTEM, content=detector.inject_message)
+            self._history.append(notice)
+            self._memory_add(notice, ctx.run_id)
 
     def _build_max_iterations_result(self, ctx: _RunContext) -> AgentResult:
         """Build the AgentResult for when max iterations are reached."""
@@ -1098,6 +1170,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         trace=ctx.trace,
                         run_id=ctx.run_id,
                         user_text_for_coherence=ctx.user_text_for_coherence,
+                        all_tool_results=ctx.all_tool_results,
                     )
                     ctx.last_tool_name = _last_name
                     ctx.last_tool_args = _last_args
@@ -1108,6 +1181,8 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         terminal = self._execute_single_tool(ctx, tool_call)
                         if terminal:
                             break
+
+                self._check_loop_detection(ctx)
 
                 if ctx.terminal_tool_result is not None:
                     final_response = Message(role=Role.ASSISTANT, content=ctx.terminal_tool_result)
@@ -1379,9 +1454,11 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 )
 
                 # Use async _process_response for non-blocking output guardrails
-                response_text, tool_calls_to_execute, reasoning_text = (
-                    await self._aprocess_response(ctx, response_msg)
-                )
+                (
+                    response_text,
+                    tool_calls_to_execute,
+                    reasoning_text,
+                ) = await self._aprocess_response(ctx, response_msg)
 
                 if not tool_calls_to_execute:
                     parsed = None
@@ -1502,6 +1579,8 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         terminal = await self._aexecute_single_tool(ctx, tool_call)
                         if terminal:
                             break
+
+                await self._acheck_loop_detection(ctx)
 
                 if ctx.terminal_tool_result is not None:
                     final_response = Message(role=Role.ASSISTANT, content=ctx.terminal_tool_result)
@@ -1664,9 +1743,11 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 response_msg = await self._acall_provider(
                     stream_handler=stream_handler, trace=ctx.trace, run_id=ctx.run_id
                 )
-                response_text, tool_calls_to_execute, reasoning_text = (
-                    await self._aprocess_response(ctx, response_msg)
-                )
+                (
+                    response_text,
+                    tool_calls_to_execute,
+                    reasoning_text,
+                ) = await self._aprocess_response(ctx, response_msg)
 
                 if not tool_calls_to_execute:
                     parsed = None
@@ -1774,6 +1855,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         trace=ctx.trace,
                         run_id=ctx.run_id,
                         user_text_for_coherence=ctx.user_text_for_coherence,
+                        all_tool_results=ctx.all_tool_results,
                     )
                     ctx.last_tool_name = _last_name
                     ctx.last_tool_args = _last_args
@@ -1784,6 +1866,8 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         terminal = await self._aexecute_single_tool(ctx, tool_call)
                         if terminal:
                             break
+
+                await self._acheck_loop_detection(ctx)
 
                 if ctx.terminal_tool_result is not None:
                     final_response = Message(role=Role.ASSISTANT, content=ctx.terminal_tool_result)

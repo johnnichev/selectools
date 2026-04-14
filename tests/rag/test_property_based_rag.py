@@ -61,9 +61,9 @@ class TestTextSplitterProperties:
         chunks = splitter.split_text(text)
 
         for chunk in chunks:
-            assert (
-                len(chunk) <= chunk_size
-            ), f"Chunk of len {len(chunk)} exceeds chunk_size={chunk_size}: {chunk!r:.50}"
+            assert len(chunk) <= chunk_size, (
+                f"Chunk of len {len(chunk)} exceeds chunk_size={chunk_size}: {chunk!r:.50}"
+            )
 
     @given(text=nonempty_text, params=valid_splitter_params())
     @settings(max_examples=100)
@@ -117,9 +117,9 @@ class TestRecursiveTextSplitterProperties:
         chunks = splitter.split_text(text)
 
         for chunk in chunks:
-            assert (
-                len(chunk) <= chunk_size
-            ), f"Chunk of len {len(chunk)} exceeds chunk_size={chunk_size}: {chunk!r:.50}"
+            assert len(chunk) <= chunk_size, (
+                f"Chunk of len {len(chunk)} exceeds chunk_size={chunk_size}: {chunk!r:.50}"
+            )
 
     @given(params=valid_splitter_params())
     @settings(max_examples=50)

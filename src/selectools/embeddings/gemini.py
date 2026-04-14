@@ -66,9 +66,7 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
         if "embedding-004" in self.model or "embedding-001" in self.model:
             return 768
         else:
-            logger.warning(
-                f"Unknown Gemini embedding model '{self.model}', " f"assuming dimension 768"
-            )
+            logger.warning(f"Unknown Gemini embedding model '{self.model}', assuming dimension 768")
             return 768
 
     def embed_text(self, text: str) -> List[float]:

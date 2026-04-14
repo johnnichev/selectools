@@ -63,7 +63,8 @@ class TestOllamaIntegration:
         # Use LocalProvider as a proxy since we can't assume Ollama is running
         provider = LocalProvider()
         config = AgentConfig(
-            model="local", cost_warning_threshold=0.01  # Should not trigger for free models
+            model="local",
+            cost_warning_threshold=0.01,  # Should not trigger for free models
         )
         agent = Agent(tools=[simple_tool], provider=provider, config=config)
 

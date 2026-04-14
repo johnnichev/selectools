@@ -461,9 +461,9 @@ class TestAstreamCoherenceCheck:
             result = await _collect_astream(agent, "Hi")
             # Should have a coherence_check trace step (not a generic error step)
             trace_types = [s.type for s in result.trace.steps]
-            assert (
-                "coherence_check" in trace_types
-            ), f"Expected 'coherence_check' step type, got: {trace_types}"
+            assert "coherence_check" in trace_types, (
+                f"Expected 'coherence_check' step type, got: {trace_types}"
+            )
             coherence_steps = [s for s in result.trace.steps if s.type == "coherence_check"]
             assert any("Not coherent" in (s.error or "") for s in coherence_steps)
         finally:

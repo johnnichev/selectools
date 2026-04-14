@@ -71,7 +71,6 @@ def _builder_redirect() -> Response:
 
 
 def _make_routes(auth_token: Optional[str]) -> list:  # type: ignore[type-arg]
-
     async def health(_: Request) -> JSONResponse:
         return JSONResponse({"status": "ok", "mode": "builder", "version": __version__})
 
@@ -117,7 +116,7 @@ def _make_routes(auth_token: Optional[str]) -> list:  # type: ignore[type-arg]
         params = _up.urlencode(
             {
                 "client_id": gh_client_id,
-                "redirect_uri": f"http://{request.headers.get('host','localhost')}/auth/github/callback",
+                "redirect_uri": f"http://{request.headers.get('host', 'localhost')}/auth/github/callback",
                 "scope": "read:user user:email",
             }
         )

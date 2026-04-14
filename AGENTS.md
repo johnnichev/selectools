@@ -7,12 +7,11 @@
 pytest tests/ -x -q
 pytest tests/ -k "not e2e" -x -q          # no API keys needed
 
-# Format (MUST run before commit)
-black src/ tests/ --line-length=100
-isort src/ tests/ --profile=black --line-length=100
+# Format + lint (MUST run before commit — replaces Black + isort + flake8)
+ruff format src/ tests/
+ruff check src/ tests/ --fix
 
-# Lint
-flake8 src/
+# Type check
 mypy src/
 
 # Security (MUST pass before release tags)
@@ -26,13 +25,13 @@ cp CHANGELOG.md docs/CHANGELOG.md && mkdocs build
 
 - Python 3.9+ (CI: 3.9, 3.10, 3.11, 3.12, 3.13)
 - pip + setuptools, src-layout: `src/selectools/`
-- pytest (4612 tests), Black + isort, flake8, mypy
+- pytest (5000+ tests), Ruff (format + lint), mypy
 - MkDocs Material for docs, deployed to GitHub Pages
 
 ## Boundaries
 
 ### Always (do without asking)
-- Run `black` and `isort` on every modified file
+- Run `ruff format` and `ruff check --fix` on every modified file
 - Run `pytest tests/ -k "not e2e" -x -q` after implementation changes
 - Add type hints to all public APIs
 - Add a regression test for every bug fix

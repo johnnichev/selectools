@@ -169,8 +169,8 @@ def test_configuration(
     avg_score = sum(r.score for r in results) / len(results) if results else 0.0
 
     print(f"\n📊 Results:")
-    print(f"  Setup time: {setup_time*1000:.2f}ms")
-    print(f"  Query time: {query_time*1000:.2f}ms")
+    print(f"  Setup time: {setup_time * 1000:.2f}ms")
+    print(f"  Query time: {query_time * 1000:.2f}ms")
     print(f"  Documents loaded: {len(documents)}")
     print(f"  Chunks created: {len(chunked_docs)}")
     print(f"  Results returned: {len(results)}")

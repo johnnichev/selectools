@@ -1412,7 +1412,7 @@ class TestAnthropicProviderStream:
 
         def exploding_iter():
             raise ProviderError("original error")
-            yield  # noqa: unreachable
+            yield
 
         provider._client.messages.create.return_value = exploding_iter()
         with pytest.raises(ProviderError, match="original error"):
@@ -1581,7 +1581,7 @@ class TestAnthropicProviderAstream:
 
         async def exploding_stream():
             raise ProviderError("original")
-            yield  # noqa: unreachable
+            yield
 
         provider._async_client.messages.create = AsyncMock(return_value=exploding_stream())
         with pytest.raises(ProviderError, match="original"):
@@ -2166,7 +2166,7 @@ class TestGeminiProviderStream:
 
         def exploding_iter():
             raise ProviderError("original")
-            yield  # noqa: unreachable
+            yield
 
         provider._client.models.generate_content_stream.return_value = exploding_iter()
 
@@ -2565,7 +2565,7 @@ class TestGeminiProviderAstream:
 
         async def exploding_stream():
             raise ProviderError("original")
-            yield  # noqa: unreachable
+            yield
 
         provider._client.aio.models.generate_content_stream = AsyncMock(
             return_value=exploding_stream()

@@ -26,7 +26,7 @@ from selectools.env import load_default_env, load_env_if_present
 def env_file(tmp_path: Path) -> Path:
     """Create a temporary .env file."""
     env = tmp_path / ".env"
-    env.write_text("TEST_VAR_A=hello\n" "TEST_VAR_B=world\n")
+    env.write_text("TEST_VAR_A=hello\nTEST_VAR_B=world\n")
     return env
 
 
@@ -64,7 +64,7 @@ class TestLoadEnvIfPresent:
 
     def test_skips_comments(self, tmp_path: Path) -> None:
         env = tmp_path / ".env"
-        env.write_text("# This is a comment\n" "TEST_VAR_A=value\n" "# COMMENTED_OUT=nope\n")
+        env.write_text("# This is a comment\nTEST_VAR_A=value\n# COMMENTED_OUT=nope\n")
         load_env_if_present([env])
 
         assert os.environ.get("TEST_VAR_A") == "value"
@@ -72,7 +72,7 @@ class TestLoadEnvIfPresent:
 
     def test_skips_blank_lines(self, tmp_path: Path) -> None:
         env = tmp_path / ".env"
-        env.write_text("\n" "TEST_VAR_A=a\n" "\n" "TEST_VAR_B=b\n" "\n")
+        env.write_text("\nTEST_VAR_A=a\n\nTEST_VAR_B=b\n\n")
         load_env_if_present([env])
 
         assert os.environ.get("TEST_VAR_A") == "a"
@@ -80,7 +80,7 @@ class TestLoadEnvIfPresent:
 
     def test_skips_lines_without_equals(self, tmp_path: Path) -> None:
         env = tmp_path / ".env"
-        env.write_text("TEST_VAR_A=valid\n" "this_has_no_equals\n" "TEST_VAR_B=also_valid\n")
+        env.write_text("TEST_VAR_A=valid\nthis_has_no_equals\nTEST_VAR_B=also_valid\n")
         load_env_if_present([env])
 
         assert os.environ.get("TEST_VAR_A") == "valid"

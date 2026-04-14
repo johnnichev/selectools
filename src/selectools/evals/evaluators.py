@@ -51,7 +51,7 @@ class ToolUseEvaluator:
                         evaluator_name=self.name,
                         expected=case.expect_tools,
                         actual=called,
-                        message=f"Expected tools {missing} to be called, " f"but got: {called}",
+                        message=f"Expected tools {missing} to be called, but got: {called}",
                     )
                 )
 
@@ -117,8 +117,7 @@ class ContainsEvaluator:
                         evaluator_name=self.name,
                         expected=f"NOT '{case.expect_not_contains}'",
                         actual=content[:200],
-                        message=f"Response contains '{case.expect_not_contains}' "
-                        f"but should not",
+                        message=f"Response contains '{case.expect_not_contains}' but should not",
                     )
                 )
 
@@ -156,8 +155,7 @@ class OutputEvaluator:
                             evaluator_name=self.name,
                             expected=case.expect_output_regex,
                             actual=content[:200],
-                            message=f"Response does not match regex "
-                            f"'{case.expect_output_regex}'",
+                            message=f"Response does not match regex '{case.expect_output_regex}'",
                         )
                     )
             except re.error as exc:

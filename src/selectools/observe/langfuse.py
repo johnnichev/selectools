@@ -42,8 +42,7 @@ class LangfuseObserver(AgentObserver):
             from langfuse import Langfuse
         except ImportError as exc:
             raise ImportError(
-                "langfuse is required for LangfuseObserver. "
-                "Install it with: pip install langfuse"
+                "langfuse is required for LangfuseObserver. Install it with: pip install langfuse"
             ) from exc
         self._langfuse = Langfuse(
             public_key=public_key or os.getenv("LANGFUSE_PUBLIC_KEY"),

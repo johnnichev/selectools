@@ -47,7 +47,7 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
             from openai import OpenAI
         except ImportError as e:
             raise ImportError(
-                "OpenAI package required for OpenAI embeddings. " "Install with: pip install openai"
+                "OpenAI package required for OpenAI embeddings. Install with: pip install openai"
             ) from e
 
         self.client = OpenAI(api_key=api_key)
@@ -71,7 +71,7 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         else:
             # Default fallback
             logger.warning(
-                f"Unknown OpenAI embedding model '{self.model}', " f"assuming dimension 1536"
+                f"Unknown OpenAI embedding model '{self.model}', assuming dimension 1536"
             )
             return 1536
 

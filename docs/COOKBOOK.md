@@ -939,3 +939,45 @@ for step in result.trace.steps:
     if step.type.name == "LLM_CALL":
         print(step.summary)
 ```
+
+---
+
+## Detect and stop pathological tool-call loops
+
+Prevent token waste when an agent gets stuck calling the same tool repeatedly,
+polling without progress, or ping-ponging between tools.
+
+```python
+from selectools import Agent, AgentConfig, LoopDetector, LoopDetectedError
+from selectools.providers import OpenAIProvider
+
+agent = Agent(
+    tools=[...],
+    provider=OpenAIProvider(),
+    config=AgentConfig(
+        max_iterations=20,
+        loop_detector=LoopDetector.default(),  # Repeat + Stall + PingPong
+    ),
+)
+
+try:
+    result = agent.run("Research this topic")
+except LoopDetectedError as exc:
+    print(f"Agent got stuck: {exc.detector}")
+    print(f"Details: {exc.details}")
+    # Inspect trace for what led to the loop
+    # agent.trace is not available post-raise; use result.trace after INJECT_MESSAGE
+```
+
+Prefer `LoopPolicy.INJECT_MESSAGE` when you want the agent to self-correct
+instead of failing:
+
+```python
+from selectools import LoopDetector, LoopPolicy, RepeatDetector
+
+detector = LoopDetector(
+    detectors=[RepeatDetector(threshold=3)],
+    policy=LoopPolicy.INJECT_MESSAGE,
+    inject_message="Stop repeating. Try a different approach.",
+)
+```

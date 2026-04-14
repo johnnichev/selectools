@@ -399,9 +399,9 @@ class TestGeminiFormatContentsThoughtSignature:
         # thought_signature should NOT have been set dynamically
         fc_part = fc_parts[0]
         sig = getattr(fc_part, "thought_signature", "NOT_SET")
-        assert (
-            sig is None or sig == "NOT_SET"
-        ), f"Expected no thought_signature or None, got {sig!r}"
+        assert sig is None or sig == "NOT_SET", (
+            f"Expected no thought_signature or None, got {sig!r}"
+        )
 
     def test_assistant_multiple_tool_calls_mixed(self) -> None:
         """ASSISTANT with multiple tool_calls: only the one with signature gets it."""

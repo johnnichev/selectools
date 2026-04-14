@@ -45,7 +45,7 @@ class CohereEmbeddingProvider(EmbeddingProvider):
             import cohere
         except ImportError as e:
             raise ImportError(
-                "cohere package required for Cohere embeddings. " "Install with: pip install cohere"
+                "cohere package required for Cohere embeddings. Install with: pip install cohere"
             ) from e
 
         self.client = cohere.Client(api_key=api_key)
@@ -61,7 +61,7 @@ class CohereEmbeddingProvider(EmbeddingProvider):
             return 4096
         else:
             logger.warning(
-                f"Unknown Cohere embedding model '{self.model}', " f"assuming dimension 1024"
+                f"Unknown Cohere embedding model '{self.model}', assuming dimension 1024"
             )
             return 1024
 
@@ -96,13 +96,30 @@ class CohereEmbeddingProvider(EmbeddingProvider):
         if not texts:
             return []
 
-        response = self.client.embed(
-            texts=texts,
-            model=self.model,
-            input_type="search_document",
-            truncate=self.truncate,
-        )
-        return cast(List[List[float]], response.embeddings)
+        # BUG-37 / Haystack analog: Cohere embed API limits requests to 96
+        # texts. Batch automatically so callers don't hit API errors on
+        # large document sets.
+        _MAX_BATCH = 96
+        if len(texts) <= _MAX_BATCH:
+            response = self.client.embed(
+                texts=texts,
+                model=self.model,
+                input_type="search_document",
+                truncate=self.truncate,
+            )
+            return cast(List[List[float]], response.embeddings)
+
+        all_embeddings: List[List[float]] = []
+        for i in range(0, len(texts), _MAX_BATCH):
+            batch = texts[i : i + _MAX_BATCH]
+            response = self.client.embed(
+                texts=batch,
+                model=self.model,
+                input_type="search_document",
+                truncate=self.truncate,
+            )
+            all_embeddings.extend(cast(List[List[float]], response.embeddings))
+        return all_embeddings
 
     def embed_query(self, query: str) -> List[float]:
         """

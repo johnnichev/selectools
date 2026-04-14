@@ -398,9 +398,9 @@ class TestCountTextEmptyInputLabels:
     def test_empty_string_average_word_length_has_label(self) -> None:
         """Empty text must produce 'Average word length: N/A', not a bare 'N/A'."""
         result = text_tools.count_text.function("", detailed=True)
-        assert (
-            "Average word length: N/A" in result
-        ), f"Expected labelled 'Average word length: N/A', got:\n{result}"
+        assert "Average word length: N/A" in result, (
+            f"Expected labelled 'Average word length: N/A', got:\n{result}"
+        )
 
     def test_non_empty_text_average_word_length_has_label(self) -> None:
         """Non-empty text must still produce 'Average word length: X.Y'."""

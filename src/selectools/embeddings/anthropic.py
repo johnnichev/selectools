@@ -63,7 +63,7 @@ class AnthropicEmbeddingProvider(EmbeddingProvider):
             return 1024
         else:
             logger.warning(
-                f"Unknown Voyage embedding model '{self.model}', " f"assuming dimension 1024"
+                f"Unknown Voyage embedding model '{self.model}', assuming dimension 1024"
             )
             return 1024
 

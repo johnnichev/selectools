@@ -219,9 +219,9 @@ class TestBuilderHtml:
         # Find replayHistory function and verify evalResults reset inside it
         rh_idx = BUILDER_HTML.find("function replayHistory(")
         reset_idx = BUILDER_HTML.find("evalResults = {};", rh_idx)
-        assert (
-            reset_idx != -1 and reset_idx < rh_idx + 400
-        ), "evalResults must be reset inside replayHistory"
+        assert reset_idx != -1 and reset_idx < rh_idx + 400, (
+            "evalResults must be reset inside replayHistory"
+        )
 
     def test_eval_assertion_in_mk_node(self):
         """mkNode must initialise eval_assertion field on agent nodes."""
@@ -1701,9 +1701,9 @@ class TestBuilderGantt:
         ts_values = [e["ts"] for e in collected if "ts" in e]
         assert len(ts_values) >= 2
         for i in range(1, len(ts_values)):
-            assert (
-                ts_values[i] >= ts_values[i - 1]
-            ), f"ts not monotonic at index {i}: {ts_values[i-1]} > {ts_values[i]}"
+            assert ts_values[i] >= ts_values[i - 1], (
+                f"ts not monotonic at index {i}: {ts_values[i - 1]} > {ts_values[i]}"
+            )
 
     def test_render_gantt_called_after_run(self):
         """renderGantt() must be called after renderScrubber() at run completion."""

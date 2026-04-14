@@ -26,7 +26,7 @@ def search_web(query: str, max_results: int = 5) -> str:
     (Mock implementation for demo purposes)
     """
     results = [
-        f"Result {i+1} for '{query}': Sample information..." for i in range(min(max_results, 3))
+        f"Result {i + 1} for '{query}': Sample information..." for i in range(min(max_results, 3))
     ]
     return "\n".join(results)
 
@@ -277,7 +277,7 @@ if analytics:
         for line in lines[:5]:  # Show first 5 lines
             print(f"  {line.rstrip()}")
         if len(lines) > 5:
-            print(f"  ... ({len(lines)-5} more lines)")
+            print(f"  ... ({len(lines) - 5} more lines)")
 
     print()
     print(f"📁 Files saved to: {temp_dir}")

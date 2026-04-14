@@ -1650,8 +1650,7 @@ class AgentGraph:
                             self.name,
                             current,
                             ValueError(
-                                f"Router returned {raw!r} but path_map keys are"
-                                f" {list(pmap.keys())}"
+                                f"Router returned {raw!r} but path_map keys are {list(pmap.keys())}"
                             ),
                             0,
                         )

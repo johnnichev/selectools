@@ -273,9 +273,9 @@ class TestRoutingOnlyIterationEvents:
         )
         result = agent.run("route me")
         assert result.tool_name == "dummy_tool"
-        assert (
-            len(observer.events.get("on_iteration_end", [])) == 1
-        ), "routing_only must fire on_iteration_end before returning"
+        assert len(observer.events.get("on_iteration_end", [])) == 1, (
+            "routing_only must fire on_iteration_end before returning"
+        )
 
     @pytest.mark.asyncio
     async def test_routing_only_fires_iteration_end_async(self) -> None:
@@ -934,9 +934,9 @@ class TestAnthropicSystemMessages:
 
         # No message should have role="system"
         for msg in formatted:
-            assert (
-                msg["role"] != "system"
-            ), f"Found role='system' in formatted messages — Anthropic will reject this"
+            assert msg["role"] != "system", (
+                f"Found role='system' in formatted messages — Anthropic will reject this"
+            )
 
         # SYSTEM messages should be converted to user role and prepended at the
         # start so they never break tool_use -> tool_result adjacency.
@@ -969,8 +969,13 @@ class TestAnthropicSystemMessages:
             from google.genai import types  # noqa: F401
 
             formatted = provider._format_contents("system prompt", messages)
-            # SYSTEM message should become user role, not cause an error
-            assert formatted[1].role == "user"
+            # SYSTEM message should become user role, not cause an error.
+            # BUG-39: consecutive same-role messages are now merged, so
+            # the SYSTEM-converted-to-user content may be coalesced with
+            # the preceding USER message. Assert the content is present
+            # in ANY user Content rather than at a fixed position.
+            all_user_text = " ".join(str(p) for c in formatted if c.role == "user" for p in c.parts)
+            assert "[Compressed context] Summary" in all_user_text
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -1146,9 +1151,9 @@ class TestParallelToolsExecutorSingleton:
         agent.run("run both tools")
 
         executor_after = _get_tool_timeout_executor()
-        assert (
-            executor_before is executor_after
-        ), "Parallel tool execution must reuse the singleton executor, not create a new one"
+        assert executor_before is executor_after, (
+            "Parallel tool execution must reuse the singleton executor, not create a new one"
+        )
         assert call_counts["tool_a"] == 1
         assert call_counts["tool_b"] == 1
 
@@ -1204,9 +1209,9 @@ class TestParallelToolsExecutorSingleton:
         agent.run("do secure thing")
 
         executor_after = _get_tool_timeout_executor()
-        assert (
-            executor_before is executor_after
-        ), "confirm_action must reuse the singleton executor, not create a new one"
+        assert executor_before is executor_after, (
+            "confirm_action must reuse the singleton executor, not create a new one"
+        )
         assert approval_calls == ["secure_tool"]
 
 
@@ -1297,9 +1302,9 @@ class TestCoherenceCheckTraceStepType:
             f"Expected COHERENCE_CHECK trace step, got none. "
             f"Step types: {[s.type for s in result.trace.steps]}"
         )
-        assert (
-            len(error_steps_for_coherence) == 0
-        ), "Coherence check failures must NOT produce ERROR trace steps"
+        assert len(error_steps_for_coherence) == 0, (
+            "Coherence check failures must NOT produce ERROR trace steps"
+        )
 
     @pytest.mark.asyncio
     async def test_async_sequential_coherence_failure_produces_correct_trace_step(self) -> None:
@@ -1473,9 +1478,9 @@ class TestAsyncGuardrailsNewMessagesOnly:
             "arun() must not re-validate previously stored history messages through guardrails. "
             f"Processed: {processed}"
         )
-        assert any(
-            "new message only" in p for p in processed
-        ), "arun() must apply guardrails to the new message"
+        assert any("new message only" in p for p in processed), (
+            "arun() must apply guardrails to the new message"
+        )
 
     @pytest.mark.asyncio
     async def test_astream_guardrails_only_applied_to_new_messages(self) -> None:
@@ -1512,9 +1517,9 @@ class TestAsyncGuardrailsNewMessagesOnly:
             "astream() must not re-validate previously stored history messages. "
             f"Processed: {processed}"
         )
-        assert any(
-            "new message only" in p for p in processed
-        ), "astream() must apply guardrails to the new message"
+        assert any("new message only" in p for p in processed), (
+            "astream() must apply guardrails to the new message"
+        )
 
 
 # Bug P5-1: Sync _run_input_guardrails / _run_output_guardrails never added
@@ -1580,9 +1585,9 @@ class TestSyncGuardrailTraceStep:
         result = agent.run("give me pii")
 
         guardrail_steps = [s for s in result.trace.steps if s.type == StepType.GUARDRAIL]
-        assert (
-            guardrail_steps
-        ), "Sync run() must add a GUARDRAIL trace step when a REWRITE output guardrail fires."
+        assert guardrail_steps, (
+            "Sync run() must add a GUARDRAIL trace step when a REWRITE output guardrail fires."
+        )
         assert "rewrite-guard" in guardrail_steps[0].summary
         # Also verify the content was actually rewritten
         assert result.content == "[redacted]"
@@ -1924,9 +1929,9 @@ class TestPrepareRunPromptLeakFix:
         with pytest.raises(RuntimeError, match="guardrail boom"):
             agent.run("test", response_format=schema)
 
-        assert (
-            agent._system_prompt == original_prompt
-        ), "_system_prompt was not restored after _prepare_run failure"
+        assert agent._system_prompt == original_prompt, (
+            "_system_prompt was not restored after _prepare_run failure"
+        )
 
     @pytest.mark.asyncio
     async def test_system_prompt_restored_on_prepare_run_failure_arun(self) -> None:
@@ -2474,9 +2479,9 @@ def test_bug05_subgraph_propagates_hitl_interrupt():
     # parent's resume machinery can route the stored response back into
     # the subgraph's generator on re-execution.
     pending = result.state.metadata.get("__pending_interrupt_key__")
-    assert (
-        pending == "gate_0"
-    ), f"Expected flat pending key 'gate_0' from subgraph generator node; got: {pending!r}"
+    assert pending == "gate_0", (
+        f"Expected flat pending key 'gate_0' from subgraph generator node; got: {pending!r}"
+    )
 
 
 # ---- BUG-05 Part 2: Subgraph HITL resume ----
@@ -2564,9 +2569,9 @@ def test_bug06_concurrent_add_preserves_all_messages():
 
     assert not errors, f"Worker errors: {errors}"
     history = memory.get_history()
-    assert (
-        len(history) == n_threads * n_adds
-    ), f"Expected {n_threads * n_adds} messages, got {len(history)}"
+    assert len(history) == n_threads * n_adds, (
+        f"Expected {n_threads * n_adds} messages, got {len(history)}"
+    )
 
 
 def test_bug06_concurrent_add_with_trim_no_crash():
@@ -2955,9 +2960,9 @@ def test_bug15_summary_helper_caps_at_max_chars():
     new_chunk = "new summary chunk with recent context"
     result = _append_summary(existing, new_chunk)
 
-    assert (
-        len(result) <= _MAX_SUMMARY_CHARS
-    ), f"Summary exceeded cap: {len(result)} > {_MAX_SUMMARY_CHARS}"
+    assert len(result) <= _MAX_SUMMARY_CHARS, (
+        f"Summary exceeded cap: {len(result)} > {_MAX_SUMMARY_CHARS}"
+    )
     # The NEWEST content must be preserved (recent context matters most)
     assert "new summary chunk" in result
 
@@ -3272,13 +3277,13 @@ def test_bug18_lifecycle_has_done_callback_helper():
 
     from selectools.agent import _lifecycle
 
-    assert hasattr(
-        _lifecycle, "_log_task_exception"
-    ), "BUG-18 fix requires a module-level _log_task_exception helper"
+    assert hasattr(_lifecycle, "_log_task_exception"), (
+        "BUG-18 fix requires a module-level _log_task_exception helper"
+    )
     source = inspect.getsource(_lifecycle._LifecycleMixin._anotify_observers)
-    assert (
-        "add_done_callback" in source
-    ), "_anotify_observers must attach add_done_callback to fire-and-forget tasks"
+    assert "add_done_callback" in source, (
+        "_anotify_observers must attach add_done_callback to fire-and-forget tasks"
+    )
 
 
 # ---- BUG-19: ``_clone_for_isolation`` shallow-copies config ----
@@ -3310,20 +3315,20 @@ def test_bug19_clone_isolates_observer_list():
     assert hasattr(agent, "_clone_for_isolation"), "_clone_for_isolation must exist"
     clone = agent._clone_for_isolation()
 
-    assert (
-        clone.config is not agent.config
-    ), "Clone should have its own config instance, not share the source config"
-    assert (
-        clone.config.observers is not agent.config.observers
-    ), "Clone should have its own observer list, not share the source list"
-    assert clone.config.observers == [
-        obs
-    ], "Clone observer list should contain the same observer instances"
+    assert clone.config is not agent.config, (
+        "Clone should have its own config instance, not share the source config"
+    )
+    assert clone.config.observers is not agent.config.observers, (
+        "Clone should have its own observer list, not share the source list"
+    )
+    assert clone.config.observers == [obs], (
+        "Clone observer list should contain the same observer instances"
+    )
 
     clone.config.observers.append(_Obs())
-    assert (
-        len(agent.config.observers) == 1
-    ), "Mutating the clone's observer list must not affect the source agent"
+    assert len(agent.config.observers) == 1, (
+        "Mutating the clone's observer list must not affect the source agent"
+    )
 
 
 def test_bug19_clone_without_observers_does_not_crash():
@@ -3388,9 +3393,9 @@ def test_bug22_optional_without_default_is_not_required():
 
     params = {p.name: p for p in search.parameters}
     assert params["query"].required is True  # plain str, no default -> required
-    assert (
-        params["filter"].required is False
-    ), "Optional[T] without a default value should be marked required=False"
+    assert params["filter"].required is False, (
+        "Optional[T] without a default value should be marked required=False"
+    )
 
 
 def test_bug22_optional_with_default_still_not_required():
@@ -3470,16 +3475,16 @@ def test_bug21_memory_store_search_dedup_opt_in() -> None:
     # Without dedup: duplicates preserved (default behavior).
     results_no_dedup = store.search(query_vec, top_k=10)
     texts_no_dedup = [r.document.text for r in results_no_dedup]
-    assert (
-        texts_no_dedup.count(same_text) >= 2
-    ), f"Without dedup, expected 2+ copies of {same_text!r}; got: {texts_no_dedup}"
+    assert texts_no_dedup.count(same_text) >= 2, (
+        f"Without dedup, expected 2+ copies of {same_text!r}; got: {texts_no_dedup}"
+    )
 
     # With dedup=True: only the first occurrence of each text survives.
     results_dedup = store.search(query_vec, top_k=10, dedup=True)
     texts_dedup = [r.document.text for r in results_dedup]
-    assert (
-        texts_dedup.count(same_text) == 1
-    ), f"With dedup=True, expected 1 copy of {same_text!r}; got: {texts_dedup}"
+    assert texts_dedup.count(same_text) == 1, (
+        f"With dedup=True, expected 1 copy of {same_text!r}; got: {texts_dedup}"
+    )
     # The "different doc" should still be present.
     assert "different doc" in texts_dedup
 
@@ -3500,9 +3505,9 @@ def test_bug21_dedup_default_is_false_backward_compat() -> None:
 
     query_vec = embedder.embed_query("hello")
     results = store.search(query_vec, top_k=10)
-    assert (
-        len(results) == 2
-    ), f"Default dedup=False should preserve duplicates; got {len(results)} results"
+    assert len(results) == 2, (
+        f"Default dedup=False should preserve duplicates; got {len(results)} results"
+    )
 
 
 # ---- BUG-23: Reranker top_k=0 falsy fallback ----
@@ -3556,9 +3561,9 @@ def test_bug23_reranker_top_k_none_returns_all():
 
     reranker.rerank("query", results, top_k=None)
     call_kwargs = reranker.client.rerank.call_args.kwargs
-    assert (
-        call_kwargs["top_n"] == 3
-    ), f"top_k=None must default to len(results); got top_n={call_kwargs['top_n']}"
+    assert call_kwargs["top_n"] == 3, (
+        f"top_k=None must default to len(results); got top_n={call_kwargs['top_n']}"
+    )
 
 
 # ---- BUG-24: _dedup_search_results keyed only on document.text ----
@@ -3611,9 +3616,9 @@ def test_bug24_dedup_collapses_same_text_same_source():
     ]
 
     deduped = _dedup_search_results(results)
-    assert (
-        len(deduped) == 1
-    ), f"True duplicate (same text + same source) must still collapse; got {len(deduped)}"
+    assert len(deduped) == 1, (
+        f"True duplicate (same text + same source) must still collapse; got {len(deduped)}"
+    )
     assert deduped[0].score == 0.9, "Must keep first (highest-scoring) occurrence"
 
 
@@ -3653,9 +3658,9 @@ def test_bug26_gemini_usage_no_or_zero_pattern_in_source():
         "None (unknown) with 0 (legitimate cached-prompt value). "
         "Use `x if x is not None else 0` instead (pitfall #22)."
     )
-    assert (
-        "candidates_token_count or 0" not in source
-    ), "gemini_provider.py uses `candidates_token_count or 0` — same pitfall #22 class."
+    assert "candidates_token_count or 0" not in source, (
+        "gemini_provider.py uses `candidates_token_count or 0` — same pitfall #22 class."
+    )
 
 
 def test_bug26_gemini_usage_fix_pattern_in_source():
@@ -3665,12 +3670,12 @@ def test_bug26_gemini_usage_fix_pattern_in_source():
     from selectools.providers import gemini_provider
 
     source = inspect.getsource(gemini_provider)
-    assert (
-        source.count("prompt_token_count is not None") >= 2
-    ), "Both sync (complete) and stream paths must use `is not None` guard on prompt_token_count"
-    assert (
-        source.count("candidates_token_count is not None") >= 2
-    ), "Both sync (complete) and stream paths must use `is not None` guard on candidates_token_count"
+    assert source.count("prompt_token_count is not None") >= 2, (
+        "Both sync (complete) and stream paths must use `is not None` guard on prompt_token_count"
+    )
+    assert source.count("candidates_token_count is not None") >= 2, (
+        "Both sync (complete) and stream paths must use `is not None` guard on candidates_token_count"
+    )
 
 
 # ---- BUG-25: In-memory _matches_filter silently mishandles operator-dict values ----
@@ -3745,9 +3750,9 @@ def test_bug25_memory_filter_literal_dict_still_works():
     query_vec = store.embedder.embed_query("q")
     results = store.search(query_vec, top_k=5, filter={"config": {"theme": "dark"}})
     matched = [r for r in results if r.document.text == "doc a"]
-    assert (
-        len(matched) == 1
-    ), f"Literal dict metadata match (no $-prefixed keys) must still work; got {len(matched)}"
+    assert len(matched) == 1, (
+        f"Literal dict metadata match (no $-prefixed keys) must still work; got {len(matched)}"
+    )
 
 
 def test_bug25_memory_filter_simple_equality_still_works():
@@ -3783,9 +3788,9 @@ def test_bug27_fallback_retriable_anthropic_529_overloaded():
     """Anthropic 529 Overloaded must be treated as retriable."""
     from selectools.providers.fallback import _is_retriable
 
-    assert _is_retriable(
-        Exception("Anthropic API Error: 529 Overloaded")
-    ), "Anthropic 529 Overloaded must be retriable"
+    assert _is_retriable(Exception("Anthropic API Error: 529 Overloaded")), (
+        "Anthropic 529 Overloaded must be retriable"
+    )
     assert _is_retriable(
         Exception("anthropic: overloaded_error: server is temporarily overloaded")
     ), "`overloaded_error` string must be retriable"
@@ -3809,9 +3814,9 @@ def test_bug27_fallback_retriable_rate_limit_underscore_form():
     """OpenAI/Mistral `rate_limit_exceeded` (underscore) must be retriable."""
     from selectools.providers.fallback import _is_retriable
 
-    assert _is_retriable(
-        Exception("openai: rate_limit_exceeded: quota reached")
-    ), "`rate_limit_exceeded` (underscore form) must be retriable"
+    assert _is_retriable(Exception("openai: rate_limit_exceeded: quota reached")), (
+        "`rate_limit_exceeded` (underscore form) must be retriable"
+    )
 
 
 def test_bug27_fallback_retriable_cloudflare_522_524():
@@ -3860,12 +3865,12 @@ def test_bug28_azure_no_model_family_falls_back_to_deployment_name():
 
     provider = AzureOpenAIProvider.__new__(AzureOpenAIProvider)
     provider._model_family = None
-    assert (
-        provider._get_token_key("gpt-5-mini") == "max_completion_tokens"
-    ), "Deployment name matching a family prefix still works"
-    assert (
-        provider._get_token_key("gpt-4") == "max_tokens"
-    ), "Deployment name not matching any family prefix still uses max_tokens"
+    assert provider._get_token_key("gpt-5-mini") == "max_completion_tokens", (
+        "Deployment name matching a family prefix still works"
+    )
+    assert provider._get_token_key("gpt-4") == "max_tokens", (
+        "Deployment name not matching any family prefix still uses max_tokens"
+    )
 
 
 def test_bug28_azure_model_family_overrides_deployment_family_mismatch():
@@ -3903,9 +3908,9 @@ def test_bug29_list_str_param_schema_has_items_type():
         "`list[str]` parameter must emit an inner `items` schema with "
         "element type. Got: " + repr(params["items"])
     )
-    assert (
-        params["items"]["items"]["type"] == "string"
-    ), f"`list[str]` element type must be `string`, got: {params['items']['items']}"
+    assert params["items"]["items"]["type"] == "string", (
+        f"`list[str]` element type must be `string`, got: {params['items']['items']}"
+    )
 
 
 def test_bug29_list_int_param_schema_has_items_integer():
@@ -3967,9 +3972,9 @@ def test_bug29_optional_list_str_still_preserves_items():
 
     schema = f.schema()
     params = schema["parameters"]["properties"]
-    assert (
-        params["tags"]["items"]["type"] == "string"
-    ), "Optional[list[str]] must preserve element type through Optional unwrap"
+    assert params["tags"]["items"]["type"] == "string", (
+        "Optional[list[str]] must preserve element type through Optional unwrap"
+    )
 
 
 # ---- BUG-30: pipeline.parallel() passes same input ref to every branch ----
@@ -3998,9 +4003,9 @@ def test_bug30_parallel_sync_branches_do_not_share_input_mutation():
     result = group.fn({"id": 42})
 
     assert result["branch_a"]["seen_by"] == "A"
-    assert (
-        result["branch_b"]["saw_seen_by"] == "NONE"
-    ), f"branch_b must not see branch_a's mutation; got {result['branch_b']}"
+    assert result["branch_b"]["saw_seen_by"] == "NONE", (
+        f"branch_b must not see branch_a's mutation; got {result['branch_b']}"
+    )
 
 
 def test_bug30_parallel_async_branches_do_not_share_input_mutation():
@@ -4023,7 +4028,7 @@ def test_bug30_parallel_async_branches_do_not_share_input_mutation():
 
     assert result["branch_a"]["seen_by"] == "A"
     assert result["branch_b"]["saw_seen_by"] == "NONE", (
-        "Async branches must receive independent input copies; " f"got {result['branch_b']}"
+        f"Async branches must receive independent input copies; got {result['branch_b']}"
     )
 
 
@@ -4078,7 +4083,7 @@ async def test_bug32_run_in_executor_copyctx_propagates_contextvar():
     loop = asyncio.get_running_loop()
     seen = await run_in_executor_copyctx(loop, None, _read_cv)
     assert seen == "caller_value", (
-        f"ContextVar set in caller must propagate through run_in_executor; " f"got {seen!r}"
+        f"ContextVar set in caller must propagate through run_in_executor; got {seen!r}"
     )
 
 
@@ -4105,8 +4110,7 @@ async def test_bug32_run_in_executor_copyctx_respects_executor_arg():
         pool.shutdown(wait=True)
 
     assert thread_names and thread_names[0].startswith("bug32-test-pool"), (
-        f"run_in_executor_copyctx must use the provided executor; "
-        f"thread names seen: {thread_names}"
+        f"run_in_executor_copyctx must use the provided executor; thread names seen: {thread_names}"
     )
 
 
@@ -4124,9 +4128,9 @@ def test_bug32_five_executor_sites_use_contextvar_helper():
         (_tool_executor, "agent/_tool_executor.py"),
     ]:
         source = inspect.getsource(mod)
-        assert (
-            "run_in_executor_copyctx" in source
-        ), f"{label} must import run_in_executor_copyctx for BUG-32 contextvar propagation"
+        assert "run_in_executor_copyctx" in source, (
+            f"{label} must import run_in_executor_copyctx for BUG-32 contextvar propagation"
+        )
         # The raw `loop.run_in_executor(` pattern should have been replaced
         # (allow it to appear only inside comments / docstrings, not code)
         code_lines = [
@@ -4221,9 +4225,9 @@ def test_bug31_tool_executor_surfaces_parse_error_as_retry_message():
     assert "malformed arguments" in source
 
     async_source = inspect.getsource(_tool_executor._ToolExecutorMixin._aexecute_single_tool)
-    assert (
-        "parse_error" in async_source
-    ), "_aexecute_single_tool must check tool_call.parse_error (BUG-31)"
+    assert "parse_error" in async_source, (
+        "_aexecute_single_tool must check tool_call.parse_error (BUG-31)"
+    )
 
 
 def test_bug31_providers_no_silent_empty_dict_on_decode_error():
@@ -4313,9 +4317,9 @@ def test_bug34_run_context_has_structured_retries_counter():
     from selectools.agent.core import _RunContext
 
     fields = {f.name for f in _RunContext.__dataclass_fields__.values()}
-    assert (
-        "structured_retries" in fields
-    ), "_RunContext must have a structured_retries field (BUG-34)"
+    assert "structured_retries" in fields, (
+        "_RunContext must have a structured_retries field (BUG-34)"
+    )
 
 
 def test_bug34_structured_retry_budget_checked_against_retry_max_retries():
@@ -4327,9 +4331,9 @@ def test_bug34_structured_retry_budget_checked_against_retry_max_retries():
     source = inspect.getsource(core)
     # Every structured_retry branch (there are 3 — run, arun, astream) must
     # reference the new counter, not just ctx.iteration.
-    assert (
-        source.count("ctx.structured_retries") >= 3
-    ), "All 3 structured-retry branches (run/arun/astream) must use ctx.structured_retries (BUG-34)"
+    assert source.count("ctx.structured_retries") >= 3, (
+        "All 3 structured-retry branches (run/arun/astream) must use ctx.structured_retries (BUG-34)"
+    )
 
 
 def test_bug34_structured_retry_honors_retry_budget_beyond_max_iterations():

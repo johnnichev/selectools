@@ -63,9 +63,9 @@ class TestOTelRealSDK:
 
         # There should be a root agent.run span
         names = [s.name for s in spans]
-        assert any(
-            "run" in n.lower() or "agent" in n.lower() for n in names
-        ), f"No agent/run span found; got: {names}"
+        assert any("run" in n.lower() or "agent" in n.lower() for n in names), (
+            f"No agent/run span found; got: {names}"
+        )
 
     def test_run_span_has_gen_ai_system_attribute(
         self, otel_exporter: InMemorySpanExporter

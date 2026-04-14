@@ -140,6 +140,7 @@ nav:
     - MCP Client/Server: modules/MCP.md
     - Token Budget: modules/BUDGET.md
     - Cancellation: modules/CANCELLATION.md
+    - Loop Detection: modules/LOOP_DETECTION.md
     - Token Estimation: modules/TOKEN_ESTIMATION.md
     - Model Switching: modules/MODEL_SWITCHING.md
     - Reasoning Strategies: modules/REASONING_STRATEGIES.md

@@ -24,7 +24,7 @@ registry = ToolRegistry()
 @registry.tool(description="Return mock search results for a query.")
 def search(query: str, top_k: int = 3) -> str:
     results = [
-        {"title": f"Result {i+1} for {query}", "url": f"https://example.com/{i+1}"}
+        {"title": f"Result {i + 1} for {query}", "url": f"https://example.com/{i + 1}"}
         for i in range(top_k)
     ]
     return json.dumps({"results": results})

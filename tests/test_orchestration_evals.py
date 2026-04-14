@@ -129,9 +129,9 @@ class TestToolCallingAccuracy:
         result = graph.run("What is the capital of France?")
 
         assert result.content, f"[{provider_name}] Empty response"
-        assert (
-            "Paris" in result.content
-        ), f"[{provider_name}] Expected 'Paris' in response, got: {result.content[:200]}"
+        assert "Paris" in result.content, (
+            f"[{provider_name}] Expected 'Paris' in response, got: {result.content[:200]}"
+        )
 
     @pytest.mark.parametrize("provider_name", PROVIDERS)
     def test_agent_calls_correct_tool_for_math(self, provider_name):
@@ -143,9 +143,9 @@ class TestToolCallingAccuracy:
         result = graph.run("What is 15 * 7?")
 
         assert result.content, f"[{provider_name}] Empty response"
-        assert (
-            "105" in result.content
-        ), f"[{provider_name}] Expected '105' in response, got: {result.content[:200]}"
+        assert "105" in result.content, (
+            f"[{provider_name}] Expected '105' in response, got: {result.content[:200]}"
+        )
 
 
 @pytest.mark.e2e
@@ -219,9 +219,9 @@ class TestSystemMessageSurvival:
 
         # Must not crash. Content should be about Paris.
         assert result.content, f"[{provider_name}] Empty response after SYSTEM injection"
-        assert (
-            "error" not in result.content.lower() or "Paris" in result.content
-        ), f"[{provider_name}] Got error or wrong answer: {result.content[:200]}"
+        assert "error" not in result.content.lower() or "Paris" in result.content, (
+            f"[{provider_name}] Got error or wrong answer: {result.content[:200]}"
+        )
 
     @pytest.mark.parametrize("provider_name", PROVIDERS)
     def test_multiple_system_messages_dont_crash(self, provider_name):
@@ -246,9 +246,9 @@ class TestSystemMessageSurvival:
         result = graph.run("start")
 
         assert result.content, f"[{provider_name}] Empty response"
-        assert (
-            "30" in result.content
-        ), f"[{provider_name}] Expected '30' in response, got: {result.content[:200]}"
+        assert "30" in result.content, (
+            f"[{provider_name}] Expected '30' in response, got: {result.content[:200]}"
+        )
 
 
 @pytest.mark.e2e

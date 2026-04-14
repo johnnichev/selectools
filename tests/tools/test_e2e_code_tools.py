@@ -43,9 +43,7 @@ class TestExecutePythonReal:
 
     def test_stdout_stderr_both_captured(self) -> None:
         """stdout and stderr are both captured from the real subprocess."""
-        code = (
-            "import sys\n" "sys.stdout.write('on stdout\\n')\n" "sys.stderr.write('on stderr\\n')\n"
-        )
+        code = "import sys\nsys.stdout.write('on stdout\\n')\nsys.stderr.write('on stderr\\n')\n"
         result = code_tools.execute_python.function(code)
         assert "on stdout" in result
         assert "on stderr" in result

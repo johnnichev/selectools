@@ -74,6 +74,13 @@ FAISS → Qdrant → pgvector vector stores
 → OTel observer → Langfuse observer
 → Code execution, web search, GitHub, DB toolbox tools
 
+v0.22.0 ✅ Competitor-Informed Bug Fixes + Loop Detection + Ruff Tooling
+38 bug fixes from 3 rounds mining Agno/PraisonAI/LangChain/LangGraph/
+CrewAI/n8n/LlamaIndex/AutoGen/LiteLLM/Pydantic-AI/Haystack (~325k stars)
+→ Loop detection (Repeat, Stall, PingPong) with RAISE / INJECT_MESSAGE policies
+→ Dev tooling consolidated: Black + isort + flake8 → Ruff
+→ 30-recipe cookbook expansion → 95 runnable examples
+
 v1.0.0 🟡 Stable Release
 API freeze → Stability markers on all modules → Deprecation policy
 → Security audit published → Compatibility matrix → 0.x→1.0 migration guide

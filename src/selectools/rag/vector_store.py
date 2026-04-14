@@ -175,9 +175,7 @@ class VectorStore(ABC):
         pass
 
     @staticmethod
-    def create(
-        backend: str, embedder: "EmbeddingProvider", **kwargs: Any
-    ) -> "VectorStore":  # noqa: F821
+    def create(backend: str, embedder: "EmbeddingProvider", **kwargs: Any) -> "VectorStore":  # noqa: F821
         """
         Factory method to create a vector store.
 

@@ -2,8 +2,8 @@
 
 Thank you for your interest in contributing to Selectools! We welcome contributions from the community.
 
-**Current Version:** v0.21.0
-**Test Status:** 5271 tests collected (95% coverage)
+**Current Version:** v0.22.0
+**Test Status:** 5343 tests collected (95% coverage)
 **Python:** 3.9 – 3.13
 
 ## Getting Started
@@ -44,9 +44,7 @@ pre-commit run --all-files
 ```
 
 The hooks will automatically run on staged files when you commit. They include:
-- **Black** - Code formatting
-- **isort** - Import sorting
-- **flake8** - Linting
+- **Ruff** - Formatting + linting + import sorting (replaces Black + isort + flake8)
 - **mypy** - Type checking
 - **bandit** - Security checks
 
@@ -74,7 +72,7 @@ Similar to `npm run` scripts, here are the common commands for this project:
 ### Testing
 
 ```bash
-# Run all tests (5271 tests)
+# Run all tests (5343 tests)
 pytest tests/ -v
 
 # Run tests quietly (summary only)
@@ -104,9 +102,8 @@ pytest tests/ -k "not e2e" -v
 pre-commit run --all-files
 
 # Run individual tools
-black src/ tests/ examples/          # Format code
-isort src/ tests/ examples/          # Sort imports
-flake8 src/                          # Lint code
+ruff format src/ tests/ examples/    # Format code + sort imports
+ruff check src/ tests/ --fix         # Lint code + auto-fix
 mypy src/                            # Type check
 bandit -r src/                       # Security scan
 ```
@@ -183,11 +180,11 @@ We follow standard Python conventions and use automated tools to enforce consist
 
 ### Style Guidelines
 
-- **PEP 8** style guide (enforced by flake8)
+- **PEP 8** style guide (enforced by ruff)
 - **Type hints** for function signatures (checked by mypy)
 - **Docstrings** for public APIs (Google style preferred)
 - **Clear variable names** over abbreviations
-- **Line length**: 100 characters (configured in Black and isort)
+- **Line length**: 100 characters (configured in Ruff — see `pyproject.toml`)
 
 ### Automated Formatting
 
@@ -195,14 +192,11 @@ If you installed pre-commit hooks (recommended), your code will be automatically
 You can also run formatters manually:
 
 ```bash
-# Format code with Black
-black src/ tests/ examples/
-
-# Sort imports with isort
-isort src/ tests/ examples/
+# Format code + sort imports with Ruff
+ruff format src/ tests/ examples/
 
 # Check for linting issues
-flake8 src/
+ruff check src/ tests/ --fix
 
 # Type check
 mypy src/
@@ -264,13 +258,13 @@ selectools/
 │   ├── embeddings/             # Embedding providers
 │   ├── rag/                    # RAG: vector stores, chunking, loaders
 │   └── toolbox/                # 33 pre-built tools
-├── tests/                      # Test suite (5271 tests, 95% coverage)
+├── tests/                      # Test suite (5343 tests, 95% coverage)
 │   ├── agent/                  # Agent tests
 │   ├── rag/                    # RAG tests
 │   ├── tools/                  # Tool tests
 │   ├── core/                   # Core framework tests
 │   └── integration/            # E2E tests (require API keys)
-├── examples/                   # 94 numbered examples
+├── examples/                   # 95 numbered examples
 ├── docs/                       # Detailed documentation
 │   ├── QUICKSTART.md           # 5-minute getting started
 │   ├── ARCHITECTURE.md         # Architecture overview
@@ -371,7 +365,7 @@ We especially welcome contributions in these areas:
 - Add comparison guides (vs LangChain, LlamaIndex)
 
 ### 🧪 **Testing**
-- Increase test coverage (currently 5271 tests collected!)
+- Increase test coverage (currently 5343 tests collected!)
 - Add performance benchmarks
 - Improve E2E test stability with retry/rate-limit handling
 

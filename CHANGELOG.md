@@ -5,7 +5,29 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.22.0] - 2026-04-11 — Competitor-Informed Bug Fixes
+## [0.22.0] - 2026-04-13 — Competitor-Informed Bug Fixes + Loop Detection
+
+### Added
+
+- **Loop Detection** (PraisonAI gap, @beta): new `LoopDetector` facade over three
+  composable detectors — `RepeatDetector` (same tool+args N times), `StallDetector`
+  (same tool+result N times), `PingPongDetector` (cycle of length K repeats M times).
+  Opt-in via `AgentConfig.loop_detector`. Policies: `RAISE` (default) or
+  `INJECT_MESSAGE`. Observer callback `on_tool_loop_detected`. Structured-validation
+  retries are correctly excluded from loop counting. stdlib-only, no new deps.
+  See [`docs/modules/LOOP_DETECTION.md`](modules/LOOP_DETECTION.md) and
+  [`examples/95_loop_detection.py`](https://github.com/johnnichev/selectools/blob/main/examples/95_loop_detection.py).
+  28 new tests (22 unit + 6 integration).
+
+### Tooling
+
+- **Switched dev tooling from Black + isort + flake8 to [Ruff](https://docs.astral.sh/ruff/)**.
+  Configuration collapsed into `[tool.ruff]` in `pyproject.toml`, pre-commit reduced
+  from 3 hooks to 2 (`ruff check --fix` + `ruff-format`, pinned v0.15.8). Ignored
+  rule set mirrors the prior flake8 extend-ignore list. Cosmetic-only reformats
+  across ~75 files (primarily f-string joining). Full pytest suite passes unchanged.
+
+
 
 ### Methodology
 
@@ -35,8 +57,8 @@ selectools. Remaining needs-review candidates parked for v0.23.0.
 
 Each fix includes a TDD regression test in `tests/agent/test_regression.py`
 that empirically fails without the fix and passes after. Test suite grew
-from 5,015 to 5,064 with 104 new regression tests (57 round-1 + 8 round-2
-+ 39 round-3).
+from 5,015 to 5,092 with 132 new regression + feature tests (57 round-1
++ 8 round-2 + 39 round-3 + 28 loop detection).
 
 ### Fixed — High Severity (Shipping Blockers)
 

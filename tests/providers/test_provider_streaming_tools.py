@@ -271,9 +271,9 @@ class TestAstreamToolCallHandling:
         )
         result = await agent.arun([Message(role=Role.USER, content="hi")])
 
-        assert (
-            "ToolCall(" not in result.content
-        ), "ToolCall object was str()-ified into the response text"
+        assert "ToolCall(" not in result.content, (
+            "ToolCall object was str()-ified into the response text"
+        )
 
 
 # ============================================================================
@@ -496,9 +496,9 @@ class TestAnthropicStreamPassesTools:
         )
 
         call_kwargs = provider._client.messages.create.call_args
-        assert "tools" in call_kwargs[1] or (
-            call_kwargs[0] and "tools" in call_kwargs[0]
-        ), "tools not passed to Anthropic stream() API call"
+        assert "tools" in call_kwargs[1] or (call_kwargs[0] and "tools" in call_kwargs[0]), (
+            "tools not passed to Anthropic stream() API call"
+        )
 
     @pytest.mark.asyncio
     async def test_astream_includes_tools_in_request(self) -> None:
@@ -851,7 +851,9 @@ class TestGeminiStreamSafetyFilter:
 
         # Build minimal config mock
         config_mock = MagicMock()
-        with (MagicMock() as _mock_types,):
+        with (
+            MagicMock() as _mock_types,
+        ):
             pass
 
         # Use a direct mock of _format_contents and _map_tool_to_gemini to avoid SDK calls

@@ -198,7 +198,7 @@ def run_search_comparison(queries: List[str]) -> None:
                         else f"       Text: {text}"
                     )
 
-            print(f"\n   ⏱️  Search time: {elapsed_time*1000:.2f}ms")
+            print(f"\n   ⏱️  Search time: {elapsed_time * 1000:.2f}ms")
 
     # -------------------------------------------------------------------------
     # Performance comparison

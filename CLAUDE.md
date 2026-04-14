@@ -16,9 +16,9 @@ See subdirectory `CLAUDE.md` files for scoped rules: `tests/`, `src/selectools/`
 ```bash
 pytest tests/ -x -q                                    # All tests
 pytest tests/ -k "not e2e" -x -q                       # Skip E2E
-black src/ tests/ --line-length=100                     # Format
-isort src/ tests/ --profile=black --line-length=100     # Sort imports
-flake8 src/ && mypy src/                                # Lint + types
+ruff format src/ tests/                                 # Format (replaces Black + isort)
+ruff check src/ tests/ --fix                            # Lint + auto-fix (replaces flake8)
+mypy src/                                               # Type check
 bandit -r src/ -ll -q -c pyproject.toml                 # Security
 cp CHANGELOG.md docs/CHANGELOG.md && mkdocs build       # Docs
 ```
@@ -69,3 +69,4 @@ Apply to every public class/function in `__init__.py` exports:
 28. **ContextVars propagation in `run_in_executor`**: Direct `loop.run_in_executor(None, fn)` drops `contextvars.Context` (OTel spans, Langfuse traces lost). Use `run_in_executor_copyctx(loop, executor, fn)` from `_async_utils.py`.
 29. **Malformed tool-call JSON recovery**: Provider `json.loads()` failures MUST surface via `ToolCall.parse_error`, not silent `return {}`. Use shared `_parse_tool_args()` helper. Tool executor checks `parse_error` before tool lookup.
 30. **Structured retry budget**: `RetryConfig.max_retries` controls structured-validation retries INDEPENDENTLY of `max_iterations`. Outer loop uses `max_iterations + ctx.structured_retries` so validation failures don't eat the tool budget.
+31. **Loop detection runs AFTER tool execution**: `_check_loop_detection` / `_acheck_loop_detection` runs after the tool-execution block but before the terminal-tool and cancellation checks, so a terminal repetitive tool still surfaces as a loop. Observer callback is `on_tool_loop_detected` (NOT `on_loop_detected` — that name is taken by graph-level stall detection). Agent tracks tool results in `_RunContext.all_tool_results`, populated alongside every `all_tool_calls.append()`.

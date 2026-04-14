@@ -47,9 +47,7 @@ class SQLiteVectorStore(VectorStore):
 
     embedder: "EmbeddingProvider"
 
-    def __init__(
-        self, embedder: "EmbeddingProvider", db_path: str = "vector_store.db"
-    ) -> None:  # noqa: F821
+    def __init__(self, embedder: "EmbeddingProvider", db_path: str = "vector_store.db") -> None:  # noqa: F821
         """
         Initialize SQLite vector store.
 

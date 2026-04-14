@@ -408,9 +408,9 @@ class _OpenAICompatibleBase(ABC):
                                 if tc_delta.function.name:
                                     tool_call_deltas[index]["name"] = tc_delta.function.name
                                 if tc_delta.function.arguments:
-                                    tool_call_deltas[index][
-                                        "arguments"
-                                    ] += tc_delta.function.arguments
+                                    tool_call_deltas[index]["arguments"] += (
+                                        tc_delta.function.arguments
+                                    )
 
                     # Check for finish reason to emit completed tool calls
                     finish_reason = chunk.choices[0].finish_reason

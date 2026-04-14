@@ -50,7 +50,9 @@ class InMemoryVectorStore(VectorStore):
     embedder: "EmbeddingProvider"
 
     def __init__(
-        self, embedder: "EmbeddingProvider", max_documents: Optional[int] = None  # noqa: F821
+        self,
+        embedder: "EmbeddingProvider",
+        max_documents: Optional[int] = None,  # noqa: F821
     ):
         """
         Initialize in-memory vector store.
@@ -108,8 +110,12 @@ class InMemoryVectorStore(VectorStore):
             new_ids = [f"doc_{self._id_counter + i}" for i in range(len(documents))]
             self._id_counter += len(documents)
 
-            # Add to storage
-            self.documents.extend(documents)
+            # Add to storage — BUG-36 / Haystack PR #10702: store shallow
+            # copies so external mutation of caller's Document objects does
+            # not corrupt the stored index while the embedding matrix is stale.
+            import dataclasses
+
+            self.documents.extend(dataclasses.replace(d) for d in documents)
             self.ids.extend(new_ids)
 
             # Update embeddings matrix

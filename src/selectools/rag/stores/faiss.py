@@ -22,8 +22,7 @@ def _import_faiss() -> Any:
         import faiss
     except ImportError as e:
         raise ImportError(
-            "faiss-cpu package required for FAISS vector store. "
-            "Install with: pip install faiss-cpu"
+            "faiss-cpu package required for FAISS vector store. Install with: pip install faiss-cpu"
         ) from e
     return faiss
 
@@ -34,7 +33,7 @@ def _import_numpy() -> Any:
         import numpy as np
     except ImportError as e:
         raise ImportError(
-            "numpy package required for FAISS vector store. " "Install with: pip install numpy"
+            "numpy package required for FAISS vector store. Install with: pip install numpy"
         ) from e
     return np
 

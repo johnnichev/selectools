@@ -59,7 +59,7 @@ def _donut_svg(pass_n: int, fail_n: int, error_n: int, skip_n: int) -> str:
         )
         paths.append(f'<path d="{d}" fill="{color}" opacity="0.9"/>')
         start_angle = end_angle
-    return f'<svg viewBox="0 0 120 120" width="120" height="120">' f'{"".join(paths)}</svg>'
+    return f'<svg viewBox="0 0 120 120" width="120" height="120">{"".join(paths)}</svg>'
 
 
 def _histogram_svg(latencies: List[float]) -> str:
@@ -180,8 +180,7 @@ def render_html_report(  # noqa: C901
             detail_parts.append(f"<strong>Failures:</strong><ul class='failures'>{items}</ul>")
         if cr.error:
             detail_parts.append(
-                f"<strong>Error:</strong> <span class='error-msg'>"
-                f"{html.escape(cr.error)}</span>"
+                f"<strong>Error:</strong> <span class='error-msg'>{html.escape(cr.error)}</span>"
             )
 
         detail_html = "<br>".join(detail_parts)
@@ -319,27 +318,27 @@ footer{{margin-top:1.5rem;padding-top:1rem;border-top:1px solid #334155;font-siz
 <body>
 
 <h1>Eval Report: {html.escape(report.metadata.suite_name)}</h1>
-<div class="subtitle">{report.metadata.model or 'unknown model'} &middot; {report.metadata.provider or 'unknown provider'} &middot; {report.metadata.total_cases} cases &middot; {report.metadata.duration_ms:.0f}ms</div>
+<div class="subtitle">{report.metadata.model or "unknown model"} &middot; {report.metadata.provider or "unknown provider"} &middot; {report.metadata.total_cases} cases &middot; {report.metadata.duration_ms:.0f}ms</div>
 
 <div class="top-grid">
   <div>
     <div class="summary">
       <div class="stat"><div class="stat-label">Accuracy</div><div class="stat-value {acc_class}">{report.accuracy:.1%}</div></div>
       <div class="stat"><div class="stat-label">Pass</div><div class="stat-value good">{report.pass_count}</div></div>
-      <div class="stat"><div class="stat-label">Fail</div><div class="stat-value {'bad' if report.fail_count else ''}">{report.fail_count}</div></div>
+      <div class="stat"><div class="stat-label">Fail</div><div class="stat-value {"bad" if report.fail_count else ""}">{report.fail_count}</div></div>
       <div class="stat"><div class="stat-label">Latency p50</div><div class="stat-value">{report.latency_p50:.0f}ms</div></div>
       <div class="stat"><div class="stat-label">Latency p95</div><div class="stat-value">{report.latency_p95:.0f}ms</div></div>
       <div class="stat"><div class="stat-label">Total Cost</div><div class="stat-value">${report.total_cost:.4f}</div></div>
       <div class="stat"><div class="stat-label">Cost/Case</div><div class="stat-value">${report.cost_per_case:.6f}</div></div>
       <div class="stat"><div class="stat-label">Tokens</div><div class="stat-value">{report.total_tokens:,}</div></div>
-      <div class="stat"><div class="stat-label">Errors</div><div class="stat-value {'warn' if report.error_count else ''}">{report.error_count}</div></div>
+      <div class="stat"><div class="stat-label">Errors</div><div class="stat-value {"warn" if report.error_count else ""}">{report.error_count}</div></div>
     </div>
   </div>
   <div class="charts">
     <div class="charts-row">
       {donut}
       <div>{histogram}</div>
-      {f'<div>{trend_chart}</div>' if trend_chart else ''}
+      {f"<div>{trend_chart}</div>" if trend_chart else ""}
     </div>
     <div class="legend">
       <span class="legend-item"><span class="legend-dot" style="background:#4ade80"></span>Pass ({report.pass_count})</span>

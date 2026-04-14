@@ -172,7 +172,7 @@ class JinaReranker(Reranker):
             self._requests = requests
         except ImportError as e:
             raise ImportError(
-                "requests package required for JinaReranker. " "Install with: pip install requests"
+                "requests package required for JinaReranker. Install with: pip install requests"
             ) from e
 
         if api_key is None:

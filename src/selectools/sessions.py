@@ -136,8 +136,7 @@ class JsonFileSessionStore:
         safe_id = os.path.basename(key)
         if safe_id != key or ".." in key or "\x00" in key or "/" in key:
             raise ValueError(
-                f"Invalid session_id/namespace: session_id={session_id!r}, "
-                f"namespace={namespace!r}"
+                f"Invalid session_id/namespace: session_id={session_id!r}, namespace={namespace!r}"
             )
         return os.path.join(self._directory, f"{safe_id}.json")
 

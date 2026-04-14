@@ -61,7 +61,7 @@ print(f"\n  Log file: {log_files[0]}")
 with open(os.path.join(audit_dir, log_files[0])) as f:
     for i, line in enumerate(f):
         entry = json.loads(line)
-        print(f"  [{i+1}] {entry['event']:20s} run={entry.get('run_id', '')[:8]}")
+        print(f"  [{i + 1}] {entry['event']:20s} run={entry.get('run_id', '')[:8]}")
         if "tool_name" in entry:
             print(f"      tool={entry['tool_name']}")
         if "tool_args" in entry:

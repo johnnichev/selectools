@@ -27,14 +27,14 @@ class ToolValidationError(SelectoolsError):
         self.issue = issue
         self.suggestion = suggestion
 
-        message = f"\n{'='*60}\n"
+        message = f"\n{'=' * 60}\n"
         message += f"❌ Tool Validation Error: '{tool_name}'\n"
-        message += f"{'='*60}\n\n"
+        message += f"{'=' * 60}\n\n"
         message += f"Parameter: {param_name}\n"
         message += f"Issue: {issue}\n"
         if suggestion:
             message += f"\n💡 Suggestion: {suggestion}\n"
-        message += f"\n{'='*60}\n"
+        message += f"\n{'=' * 60}\n"
 
         super().__init__(message)
 
@@ -47,16 +47,16 @@ class ToolExecutionError(SelectoolsError):
         self.error = error
         self.params = params
 
-        message = f"\n{'='*60}\n"
+        message = f"\n{'=' * 60}\n"
         message += f"❌ Tool Execution Failed: '{tool_name}'\n"
-        message += f"{'='*60}\n\n"
+        message += f"{'=' * 60}\n\n"
         message += f"Error: {type(error).__name__}: {str(error)}\n"
         message += f"Parameters: {params}\n"
         message += f"\n💡 Check that:\n"
         message += f"  - All required parameters are provided\n"
         message += f"  - Parameter types match the tool's schema\n"
         message += f"  - The tool function is correctly implemented\n"
-        message += f"\n{'='*60}\n"
+        message += f"\n{'=' * 60}\n"
 
         super().__init__(message)
 
@@ -69,9 +69,9 @@ class ProviderConfigurationError(SelectoolsError):
         self.missing_config = missing_config
         self.env_var = env_var
 
-        message = f"\n{'='*60}\n"
+        message = f"\n{'=' * 60}\n"
         message += f"❌ Provider Configuration Error: '{provider_name}'\n"
-        message += f"{'='*60}\n\n"
+        message += f"{'=' * 60}\n\n"
         message += f"Missing: {missing_config}\n"
         if env_var:
             message += f"\n💡 How to fix:\n"
@@ -79,7 +79,7 @@ class ProviderConfigurationError(SelectoolsError):
             message += f"     export {env_var}='your-api-key'\n"
             message += f"  2. Or pass it directly:\n"
             message += f"     provider = {provider_name}Provider(api_key='your-api-key')\n"
-        message += f"\n{'='*60}\n"
+        message += f"\n{'=' * 60}\n"
 
         super().__init__(message)
 
@@ -92,9 +92,9 @@ class MemoryLimitExceededError(SelectoolsError):
         self.limit = limit
         self.limit_type = limit_type
 
-        message = f"\n{'='*60}\n"
+        message = f"\n{'=' * 60}\n"
         message += f"⚠️  Memory Limit Exceeded\n"
-        message += f"{'='*60}\n\n"
+        message += f"{'=' * 60}\n\n"
         message += f"Limit Type: {limit_type}\n"
         message += f"Current: {current}\n"
         message += f"Limit: {limit}\n"
@@ -106,7 +106,7 @@ class MemoryLimitExceededError(SelectoolsError):
             message += f"  - Increase max_tokens: ConversationMemory(max_tokens={limit * 2})\n"
             message += f"  - Use shorter messages\n"
             message += f"  - Enable conversation summarization (coming in v0.6.0)\n"
-        message += f"\n{'='*60}\n"
+        message += f"\n{'=' * 60}\n"
 
         super().__init__(message)
 
@@ -126,16 +126,16 @@ class GraphExecutionError(SelectoolsError):
         self.error = error
         self.step = step
 
-        message = f"\n{'='*60}\n"
+        message = f"\n{'=' * 60}\n"
         message += f"❌ Graph Execution Failed: '{graph_name}'\n"
-        message += f"{'='*60}\n\n"
+        message += f"{'=' * 60}\n\n"
         message += f"Node: {node_name} (step {step})\n"
         message += f"Error: {type(error).__name__}: {str(error)}\n"
         message += f"\n💡 Check that:\n"
         message += f"  - The node '{node_name}' is correctly configured\n"
         message += f"  - All required inputs are available at step {step}\n"
         message += f"  - The node's agent or function is working correctly\n"
-        message += f"\n{'='*60}\n"
+        message += f"\n{'=' * 60}\n"
 
         super().__init__(message)
 

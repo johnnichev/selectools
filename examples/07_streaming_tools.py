@@ -35,16 +35,16 @@ def process_dataset(size: int) -> Generator[str, None, None]:
 
         # Yield progress update
         if i == 0:
-            yield f"[Item {i+1}/{size}] Processing first item\n"
+            yield f"[Item {i + 1}/{size}] Processing first item\n"
         elif i == size - 1:
-            yield f"[Item {i+1}/{size}] Processing final item\n"
+            yield f"[Item {i + 1}/{size}] Processing final item\n"
         else:
-            yield f"[Item {i+1}/{size}] Processing...\n"
+            yield f"[Item {i + 1}/{size}] Processing...\n"
 
         # Yield milestone updates
         if (i + 1) % 5 == 0:
             percent = ((i + 1) / size) * 100
-            yield f"\n✅ Milestone: {i+1} items processed ({percent:.0f}% complete)\n\n"
+            yield f"\n✅ Milestone: {i + 1} items processed ({percent:.0f}% complete)\n\n"
 
     yield f"\n🎉 Successfully processed all {size} items!\n"
 
@@ -117,9 +117,9 @@ async def fetch_data_async(url: str, chunks: int = 5) -> AsyncGenerator[str, Non
 
         # Yield chunk
         chunk_size = 1024 * (i + 1)
-        yield f"Chunk {i+1}/{chunks}: Received {chunk_size} bytes\n"
+        yield f"Chunk {i + 1}/{chunks}: Received {chunk_size} bytes\n"
 
-    yield f"\n✅ Download complete! Total: {sum(1024 * (i+1) for i in range(chunks))} bytes\n"
+    yield f"\n✅ Download complete! Total: {sum(1024 * (i + 1) for i in range(chunks))} bytes\n"
 
 
 # === Demo functions ===
@@ -264,15 +264,11 @@ def demo_toolbox_streaming(tmp_path: Path) -> None:
     # Create sample files
     test_file = tmp_path / "sample.txt"
     test_file.write_text(
-        "This is line 1\n"
-        "This is line 2\n"
-        "This is line 3\n"
-        "This is line 4\n"
-        "This is line 5\n"
+        "This is line 1\nThis is line 2\nThis is line 3\nThis is line 4\nThis is line 5\n"
     )
 
     test_csv = tmp_path / "sample.csv"
-    test_csv.write_text("name,age,city\n" "Alice,30,NYC\n" "Bob,25,SF\n" "Charlie,35,LA\n")
+    test_csv.write_text("name,age,city\nAlice,30,NYC\nBob,25,SF\nCharlie,35,LA\n")
 
     from selectools.toolbox.data_tools import process_csv_stream
     from selectools.toolbox.file_tools import read_file_stream
