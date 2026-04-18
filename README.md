@@ -30,6 +30,29 @@ result = AgentGraph.chain(planner, writer, reviewer).run("Write a blog post")
 # selectools serve agent.yaml
 ```
 
+## What's New in v0.23
+
+### v0.23.0 — Supabase Sessions + Builder RAG
+
+Two user-facing features plus a post-ship bug-hunt sweep that pinned 8 code-generator fixes in the visual builder.
+
+- **`SupabaseSessionStore`** — 4th `SessionStore` backend alongside JSON, SQLite, and Redis. Postgres-backed via Supabase PostgREST, with idempotent upserts, namespace isolation, and the same validation guards as `RedisSessionStore`. Optional dep: `pip install selectools[supabase]`. Demo: [`examples/96_supabase_session_store.py`](https://github.com/johnnichev/selectools/blob/main/examples/96_supabase_session_store.py).
+
+- **Visual builder: first-class RAG + session nodes** — drag `Retriever (RAG)` onto the canvas and pick any of 7 vector stores (memory, SQLite, Chroma, Pinecone, FAISS, Qdrant, pgvector), toggle Hybrid (BM25 + vector + RRF) and cross-encoder Rerank. Drag `Session Store` as a resource node and wire it into an agent via the new Session Store dropdown. Two new presets: **Hybrid RAG** and **Multi-Tenant RAG**. Python + YAML code generators emit real, runnable code.
+
+```python
+from supabase import create_client
+from selectools import SupabaseSessionStore, Agent, AgentConfig
+
+store = SupabaseSessionStore(client=create_client(URL, KEY))
+agent = Agent(
+    tools=[...],
+    config=AgentConfig(session_store=store, session_id="u-1", max_iterations=5),
+)
+```
+
+See `CHANGELOG.md` for the full entry including the 8 builder code-gen fixes.
+
 ## What's New in v0.22
 
 ### v0.22.0 — Competitor-Informed Bug Fixes
@@ -107,7 +130,7 @@ The first AI agent framework to ship a visual graph builder in a single `pip ins
 
 **[Try the builder in your browser →](https://selectools.dev/builder/)** — no install required.
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb) [![Examples Gallery](https://img.shields.io/badge/examples-94_scripts-06b6d4)](https://selectools.dev/examples/)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb) [![Examples Gallery](https://img.shields.io/badge/examples-96_scripts-06b6d4)](https://selectools.dev/examples/)
 
 ```bash
 pip install selectools
@@ -164,7 +187,7 @@ Path("trace.html").write_text(trace_to_html(result.trace))
 - **Trace HTML viewer** — `trace_to_html(trace)` renders a standalone waterfall timeline
 - **Deprecation policy** — 2-minor-version window, programmatic introspection via `.__stability__`
 - **Security audit** — all 41 `# nosec` annotations reviewed and published in `docs/SECURITY.md`
-- **Quality infrastructure** — property-based tests (Hypothesis), thread-safety smoke suite, 5 new production simulations (5343 tests total)
+- **Quality infrastructure** — property-based tests (Hypothesis), thread-safety smoke suite, 5 new production simulations (5332 tests total)
 
 ### v0.19.1 — Advanced Agent Patterns
 
@@ -517,10 +540,10 @@ report.to_html("report.html")
 - **Conversation Branching**: `ConversationMemory.branch()` and `SessionStore.branch()` for A/B exploration and checkpointing
 - **Multi-Agent Orchestration**: `AgentGraph` with routing, parallel execution, HITL, checkpointing; `SupervisorAgent` with 4 strategies (plan_and_execute, round_robin, dynamic, magentic)
 - **Composable Pipelines**: `Pipeline` + `@step` + `|` operator + `parallel()` + `branch()` — chain agents, tools, and transforms
-- **76 Examples**: Multi-agent graphs, RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions, entity memory, knowledge graph, eval framework, advanced agent patterns, stability markers, HTML trace viewer, and more
+- **96 Examples**: Multi-agent graphs, RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions (incl. Supabase), entity memory, knowledge graph, eval framework, advanced agent patterns, stability markers, HTML trace viewer, and more
 - **Built-in Eval Framework**: 50 evaluators (30 deterministic + 21 LLM-as-judge), A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing
 - **AgentObserver Protocol**: 45 lifecycle events with `run_id` correlation, `LoggingObserver`, `SimpleStepObserver`, OTel export
-- **5343 Tests**: Unit, integration, regression, and E2E with real API calls
+- **5332 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 
@@ -1144,7 +1167,7 @@ pytest tests/ -x -q          # All tests
 pytest tests/ -k "not e2e"   # Skip E2E (no API keys needed)
 ```
 
-5343 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, orchestration, pipelines, agent patterns, stability markers, trace viewer, and E2E integration with real API calls.
+5332 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, orchestration, pipelines, agent patterns, stability markers, trace viewer, and E2E integration with real API calls.
 
 ## License
 
