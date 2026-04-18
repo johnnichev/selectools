@@ -84,6 +84,9 @@ mcp = [
 postgres = [
     "psycopg2-binary>=2.9.0",
 ]
+supabase = [
+    "supabase>=2.0.0",
+]
 serve = [
     "pyyaml>=6.0.0",
     "starlette>=0.27.0",

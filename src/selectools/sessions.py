@@ -585,10 +585,202 @@ class RedisSessionStore:
         self.save(new_id, memory)
 
 
+# ======================================================================
+# Supabase backend
+# ======================================================================
+
+
+def _iso_to_ts(value: Any) -> float:
+    """Convert an ISO-8601 string (or numeric timestamp) to a Unix float.
+
+    Handles the ``Z`` suffix and naive datetimes (treated as UTC).
+    Returns ``0.0`` on any parse failure rather than raising.
+    """
+    from datetime import datetime, timezone
+
+    if value is None:
+        return 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.timestamp()
+    except ValueError:
+        return 0.0
+
+
+@stable
+class SupabaseSessionStore:
+    """Postgres-backed session store via Supabase PostgREST.
+
+    Each session is stored as a single row keyed by ``session_id`` (or
+    ``namespace:session_id`` when a namespace is supplied).  The
+    ``memory_json`` column holds the full ``ConversationMemory`` dict.
+    Saves use ``upsert(on_conflict='session_id')`` so repeated saves are
+    idempotent.
+
+    The ``supabase`` package is an optional dependency.  Install it with::
+
+        pip install selectools[supabase]
+
+    You must create and manage the Supabase client yourself and pass it
+    in.  This class never constructs a client internally.
+
+    Args:
+        client: An initialised ``supabase.Client`` instance.  Typed as
+            ``Any`` to avoid a hard import at module load time.
+        table_name: Name of the Postgres table to use.  Defaults to
+            ``"selectools_sessions"``.
+
+    Required table DDL (run once in your Supabase project)::
+
+        create table selectools_sessions (
+            session_id   text        primary key,
+            memory_json  jsonb       not null,
+            message_count integer    not null default 0,
+            created_at   timestamptz not null default now(),
+            updated_at   timestamptz not null default now()
+        );
+
+    Lifted from Sheriff (johnnichev/sheriff,
+    ``api/src/cashcop/core/session_store.py``) and aligned with the
+    upstream backends: validation guards (null bytes, length cap),
+    namespace prefix support, ``@stable`` decorator.
+    """
+
+    def __init__(
+        self,
+        client: Any,
+        table_name: str = "selectools_sessions",
+    ) -> None:
+        try:
+            import supabase as supabase_lib  # type: ignore[import-untyped]  # noqa: F401
+        except ImportError as exc:
+            raise ImportError(
+                "SupabaseSessionStore requires the 'supabase' package. "
+                "Install it with: pip install selectools[supabase]"
+            ) from exc
+
+        self._client = client
+        self._table = table_name
+
+    # -- validation helpers ------------------------------------------------
+
+    @staticmethod
+    def _validate_session_id(session_id: str) -> None:
+        """Reject session IDs that could cause key collisions or other problems."""
+        if not session_id:
+            raise ValueError("session_id must not be empty")
+        if "\x00" in session_id:
+            raise ValueError(f"session_id must not contain null bytes: {session_id!r}")
+        if len(session_id) > 512:
+            raise ValueError(
+                f"session_id too long ({len(session_id)} chars, max 512): {session_id!r}"
+            )
+
+    @staticmethod
+    def _validate_namespace(namespace: Optional[str]) -> None:
+        if namespace is None:
+            return
+        if not namespace:
+            raise ValueError("namespace must not be empty when provided")
+        if "\x00" in namespace:
+            raise ValueError(f"namespace must not contain null bytes: {namespace!r}")
+        if len(namespace) > 512:
+            raise ValueError(f"namespace too long ({len(namespace)} chars, max 512): {namespace!r}")
+
+    def _key(self, session_id: str, namespace: Optional[str] = None) -> str:
+        self._validate_session_id(session_id)
+        self._validate_namespace(namespace)
+        return _make_key(session_id, namespace)
+
+    # -- public API --------------------------------------------------------
+
+    def save(
+        self,
+        session_id: str,
+        memory: ConversationMemory,
+        namespace: Optional[str] = None,
+    ) -> None:
+        """Persist *memory* under *session_id* (upsert on conflict)."""
+        from datetime import datetime, timezone
+
+        key = self._key(session_id, namespace)
+        payload = {
+            "session_id": key,
+            "memory_json": memory.to_dict(),
+            "message_count": len(memory),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        self._client.table(self._table).upsert(payload, on_conflict="session_id").execute()
+
+    def load(
+        self, session_id: str, namespace: Optional[str] = None
+    ) -> Optional[ConversationMemory]:
+        """Return the stored ``ConversationMemory``, or ``None`` if absent."""
+        key = self._key(session_id, namespace)
+        response = (
+            self._client.table(self._table)
+            .select("memory_json")
+            .eq("session_id", key)
+            .limit(1)
+            .execute()
+        )
+        if not response.data:
+            return None
+        return ConversationMemory.from_dict(response.data[0]["memory_json"])
+
+    def list(self) -> List[SessionMetadata]:
+        """Return metadata for every row in the table."""
+        response = (
+            self._client.table(self._table)
+            .select("session_id,message_count,created_at,updated_at")
+            .execute()
+        )
+        rows = response.data or []
+        return [
+            SessionMetadata(
+                session_id=row["session_id"],
+                message_count=int(row.get("message_count") or 0),
+                created_at=_iso_to_ts(row.get("created_at")),
+                updated_at=_iso_to_ts(row.get("updated_at")),
+            )
+            for row in rows
+        ]
+
+    def delete(self, session_id: str, namespace: Optional[str] = None) -> bool:
+        """Delete *session_id*.  Returns ``True`` if the row existed."""
+        key = self._key(session_id, namespace)
+        response = self._client.table(self._table).delete().eq("session_id", key).execute()
+        return bool(response.data)
+
+    def exists(self, session_id: str, namespace: Optional[str] = None) -> bool:
+        """Return ``True`` if *session_id* has a stored row."""
+        key = self._key(session_id, namespace)
+        response = (
+            self._client.table(self._table)
+            .select("session_id")
+            .eq("session_id", key)
+            .limit(1)
+            .execute()
+        )
+        return bool(response.data)
+
+    def branch(self, source_id: str, new_id: str) -> None:
+        """Copy session *source_id* to a new session *new_id*."""
+        memory = self.load(source_id)
+        if memory is None:
+            raise ValueError(f"Session {source_id!r} not found")
+        self.save(new_id, memory)
+
+
 __all__ = [
     "SessionStore",
     "SessionMetadata",
     "JsonFileSessionStore",
     "SQLiteSessionStore",
     "RedisSessionStore",
+    "SupabaseSessionStore",
 ]
