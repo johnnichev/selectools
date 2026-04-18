@@ -42,6 +42,8 @@
         <div class="tmpl-item tmpl-indent" onclick="loadTemplate('simple_chatbot')">Simple Chatbot</div>
         <div class="tmpl-item tmpl-indent" onclick="loadTemplate('researcher_writer')">Researcher + Writer</div>
         <div class="tmpl-item tmpl-indent" onclick="loadTemplate('rag_pipeline')">RAG Pipeline</div>
+        <div class="tmpl-item tmpl-indent" onclick="loadTemplate('hybrid_rag')">Hybrid RAG (BM25 + vector + rerank)</div>
+        <div class="tmpl-item tmpl-indent" onclick="loadTemplate('multi_tenant_rag')">Multi-Tenant RAG (session-scoped)</div>
         <div class="tmpl-item tmpl-indent" onclick="loadTemplate('reviewer_loop')">Reviewer Loop</div>
         <div class="tmpl-item tmpl-indent" onclick="loadTemplate('hitl_approval')">HITL Approval</div>
         <div class="tmpl-item tmpl-indent" onclick="loadTemplate('multi_model_panel')">Multi-Model Panel</div>
@@ -112,6 +114,14 @@
     <div class="palette-item" draggable="true" data-type="agent_tool"
          ondragstart="palDragStart(event,'agent_tool')">
       <div class="dot" style="background:#a78bfa"></div> Agent Tool
+    </div>
+    <div class="palette-item" draggable="true" data-type="retriever"
+         ondragstart="palDragStart(event,'retriever')">
+      <div class="dot" style="background:#06b6d4"></div> Retriever (RAG)
+    </div>
+    <div class="palette-item" draggable="true" data-type="session"
+         ondragstart="palDragStart(event,'session')">
+      <div class="dot" style="background:#8b5cf6"></div> Session Store
     </div>
 
     <div class="section-title" style="margin-top:10px">Tips</div>

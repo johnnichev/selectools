@@ -47,7 +47,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
 
 **Added in:** v0.16.0
 **File:** `src/selectools/sessions.py`
-**Classes:** `SessionStore`, `JsonFileSessionStore`, `SQLiteSessionStore`, `RedisSessionStore`
+**Classes:** `SessionStore`, `JsonFileSessionStore`, `SQLiteSessionStore`, `RedisSessionStore`, `SupabaseSessionStore`
 
 ## Table of Contents
 
@@ -255,6 +255,56 @@ store = RedisSessionStore(
 pip install selectools[redis]  # Includes redis-py
 ```
 
+### 4. SupabaseSessionStore
+
+**Best for:** Postgres-backed production deployments on Supabase (managed RLS, PostgREST access)
+
+**Since:** v0.23.0
+
+```python
+from supabase import create_client
+from selectools.sessions import SupabaseSessionStore
+
+client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+store = SupabaseSessionStore(
+    client=client,
+    table_name="selectools_sessions",  # default
+)
+```
+
+**Required table DDL** (run once in your Supabase project):
+
+```sql
+create table if not exists public.selectools_sessions (
+    session_id    text        primary key,
+    memory_json   jsonb       not null,
+    message_count integer     not null default 0,
+    created_at    timestamptz not null default now(),
+    updated_at    timestamptz not null default now()
+);
+alter table public.selectools_sessions enable row level security;
+```
+
+The service-role key bypasses RLS — same pattern as the other backends. Enabling
+RLS with no policies locks anon access out.
+
+**Features:**
+
+- Postgres persistence with JSONB payloads
+- Idempotent saves via `upsert(on_conflict="session_id")`
+- Namespace prefix support and the same `session_id` / `namespace` validation
+  guards as `RedisSessionStore` (null bytes, 512-char cap)
+- Client ownership stays with the caller — you pass in an already-constructed
+  `supabase.Client`
+
+**Installation:**
+
+```bash
+pip install selectools[supabase]
+```
+
+**Example:** [`examples/96_supabase_session_store.py`](https://github.com/johnnichev/selectools/blob/main/examples/96_supabase_session_store.py) — runs offline against an in-process fake client; swap in `supabase.create_client(...)` for production.
+
 ---
 
 ## TTL-Based Expiry
@@ -406,7 +456,9 @@ flowchart TD
     A{"Prototyping?"} -->|Yes| B["JsonFileSessionStore"]
     A -->|No| C{"Single process, local?"}
     C -->|Yes| D["SQLiteSessionStore"]
-    C -->|No| E["RedisSessionStore"]
+    C -->|No| E{"On Supabase / Postgres?"}
+    E -->|Yes| F["SupabaseSessionStore"]
+    E -->|No| G["RedisSessionStore"]
 ```
 
 ---
@@ -535,9 +587,10 @@ def test_agent_with_sessions():
 ## Namespace Isolation
 
 All session stores (`JsonFileSessionStore`, `SQLiteSessionStore`,
-`RedisSessionStore`) accept an optional `namespace` parameter on `save`,
-`load`, `delete`, and `exists`. Use it to isolate session data when
-multiple agents share the same `session_id`.
+`RedisSessionStore`, `SupabaseSessionStore`) accept an optional
+`namespace` parameter on `save`, `load`, `delete`, and `exists`. Use it
+to isolate session data when multiple agents share the same
+`session_id`.
 
 ```python
 from selectools.sessions import JsonFileSessionStore
@@ -566,6 +619,7 @@ saved before this feature.
 | `JsonFileSessionStore(directory, ttl_seconds)` | File-based backend, one JSON file per session |
 | `SQLiteSessionStore(db_path, ttl_seconds)` | SQLite-backed backend, single database file |
 | `RedisSessionStore(url, prefix, ttl_seconds)` | Redis-backed backend for distributed deployments |
+| `SupabaseSessionStore(client, table_name)` | Postgres-backed backend via Supabase PostgREST |
 
 | AgentConfig Field | Type | Description |
 |---|---|---|

@@ -129,12 +129,14 @@ function redoAction() {
 
 // ─── Factories ────────────────────────────────────────────────────────────
 function mkNode(type, x, y) {
-  const id = type === 'start'    ? '__start__'
-           : type === 'end'      ? 'end_' + (seq++)
-           : type === 'loop'     ? 'loop_' + (seq++)
-           : type === 'subgraph' ? 'sub_' + (seq++)
-           : type === 'note'     ? 'note_' + (seq++)
-           : type === 'hitl'     ? 'hitl_' + (seq++)
+  const id = type === 'start'     ? '__start__'
+           : type === 'end'       ? 'end_' + (seq++)
+           : type === 'loop'      ? 'loop_' + (seq++)
+           : type === 'subgraph'  ? 'sub_' + (seq++)
+           : type === 'note'      ? 'note_' + (seq++)
+           : type === 'hitl'      ? 'hitl_' + (seq++)
+           : type === 'retriever' ? 'ret_' + (seq++)
+           : type === 'session'   ? 'sess_' + (seq++)
            : 'agent_' + (seq++);
   const base = { id, type, x, y };
   if (type === 'start') return { ...base, name: 'START' };
@@ -144,7 +146,30 @@ function mkNode(type, x, y) {
   if (type === 'note')  return { ...base, name: 'Note', text: '', color: 'yellow' };
   if (type === 'hitl')  return { ...base, name: 'Human Input', options: 'approve, reject', timeout_label: 'timeout' };
   if (type === 'agent_tool') return { ...base, label: 'Nested Agent', tool_name: 'nested_agent', tool_description: '', tool_input_param: 'query', tool_target_node: '', tool_max_tokens: 500 };
-  return { ...base, name: 'Agent ' + seq, provider: 'openai', model: 'gpt-4o-mini', system_prompt: '', tools: '', frozen: false, eval_assertion: '' };
+  if (type === 'retriever') return {
+    ...base, name: 'Retriever ' + seq,
+    store_type: 'memory',           // memory | sqlite | chroma | pinecone | faiss | qdrant | pgvector
+    collection_name: 'docs',
+    embedding_provider: 'openai',   // openai | gemini
+    embedding_model: 'text-embedding-3-small',
+    top_k: 5,
+    score_threshold: 0.0,
+    hybrid: false,                  // true → adds BM25 + RRF
+    bm25_weight: 0.5,
+    rerank: false,                  // true → cross-encoder reranker
+    rerank_model: 'cross-encoder/ms-marco-MiniLM-L-6-v2',
+    connection_string: '',          // pinecone/qdrant URL, pgvector DSN, etc.
+  };
+  if (type === 'session') return {
+    ...base, name: 'Session ' + seq,
+    store_type: 'json',             // json | sqlite | redis | supabase
+    session_id: 'demo-session',
+    namespace: '',
+    ttl_seconds: '',
+    connection_string: '',          // redis:// URL, supabase client var, etc.
+    table_name: 'selectools_sessions',
+  };
+  return { ...base, name: 'Agent ' + seq, provider: 'openai', model: 'gpt-4o-mini', system_prompt: '', tools: '', frozen: false, eval_assertion: '', session_ref: '' };
 }
 
 function mkEdge(from, to) {
@@ -440,6 +465,34 @@ function renderNodes() {
           class: 'note-resize-handle', style: `fill:${nc}88` }, g);
         rh.addEventListener('mousedown', ev => startNoteResize(ev, rhNid));
       }
+    } else if (n.type === 'retriever') {
+      Stext('⛁ Retriever', NW / 2, 14, {
+        class: 'node-sublabel', 'text-anchor': 'middle', 'dominant-baseline': 'middle',
+        style: 'fill:#06b6d4;font-size:9px;font-weight:700'
+      }, g);
+      Stext(n.name, NW / 2, 32, {
+        class: 'node-label', 'text-anchor': 'middle', 'dominant-baseline': 'middle'
+      }, g);
+      const retSub = (n.hybrid ? 'hybrid · ' : '') + n.store_type + ' · k=' + n.top_k + (n.rerank ? ' · rerank' : '');
+      Stext(retSub, NW / 2, 50, {
+        class: 'node-sublabel', 'text-anchor': 'middle', 'dominant-baseline': 'middle',
+        style: 'fill:#06b6d4;font-size:9px'
+      }, g);
+
+    } else if (n.type === 'session') {
+      Stext('◨ Session Store', NW / 2, 14, {
+        class: 'node-sublabel', 'text-anchor': 'middle', 'dominant-baseline': 'middle',
+        style: 'fill:#8b5cf6;font-size:9px;font-weight:700'
+      }, g);
+      Stext(n.name, NW / 2, 32, {
+        class: 'node-label', 'text-anchor': 'middle', 'dominant-baseline': 'middle'
+      }, g);
+      const sessSub = n.store_type + (n.namespace ? ' · ns=' + n.namespace : '');
+      Stext(sessSub, NW / 2, 50, {
+        class: 'node-sublabel', 'text-anchor': 'middle', 'dominant-baseline': 'middle',
+        style: 'fill:#8b5cf6;font-size:9px'
+      }, g);
+
     } else if (n.type === 'agent_tool') {
       // Feature 17: agent_tool node rendering
       S('rect', { class: 'body', width: NW, height: NH, rx: 8, style: 'stroke:#a78bfa;stroke-width:1.5' }, g);
@@ -457,8 +510,8 @@ function renderNodes() {
       }, g);
     }
 
-    // Input port (not for START, not for note)
-    if (n.type !== 'start' && n.type !== 'note') {
+    // Input port (not for START, not for note, not for session resource nodes)
+    if (n.type !== 'start' && n.type !== 'note' && n.type !== 'session') {
       const inPtype = n.type === 'end' ? 'term' : n.type === 'loop' ? 'body'
                     : n.type === 'subgraph' ? 'sub' : 'msg';
       const nh = nodeHeight(n);
@@ -484,8 +537,8 @@ function renderNodes() {
       }
     }
 
-    // Output ports
-    if (n.type !== 'end' && n.type !== 'note') {
+    // Output ports (session nodes are resource-only, no edges)
+    if (n.type !== 'end' && n.type !== 'note' && n.type !== 'session') {
       if (n.type === 'loop') {
         // Two output ports for loop: body and done
         const pgb = S('g', { class: 'port port-body', transform: `translate(${NW},${NH*0.3})` }, g);
@@ -915,6 +968,17 @@ function showNodeProps(id) {
     addModelField(body, n);
     addField(body, 'System Prompt', 'textarea', n.system_prompt, v => { n.system_prompt = v; updateCode(); });
     addField(body, 'Tools (comma-sep)', 'text', n.tools, v => { n.tools = v; updateCode(); });
+    const sessionNodes = nodes.filter(x => x.type === 'session');
+    const sessionOpts = ['(none)', ...sessionNodes.map(s => s.name)];
+    const currentSession = (() => {
+      const ref = nodes.find(x => x.id === n.session_ref);
+      return ref ? ref.name : '(none)';
+    })();
+    addField(body, 'Session Store', 'select', currentSession, v => {
+      const match = sessionNodes.find(s => s.name === v);
+      n.session_ref = match ? match.id : '';
+      updateCode();
+    }, sessionOpts);
     // Agent-as-tool picker
     const agentRow = document.createElement('div');
     agentRow.style.cssText = 'position:relative;margin-top:-4px;margin-bottom:4px';
@@ -977,6 +1041,64 @@ function showNodeProps(id) {
     formEditorDiv.innerHTML = `<div style="font-size:10px;color:var(--muted);margin-bottom:4px">Form fields</div><div id="hitlFieldsList"></div><button class="btn" style="font-size:10px;margin-top:4px;padding:2px 8px" onclick="addHitlField()">+ Add field</button>`;
     body.appendChild(formEditorDiv);
     renderHitlFormEditor(n);
+  } else if (n.type === 'retriever') {
+    addField(body, 'Name', 'text', n.name, v => { n.name = v; render(); updateCode(); });
+    addField(body, 'Vector Store', 'select', n.store_type, v => { n.store_type = v; render(); updateCode(); },
+      ['memory', 'sqlite', 'chroma', 'pinecone', 'faiss', 'qdrant', 'pgvector']);
+    addField(body, 'Collection / Index', 'text', n.collection_name, v => { n.collection_name = v; updateCode(); });
+    addField(body, 'Connection / Path', 'text', n.connection_string, v => { n.connection_string = v; updateCode(); });
+    addField(body, 'Embedding Provider', 'select', n.embedding_provider, v => { n.embedding_provider = v; updateCode(); },
+      ['openai', 'gemini']);
+    addField(body, 'Embedding Model', 'text', n.embedding_model, v => { n.embedding_model = v; updateCode(); });
+    addField(body, 'top_k', 'number', String(n.top_k), v => { n.top_k = parseInt(v) || 5; render(); updateCode(); });
+    addField(body, 'Score threshold', 'number', String(n.score_threshold), v => { n.score_threshold = parseFloat(v) || 0.0; updateCode(); });
+    const hybridBtn = document.createElement('button');
+    hybridBtn.className = 'btn';
+    hybridBtn.style.cssText = 'width:100%;font-size:11px;padding:5px 8px;margin-top:4px';
+    hybridBtn.textContent = n.hybrid ? '✓ Hybrid (BM25 + vector + RRF)' : '○ Enable Hybrid (BM25 + vector + RRF)';
+    if (n.hybrid) hybridBtn.style.borderColor = '#06b6d4';
+    hybridBtn.onclick = () => { n.hybrid = !n.hybrid; render(); updateCode(); showNodeProps(n.id); };
+    body.appendChild(hybridBtn);
+    if (n.hybrid) {
+      addField(body, 'BM25 weight (0–1)', 'number', String(n.bm25_weight), v => { n.bm25_weight = parseFloat(v) || 0.5; updateCode(); });
+    }
+    const rerankBtn = document.createElement('button');
+    rerankBtn.className = 'btn';
+    rerankBtn.style.cssText = 'width:100%;font-size:11px;padding:5px 8px;margin-top:4px';
+    rerankBtn.textContent = n.rerank ? '✓ Rerank (cross-encoder)' : '○ Enable Rerank (cross-encoder)';
+    if (n.rerank) rerankBtn.style.borderColor = '#06b6d4';
+    rerankBtn.onclick = () => { n.rerank = !n.rerank; render(); updateCode(); showNodeProps(n.id); };
+    body.appendChild(rerankBtn);
+    if (n.rerank) {
+      addField(body, 'Rerank model', 'text', n.rerank_model, v => { n.rerank_model = v; updateCode(); });
+    }
+    const hint = document.createElement('p');
+    hint.style.cssText = 'color:var(--muted);font-size:11px;line-height:1.5;padding:2px 0';
+    hint.textContent = 'Generates a VectorStore + Retrieval tool; downstream agents receive the enriched context.';
+    body.appendChild(hint);
+  } else if (n.type === 'session') {
+    addField(body, 'Name', 'text', n.name, v => { n.name = v; render(); updateCode(); });
+    addField(body, 'Backend', 'select', n.store_type, v => { n.store_type = v; render(); updateCode(); },
+      ['json', 'sqlite', 'redis', 'supabase']);
+    addField(body, 'Default session_id', 'text', n.session_id, v => { n.session_id = v; updateCode(); });
+    addField(body, 'Namespace (optional)', 'text', n.namespace, v => { n.namespace = v; render(); updateCode(); });
+    if (n.store_type === 'json' || n.store_type === 'sqlite' || n.store_type === 'redis') {
+      addField(body, 'TTL seconds (optional)', 'text', n.ttl_seconds, v => { n.ttl_seconds = v; updateCode(); });
+    }
+    if (n.store_type === 'redis') {
+      addField(body, 'Redis URL', 'text', n.connection_string, v => { n.connection_string = v; updateCode(); });
+    } else if (n.store_type === 'supabase') {
+      addField(body, 'Supabase client var', 'text', n.connection_string || 'supabase_client', v => { n.connection_string = v; updateCode(); });
+      addField(body, 'Table name', 'text', n.table_name, v => { n.table_name = v; updateCode(); });
+    } else if (n.store_type === 'sqlite') {
+      addField(body, 'DB path', 'text', n.connection_string || 'sessions.db', v => { n.connection_string = v; updateCode(); });
+    } else if (n.store_type === 'json') {
+      addField(body, 'Directory', 'text', n.connection_string || './sessions', v => { n.connection_string = v; updateCode(); });
+    }
+    const hint = document.createElement('p');
+    hint.style.cssText = 'color:var(--muted);font-size:11px;line-height:1.5;padding:2px 0';
+    hint.textContent = 'Resource node — no edges. Pick it from the Session Store dropdown on any Agent to wire it into that agent\'s AgentConfig.';
+    body.appendChild(hint);
   } else if (n.type === 'agent_tool') {
     // Feature 17: Agent-as-Tool props
     const atDiv = document.createElement('div');
@@ -1317,18 +1439,70 @@ function loadTemplate(name) {
   } else if (name === 'rag_pipeline') {
     const start = mkNode('start', 60, 185);
     nodes.push(start);
-    const retriever = mkNode('agent', 280, 185);
-    retriever.name = 'Retriever';
-    retriever.system_prompt = 'Retrieve relevant documents from the knowledge base and return structured context.';
-    retriever.tools = 'vector_search, bm25_search';
+    const retriever = mkNode('retriever', 280, 185);
+    retriever.name = 'KnowledgeBase';
+    retriever.store_type = 'chroma';
+    retriever.collection_name = 'docs';
+    retriever.top_k = 5;
     nodes.push(retriever);
-    const writer = mkNode('agent', 500, 185);
+    const writer = mkNode('agent', 520, 185);
     writer.name = 'Writer';
     writer.system_prompt = 'Use the retrieved context to write a comprehensive, accurate answer.';
     nodes.push(writer);
-    const end = mkNode('end', 720, 185);
+    const end = mkNode('end', 760, 185);
     nodes.push(end);
-    edges.push(mkEdge(start.id, retriever.id));
+    edges.push(mkEdge(start.id, writer.id));
+    edges.push(mkEdge(retriever.id, writer.id));
+    edges.push(mkEdge(writer.id, end.id));
+
+  } else if (name === 'hybrid_rag') {
+    const start = mkNode('start', 60, 185);
+    nodes.push(start);
+    const retriever = mkNode('retriever', 260, 185);
+    retriever.name = 'HybridIndex';
+    retriever.store_type = 'qdrant';
+    retriever.collection_name = 'docs';
+    retriever.connection_string = 'http://localhost:6333';
+    retriever.top_k = 8;
+    retriever.hybrid = true;
+    retriever.bm25_weight = 0.4;
+    retriever.rerank = true;
+    nodes.push(retriever);
+    const writer = mkNode('agent', 540, 185);
+    writer.name = 'Answerer';
+    writer.system_prompt = 'Answer the user question using the retrieved hybrid-search context. Cite sources.';
+    nodes.push(writer);
+    const end = mkNode('end', 780, 185);
+    nodes.push(end);
+    edges.push(mkEdge(start.id, writer.id));
+    edges.push(mkEdge(retriever.id, writer.id));
+    edges.push(mkEdge(writer.id, end.id));
+
+  } else if (name === 'multi_tenant_rag') {
+    const start = mkNode('start', 60, 220);
+    nodes.push(start);
+    const retriever = mkNode('retriever', 260, 120);
+    retriever.name = 'TenantDocs';
+    retriever.store_type = 'pgvector';
+    retriever.collection_name = 'tenant_documents';
+    retriever.connection_string = 'postgresql://user:pass@localhost/rag';
+    retriever.top_k = 6;
+    nodes.push(retriever);
+    const session = mkNode('session', 260, 340);
+    session.name = 'UserSessions';
+    session.store_type = 'supabase';
+    session.session_id = 'user-session';
+    session.namespace = 'tenant-a';
+    session.connection_string = 'supabase_client';
+    nodes.push(session);
+    const writer = mkNode('agent', 540, 220);
+    writer.name = 'TenantAgent';
+    writer.system_prompt = 'Answer the tenant\'s question using their scoped knowledge base. Remember prior turns via the session store.';
+    writer.session_ref = session.id;
+    nodes.push(writer);
+    const end = mkNode('end', 780, 220);
+    nodes.push(end);
+    edges.push(mkEdge(start.id, writer.id));
     edges.push(mkEdge(retriever.id, writer.id));
     edges.push(mkEdge(writer.id, end.id));
 
@@ -1457,7 +1631,9 @@ function genPython() {
   const loops = nodes.filter(n => n.type === 'loop');
   const subgraphs = nodes.filter(n => n.type === 'subgraph');
   const hitls = nodes.filter(n => n.type === 'hitl');
-  if (!agents.length && !loops.length && !subgraphs.length && !hitls.length) return '# Drag agent nodes onto the canvas to generate code';
+  const retrievers = nodes.filter(n => n.type === 'retriever');
+  const sessions = nodes.filter(n => n.type === 'session');
+  if (!agents.length && !loops.length && !subgraphs.length && !hitls.length && !retrievers.length) return '# Drag agent nodes onto the canvas to generate code';
 
   // Collect all @agentname tool references across all nodes
   const agentToolRefs = new Set();
@@ -1467,16 +1643,131 @@ function genPython() {
   }
   const needsToolDecorator = agentToolRefs.size > 0;
 
+  // Which vector-store and embedding imports does each retriever need?
+  const vectorStoreImports = {
+    memory: 'from selectools.rag.stores.memory import InMemoryVectorStore',
+    sqlite: 'from selectools.rag.stores.sqlite import SQLiteVectorStore',
+    chroma: 'from selectools.rag.stores.chroma import ChromaVectorStore',
+    pinecone: 'from selectools.rag.stores.pinecone import PineconeVectorStore',
+    faiss: 'from selectools.rag.stores.faiss import FAISSVectorStore',
+    qdrant: 'from selectools.rag.stores.qdrant import QdrantVectorStore',
+    pgvector: 'from selectools.rag.stores.pgvector import PgVectorStore',
+  };
+  const sessionStoreImports = {
+    json: 'from selectools.sessions import JsonFileSessionStore',
+    sqlite: 'from selectools.sessions import SQLiteSessionStore',
+    redis: 'from selectools.sessions import RedisSessionStore',
+    supabase: 'from selectools.sessions import SupabaseSessionStore',
+  };
+
+  // Any agent with no tools and no upstream retriever needs a stub tool —
+  // `Agent(...)` raises if `tools=[]`. We inject a shared `_noop_tool` once.
+  const agentsNeedStub = agents.some(a => {
+    const raw = a.tools ? a.tools.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const hasRet = retrievers.some(r => edges.some(e => e.from === r.id && e.to === a.id));
+    return raw.length === 0 && !hasRet;
+  });
+
   const L = [];
   L.push('from selectools import Agent, AgentConfig');
   L.push('from selectools.orchestration import AgentGraph');
   if (subgraphs.length) L.push('from selectools.orchestration import load_subgraph');
-  if (needsToolDecorator) L.push('from selectools.tools import tool');
+  if (needsToolDecorator || agentsNeedStub) L.push('from selectools.tools import tool');
+  if (retrievers.length) {
+    if (retrievers.some(r => r.store_type === 'memory')) {
+      L.push('from selectools.rag.stores.memory import InMemoryVectorStore');
+    }
+    const needed = new Set(retrievers.filter(r => r.store_type !== 'memory').map(r => r.store_type));
+    for (const t of needed) L.push(vectorStoreImports[t]);
+    if (retrievers.some(r => r.hybrid)) L.push('from selectools.rag import BM25, HybridSearcher, HybridSearchTool');
+    else L.push('from selectools.rag import RAGTool');
+    if (retrievers.some(r => r.rerank)) L.push('from selectools.rag import Reranker');
+    if (retrievers.some(r => r.embedding_provider === 'openai')) L.push('from selectools.embeddings.openai import OpenAIEmbeddingProvider');
+    if (retrievers.some(r => r.embedding_provider === 'gemini')) L.push('from selectools.embeddings.gemini import GeminiEmbeddingProvider');
+  }
+  if (sessions.length) {
+    const needed = new Set(sessions.map(s => s.store_type));
+    for (const t of needed) L.push(sessionStoreImports[t]);
+  }
   L.push('');
   L.push('# Initialise your provider, e.g.:');
   L.push('# from selectools import OpenAIProvider');
   L.push('# provider = OpenAIProvider(api_key="...")');
   L.push('');
+
+  if (agentsNeedStub) {
+    L.push('@tool(description="Placeholder — replace with a real tool.")');
+    L.push('def _noop_tool(query: str) -> str:');
+    L.push('    """Agents require at least one tool. Replace this stub with real ones."""');
+    L.push('    return query');
+    L.push('');
+  }
+
+  // Retriever resources — emit VectorStore + RAG tool, exposed as {varName}_tool
+  for (const r of retrievers) {
+    const v = varName(r.name);
+    const embedderVar = v + '_embedder';
+    if (r.embedding_provider === 'openai') {
+      L.push(`${embedderVar} = OpenAIEmbeddingProvider(model=${JSON.stringify(r.embedding_model)})`);
+    } else {
+      L.push(`${embedderVar} = GeminiEmbeddingProvider(model=${JSON.stringify(r.embedding_model)})`);
+    }
+    const storeVar = v + '_store';
+    const conn = r.connection_string;
+    if (r.store_type === 'memory') {
+      L.push(`${storeVar} = InMemoryVectorStore(embedder=${embedderVar})`);
+    } else if (r.store_type === 'sqlite') {
+      L.push(`${storeVar} = SQLiteVectorStore(embedder=${embedderVar}, db_path=${JSON.stringify(conn || 'vector_store.db')})`);
+    } else if (r.store_type === 'chroma') {
+      L.push(`${storeVar} = ChromaVectorStore(embedder=${embedderVar}, collection_name=${JSON.stringify(r.collection_name || 'docs')}${conn ? ', persist_directory=' + JSON.stringify(conn) : ''})`);
+    } else if (r.store_type === 'pinecone') {
+      L.push(`${storeVar} = PineconeVectorStore(embedder=${embedderVar}, index_name=${JSON.stringify(r.collection_name || 'docs')}${conn ? ', environment=' + JSON.stringify(conn) : ''})`);
+    } else if (r.store_type === 'faiss') {
+      L.push(`${storeVar} = FAISSVectorStore(embedder=${embedderVar})`);
+    } else if (r.store_type === 'qdrant') {
+      L.push(`${storeVar} = QdrantVectorStore(embedder=${embedderVar}, collection_name=${JSON.stringify(r.collection_name || 'selectools')}${conn ? ', url=' + JSON.stringify(conn) : ''})`);
+    } else if (r.store_type === 'pgvector') {
+      L.push(`${storeVar} = PgVectorStore(embedder=${embedderVar}, connection_string=${JSON.stringify(conn || 'postgresql://localhost/selectools')}, table_name=${JSON.stringify(r.collection_name || 'selectools_documents')})`);
+    }
+    L.push(`# ${storeVar}.add_documents([...])  # populate with Document objects`);
+    const toolVar = v + '_tool';
+    if (r.hybrid) {
+      const bm25Var = v + '_bm25';
+      const searcherVar = v + '_searcher';
+      L.push(`${bm25Var} = BM25()`);
+      L.push(`${searcherVar} = HybridSearcher(`);
+      L.push(`    vector_store=${storeVar},`);
+      L.push(`    bm25=${bm25Var},`);
+      L.push(`    fusion="rrf",`);
+      L.push(`    vector_weight=${(1 - (r.bm25_weight || 0.5)).toFixed(2)},`);
+      L.push(`    keyword_weight=${(r.bm25_weight || 0.5).toFixed(2)},`);
+      if (r.rerank) L.push(`    reranker=Reranker(model_name=${JSON.stringify(r.rerank_model)}),`);
+      L.push(`)`);
+      L.push(`${toolVar} = HybridSearchTool(searcher=${searcherVar}, top_k=${r.top_k}, score_threshold=${r.score_threshold}).search_knowledge_base`);
+    } else {
+      const rerankBit = r.rerank ? `, reranker=Reranker(model_name=${JSON.stringify(r.rerank_model)})` : '';
+      L.push(`${toolVar} = RAGTool(vector_store=${storeVar}, top_k=${r.top_k}, score_threshold=${r.score_threshold}${rerankBit}).search_knowledge_base`);
+    }
+    L.push('');
+  }
+
+  // Session resources
+  for (const s of sessions) {
+    const v = varName(s.name);
+    const conn = s.connection_string;
+    const ttlArg = s.ttl_seconds ? `, default_ttl=${parseInt(s.ttl_seconds) || 0}` : '';
+    if (s.store_type === 'json') {
+      L.push(`${v} = JsonFileSessionStore(directory=${JSON.stringify(conn || './sessions')}${ttlArg})`);
+    } else if (s.store_type === 'sqlite') {
+      L.push(`${v} = SQLiteSessionStore(db_path=${JSON.stringify(conn || 'sessions.db')}${ttlArg})`);
+    } else if (s.store_type === 'redis') {
+      L.push(`${v} = RedisSessionStore(url=${JSON.stringify(conn || 'redis://localhost:6379/0')}${ttlArg})`);
+    } else if (s.store_type === 'supabase') {
+      L.push(`# Provide a supabase client: ${conn || 'supabase_client'} = supabase.create_client(URL, KEY)`);
+      L.push(`${v} = SupabaseSessionStore(client=${conn || 'supabase_client'}, table_name=${JSON.stringify(s.table_name || 'selectools_sessions')})`);
+    }
+    L.push('');
+  }
 
   // Topological sort: agents referenced as tools must be defined first
   const agentOrder = [...agents];
@@ -1491,14 +1782,30 @@ function genPython() {
     const rawTools = n.tools ? n.tools.split(',').map(s => s.trim()).filter(Boolean) : [];
     // Resolve @agentname refs → wrapper function names, keep plain tools as-is
     const resolvedTools = rawTools.map(t => t.startsWith('@') ? t.slice(1) + '_tool' : t);
+    // Auto-attach retriever tools: any retriever upstream of this agent injects its *_tool
+    for (const r of retrievers) {
+      const hasEdge = edges.some(e => e.from === r.id && e.to === n.id);
+      const toolRef = varName(r.name) + '_tool';
+      if (hasEdge && !resolvedTools.includes(toolRef)) resolvedTools.push(toolRef);
+    }
+    if (resolvedTools.length === 0) resolvedTools.push('_noop_tool');
 
     L.push(`${v} = Agent(`);
+    L.push(`    tools=[${resolvedTools.join(', ')}],`);
     L.push(`    provider=provider,`);
-    if (resolvedTools.length) L.push(`    tools=[${resolvedTools.join(', ')}],`);
     L.push(`    config=AgentConfig(`);
     L.push(`        name="${n.name}",`);
     if (n.system_prompt)
       L.push(`        system_prompt=${JSON.stringify(n.system_prompt)},`);
+    if (n.session_ref) {
+      const sess = nodes.find(s => s.id === n.session_ref && s.type === 'session');
+      if (sess) {
+        L.push(`        session_store=${varName(sess.name)},`);
+        L.push(`        session_id=${JSON.stringify(sess.session_id || 'session')},`);
+      } else {
+        L.push(`        # warning: session_ref points to missing node '${n.session_ref}' — re-attach a Session Store in the builder`);
+      }
+    }
     L.push(`    )`);
     L.push(`)`);
     const vars = extractVars(n.system_prompt);
@@ -1541,20 +1848,29 @@ function genPython() {
     L.push(`graph.add_node("${varName(n.name)}", AgentGraph.loop_node(max_iterations=${maxIter}, exit_condition="${exitCond}"))`);
   }
 
-  // entry point from START edges
+  // entry point from START edges — skip past retrievers (they're tool providers, not graph nodes)
   const startEdge = edges.find(e => { const fn = nodes.find(n => n.id === e.from); return fn?.type === 'start'; });
   if (startEdge) {
-    const tn = nodes.find(n => n.id === startEdge.to);
-    if (tn && tn.type !== 'end' && tn.type !== 'note') L.push(`graph.set_entry_point("${varName(tn.name)}")`);
+    let tn = nodes.find(n => n.id === startEdge.to);
+    while (tn && tn.type === 'retriever') {
+      const next = edges.find(e => e.from === tn.id);
+      tn = next ? nodes.find(n => n.id === next.to) : null;
+    }
+    if (tn && tn.type !== 'end' && tn.type !== 'note' && tn.type !== 'session') {
+      L.push(`graph.set_entry("${varName(tn.name)}")`);
+    }
   }
   L.push('');
 
-  // group conditional edges by source
+  // group conditional edges by source — retrievers and sessions are virtual, skip their edges
   const condMap = {};
   for (const e of edges) {
     const fn = nodes.find(n => n.id === e.from);
     const tn = nodes.find(n => n.id === e.to);
-    if (!fn || !tn || fn.type === 'start' || fn.type === 'note' || tn.type === 'note') continue;
+    if (!fn || !tn) continue;
+    if (fn.type === 'start' || fn.type === 'note' || tn.type === 'note') continue;
+    if (fn.type === 'retriever' || fn.type === 'session') continue;
+    if (tn.type === 'retriever' || tn.type === 'session') continue;
     const fid = varName(fn.name);
     const tid = tn.type === 'end' ? 'AgentGraph.END' : `"${varName(tn.name)}"`;
     if (fn.type === 'loop') {
@@ -1589,7 +1905,9 @@ function genYaml() {
   const loops = nodes.filter(n => n.type === 'loop');
   const subgraphs = nodes.filter(n => n.type === 'subgraph');
   const hitls = nodes.filter(n => n.type === 'hitl');
-  if (!agents.length && !loops.length && !subgraphs.length && !hitls.length) return '# Drag agent nodes onto the canvas to generate YAML';
+  const retrievers = nodes.filter(n => n.type === 'retriever');
+  const sessions = nodes.filter(n => n.type === 'session');
+  if (!agents.length && !loops.length && !subgraphs.length && !hitls.length && !retrievers.length) return '# Drag agent nodes onto the canvas to generate YAML';
 
   const L = [];
   L.push('# selectools agent graph — generated by builder');
@@ -1607,12 +1925,58 @@ function genYaml() {
       L.push(`    system_prompt: |`);
       for (const line of n.system_prompt.split('\n')) L.push(`      ${line}`);
     }
-    if (n.tools) {
-      const ts = n.tools.split(',').map(s => s.trim()).filter(Boolean);
-      if (ts.length) { L.push(`    tools:`); ts.forEach(t => L.push(`      - ${t}`)); }
+    const ts = n.tools ? n.tools.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const retrieverTools = retrievers
+      .filter(r => edges.some(e => e.from === r.id && e.to === n.id))
+      .map(r => varName(r.name) + '_tool');
+    const allTools = [...new Set([...ts, ...retrieverTools])];
+    if (allTools.length) { L.push(`    tools:`); allTools.forEach(t => L.push(`      - ${t}`)); }
+    if (n.session_ref) {
+      const sess = nodes.find(s => s.id === n.session_ref && s.type === 'session');
+      if (sess) {
+        L.push(`    session_store: ${varName(sess.name)}`);
+        L.push(`    session_id: ${JSON.stringify(sess.session_id || 'session')}`);
+      }
     }
     const vars = extractVars(n.system_prompt);
     if (vars.length) { L.push(`    input_vars:`); vars.forEach(v => L.push(`      - ${v}`)); }
+  }
+  for (const r of retrievers) {
+    const id = varName(r.name);
+    L.push(`  ${id}:`);
+    L.push(`    type: retriever`);
+    L.push(`    store: ${r.store_type}`);
+    if (r.collection_name) L.push(`    collection: ${r.collection_name}`);
+    if (r.connection_string) L.push(`    connection: ${JSON.stringify(r.connection_string)}`);
+    L.push(`    embedding:`);
+    L.push(`      provider: ${r.embedding_provider}`);
+    L.push(`      model: ${r.embedding_model}`);
+    L.push(`    top_k: ${r.top_k}`);
+    if (r.score_threshold) L.push(`    score_threshold: ${r.score_threshold}`);
+    if (r.hybrid) {
+      L.push(`    hybrid: true`);
+      L.push(`    bm25_weight: ${r.bm25_weight}`);
+    }
+    if (r.rerank) {
+      L.push(`    rerank:`);
+      L.push(`      model: ${r.rerank_model}`);
+    }
+  }
+  for (const s of sessions) {
+    const id = varName(s.name);
+    L.push(`  ${id}:`);
+    L.push(`    type: session`);
+    L.push(`    backend: ${s.store_type}`);
+    if (s.session_id) L.push(`    session_id: ${JSON.stringify(s.session_id)}`);
+    if (s.namespace) L.push(`    namespace: ${JSON.stringify(s.namespace)}`);
+    if (s.ttl_seconds) L.push(`    default_ttl: ${parseInt(s.ttl_seconds) || 0}`);
+    if (s.store_type === 'json' && s.connection_string) L.push(`    directory: ${JSON.stringify(s.connection_string)}`);
+    if (s.store_type === 'sqlite' && s.connection_string) L.push(`    db_path: ${JSON.stringify(s.connection_string)}`);
+    if (s.store_type === 'redis' && s.connection_string) L.push(`    url: ${JSON.stringify(s.connection_string)}`);
+    if (s.store_type === 'supabase') {
+      L.push(`    client_var: ${JSON.stringify(s.connection_string || 'supabase_client')}`);
+      L.push(`    table_name: ${JSON.stringify(s.table_name || 'selectools_sessions')}`);
+    }
   }
   for (const n of loops) {
     L.push(`  ${varName(n.name)}:`);
@@ -1639,6 +2003,8 @@ function genYaml() {
     const fn = nodes.find(n => n.id === e.from);
     const tn = nodes.find(n => n.id === e.to);
     if (!fn || !tn || fn.type === 'note' || tn.type === 'note') continue;
+    // Retriever/session are resources, not graph steps — skip wiring edges
+    if (fn.type === 'retriever' || fn.type === 'session' || tn.type === 'retriever' || tn.type === 'session') continue;
     const fid = fn.type === 'start' ? 'START' : varName(fn.name);
     const tid = tn.type === 'end'   ? 'END'   : varName(tn.name);
     L.push(`  - from: ${fid}`);

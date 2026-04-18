@@ -9,9 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Visual builder: first-class RAG and session nodes.** Two new node
+  types in `selectools serve --builder`:
+  - `Retriever (RAG)` — vector-store-backed retrieval with all 7
+    backends (memory, SQLite, Chroma, Pinecone, FAISS, Qdrant, pgvector),
+    embedding provider/model picker, `top_k`, score threshold, toggleable
+    Hybrid (BM25 + vector + RRF) and cross-encoder Rerank. Code
+    generation emits a real `VectorStore` + `RAGTool` /
+    `HybridSearchTool` / `Reranker` and auto-attaches the tool to any
+    agent downstream of the retriever.
+  - `Session Store` — resource node for `SessionStore` with all 4
+    backends (JSON, SQLite, Redis, Supabase), namespace, TTL, and
+    backend-specific fields. Agents gain a **Session Store** dropdown
+    that wires the selected store into `AgentConfig(session_store=...,
+    session_id=...)`.
+  Two new presets: **Hybrid RAG** (Qdrant + BM25 + rerank) and
+  **Multi-Tenant RAG** (pgvector retrieval + Supabase session store,
+  namespace-scoped). The existing **RAG Pipeline** preset now uses a
+  real retriever node instead of a plain agent with a tool-string.
+  Python and YAML code generators emit imports, construction, and
+  wiring for both node types; graph edges involving retriever/session
+  nodes are treated as virtual and skipped during `AgentGraph` wiring.
+  18 new tests across `tests/test_visual_builder.py` covering palette
+  entries, panels, Python + YAML emission, and preset wiring.
+
 - `SupabaseSessionStore` — Postgres-backed `SessionStore` via Supabase
-  PostgREST. Optional dep: `pip install selectools[supabase]`. Closes part
-  of #60 (the SessionStore half; KnowledgeMemory backend is separate).
+  PostgREST. Fourth backend alongside JSON file, SQLite, and Redis.
+  `@stable`, with the same validation guards (null bytes, 512-char cap)
+  and namespace support as `RedisSessionStore`. Idempotent saves via
+  `upsert(on_conflict="session_id")`. Configurable `table_name`
+  (defaults to `selectools_sessions`). Optional dep:
+  `pip install selectools[supabase]`. Exported from the top-level
+  `selectools` package and documented in
+  [`docs/modules/SESSIONS.md`](modules/SESSIONS.md). 37 new unit tests
+  backed by a `FakeSupabaseClient` — no live Supabase or installed
+  `supabase` package required. Runnable demo at
+  [`examples/96_supabase_session_store.py`](https://github.com/johnnichev/selectools/blob/main/examples/96_supabase_session_store.py).
+  Closes part of #60 (the SessionStore half; KnowledgeMemory backend is
+  a separate follow-up).
 
 ## [0.22.0] - 2026-04-13 — Competitor-Informed Bug Fixes + Loop Detection
 

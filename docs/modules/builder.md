@@ -81,6 +81,8 @@ graph TD
 | **Subgraph** | Purple | Runs another `AgentGraph` as a nested step. Reference by graph name. |
 | **Human Input** | Amber | Pauses and waits for human approval. Each option becomes an output port. Timeout auto-resumes. |
 | **Agent Tool** | Violet | Wraps another agent as a callable `@tool`. Use an entire workflow inside another agent. |
+| **Retriever (RAG)** | Cyan | Vector-store-backed retrieval node. Pick one of 7 backends (memory / SQLite / Chroma / Pinecone / FAISS / Qdrant / pgvector), configure embedding provider, `top_k`, score threshold. Toggle Hybrid (BM25 + vector + RRF) and cross-encoder Rerank. Generates a `VectorStore` + `RAGTool`/`HybridSearchTool`; any agent downstream of the retriever gets the tool auto-attached. |
+| **Session Store** | Violet (dashed) | Resource node for `SessionStore`. Pick backend (JSON file / SQLite / Redis / Supabase), set default `session_id`, namespace, TTL. No edges — select it from the **Session Store** dropdown on any Agent panel to wire it into that agent's `AgentConfig`. |
 | **Note** | Amber | Canvas annotation — Markdown, resizable, collapsible. Does not execute. |
 | **END** | Red | Exit point. Connect any node here to terminate the flow. |
 
@@ -125,7 +127,7 @@ Click **▶ Run**, enter a test message, and click **Run** in the panel. Respons
 |------|-------------|
 | New (Clear) | Reset the canvas |
 | Load Example | Load a pre-built example graph |
-| Templates | 7 starter templates: Simple Chatbot, Researcher + Writer, RAG Pipeline, Reviewer Loop, HITL Approval, Multi-Model Panel, Chain of Thought |
+| Templates | 9 starter templates: Simple Chatbot, Researcher + Writer, RAG Pipeline, Hybrid RAG (BM25 + vector + rerank), Multi-Tenant RAG (session-scoped), Reviewer Loop, HITL Approval, Multi-Model Panel, Chain of Thought |
 | Import YAML / Python… | Paste `AgentGraph` Python or YAML to load onto the canvas |
 | Watch File… | Point to a `.py` file — canvas reloads every time you save it |
 

@@ -411,7 +411,7 @@ result = agent2.ask("What is my favorite color?")
 # Agent remembers the previous conversation
 ```
 
-Three backends available: `JsonFileSessionStore`, `SQLiteSessionStore`, `RedisSessionStore`. All support TTL-based expiry.
+Four backends available: `JsonFileSessionStore`, `SQLiteSessionStore`, `RedisSessionStore`, `SupabaseSessionStore`. All support namespace isolation; the file/SQLite/Redis backends also support TTL-based expiry.
 
 ## Step 13: Entity Memory
 

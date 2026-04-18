@@ -139,6 +139,7 @@ from .sessions import (
     SessionMetadata,
     SessionStore,
     SQLiteSessionStore,
+    SupabaseSessionStore,
 )
 from .stability import beta, deprecated, stable
 from .structured import ResponseFormat
@@ -263,6 +264,7 @@ __all__ = [
     "JsonFileSessionStore",
     "SQLiteSessionStore",
     "RedisSessionStore",
+    "SupabaseSessionStore",
     # Entity Memory
     "Entity",
     "EntityMemory",

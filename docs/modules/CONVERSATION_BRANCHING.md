@@ -85,7 +85,7 @@ The branch and original share no mutable state — appending, clearing, or trimm
 
 ## `SessionStore.branch(source_id, new_id)`
 
-All three session backends (`JsonFileSessionStore`, `SQLiteSessionStore`, `RedisSessionStore`) support branching persisted sessions:
+All four session backends (`JsonFileSessionStore`, `SQLiteSessionStore`, `RedisSessionStore`, `SupabaseSessionStore`) support branching persisted sessions:
 
 ```python
 from selectools.sessions import JsonFileSessionStore
