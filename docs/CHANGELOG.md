@@ -5,6 +5,81 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.0] - 2026-04-18 — Supabase Sessions + Builder RAG
+
+### Added
+
+- **Visual builder: first-class RAG and session nodes.** Two new node
+  types in `selectools serve --builder`:
+  - `Retriever (RAG)` — vector-store-backed retrieval with all 7
+    backends (memory, SQLite, Chroma, Pinecone, FAISS, Qdrant, pgvector),
+    embedding provider/model picker, `top_k`, score threshold, toggleable
+    Hybrid (BM25 + vector + RRF) and cross-encoder Rerank. Code
+    generation emits a real `VectorStore` + `RAGTool` /
+    `HybridSearchTool` / `Reranker` and auto-attaches the tool to any
+    agent downstream of the retriever.
+  - `Session Store` — resource node for `SessionStore` with all 4
+    backends (JSON, SQLite, Redis, Supabase), namespace, TTL, and
+    backend-specific fields. Agents gain a **Session Store** dropdown
+    that wires the selected store into `AgentConfig(session_store=...,
+    session_id=...)`.
+
+  Two new presets: **Hybrid RAG** (Qdrant + BM25 + rerank) and
+  **Multi-Tenant RAG** (pgvector retrieval + Supabase session store,
+  namespace-scoped). The existing **RAG Pipeline** preset now uses a
+  real retriever node instead of a plain agent with a tool-string.
+  Python and YAML code generators emit imports, construction, and
+  wiring for both node types; graph edges involving retriever/session
+  nodes are treated as virtual and skipped during `AgentGraph` wiring.
+
+- `SupabaseSessionStore` — Postgres-backed `SessionStore` via Supabase
+  PostgREST. Fourth backend alongside JSON file, SQLite, and Redis.
+  `@stable`, with the same validation guards (null bytes, 512-char cap)
+  and namespace support as `RedisSessionStore`. Idempotent saves via
+  `upsert(on_conflict="session_id")`. Configurable `table_name`
+  (defaults to `selectools_sessions`). Optional dep:
+  `pip install selectools[supabase]`. Exported from the top-level
+  `selectools` package and documented in
+  [`docs/modules/SESSIONS.md`](modules/SESSIONS.md). Runnable demo at
+  [`examples/96_supabase_session_store.py`](https://github.com/johnnichev/selectools/blob/main/examples/96_supabase_session_store.py).
+  Closes part of #60 (the SessionStore half; KnowledgeMemory backend is
+  a separate follow-up).
+
+### Fixed
+
+- Builder code-gen bugs surfaced by a post-ship bug-hunt + offline
+  e2e sweep (all pinned with regression tests):
+  - Wrong embedder class names: `OpenAIEmbedder` / `GeminiEmbedder` →
+    `OpenAIEmbeddingProvider` / `GeminiEmbeddingProvider`.
+  - `from selectools.rag import InMemoryVectorStore` → must import
+    from `selectools.rag.stores.memory`.
+  - `HybridSearcher(fusion_method=FusionMethod.RRF, bm25_weight=...)`
+    → real signature is `fusion: str = "rrf"`, `keyword_weight: float`.
+  - `HybridSearchTool(...).search` → `.search_knowledge_base` (the
+    `@tool`-decorated method).
+  - `graph.set_entry_point(...)` → `AgentGraph.set_entry(...)`.
+  - `Agent(provider=..., config=...)` without `tools=[]` — framework
+    rejects empty tool lists. Generator now auto-injects a
+    `_noop_tool` stub when an agent has no tools and no upstream
+    retriever, so generated code is runnable out of the box.
+  - Retriever tools deduped across multiple edges to the same agent.
+  - Dangling `session_ref` (session node deleted) now emits a warning
+    comment instead of silently dropping session wiring.
+
+### Tests
+
+- 65 new tests: 38 for `SupabaseSessionStore` (including top-level
+  import regression), 18 covering the new builder retriever/session
+  node types + presets, 8 regression tests pinning the post-ship
+  code-gen fixes. Visual builder suite: 420/420 pass.
+
+### Migration notes
+
+- `from selectools import SupabaseSessionStore` now resolves
+  (previously raised `ImportError` between the 0.22.0 + #61 merge and
+  this release). If you vendored the class locally, you can drop your
+  copy and import from `selectools.sessions`.
+
 ## [0.22.0] - 2026-04-13 — Competitor-Informed Bug Fixes + Loop Detection
 
 ### Added

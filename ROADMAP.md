@@ -81,6 +81,15 @@ CrewAI/n8n/LlamaIndex/AutoGen/LiteLLM/Pydantic-AI/Haystack (~325k stars)
 → Dev tooling consolidated: Black + isort + flake8 → Ruff
 → 30-recipe cookbook expansion → 95 runnable examples
 
+v0.23.0 ✅ Supabase Sessions + Builder RAG
+SupabaseSessionStore → 4th SessionStore backend (JSON/SQLite/Redis/Supabase)
+→ Visual builder: first-class Retriever (RAG) + Session Store node types
+→ 7 vector-store backends in builder (memory/SQLite/Chroma/Pinecone/FAISS/Qdrant/pgvector)
+→ Hybrid (BM25 + vector + RRF) + cross-encoder rerank toggles
+→ New presets: Hybrid RAG, Multi-Tenant RAG (pgvector + Supabase session)
+→ 8 post-ship code-gen fixes in builder (embedder class names, HybridSearcher params, etc.)
+→ 96 runnable examples, 5332 tests total
+
 v1.0.0 🟡 Stable Release
 API freeze → Stability markers on all modules → Deprecation policy
 → Security audit published → Compatibility matrix → 0.x→1.0 migration guide
