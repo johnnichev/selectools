@@ -1521,14 +1521,14 @@ class TestBuilderAgentAsToolPicker:
     def test_genpython_emits_tool_wrapper(self):
         """genPython must emit @tool() + def <agent>_tool wrapper."""
         gp_idx = BUILDER_HTML.index("function genPython(")
-        gp_block = BUILDER_HTML[gp_idx : gp_idx + 10000]
+        gp_block = BUILDER_HTML[gp_idx : gp_idx + 13000]
         assert "@tool()" in gp_block
         assert "def ${v}_tool" in gp_block or "_tool" in gp_block
 
     def test_genpython_topo_sort_for_agent_tools(self):
         """genPython must sort agents so tool-referenced ones are defined first."""
         gp_idx = BUILDER_HTML.index("function genPython(")
-        gp_block = BUILDER_HTML[gp_idx : gp_idx + 8000]
+        gp_block = BUILDER_HTML[gp_idx : gp_idx + 11000]
         assert "agentToolRefs" in gp_block
         assert "agentOrder" in gp_block
 
@@ -2923,10 +2923,14 @@ class TestBuilderRetrieverNode:
 
     def test_genpython_hybrid_emits_hybrid_searcher(self):
         gp_idx = BUILDER_HTML.index("function genPython(")
-        gp_block = BUILDER_HTML[gp_idx : gp_idx + 10000]
+        gp_block = BUILDER_HTML[gp_idx : gp_idx + 13000]
         assert "HybridSearcher" in gp_block
-        assert "FusionMethod.RRF" in gp_block
+        # fusion is a string param ("rrf") — the FusionMethod enum is not used at call site
+        assert 'fusion="rrf"' in gp_block
+        assert "keyword_weight" in gp_block
         assert "HybridSearchTool" in gp_block
+        # Tool method must be @tool-decorated `.search_knowledge_base`, not `.search`
+        assert ".search_knowledge_base" in gp_block
 
     def test_genpython_rerank_emits_reranker(self):
         gp_idx = BUILDER_HTML.index("function genPython(")
@@ -2941,7 +2945,7 @@ class TestBuilderRetrieverNode:
     def test_retriever_is_not_a_graph_node(self):
         """Edges involving retrievers must be skipped in graph wiring."""
         gp_idx = BUILDER_HTML.index("function genPython(")
-        gp_block = BUILDER_HTML[gp_idx : gp_idx + 12000]
+        gp_block = BUILDER_HTML[gp_idx : gp_idx + 15000]
         assert "fn.type === 'retriever'" in gp_block
 
 
@@ -3010,3 +3014,82 @@ class TestBuilderRagPresets:
         idx = BUILDER_HTML.index("name === 'rag_pipeline'")
         block = BUILDER_HTML[idx : idx + 1500]
         assert "mkNode('retriever'" in block
+
+
+# ─── Regressions from bug-hunt (commit 104d103 → follow-up) ──────────────
+
+
+class TestBuilderCodegenRegressions:
+    """Each case here pins a bug caught by the post-ship bug-hunt sweep."""
+
+    def test_embedder_uses_full_provider_class_name(self):
+        """Pre-fix emitted OpenAIEmbedder/GeminiEmbedder — those classes don't exist.
+        The real exports are OpenAIEmbeddingProvider / GeminiEmbeddingProvider.
+        """
+        assert "OpenAIEmbeddingProvider" in BUILDER_HTML
+        assert "GeminiEmbeddingProvider" in BUILDER_HTML
+        # Old (wrong) names must not appear as a Python import target
+        assert "import OpenAIEmbedder" not in BUILDER_HTML
+        assert "import GeminiEmbedder" not in BUILDER_HTML
+
+    def test_in_memory_vector_store_import_path(self):
+        """`selectools.rag` does not re-export InMemoryVectorStore — must import from
+        selectools.rag.stores.memory.
+        """
+        # Neither of these wrong paths should appear in the generator:
+        assert "from selectools.rag import InMemoryVectorStore" not in BUILDER_HTML
+        assert "from selectools.rag.stores.memory import InMemoryVectorStore" in BUILDER_HTML
+
+    def test_hybrid_searcher_uses_string_fusion_and_keyword_weight(self):
+        """HybridSearcher signature is fusion: str, keyword_weight: float — not
+        fusion_method=FusionMethod.RRF or bm25_weight.
+        """
+        assert 'fusion="rrf"' in BUILDER_HTML
+        assert "keyword_weight=" in BUILDER_HTML
+        assert "fusion_method=FusionMethod" not in BUILDER_HTML
+        # The FusionMethod import should be gone too since we no longer reference it
+        assert "FusionMethod" not in BUILDER_HTML
+
+    def test_hybrid_tool_uses_search_knowledge_base_not_search(self):
+        """`.search` is a non-@tool method; `.search_knowledge_base` is the
+        @tool-decorated attribute selectools.Agent expects.
+        """
+        # Both RAGTool and HybridSearchTool must expose the tool-decorated method
+        gp_idx = BUILDER_HTML.index("function genPython(")
+        gp = BUILDER_HTML[gp_idx : gp_idx + 15000]
+        assert "HybridSearchTool(" in gp
+        # HybridSearchTool usage must end in .search_knowledge_base
+        assert "HybridSearchTool(searcher=" in gp
+        # Explicit negative: no chained `.search` right after the closing paren
+        assert ").search\n" not in gp and ").search`" not in gp
+        assert "HybridSearchTool(searcher=${searcherVar}, top_k=${r.top_k}" in gp
+        assert ".search_knowledge_base" in gp
+
+    def test_agent_graph_uses_set_entry_not_set_entry_point(self):
+        """AgentGraph.set_entry_point doesn't exist — the method is .set_entry."""
+        assert ".set_entry(" in BUILDER_HTML
+        assert ".set_entry_point(" not in BUILDER_HTML
+
+    def test_agent_always_has_tools_arg(self):
+        """Agent.__init__ requires a non-empty tools list. The generator injects a
+        `_noop_tool` stub when an agent has no tools and no upstream retriever.
+        """
+        assert "_noop_tool" in BUILDER_HTML
+        assert "agentsNeedStub" in BUILDER_HTML
+        # `tools=[...]` must be emitted unconditionally (no gate on resolvedTools.length)
+        gp_idx = BUILDER_HTML.index("function genPython(")
+        gp = BUILDER_HTML[gp_idx : gp_idx + 15000]
+        assert "L.push(`    tools=[${resolvedTools.join(', ')}],`)" in gp
+
+    def test_retriever_tool_list_is_deduped(self):
+        """Multiple edges from the same retriever to the same agent must not produce
+        duplicate entries in tools=[...]."""
+        # Python side: `!resolvedTools.includes(toolRef)` guard
+        assert "!resolvedTools.includes(toolRef)" in BUILDER_HTML
+        # YAML side: Set-based dedup
+        assert "new Set([...ts, ...retrieverTools])" in BUILDER_HTML
+
+    def test_dangling_session_ref_emits_warning_comment(self):
+        """If session_ref points to a deleted node, generated code must emit a
+        warning comment instead of silently dropping the session wiring."""
+        assert "session_ref points to missing node" in BUILDER_HTML

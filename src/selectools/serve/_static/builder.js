@@ -1645,7 +1645,7 @@ function genPython() {
 
   // Which vector-store and embedding imports does each retriever need?
   const vectorStoreImports = {
-    memory: 'from selectools.rag import VectorStore as _MemStore  # use InMemoryVectorStore',
+    memory: 'from selectools.rag.stores.memory import InMemoryVectorStore',
     sqlite: 'from selectools.rag.stores.sqlite import SQLiteVectorStore',
     chroma: 'from selectools.rag.stores.chroma import ChromaVectorStore',
     pinecone: 'from selectools.rag.stores.pinecone import PineconeVectorStore',
@@ -1660,22 +1660,30 @@ function genPython() {
     supabase: 'from selectools.sessions import SupabaseSessionStore',
   };
 
+  // Any agent with no tools and no upstream retriever needs a stub tool —
+  // `Agent(...)` raises if `tools=[]`. We inject a shared `_noop_tool` once.
+  const agentsNeedStub = agents.some(a => {
+    const raw = a.tools ? a.tools.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const hasRet = retrievers.some(r => edges.some(e => e.from === r.id && e.to === a.id));
+    return raw.length === 0 && !hasRet;
+  });
+
   const L = [];
   L.push('from selectools import Agent, AgentConfig');
   L.push('from selectools.orchestration import AgentGraph');
   if (subgraphs.length) L.push('from selectools.orchestration import load_subgraph');
-  if (needsToolDecorator) L.push('from selectools.tools import tool');
+  if (needsToolDecorator || agentsNeedStub) L.push('from selectools.tools import tool');
   if (retrievers.length) {
     if (retrievers.some(r => r.store_type === 'memory')) {
-      L.push('from selectools.rag import InMemoryVectorStore');
+      L.push('from selectools.rag.stores.memory import InMemoryVectorStore');
     }
     const needed = new Set(retrievers.filter(r => r.store_type !== 'memory').map(r => r.store_type));
     for (const t of needed) L.push(vectorStoreImports[t]);
-    if (retrievers.some(r => r.hybrid)) L.push('from selectools.rag import BM25, HybridSearcher, FusionMethod, HybridSearchTool');
+    if (retrievers.some(r => r.hybrid)) L.push('from selectools.rag import BM25, HybridSearcher, HybridSearchTool');
     else L.push('from selectools.rag import RAGTool');
     if (retrievers.some(r => r.rerank)) L.push('from selectools.rag import Reranker');
-    if (retrievers.some(r => r.embedding_provider === 'openai')) L.push('from selectools.embeddings.openai import OpenAIEmbedder');
-    if (retrievers.some(r => r.embedding_provider === 'gemini')) L.push('from selectools.embeddings.gemini import GeminiEmbedder');
+    if (retrievers.some(r => r.embedding_provider === 'openai')) L.push('from selectools.embeddings.openai import OpenAIEmbeddingProvider');
+    if (retrievers.some(r => r.embedding_provider === 'gemini')) L.push('from selectools.embeddings.gemini import GeminiEmbeddingProvider');
   }
   if (sessions.length) {
     const needed = new Set(sessions.map(s => s.store_type));
@@ -1687,14 +1695,22 @@ function genPython() {
   L.push('# provider = OpenAIProvider(api_key="...")');
   L.push('');
 
+  if (agentsNeedStub) {
+    L.push('@tool(description="Placeholder — replace with a real tool.")');
+    L.push('def _noop_tool(query: str) -> str:');
+    L.push('    """Agents require at least one tool. Replace this stub with real ones."""');
+    L.push('    return query');
+    L.push('');
+  }
+
   // Retriever resources — emit VectorStore + RAG tool, exposed as {varName}_tool
   for (const r of retrievers) {
     const v = varName(r.name);
     const embedderVar = v + '_embedder';
     if (r.embedding_provider === 'openai') {
-      L.push(`${embedderVar} = OpenAIEmbedder(model=${JSON.stringify(r.embedding_model)})`);
+      L.push(`${embedderVar} = OpenAIEmbeddingProvider(model=${JSON.stringify(r.embedding_model)})`);
     } else {
-      L.push(`${embedderVar} = GeminiEmbedder(model=${JSON.stringify(r.embedding_model)})`);
+      L.push(`${embedderVar} = GeminiEmbeddingProvider(model=${JSON.stringify(r.embedding_model)})`);
     }
     const storeVar = v + '_store';
     const conn = r.connection_string;
@@ -1722,12 +1738,12 @@ function genPython() {
       L.push(`${searcherVar} = HybridSearcher(`);
       L.push(`    vector_store=${storeVar},`);
       L.push(`    bm25=${bm25Var},`);
-      L.push(`    fusion_method=FusionMethod.RRF,`);
+      L.push(`    fusion="rrf",`);
       L.push(`    vector_weight=${(1 - (r.bm25_weight || 0.5)).toFixed(2)},`);
-      L.push(`    bm25_weight=${(r.bm25_weight || 0.5).toFixed(2)},`);
+      L.push(`    keyword_weight=${(r.bm25_weight || 0.5).toFixed(2)},`);
       if (r.rerank) L.push(`    reranker=Reranker(model_name=${JSON.stringify(r.rerank_model)}),`);
       L.push(`)`);
-      L.push(`${toolVar} = HybridSearchTool(searcher=${searcherVar}, top_k=${r.top_k}, score_threshold=${r.score_threshold}).search`);
+      L.push(`${toolVar} = HybridSearchTool(searcher=${searcherVar}, top_k=${r.top_k}, score_threshold=${r.score_threshold}).search_knowledge_base`);
     } else {
       const rerankBit = r.rerank ? `, reranker=Reranker(model_name=${JSON.stringify(r.rerank_model)})` : '';
       L.push(`${toolVar} = RAGTool(vector_store=${storeVar}, top_k=${r.top_k}, score_threshold=${r.score_threshold}${rerankBit}).search_knowledge_base`);
@@ -1769,12 +1785,14 @@ function genPython() {
     // Auto-attach retriever tools: any retriever upstream of this agent injects its *_tool
     for (const r of retrievers) {
       const hasEdge = edges.some(e => e.from === r.id && e.to === n.id);
-      if (hasEdge) resolvedTools.push(varName(r.name) + '_tool');
+      const toolRef = varName(r.name) + '_tool';
+      if (hasEdge && !resolvedTools.includes(toolRef)) resolvedTools.push(toolRef);
     }
+    if (resolvedTools.length === 0) resolvedTools.push('_noop_tool');
 
     L.push(`${v} = Agent(`);
+    L.push(`    tools=[${resolvedTools.join(', ')}],`);
     L.push(`    provider=provider,`);
-    if (resolvedTools.length) L.push(`    tools=[${resolvedTools.join(', ')}],`);
     L.push(`    config=AgentConfig(`);
     L.push(`        name="${n.name}",`);
     if (n.system_prompt)
@@ -1784,6 +1802,8 @@ function genPython() {
       if (sess) {
         L.push(`        session_store=${varName(sess.name)},`);
         L.push(`        session_id=${JSON.stringify(sess.session_id || 'session')},`);
+      } else {
+        L.push(`        # warning: session_ref points to missing node '${n.session_ref}' — re-attach a Session Store in the builder`);
       }
     }
     L.push(`    )`);
@@ -1837,7 +1857,7 @@ function genPython() {
       tn = next ? nodes.find(n => n.id === next.to) : null;
     }
     if (tn && tn.type !== 'end' && tn.type !== 'note' && tn.type !== 'session') {
-      L.push(`graph.set_entry_point("${varName(tn.name)}")`);
+      L.push(`graph.set_entry("${varName(tn.name)}")`);
     }
   }
   L.push('');
@@ -1909,7 +1929,7 @@ function genYaml() {
     const retrieverTools = retrievers
       .filter(r => edges.some(e => e.from === r.id && e.to === n.id))
       .map(r => varName(r.name) + '_tool');
-    const allTools = [...ts, ...retrieverTools];
+    const allTools = [...new Set([...ts, ...retrieverTools])];
     if (allTools.length) { L.push(`    tools:`); allTools.forEach(t => L.push(`      - ${t}`)); }
     if (n.session_ref) {
       const sess = nodes.find(s => s.id === n.session_ref && s.type === 'session');
