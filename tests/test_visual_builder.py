@@ -1465,7 +1465,7 @@ class TestBuilderEmbedWidget:
     def test_embed_button_in_header_actions(self):
         """Embed button must appear in the header-actions div (inside Export dropdown)."""
         ha_idx = BUILDER_HTML.index('class="header-actions"')
-        ha_block = BUILDER_HTML[ha_idx : ha_idx + 2500]
+        ha_block = BUILDER_HTML[ha_idx : ha_idx + 3500]
         assert "openEmbed()" in ha_block
 
     def test_escape_closes_embed(self):
@@ -1508,27 +1508,27 @@ class TestBuilderAgentAsToolPicker:
     def test_genpython_handles_at_agent_refs(self):
         """genPython must resolve @agentname tool refs to _tool wrappers."""
         gp_idx = BUILDER_HTML.index("function genPython(")
-        gp_block = BUILDER_HTML[gp_idx : gp_idx + 2000]
+        gp_block = BUILDER_HTML[gp_idx : gp_idx + 6000]
         assert "startsWith('@')" in gp_block
         assert "_tool" in gp_block
 
     def test_genpython_imports_tool_decorator(self):
         """genPython must import @tool when agent refs are present."""
         gp_idx = BUILDER_HTML.index("function genPython(")
-        gp_block = BUILDER_HTML[gp_idx : gp_idx + 2000]
+        gp_block = BUILDER_HTML[gp_idx : gp_idx + 6000]
         assert "from selectools.tools import tool" in gp_block
 
     def test_genpython_emits_tool_wrapper(self):
         """genPython must emit @tool() + def <agent>_tool wrapper."""
         gp_idx = BUILDER_HTML.index("function genPython(")
-        gp_block = BUILDER_HTML[gp_idx : gp_idx + 3000]
+        gp_block = BUILDER_HTML[gp_idx : gp_idx + 10000]
         assert "@tool()" in gp_block
         assert "def ${v}_tool" in gp_block or "_tool" in gp_block
 
     def test_genpython_topo_sort_for_agent_tools(self):
         """genPython must sort agents so tool-referenced ones are defined first."""
         gp_idx = BUILDER_HTML.index("function genPython(")
-        gp_block = BUILDER_HTML[gp_idx : gp_idx + 1500]
+        gp_block = BUILDER_HTML[gp_idx : gp_idx + 8000]
         assert "agentToolRefs" in gp_block
         assert "agentOrder" in gp_block
 
@@ -2877,3 +2877,136 @@ class TestBuilderEvalRoute:
         heuristic = _smart_route("hello world", "", None, None)
         result = _eval_route("hello world", "", [], api_key="")
         assert result["model"] == heuristic
+
+
+# ─── Retriever (RAG) + Session node types ────────────────────────────────
+
+
+class TestBuilderRetrieverNode:
+    """Retriever node: full RAG pipeline — vector store, embeddings, top_k, hybrid, rerank."""
+
+    def test_palette_has_retriever_entry(self):
+        assert 'data-type="retriever"' in BUILDER_HTML
+        assert "Retriever (RAG)" in BUILDER_HTML
+
+    def test_mknode_retriever_defaults(self):
+        assert "store_type: 'memory'" in BUILDER_HTML
+        assert "embedding_provider: 'openai'" in BUILDER_HTML
+        assert "top_k: 5" in BUILDER_HTML
+        assert "hybrid: false" in BUILDER_HTML
+        assert "rerank: false" in BUILDER_HTML
+
+    def test_retriever_panel_has_all_controls(self):
+        """Panel exposes store, collection, embedding, top_k, threshold, hybrid, rerank."""
+        # The panel is in showNodeProps — labels 'Vector Store' only appear there.
+        idx = BUILDER_HTML.index("Vector Store")
+        block = BUILDER_HTML[idx : idx + 3000]
+        assert "Embedding Provider" in block
+        assert "top_k" in block
+        assert "Hybrid" in block
+        assert "Rerank" in block
+
+    def test_genpython_emits_vector_store_imports(self):
+        """Every vector-store backend has an import path wired into genPython."""
+        gp_idx = BUILDER_HTML.index("function genPython(")
+        gp_block = BUILDER_HTML[gp_idx : gp_idx + 3500]
+        for backend in [
+            "SQLiteVectorStore",
+            "ChromaVectorStore",
+            "PineconeVectorStore",
+            "FAISSVectorStore",
+            "QdrantVectorStore",
+            "PgVectorStore",
+        ]:
+            assert backend in gp_block, f"missing import for {backend}"
+        assert "InMemoryVectorStore" in gp_block
+
+    def test_genpython_hybrid_emits_hybrid_searcher(self):
+        gp_idx = BUILDER_HTML.index("function genPython(")
+        gp_block = BUILDER_HTML[gp_idx : gp_idx + 10000]
+        assert "HybridSearcher" in gp_block
+        assert "FusionMethod.RRF" in gp_block
+        assert "HybridSearchTool" in gp_block
+
+    def test_genpython_rerank_emits_reranker(self):
+        gp_idx = BUILDER_HTML.index("function genPython(")
+        gp_block = BUILDER_HTML[gp_idx : gp_idx + 10000]
+        assert "Reranker(" in gp_block
+
+    def test_genyaml_emits_retriever_block(self):
+        gy_idx = BUILDER_HTML.index("function genYaml(")
+        gy_block = BUILDER_HTML[gy_idx : gy_idx + 4000]
+        assert "type: retriever" in gy_block
+
+    def test_retriever_is_not_a_graph_node(self):
+        """Edges involving retrievers must be skipped in graph wiring."""
+        gp_idx = BUILDER_HTML.index("function genPython(")
+        gp_block = BUILDER_HTML[gp_idx : gp_idx + 12000]
+        assert "fn.type === 'retriever'" in gp_block
+
+
+class TestBuilderSessionNode:
+    """Session resource node: JSON / SQLite / Redis / Supabase."""
+
+    def test_palette_has_session_entry(self):
+        assert 'data-type="session"' in BUILDER_HTML
+        assert "Session Store" in BUILDER_HTML
+
+    def test_mknode_session_defaults(self):
+        assert "store_type: 'json'" in BUILDER_HTML
+        assert "table_name: 'selectools_sessions'" in BUILDER_HTML
+
+    def test_session_panel_backend_options(self):
+        # Locate the backend-select block by the 'Backend' label in the panel.
+        idx = BUILDER_HTML.index("'Backend', 'select'")
+        block = BUILDER_HTML[idx : idx + 500]
+        for backend in ["'json'", "'sqlite'", "'redis'", "'supabase'"]:
+            assert backend in block, f"missing session backend {backend}"
+
+    def test_agent_panel_has_session_dropdown(self):
+        # The agent panel wires the Session Store dropdown to session_ref.
+        assert "session_ref" in BUILDER_HTML
+        # `n.session_ref = match` is the writer in the agent-panel dropdown handler.
+        idx = BUILDER_HTML.index("n.session_ref = match")
+        block = BUILDER_HTML[max(0, idx - 500) : idx + 300]
+        assert "Session Store" in block
+
+    def test_genpython_emits_session_store_imports(self):
+        gp_idx = BUILDER_HTML.index("function genPython(")
+        gp_block = BUILDER_HTML[gp_idx : gp_idx + 3500]
+        for cls in [
+            "JsonFileSessionStore",
+            "SQLiteSessionStore",
+            "RedisSessionStore",
+            "SupabaseSessionStore",
+        ]:
+            assert cls in gp_block, f"missing session-store import for {cls}"
+
+    def test_genpython_wires_session_into_agent_config(self):
+        gp_idx = BUILDER_HTML.index("function genPython(")
+        gp_block = BUILDER_HTML[gp_idx : gp_idx + 10000]
+        assert "session_store=" in gp_block
+        assert "session_id=" in gp_block
+
+    def test_session_has_no_ports(self):
+        """Session nodes are resource nodes — no input/output edges."""
+        assert "n.type !== 'start' && n.type !== 'note' && n.type !== 'session'" in BUILDER_HTML
+        assert "n.type !== 'end' && n.type !== 'note' && n.type !== 'session'" in BUILDER_HTML
+
+
+class TestBuilderRagPresets:
+    """New presets: hybrid_rag, multi_tenant_rag. Existing rag_pipeline uses retriever node."""
+
+    def test_hybrid_rag_template_exists(self):
+        assert "name === 'hybrid_rag'" in BUILDER_HTML
+        assert "Hybrid RAG" in BUILDER_HTML
+
+    def test_multi_tenant_rag_template_exists(self):
+        assert "name === 'multi_tenant_rag'" in BUILDER_HTML
+        assert "Multi-Tenant RAG" in BUILDER_HTML
+
+    def test_rag_pipeline_uses_retriever_node(self):
+        """Updated preset: retriever is a retriever node, not a plain agent."""
+        idx = BUILDER_HTML.index("name === 'rag_pipeline'")
+        block = BUILDER_HTML[idx : idx + 1500]
+        assert "mkNode('retriever'" in block

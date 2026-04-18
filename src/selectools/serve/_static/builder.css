@@ -430,6 +430,8 @@ select option { background: var(--surface); }
 .node-note       { --glow: rgba(245,158,11,0.28); }
 .node-hitl       { --glow: rgba(245,158,11,0.28); }
 .node-agent_tool { --glow: rgba(167,139,250,0.28); }
+.node-retriever  { --glow: rgba(6,182,212,0.28); }
+.node-session    { --glow: rgba(139,92,246,0.28); }
 .node-start .body { fill: rgba(34,197,94,0.12); stroke: #22c55e; stroke-width: 1.5; rx: 8; }
 .node-end   .body { fill: rgba(239,68,68,0.12);  stroke: #ef4444; stroke-width: 1.5; rx: 8; }
 .node-agent .body { fill: rgba(34,211,238,0.09); stroke: #22d3ee; stroke-width: 1.5; rx: 8; }
@@ -437,8 +439,11 @@ select option { background: var(--surface); }
 .node-subgraph .body { fill: rgba(168,85,247,0.09); stroke: #a855f7; stroke-width: 1.5; rx: 8; }
 .node-note  .body { fill: rgba(245,158,11,0.09); stroke: #f59e0b; stroke-width: 1.5; rx: 8; }
 .node-hitl  .body { fill: rgba(245,158,11,0.12); stroke: #f59e0b; stroke-width: 2; rx: 8; }
+.node-retriever .body { fill: rgba(6,182,212,0.09);  stroke: #06b6d4; stroke-width: 1.5; rx: 8; }
+.node-session   .body { fill: rgba(139,92,246,0.09); stroke: #8b5cf6; stroke-width: 1.5; stroke-dasharray: 4,3; rx: 8; }
 .node-agent.sel .body { stroke: var(--blue); stroke-width: 2.5; }
-.node-loop.sel .body, .node-subgraph.sel .body, .node-note.sel .body, .node-hitl.sel .body { stroke-width: 2.5; filter: drop-shadow(0 0 5px currentColor); }
+.node-loop.sel .body, .node-subgraph.sel .body, .node-note.sel .body, .node-hitl.sel .body,
+.node-retriever.sel .body, .node-session.sel .body { stroke-width: 2.5; filter: drop-shadow(0 0 5px currentColor); }
 .node-start.sel .body,
 .node-end.sel   .body { stroke-width: 2.5; filter: drop-shadow(0 0 5px currentColor); }
 .node-label    { fill: var(--text);  font-family: var(--font-ui); font-size: 12px; font-weight: 600; }
