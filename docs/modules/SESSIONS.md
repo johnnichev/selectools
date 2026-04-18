@@ -303,6 +303,8 @@ RLS with no policies locks anon access out.
 pip install selectools[supabase]
 ```
 
+**Example:** [`examples/96_supabase_session_store.py`](https://github.com/johnnichev/selectools/blob/main/examples/96_supabase_session_store.py) — runs offline against an in-process fake client; swap in `supabase.create_client(...)` for production.
+
 ---
 
 ## TTL-Based Expiry

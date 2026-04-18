@@ -19,8 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `selectools` package and documented in
   [`docs/modules/SESSIONS.md`](modules/SESSIONS.md). 37 new unit tests
   backed by a `FakeSupabaseClient` — no live Supabase or installed
-  `supabase` package required. Closes part of #60 (the SessionStore
-  half; KnowledgeMemory backend is a separate follow-up).
+  `supabase` package required. Runnable demo at
+  [`examples/96_supabase_session_store.py`](https://github.com/johnnichev/selectools/blob/main/examples/96_supabase_session_store.py).
+  Closes part of #60 (the SessionStore half; KnowledgeMemory backend is
+  a separate follow-up).
 
 ## [0.22.0] - 2026-04-13 — Competitor-Informed Bug Fixes + Loop Detection
 
