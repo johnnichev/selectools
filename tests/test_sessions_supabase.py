@@ -516,3 +516,18 @@ class TestSupabaseSessionStoreImportError:
         with patch.dict("sys.modules", {"supabase": None}):
             with pytest.raises(ImportError, match="supabase"):
                 SupabaseSessionStore(client=client)
+
+
+# ======================================================================
+# Top-level package export
+# ======================================================================
+
+
+class TestSupabaseSessionStoreTopLevelImport:
+    def test_importable_from_package_root(self) -> None:
+        """`from selectools import SupabaseSessionStore` must work."""
+        import selectools
+
+        assert hasattr(selectools, "SupabaseSessionStore")
+        assert selectools.SupabaseSessionStore is SupabaseSessionStore
+        assert "SupabaseSessionStore" in selectools.__all__

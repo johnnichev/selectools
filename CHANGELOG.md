@@ -10,8 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `SupabaseSessionStore` — Postgres-backed `SessionStore` via Supabase
-  PostgREST. Optional dep: `pip install selectools[supabase]`. Closes part
-  of #60 (the SessionStore half; KnowledgeMemory backend is separate).
+  PostgREST. Fourth backend alongside JSON file, SQLite, and Redis.
+  `@stable`, with the same validation guards (null bytes, 512-char cap)
+  and namespace support as `RedisSessionStore`. Idempotent saves via
+  `upsert(on_conflict="session_id")`. Configurable `table_name`
+  (defaults to `selectools_sessions`). Optional dep:
+  `pip install selectools[supabase]`. Exported from the top-level
+  `selectools` package and documented in
+  [`docs/modules/SESSIONS.md`](modules/SESSIONS.md). 37 new unit tests
+  backed by a `FakeSupabaseClient` — no live Supabase or installed
+  `supabase` package required. Closes part of #60 (the SessionStore
+  half; KnowledgeMemory backend is a separate follow-up).
 
 ## [0.22.0] - 2026-04-13 — Competitor-Informed Bug Fixes + Loop Detection
 

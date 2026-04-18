@@ -897,7 +897,7 @@ result = agent.run([Message(role=Role.USER, content="What's my name?")])
 # Agent knows: "Alice"
 ```
 
-Three backends are available: `JsonFileSessionStore`, `SQLiteSessionStore`, `RedisSessionStore`. All support TTL-based expiry.
+Four backends are available: `JsonFileSessionStore`, `SQLiteSessionStore`, `RedisSessionStore`, `SupabaseSessionStore`. All support namespace isolation; the file/SQLite/Redis backends also support TTL-based expiry.
 
 See [Sessions Module](SESSIONS.md) for backend details and TTL configuration.
 
@@ -1897,7 +1897,7 @@ def divide(a: float, b: float) -> str:
 - [Parser Module](PARSER.md) - Tool call parsing details
 - [Providers Module](PROVIDERS.md) - Provider implementations and FallbackProvider
 - [Memory Module](MEMORY.md) - Conversation memory and tool-pair-aware trimming
-- [Sessions Module](SESSIONS.md) - Persistent session storage with 3 backends
+- [Sessions Module](SESSIONS.md) - Persistent session storage with 4 backends
 - [Entity Memory Module](ENTITY_MEMORY.md) - Named entity extraction and tracking
 - [Knowledge Graph Module](KNOWLEDGE_GRAPH.md) - Relationship triple extraction
 - [Knowledge Memory Module](KNOWLEDGE.md) - Cross-session durable memory

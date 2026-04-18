@@ -63,7 +63,7 @@ Selectools is a production-ready Python framework for building AI agents with to
 - **Audit Logging**: JSONL audit trail with privacy controls (full/keys-only/hashed/none)
 - **Tool Output Screening**: Pattern-based prompt injection detection (15 built-in patterns)
 - **Coherence Checking**: LLM-based intent verification for tool calls
-- **Persistent Sessions**: SessionStore protocol with JSON file, SQLite, and Redis backends
+- **Persistent Sessions**: SessionStore protocol with JSON file, SQLite, Redis, and Supabase backends
 - **Summarize-on-Trim**: LLM-generated summaries of trimmed messages
 - **Entity Memory**: Auto-extract named entities with LRU-pruned registry
 - **Knowledge Graph**: Relationship triple extraction and keyword-based querying
@@ -195,11 +195,12 @@ Each implements the `Provider` protocol with `complete()`, `stream()`, `acomplet
 
 ### 6a. Persistent Sessions (`sessions.py`)
 
-**SessionStore** protocol with three backends for saving/loading `ConversationMemory`:
+**SessionStore** protocol with four backends for saving/loading `ConversationMemory`:
 
 - `JsonFileSessionStore` — file-based, one JSON file per session
 - `SQLiteSessionStore` — single database, JSON column
 - `RedisSessionStore` — distributed, server-side TTL
+- `SupabaseSessionStore` — Postgres-backed via Supabase PostgREST, JSONB column
 - Auto-save after each run, auto-load on init via `AgentConfig`
 
 ### 6b. Entity Memory (`entity_memory.py`)
