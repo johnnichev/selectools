@@ -132,6 +132,15 @@ class TestEntityMemoryExtraction:
         result = em.extract_entities([Message(role=Role.USER, content="test")])
         assert result == []
 
+    def test_provider_failure_logs_warning(self, caplog) -> None:
+        import logging as _logging
+
+        em = EntityMemory(provider=FailingProvider())
+        with caplog.at_level(_logging.WARNING, logger="selectools.entity_memory"):
+            result = em.extract_entities([Message(role=Role.USER, content="test")])
+        assert result == []
+        assert "Entity extraction failed" in caplog.text
+
     def test_respects_relevance_window(self) -> None:
         entities_json = json.dumps([{"name": "X", "entity_type": "concept"}])
         provider = FakeExtractionProvider(entities_json)

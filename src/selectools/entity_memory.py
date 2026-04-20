@@ -8,6 +8,7 @@ extraction, deduplication, and LRU pruning.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import threading
 import time
@@ -16,6 +17,8 @@ from typing import Any, Dict, List, Optional
 
 from .stability import stable
 from .types import Message, Role
+
+logger = logging.getLogger(__name__)
 
 
 @stable
@@ -173,6 +176,7 @@ class EntityMemory:
                 )
             return extracted
         except Exception:
+            logger.warning("Entity extraction failed", exc_info=True)
             return []
 
     def update(self, entities: List[Entity]) -> None:
