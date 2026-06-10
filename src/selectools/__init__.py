@@ -50,10 +50,15 @@ from .guardrails import (
 )
 from .knowledge import (
     FileKnowledgeStore,
+    KnowledgeBackend,
     KnowledgeEntry,
     KnowledgeMemory,
     KnowledgeStore,
     SQLiteKnowledgeStore,
+)
+from .knowledge_backends import (
+    RedisKnowledgeBackend,
+    SupabaseKnowledgeBackend,
 )
 from .knowledge_graph import (
     InMemoryTripleStore,
@@ -277,6 +282,10 @@ __all__ = [
     # Knowledge stores (optional deps: redis, supabase)
     # from selectools.knowledge_store_redis import RedisKnowledgeStore
     # from selectools.knowledge_store_supabase import SupabaseKnowledgeStore
+    # Knowledge backends (blob persistence between deploys; lazy optional deps)
+    "KnowledgeBackend",
+    "SupabaseKnowledgeBackend",
+    "RedisKnowledgeBackend",
     # Token estimation
     "TokenEstimate",
     "estimate_tokens",
