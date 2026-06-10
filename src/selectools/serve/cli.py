@@ -40,6 +40,11 @@ def main() -> None:
     )
     serve_parser.add_argument("--no-playground", action="store_true", help="Disable playground UI")
     serve_parser.add_argument(
+        "--api",
+        action="store_true",
+        help="Serve the agent as a production REST API (/v1/chat, /v1/sessions, ...)",
+    )
+    serve_parser.add_argument(
         "--builder", action="store_true", help="Enable visual agent builder UI at /builder"
     )
     serve_parser.add_argument(
@@ -104,6 +109,10 @@ def _cmd_serve(args: argparse.Namespace) -> None:
         print(f"Available templates: {', '.join(list_templates())}")
         sys.exit(1)
 
+    if getattr(args, "api", False):
+        _serve_api(agent, args.host, args.port, auth_token)
+        return
+
     app = create_app(
         agent,
         playground=not args.no_playground,
@@ -113,6 +122,31 @@ def _cmd_serve(args: argparse.Namespace) -> None:
         auth_token=auth_token,
     )
     app.serve()
+
+
+def _serve_api(agent: Any, host: str, port: int, auth_token: Any) -> None:
+    """Serve an agent as a production REST API via AgentAPI (Starlette/uvicorn)."""
+    try:
+        import uvicorn
+
+        from .api import AgentAPI
+    except ImportError:
+        print("The --api flag requires starlette and uvicorn:")
+        print("  pip install selectools[serve]")
+        sys.exit(1)
+
+    app = AgentAPI(agents=[agent], auth_key=auth_token)
+    print(f"Agent API serving at http://{host}:{port}")
+    print("  POST   /v1/chat           — single-turn completion")
+    print("  POST   /v1/chat/stream    — streaming completion (SSE)")
+    print("  POST   /v1/sessions       — create session")
+    print("  GET    /v1/sessions/{id}  — get session history")
+    print("  DELETE /v1/sessions/{id}  — delete session")
+    print("  GET    /v1/health         — health check")
+    if auth_token:
+        print("Auth: Authorization: Bearer <token> required (except /v1/health).")
+    print("\nPress Ctrl+C to stop.")
+    uvicorn.run(app, host=host, port=port)
 
 
 def _serve_builder(host: str, port: int, auth_token: Any) -> None:

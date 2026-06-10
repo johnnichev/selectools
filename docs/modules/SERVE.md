@@ -38,7 +38,8 @@ app.serve(port=8000)
 
 1. [Overview](#overview)
 2. [Quick Start](#quick-start)
-3. [CLI Commands](#cli-commands)
+3. [Agent-as-API (Production REST)](#agent-as-api-production-rest)
+4. [CLI Commands](#cli-commands)
 4. [Endpoints](#endpoints)
 5. [Streaming (SSE)](#streaming-sse)
 6. [Playground UI](#playground-ui)
@@ -113,6 +114,86 @@ Selectools agent serving at http://0.0.0.0:8000
 
 Press Ctrl+C to stop.
 ```
+
+---
+
+## Agent-as-API (Production REST)
+
+**Import:** `from selectools.serve import AgentAPI`
+**Stability:** beta
+**Added in:** v0.24.0
+**Requires:** `pip install selectools[serve]` (Starlette + uvicorn)
+
+`AgentAPI` auto-generates a production REST API from any `Agent` (or several). The instance is a Starlette ASGI app -- run it with uvicorn, hypercorn, or any ASGI server.
+
+```python title="api.py"
+from selectools.serve import AgentAPI
+
+app = AgentAPI(agents=[my_agent, my_other_agent], auth_key="sk-...")
+# Run with: uvicorn api:app --port 8000
+```
+
+Or straight from a YAML config:
+
+```bash
+selectools serve agent.yaml --api --port 8000
+```
+
+### Generated Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/v1/chat` | Single-turn completion (JSON) |
+| `POST` | `/v1/chat/stream` | Streaming completion (SSE) |
+| `POST` | `/v1/sessions` | Create a session |
+| `GET` | `/v1/sessions/{id}` | Get session history |
+| `DELETE` | `/v1/sessions/{id}` | Delete a session |
+| `GET` | `/v1/health` | Health check (never requires auth) |
+
+### Request / Response Schema
+
+```bash
+curl -X POST http://localhost:8000/v1/chat \
+  -H "Authorization: Bearer sk-..." \
+  -H "user_id: alice" \
+  -H "Content-Type: application/json" \
+  -d '{"input": "Hello!", "session_id": "optional", "agent": "optional-name"}'
+```
+
+```json
+{
+  "output": "Hi there!",
+  "session_id": "01bed06e7cf747d9...",
+  "agent": "support",
+  "usage": {"prompt_tokens": 12, "completion_tokens": 8, "total_tokens": 20, "cost_usd": 0.0001}
+}
+```
+
+Errors use a standardized envelope with proper status codes (401 unauthorized, 404 unknown session/agent, 422 validation):
+
+```json
+{"error": {"message": "Session 'abc' not found", "type": "not_found"}}
+```
+
+### Auth, Users, and Sessions
+
+- **Auth:** pass `auth_key="sk-..."` and every route except `/v1/health` requires `Authorization: Bearer <key>`.
+- **Per-user isolation:** clients send a `user_id` header (or `x-user-id`). Sessions are namespaced per user -- one user can never read, write, or delete another user's sessions. Requests without the header share the `"default"` namespace.
+- **Session persistence:** pass any `SessionStore` backend (`JsonFileSessionStore`, `SQLiteSessionStore`, `RedisSessionStore`, `SupabaseSessionStore`) via `session_store=`. Defaults to an in-memory store.
+- **Multi-agent:** `AgentAPI(agents=[a, b])` routes by `config.name` via the optional `"agent"` request field; the first agent is the default.
+
+### Streaming Events
+
+`POST /v1/chat/stream` emits SSE events:
+
+```
+data: {"type": "chunk", "content": "Hi"}
+data: {"type": "chunk", "content": " there!"}
+data: {"type": "result", "output": "Hi there!", "session_id": "...", "agent": "support", "usage": {...}}
+data: [DONE]
+```
+
+See `examples/97_agent_as_api.py` for a complete offline runnable demo.
 
 ---
 
