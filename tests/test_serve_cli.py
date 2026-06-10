@@ -104,6 +104,24 @@ class TestMainParsing:
             args = mock_serve.call_args[0][0]
             assert args.builder is True
 
+    def test_serve_api_flag(self):
+        with (
+            patch("sys.argv", ["selectools", "serve", "agent.yaml", "--api"]),
+            patch("selectools.serve.cli._cmd_serve") as mock_serve,
+        ):
+            main()
+            args = mock_serve.call_args[0][0]
+            assert args.api is True
+
+    def test_serve_api_flag_default_false(self):
+        with (
+            patch("sys.argv", ["selectools", "serve", "agent.yaml"]),
+            patch("selectools.serve.cli._cmd_serve") as mock_serve,
+        ):
+            main()
+            args = mock_serve.call_args[0][0]
+            assert args.api is False
+
 
 # ---------------------------------------------------------------------------
 # _cmd_serve
@@ -151,6 +169,27 @@ class TestCmdServe:
         with patch("selectools.serve.cli._serve_with_reload") as mock_reload:
             _cmd_serve(args)
             mock_reload.assert_called_once()
+
+    def test_api_mode_calls_serve_api(self, tmp_path):
+        config_file = tmp_path / "agent.yaml"
+        config_file.write_text("provider: local\nmodel: test\n")
+        args = argparse.Namespace(
+            config=str(config_file),
+            builder=False,
+            reload=False,
+            host="0.0.0.0",
+            port=8000,
+            no_playground=False,
+            auth_token="sk-test",
+            api=True,
+        )
+        with patch("selectools.serve.cli._serve_api") as mock_api:
+            _cmd_serve(args)
+            mock_api.assert_called_once()
+            call_args = mock_api.call_args[0]
+            assert call_args[1] == "0.0.0.0"
+            assert call_args[2] == 8000
+            assert call_args[3] == "sk-test"
 
     def test_config_file_loads_yaml(self, tmp_path):
         config_file = tmp_path / "agent.yaml"
