@@ -109,12 +109,31 @@ class AnthropicProvider(Provider):
     supports_streaming = True
     supports_async = True
 
+    # Class-level defaults so instances created without __init__ (e.g. in
+    # tests via __new__) keep the caching-off behavior.
+    cache_system: bool = False
+    cache_tools: bool = False
+
     def __init__(
         self,
         api_key: str | None = None,
         default_model: str = AnthropicModels.SONNET_4_6.id,
         base_url: str | None = None,
+        cache_system: bool = False,
+        cache_tools: bool = False,
     ):
+        """
+        Args:
+            api_key: Anthropic API key (falls back to ANTHROPIC_API_KEY).
+            default_model: Model used when calls omit an explicit model.
+            base_url: Optional API base URL override.
+            cache_system: Opt in to Anthropic prompt caching for the system
+                prompt — sends ``system`` in block form with an ephemeral
+                ``cache_control`` marker.
+            cache_tools: Opt in to Anthropic prompt caching for tools — adds
+                an ephemeral ``cache_control`` marker to the last tool, which
+                caches the entire tool list.
+        """
         load_default_env()
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
         if not self.api_key:
@@ -134,6 +153,8 @@ class AnthropicProvider(Provider):
         self._client = Anthropic(api_key=self.api_key, base_url=base_url)
         self._async_client = AsyncAnthropic(api_key=self.api_key, base_url=base_url)
         self.default_model = default_model
+        self.cache_system = cache_system
+        self.cache_tools = cache_tools
 
     def complete(
         self,
@@ -167,13 +188,13 @@ class AnthropicProvider(Provider):
         model_name = model or self.default_model
         request_args = {
             "model": model_name,
-            "system": system_prompt,
+            "system": self._system_param(system_prompt),
             "messages": payload,
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
         if tools:
-            request_args["tools"] = [self._map_tool_to_anthropic(t) for t in tools]
+            request_args["tools"] = self._tools_param(tools)
 
         if timeout is not None:
             request_args["timeout"] = timeout
@@ -212,6 +233,10 @@ class AnthropicProvider(Provider):
             ),
             model=model_name,
             provider="anthropic",
+            cache_creation_input_tokens=self._cache_usage_token(
+                usage, "cache_creation_input_tokens"
+            ),
+            cache_read_input_tokens=self._cache_usage_token(usage, "cache_read_input_tokens"),
         )
 
         return (
@@ -245,14 +270,14 @@ class AnthropicProvider(Provider):
         model_name = model or self.default_model
         request_args = {
             "model": model_name,
-            "system": system_prompt,
+            "system": self._system_param(system_prompt),
             "messages": payload,
             "temperature": temperature,
             "max_tokens": max_tokens,
             "stream": True,
         }
         if tools:
-            request_args["tools"] = [self._map_tool_to_anthropic(t) for t in tools]
+            request_args["tools"] = self._tools_param(tools)
         if timeout is not None:
             request_args["timeout"] = timeout
         try:
@@ -471,6 +496,39 @@ class AnthropicProvider(Provider):
 
         return formatted
 
+    def _system_param(self, system_prompt: str) -> Union[str, List[Dict[str, Any]]]:
+        """Build the top-level ``system`` field.
+
+        When ``cache_system`` is enabled the prompt is sent in block form
+        with an ephemeral ``cache_control`` marker so Anthropic caches it.
+        """
+        if self.cache_system:
+            return [
+                {
+                    "type": "text",
+                    "text": system_prompt,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ]
+        return system_prompt
+
+    def _tools_param(self, tools: List[Tool]) -> List[Dict[str, Any]]:
+        """Map tools to Anthropic schema, marking the last one for caching.
+
+        Anthropic caches everything up to the ``cache_control`` marker, so
+        a single marker on the final tool caches the entire tool list.
+        """
+        mapped = [self._map_tool_to_anthropic(t) for t in tools]
+        if self.cache_tools and mapped:
+            mapped[-1]["cache_control"] = {"type": "ephemeral"}
+        return mapped
+
+    @staticmethod
+    def _cache_usage_token(usage: Any, attr: str) -> int | None:
+        """Read an optional cache token count from a response usage object."""
+        value = getattr(usage, attr, None) if usage else None
+        return value if isinstance(value, int) else None
+
     def _map_tool_to_anthropic(self, tool: Tool) -> Dict[str, Any]:
         """Convert a selectools.Tool to Anthropic tool schema."""
         schema = tool.schema()
@@ -502,13 +560,13 @@ class AnthropicProvider(Provider):
         model_name = model or self.default_model
         request_args = {
             "model": model_name,
-            "system": system_prompt,
+            "system": self._system_param(system_prompt),
             "messages": payload,
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
         if tools:
-            request_args["tools"] = [self._map_tool_to_anthropic(t) for t in tools]
+            request_args["tools"] = self._tools_param(tools)
 
         if timeout is not None:
             request_args["timeout"] = timeout
@@ -547,6 +605,10 @@ class AnthropicProvider(Provider):
             ),
             model=model_name,
             provider="anthropic",
+            cache_creation_input_tokens=self._cache_usage_token(
+                usage, "cache_creation_input_tokens"
+            ),
+            cache_read_input_tokens=self._cache_usage_token(usage, "cache_read_input_tokens"),
         )
 
         return (
@@ -580,14 +642,14 @@ class AnthropicProvider(Provider):
         model_name = model or self.default_model
         request_args = {
             "model": model_name,
-            "system": system_prompt,
+            "system": self._system_param(system_prompt),
             "messages": payload,
             "temperature": temperature,
             "max_tokens": max_tokens,
             "stream": True,
         }
         if tools:
-            request_args["tools"] = [self._map_tool_to_anthropic(t) for t in tools]
+            request_args["tools"] = self._tools_param(tools)
         if timeout is not None:
             request_args["timeout"] = timeout
         try:

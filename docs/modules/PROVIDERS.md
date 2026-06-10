@@ -210,9 +210,25 @@ provider = AnthropicProvider(
 # - Vision support (model-dependent)
 # - Full usage stats
 # - Native tool calling (function calling API)
+# - Prompt caching (opt-in)
 ```
 
 **API:** Anthropic Messages API
+
+**Prompt Caching:** Opt-in flags enable Anthropic prompt caching to cut cost and latency on repeated prefixes:
+
+```python
+provider = AnthropicProvider(
+    cache_system=True,  # system prompt sent in block form with cache_control
+    cache_tools=True,   # cache_control marker on the last tool (caches the whole list)
+)
+
+msg, usage = provider.complete(model="", system_prompt="...", messages=[...])
+usage.cache_creation_input_tokens  # tokens written to the cache (None if not reported)
+usage.cache_read_input_tokens      # tokens served from the cache (None if not reported)
+```
+
+Both flags default to `False` (behavior unchanged). Anthropic enforces minimum cacheable prefix sizes, so caching short prompts has no effect — enable these only when the system prompt or tool list is large and stable.
 
 ### Gemini Provider
 
