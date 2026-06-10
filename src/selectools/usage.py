@@ -25,6 +25,12 @@ class UsageStats:
         provider: Provider name (openai, anthropic, gemini, etc.).
         embedding_tokens: Number of tokens used for embeddings (RAG only).
         embedding_cost_usd: Estimated cost in USD for embeddings (RAG only).
+        cache_creation_input_tokens: Tokens written to the provider prompt
+            cache (Anthropic prompt caching). None when the provider does
+            not report cache usage.
+        cache_read_input_tokens: Tokens served from the provider prompt
+            cache (Anthropic prompt caching). None when the provider does
+            not report cache usage.
     """
 
     prompt_tokens: int = 0
@@ -35,6 +41,8 @@ class UsageStats:
     provider: str = ""
     embedding_tokens: int = 0
     embedding_cost_usd: float = 0.0
+    cache_creation_input_tokens: Optional[int] = None
+    cache_read_input_tokens: Optional[int] = None
 
     def __post_init__(self) -> None:
         """Ensure total_tokens is consistent."""
