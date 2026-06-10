@@ -63,7 +63,8 @@ with tempfile.TemporaryDirectory() as tmpdir:
 7. [Auto-Registered Tool](#auto-registered-tool)
 8. [Agent Integration](#agent-integration)
 9. [Log Pruning](#log-pruning)
-10. [Best Practices](#best-practices)
+10. [Backends for Ephemeral Infrastructure](#backends-for-ephemeral-infrastructure)
+11. [Best Practices](#best-practices)
 
 ---
 
@@ -502,6 +503,109 @@ Typical daily log: ~1-10 KB per day
 30 days retention: ~30-300 KB total
 MEMORY.md: ~1-50 KB (depends on usage)
 ```
+
+---
+
+## Backends for Ephemeral Infrastructure
+
+`KnowledgeMemory` is filesystem-based, but Railway, Fly.io, Lambda, Cloud Run,
+and Vercel Functions wipe `/tmp` between deploys. The `KnowledgeBackend`
+protocol (beta) upstreams the standard workaround: **scratch on disk during
+the request, persist to blob/DB between requests.**
+
+```python
+from selectools import KnowledgeMemory
+from selectools.knowledge_backends import SupabaseKnowledgeBackend
+
+memory = KnowledgeMemory(
+    directory="/tmp/agent-memory",
+    backend=SupabaseKnowledgeBackend(client, key="user-123"),
+)
+```
+
+On construction the directory is restored from the backend; after every
+mutation (`remember()`, `prune_old_logs()`) the directory is packed into a
+single blob and saved back. `backend=None` (the default) keeps the original
+filesystem-only behavior exactly. Call `memory.flush()` after mutating
+`memory.store` directly or hand-writing files into the directory.
+
+### The Protocol
+
+Two methods, single-blob contract:
+
+```python
+class KnowledgeBackend(Protocol):
+    def load_bytes(self) -> Optional[bytes]: ...
+    def save_bytes(self, data: bytes) -> None: ...
+```
+
+Any object with these two methods works — write your own adapter in ~10 lines.
+
+### SupabaseKnowledgeBackend
+
+Postgres table via Supabase PostgREST, mirroring `SupabaseSessionStore`
+client handling (you create the client, pass it in; `supabase` is a lazy
+optional dependency: `pip install selectools[supabase]`).
+
+```python
+from supabase import create_client
+from selectools.knowledge_backends import SupabaseKnowledgeBackend
+
+client = create_client(SUPABASE_URL, SERVICE_ROLE_KEY)
+backend = SupabaseKnowledgeBackend(client, key="user-123")
+```
+
+**Required table DDL** (run once in your Supabase project):
+
+```sql
+create table if not exists public.selectools_knowledge (
+    key        text        primary key,
+    data       text        not null,
+    updated_at timestamptz not null default now()
+);
+alter table public.selectools_knowledge enable row level security;
+```
+
+The blob is stored as readable text in the `data` column (UTF-8 JSON archive;
+non-UTF-8 payloads fall back to `b64:`-prefixed base64). To reuse an existing
+table, override the layout:
+
+```python
+SupabaseKnowledgeBackend(
+    client,
+    key=user_id,
+    table_name="users",
+    key_column="user_id",
+    data_column="memory_text",
+)
+```
+
+### RedisKnowledgeBackend
+
+Mirrors the `RedisSessionStore` pattern: lazy `import redis`
+(`pip install selectools[cache]`), prefix namespace, optional server-side TTL.
+
+```python
+from selectools.knowledge_backends import RedisKnowledgeBackend
+
+backend = RedisKnowledgeBackend(
+    key="user-123",
+    url="redis://localhost:6379/0",
+    prefix="selectools:knowledge:",   # default
+    ttl=86400,                         # optional, seconds
+)
+```
+
+### Notes
+
+- The backend snapshots the **directory**. A custom `store` whose data lives
+  outside the directory (e.g. `SQLiteKnowledgeStore` with a db path elsewhere)
+  is not covered by the snapshot.
+- Construct one `KnowledgeMemory` per request/user on ephemeral infra so the
+  restore-on-init / save-on-mutation cycle brackets each request.
+- `KnowledgeBackend` differs from `KnowledgeStore`: the store handles
+  structured entries and querying; the backend persists the whole directory
+  (store files, daily logs, `MEMORY.md`) as one opaque blob.
 
 ---
 

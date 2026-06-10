@@ -5,11 +5,27 @@ Provides durable memory that persists across agent sessions.  The original
 file-based backend is preserved for backward compatibility; new code can
 use the ``KnowledgeStore`` protocol with ``SQLiteKnowledgeStore`` (or Redis /
 Supabase backends in separate modules) for richer querying.
+
+For ephemeral infrastructure (Railway, Lambda, Cloud Run) where the local
+filesystem is wiped between deploys, pass a ``KnowledgeBackend`` to
+``KnowledgeMemory``.  The directory remains the fast scratch space during
+the request; the backend persists a snapshot of it between requests::
+
+    from selectools import KnowledgeMemory
+    from selectools.knowledge_backends import SupabaseKnowledgeBackend
+
+    memory = KnowledgeMemory(
+        directory="/tmp/agent-memory",
+        backend=SupabaseKnowledgeBackend(client, key="user-123"),
+    )
 """
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
+import logging
 import os
 import sqlite3
 import threading
@@ -19,7 +35,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 
-from .stability import stable
+from .stability import beta, stable
+
+_logger = logging.getLogger(__name__)
 
 # ======================================================================
 # KnowledgeEntry — structured entry for the new store-based API
@@ -110,6 +128,117 @@ class KnowledgeStore(Protocol):
     ) -> int:
         """Remove expired and low-importance non-persistent entries.  Returns count removed."""
         ...
+
+
+# ======================================================================
+# KnowledgeBackend — protocol for blob persistence of the memory directory
+# ======================================================================
+
+
+@beta
+class KnowledgeBackend(Protocol):
+    """Protocol for persisting the knowledge directory as a single blob.
+
+    The contract is a single opaque byte payload: ``KnowledgeMemory`` packs
+    its scratch directory into one blob after every mutation and restores it
+    on construction.  Implementations only need to store and retrieve that
+    blob — they never interpret its contents.
+
+    Built-in adapters live in ``selectools.knowledge_backends``
+    (``SupabaseKnowledgeBackend``, ``RedisKnowledgeBackend``).
+    """
+
+    def load_bytes(self) -> Optional[bytes]:
+        """Return the stored blob, or ``None`` if nothing has been saved yet."""
+        ...
+
+    def save_bytes(self, data: bytes) -> None:
+        """Persist *data*, replacing any previously stored blob."""
+        ...
+
+
+_ARCHIVE_VERSION = 1
+
+
+def _pack_directory(directory: str) -> bytes:
+    """Pack every file under *directory* into a JSON archive blob.
+
+    Layout: ``{"version": 1, "files": {relpath: {"encoding", "content"}}}``.
+    Text files use ``utf-8`` encoding; anything else falls back to
+    ``base64``.  In-flight ``*.tmp`` files from atomic writes are skipped.
+    """
+    files: Dict[str, Dict[str, str]] = {}
+    for root, _dirs, names in os.walk(directory):
+        for name in names:
+            if name.endswith(".tmp"):
+                continue
+            path = os.path.join(root, name)
+            rel = os.path.relpath(path, directory).replace(os.sep, "/")
+            try:
+                with open(path, "rb") as f:
+                    raw = f.read()
+            except OSError:
+                continue
+            try:
+                files[rel] = {"encoding": "utf-8", "content": raw.decode("utf-8")}
+            except UnicodeDecodeError:
+                files[rel] = {
+                    "encoding": "base64",
+                    "content": base64.b64encode(raw).decode("ascii"),
+                }
+    payload = {"version": _ARCHIVE_VERSION, "files": files}
+    return json.dumps(payload, ensure_ascii=False).encode("utf-8")
+
+
+def _validate_archive_path(directory: str, rel: str) -> str:
+    """Resolve *rel* inside *directory*, rejecting traversal and absolute paths."""
+    if not rel or "\x00" in rel:
+        raise ValueError(f"Invalid path in knowledge archive: {rel!r}")
+    if os.path.isabs(rel) or rel.startswith(("/", "\\")) or (len(rel) > 1 and rel[1] == ":"):
+        raise ValueError(f"Absolute path in knowledge archive: {rel!r}")
+    base = os.path.abspath(directory)
+    target = os.path.abspath(os.path.join(base, rel.replace("/", os.sep)))
+    if target != base and not target.startswith(base + os.sep):
+        raise ValueError(f"Path escapes knowledge directory: {rel!r}")
+    return target
+
+
+def _unpack_directory(directory: str, blob: bytes) -> None:
+    """Restore an archive produced by ``_pack_directory`` into *directory*.
+
+    Corrupt (non-JSON / wrong-shape) blobs are logged and ignored so a
+    damaged backend row never bricks agent startup.  Unsafe paths and
+    unknown encodings raise ``ValueError`` — those indicate tampering, not
+    benign corruption.
+    """
+    try:
+        payload = json.loads(blob.decode("utf-8"))
+        files = payload["files"]
+        if not isinstance(files, dict):
+            raise TypeError("'files' must be a dict")
+    except (json.JSONDecodeError, UnicodeDecodeError, KeyError, TypeError) as exc:
+        _logger.warning("Ignoring corrupt knowledge archive (%s); starting fresh", exc)
+        return
+    for rel, entry in files.items():
+        target = _validate_archive_path(directory, rel)
+        encoding = entry.get("encoding")
+        content = entry.get("content", "")
+        if encoding == "utf-8":
+            raw = content.encode("utf-8")
+        elif encoding == "base64":
+            try:
+                raw = base64.b64decode(content, validate=True)
+            except (binascii.Error, ValueError) as exc:
+                raise ValueError(
+                    f"Invalid base64 content for {rel!r} in knowledge archive"
+                ) from exc
+        else:
+            raise ValueError(f"Unknown encoding {encoding!r} for {rel!r} in knowledge archive")
+        os.makedirs(os.path.dirname(target) or directory, exist_ok=True)
+        tmp_path = target + ".tmp"
+        with open(tmp_path, "wb") as f:
+            f.write(raw)
+        os.replace(tmp_path, target)
 
 
 # ======================================================================
@@ -461,12 +590,25 @@ class KnowledgeMemory:
     2. **Store mode**: Pass a ``KnowledgeStore`` for structured entries with
        importance scoring, TTL, and pluggable backends.
 
+    Either mode can additionally be paired with a ``KnowledgeBackend`` for
+    ephemeral infrastructure: the directory is restored from the backend on
+    construction and re-persisted after every mutation, so ``/tmp`` being
+    wiped between deploys loses nothing.  ``backend=None`` (the default)
+    keeps the original filesystem-only behavior exactly.
+
+    Note: the backend snapshots the *directory*.  A custom ``store`` whose
+    data lives outside the directory (e.g. ``SQLiteKnowledgeStore`` with a
+    db path elsewhere) is not covered by the snapshot.
+
     Args:
         directory: Base directory for knowledge files.  Created if absent.
         store: Optional pluggable backend.  If ``None``, uses ``FileKnowledgeStore``.
         recent_days: Number of recent days to include in context.  Default: 2.
         max_context_chars: Maximum characters to include in context output.
         max_entries: Maximum entries before importance-based eviction.  Default: 50.
+        backend: Optional ``KnowledgeBackend`` that persists the directory
+            as a single blob between processes.  Restored on init, saved
+            after ``remember()`` / ``prune_old_logs()`` / ``flush()``.
     """
 
     def __init__(
@@ -476,14 +618,20 @@ class KnowledgeMemory:
         recent_days: int = 2,
         max_context_chars: int = 5000,
         max_entries: int = 50,
+        backend: Optional[KnowledgeBackend] = None,
     ) -> None:
         self._directory = directory
-        self._store = store or FileKnowledgeStore(directory)
         self._recent_days = recent_days
         self._max_context_chars = max_context_chars
         self._max_entries = max_entries
         self._lock = threading.Lock()
+        self._backend = backend
         os.makedirs(directory, exist_ok=True)
+        if backend is not None:
+            blob = backend.load_bytes()
+            if blob is not None:
+                _unpack_directory(directory, blob)
+        self._store = store or FileKnowledgeStore(directory)
 
     @property
     def directory(self) -> str:
@@ -494,6 +642,24 @@ class KnowledgeMemory:
     def store(self) -> KnowledgeStore:
         """The underlying knowledge store."""
         return self._store
+
+    @property
+    def backend(self) -> Optional[KnowledgeBackend]:
+        """The blob-persistence backend, or ``None`` for filesystem-only mode."""
+        return self._backend
+
+    def flush(self) -> None:
+        """Persist the current directory state to the backend.
+
+        No-op when no backend is configured.  ``remember()`` and
+        ``prune_old_logs()`` call this automatically; call it manually after
+        mutating ``store`` directly or writing files into the directory.
+        """
+        if self._backend is None:
+            return
+        with self._lock:
+            blob = _pack_directory(self._directory)
+        self._backend.save_bytes(blob)
 
     def remember(
         self,
@@ -543,6 +709,8 @@ class KnowledgeMemory:
 
         # Importance-based eviction
         self._enforce_max_entries()
+
+        self.flush()
 
         return entry_id
 
@@ -681,6 +849,9 @@ class KnowledgeMemory:
             except ValueError:
                 continue
 
+        if removed:
+            self.flush()
+
         return removed
 
     def to_dict(self) -> Dict[str, Any]:
@@ -704,6 +875,7 @@ class KnowledgeMemory:
 __all__ = [
     "KnowledgeEntry",
     "KnowledgeStore",
+    "KnowledgeBackend",
     "FileKnowledgeStore",
     "SQLiteKnowledgeStore",
     "KnowledgeMemory",
