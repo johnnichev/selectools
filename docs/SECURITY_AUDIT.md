@@ -14,7 +14,7 @@ This supersedes the [v0.19.2 audit](SECURITY.md). To report a vulnerability, see
 ## Scope and Methodology
 
 1. Full `bandit -r src/ -ll -q -c pyproject.toml` scan of `src/selectools/`
-2. Manual review of every `# nosec` annotation — **73 annotations across 30 files**
+2. Manual review of every `# nosec` annotation — **73 annotations across 35 files**
 3. `pip-audit` scan of the four core production dependencies and their resolved transitive tree
 4. SBOM regeneration and verification
 5. Review of the framework's defensive layers (threat-model summary below)

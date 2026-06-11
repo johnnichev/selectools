@@ -116,10 +116,12 @@ This matters if you use `from selectools import *` or lint against the public AP
 
 - **Pipeline family:** `Pipeline`, `Step`, `StepResult`, `step`, `branch`, `parallel`,
   `retry`, `cache_step`
-- **Router provider:** `RouterProvider`, `RouterConfig`
+- **Router provider:** `RouterProvider`, `RouterConfig` (these two were previously
+  importable only from `selectools.providers`; the top-level re-export is new)
 
 Existing `from selectools import Pipeline`-style imports keep working as before; they are
-simply official now.
+simply official now. `from selectools import RouterProvider` becomes available for the
+first time.
 
 ---
 
