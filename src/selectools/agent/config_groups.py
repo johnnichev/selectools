@@ -52,13 +52,61 @@ class RetryConfig:
 
 @dataclass
 class ToolConfig:
-    """Tool execution settings."""
+    """Tool execution settings.
+
+    Attributes:
+        timeout_seconds: Maximum execution time for each tool call. None = no timeout.
+        policy: Optional ToolPolicy with allow/review/deny rules.
+        confirm_action: Callback invoked for tools whose policy decision is ``review``.
+        approval_timeout: Seconds to wait for a confirm_action response.
+        parallel_execution: Execute multiple tool calls concurrently.
+        compress_results: When True, tool results longer than ``compress_threshold``
+            characters are summarized by a one-shot LLM call before being appended
+            to the conversation. Compressed results are prefixed with
+            ``[compressed from N chars]`` so the model knows. Terminal-tool results
+            and results matching ``stop_condition`` are never compressed (they
+            become the agent's final answer verbatim). On summarization failure the
+            result is truncated to ``compress_threshold`` chars with a
+            ``[truncated from N chars; compression failed]`` marker instead of
+            crashing the tool loop. Default: False (zero overhead).
+        compress_threshold: Character length above which a tool result is
+            compressed. Default: 2000.
+        compress_provider: Optional dedicated provider for compression calls.
+            Falls back to the agent's own provider when None — note this means
+            compression is billed at the agent's model rates unless
+            ``compress_model`` selects a cheaper model. When set,
+            ``compress_model`` MUST also be set: the agent's model almost
+            never exists on a different provider, and the resulting persistent
+            404 would silently degrade every oversized result to the
+            truncation fallback. Default: None.
+        compress_model: Model override for compression calls. Defaults to the
+            agent's effective model. A fast/cheap model is recommended.
+            Required when ``compress_provider`` is set. Default: None.
+
+    Raises:
+        ValueError: If ``compress_provider`` is set without an explicit
+            ``compress_model``.
+    """
 
     timeout_seconds: Optional[float] = None
     policy: Optional["ToolPolicy"] = None
     confirm_action: Optional[Any] = None  # ConfirmAction type
     approval_timeout: float = 60.0
     parallel_execution: bool = True
+    compress_results: bool = False
+    compress_threshold: int = 2000
+    compress_provider: Optional["Provider"] = None
+    compress_model: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if self.compress_provider is not None and self.compress_model is None:
+            raise ValueError(
+                "ToolConfig: compress_provider is set but compress_model is not. "
+                "The agent's own model is unlikely to exist on a dedicated "
+                "compression provider, which would 404 on every call and "
+                "silently degrade all oversized results to the truncation "
+                "fallback. Set compress_model explicitly."
+            )
 
 
 @dataclass

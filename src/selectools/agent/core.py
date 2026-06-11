@@ -31,7 +31,7 @@ from ..structured import (
 from ..tools import Tool
 from ..trace import AgentTrace, StepType, TraceStep
 from ..types import AgentResult, Message, Role, StreamChunk, ToolCall
-from ..usage import AgentUsage
+from ..usage import AgentUsage, UsageStats
 from ._lifecycle import _LifecycleMixin
 from ._memory_manager import _MemoryManagerMixin
 from ._provider_caller import _ProviderCallerMixin
@@ -67,6 +67,12 @@ class _RunContext:
     # Per-run artifact collector list (shared with the results contextvar so
     # tools can append via emit_artifact() during execution).
     artifacts: List[Artifact] = field(default_factory=list)
+    # Tool-result compression bookkeeping: warn about the truncation fallback
+    # at most once per run, and remember the parent iteration's usage so
+    # tool_tokens attribution is not polluted by compression-call usage
+    # entries appended mid-turn.
+    compression_fallback_warned: bool = False
+    parent_iteration_usage: Optional[UsageStats] = None
 
 
 @stable
@@ -1166,6 +1172,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 self._history.append(response_msg)
                 self._memory_add(response_msg, ctx.run_id)
 
+                # Capture the iteration usage that requested this tool batch
+                # BEFORE any tool-result compression appends its own usage
+                # entries (tool_tokens attribution; see _tool_executor).
+                ctx.parent_iteration_usage = (
+                    self.usage.iterations[-1] if self.usage.iterations else None
+                )
                 use_parallel = (
                     self.config.parallel_tool_execution and len(tool_calls_to_execute) > 1
                 )
@@ -1180,6 +1192,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         run_id=ctx.run_id,
                         user_text_for_coherence=ctx.user_text_for_coherence,
                         all_tool_results=ctx.all_tool_results,
+                        run_ctx=ctx,
                     )
                     ctx.last_tool_name = _last_name
                     ctx.last_tool_args = _last_args
@@ -1565,6 +1578,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 self._history.append(response_msg)
                 self._memory_add(response_msg, ctx.run_id)
 
+                # Capture the iteration usage that requested this tool batch
+                # BEFORE any tool-result compression appends its own usage
+                # entries (tool_tokens attribution; see _tool_executor).
+                ctx.parent_iteration_usage = (
+                    self.usage.iterations[-1] if self.usage.iterations else None
+                )
                 use_parallel = (
                     self.config.parallel_tool_execution and len(tool_calls_to_execute) > 1
                 )
@@ -1578,6 +1597,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         trace=ctx.trace,
                         run_id=ctx.run_id,
                         user_text_for_coherence=ctx.user_text_for_coherence,
+                        run_ctx=ctx,
                     )
                     ctx.last_tool_name = _last_name
                     ctx.last_tool_args = _last_args
@@ -1851,6 +1871,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 self._history.append(response_msg)
                 self._memory_add(response_msg, ctx.run_id)
 
+                # Capture the iteration usage that requested this tool batch
+                # BEFORE any tool-result compression appends its own usage
+                # entries (tool_tokens attribution; see _tool_executor).
+                ctx.parent_iteration_usage = (
+                    self.usage.iterations[-1] if self.usage.iterations else None
+                )
                 use_parallel = (
                     self.config.parallel_tool_execution and len(tool_calls_to_execute) > 1
                 )
@@ -1865,6 +1891,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         run_id=ctx.run_id,
                         user_text_for_coherence=ctx.user_text_for_coherence,
                         all_tool_results=ctx.all_tool_results,
+                        run_ctx=ctx,
                     )
                     ctx.last_tool_name = _last_name
                     ctx.last_tool_args = _last_args

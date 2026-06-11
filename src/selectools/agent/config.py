@@ -131,6 +131,13 @@ class AgentConfig:
         compress_keep_recent: Number of recent conversation turns to always keep
                verbatim.  Each "turn" is one user + one assistant message pair.
                Default: 4.
+        stop_condition: Optional predicate ``(tool_name, raw_result) -> bool``
+               that turns a tool result into the agent's final answer when it
+               returns True.  MUST be pure and cheap: it is evaluated on every
+               tool result (always on the RAW, uncompressed output, including
+               cached results), so it must not mutate state, perform I/O, or
+               depend on call order.  An exception raised by the predicate
+               propagates to the caller and aborts the run.  Default: None.
     """
 
     name: str = "agent"

@@ -1869,7 +1869,7 @@ class TestToolCacheHelpers:
         try:
             agent._store_tool_cache(echo_tool, {"text": "hi"}, "result_value")
             hit = agent._check_tool_cache(echo_tool, {"text": "hi"})
-            assert hit == "result_value"
+            assert hit == ("result_value", None)
         finally:
             echo_tool.cacheable = False
 

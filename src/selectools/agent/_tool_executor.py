@@ -7,12 +7,15 @@ import contextvars
 import hashlib
 import inspect
 import json
+import logging
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 # Module-level singleton for tool timeout execution — avoids spawning a new
 # thread pool on every tool call (see pitfall #20).
@@ -66,6 +69,19 @@ if TYPE_CHECKING:
     from .core import _RunContext
 
 
+# Marker prefix applied by _finish_compression to successful summaries.
+# Used to distinguish real compression output from the truncation fallback
+# when deciding whether to cache the compressed form alongside the raw result.
+_COMPRESSED_MARKER_PREFIX = "[compressed from "
+
+_COMPRESS_SYSTEM_PROMPT = (
+    "You compress verbose tool outputs for an AI agent. Produce a faithful, dense "
+    "summary of the tool output. Preserve exactly, verbatim: all numbers, "
+    "identifiers, URLs, file paths, error messages, and key data values. Never "
+    "invent or add information that is not in the input. Output only the summary."
+)
+
+
 class _ToolExecutorMixin:
     """Mixin that provides tool execution methods for the Agent class.
 
@@ -73,6 +89,172 @@ class _ToolExecutorMixin:
     analytics, _tools_by_name, etc.) which are expected to be provided by the
     Agent class that inherits from this mixin.
     """
+
+    # ------------------------------------------------------------------
+    # Tool result compression (ROADMAP P2)
+    # ------------------------------------------------------------------
+
+    def _tool_compression_candidate(self, tool: Optional["Tool"], result: str) -> bool:
+        """Cheap gate deciding whether tool-result compression should be attempted.
+
+        Returns False (with zero extra work) when compression is disabled, the
+        result is within the threshold, or the tool is terminal (its result
+        becomes the agent's final answer and must stay verbatim).
+        """
+        tcfg = self.config.tool
+        if tcfg is None or not getattr(tcfg, "compress_results", False):
+            return False
+        if tool is None or getattr(tool, "terminal", False):
+            return False
+        return len(result) > tcfg.compress_threshold
+
+    def _stop_condition_hit(self, tool_name: str, result: str) -> bool:
+        """True if config.stop_condition fires for this result (terminal path)."""
+        return bool(self.config.stop_condition and self.config.stop_condition(tool_name, result))
+
+    def _compression_fallback(self, result: str) -> str:
+        """Truncation-with-marker fallback used when summarization fails."""
+        threshold = self.config.tool.compress_threshold
+        return f"[truncated from {len(result)} chars; compression failed] {result[:threshold]}"
+
+    def _warn_compression_fallback(
+        self, tool_name: str, exc: Exception, run_ctx: Optional["_RunContext"]
+    ) -> None:
+        """Log a loud warning when compression degrades to truncation.
+
+        Logged at most once per run (via a flag on the run context) so a
+        persistently broken compress_provider/compress_model does not spam
+        one warning per oversized tool result.
+        """
+        if run_ctx is not None:
+            if run_ctx.compression_fallback_warned:
+                return
+            run_ctx.compression_fallback_warned = True
+        logger.warning(
+            "Tool result compression for '%s' fell back to truncation "
+            "(%s: %s). Check compress_provider/compress_model. Further "
+            "compression fallbacks in this run will not be logged.",
+            tool_name,
+            type(exc).__name__,
+            exc,
+        )
+
+    def _build_compression_request(self, tool_name: str, result: str) -> Message:
+        """Build the one-shot user message for the compression call."""
+        return Message(
+            role=Role.USER,
+            content=(
+                f"Summarize the following output from tool '{tool_name}'. Preserve "
+                "all numbers, IDs, URLs, file paths, and error text verbatim:\n\n" + result
+            ),
+        )
+
+    def _finish_compression(
+        self,
+        completion: Any,
+        original: str,
+        tool_name: str,
+        trace: Optional["AgentTrace"],
+    ) -> str:
+        """Shared tail of the sync/async compression paths.
+
+        Unpacks the provider response, records usage, applies the fidelity
+        marker, and never returns something longer than the original.
+
+        A summary that hit the max-token cap is treated as a failure (it is
+        cut off mid-sentence and may have silently dropped data): detected via
+        the response's finish/stop reason when the provider exposes one, or
+        via ``completion_tokens`` reaching the requested budget. Raising here
+        routes the caller to the truncation fallback.
+        """
+        msg = completion[0] if isinstance(completion, tuple) else completion
+        usage = completion[1] if isinstance(completion, tuple) else None
+        if usage is not None:
+            self.usage.add_usage(usage)
+        finish = getattr(msg, "finish_reason", None) or getattr(msg, "stop_reason", None)
+        if isinstance(finish, str) and finish.lower() in {
+            "length",
+            "max_tokens",
+            "max_output_tokens",
+        }:
+            raise ValueError(f"compression summary hit the max-token cap (finish={finish})")
+        if usage is not None and usage.completion_tokens >= self._compression_max_tokens():
+            raise ValueError(
+                "compression summary hit the max-token cap "
+                f"(completion_tokens={usage.completion_tokens})"
+            )
+        summary = (msg.content or "").strip()
+        if not summary:
+            raise ValueError("compression returned empty summary")
+        compressed = f"{_COMPRESSED_MARKER_PREFIX}{len(original)} chars] {summary}"
+        if len(compressed) >= len(original):
+            return original  # compression made it worse — keep the raw result
+        if trace is not None:
+            trace.add(
+                TraceStep(
+                    type=StepType.PROMPT_COMPRESSED,
+                    tool_name=tool_name,
+                    summary=(f"Tool result compressed: {len(original)}→{len(compressed)} chars"),
+                )
+            )
+        return compressed
+
+    def _compression_max_tokens(self) -> int:
+        """Token budget for the summary: comfortably under the char threshold."""
+        threshold = self.config.tool.compress_threshold
+        return max(128, min(1000, threshold // 4))
+
+    def _compress_tool_result(
+        self,
+        tool_name: str,
+        result: str,
+        trace: Optional["AgentTrace"] = None,
+        run_ctx: Optional["_RunContext"] = None,
+    ) -> str:
+        """Summarize an oversized tool result via a one-shot LLM call (sync).
+
+        Falls back to truncation-with-marker on ANY failure — never crashes
+        the tool loop. The fallback logs a warning (once per run).
+        """
+        tcfg = self.config.tool
+        try:
+            provider = tcfg.compress_provider or self.provider
+            model = tcfg.compress_model or self._effective_model
+            completion = provider.complete(
+                model=model,
+                system_prompt=_COMPRESS_SYSTEM_PROMPT,
+                messages=[self._build_compression_request(tool_name, result)],
+                max_tokens=self._compression_max_tokens(),
+                timeout=self.config.request_timeout,
+            )
+            return self._finish_compression(completion, result, tool_name, trace)
+        except Exception as exc:
+            self._warn_compression_fallback(tool_name, exc, run_ctx)
+            return self._compression_fallback(result)
+
+    async def _acompress_tool_result(
+        self,
+        tool_name: str,
+        result: str,
+        trace: Optional["AgentTrace"] = None,
+        run_ctx: Optional["_RunContext"] = None,
+    ) -> str:
+        """Async counterpart of :meth:`_compress_tool_result`."""
+        tcfg = self.config.tool
+        try:
+            provider = tcfg.compress_provider or self.provider
+            model = tcfg.compress_model or self._effective_model
+            completion = await provider.acomplete(
+                model=model,
+                system_prompt=_COMPRESS_SYSTEM_PROMPT,
+                messages=[self._build_compression_request(tool_name, result)],
+                max_tokens=self._compression_max_tokens(),
+                timeout=self.config.request_timeout,
+            )
+            return self._finish_compression(completion, result, tool_name, trace)
+        except Exception as exc:
+            self._warn_compression_fallback(tool_name, exc, run_ctx)
+            return self._compression_fallback(result)
 
     def _screen_tool_result(self, tool_name: str, result: str) -> str:
         """Screen a tool result for prompt injection if the tool or config requires it."""
@@ -95,23 +277,59 @@ class _ToolExecutorMixin:
         params_hash = hashlib.sha256(params_str.encode()).hexdigest()[:16]
         return f"tool_result:{tool_name}:{params_hash}"
 
-    def _check_tool_cache(self, tool: "Tool", params: Dict[str, Any]) -> Optional[str]:
-        """Return cached tool result or None on miss."""
+    def _check_tool_cache(
+        self, tool: "Tool", params: Dict[str, Any]
+    ) -> Optional[Tuple[str, Optional[str]]]:
+        """Return ``(raw_result, compressed_or_None)`` on cache hit, None on miss.
+
+        Hit paths must run stop_condition/terminal checks on the RAW result
+        but append the stored compressed text (when present) to history, so
+        repeated cache hits don't re-flood the context with the full blob.
+        Backward compatible with older entry formats: a plain string or a
+        ``(raw, None)`` tuple both yield ``compressed=None`` (behaves as if
+        compression never happened).
+        """
         if not self.config.cache or not getattr(tool, "cacheable", False):
             return None
         key = self._build_tool_cache_key(tool.name, params)
         cached = self.config.cache.get(key)
-        if cached is not None:
-            return str(cached[0])  # (result_str, None)
-        return None
+        if cached is None:
+            return None
+        if isinstance(cached, str):
+            return (cached, None)  # legacy plain-string entry
+        raw = str(cached[0])
+        compressed: Optional[str] = None
+        if len(cached) > 1 and cached[1] is not None:
+            compressed = str(cached[1])
+        return (raw, compressed)
 
-    def _store_tool_cache(self, tool: "Tool", params: Dict[str, Any], result: str) -> None:
-        """Store a tool result in the cache."""
+    def _store_tool_cache(
+        self,
+        tool: "Tool",
+        params: Dict[str, Any],
+        result: str,
+        compressed: Optional[str] = None,
+    ) -> None:
+        """Store a tool result (and its compressed form, when any) in the cache."""
         if not self.config.cache or not getattr(tool, "cacheable", False):
             return
         key = self._build_tool_cache_key(tool.name, params)
         ttl = getattr(tool, "cache_ttl", 300)
-        self.config.cache.set(key, (result, None), ttl=ttl)
+        self.config.cache.set(key, (result, compressed), ttl=ttl)
+
+    def _store_compressed_in_cache(
+        self, tool: Optional["Tool"], params: Dict[str, Any], raw: str, message_content: str
+    ) -> None:
+        """Re-store a cache entry with its compressed text after compression.
+
+        Only successful summaries (marked ``[compressed from ...]``) are
+        cached; the truncation fallback reflects a transient summarizer
+        failure and must not be frozen into the cache.
+        """
+        if tool is None or message_content == raw:
+            return
+        if message_content.startswith(_COMPRESSED_MARKER_PREFIX):
+            self._store_tool_cache(tool, params, raw, compressed=message_content)
 
     def _check_coherence(
         self,
@@ -374,6 +592,7 @@ class _ToolExecutorMixin:
         run_id: Optional[str] = None,
         user_text_for_coherence: str = "",
         all_tool_results: Optional[List[str]] = None,
+        run_ctx: Optional["_RunContext"] = None,
     ) -> tuple:
         """Execute multiple tool calls concurrently using ThreadPoolExecutor.
 
@@ -390,6 +609,8 @@ class _ToolExecutorMixin:
             tool: Optional[Tool]
             chunk_count: int
             error_step_type: "StepType" = StepType.ERROR
+            cached: bool = False
+            cached_compressed: Optional[str] = None
 
         def _run_one(tc: ToolCall) -> _Result:
             tool_name = tc.tool_name
@@ -420,9 +641,12 @@ class _ToolExecutorMixin:
                 )
 
             # Tool result cache check
-            cached_result = self._check_tool_cache(tool, parameters)
-            if cached_result is not None:
-                return _Result(tc, cached_result, False, 0.0, tool, 0)
+            cached_entry = self._check_tool_cache(tool, parameters)
+            if cached_entry is not None:
+                raw, compressed = cached_entry
+                return _Result(
+                    tc, raw, False, 0.0, tool, 0, cached=True, cached_compressed=compressed
+                )
 
             call_id = tc.id or ""
             start = time.time()
@@ -492,6 +716,12 @@ class _ToolExecutorMixin:
         last_tool_args: Dict[str, Any] = {}
         terminal_result: Optional[str] = None
 
+        # tool_tokens attribution: capture the PARENT iteration's usage once,
+        # BEFORE compression appends its own usage entries below — otherwise
+        # the second result in the batch would be attributed the compression
+        # call's tokens instead of the iteration that requested the tools.
+        parent_iteration_usage = self.usage.iterations[-1] if self.usage.iterations else None
+
         for r in results:
             all_tool_calls.append(r.tool_call)
             if all_tool_results is not None:
@@ -516,13 +746,13 @@ class _ToolExecutorMixin:
                     cost=0.0,
                     chunk_count=r.chunk_count,
                 )
-            if not r.is_error and self.usage.iterations:
+            if not r.is_error and parent_iteration_usage is not None:
                 self.usage.tool_usage[r.tool_call.tool_name] = (
                     self.usage.tool_usage.get(r.tool_call.tool_name, 0) + 1
                 )
                 self.usage.tool_tokens[r.tool_call.tool_name] = (
                     self.usage.tool_tokens.get(r.tool_call.tool_name, 0)
-                    + self.usage.iterations[-1].total_tokens
+                    + parent_iteration_usage.total_tokens
                 )
 
             if trace is not None:
@@ -541,6 +771,11 @@ class _ToolExecutorMixin:
                     )
                 )
 
+            # Evaluate stop_condition exactly once per result (always on the
+            # RAW result) and reuse the boolean for both the compression gate
+            # and the terminal check. A raising predicate propagates.
+            stop_hit = not r.is_error and self._stop_condition_hit(r.tool_call.tool_name, r.result)
+
             if r.is_error:
                 self._append_tool_result(
                     r.result,
@@ -549,20 +784,37 @@ class _ToolExecutorMixin:
                     run_id=run_id,
                 )
             else:
+                # Tool result compression runs here in the dispatching thread
+                # (after workers returned), never inside the worker pool.
+                # NOTE: this sync path compresses SEQUENTIALLY by design — the
+                # shared thread pools serve every concurrent agent run, so a
+                # batch with N oversized results costs N back-to-back
+                # summarizer round-trips (documented in docs/modules/TOOLS.md).
+                # The async path uses an asyncio.gather pre-pass instead.
+                message_content = r.result
+                if r.cached:
+                    # Cache hit: append the stored compressed text when present;
+                    # terminal/stop checks still use the RAW result above/below.
+                    if r.cached_compressed is not None:
+                        message_content = r.cached_compressed
+                elif not stop_hit and self._tool_compression_candidate(r.tool, r.result):
+                    message_content = self._compress_tool_result(
+                        r.tool_call.tool_name, r.result, trace, run_ctx=run_ctx
+                    )
+                    self._store_compressed_in_cache(
+                        r.tool, r.tool_call.parameters, r.result, message_content
+                    )
                 self._append_tool_result(
-                    r.result,
+                    message_content,
                     r.tool_call.tool_name,
                     r.tool_call.id,
-                    tool_result=r.result,
+                    tool_result=message_content,
                     run_id=run_id,
                 )
 
             # Check terminal tool
             if not r.is_error and r.tool and terminal_result is None:
-                if getattr(r.tool, "terminal", False) or (
-                    self.config.stop_condition
-                    and self.config.stop_condition(r.tool_call.tool_name, r.result)
-                ):
+                if getattr(r.tool, "terminal", False) or stop_hit:
                     terminal_result = r.result
 
         return last_tool_name, last_tool_args, terminal_result
@@ -577,6 +829,7 @@ class _ToolExecutorMixin:
         run_id: Optional[str] = None,
         user_text_for_coherence: str = "",
         all_tool_results: Optional[List[str]] = None,
+        run_ctx: Optional["_RunContext"] = None,
     ) -> tuple:
         """Execute multiple tool calls concurrently using asyncio.gather.
 
@@ -593,6 +846,8 @@ class _ToolExecutorMixin:
             tool: Optional[Tool]
             chunk_count: int
             error_step_type: "StepType" = StepType.ERROR
+            cached: bool = False
+            cached_compressed: Optional[str] = None
 
         async def _run_one(tc: ToolCall) -> _Result:
             tool_name = tc.tool_name
@@ -626,9 +881,12 @@ class _ToolExecutorMixin:
                 )
 
             # Tool result cache check
-            cached_result = self._check_tool_cache(tool, parameters)
-            if cached_result is not None:
-                return _Result(tc, cached_result, False, 0.0, tool, 0)
+            cached_entry = self._check_tool_cache(tool, parameters)
+            if cached_entry is not None:
+                raw, compressed = cached_entry
+                return _Result(
+                    tc, raw, False, 0.0, tool, 0, cached=True, cached_compressed=compressed
+                )
 
             start = time.time()
             if run_id:
@@ -703,7 +961,48 @@ class _ToolExecutorMixin:
         last_tool_args: Dict[str, Any] = {}
         terminal_result: Optional[str] = None
 
-        for r in results:
+        # tool_tokens attribution: capture the PARENT iteration's usage once,
+        # BEFORE the compression pre-pass appends its own usage entries —
+        # otherwise per-result attribution would pick up compression-call
+        # tokens instead of the iteration that requested the tools.
+        parent_iteration_usage = self.usage.iterations[-1] if self.usage.iterations else None
+
+        # Evaluate stop_condition exactly once per result (always on the RAW
+        # result); the booleans gate compression below and feed the terminal
+        # check in the result loop. A raising predicate propagates.
+        stop_hits = [
+            (not r.is_error) and self._stop_condition_hit(r.tool_call.tool_name, r.result)
+            for r in results
+        ]
+
+        # Compression pre-pass: summarize every oversized candidate
+        # CONCURRENTLY in a single asyncio.gather instead of one sequential
+        # round-trip per result inside the loop below.
+        compressed_by_index: Dict[int, str] = {}
+        candidate_indices = [
+            i
+            for i, r in enumerate(results)
+            if not r.is_error
+            and not r.cached
+            and not stop_hits[i]
+            and self._tool_compression_candidate(r.tool, r.result)
+        ]
+        if candidate_indices:
+            compressed_texts = await asyncio.gather(
+                *[
+                    self._acompress_tool_result(
+                        results[i].tool_call.tool_name, results[i].result, trace, run_ctx=run_ctx
+                    )
+                    for i in candidate_indices
+                ]
+            )
+            for i, text in zip(candidate_indices, compressed_texts):
+                compressed_by_index[i] = text
+                self._store_compressed_in_cache(
+                    results[i].tool, results[i].tool_call.parameters, results[i].result, text
+                )
+
+        for idx, r in enumerate(results):
             all_tool_calls.append(r.tool_call)
             if all_tool_results is not None:
                 all_tool_results.append(r.result)
@@ -727,13 +1026,14 @@ class _ToolExecutorMixin:
                     cost=0.0,
                     chunk_count=r.chunk_count,
                 )
-            if not r.is_error and self.usage.iterations:
+            if not r.is_error and parent_iteration_usage is not None:
                 self.usage.tool_usage[r.tool_call.tool_name] = (
                     self.usage.tool_usage.get(r.tool_call.tool_name, 0) + 1
                 )
-                self.usage.tool_tokens[r.tool_call.tool_name] = self.usage.tool_tokens.get(
-                    r.tool_call.tool_name, 0
-                ) + (self.usage.iterations[-1].total_tokens if self.usage.iterations else 0)
+                self.usage.tool_tokens[r.tool_call.tool_name] = (
+                    self.usage.tool_tokens.get(r.tool_call.tool_name, 0)
+                    + parent_iteration_usage.total_tokens
+                )
 
             if trace is not None:
                 step_type = r.error_step_type if r.is_error else StepType.TOOL_EXECUTION
@@ -759,20 +1059,26 @@ class _ToolExecutorMixin:
                     run_id=run_id,
                 )
             else:
+                # Compressed text comes from the gather pre-pass above (or the
+                # cached compressed form on cache hits); never compressed
+                # inside tool coroutines.
+                message_content = r.result
+                if r.cached:
+                    if r.cached_compressed is not None:
+                        message_content = r.cached_compressed
+                elif idx in compressed_by_index:
+                    message_content = compressed_by_index[idx]
                 self._append_tool_result(
-                    r.result,
+                    message_content,
                     r.tool_call.tool_name,
                     r.tool_call.id,
-                    tool_result=r.result,
+                    tool_result=message_content,
                     run_id=run_id,
                 )
 
             # Check terminal tool
             if not r.is_error and r.tool and terminal_result is None:
-                if getattr(r.tool, "terminal", False) or (
-                    self.config.stop_condition
-                    and self.config.stop_condition(r.tool_call.tool_name, r.result)
-                ):
+                if getattr(r.tool, "terminal", False) or stop_hits[idx]:
                     terminal_result = r.result
 
         return last_tool_name, last_tool_args, terminal_result
@@ -909,25 +1215,31 @@ class _ToolExecutorMixin:
             return False
 
         # --- Tool result cache check ---
-        cached_result = self._check_tool_cache(tool, parameters)
-        if cached_result is not None:
+        cached_entry = self._check_tool_cache(tool, parameters)
+        if cached_entry is not None:
+            cached_raw, cached_compressed = cached_entry
             ctx.trace.add(
                 TraceStep(
                     type=StepType.CACHE_HIT,
                     tool_name=tool_name,
                     tool_args=parameters,
-                    tool_result=self._truncate_tool_result(cached_result),
+                    tool_result=self._truncate_tool_result(cached_raw),
                     summary=f"{tool_name} → cached",
                 )
             )
-            ctx.all_tool_results.append(cached_result)
+            # History gets the stored compressed text when present; loop
+            # detection and terminal checks always see the RAW result.
+            cached_content = cached_compressed if cached_compressed is not None else cached_raw
+            ctx.all_tool_results.append(cached_raw)
             self._append_tool_result(
-                cached_result, tool_name, tool_call.id, tool_result=cached_result, run_id=ctx.run_id
+                cached_content,
+                tool_name,
+                tool_call.id,
+                tool_result=cached_content,
+                run_id=ctx.run_id,
             )
-            if getattr(tool, "terminal", False) or (
-                self.config.stop_condition and self.config.stop_condition(tool_name, cached_result)
-            ):
-                ctx.terminal_tool_result = cached_result
+            if getattr(tool, "terminal", False) or self._stop_condition_hit(tool_name, cached_raw):
+                ctx.terminal_tool_result = cached_raw
                 return True
             return False
 
@@ -973,26 +1285,17 @@ class _ToolExecutorMixin:
                     cost=0.0,
                     chunk_count=chunk_counter["count"],
                 )
-            if self.usage.iterations:
+            # tool_tokens attribution: prefer the parent-iteration usage
+            # captured before this turn's tool batch — a previous tool's
+            # compression call may have appended its own usage entry since.
+            parent_usage = ctx.parent_iteration_usage or (
+                self.usage.iterations[-1] if self.usage.iterations else None
+            )
+            if parent_usage is not None:
                 self.usage.tool_usage[tool.name] = self.usage.tool_usage.get(tool.name, 0) + 1
                 self.usage.tool_tokens[tool.name] = (
-                    self.usage.tool_tokens.get(tool.name, 0)
-                    + self.usage.iterations[-1].total_tokens
+                    self.usage.tool_tokens.get(tool.name, 0) + parent_usage.total_tokens
                 )
-
-            ctx.all_tool_results.append(result)
-            self._append_tool_result(
-                result, tool_name, tool_call.id, tool_result=result, run_id=ctx.run_id
-            )
-
-            # --- Terminal tool check ---
-            if getattr(tool, "terminal", False) or (
-                self.config.stop_condition and self.config.stop_condition(tool_name, result)
-            ):
-                ctx.terminal_tool_result = result
-                return True
-
-            return False
 
         except Exception as exc:
             duration = time.time() - start_time
@@ -1028,6 +1331,35 @@ class _ToolExecutorMixin:
             ctx.all_tool_results.append(error_message)
             self._append_tool_result(error_message, tool_name, tool_call.id, run_id=ctx.run_id)
             return False
+
+        # Evaluate stop_condition exactly once, OUTSIDE the execute try: a
+        # raising predicate propagates to the caller instead of converting a
+        # successful tool result into a tool error.
+        stop_hit = self._stop_condition_hit(tool_name, result)
+
+        # Tool result compression: the model sees the compressed text, but
+        # ctx.all_tool_results keeps the raw result (loop detection needs
+        # deterministic outputs) and terminal checks run on the raw result.
+        message_content = result
+        if not stop_hit and self._tool_compression_candidate(tool, result):
+            message_content = self._compress_tool_result(tool_name, result, ctx.trace, run_ctx=ctx)
+            self._store_compressed_in_cache(tool, parameters, result, message_content)
+
+        ctx.all_tool_results.append(result)
+        self._append_tool_result(
+            message_content,
+            tool_name,
+            tool_call.id,
+            tool_result=message_content,
+            run_id=ctx.run_id,
+        )
+
+        # --- Terminal tool check ---
+        if getattr(tool, "terminal", False) or stop_hit:
+            ctx.terminal_tool_result = result
+            return True
+
+        return False
 
     async def _aexecute_single_tool(self, ctx: _RunContext, tool_call: ToolCall) -> bool:
         """Execute a single tool call end-to-end (async).
@@ -1119,25 +1451,31 @@ class _ToolExecutorMixin:
             return False
 
         # --- Tool result cache check ---
-        cached_result = self._check_tool_cache(tool, parameters)
-        if cached_result is not None:
+        cached_entry = self._check_tool_cache(tool, parameters)
+        if cached_entry is not None:
+            cached_raw, cached_compressed = cached_entry
             ctx.trace.add(
                 TraceStep(
                     type=StepType.CACHE_HIT,
                     tool_name=tool_name,
                     tool_args=parameters,
-                    tool_result=self._truncate_tool_result(cached_result),
+                    tool_result=self._truncate_tool_result(cached_raw),
                     summary=f"{tool_name} → cached",
                 )
             )
-            ctx.all_tool_results.append(cached_result)
+            # History gets the stored compressed text when present; loop
+            # detection and terminal checks always see the RAW result.
+            cached_content = cached_compressed if cached_compressed is not None else cached_raw
+            ctx.all_tool_results.append(cached_raw)
             self._append_tool_result(
-                cached_result, tool_name, tool_call.id, tool_result=cached_result, run_id=ctx.run_id
+                cached_content,
+                tool_name,
+                tool_call.id,
+                tool_result=cached_content,
+                run_id=ctx.run_id,
             )
-            if getattr(tool, "terminal", False) or (
-                self.config.stop_condition and self.config.stop_condition(tool_name, cached_result)
-            ):
-                ctx.terminal_tool_result = cached_result
+            if getattr(tool, "terminal", False) or self._stop_condition_hit(tool_name, cached_raw):
+                ctx.terminal_tool_result = cached_raw
                 return True
             return False
 
@@ -1189,26 +1527,17 @@ class _ToolExecutorMixin:
                     cost=0.0,
                     chunk_count=chunk_counter["count"],
                 )
-            if self.usage.iterations:
+            # tool_tokens attribution: prefer the parent-iteration usage
+            # captured before this turn's tool batch — a previous tool's
+            # compression call may have appended its own usage entry since.
+            parent_usage = ctx.parent_iteration_usage or (
+                self.usage.iterations[-1] if self.usage.iterations else None
+            )
+            if parent_usage is not None:
                 self.usage.tool_usage[tool.name] = self.usage.tool_usage.get(tool.name, 0) + 1
                 self.usage.tool_tokens[tool.name] = (
-                    self.usage.tool_tokens.get(tool.name, 0)
-                    + self.usage.iterations[-1].total_tokens
+                    self.usage.tool_tokens.get(tool.name, 0) + parent_usage.total_tokens
                 )
-
-            ctx.all_tool_results.append(result)
-            self._append_tool_result(
-                result, tool_name, tool_call.id, tool_result=result, run_id=ctx.run_id
-            )
-
-            # --- Terminal tool check ---
-            if getattr(tool, "terminal", False) or (
-                self.config.stop_condition and self.config.stop_condition(tool_name, result)
-            ):
-                ctx.terminal_tool_result = result
-                return True
-
-            return False
 
         except Exception as exc:
             duration = time.time() - start_time
@@ -1253,3 +1582,32 @@ class _ToolExecutorMixin:
             ctx.all_tool_results.append(error_message)
             self._append_tool_result(error_message, tool_name, tool_call.id, run_id=ctx.run_id)
             return False
+
+        # Evaluate stop_condition exactly once, OUTSIDE the execute try: a
+        # raising predicate propagates to the caller instead of converting a
+        # successful tool result into a tool error.
+        stop_hit = self._stop_condition_hit(tool_name, result)
+
+        # Tool result compression (see sync counterpart for invariants).
+        message_content = result
+        if not stop_hit and self._tool_compression_candidate(tool, result):
+            message_content = await self._acompress_tool_result(
+                tool_name, result, ctx.trace, run_ctx=ctx
+            )
+            self._store_compressed_in_cache(tool, parameters, result, message_content)
+
+        ctx.all_tool_results.append(result)
+        self._append_tool_result(
+            message_content,
+            tool_name,
+            tool_call.id,
+            tool_result=message_content,
+            run_id=ctx.run_id,
+        )
+
+        # --- Terminal tool check ---
+        if getattr(tool, "terminal", False) or stop_hit:
+            ctx.terminal_tool_result = result
+            return True
+
+        return False
