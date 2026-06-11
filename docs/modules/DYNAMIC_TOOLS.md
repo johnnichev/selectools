@@ -32,7 +32,7 @@ print(result.content)
 
 !!! tip "See Also"
     - [Tools](TOOLS.md) -- tool definition and `@tool` decorator
-    - [Toolbox](TOOLBOX.md) -- 24 pre-built tools for common tasks
+    - [Toolbox](TOOLBOX.md) -- 48 pre-built tools for common tasks
 
 **File:** `src/selectools/tools/loader.py`, `src/selectools/agent/core.py`
 **Classes:** `ToolLoader` (loader), `Agent` (dynamic tool methods)

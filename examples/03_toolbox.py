@@ -1,5 +1,5 @@
 """
-Pre-built Toolbox — 22 ready-made tools for files, data, text, datetime, and web.
+Pre-built Toolbox — 48 ready-made tools for files, data, text, datetime, web, code, search, and integrations.
 
 No API key needed for exploring tool schemas.
 

@@ -44,7 +44,7 @@ Detailed technical documentation for each module:
 16. **[GUARDRAILS.md](modules/GUARDRAILS.md)** - Input/output validation pipeline, PII redaction, topic blocking
 17. **[AUDIT.md](modules/AUDIT.md)** - JSONL audit logging with privacy controls
 18. **[SECURITY.md](modules/SECURITY.md)** - Tool output screening and coherence checking
-19. **[TOOLBOX.md](modules/TOOLBOX.md)** - 24 pre-built tools across 5 categories (file, web, data, datetime, text)
+19. **[TOOLBOX.md](modules/TOOLBOX.md)** - 48 pre-built tools across 15 categories (file, web, data, datetime, text, code, search, and more)
 20. **[EXCEPTIONS.md](modules/EXCEPTIONS.md)** - Error hierarchy, exception attributes, catch patterns
 21. **[SESSIONS.md](modules/SESSIONS.md)** - Persistent session storage with 4 backends
 22. **[ENTITY_MEMORY.md](modules/ENTITY_MEMORY.md)** - Named entity extraction and tracking

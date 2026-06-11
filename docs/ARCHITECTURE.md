@@ -301,7 +301,7 @@ Resilient provider orchestration:
 
 Class-based lifecycle observability:
 
-- 45 event methods with `run_id` correlation for concurrent requests
+- 46 event methods with `run_id` correlation for concurrent requests
 - `call_id` for matching parallel tool start/end pairs
 - `AsyncAgentObserver` provides async equivalents of all observer events
 - Built-in `LoggingObserver` for structured JSON log output
@@ -471,7 +471,7 @@ graph LR
 
 **Problem:** Black box behavior makes debugging hard.
 
-**Solution:** `AgentObserver` protocol (45 lifecycle events including 13 graph events, `run_id` correlation):
+**Solution:** `AgentObserver` protocol (46 lifecycle events including 13 graph events, `run_id` correlation):
 
 - `on_run_start/end`, `on_iteration_start/end`
 - `on_tool_start/end/error/chunk`
