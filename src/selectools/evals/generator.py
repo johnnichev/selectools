@@ -6,10 +6,12 @@ import json
 import re
 from typing import Any, Dict, List, Optional
 
+from ..stability import beta
 from ..types import Message, Role
 from .types import TestCase
 
 
+@beta
 def generate_cases(
     provider: Any,
     model: str,

@@ -7,7 +7,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+from ..stability import beta
 
+
+@beta
 @dataclass
 class SnapshotDiff:
     """A diff between the current output and the stored snapshot."""
@@ -22,6 +25,7 @@ class SnapshotDiff:
         return self.expected != self.actual  # type: ignore[no-any-return]
 
 
+@beta
 @dataclass
 class SnapshotResult:
     """Result of comparing current outputs against snapshots."""
@@ -61,6 +65,7 @@ class SnapshotResult:
         return "\n".join(lines)
 
 
+@beta
 class SnapshotStore:
     """Capture and compare exact agent outputs across runs.
 

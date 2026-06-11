@@ -58,6 +58,8 @@ from .types import (
 if TYPE_CHECKING:
     from ..agent.core import Agent
 
+__stability__ = "beta"
+
 __all__ = ["A2AServer"]
 
 logger = logging.getLogger(__name__)

@@ -189,4 +189,6 @@ class LiteLLMProvider(_OpenAICompatibleBase):
         return getattr(tc_delta, "id", None)
 
 
+__stability__ = "beta"
+
 __all__ = ["LiteLLMProvider"]

@@ -6,12 +6,14 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Union
 
+from ..stability import beta
 from .types import TestCase
 
 # Fields that map directly to TestCase constructor
 _TESTCASE_FIELDS = {f.name for f in TestCase.__dataclass_fields__.values()}
 
 
+@beta
 class DatasetLoader:
     """Load TestCase lists from files or dicts."""
 

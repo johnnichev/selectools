@@ -242,3 +242,12 @@ def github_list_issues(repo: str, state: str = "open", max_results: int = 10) ->
         return f"Error: Could not connect to GitHub API: {e.reason}"
     except Exception as e:
         return f"Error listing issues: {e}"
+
+
+__stability__ = "stable"
+
+__all__ = [
+    "github_search_repos",
+    "github_get_file",
+    "github_list_issues",
+]

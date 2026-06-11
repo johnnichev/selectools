@@ -5,11 +5,13 @@ from __future__ import annotations
 import logging
 from typing import List, Optional
 
+from ..stability import beta
 from .provider import EmbeddingProvider
 
 logger = logging.getLogger(__name__)
 
 
+@beta
 class GeminiEmbeddingProvider(EmbeddingProvider):
     """
     Google Gemini embedding provider.
@@ -154,5 +156,7 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
         """
         return self._dimension
 
+
+__stability__ = "beta"
 
 __all__ = ["GeminiEmbeddingProvider"]

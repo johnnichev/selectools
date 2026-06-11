@@ -68,6 +68,8 @@ from .suite import EvalSuite
 from .templates import code_quality_suite, customer_support_suite, rag_quality_suite, safety_suite
 from .types import CaseResult, CaseVerdict, EvalFailure, EvalMetadata, TestCase
 
+__stability__ = "beta"
+
 __all__ = [
     # Core
     "EvalSuite",

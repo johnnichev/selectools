@@ -9,9 +9,11 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
+from .stability import stable
 from .types import ToolCall
 
 
+@stable
 @dataclass
 class ParseResult:
     """Result of attempting to parse a tool call."""
@@ -20,6 +22,7 @@ class ParseResult:
     raw_text: str
 
 
+@stable
 class ToolCallParser:
     """Robustly extract TOOL_CALL directives from model output."""
 
@@ -116,5 +119,7 @@ class ToolCallParser:
                         break
         return candidates
 
+
+__stability__ = "stable"
 
 __all__ = ["ToolCallParser", "ParseResult"]

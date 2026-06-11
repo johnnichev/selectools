@@ -507,4 +507,6 @@ class PgVectorStore(VectorStore):
         )
 
 
+__stability__ = "beta"
+
 __all__ = ["PgVectorStore"]

@@ -226,4 +226,6 @@ class AuditLogger(AgentObserver):
         )
 
 
+__stability__ = "stable"
+
 __all__ = ["AuditLogger", "PrivacyLevel"]

@@ -119,4 +119,6 @@ class GuardrailsPipeline:
         return GuardrailResult(passed=True, content=current, guardrail_name=guardrail_name)
 
 
+__stability__ = "stable"
+
 __all__ = ["GuardrailsPipeline"]

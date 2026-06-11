@@ -29,8 +29,10 @@ from .orchestration.checkpoint import (
     _serialize_checkpoint,
 )
 from .orchestration.state import GraphState
+from .stability import stable
 
 
+@stable
 class PostgresCheckpointStore:
     """Postgres-backed checkpoint store for production orchestration.
 
@@ -156,5 +158,7 @@ class PostgresCheckpointStore:
         """Close the database connection."""
         self._conn.close()
 
+
+__stability__ = "stable"
 
 __all__ = ["PostgresCheckpointStore"]

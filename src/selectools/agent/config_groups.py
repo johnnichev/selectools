@@ -26,6 +26,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
 
+from ..stability import stable
+
 if TYPE_CHECKING:
     from ..cache import Cache
     from ..cancellation import CancellationToken
@@ -40,6 +42,7 @@ if TYPE_CHECKING:
     from ..usage import AgentUsage
 
 
+@stable
 @dataclass
 class RetryConfig:
     """Retry and timeout settings."""
@@ -50,6 +53,7 @@ class RetryConfig:
     rate_limit_cooldown_seconds: float = 5.0
 
 
+@stable
 @dataclass
 class ToolConfig:
     """Tool execution settings.
@@ -151,6 +155,7 @@ class ToolConfig:
             )
 
 
+@stable
 @dataclass
 class CoherenceConfig:
     """Coherence checking settings."""
@@ -161,6 +166,7 @@ class CoherenceConfig:
     fail_closed: bool = False
 
 
+@stable
 @dataclass
 class GuardrailsConfig:
     """Input/output guardrail settings."""
@@ -170,6 +176,7 @@ class GuardrailsConfig:
     output_screening_patterns: Optional[List[str]] = None
 
 
+@stable
 @dataclass
 class SessionConfig:
     """Session persistence settings."""
@@ -178,6 +185,7 @@ class SessionConfig:
     session_id: Optional[str] = None
 
 
+@stable
 @dataclass
 class SummarizeConfig:
     """Summarize-on-trim settings."""
@@ -188,6 +196,7 @@ class SummarizeConfig:
     max_tokens: int = 150
 
 
+@stable
 @dataclass
 class MemoryConfig:
     """Memory subsystem settings."""
@@ -197,6 +206,7 @@ class MemoryConfig:
     knowledge_memory: Optional["KnowledgeMemory"] = None
 
 
+@stable
 @dataclass
 class BudgetConfig:
     """Token and cost budget settings."""
@@ -207,6 +217,7 @@ class BudgetConfig:
     cancellation_token: Optional["CancellationToken"] = None
 
 
+@stable
 @dataclass
 class TraceConfig:
     """Tracing and observability settings."""
@@ -216,6 +227,7 @@ class TraceConfig:
     parent_run_id: Optional[str] = None
 
 
+@stable
 @dataclass
 class CompressConfig:
     """Prompt compression settings."""
@@ -224,6 +236,8 @@ class CompressConfig:
     threshold: float = 0.75
     keep_recent: int = 4
 
+
+__stability__ = "stable"
 
 __all__ = [
     "RetryConfig",

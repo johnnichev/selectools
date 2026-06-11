@@ -275,4 +275,6 @@ class LangfuseObserver(AgentObserver):
             logger.warning("Failed to flush Langfuse on shutdown", exc_info=True)
 
 
+__stability__ = "beta"
+
 __all__ = ["LangfuseObserver"]

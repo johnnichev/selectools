@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+from ..stability import beta
 from ..tools import tool
 
 if TYPE_CHECKING:
@@ -11,6 +12,7 @@ if TYPE_CHECKING:
     from .vector_store import VectorStore
 
 
+@beta
 class RAGTool:
     """
     Pre-built tool for retrieval-augmented generation (RAG).
@@ -139,6 +141,7 @@ class RAGTool:
         return "\n".join(context_parts)
 
 
+@beta
 class SemanticSearchTool:
     """
     Tool for pure semantic search without LLM integration.
@@ -241,6 +244,7 @@ class SemanticSearchTool:
         return "\n".join(output_parts)
 
 
+@beta
 class HybridSearchTool:
     """
     Pre-built tool for hybrid (vector + keyword) knowledge base search.
@@ -352,5 +356,7 @@ class HybridSearchTool:
         results = self.searcher.search(query, top_k=self.top_k, filter=filter)
         return [r for r in results if r.score >= self.score_threshold]
 
+
+__stability__ = "beta"
 
 __all__ = ["RAGTool", "SemanticSearchTool", "HybridSearchTool"]

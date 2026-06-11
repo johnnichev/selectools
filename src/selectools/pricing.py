@@ -16,6 +16,7 @@ import logging
 from typing import Dict
 
 from .models import ALL_MODELS, MODELS_BY_ID
+from .stability import register_stability, stable
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +25,10 @@ PRICING: Dict[str, Dict[str, float]] = {
     model.id: {"prompt": model.prompt_cost, "completion": model.completion_cost}
     for model in ALL_MODELS
 }
+register_stability("PRICING", "stable")
 
 
+@stable
 def calculate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> float:
     """
     Calculate cost in USD for given token usage.
@@ -58,6 +61,7 @@ def calculate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> fl
     return prompt_cost + completion_cost
 
 
+@stable
 def calculate_embedding_cost(model: str, tokens: int) -> float:
     """
     Calculate cost in USD for embedding token usage.
@@ -89,6 +93,7 @@ def calculate_embedding_cost(model: str, tokens: int) -> float:
     return embedding_cost
 
 
+@stable
 def get_model_pricing(model: str) -> Dict[str, float] | None:
     """
     Get pricing information for a specific model (backward compatible).
@@ -106,5 +111,7 @@ def get_model_pricing(model: str) -> Dict[str, float] | None:
     """
     return PRICING.get(model)
 
+
+__stability__ = "stable"
 
 __all__ = ["PRICING", "calculate_cost", "calculate_embedding_cost", "get_model_pricing"]

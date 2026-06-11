@@ -33,6 +33,7 @@ from .stability import beta
 from .types import ToolCall
 
 
+@beta
 class LoopPolicy(Enum):
     """How the agent should respond when a loop is detected."""
 

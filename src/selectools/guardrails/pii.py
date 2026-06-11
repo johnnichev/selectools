@@ -26,6 +26,7 @@ _BUILTIN_PATTERNS: Dict[str, re.Pattern[str]] = {
 }
 
 
+@stable
 @dataclass
 class PIIMatch:
     """A single PII detection within text."""
@@ -138,5 +139,7 @@ class PIIGuardrail(Guardrail):
             guardrail_name=self.name,
         )
 
+
+__stability__ = "stable"
 
 __all__ = ["PIIGuardrail", "PIIMatch"]

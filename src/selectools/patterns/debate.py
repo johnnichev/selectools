@@ -17,10 +17,11 @@ if TYPE_CHECKING:
     from ..observer import AgentObserver
 
 from .._async_utils import run_sync
-from ..stability import beta
+from ..stability import beta, stable
 from ..types import Message, Role
 
 
+@stable
 @dataclass
 class DebateRound:
     """Arguments from all agents in one debate round."""
@@ -29,6 +30,7 @@ class DebateRound:
     arguments: Dict[str, str]  # agent_name → argument text
 
 
+@stable
 @dataclass
 class DebateResult:
     """Result of a DebateAgent run."""
@@ -41,7 +43,7 @@ class DebateResult:
         return len(self.rounds)
 
 
-@beta
+@stable
 class DebateAgent:
     """Multi-agent debate: agents argue → judge synthesizes conclusion.
 
@@ -130,5 +132,7 @@ class DebateAgent:
 
         return DebateResult(conclusion=conclusion, rounds=rounds)
 
+
+__stability__ = "beta"
 
 __all__ = ["DebateAgent", "DebateRound", "DebateResult"]

@@ -151,12 +151,48 @@ deprecation-warning-free on the latest 0.24.x release should run unmodified on 1
 
 ## Symbols promoted to stable at 1.0
 
-The pre-1.0 marking sweep promotes proven `@beta` APIs to `@stable`. This table is filled
-in by that sweep before the tag:
+The pre-1.0 marking sweep promotes proven `@beta` APIs (2+ releases, no breaking
+changes) to `@stable`:
 
 | Symbol | Module | 0.x marker | 1.0 marker |
 |--------|--------|-----------|------------|
-| _TBD — populated by the pre-1.0 stability-marking sweep_ | | | |
+| `AgentGraph` | `selectools.orchestration` | `@beta` | `@stable` |
+| `GraphState` | `selectools.orchestration` | `@beta` | `@stable` |
+| `MergePolicy` | `selectools.orchestration` | `@beta` | `@stable` |
+| `ContextMode` | `selectools.orchestration` | `@beta` | `@stable` |
+| `InterruptRequest` | `selectools.orchestration` | `@beta` | `@stable` |
+| `Scatter` | `selectools.orchestration` | `@beta` | `@stable` |
+| `CheckpointStore` | `selectools.orchestration` | `@beta` | `stable` (registry) |
+| `InMemoryCheckpointStore` | `selectools.orchestration` | `@beta` | `@stable` |
+| `FileCheckpointStore` | `selectools.orchestration` | `@beta` | `@stable` |
+| `SQLiteCheckpointStore` | `selectools.orchestration` | `@beta` | `@stable` |
+| `SupervisorAgent` | `selectools.orchestration` | `@beta` | `@stable` |
+| `PlanAndExecuteAgent` | `selectools.patterns` | `@beta` | `@stable` |
+| `ReflectiveAgent` | `selectools.patterns` | `@beta` | `@stable` |
+| `DebateAgent` | `selectools.patterns` | `@beta` | `@stable` |
+| `TeamLeadAgent` | `selectools.patterns` | `@beta` | `@stable` |
+| `trace_to_html` | `selectools.trace` | `@beta` | `@stable` |
+| `SimpleStepObserver` | `selectools.observer` | `@beta` | `@stable` |
+| `RedisSessionStore` | `selectools.sessions` | `@beta` | `@stable` |
+| `AzureOpenAIProvider` | `selectools.providers` | `@beta` | `@stable` |
+
+Companion types of the promoted APIs (result/config/event dataclasses, enums, and
+graph helper functions such as `GraphResult`, `GraphEvent`, `GraphNode`, `PlanStep`,
+`ReflectiveResult`, `DebateResult`, `TeamLeadResult`, `SupervisorStrategy`,
+`CheckpointMetadata`, `goto`, `update`, `merge_states`, `trace_to_json`) were
+previously unmarked and are now `@stable` alongside their parent APIs.
+
+`CheckpointStore` is `@runtime_checkable` and therefore carries its marker in
+`selectools.stability.STABILITY_REGISTRY` instead of a class attribute (a class
+attribute would become a structural protocol member on Python 3.9-3.11 and break
+`isinstance()` for third-party stores).
+
+Deliberately **not** promoted (still `@beta` at 1.0): the loop-detection family,
+`LocalProvider` (test stub), the `Pipeline`/`compose` family, everything shipped in
+v0.24/v0.25-dev (`pending`, `results`, `a2a`, `AgentAPI`, knowledge backends,
+unified memory, `LiteLLMProvider`/`RouterProvider`, sanitizers, planning,
+compression/HITL types), and the `rag`/`mcp`/`embeddings`/`observe`/`evals`
+(evaluators) surfaces.
 
 Anything still `@beta` at 1.0 (for example, the `selectools serve` CLI surface) remains
 outside the semver guarantee until promoted in a later 1.x release.

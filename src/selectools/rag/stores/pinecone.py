@@ -5,12 +5,15 @@ from __future__ import annotations
 import hashlib
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+from ...stability import beta
+
 if TYPE_CHECKING:
     from ...embeddings.provider import EmbeddingProvider
 
 from ..vector_store import Document, SearchResult, VectorStore, _dedup_search_results
 
 
+@beta
 class PineconeVectorStore(VectorStore):
     """
     Pinecone-based vector store wrapper.
@@ -208,5 +211,7 @@ class PineconeVectorStore(VectorStore):
         # Delete all vectors in the namespace
         self.index.delete(delete_all=True, namespace=self.namespace)
 
+
+__stability__ = "beta"
 
 __all__ = ["PineconeVectorStore"]

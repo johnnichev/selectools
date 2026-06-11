@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
+from ..stability import beta
 from .provider import EmbeddingProvider
 
 logger = logging.getLogger(__name__)
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 _MAX_BATCH = 2048
 
 
+@beta
 class OpenAIEmbeddingProvider(EmbeddingProvider):
     """
     OpenAI embedding provider using text-embedding models.
@@ -147,5 +149,7 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         """
         return self._dimension
 
+
+__stability__ = "beta"
 
 __all__ = ["OpenAIEmbeddingProvider"]

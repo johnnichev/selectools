@@ -41,7 +41,7 @@ from typing import (
 )
 
 from ..pricing import get_model_pricing
-from ..stability import beta
+from ..stability import beta, register_stability
 from ..token_estimation import estimate_tokens
 from ..types import Message, Role, ToolCall, text_content
 from .fallback import FallbackProvider
@@ -55,6 +55,12 @@ logger = logging.getLogger(__name__)
 COMPLEXITY_SIMPLE = "simple"
 COMPLEXITY_MODERATE = "moderate"
 COMPLEXITY_COMPLEX = "complex"
+
+# Constants cannot carry a __stability__ attribute: register instead (beta,
+# matching the router domain).
+register_stability("COMPLEXITY_SIMPLE", "beta")
+register_stability("COMPLEXITY_MODERATE", "beta")
+register_stability("COMPLEXITY_COMPLEX", "beta")
 
 _STRATEGIES = ("cost_optimized", "quality_first", "balanced")
 
@@ -599,6 +605,8 @@ class RouterProvider:
         served_tier = chain_fb.provider_used
         self.tier_used = served_tier
 
+
+__stability__ = "beta"
 
 __all__ = [
     "RouterProvider",

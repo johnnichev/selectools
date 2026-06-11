@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from ..agent.core import Agent
 
 from .. import __version__
+from ..stability import beta
 from .builder import BUILDER_HTML
 from .models import HealthResponse, InvokeResponse
 from .playground import PLAYGROUND_HTML
@@ -82,6 +83,7 @@ def _make_session_cookie(auth_token: str) -> str:
     return hmac.new(auth_token.encode(), b"builder_ok", "sha256").hexdigest()
 
 
+@beta
 class AgentRouter:
     """Routes HTTP requests to agent methods.
 
@@ -190,6 +192,7 @@ class AgentRouter:
         }
 
 
+@beta
 def create_app(
     agent: "Agent",
     prefix: str = "",
@@ -1329,6 +1332,7 @@ def _estimate_run_cost(nodes_data: List[Dict[str, Any]], input_text: str) -> Dic
     return {"total_tokens": total_tokens, "total_cost_usd": round(total_cost, 6)}
 
 
+@beta
 class BuilderServer:
     """Standalone visual builder server — no agent required.
 

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, AsyncIterable, Iterable, Protocol, Union, runtime_checkable
 
+from ..stability import register_stability, stable
 from ..types import Message, ToolCall
 
 if TYPE_CHECKING:
@@ -13,6 +14,7 @@ if TYPE_CHECKING:
     from ..usage import UsageStats
 
 
+@stable
 class ProviderError(RuntimeError):
     """Raised when an adapter cannot complete a request."""
 
@@ -120,5 +122,12 @@ class Provider(Protocol):
         """
         ...
 
+
+# Provider is @runtime_checkable: a ``__stability__`` class attribute would become
+# a structural protocol member on Python 3.9-3.11 and break ``isinstance()``
+# for implementations that do not define it, so it is registered instead.
+register_stability("Provider", "stable")
+
+__stability__ = "stable"
 
 __all__ = ["Provider", "ProviderError"]

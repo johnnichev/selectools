@@ -63,6 +63,8 @@ from ..types import AgentResult, Message, Role, StreamChunk
 if TYPE_CHECKING:
     from ..agent.core import Agent
 
+__stability__ = "beta"
+
 __all__ = ["AgentAPI"]
 
 logger = logging.getLogger(__name__)

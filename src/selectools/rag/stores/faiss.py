@@ -489,4 +489,6 @@ class FAISSVectorStore(VectorStore):
         return f"FAISSVectorStore(dimension={self._dimension}, count={self.count})"
 
 
+__stability__ = "beta"
+
 __all__ = ["FAISSVectorStore"]

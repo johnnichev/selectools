@@ -6,6 +6,7 @@ import math
 import re
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
+from ..stability import beta
 from .vector_store import Document
 
 if TYPE_CHECKING:
@@ -13,6 +14,7 @@ if TYPE_CHECKING:
     from ..providers.base import Provider
 
 
+@beta
 class TextSplitter:
     """
     Split text into chunks with fixed size and overlap.
@@ -139,6 +141,7 @@ class TextSplitter:
         return chunked_docs
 
 
+@beta
 class RecursiveTextSplitter(TextSplitter):
     r"""
     Split text recursively using multiple separators.
@@ -306,6 +309,7 @@ def _cosine_similarity(a: List[float], b: List[float]) -> float:
     return dot / (norm_a * norm_b)
 
 
+@beta
 class SemanticChunker:
     """
     Split documents at semantic boundaries using embedding similarity.
@@ -432,6 +436,7 @@ class SemanticChunker:
         return chunked
 
 
+@beta
 class ContextualChunker:
     """
     Wrap any chunker and prepend LLM-generated context to each chunk.
@@ -576,6 +581,8 @@ class ContextualChunker:
         docs = self.split_documents([Document(text=text)])
         return [d.text for d in docs]
 
+
+__stability__ = "beta"
 
 __all__ = [
     "TextSplitter",

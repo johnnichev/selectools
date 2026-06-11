@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from .tools.base import Tool
     from .types import Message
 
-from .stability import stable
+from .stability import register_stability, stable
 
 # ---------------------------------------------------------------------------
 # CacheStats
@@ -71,7 +71,6 @@ class _CacheEntry:
 # ---------------------------------------------------------------------------
 
 
-@stable
 @runtime_checkable
 class Cache(Protocol):
     """
@@ -286,6 +285,13 @@ class CacheKeyBuilder:
         digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
         return f"selectools:{digest}"
 
+
+# Cache is @runtime_checkable: a ``__stability__`` class attribute would become
+# a structural protocol member on Python 3.9-3.11 and break ``isinstance()``
+# for implementations that do not define it, so it is registered instead.
+register_stability("Cache", "stable")
+
+__stability__ = "stable"
 
 __all__ = [
     "Cache",

@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any, List, Optional
 
+from ..stability import beta
 from ..types import Message, Role
 from .types import CaseResult, EvalFailure, TestCase
 
@@ -82,6 +83,7 @@ def _call_judge(
     return response.content or ""
 
 
+@beta
 class LLMJudgeEvaluator:
     """Generic LLM-as-judge with a custom rubric.
 
@@ -142,6 +144,7 @@ class LLMJudgeEvaluator:
         return []
 
 
+@beta
 class CorrectnessEvaluator:
     """LLM-as-judge: is the output correct given a reference answer?
 
@@ -192,6 +195,7 @@ class CorrectnessEvaluator:
         return []
 
 
+@beta
 class RelevanceEvaluator:
     """LLM-as-judge: is the output relevant to the user's query?"""
 
@@ -237,6 +241,7 @@ class RelevanceEvaluator:
         return []
 
 
+@beta
 class FaithfulnessEvaluator:
     """LLM-as-judge: is the output grounded in the provided context?
 
@@ -287,6 +292,7 @@ class FaithfulnessEvaluator:
         return []
 
 
+@beta
 class HallucinationEvaluator:
     """LLM-as-judge: does the output contain hallucinated information?
 
@@ -337,6 +343,7 @@ class HallucinationEvaluator:
         return []
 
 
+@beta
 class ToxicityEvaluator:
     """LLM-as-judge: is the output toxic, harmful, or inappropriate?"""
 
@@ -383,6 +390,7 @@ class ToxicityEvaluator:
         return []
 
 
+@beta
 class CoherenceEvaluator:
     """LLM-as-judge: is the output coherent, well-structured, and logical?"""
 
@@ -429,6 +437,7 @@ class CoherenceEvaluator:
         return []
 
 
+@beta
 class CompletenessEvaluator:
     """LLM-as-judge: does the output fully address the user's query?"""
 
@@ -474,6 +483,7 @@ class CompletenessEvaluator:
         return []
 
 
+@beta
 class BiasEvaluator:
     """LLM-as-judge: does the output show bias (gender, racial, political, etc.)?"""
 
@@ -521,6 +531,7 @@ class BiasEvaluator:
         return []
 
 
+@beta
 class SummaryEvaluator:
     """LLM-as-judge: is the summary accurate and complete?
 
@@ -570,6 +581,7 @@ class SummaryEvaluator:
         return []
 
 
+@beta
 class ConcisenessEvaluator:
     """LLM-as-judge: is the output concise without being incomplete?"""
 
@@ -617,6 +629,7 @@ class ConcisenessEvaluator:
         return []
 
 
+@beta
 class InstructionFollowingEvaluator:
     """LLM-as-judge: did the agent follow the specific instructions given?
 
@@ -666,6 +679,7 @@ class InstructionFollowingEvaluator:
         return []
 
 
+@beta
 class ToneEvaluator:
     """LLM-as-judge: does the output match the expected tone?
 
@@ -715,6 +729,7 @@ class ToneEvaluator:
         return []
 
 
+@beta
 class ContextRecallEvaluator:
     """LLM-as-judge: did the response use all relevant information from context?
 
@@ -765,6 +780,7 @@ class ContextRecallEvaluator:
         return []
 
 
+@beta
 class ContextPrecisionEvaluator:
     """LLM-as-judge: was the retrieved context actually relevant to the query?
 
@@ -815,6 +831,7 @@ class ContextPrecisionEvaluator:
         return []
 
 
+@beta
 class GrammarEvaluator:
     """LLM-as-judge: is the output grammatically correct and fluent?"""
 
@@ -861,6 +878,7 @@ class GrammarEvaluator:
         return []
 
 
+@beta
 class FactConsistencyEvaluator:
     """LLM-as-judge: does the response contradict any facts in the provided context?
 
@@ -912,6 +930,7 @@ class FactConsistencyEvaluator:
         return []
 
 
+@beta
 class CustomRubricEvaluator:
     """LLM-as-judge: scores each criterion independently, fails if any is low.
 
@@ -1014,6 +1033,7 @@ class CustomRubricEvaluator:
         return failures
 
 
+@beta
 class AnswerAttributionEvaluator:
     """LLM-as-judge: can each factual claim in the response be traced to the context?
 
@@ -1067,6 +1087,7 @@ class AnswerAttributionEvaluator:
         return []
 
 
+@beta
 class StepReasoningEvaluator:
     """LLM-as-judge: does the response show clear step-by-step logical reasoning?
 
@@ -1123,6 +1144,7 @@ class StepReasoningEvaluator:
         return []
 
 
+@beta
 class SafetyEvaluator:
     """LLM-as-judge: comprehensive safety check (broader than toxicity).
 

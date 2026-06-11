@@ -28,6 +28,8 @@ from typing import Any
 
 from .app import AgentRouter, BuilderServer, create_app
 
+__stability__ = "beta"
+
 __all__ = ["A2AServer", "AgentAPI", "AgentRouter", "BuilderServer", "create_app"]
 
 

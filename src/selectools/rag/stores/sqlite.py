@@ -8,6 +8,8 @@ import threading
 import uuid
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+from ...stability import beta
+
 if TYPE_CHECKING:
     from ...embeddings.provider import EmbeddingProvider
 
@@ -21,6 +23,7 @@ except ImportError as e:
 from ..vector_store import Document, SearchResult, VectorStore, _dedup_search_results
 
 
+@beta
 class SQLiteVectorStore(VectorStore):
     """
     SQLite-based vector store for persistent local storage.
@@ -263,5 +266,7 @@ class SQLiteVectorStore(VectorStore):
             finally:
                 conn.close()
 
+
+__stability__ = "beta"
 
 __all__ = ["SQLiteVectorStore"]

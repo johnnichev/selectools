@@ -11,9 +11,13 @@ import json
 import re
 from typing import Any, Dict, Optional, Type, Union
 
+from .stability import register_stability, stable
+
 ResponseFormat = Union[Type[Any], Dict[str, Any]]
+register_stability("ResponseFormat", "stable")
 
 
+@stable
 def schema_from_response_format(response_format: ResponseFormat) -> Dict[str, Any]:
     """Convert a Pydantic model class or raw dict into a JSON Schema dict."""
     if isinstance(response_format, dict):
@@ -27,6 +31,7 @@ def schema_from_response_format(response_format: ResponseFormat) -> Dict[str, An
     )
 
 
+@stable
 def build_schema_instruction(schema: Dict[str, Any]) -> str:
     """Build a system prompt suffix instructing the LLM to produce valid JSON."""
     compact = json.dumps(schema, indent=2)
@@ -40,6 +45,7 @@ def build_schema_instruction(schema: Dict[str, Any]) -> str:
 _JSON_BLOCK_RE = re.compile(r"```(?:json)?\s*\n?(.*?)\n?\s*```", re.DOTALL)
 
 
+@stable
 def extract_json(text: str) -> Optional[str]:
     """Extract the first complete JSON object from text.
 
@@ -81,6 +87,7 @@ def extract_json(text: str) -> Optional[str]:
     return None
 
 
+@stable
 def parse_and_validate(
     text: str,
     response_format: ResponseFormat,
@@ -117,6 +124,7 @@ def parse_and_validate(
     )
 
 
+@stable
 def validation_retry_message(error: Exception) -> str:
     """Build a user-message telling the LLM what went wrong so it can fix it."""
     return (
@@ -124,6 +132,8 @@ def validation_retry_message(error: Exception) -> str:
         "Please try again, returning ONLY a valid JSON object matching the schema."
     )
 
+
+__stability__ = "stable"
 
 __all__ = [
     "ResponseFormat",

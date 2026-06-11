@@ -54,4 +54,6 @@ class CancellationToken:
             raise CancellationError("Agent run was cancelled")
 
 
+__stability__ = "stable"
+
 __all__ = ["CancellationToken"]

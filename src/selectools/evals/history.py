@@ -7,7 +7,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+from ..stability import beta
 
+
+@beta
 @dataclass
 class HistoryEntry:
     """A single historical eval run."""
@@ -28,6 +31,7 @@ class HistoryEntry:
     duration_ms: float
 
 
+@beta
 @dataclass
 class HistoryTrend:
     """Trend analysis across historical runs."""
@@ -102,6 +106,7 @@ class HistoryTrend:
         return "\n".join(lines)
 
 
+@beta
 class HistoryStore:
     """Track eval results over time.
 

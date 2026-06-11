@@ -5,11 +5,13 @@ from __future__ import annotations
 import logging
 from typing import List, Optional, cast
 
+from ..stability import beta
 from .provider import EmbeddingProvider
 
 logger = logging.getLogger(__name__)
 
 
+@beta
 class AnthropicEmbeddingProvider(EmbeddingProvider):
     """
     Anthropic embedding provider using Voyage AI models.
@@ -136,5 +138,7 @@ class AnthropicEmbeddingProvider(EmbeddingProvider):
         """
         return self._dimension
 
+
+__stability__ = "beta"
 
 __all__ = ["AnthropicEmbeddingProvider"]

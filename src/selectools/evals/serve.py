@@ -10,6 +10,7 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 from io import BytesIO
 from typing import Any, Callable, Dict, List, Optional
 
+from ..stability import beta
 from .types import CaseVerdict
 
 
@@ -49,6 +50,7 @@ class _DashboardHandler(SimpleHTTPRequestHandler):
         pass  # Suppress request logging
 
 
+@beta
 def serve_eval(
     suite: Any,
     *,

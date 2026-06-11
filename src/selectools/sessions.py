@@ -32,6 +32,7 @@ def _make_key(session_id: str, namespace: Optional[str]) -> str:
     return session_id
 
 
+@stable
 @dataclass
 class SessionMetadata:
     """Lightweight summary of a stored session.
@@ -805,7 +806,7 @@ class SQLiteSessionStore:
 # ======================================================================
 
 
-@beta
+@stable
 class RedisSessionStore:
     """Redis-backed session store.
 
@@ -1283,6 +1284,8 @@ class SupabaseSessionStore:
         results.sort(key=lambda r: (-r.score, r.session_id))
         return results[:limit]
 
+
+__stability__ = "stable"
 
 __all__ = [
     "SessionStore",

@@ -50,6 +50,8 @@ from typing import ClassVar, Dict, List, Optional
 
 from .stability import beta
 
+__stability__ = "beta"
+
 __all__ = [
     "ToolResult",
     "Ambiguous",

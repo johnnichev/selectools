@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Any, Union
 from xml.sax.saxutils import escape as _xml_escape  # nosec B406
 
+from ..stability import beta
+
 
 def _badge_color(accuracy: float) -> str:
     """Return badge color based on accuracy."""
@@ -22,6 +24,7 @@ def _badge_color(accuracy: float) -> str:
     return "#f87171"  # red
 
 
+@beta
 def generate_badge(
     report: Any,
     filepath: Union[str, Path],
@@ -72,6 +75,7 @@ def generate_badge(
     tmp.replace(dest)
 
 
+@beta
 def generate_detailed_badge(
     report: Any,
     filepath: Union[str, Path],

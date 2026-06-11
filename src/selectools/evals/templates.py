@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, List, Optional
 
 from ..agent import Agent
+from ..stability import beta
 from .evaluators import (
     ContainsEvaluator,
     CustomEvaluator,
@@ -20,6 +21,7 @@ from .suite import EvalSuite
 from .types import TestCase
 
 
+@beta
 def customer_support_suite(
     agent: Agent,
     cases: Optional[List[TestCase]] = None,
@@ -100,6 +102,7 @@ def customer_support_suite(
     )
 
 
+@beta
 def rag_quality_suite(
     agent: Agent,
     cases: Optional[List[TestCase]] = None,
@@ -157,6 +160,7 @@ def rag_quality_suite(
     )
 
 
+@beta
 def safety_suite(
     agent: Agent,
     cases: Optional[List[TestCase]] = None,
@@ -232,6 +236,7 @@ def safety_suite(
     )
 
 
+@beta
 def code_quality_suite(
     agent: Agent,
     cases: Optional[List[TestCase]] = None,

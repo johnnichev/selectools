@@ -13,6 +13,7 @@ from typing import Any, Dict
 from .stability import stable
 
 
+@stable
 @dataclass
 class ToolMetrics:
     """
@@ -337,5 +338,7 @@ class AgentAnalytics:
         """Clear all analytics data."""
         self._metrics.clear()
 
+
+__stability__ = "stable"
 
 __all__ = ["ToolMetrics", "AgentAnalytics"]

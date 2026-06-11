@@ -20,6 +20,23 @@ Examples::
 
     @deprecated(since="0.19", replacement="NewThing")
     def old_function(): ...
+
+Some public symbols cannot carry a ``__stability__`` attribute:
+
+- module-level constants (``str``/``float``/``list``/``dict``/``tuple`` instances)
+- typing aliases (``Union[...]``, ``Callable[...]``, and friends)
+- ``@runtime_checkable`` Protocol classes — on Python 3.9-3.11 a
+  ``__stability__`` class attribute becomes a structural member of the
+  protocol and silently breaks ``isinstance()`` for conforming
+  implementations that do not define it.
+
+Those symbols are registered in :data:`STABILITY_REGISTRY` via
+:func:`register_stability` at their definition site instead.
+
+Module-level stability follows a plain-attribute convention: every public
+submodule sets ``__stability__ = "stable"`` or ``"beta"`` at module scope to
+declare the default guarantee for its surface (enforced by
+``tests/test_architecture.py``).
 """
 
 from __future__ import annotations
@@ -27,7 +44,7 @@ from __future__ import annotations
 import functools
 import inspect
 import warnings
-from typing import Any, Callable, Optional, TypeVar, Union, overload
+from typing import Any, Callable, Dict, Optional, TypeVar, Union, overload
 
 _F = TypeVar("_F", bound=Callable[..., Any])
 _C = TypeVar("_C", bound=type)
@@ -39,10 +56,6 @@ def stable(obj: _C) -> _C: ...
 
 @overload
 def stable(obj: _F) -> _F: ...
-
-
-@overload
-def stable(obj: Any) -> Any: ...
 
 
 def stable(obj: Any) -> Any:
@@ -60,10 +73,6 @@ def beta(obj: _C) -> _C: ...
 
 @overload
 def beta(obj: _F) -> _F: ...
-
-
-@overload
-def beta(obj: Any) -> Any: ...
 
 
 def beta(obj: Any) -> Any:
@@ -140,4 +149,73 @@ def deprecated(
 
 deprecated.__stability__ = "stable"  # type: ignore[attr-defined]
 
-__all__ = ["stable", "beta", "deprecated"]
+_VALID_LEVELS = ("stable", "beta", "deprecated")
+
+#: Stability levels for public symbols that cannot carry a ``__stability__``
+#: attribute (constants, typing aliases, runtime-checkable Protocols).
+#: Keys are the public symbol names exactly as they appear in ``__all__``.
+STABILITY_REGISTRY: Dict[str, str] = {}
+
+
+def register_stability(name: str, level: str) -> None:
+    """Register the stability level of a symbol that cannot be decorated.
+
+    Use this for module-level constants, typing aliases, and
+    ``@runtime_checkable`` Protocol classes (decorating those would change
+    ``isinstance()`` behavior on Python 3.9-3.11). Call it at the symbol's
+    definition site, right after the assignment.
+
+    Raises:
+        ValueError: If ``level`` is not a recognized stability level, or if
+            ``name`` was already registered with a different level.
+    """
+    if level not in _VALID_LEVELS:
+        raise ValueError(
+            f"Invalid stability level {level!r} for {name!r}; expected one of {_VALID_LEVELS}"
+        )
+    existing = STABILITY_REGISTRY.get(name)
+    if existing is not None and existing != level:
+        raise ValueError(
+            f"Conflicting stability registration for {name!r}: {existing!r} vs {level!r}"
+        )
+    STABILITY_REGISTRY[name] = level
+
+
+def get_stability(obj: Any, name: Optional[str] = None) -> Optional[str]:
+    """Return the stability level of a public symbol, or ``None`` if unmarked.
+
+    Checks the symbol's own ``__stability__`` attribute first (the marker set
+    by ``@stable``/``@beta``/``@deprecated``), then falls back to
+    :data:`STABILITY_REGISTRY` keyed by ``name``. For classes and functions
+    only the symbol's *own* marker counts — markers inherited from a base
+    class do not, so every public subclass must be marked explicitly.
+    """
+    if inspect.isclass(obj) or inspect.isroutine(obj):
+        level = vars(obj).get("__stability__")
+    else:
+        level = getattr(obj, "__stability__", None)
+    if isinstance(level, str):
+        return level
+    if name is not None:
+        return STABILITY_REGISTRY.get(name)
+    return None
+
+
+# The stability API is itself part of the v1.0 contract. ``stable``/``beta``/
+# ``deprecated`` carry their markers at their definition sites above; the
+# remaining three are marked here (the dict via the registry, the functions
+# via the same direct-attribute pattern as the decorators).
+register_stability("STABILITY_REGISTRY", "stable")
+register_stability.__stability__ = "stable"  # type: ignore[attr-defined]
+get_stability.__stability__ = "stable"  # type: ignore[attr-defined]
+
+__stability__ = "stable"
+
+__all__ = [
+    "stable",
+    "beta",
+    "deprecated",
+    "STABILITY_REGISTRY",
+    "register_stability",
+    "get_stability",
+]

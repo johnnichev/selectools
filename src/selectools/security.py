@@ -24,6 +24,8 @@ import unicodedata
 from dataclasses import dataclass
 from typing import List, Optional
 
+from .stability import stable
+
 _DEFAULT_INJECTION_PATTERNS: List[re.Pattern[str]] = [
     re.compile(r"ignore\s+(all\s+)?previous\s+instructions", re.IGNORECASE),
     re.compile(r"ignore\s+(all\s+)?above\s+instructions", re.IGNORECASE),
@@ -111,6 +113,7 @@ def _normalize_for_screening(text: str) -> str:
     return text
 
 
+@stable
 @dataclass
 class ScreeningResult:
     """Result of screening a tool output.
@@ -126,6 +129,7 @@ class ScreeningResult:
     matched_patterns: List[str]
 
 
+@stable
 def screen_output(
     content: str,
     *,
@@ -173,5 +177,7 @@ def screen_output(
 
     return ScreeningResult(safe=True, content=content, matched_patterns=[])
 
+
+__stability__ = "stable"
 
 __all__ = ["ScreeningResult", "screen_output"]

@@ -63,4 +63,6 @@ class TopicGuardrail(Guardrail):
         return GuardrailResult(passed=True, content=content, guardrail_name=self.name)
 
 
+__stability__ = "stable"
+
 __all__ = ["TopicGuardrail"]

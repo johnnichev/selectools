@@ -9,12 +9,14 @@ from typing import Any, Dict, List, Optional
 
 from .. import __version__
 from ..agent import Agent
+from ..stability import beta
 from .evaluators import DEFAULT_EVALUATORS
 from .report import EvalReport
 from .suite import EvalSuite
 from .types import CaseResult, CaseVerdict, EvalMetadata, TestCase
 
 
+@beta
 @dataclass
 class PairwiseCaseResult:
     """Result of comparing two agents on a single test case."""
@@ -26,6 +28,7 @@ class PairwiseCaseResult:
     reason: str
 
 
+@beta
 @dataclass
 class PairwiseReport:
     """Aggregated A/B comparison results."""
@@ -107,6 +110,7 @@ class PairwiseReport:
         }
 
 
+@beta
 class PairwiseEval:
     """Compare two agents head-to-head on the same test cases.
 

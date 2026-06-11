@@ -153,3 +153,11 @@ def extract_pdf_tables(path: str, pages: Optional[str] = None) -> str:
             return "\n".join([header, ""] + lines).strip()
     except Exception as exc:
         return f"Error reading PDF: {type(exc).__name__}: {exc}"
+
+
+__stability__ = "stable"
+
+__all__ = [
+    "extract_pdf_text",
+    "extract_pdf_tables",
+]

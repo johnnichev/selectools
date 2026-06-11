@@ -5,12 +5,15 @@ from __future__ import annotations
 import hashlib
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+from ...stability import beta
+
 if TYPE_CHECKING:
     from ...embeddings.provider import EmbeddingProvider
 
 from ..vector_store import Document, SearchResult, VectorStore, _dedup_search_results
 
 
+@beta
 class ChromaVectorStore(VectorStore):
     """
     ChromaDB-based vector store wrapper.
@@ -222,5 +225,7 @@ class ChromaVectorStore(VectorStore):
             name=self.collection_name, metadata={"hnsw:space": "cosine"}
         )
 
+
+__stability__ = "beta"
 
 __all__ = ["ChromaVectorStore"]

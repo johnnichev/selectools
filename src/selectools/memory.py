@@ -325,4 +325,6 @@ class ConversationMemory:
         self._lock = threading.RLock()
 
 
+__stability__ = "stable"
+
 __all__ = ["ConversationMemory"]

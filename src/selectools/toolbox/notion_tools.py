@@ -257,3 +257,12 @@ def notion_update_page(
         return f"Error: Could not reach the Notion API: {type(exc).__name__}"
     except Exception as exc:
         return f"Error updating Notion page: {type(exc).__name__}: {exc}"
+
+
+__stability__ = "stable"
+
+__all__ = [
+    "notion_create_page",
+    "notion_search",
+    "notion_update_page",
+]

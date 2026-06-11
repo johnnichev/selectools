@@ -6,12 +6,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from ..stability import stable
 from ..tools import Tool, ToolParameter
 
 if TYPE_CHECKING:
     from ..knowledge import KnowledgeMemory
 
 
+@stable
 def make_remember_tool(knowledge: "KnowledgeMemory") -> Tool:
     """Create a ``remember`` tool bound to a KnowledgeMemory instance.
 
@@ -60,5 +62,7 @@ def make_remember_tool(knowledge: "KnowledgeMemory") -> Tool:
         function=_remember,
     )
 
+
+__stability__ = "stable"
 
 __all__ = ["make_remember_tool"]

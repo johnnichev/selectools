@@ -17,9 +17,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Protocol, runtime_checkable
 
+from ..stability import beta, register_stability
 from ..trace import AgentTrace
 
 
+@beta
 @dataclass
 class TraceSummary:
     """Lightweight summary of a stored trace."""
@@ -31,6 +33,7 @@ class TraceSummary:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
+@beta
 @dataclass
 class TraceFilter:
     """Filter criteria for querying traces."""
@@ -72,6 +75,7 @@ class TraceStore(Protocol):
 # ---------------------------------------------------------------------------
 
 
+@beta
 class InMemoryTraceStore:
     """In-memory trace store for development and testing."""
 
@@ -170,6 +174,7 @@ CREATE INDEX IF NOT EXISTS idx_traces_created ON traces(created_at DESC);
 """
 
 
+@beta
 class SQLiteTraceStore:
     """SQLite-backed trace store for production use."""
 
@@ -290,6 +295,7 @@ class SQLiteTraceStore:
 # ---------------------------------------------------------------------------
 
 
+@beta
 class JSONLTraceStore:
     """Append-only JSONL trace store for export and archival."""
 
@@ -382,6 +388,13 @@ class JSONLTraceStore:
                     return False
         return True
 
+
+# TraceStore is @runtime_checkable: a ``__stability__`` class attribute would become
+# a structural protocol member on Python 3.9-3.11 and break ``isinstance()``
+# for implementations that do not define it, so it is registered instead.
+register_stability("TraceStore", "beta")
+
+__stability__ = "beta"
 
 __all__ = [
     "TraceStore",

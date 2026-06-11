@@ -1446,7 +1446,7 @@ class AsyncAgentObserver(AgentObserver):
 # ======================================================================
 
 
-@beta
+@stable
 class SimpleStepObserver(AgentObserver):
     """Observer that routes all lifecycle events to a single callback.
 
@@ -1742,5 +1742,7 @@ class SimpleStepObserver(AgentObserver):
             duration_ms=duration_ms,
         )
 
+
+__stability__ = "stable"
 
 __all__ = ["AgentObserver", "AsyncAgentObserver", "LoggingObserver", "SimpleStepObserver"]

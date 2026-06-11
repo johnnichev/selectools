@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 from typing import Dict, List, Optional
 
+from .stability import register_stability, stable
 from .tools import Tool
 
 DEFAULT_SYSTEM_INSTRUCTIONS = """You are an assistant that can call tools when helpful.
@@ -45,6 +46,7 @@ REASONING_STRATEGIES: Dict[str, str] = {
 }
 
 
+@stable
 class PromptBuilder:
     """Render a system prompt that includes tool schemas."""
 
@@ -79,5 +81,10 @@ class PromptBuilder:
 
         return prompt
 
+
+register_stability("DEFAULT_SYSTEM_INSTRUCTIONS", "stable")
+register_stability("REASONING_STRATEGIES", "stable")
+
+__stability__ = "stable"
 
 __all__ = ["PromptBuilder", "DEFAULT_SYSTEM_INSTRUCTIONS", "REASONING_STRATEGIES"]

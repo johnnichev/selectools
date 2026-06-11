@@ -243,3 +243,11 @@ def read_inbox(
             client.logout()
         except Exception:
             pass
+
+
+__stability__ = "stable"
+
+__all__ = [
+    "send_email",
+    "read_inbox",
+]

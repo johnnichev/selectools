@@ -279,3 +279,15 @@ def process_csv_stream(
         yield f"❌ Error parsing CSV: {e}\n"
     except Exception as e:
         yield f"❌ Error processing file: {e}\n"
+
+
+__stability__ = "stable"
+
+__all__ = [
+    "parse_json",
+    "json_to_csv",
+    "csv_to_json",
+    "extract_json_field",
+    "format_table",
+    "process_csv_stream",
+]

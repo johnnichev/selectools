@@ -51,7 +51,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 from .entity_memory import EntityMemory
 from .knowledge import KnowledgeEntry, KnowledgeMemory
 from .memory import ConversationMemory
-from .stability import beta
+from .stability import beta, register_stability
 from .token_estimation import estimate_tokens
 from .types import Message, Role
 
@@ -60,6 +60,7 @@ logger = logging.getLogger(__name__)
 #: Importance assigned when no rule matches.  Deliberately below the default
 #: promotion threshold (0.7) so unremarkable turns stay short-term only.
 DEFAULT_BASE_IMPORTANCE = 0.3
+register_stability("DEFAULT_BASE_IMPORTANCE", "beta")
 
 
 # ======================================================================
@@ -912,6 +913,10 @@ def _overlap(terms: Sequence[str], haystack: str) -> float:
 def _clip(text: str, limit: int = 100) -> str:
     return text if len(text) <= limit else text[: limit - 3] + "..."
 
+
+register_stability("DEFAULT_IMPORTANCE_RULES", "beta")
+
+__stability__ = "beta"
 
 __all__ = [
     "DEFAULT_BASE_IMPORTANCE",

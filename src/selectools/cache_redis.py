@@ -12,8 +12,10 @@ import pickle  # nosec B403 - we only deserialize data we serialized ourselves
 from typing import Any, Optional, Tuple
 
 from .cache import CacheStats
+from .stability import stable
 
 
+@stable
 class RedisCache:
     """
     Distributed TTL cache backed by Redis.
@@ -108,5 +110,7 @@ class RedisCache:
         """Return a human-readable summary of the Redis cache configuration."""
         return f"RedisCache(prefix={self._prefix!r}, default_ttl={self._default_ttl})"
 
+
+__stability__ = "stable"
 
 __all__ = ["RedisCache"]

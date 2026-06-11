@@ -11,6 +11,8 @@ from .openai_provider import OpenAIProvider
 from .router import RouterConfig, RouterProvider
 from .stubs import LocalProvider
 
+__stability__ = "stable"
+
 __all__ = [
     "Provider",
     "ProviderError",

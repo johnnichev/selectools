@@ -206,6 +206,8 @@ def dedupe_against(
     return _reject_near_duplicates
 
 
+__stability__ = "beta"
+
 __all__ = [
     "defang_delimiters",
     "strip_surrogates",

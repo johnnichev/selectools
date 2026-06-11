@@ -102,13 +102,15 @@ from typing import (
 )
 
 from .results import ToolResult
-from .stability import beta
+from .stability import beta, register_stability
 
 if TYPE_CHECKING:
     from .agent.core import Agent
 from .types import AgentResult, Message, Role
 
 logger = logging.getLogger(__name__)
+
+__stability__ = "beta"
 
 __all__ = [
     "DEFAULT_TTL_SECONDS",
@@ -132,6 +134,7 @@ __all__ = [
 # destructive action proposed minutes earlier. Users who take longer simply
 # re-ask — annoying, not destructive.
 DEFAULT_TTL_SECONDS: float = 60.0
+register_stability("DEFAULT_TTL_SECONDS", "beta")
 
 # TTL applied by the "ignore" intent (issue #82, Sheriff round-13 F11): an
 # unrecognized/stale button tap PRESERVES the pending but tightens its window
@@ -141,6 +144,7 @@ DEFAULT_TTL_SECONDS: float = 60.0
 # 10s keeps the legitimate "oh, let me retype my answer" path alive without
 # leaving a destructive op armed for a long window.
 DEFAULT_IGNORE_TTL_SECONDS: float = 10.0
+register_stability("DEFAULT_IGNORE_TTL_SECONDS", "beta")
 
 # Statuses for the PendingAction lifecycle.
 _PENDING = "pending"

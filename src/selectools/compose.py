@@ -107,4 +107,6 @@ def compose(
     )
 
 
+__stability__ = "beta"
+
 __all__ = ["compose"]

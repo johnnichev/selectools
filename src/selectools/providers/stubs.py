@@ -107,4 +107,6 @@ class LocalProvider(Provider):
         yield ""  # pragma: no cover  # makes this an async generator for mypy
 
 
+__stability__ = "beta"
+
 __all__ = ["LocalProvider"]

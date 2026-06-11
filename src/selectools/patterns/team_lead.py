@@ -25,10 +25,11 @@ from .._async_utils import run_sync
 from .._json_utils import safe_json_parse as _safe_json_parse
 from ..orchestration.graph import AgentGraph
 from ..orchestration.state import ContextMode, GraphState
-from ..stability import beta
+from ..stability import beta, stable
 from ..types import Message, Role
 
 
+@stable
 @dataclass
 class Subtask:
     """A unit of work assigned to a team member."""
@@ -40,6 +41,7 @@ class Subtask:
     attempt: int = 0
 
 
+@stable
 @dataclass
 class TeamLeadResult:
     """Result of a TeamLeadAgent run."""
@@ -81,7 +83,7 @@ Team members: {members}
 """
 
 
-@beta
+@stable
 class TeamLeadAgent:
     """Team lead delegates subtasks to agents and coordinates results.
 
@@ -302,5 +304,7 @@ class TeamLeadAgent:
         synthesis = await self.lead.arun([Message(role=Role.USER, content=synthesis_prompt)])
         return TeamLeadResult(content=synthesis.content or work_log, subtasks=all_subtasks)
 
+
+__stability__ = "beta"
 
 __all__ = ["TeamLeadAgent", "Subtask", "TeamLeadResult"]

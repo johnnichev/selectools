@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Sequence
 
+from ..stability import stable
 from .base import Tool
 
 
@@ -27,6 +28,7 @@ def _module_name_for_path(path: Path) -> str:
     return f"_selectools_dynamic_.{safe_stem}_{path_hash}"
 
 
+@stable
 class ToolLoader:
     """
     Discover and load ``Tool`` instances from Python modules and directories.
@@ -203,5 +205,7 @@ class ToolLoader:
 
         return ToolLoader.from_file(file_path)
 
+
+__stability__ = "stable"
 
 __all__ = ["ToolLoader"]

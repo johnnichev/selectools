@@ -185,4 +185,6 @@ class AgentUsage:
         return "\n".join(lines)
 
 
+__stability__ = "stable"
+
 __all__ = ["UsageStats", "AgentUsage"]

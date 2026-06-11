@@ -32,10 +32,11 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Protocol, Tuple, runtime_checkable
 
-from ..stability import beta
+from ..stability import register_stability, stable
 from .state import GraphState
 
 
+@stable
 @dataclass
 class CheckpointMetadata:
     """Metadata record for a stored checkpoint.
@@ -57,7 +58,6 @@ class CheckpointMetadata:
     created_at: datetime
 
 
-@beta
 @runtime_checkable
 class CheckpointStore(Protocol):
     """Protocol for checkpoint backends.
@@ -119,7 +119,7 @@ def _deserialize_checkpoint(data: Dict) -> Tuple[GraphState, int]:
 # ------------------------------------------------------------------
 
 
-@beta
+@stable
 class InMemoryCheckpointStore:
     """Thread-safe in-memory checkpoint store.
 
@@ -175,7 +175,7 @@ class InMemoryCheckpointStore:
 # ------------------------------------------------------------------
 
 
-@beta
+@stable
 class FileCheckpointStore:
     """File-based checkpoint store.
 
@@ -294,7 +294,7 @@ CREATE INDEX IF NOT EXISTS idx_checkpoints_graph_id ON checkpoints (graph_id);
 """
 
 
-@beta
+@stable
 class SQLiteCheckpointStore:
     """SQLite-backed checkpoint store with WAL mode for concurrent access.
 
@@ -386,6 +386,13 @@ class SQLiteCheckpointStore:
         conn.commit()
         return cursor.rowcount > 0
 
+
+# CheckpointStore is @runtime_checkable: a ``__stability__`` class attribute would become
+# a structural protocol member on Python 3.9-3.11 and break ``isinstance()``
+# for implementations that do not define it, so it is registered instead.
+register_stability("CheckpointStore", "stable")
+
+__stability__ = "beta"
 
 __all__ = [
     "CheckpointMetadata",

@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Set
 
+from ..stability import beta
 from ..tools.base import Tool
 from .client import MCPClient
 from .config import MCPServerConfig
 
 
+@beta
 class MultiMCPClient:
     """Manage connections to multiple MCP servers.
 

@@ -7,11 +7,13 @@ import time
 from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
+from ..stability import beta
 from ..tools.base import Tool
 from .bridge import mcp_to_tool
 from .config import MCPServerConfig
 
 
+@beta
 class MCPClient:
     """Connect to a single MCP server and discover its tools.
 

@@ -284,3 +284,12 @@ def linear_update_issue(
         return f"Error: Could not reach the Linear API: {type(exc).__name__}"
     except Exception as exc:
         return f"Error updating Linear issue: {type(exc).__name__}: {exc}"
+
+
+__stability__ = "stable"
+
+__all__ = [
+    "linear_create_issue",
+    "linear_list_issues",
+    "linear_update_issue",
+]

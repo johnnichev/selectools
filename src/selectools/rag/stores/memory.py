@@ -5,6 +5,8 @@ from __future__ import annotations
 import threading
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+from ...stability import beta
+
 if TYPE_CHECKING:
     from ...embeddings.provider import EmbeddingProvider
 
@@ -24,6 +26,7 @@ from ..vector_store import (
 )
 
 
+@beta
 class InMemoryVectorStore(VectorStore):
     """
     Simple in-memory vector store using NumPy for similarity search.
@@ -247,5 +250,7 @@ class InMemoryVectorStore(VectorStore):
                 return False
         return True
 
+
+__stability__ = "beta"
 
 __all__ = ["InMemoryVectorStore"]

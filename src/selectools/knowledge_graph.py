@@ -14,10 +14,11 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 
-from .stability import stable
+from .stability import beta, register_stability, stable
 from .types import Message, Role
 
 
+@beta
 @dataclass
 class Triple:
     """A relationship triple extracted from conversation.
@@ -78,6 +79,7 @@ class TripleStore(Protocol):
     def to_list(self) -> List[Dict[str, Any]]: ...
 
 
+@beta
 class InMemoryTripleStore:
     """In-memory triple store backed by a list."""
 
@@ -122,6 +124,7 @@ class InMemoryTripleStore:
             self._triples = self._triples[excess:]
 
 
+@beta
 class SQLiteTripleStore:
     """SQLite-backed triple store for persistent storage.
 
@@ -486,6 +489,13 @@ class KnowledgeGraphMemory:
             mem._store.add_many(triples)
         return mem
 
+
+# TripleStore is @runtime_checkable: a ``__stability__`` class attribute would become
+# a structural protocol member on Python 3.9-3.11 and break ``isinstance()``
+# for implementations that do not define it, so it is registered instead.
+register_stability("TripleStore", "beta")
+
+__stability__ = "beta"
 
 __all__ = [
     "Triple",

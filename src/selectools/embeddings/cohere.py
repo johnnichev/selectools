@@ -5,11 +5,13 @@ from __future__ import annotations
 import logging
 from typing import List, Optional, cast
 
+from ..stability import beta
 from .provider import EmbeddingProvider
 
 logger = logging.getLogger(__name__)
 
 
+@beta
 class CohereEmbeddingProvider(EmbeddingProvider):
     """
     Cohere embedding provider.
@@ -151,5 +153,7 @@ class CohereEmbeddingProvider(EmbeddingProvider):
         """
         return self._dimension
 
+
+__stability__ = "beta"
 
 __all__ = ["CohereEmbeddingProvider"]

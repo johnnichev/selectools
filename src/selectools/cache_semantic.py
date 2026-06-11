@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, List, Optional, Tuple
 
 from .cache import CacheStats
+from .stability import stable
 
 if TYPE_CHECKING:
     from .embeddings.provider import EmbeddingProvider
@@ -41,6 +42,7 @@ class _SemanticEntry:
 # ---------------------------------------------------------------------------
 
 
+@stable
 class SemanticCache:
     """
     Thread-safe semantic cache with embedding-based similarity lookup.
@@ -215,5 +217,7 @@ def _cosine_similarity(a: List[float], b: List[float]) -> float:
         return 0.0
     return dot / (norm_a * norm_b)
 
+
+__stability__ = "stable"
 
 __all__ = ["SemanticCache"]

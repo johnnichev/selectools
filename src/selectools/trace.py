@@ -365,7 +365,7 @@ _STEP_COLORS: Dict[str, str] = {
 _DEFAULT_COLOR = "#64748b"
 
 
-@beta
+@stable
 def trace_to_html(trace: "AgentTrace") -> str:
     """Render an AgentTrace as a standalone HTML waterfall timeline.
 
@@ -514,6 +514,7 @@ function toggleDetail(id) {{
 </html>"""
 
 
+@stable
 def trace_to_json(trace: "AgentTrace") -> str:
     """Serialize an AgentTrace to a JSON string for loading into the visual builder.
 
@@ -541,5 +542,7 @@ def trace_to_json(trace: "AgentTrace") -> str:
 
     return json.dumps(dataclasses.asdict(trace), default=_default)  # type: ignore[arg-type]
 
+
+__stability__ = "stable"
 
 __all__ = ["TraceStep", "AgentTrace", "StepType", "trace_to_html", "trace_to_json"]

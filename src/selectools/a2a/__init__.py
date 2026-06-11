@@ -25,6 +25,8 @@ from typing import Any
 
 from .types import A2AError, A2ATask, AgentCard, AgentSkill, TaskState
 
+__stability__ = "beta"
+
 __all__ = [
     "A2AClient",
     "A2AError",
