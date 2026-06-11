@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import hashlib
 import inspect
 import json
@@ -477,7 +478,14 @@ class _ToolExecutorMixin:
         # max_workers/2+1: every dispatch-worker blocks on an inner timeout
         # submission that can never start because all slots are taken.
         pool = _get_parallel_dispatch_executor()
-        futures = [pool.submit(_run_one, tc) for tc in tool_calls_to_execute]
+        # Propagate caller contextvars into dispatch workers (pitfall #28 /
+        # BUG-32) so emit_artifact() reaches the per-run collector. Each
+        # submission needs its OWN context copy: Context.run raises if the
+        # same Context is entered concurrently.
+        futures = [
+            pool.submit(contextvars.copy_context().run, _run_one, tc)
+            for tc in tool_calls_to_execute
+        ]
         results = [f.result() for f in futures]  # preserves order
 
         last_tool_name: Optional[str] = None
@@ -777,7 +785,10 @@ class _ToolExecutorMixin:
             return tool.execute(parameters, chunk_callback=chunk_callback)
 
         executor = _get_tool_timeout_executor()
-        future = executor.submit(tool.execute, parameters, chunk_callback)
+        # Propagate caller contextvars into the timeout worker (pitfall #28 /
+        # BUG-32) so emit_artifact() reaches the per-run collector.
+        ctx_copy = contextvars.copy_context()
+        future = executor.submit(ctx_copy.run, tool.execute, parameters, chunk_callback)
         try:
             return future.result(timeout=self.config.tool_timeout_seconds)
         except FuturesTimeoutError:

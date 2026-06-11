@@ -13,6 +13,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol
 
+from selectools.results import Artifact
 from selectools.stability import stable
 
 
@@ -313,6 +314,7 @@ class AgentResult:
         reasoning_history: Reasoning text from each iteration that selected a tool.
         trace: Execution trace capturing every step of the agent run.
         provider_used: Name of the provider that handled the run (useful with FallbackProvider).
+        artifacts: Files emitted by tools during the run via ``emit_artifact()``.
 
     Example:
         >>> result = agent.run([Message(role=Role.USER, content="Search for Python")])
@@ -337,6 +339,7 @@ class AgentResult:
     trace: Optional[Any] = None
     provider_used: Optional[str] = None
     usage: Optional[Any] = None
+    artifacts: List[Artifact] = field(default_factory=list)
 
     @property
     def content(self) -> str:

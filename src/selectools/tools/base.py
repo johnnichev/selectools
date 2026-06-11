@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from ..exceptions import ToolExecutionError, ToolValidationError
+from ..results import ToolResult
 from ..stability import stable
 
 JsonSchema = Dict[str, Any]
@@ -505,6 +506,13 @@ class Tool:
             return json.dumps(result, default=str)
         if hasattr(result, "model_dump"):  # Pydantic v2
             return json.dumps(result.model_dump(), default=str)
+        if isinstance(result, ToolResult):
+            # ``kind`` is a ClassVar, so asdict() silently drops it (ClassVar
+            # annotations are excluded from dataclasses.fields() by design).
+            # Re-inject it explicitly — first, for LLM readability.
+            from dataclasses import asdict
+
+            return json.dumps({"kind": type(result).kind, **asdict(result)}, default=str)
         if hasattr(result, "__dataclass_fields__"):  # dataclass
             from dataclasses import asdict
 

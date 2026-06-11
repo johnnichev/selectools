@@ -138,6 +138,7 @@ from .providers.gemini_provider import GeminiProvider
 from .providers.ollama_provider import OllamaProvider
 from .providers.openai_provider import OpenAIProvider
 from .providers.stubs import LocalProvider
+from .results import Ambiguous, Artifact, NotFound, ToolResult, emit_artifact
 from .sessions import (
     JsonFileSessionStore,
     RedisSessionStore,
@@ -223,6 +224,12 @@ __all__ = [
     "PolicyResult",
     # Structured output
     "ResponseFormat",
+    # Typed tool results + artifact side-channel (issue #59)
+    "ToolResult",
+    "Ambiguous",
+    "NotFound",
+    "Artifact",
+    "emit_artifact",
     # Stability markers
     "stable",
     "beta",
