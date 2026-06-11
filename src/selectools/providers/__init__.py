@@ -8,6 +8,7 @@ from .gemini_provider import GeminiProvider
 from .litellm_provider import LiteLLMProvider
 from .ollama_provider import OllamaProvider
 from .openai_provider import OpenAIProvider
+from .router import RouterConfig, RouterProvider
 from .stubs import LocalProvider
 
 __all__ = [
@@ -20,5 +21,7 @@ __all__ = [
     "OllamaProvider",
     "LiteLLMProvider",
     "FallbackProvider",
+    "RouterProvider",
+    "RouterConfig",
     "LocalProvider",
 ]
