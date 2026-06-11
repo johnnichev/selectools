@@ -481,7 +481,7 @@ Focus: Close the integration gap with LangChain by adding high-demand document l
 | Document Loaders    | 4        | text, file, directory, PDF               |
 | Vector Stores       | 4        | Memory, SQLite, Chroma, Pinecone         |
 | Embedding Providers | 4        | OpenAI, Anthropic/Voyage, Gemini, Cohere |
-| Toolbox             | 24 tools | file, web, data, datetime, text          |
+| Toolbox             | 48 tools | file, web, data, datetime, text, code, etc |
 | Rerankers           | 2        | Cohere, Jina                             |
 
 ### New Document Loaders
