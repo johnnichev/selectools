@@ -13,7 +13,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from selectools.stability import stable
+from selectools.stability import beta, stable
 
 
 @stable
@@ -21,6 +21,25 @@ class PolicyDecision(str, Enum):
     ALLOW = "allow"
     REVIEW = "review"
     DENY = "deny"
+
+
+@beta
+@dataclass
+class ApprovalRequest:
+    """Structured request passed to ``ToolConfig.approval_handler``.
+
+    Attributes:
+        tool_name: Name of the tool awaiting approval.
+        tool_args: Parameters the LLM requested for the call.
+        reason: Why approval is required (policy rule or approval gate).
+        preview: Human-readable one-line call preview, e.g.
+            ``send_email(to='a@b.com', subject='hi')``.
+    """
+
+    tool_name: str
+    tool_args: Dict[str, Any] = field(default_factory=dict)
+    reason: str = ""
+    preview: str = ""
 
 
 @stable
@@ -214,4 +233,4 @@ class ToolPolicy:
         return cls.from_dict(data)
 
 
-__all__ = ["ToolPolicy", "PolicyDecision", "PolicyResult"]
+__all__ = ["ApprovalRequest", "ToolPolicy", "PolicyDecision", "PolicyResult"]

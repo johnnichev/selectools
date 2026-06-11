@@ -73,6 +73,10 @@ class _RunContext:
     # entries appended mid-turn.
     compression_fallback_warned: bool = False
     parent_iteration_usage: Optional[UsageStats] = None
+    # HITL: approval-handler denials memoized per (tool_name, args digest)
+    # within this run so a human is not re-paged when the model retries an
+    # identical denied call on a later iteration. Approvals are NOT memoized.
+    denied_approvals: Dict[str, str] = field(default_factory=dict)
 
 
 @stable

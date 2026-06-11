@@ -142,7 +142,7 @@ from .pending import (
     stash_pending,
 )
 from .pipeline import Pipeline, Step, StepResult, branch, cache_step, parallel, retry, step
-from .policy import PolicyDecision, PolicyResult, ToolPolicy
+from .policy import ApprovalRequest, PolicyDecision, PolicyResult, ToolPolicy
 from .pricing import PRICING, calculate_cost, calculate_embedding_cost, get_model_pricing
 from .prompt import REASONING_STRATEGIES, PromptBuilder
 from .providers.anthropic_provider import AnthropicProvider
@@ -247,6 +247,7 @@ __all__ = [
     "SemanticCache",
     # Tool policy
     "ToolPolicy",
+    "ApprovalRequest",
     "PolicyDecision",
     "PolicyResult",
     # Structured output

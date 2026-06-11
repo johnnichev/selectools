@@ -24,7 +24,7 @@ Usage::
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
 
 if TYPE_CHECKING:
     from ..cache import Cache
@@ -58,7 +58,16 @@ class ToolConfig:
         timeout_seconds: Maximum execution time for each tool call. None = no timeout.
         policy: Optional ToolPolicy with allow/review/deny rules.
         confirm_action: Callback invoked for tools whose policy decision is ``review``.
-        approval_timeout: Seconds to wait for a confirm_action response.
+        approval_timeout: Seconds to wait for a confirm_action or
+            approval_handler response. NOTE: while waiting, blocking sync
+            handlers (and async handlers invoked from sync ``run()``) each
+            occupy one slot of the shared 16-worker
+            ``selectools_tool_timeout`` thread pool, which also serves
+            tool-timeout enforcement across ALL agents in the process. Many
+            concurrent long-blocking approvals can exhaust the pool — keep
+            handlers prompt and this timeout deliberate. Timed-out approval
+            futures are cancelled so still-queued handlers never fire after
+            the call was denied.
         parallel_execution: Execute multiple tool calls concurrently.
         compress_results: When True, tool results longer than ``compress_threshold``
             characters are summarized by a one-shot LLM call before being appended
@@ -82,10 +91,34 @@ class ToolConfig:
         compress_model: Model override for compression calls. Defaults to the
             agent's effective model. A fast/cheap model is recommended.
             Required when ``compress_provider`` is set. Default: None.
+        require_approval: Agent-level human-in-the-loop gate. A list of tool
+            names (or the string ``"*"`` for all tools) that must be approved
+            before executing — the centralized equivalent of marking each tool
+            with ``requires_approval=True``. Gated calls are routed to
+            ``approval_handler`` (or ``confirm_action`` as fallback). A denied
+            call returns a standardized "denied by approval handler" tool
+            result; the loop continues and the model sees the denial.
+            Default: None (no agent-level gate).
+        approval_handler: Sync or async callable receiving an
+            ``selectools.policy.ApprovalRequest`` (tool name, args, reason,
+            preview) and returning a bool: ``True`` to approve, ``False`` to
+            deny. Any non-bool return value (coroutine, generator, mock, ...)
+            fails CLOSED and denies the call. Used for every ``review``
+            policy decision when set (takes precedence over
+            ``confirm_action``). Async handlers — both coroutine functions
+            and instances with ``async def __call__`` — work from both
+            ``run()`` and ``arun()``/``astream()``. ``request.tool_args`` is
+            a defensive copy: mutating it never changes what the tool
+            executes with. Denials are memoized per (tool name, args) within
+            a run so an identical retried call does not re-page the human;
+            approvals are re-requested every time. Default: None.
 
     Raises:
         ValueError: If ``compress_provider`` is set without an explicit
-            ``compress_model``.
+            ``compress_model``; or if ``require_approval`` is set without an
+            ``approval_handler`` or ``confirm_action`` — gated tools would be
+            unconditionally denied, which is a misconfiguration (use
+            ``ToolPolicy(deny=[...])`` to hard-block tools instead).
     """
 
     timeout_seconds: Optional[float] = None
@@ -97,6 +130,8 @@ class ToolConfig:
     compress_threshold: int = 2000
     compress_provider: Optional["Provider"] = None
     compress_model: Optional[str] = None
+    require_approval: Optional[Union[str, List[str]]] = None
+    approval_handler: Optional[Any] = None  # ApprovalHandler type
 
     def __post_init__(self) -> None:
         if self.compress_provider is not None and self.compress_model is None:
@@ -106,6 +141,13 @@ class ToolConfig:
                 "compression provider, which would 404 on every call and "
                 "silently degrade all oversized results to the truncation "
                 "fallback. Set compress_model explicitly."
+            )
+        if self.require_approval and self.approval_handler is None and self.confirm_action is None:
+            raise ValueError(
+                "ToolConfig.require_approval is set but neither approval_handler "
+                "nor confirm_action is configured — gated tools would always be "
+                "denied. Provide an approval_handler, or use "
+                "ToolPolicy(deny=[...]) to hard-block tools instead."
             )
 
 

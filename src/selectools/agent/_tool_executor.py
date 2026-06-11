@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
+import copy
 import hashlib
 import inspect
 import json
@@ -57,7 +58,7 @@ def _get_parallel_dispatch_executor() -> ThreadPoolExecutor:
 
 from .._async_utils import run_in_executor_copyctx
 from ..coherence import CoherenceResult, acheck_coherence, check_coherence
-from ..policy import PolicyDecision, PolicyResult, ToolPolicy
+from ..policy import ApprovalRequest, PolicyDecision, PolicyResult, ToolPolicy
 from ..security import screen_output as screen_tool_output
 from ..trace import StepType, TraceStep
 from ..types import Message, Role
@@ -391,16 +392,193 @@ class _ToolExecutorMixin:
             )
         return None
 
+    # ------------------------------------------------------------------
+    # Agent-level human-in-the-loop (ROADMAP P2)
+    # ------------------------------------------------------------------
+
+    def _config_requires_approval(self, tool_name: str) -> bool:
+        """True if ToolConfig.require_approval gates this tool ("*" gates all)."""
+        tcfg = self.config.tool
+        gated = getattr(tcfg, "require_approval", None)
+        if not gated:
+            return False
+        if isinstance(gated, str):
+            return gated == "*" or gated == tool_name
+        return "*" in gated or tool_name in gated
+
+    @staticmethod
+    def _build_approval_request(
+        tool_name: str, tool_args: Dict[str, Any], reason: str
+    ) -> ApprovalRequest:
+        """Build the structured request passed to the approval handler.
+
+        ``tool_args`` is deep-copied so a handler that mutates the request
+        (e.g. redacting a field before forwarding it to a pager) can never
+        change the parameters the tool actually executes with.
+        """
+        try:
+            args_copy = copy.deepcopy(tool_args)
+        except Exception:  # unpicklable values — fall back to a shallow copy
+            args_copy = dict(tool_args)
+        args_repr = ", ".join(f"{k}={v!r}" for k, v in tool_args.items())
+        preview = f"{tool_name}({args_repr})"
+        if len(preview) > 200:
+            preview = preview[:197] + "..."
+        return ApprovalRequest(
+            tool_name=tool_name, tool_args=args_copy, reason=reason, preview=preview
+        )
+
+    @staticmethod
+    def _is_async_approval_handler(handler: Callable[..., Any]) -> bool:
+        """True for coroutine functions AND instances with ``async def __call__``.
+
+        ``inspect.iscoroutinefunction(instance)`` is False for a class
+        instance whose ``__call__`` is async — without this check the
+        un-awaited coroutine object would be truth-tested (always truthy)
+        and a deny-all handler would silently APPROVE every call.
+        """
+        # B004 suppressed: we are not testing callability here — we need the
+        # bound __call__ attribute itself to detect `async def __call__`
+        # instances.
+        call_attr = getattr(handler, "__call__", handler)  # noqa: B004
+        return inspect.iscoroutinefunction(handler) or inspect.iscoroutinefunction(call_attr)
+
+    @staticmethod
+    def _approval_memo_key(tool_name: str, tool_args: Dict[str, Any]) -> str:
+        """Digest key for per-run denial memoization."""
+        args_str = json.dumps(tool_args, sort_keys=True, default=str)
+        return f"{tool_name}:{hashlib.sha256(args_str.encode()).hexdigest()[:16]}"
+
+    @staticmethod
+    def _approval_verdict(tool_name: str, approved: Any, reason: str) -> Optional[str]:
+        """Map a handler return value to an error string (None = approved).
+
+        Fails CLOSED on anything that is not a plain bool: coroutines,
+        generators, mocks, and other accidentally-truthy objects must never
+        approve a gated call.
+        """
+        if not isinstance(approved, bool):
+            return (
+                f"Tool '{tool_name}' denied: approval handler returned "
+                f"{type(approved).__name__} instead of bool — failing closed. "
+                "Return True to approve or False to deny."
+            )
+        if not approved:
+            return f"Tool '{tool_name}' denied by approval handler: {reason}"
+        return None
+
+    def _run_approval_handler(
+        self,
+        handler: Callable[..., Any],
+        tool_name: str,
+        tool_args: Dict[str, Any],
+        reason: str,
+    ) -> Optional[str]:
+        """Invoke the approval handler from the sync path. Returns error string or None.
+
+        Async handlers (coroutine functions or instances with ``async def
+        __call__``) are executed via ``asyncio.run`` on the shared worker
+        pool so they work from plain ``run()`` (even when the caller itself
+        is inside an event loop).
+
+        NOTE: while waiting for the human, the handler occupies one slot of
+        the shared 16-worker ``selectools_tool_timeout`` pool (also used for
+        tool-timeout enforcement and ``confirm_action``). Many concurrent
+        blocking approvals can exhaust the pool and stall other runs — keep
+        handlers prompt and ``approval_timeout`` deliberate.
+        """
+        request = self._build_approval_request(tool_name, tool_args, reason)
+        try:
+            # Reuse the shared module-level executor — never create a new
+            # ThreadPoolExecutor per call (pitfall #20).
+            executor = _get_tool_timeout_executor()
+            ctx_copy = contextvars.copy_context()
+            if self._is_async_approval_handler(handler):
+                future = executor.submit(ctx_copy.run, asyncio.run, handler(request))
+            else:
+
+                def _invoke() -> Any:
+                    result = handler(request)
+                    # Belt-and-suspenders: a handler classified as sync can
+                    # still return an awaitable — run it on this worker
+                    # instead of truth-testing the awaitable (fail-open).
+                    if inspect.isawaitable(result):
+
+                        async def _await_it() -> Any:
+                            return await result
+
+                        return asyncio.run(_await_it())
+                    return result
+
+                future = executor.submit(ctx_copy.run, _invoke)
+            try:
+                approved = future.result(timeout=self.config.approval_timeout)
+            except FuturesTimeoutError:
+                # Cancel so a still-QUEUED handler can never fire after the
+                # call was already denied (and never pages a human for a
+                # decision that no longer matters).
+                future.cancel()
+                return (
+                    f"Tool '{tool_name}' approval timed out after {self.config.approval_timeout}s"
+                )
+        except Exception as exc:
+            return f"Tool '{tool_name}' approval failed: {exc}"
+        return self._approval_verdict(tool_name, approved, reason)
+
+    async def _arun_approval_handler(
+        self,
+        handler: Callable[..., Any],
+        tool_name: str,
+        tool_args: Dict[str, Any],
+        reason: str,
+    ) -> Optional[str]:
+        """Async counterpart of :meth:`_run_approval_handler`."""
+        request = self._build_approval_request(tool_name, tool_args, reason)
+        try:
+            if self._is_async_approval_handler(handler):
+                approved = await asyncio.wait_for(
+                    handler(request), timeout=self.config.approval_timeout
+                )
+            else:
+                # BUG-32: propagate caller contextvars (OTel / Langfuse)
+                # into the handler worker thread.
+                loop = asyncio.get_running_loop()
+                approved = await asyncio.wait_for(
+                    run_in_executor_copyctx(loop, None, lambda: handler(request)),
+                    timeout=self.config.approval_timeout,
+                )
+                if inspect.isawaitable(approved):
+                    # Belt-and-suspenders: sync-classified handler returned an
+                    # awaitable — await it instead of truth-testing it.
+                    approved = await asyncio.wait_for(
+                        approved, timeout=self.config.approval_timeout
+                    )
+        except asyncio.TimeoutError:
+            return f"Tool '{tool_name}' approval timed out after {self.config.approval_timeout}s"
+        except Exception as exc:
+            return f"Tool '{tool_name}' approval failed: {exc}"
+        return self._approval_verdict(tool_name, approved, reason)
+
     def _check_policy(
         self,
         tool_name: str,
         tool_args: Dict[str, Any],
         run_id: str = "",
+        run_ctx: Optional["_RunContext"] = None,
     ) -> Optional[str]:
-        """Evaluate tool policy and confirm_action. Returns error string or None."""
-        # Check per-tool requires_approval flag even without a ToolPolicy
+        """Evaluate tool policy and confirm_action. Returns error string or None.
+
+        When ``run_ctx`` is provided, approval-handler denials are memoized
+        per ``(tool_name, args digest)`` for the duration of the run so a
+        human is not re-paged when the model retries the identical denied
+        call on a later iteration. Approvals are NOT memoized.
+        """
+        # Check per-tool requires_approval flag and the agent-level
+        # ToolConfig.require_approval gate even without a ToolPolicy
         tool_obj = self._tools_by_name.get(tool_name) if hasattr(self, "_tools_by_name") else None
-        tool_requires_approval = tool_obj and getattr(tool_obj, "requires_approval", False)
+        tool_flag = bool(tool_obj and getattr(tool_obj, "requires_approval", False))
+        config_gated = self._config_requires_approval(tool_name)
+        tool_requires_approval = tool_flag or config_gated
 
         if not self.config.tool_policy and not tool_requires_approval:
             return None
@@ -418,7 +596,9 @@ class _ToolExecutorMixin:
             result = PolicyResult(
                 decision=PolicyDecision.REVIEW,
                 reason=f"Tool '{tool_name}' requires approval",
-                matched_rule="tool.requires_approval",
+                matched_rule=(
+                    "tool.requires_approval" if tool_flag else "tool_config.require_approval"
+                ),
             )
             decision_str = result.decision.value
 
@@ -439,6 +619,19 @@ class _ToolExecutorMixin:
             return f"Tool '{tool_name}' denied by policy: {result.reason}"
 
         if result.decision == PolicyDecision.REVIEW:
+            memo_key = self._approval_memo_key(tool_name, tool_args)
+            if run_ctx is not None:
+                memoized_denial = run_ctx.denied_approvals.get(memo_key)
+                if memoized_denial is not None:
+                    return memoized_denial
+            approval_handler = getattr(self.config.tool, "approval_handler", None)
+            if approval_handler is not None:
+                error = self._run_approval_handler(
+                    approval_handler, tool_name, tool_args, result.reason
+                )
+                if error is not None and run_ctx is not None:
+                    run_ctx.denied_approvals[memo_key] = error
+                return error
             if self.config.confirm_action is None:
                 return f"Tool '{tool_name}' requires approval but no confirm_action configured: {result.reason}"
             if inspect.iscoroutinefunction(self.config.confirm_action):
@@ -456,6 +649,10 @@ class _ToolExecutorMixin:
                 try:
                     approved = future.result(timeout=self.config.approval_timeout)
                 except FuturesTimeoutError:
+                    # Same gap as the approval-handler path (sweep): cancel so
+                    # a still-queued confirm_action can never fire after the
+                    # call was already denied.
+                    future.cancel()
                     return (
                         f"Tool '{tool_name}' approval timed out "
                         f"after {self.config.approval_timeout}s"
@@ -476,11 +673,15 @@ class _ToolExecutorMixin:
         tool_name: str,
         tool_args: Dict[str, Any],
         run_id: str = "",
+        run_ctx: Optional["_RunContext"] = None,
     ) -> Optional[str]:
-        """Async version of _check_policy."""
-        # Check per-tool requires_approval flag even without a ToolPolicy
+        """Async version of _check_policy (same denial memoization semantics)."""
+        # Check per-tool requires_approval flag and the agent-level
+        # ToolConfig.require_approval gate even without a ToolPolicy
         tool_obj = self._tools_by_name.get(tool_name) if hasattr(self, "_tools_by_name") else None
-        tool_requires_approval = tool_obj and getattr(tool_obj, "requires_approval", False)
+        tool_flag = bool(tool_obj and getattr(tool_obj, "requires_approval", False))
+        config_gated = self._config_requires_approval(tool_name)
+        tool_requires_approval = tool_flag or config_gated
 
         if not self.config.tool_policy and not tool_requires_approval:
             return None
@@ -498,7 +699,9 @@ class _ToolExecutorMixin:
             result = PolicyResult(
                 decision=PolicyDecision.REVIEW,
                 reason=f"Tool '{tool_name}' requires approval",
-                matched_rule="tool.requires_approval",
+                matched_rule=(
+                    "tool.requires_approval" if tool_flag else "tool_config.require_approval"
+                ),
             )
             decision_str = result.decision.value
 
@@ -527,6 +730,19 @@ class _ToolExecutorMixin:
             return f"Tool '{tool_name}' denied by policy: {result.reason}"
 
         if result.decision == PolicyDecision.REVIEW:
+            memo_key = self._approval_memo_key(tool_name, tool_args)
+            if run_ctx is not None:
+                memoized_denial = run_ctx.denied_approvals.get(memo_key)
+                if memoized_denial is not None:
+                    return memoized_denial
+            approval_handler = getattr(self.config.tool, "approval_handler", None)
+            if approval_handler is not None:
+                error = await self._arun_approval_handler(
+                    approval_handler, tool_name, tool_args, result.reason
+                )
+                if error is not None and run_ctx is not None:
+                    run_ctx.denied_approvals[memo_key] = error
+                return error
             if self.config.confirm_action is None:
                 return f"Tool '{tool_name}' requires approval but no confirm_action configured: {result.reason}"
             try:
@@ -624,7 +840,7 @@ class _ToolExecutorMixin:
                 )
                 return _Result(tc, error_msg, True, 0.0, None, 0)
 
-            policy_error = self._check_policy(tool_name, parameters, run_id or "")
+            policy_error = self._check_policy(tool_name, parameters, run_id or "", run_ctx=run_ctx)
             if policy_error:
                 return _Result(tc, policy_error, True, 0.0, tool, 0)
 
@@ -862,7 +1078,9 @@ class _ToolExecutorMixin:
                 )
                 return _Result(tc, error_msg, True, 0.0, None, 0)
 
-            policy_error = await self._acheck_policy(tool_name, parameters, run_id or "")
+            policy_error = await self._acheck_policy(
+                tool_name, parameters, run_id or "", run_ctx=run_ctx
+            )
             if policy_error:
                 return _Result(tc, policy_error, True, 0.0, tool, 0)
 
@@ -1185,7 +1403,7 @@ class _ToolExecutorMixin:
             return False
 
         # --- Policy check ---
-        policy_error = self._check_policy(tool_name, parameters, ctx.run_id)
+        policy_error = self._check_policy(tool_name, parameters, ctx.run_id, run_ctx=ctx)
         if policy_error:
             ctx.all_tool_results.append(policy_error)
             self._append_tool_result(policy_error, tool_name, tool_call.id, run_id=ctx.run_id)
@@ -1419,7 +1637,7 @@ class _ToolExecutorMixin:
             return False
 
         # --- Policy check (async) ---
-        policy_error = await self._acheck_policy(tool_name, parameters, ctx.run_id)
+        policy_error = await self._acheck_policy(tool_name, parameters, ctx.run_id, run_ctx=ctx)
         if policy_error:
             ctx.all_tool_results.append(policy_error)
             self._append_tool_result(policy_error, tool_name, tool_call.id, run_id=ctx.run_id)
