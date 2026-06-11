@@ -33,6 +33,7 @@ Usage:
 
 from typing import List
 
+from ..stability import stable
 from ..tools import Tool
 
 # Import all tool modules
@@ -53,6 +54,8 @@ from . import (
     text_tools,
     web_tools,
 )
+
+__stability__ = "stable"
 
 __all__ = [
     "file_tools",
@@ -75,6 +78,7 @@ __all__ = [
 ]
 
 
+@stable
 def get_all_tools() -> List[Tool]:
     """
     Get all available pre-built tools from the toolbox.
@@ -190,6 +194,7 @@ def get_all_tools() -> List[Tool]:
     return tools
 
 
+@stable
 def get_tools_by_category(category: str) -> List[Tool]:
     """
     Get tools from a specific category.

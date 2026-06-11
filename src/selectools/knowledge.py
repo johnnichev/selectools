@@ -46,11 +46,12 @@ from typing import (
 )
 
 from .knowledge_sanitizers import dedupe_against
-from .stability import beta, stable
+from .stability import beta, register_stability, stable
 
 _logger = logging.getLogger(__name__)
 
 PreSaveHook = Callable[[str], Optional[str]]
+register_stability("PreSaveHook", "beta")
 """A pre-save sanitizer: returns transformed text, or ``None`` to reject the entry."""
 
 # ======================================================================
@@ -101,7 +102,6 @@ class KnowledgeEntry:
 # ======================================================================
 
 
-@stable
 @runtime_checkable
 class KnowledgeStore(Protocol):
     """Protocol for knowledge storage backends.
@@ -952,6 +952,11 @@ class KnowledgeMemory:
             max_entries=data.get("max_entries", 50),
         )
 
+
+# KnowledgeStore is @runtime_checkable: a ``__stability__`` class attribute would become
+# a structural protocol member on Python 3.9-3.11 and break ``isinstance()``
+# for implementations that do not define it, so it is registered instead.
+register_stability("KnowledgeStore", "stable")
 
 __all__ = [
     "KnowledgeEntry",

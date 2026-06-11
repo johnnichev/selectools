@@ -26,6 +26,7 @@ _BUILTIN_PATTERNS: Dict[str, re.Pattern[str]] = {
 }
 
 
+@stable
 @dataclass
 class PIIMatch:
     """A single PII detection within text."""

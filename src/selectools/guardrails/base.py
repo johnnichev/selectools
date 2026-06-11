@@ -78,6 +78,7 @@ class Guardrail:
         return await asyncio.to_thread(self.check, content)
 
 
+@stable
 class GuardrailError(Exception):
     """Raised when a guardrail with ``action=block`` rejects content."""
 

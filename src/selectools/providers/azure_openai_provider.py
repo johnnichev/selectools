@@ -14,12 +14,12 @@ from typing import Any, Dict
 from ..env import load_default_env
 from ..exceptions import ProviderConfigurationError
 from ..pricing import calculate_cost
-from ..stability import beta
+from ..stability import beta, stable
 from .base import ProviderError
 from .openai_provider import OpenAIProvider, _uses_max_completion_tokens
 
 
-@beta
+@stable
 class AzureOpenAIProvider(OpenAIProvider):
     """Azure OpenAI Service provider.
 

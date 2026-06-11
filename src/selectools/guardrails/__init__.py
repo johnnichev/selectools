@@ -8,6 +8,8 @@ from .pipeline import GuardrailsPipeline
 from .topic import TopicGuardrail
 from .toxicity import ToxicityGuardrail
 
+__stability__ = "stable"
+
 __all__ = [
     "Guardrail",
     "GuardrailAction",

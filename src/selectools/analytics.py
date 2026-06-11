@@ -13,6 +13,7 @@ from typing import Any, Dict
 from .stability import stable
 
 
+@stable
 @dataclass
 class ToolMetrics:
     """

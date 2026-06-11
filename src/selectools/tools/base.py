@@ -17,7 +17,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from ..exceptions import ToolExecutionError, ToolValidationError
 from ..results import ToolResult
-from ..stability import stable
+from ..stability import register_stability, stable
 
 JsonSchema = Dict[str, Any]
 
@@ -40,6 +40,7 @@ def _get_async_tool_executor() -> ThreadPoolExecutor:
 
 ParameterValue = Union[str, int, float, bool, dict, list]
 ParamMetadata = Dict[str, Any]
+register_stability("ParamMetadata", "stable")
 
 
 def _python_type_to_json(param_type: type) -> str:

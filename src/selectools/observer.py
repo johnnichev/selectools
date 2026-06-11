@@ -1446,7 +1446,7 @@ class AsyncAgentObserver(AgentObserver):
 # ======================================================================
 
 
-@beta
+@stable
 class SimpleStepObserver(AgentObserver):
     """Observer that routes all lifecycle events to a single callback.
 

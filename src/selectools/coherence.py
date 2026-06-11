@@ -17,9 +17,11 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from .providers.base import Provider
+from .stability import beta
 from .types import Message, Role
 
 
+@beta
 @dataclass
 class CoherenceResult:
     """Result of a coherence check.
@@ -60,6 +62,7 @@ Respond with EXACTLY one word: "COHERENT" if the tool call is a reasonable respo
 If INCOHERENT, add a brief explanation on the next line."""
 
 
+@beta
 def check_coherence(
     provider: Provider,
     model: str,
@@ -130,6 +133,7 @@ def check_coherence(
         )
 
 
+@beta
 async def acheck_coherence(
     provider: Provider,
     model: str,

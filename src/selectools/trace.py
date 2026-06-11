@@ -365,7 +365,7 @@ _STEP_COLORS: Dict[str, str] = {
 _DEFAULT_COLOR = "#64748b"
 
 
-@beta
+@stable
 def trace_to_html(trace: "AgentTrace") -> str:
     """Render an AgentTrace as a standalone HTML waterfall timeline.
 
@@ -514,6 +514,7 @@ function toggleDetail(id) {{
 </html>"""
 
 
+@stable
 def trace_to_json(trace: "AgentTrace") -> str:
     """Serialize an AgentTrace to a JSON string for loading into the visual builder.
 

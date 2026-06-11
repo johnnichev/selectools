@@ -11,13 +11,17 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
+from .stability import beta, stable
 
+
+@stable
 class SelectoolsError(Exception):
     """Base exception for all selectools errors."""
 
     pass
 
 
+@stable
 class ToolValidationError(SelectoolsError):
     """Raised when tool parameters are invalid."""
 
@@ -39,6 +43,7 @@ class ToolValidationError(SelectoolsError):
         super().__init__(message)
 
 
+@stable
 class ToolExecutionError(SelectoolsError):
     """Raised when tool execution fails."""
 
@@ -61,6 +66,7 @@ class ToolExecutionError(SelectoolsError):
         super().__init__(message)
 
 
+@stable
 class ProviderConfigurationError(SelectoolsError):
     """Raised when provider configuration is incorrect."""
 
@@ -84,6 +90,7 @@ class ProviderConfigurationError(SelectoolsError):
         super().__init__(message)
 
 
+@stable
 class MemoryLimitExceededError(SelectoolsError):
     """Raised when memory limits are exceeded."""
 
@@ -111,6 +118,7 @@ class MemoryLimitExceededError(SelectoolsError):
         super().__init__(message)
 
 
+@stable
 class GraphExecutionError(SelectoolsError):
     """Raised when a graph execution node fails."""
 
@@ -140,6 +148,7 @@ class GraphExecutionError(SelectoolsError):
         super().__init__(message)
 
 
+@stable
 class BudgetExceededError(SelectoolsError):
     """Raised when an agent run exceeds its token or cost budget."""
 
@@ -150,6 +159,7 @@ class BudgetExceededError(SelectoolsError):
         super().__init__(reason)
 
 
+@stable
 class CancellationError(SelectoolsError):
     """Raised when an agent run is cancelled via a CancellationToken."""
 
@@ -158,17 +168,22 @@ class CancellationError(SelectoolsError):
         super().__init__(reason)
 
 
+@beta
 class MCPError(SelectoolsError):
     """Base class for MCP-related errors."""
 
 
+@beta
 class MCPConnectionError(MCPError):
     """Raised when an MCP server connection fails."""
 
 
+@beta
 class MCPToolError(MCPError):
     """Raised when an MCP tool call fails."""
 
+
+__stability__ = "stable"
 
 __all__ = [
     "SelectoolsError",

@@ -68,6 +68,7 @@ class ContentPart:
     media_type: Optional[str] = None  # "image/png", "image/jpeg", etc.
 
 
+@stable
 def image_message(image: str, prompt: str = "Describe this image.") -> "Message":
     """Create a user message with an image.
 
@@ -105,6 +106,7 @@ def image_message(image: str, prompt: str = "Describe this image.") -> "Message"
     return msg
 
 
+@stable
 def text_content(message: "Message") -> str:
     """Extract text content from a Message, handling both str and content_parts."""
     if message.content_parts:
@@ -352,6 +354,7 @@ class AgentResult:
         return self.message.role
 
 
+@stable
 @dataclass
 class StreamChunk:
     """
@@ -368,6 +371,9 @@ class StreamChunk:
     tool_calls: Optional[List[ToolCall]] = None
 
 
+# StreamHandler is intentionally NOT @runtime_checkable, so the class-level
+# marker does not change isinstance() behavior (see selectools.stability).
+@stable
 class StreamHandler(Protocol):
     """Protocol for handling streaming response chunks."""
 
@@ -375,5 +381,7 @@ class StreamHandler(Protocol):
         """Called when a new chunk of content is available."""
         ...
 
+
+__stability__ = "stable"
 
 __all__ = ["Role", "Message", "ToolCall", "AgentResult", "StreamChunk", "StreamHandler"]

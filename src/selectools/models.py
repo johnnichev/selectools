@@ -18,7 +18,10 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List
 
+from .stability import register_stability, stable
 
+
+@stable
 class ModelType(str, Enum):
     """Enumeration of model types.
 
@@ -33,6 +36,7 @@ class ModelType(str, Enum):
     MULTIMODAL = "multimodal"
 
 
+@stable
 @dataclass(frozen=True)
 class ModelInfo:
     """
@@ -62,6 +66,7 @@ class ModelInfo:
 # =============================================================================
 
 
+@stable
 class OpenAI:
     """OpenAI GPT models with pricing and capabilities."""
 
@@ -813,6 +818,7 @@ class OpenAI:
 # =============================================================================
 
 
+@stable
 class Anthropic:
     """Anthropic Claude models with pricing and capabilities."""
 
@@ -1070,6 +1076,7 @@ class Anthropic:
 # =============================================================================
 
 
+@stable
 class Gemini:
     """Google Gemini models with pricing and capabilities."""
 
@@ -1388,6 +1395,7 @@ class Gemini:
 # =============================================================================
 
 
+@stable
 class Ollama:
     """Ollama local models - all free ($0.00)."""
 
@@ -1515,6 +1523,7 @@ class Ollama:
 # =============================================================================
 
 
+@stable
 class Cohere:
     """Cohere embedding models."""
 
@@ -1583,8 +1592,13 @@ ALL_MODELS: List[ModelInfo] = _collect_all_models()
 """Complete list of all models across all providers (chat + embedding)."""
 
 MODELS_BY_ID: Dict[str, ModelInfo] = {model.id: model for model in ALL_MODELS}
+
+register_stability("ALL_MODELS", "stable")
+register_stability("MODELS_BY_ID", "stable")
 """Quick lookup dictionary mapping model ID to ModelInfo."""
 
+
+__stability__ = "stable"
 
 __all__ = [
     "ModelInfo",

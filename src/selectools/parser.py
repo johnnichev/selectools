@@ -9,6 +9,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
+from .stability import stable
 from .types import ToolCall
 
 
@@ -20,6 +21,7 @@ class ParseResult:
     raw_text: str
 
 
+@stable
 class ToolCallParser:
     """Robustly extract TOOL_CALL directives from model output."""
 

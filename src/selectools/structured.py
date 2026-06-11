@@ -11,7 +11,10 @@ import json
 import re
 from typing import Any, Dict, Optional, Type, Union
 
+from .stability import register_stability
+
 ResponseFormat = Union[Type[Any], Dict[str, Any]]
+register_stability("ResponseFormat", "stable")
 
 
 def schema_from_response_format(response_format: ResponseFormat) -> Dict[str, Any]:
