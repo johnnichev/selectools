@@ -74,10 +74,18 @@ class ToolConfig:
         compress_provider: Optional dedicated provider for compression calls.
             Falls back to the agent's own provider when None — note this means
             compression is billed at the agent's model rates unless
-            ``compress_model`` selects a cheaper model. Default: None.
+            ``compress_model`` selects a cheaper model. When set,
+            ``compress_model`` MUST also be set: the agent's model almost
+            never exists on a different provider, and the resulting persistent
+            404 would silently degrade every oversized result to the
+            truncation fallback. Default: None.
         compress_model: Model override for compression calls. Defaults to the
             agent's effective model. A fast/cheap model is recommended.
-            Default: None.
+            Required when ``compress_provider`` is set. Default: None.
+
+    Raises:
+        ValueError: If ``compress_provider`` is set without an explicit
+            ``compress_model``.
     """
 
     timeout_seconds: Optional[float] = None
@@ -89,6 +97,16 @@ class ToolConfig:
     compress_threshold: int = 2000
     compress_provider: Optional["Provider"] = None
     compress_model: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if self.compress_provider is not None and self.compress_model is None:
+            raise ValueError(
+                "ToolConfig: compress_provider is set but compress_model is not. "
+                "The agent's own model is unlikely to exist on a dedicated "
+                "compression provider, which would 404 on every call and "
+                "silently degrade all oversized results to the truncation "
+                "fallback. Set compress_model explicitly."
+            )
 
 
 @dataclass
