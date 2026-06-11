@@ -134,9 +134,9 @@
       ],
       "name": "selectools",
       "type": "application",
-      "version": "0.24.0"
+      "version": "0.25.0"
     },
-    "timestamp": "2026-06-11T16:32:44.088711+00:00",
+    "timestamp": "2026-06-11T20:43:54.212332+00:00",
     "tools": {
       "components": [
         {
@@ -235,12 +235,12 @@
           ],
           "name": "cyclonedx-python-lib",
           "type": "library",
-          "version": "11.7.0"
+          "version": "9.1.0"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:a1f54cbc-da48-4da5-9294-96dbd56a338e",
+  "serialNumber": "urn:uuid:d2611a4f-8e02-4076-b893-ea0bad9ca102",
   "version": 1,
   "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
   "bomFormat": "CycloneDX",
