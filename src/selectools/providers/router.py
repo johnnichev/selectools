@@ -43,7 +43,7 @@ from typing import (
 from ..pricing import get_model_pricing
 from ..stability import beta
 from ..token_estimation import estimate_tokens
-from ..types import Message, Role, ToolCall
+from ..types import Message, Role, ToolCall, text_content
 from .fallback import FallbackProvider
 
 if TYPE_CHECKING:
@@ -247,7 +247,10 @@ class RouterProvider:
     - ``quality_first``: every request starts at the top tier and degrades
       down-tier on retriable failure (availability over cost).
     - ``balanced``: never routes below the middle tier; simple and moderate
-      go to the middle tier, complex to the top tier.
+      go to the middle tier, complex to the top tier. The middle tier is
+      index ``len(tier_order) // 2`` (cheapest-first), which rounds toward
+      the pricier tier for even tier counts: with 2 tiers the middle IS the
+      top tier, with 4 tiers it is the upper-middle tier.
 
     On retriable failure (rate limit, timeout, 5xx, ...) the request
     escalates to the next tier in the chain, reusing
@@ -262,8 +265,18 @@ class RouterProvider:
     Attributes:
         name: Always ``"router"``.
         tier_order: Resolved tier names, cheapest first.
-        tier_used: Tier that served the most recent request.
-        complexity_used: Complexity class of the most recent request.
+        tier_used: Tier that served the most recent request. Diagnostic
+            only: last-write-wins, unreliable under concurrent use. Use the
+            ``on_route``/``on_escalation`` callbacks for per-request
+            attribution.
+        complexity_used: Complexity class of the most recent request. Same
+            last-write-wins caveat as ``tier_used``.
+
+    Note:
+        ``stream`` and ``astream`` are generators: routing and the
+        ``on_route`` callback fire at first iteration, not at call time,
+        and ``tier_used`` is only updated once the stream is fully
+        consumed, so it is stale if a stream is abandoned midway.
 
     Example::
 
@@ -315,6 +328,13 @@ class RouterProvider:
             raise ValueError("RouterProvider requires at least one provider tier.")
         if strategy not in _STRATEGIES:
             raise ValueError(f"Unknown strategy {strategy!r}. Choose from {_STRATEGIES}.")
+        if tier_models:
+            unknown = sorted(set(tier_models) - set(providers))
+            if unknown:
+                raise ValueError(
+                    f"tier_models keys {unknown!r} do not match any provider tier; "
+                    f"known tiers: {sorted(providers)!r}."
+                )
 
         self.providers = dict(providers)
         self.strategy = strategy
@@ -364,9 +384,10 @@ class RouterProvider:
             model = self._tier_models[tier]
             pricing = get_model_pricing(model) if model else None
             if pricing is None:
-                logger.debug(
+                logger.warning(
                     "RouterProvider: tier %r model %r not in pricing registry; "
-                    "keeping insertion order.",
+                    "pricing verification skipped, keeping insertion order. "
+                    "Pass tier_order to silence this warning.",
                     tier,
                     model,
                 )
@@ -388,7 +409,10 @@ class RouterProvider:
     def _start_index(self, complexity: str) -> int:
         n = len(self.tier_order)
         top = n - 1
-        middle = top // 2
+        # Middle rounds toward the pricier tier for even tier counts
+        # (2 tiers -> top, 4 tiers -> upper-middle), so "balanced" never
+        # degenerates to "cost_optimized".
+        middle = n // 2
         if self.strategy == "quality_first":
             return top
         if self.strategy == "balanced":
@@ -426,9 +450,13 @@ class RouterProvider:
         tools: Optional[List["Tool"]],
     ) -> FallbackProvider:
         last_user = next((m for m in reversed(messages) if m.role == Role.USER), None)
-        text = (last_user.content if last_user else None) or ""
+        # text_content handles multimodal messages whose text lives in
+        # content_parts (content="" by convention); reading .content alone
+        # would score those requests as empty and route them to the
+        # cheapest tier.
+        text = text_content(last_user) if last_user else ""
         total_tokens = estimate_tokens(system_prompt) + sum(
-            estimate_tokens(m.content or "") for m in messages
+            estimate_tokens(text_content(m)) for m in messages
         )
         complexity = classify_complexity(
             text,
@@ -468,7 +496,16 @@ class RouterProvider:
             max_tokens=max_tokens,
             timeout=timeout,
         )
-        self.tier_used = chain_fb.provider_used
+        # chain_fb is shared by every request of the same complexity class,
+        # so chain_fb.provider_used is last-write-wins under concurrency.
+        # Capture it into a local immediately after the call returns to
+        # minimize the race window. Truly per-request attribution would
+        # require FallbackProvider's @stable API to return the serving
+        # provider alongside the result, which is out of scope here; use
+        # the on_route/on_escalation callbacks for reliable per-request
+        # attribution.
+        served_tier = chain_fb.provider_used
+        self.tier_used = served_tier
         return result
 
     async def acomplete(
@@ -492,7 +529,9 @@ class RouterProvider:
             max_tokens=max_tokens,
             timeout=timeout,
         )
-        self.tier_used = chain_fb.provider_used
+        # See complete() for the concurrency caveat on this capture.
+        served_tier = chain_fb.provider_used
+        self.tier_used = served_tier
         return result
 
     def stream(
@@ -506,6 +545,13 @@ class RouterProvider:
         max_tokens: int = 1000,
         timeout: float | None = None,
     ) -> Iterable[Union[str, ToolCall]]:
+        """Stream a completion from the routed tier.
+
+        This is a generator: routing and the ``on_route`` callback fire at
+        first iteration, not at call time. ``tier_used`` is only updated
+        once the stream is fully consumed; it is stale if the stream is
+        abandoned midway.
+        """
         chain_fb = self._route(system_prompt, messages, tools)
         yield from chain_fb.stream(
             model=model,
@@ -516,7 +562,9 @@ class RouterProvider:
             max_tokens=max_tokens,
             timeout=timeout,
         )
-        self.tier_used = chain_fb.provider_used
+        # See complete() for the concurrency caveat on this capture.
+        served_tier = chain_fb.provider_used
+        self.tier_used = served_tier
 
     async def astream(
         self,
@@ -529,6 +577,13 @@ class RouterProvider:
         max_tokens: int = 1000,
         timeout: float | None = None,
     ) -> AsyncIterable[Union[str, ToolCall]]:
+        """Stream a completion asynchronously from the routed tier.
+
+        This is an async generator: routing and the ``on_route`` callback
+        fire at first iteration, not at call time. ``tier_used`` is only
+        updated once the stream is fully consumed; it is stale if the
+        stream is abandoned midway.
+        """
         chain_fb = self._route(system_prompt, messages, tools)
         async for chunk in chain_fb.astream(
             model=model,
@@ -540,7 +595,9 @@ class RouterProvider:
             timeout=timeout,
         ):
             yield chunk
-        self.tier_used = chain_fb.provider_used
+        # See complete() for the concurrency caveat on this capture.
+        served_tier = chain_fb.provider_used
+        self.tier_used = served_tier
 
 
 __all__ = [

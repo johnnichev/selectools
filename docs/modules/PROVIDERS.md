@@ -950,20 +950,18 @@ Each tier's model comes from the provider's `default_model` attribute (or an exp
 
 ### Complexity Classification
 
-The classifier (`selectools.providers.router.classify_complexity`) is rule-based and deterministic — no LLM call. Signals are additive:
+The classifier (`selectools.providers.router.classify_complexity`) is rule-based and deterministic — no LLM call. Signals are additive across rows; the token row and the tool row each pick ONE bonus (`+2` if the complex threshold is met, *else* `+1` if the moderate threshold is met — never both):
 
 | Signal | Points |
 |---|---|
-| Input tokens ≥ `complex_token_threshold` (default 1500) | +2 |
-| Input tokens ≥ `moderate_token_threshold` (default 400) | +1 |
-| Tool count ≥ `complex_tool_threshold` (default 8) | +2 |
-| Tool count ≥ `moderate_tool_threshold` (default 4) | +1 |
+| Input tokens: ≥ `complex_token_threshold` (default 1500) → +2, *else* ≥ `moderate_token_threshold` (default 400) → +1 | max +2 |
+| Tool count: ≥ `complex_tool_threshold` (default 8) → +2, *else* ≥ `moderate_tool_threshold` (default 4) → +1 | max +2 |
 | Code block (triple backticks) present | +2 |
 | Reasoning keyword ("step by step", "analyze", "refactor", ...) | +2 |
 | Multi-part question (≥2 `?` or a numbered list) | +1 |
 | Structured-output keyword ("json", "schema", "markdown table", ...) | +1 |
 
-Score ≥ 4 → `complex`; score ≥ 2 → `moderate`; else `simple`. All thresholds, score boundaries, and keyword lists are configurable via `RouterConfig`. Input tokens are estimated with `selectools.token_estimation.estimate_tokens` over the system prompt plus all messages; keyword and structure detection runs on the latest user message.
+Score ≥ 4 → `complex`; score ≥ 2 → `moderate`; else `simple`. All thresholds, score boundaries, and keyword lists are configurable via `RouterConfig`. Input tokens are estimated with `selectools.token_estimation.estimate_tokens` over the system prompt plus all messages; keyword and structure detection runs on the latest user message. Multimodal messages are handled via `selectools.types.text_content`: text carried in `content_parts` counts toward both the classified text and the token estimate, so image-bearing requests with substantial text are not misrouted to the cheapest tier.
 
 ### Strategies
 
@@ -972,6 +970,8 @@ Score ≥ 4 → `complex`; score ≥ 2 → `moderate`; else `simple`. All thresh
 | `cost_optimized` | cheapest tier | middle tier | top tier | escalate up-tier |
 | `balanced` | middle tier | middle tier | top tier | escalate up-tier |
 | `quality_first` | top tier | top tier | top tier | degrade down-tier |
+
+The middle tier is index `len(tier_order) // 2` of the cheapest-first ordering, which rounds toward the pricier tier for even tier counts: with 2 tiers the middle IS the top tier (so `balanced` never routes to the cheapest tier, and `cost_optimized` sends moderate requests to the top); with 4 tiers it is the upper-middle tier (index 2).
 
 ### Tier Ordering
 
@@ -994,6 +994,8 @@ router.tier_order       # resolved cheapest-first ordering
 RouterProvider(..., on_route=lambda complexity, tier: ...,
                on_escalation=lambda failed_tier, next_tier, exc: ...)
 ```
+
+`tier_used` and `complexity_used` are diagnostic only: they are plain last-write-wins attributes and unreliable under concurrent use (interleaved async requests can overwrite each other's values between a call returning and the attribute being read). For per-request attribution use the `on_route`/`on_escalation` callbacks, which fire within each request's own flow. Also note `stream`/`astream` are generators: routing and the `on_route` callback fire at first iteration, not at call time, and `tier_used` only updates once the stream is fully consumed (it is stale if a stream is abandoned midway).
 
 `UsageStats` is untouched — cost and provider attribution flow through from whichever underlying provider served the request.
 

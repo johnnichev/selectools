@@ -19,7 +19,7 @@ from selectools.providers.router import (
     RouterProvider,
     classify_complexity,
 )
-from selectools.types import Message, Role, ToolCall
+from selectools.types import ContentPart, Message, Role, ToolCall
 from selectools.usage import UsageStats
 
 
@@ -178,6 +178,54 @@ class TestClassifyComplexity:
 
 
 # ---------------------------------------------------------------------------
+# Multimodal (content_parts) classification
+# ---------------------------------------------------------------------------
+
+
+def _multimodal_user(text: str) -> List[Message]:
+    """A user message carrying its text in content_parts (content='')."""
+    return [
+        Message(
+            role=Role.USER,
+            content="",
+            content_parts=[
+                ContentPart(type="text", text=text),
+                ContentPart(type="image_url", image_url="https://example.com/photo.jpg"),
+            ],
+        )
+    ]
+
+
+class TestMultimodalClassification:
+    def test_content_parts_text_classifies_same_as_plain_content(self) -> None:
+        _, _, _, plain_router = _three_tiers(strategy="cost_optimized")
+        _, _, _, mm_router = _three_tiers(strategy="cost_optimized")
+
+        plain_router.complete(model="m", system_prompt="", messages=_user(COMPLEX_PROMPT))
+        mm_router.complete(model="m", system_prompt="", messages=_multimodal_user(COMPLEX_PROMPT))
+
+        assert mm_router.complexity_used == plain_router.complexity_used == COMPLEXITY_COMPLEX
+        assert mm_router.tier_used == plain_router.tier_used == "power"
+
+    def test_multimodal_message_does_not_route_to_cheapest(self) -> None:
+        fast, smart, power, router = _three_tiers(strategy="cost_optimized")
+        router.complete(model="m", system_prompt="", messages=_multimodal_user(COMPLEX_PROMPT))
+        assert not fast.calls
+        assert len(power.calls) == 1
+
+    def test_content_parts_text_counted_in_token_estimate(self) -> None:
+        # Force the token signal alone to decide: long text lives only in
+        # content_parts. With a low threshold + structured keyword it must
+        # reach moderate, exactly like the plain-content equivalent.
+        config = RouterConfig(moderate_token_threshold=50, complex_token_threshold=10_000)
+        long_text = "Give me the answer as JSON. " + "word " * 400
+        fast, smart, power, router = _three_tiers(strategy="cost_optimized", config=config)
+        router.complete(model="m", system_prompt="", messages=_multimodal_user(long_text))
+        assert router.complexity_used == COMPLEXITY_MODERATE
+        assert router.tier_used == "smart"
+
+
+# ---------------------------------------------------------------------------
 # Construction + tier ordering
 # ---------------------------------------------------------------------------
 
@@ -196,6 +244,13 @@ class TestConstruction:
             RouterProvider(
                 providers={"a": _TierStub("a"), "b": _TierStub("b")},
                 tier_order=["a", "nope"],
+            )
+
+    def test_tier_models_unknown_key_raises(self) -> None:
+        with pytest.raises(ValueError, match="tier_models"):
+            RouterProvider(
+                providers={"a": _TierStub("a"), "b": _TierStub("b")},
+                tier_models={"a": "gpt-5.4-nano", "bb": "gpt-5.4-pro"},  # typo: "bb"
             )
 
     def test_insertion_order_when_models_unknown(self) -> None:
@@ -281,6 +336,51 @@ class TestStrategySelection:
         fast, smart, power, router = _three_tiers(strategy="balanced")
         router.complete(model="m", system_prompt="", messages=_user(COMPLEX_PROMPT))
         assert router.tier_used == "power"
+
+    def test_two_tier_cost_optimized_simple_goes_to_cheapest(self) -> None:
+        fast = _TierStub("fast")
+        power = _TierStub("power")
+        router = RouterProvider(providers={"fast": fast, "power": power}, strategy="cost_optimized")
+        router.complete(model="m", system_prompt="", messages=_user(SIMPLE_PROMPT))
+        assert router.tier_used == "fast"
+        assert not power.calls
+
+    def test_two_tier_cost_optimized_moderate_goes_to_top(self) -> None:
+        # middle = len(tiers) // 2 = 1 with two tiers: moderate starts at top.
+        fast = _TierStub("fast")
+        power = _TierStub("power")
+        router = RouterProvider(providers={"fast": fast, "power": power}, strategy="cost_optimized")
+        text = "What is X? And what is Y? Also explain why Z holds."
+        router.complete(model="m", system_prompt="", messages=_user(text))
+        assert router.complexity_used == COMPLEXITY_MODERATE
+        assert router.tier_used == "power"
+        assert not fast.calls
+
+    def test_two_tier_balanced_never_routes_to_cheapest(self) -> None:
+        # With two tiers the middle tier IS the top tier; balanced must not
+        # degenerate to cost_optimized (which sends simple to the cheapest).
+        fast = _TierStub("fast")
+        power = _TierStub("power")
+        router = RouterProvider(providers={"fast": fast, "power": power}, strategy="balanced")
+        router.complete(model="m", system_prompt="", messages=_user(SIMPLE_PROMPT))
+        assert router.tier_used == "power"
+        assert not fast.calls
+
+    def test_two_tier_quality_first_starts_at_top(self) -> None:
+        fast = _TierStub("fast")
+        power = _TierStub("power")
+        router = RouterProvider(providers={"fast": fast, "power": power}, strategy="quality_first")
+        router.complete(model="m", system_prompt="", messages=_user(SIMPLE_PROMPT))
+        assert router.tier_used == "power"
+        assert not fast.calls
+
+    def test_four_tier_balanced_simple_goes_to_upper_middle(self) -> None:
+        # middle = 4 // 2 = 2: rounds toward the pricier tier for even counts.
+        tiers = {name: _TierStub(name) for name in ("t0", "t1", "t2", "t3")}
+        router = RouterProvider(providers=tiers, strategy="balanced")  # type: ignore[arg-type]
+        router.complete(model="m", system_prompt="", messages=_user(SIMPLE_PROMPT))
+        assert router.tier_used == "t2"
+        assert not tiers["t0"].calls and not tiers["t1"].calls
 
     def test_on_route_callback(self) -> None:
         routed: List[Tuple[str, str]] = []
