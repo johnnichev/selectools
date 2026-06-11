@@ -53,6 +53,20 @@ class _ScriptedProvider(LocalProvider):
             yield token + " "
 
 
+class _RaisingProvider(_ScriptedProvider):
+    """Scripted provider that raises on the Nth call (1-based) and onwards."""
+
+    def __init__(self, responses: List[str], raise_from_call: int) -> None:
+        super().__init__(responses)
+        self._raise_from_call = raise_from_call
+
+    def complete(self, *, model, system_prompt, messages, **kwargs):  # type: ignore[override]
+        if len(self.calls) + 1 >= self._raise_from_call:
+            self.calls.append((model, messages[-1].content or ""))
+            raise RuntimeError("provider blew up")
+        return super().complete(model=model, system_prompt=system_prompt, messages=messages)
+
+
 _PLAN_JSON = (
     '[{"executor": "executor", "task": "research the topic"},'
     ' {"executor": "executor", "task": "write the summary"}]'
@@ -124,6 +138,18 @@ class TestComplexityHeuristic:
 
     def test_long_input_raises_score(self):
         assert _complexity_score("word " * 200) >= 2
+
+    def test_pasted_code_semicolons_score_one(self):
+        # Review finding: the bare-semicolon signal was dropped — semicolons
+        # in pasted code must not push a single-step prompt over the gate.
+        assert _complexity_score("Refactor x = 1; y = 2 in my code") == 1
+
+    def test_pasted_code_prompt_does_not_plan(self):
+        provider = _ScriptedProvider(["refactored"])
+        agent = _planning_agent(provider, PlanningConfig(enabled=True))
+        result = agent.run("Refactor x = 1; y = 2 in my code")
+        assert result.content == "refactored"
+        assert len(provider.calls) == 1  # no planner call
 
 
 # ---------------------------------------------------------------------------
@@ -343,6 +369,117 @@ class TestStreamingSkip:
             result = agent.run(_COMPLEX_PROMPT, stream_handler=lambda s: None)
         assert result.content == "handler answer"
         assert len(provider.calls) == 1
+
+
+# ---------------------------------------------------------------------------
+# Usage continuity on every exit path (review finding 1)
+# ---------------------------------------------------------------------------
+
+
+class TestUsageOnExceptionPaths:
+    def test_synthesis_exception_propagates_and_usage_is_merged(self):
+        # Calls 1-3 succeed (plan + 2 steps); call 4 (synthesis) raises.
+        provider = _RaisingProvider([_PLAN_JSON, "a", "b"], raise_from_call=4)
+        agent = Agent(
+            [_noop],
+            provider=provider,
+            config=AgentConfig(
+                planning=PlanningConfig(enabled=True),
+                max_retries=0,
+                retry_backoff_seconds=0.0,
+            ),
+        )
+        with pytest.raises(RuntimeError, match="provider blew up"):
+            agent.run(_COMPLEX_PROMPT)
+        # Planner + 2 step calls (2 tokens / $0.01 each) must survive the
+        # mid-flow exception on the parent's accounting.
+        assert agent.usage.total_tokens == 6
+        assert agent.usage.total_cost_usd == pytest.approx(0.03)
+        assert len(agent.usage.iterations) == 3
+
+    def test_rejected_plan_merges_planner_usage_once(self):
+        provider = _ScriptedProvider([_PLAN_JSON, "normal answer"])
+        agent = _planning_agent(
+            provider,
+            PlanningConfig(enabled=True, auto_approve=False, plan_approval_handler=lambda p: False),
+        )
+        with pytest.warns(UserWarning, match="rejected"):
+            agent.run(_COMPLEX_PROMPT)
+        # Planner call + fallback normal run = 2 calls, no double-merge.
+        assert agent.usage.total_tokens == 4
+        assert agent.usage.total_cost_usd == pytest.approx(0.02)
+
+
+# ---------------------------------------------------------------------------
+# Budget continuity across clones (review finding 2)
+# ---------------------------------------------------------------------------
+
+
+class TestBudgetContinuity:
+    def test_parent_at_cap_blocks_planned_flow_with_no_provider_calls(self):
+        provider = _ScriptedProvider([_PLAN_JSON, "a", "b", "final"])
+        agent = Agent(
+            [_noop],
+            provider=provider,
+            config=AgentConfig(
+                planning=PlanningConfig(enabled=True, always=True),
+                max_total_tokens=10,
+            ),
+        )
+        # Parent has already spent its entire token budget.
+        agent.usage.add_usage(
+            UsageStats(prompt_tokens=5, completion_tokens=5, total_tokens=10, cost_usd=0.0)
+        )
+        result = agent.run(_COMPLEX_PROMPT)
+        # Planner clone's budget check trips before any provider call; the
+        # graceful budget message flows through to the final answer.
+        assert "budget exceeded" in (result.content or "").lower()
+        assert provider.calls == []
+        # No double-count of the seeded baseline.
+        assert agent.usage.total_tokens == 10
+        assert result.usage.total_tokens == 10
+
+    def test_cap_trips_mid_flow_and_totals_are_exact(self):
+        # Each scripted call costs 2 tokens. Cap of 4 lets the planner (2)
+        # and both steps (executor reaches 4) through, then the synthesis
+        # call trips the cap before reaching the provider.
+        provider = _ScriptedProvider([_PLAN_JSON, "a", "b", "never used"])
+        agent = Agent(
+            [_noop],
+            provider=provider,
+            config=AgentConfig(
+                planning=PlanningConfig(enabled=True),
+                max_total_tokens=4,
+            ),
+        )
+        result = agent.run(_COMPLEX_PROMPT)
+        assert "budget exceeded" in (result.content or "").lower()
+        assert len(provider.calls) == 3  # plan + 2 steps, no synthesis call
+        # Exact accounting: planner 2 + executor steps 4 = 6, baseline not
+        # double-counted on merge.
+        assert agent.usage.total_tokens == 6
+        assert agent.usage.total_cost_usd == pytest.approx(0.03)
+
+
+# ---------------------------------------------------------------------------
+# Sync-only approval handler (review finding 3)
+# ---------------------------------------------------------------------------
+
+
+class TestAsyncApprovalHandlerRejected:
+    def test_async_handler_raises_type_error(self):
+        async def handler(plan):  # pragma: no cover - never awaited
+            return True
+
+        provider = _ScriptedProvider([_PLAN_JSON, "a", "b", "final"])
+        agent = _planning_agent(
+            provider,
+            PlanningConfig(enabled=True, auto_approve=False, plan_approval_handler=handler),
+        )
+        with pytest.raises(TypeError, match="sync"):
+            agent.run(_COMPLEX_PROMPT)
+        # Planner usage still merged despite the raise (finding 1 finally-merge).
+        assert agent.usage.total_tokens == 2
 
 
 # ---------------------------------------------------------------------------

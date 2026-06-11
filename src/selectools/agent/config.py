@@ -409,6 +409,32 @@ class PlanningConfig:
     own provider/tools (see ``agent/_planning.py``), then synthesizes a final
     answer. Disabled (the default) is a zero-overhead no-op.
 
+    Interplay notes (see "Planning-as-config" in docs/modules/PATTERNS.md):
+
+    - Budgets: ``max_total_tokens`` / ``max_cost_usd`` bind across the whole
+      planned flow. The planner/executor clones are seeded with the parent's
+      running totals, and every sub-run's usage is merged back into the
+      parent on every exit path (success, rejection, or exception). When a
+      cap trips inside a step, that step's graceful "budget exceeded"
+      message becomes the step's output and the plan continues; subsequent
+      steps and the synthesis call then trip the same cap before reaching
+      the provider.
+    - Cancellation: the agent's ``cancellation_token`` is shared with the
+      pattern and checked between steps, but a mid-plan cancellation still
+      runs the final synthesis call, whose graceful "cancelled" message
+      becomes the final answer (no exception is raised).
+    - Step exceptions: ``PlanAndExecuteAgent`` swallows per-step exceptions
+      (the step is marked failed and execution continues; no replanner is
+      configured). Provider errors that would propagate from a normal
+      ``run()`` are absorbed into the synthesis prompt when planning
+      engages. The planner call and the synthesis call are NOT protected;
+      exceptions there propagate (with sub-run usage still merged).
+    - Approval handlers are sync-only: passing an ``async def`` handler
+      raises ``TypeError`` when the plan is ready for approval.
+    - Memory-less agents: when ``agent.memory is None``, a planned run does
+      not update the parent's in-process ``_history`` (clones run
+      memory-less; the turn is persisted only when ``memory`` is set).
+
     Attributes:
         enabled: Master switch. Default: False.
         provider: Optional provider override for the planner call only.
@@ -418,18 +444,20 @@ class PlanningConfig:
         auto_approve: If True, plans execute immediately. If False, a
             ``plan_approval_handler`` is required and is called with the
             structured plan before execution. Default: True.
-        plan_approval_handler: Callable receiving ``List[PlanStep]`` and
-            returning ``True`` (approve), ``False`` (reject; the agent falls
-            back to standard execution), or an edited ``List[PlanStep]``.
+        plan_approval_handler: SYNC callable receiving ``List[PlanStep]``
+            and returning ``True`` (approve), ``False`` (reject; the agent
+            falls back to standard execution), or an edited
+            ``List[PlanStep]``. Async handlers raise ``TypeError``.
             Required when ``auto_approve=False``. Default: None.
         reasoning: Include the generated plan as the result's ``reasoning``
             text (and under ``trace.metadata["planning"]``). Default: True.
         always: Skip the complexity gate and plan every input. Default: False.
         min_complexity: Minimum heuristic complexity score required to
             trigger planning. The score is a cheap local heuristic (sequence
-            connectives, lists, sentence count, length — no LLM call); see
-            ``agent/_planning.py``. Simple single-step inputs score 1, so the
-            default of 2 skips planning for them. Default: 2.
+            connectives, lists, sentence count, length — no LLM call and no
+            bare-punctuation signals; see ``agent/_planning.py``). Simple
+            single-step inputs score 1, so the default of 2 skips planning
+            for them. Default: 2.
     """
 
     enabled: bool = False

@@ -23,18 +23,28 @@ Design notes
   tokens. Structured output IS supported: ``response_format`` is applied
   to the final synthesis call only.
 - Aggregation: planner + executor usage is merged into ``agent.usage``
-  and reflected in ``AgentResult.usage``; tool calls from every step are
+  on EVERY exit path (success, plan rejection, or a mid-flow exception)
+  via a ``try/finally`` so no sub-run tokens are ever lost, and is
+  reflected in ``AgentResult.usage``; tool calls from every step are
   collected into ``AgentResult.tool_calls``. Known gap: the returned
   ``AgentResult.trace`` is the synthesis run's trace (with the plan
   attached under ``trace.metadata["planning"]``); per-step traces live on
   the per-step ``AgentResult`` objects inside the pattern and are not
   merged, because ``PlanAndExecuteAgent`` returns an empty
   ``GraphResult.trace``.
+- Budget continuity: ``_clone_for_isolation()`` gives each clone a fresh
+  ``AgentUsage``, which would silently reset ``max_total_tokens`` /
+  ``max_cost_usd`` for the planned sub-runs. Each clone's usage is
+  therefore seeded with the parent's current scalar totals so the
+  lifetime caps keep binding across the whole planned flow; the
+  ``finally`` merge folds back only the DELTA (clone usage minus the
+  seeded baseline) so the baseline is never double-counted.
 """
 
 from __future__ import annotations
 
 import copy
+import inspect
 import re
 import warnings
 from typing import TYPE_CHECKING, List, Optional, Union
@@ -47,6 +57,7 @@ from .._async_utils import run_sync
 from ..patterns.plan_and_execute import PlanAndExecuteAgent, PlanStep
 from ..token_estimation import estimate_tokens
 from ..types import AgentResult, Message, Role, ToolCall
+from ..usage import AgentUsage
 
 _EXECUTOR_NAME = "executor"
 
@@ -85,12 +96,17 @@ def _complexity_score(text: str) -> int:
     - a sequence connective ("then", "after that", "finally", ...)
     - an enumerated or bulleted list
     - three or more sentences
-    - semicolon-separated clauses
     - estimated length > 120 tokens (``selectools.token_estimation``,
       which falls back to ``len(text) // 4`` without tiktoken)
 
     A plain single-clause question scores 1, so the default
     ``PlanningConfig.min_complexity = 2`` skips planning for it.
+
+    Review note: a bare-semicolon signal was deliberately REMOVED.
+    Semicolons appear in pasted code far more often than as natural
+    language clause separators (e.g. "Refactor x = 1; y = 2 in my code"
+    used to plan at the default threshold), and genuinely multi-step
+    prompts are already caught by the remaining signals.
     """
     lowered = f" {text.lower()} "
     score = 1
@@ -99,8 +115,6 @@ def _complexity_score(text: str) -> int:
     if _LIST_ITEM_RE.search(text):
         score += 1
     if len(_SENTENCE_RE.findall(text)) >= 3:
-        score += 1
-    if ";" in text:
         score += 1
     if estimate_tokens(text) > 120:
         score += 1
@@ -135,6 +149,19 @@ class _ApprovablePlanAndExecute(PlanAndExecuteAgent):
         if handler is None:
             return plan
         verdict: Union[bool, List[PlanStep]] = handler(plan)  # type: ignore[operator]
+        if inspect.isawaitable(verdict):
+            # Review finding: an async handler used to be treated as a silent
+            # rejection (a coroutine is neither True nor a list). Fail loudly
+            # instead so the misconfiguration is obvious.
+            close = getattr(verdict, "close", None)
+            if callable(close):
+                close()  # avoid "coroutine was never awaited" RuntimeWarning
+            raise TypeError(
+                "plan_approval_handler must be a sync callable returning "
+                "True, False, or List[PlanStep]; got an awaitable (async "
+                "handlers are not supported — do any async work before "
+                "returning the verdict)."
+            )
         if verdict is True:
             return plan
         if not isinstance(verdict, list):
@@ -147,6 +174,62 @@ class _ApprovablePlanAndExecute(PlanAndExecuteAgent):
         if not edited:
             raise _PlanRejected()
         return edited
+
+
+# ---------------------------------------------------------------------------
+# Usage continuity helpers (review findings: budget bypass + lost tokens)
+# ---------------------------------------------------------------------------
+
+_USAGE_SCALAR_FIELDS = (
+    "total_prompt_tokens",
+    "total_completion_tokens",
+    "total_tokens",
+    "total_cost_usd",
+    "total_embedding_tokens",
+    "total_embedding_cost_usd",
+)
+
+
+def _seed_usage_from_parent(clone_usage: AgentUsage, parent_usage: AgentUsage) -> AgentUsage:
+    """Seed a fresh clone ``AgentUsage`` with the parent's scalar totals.
+
+    ``Agent._clone_for_isolation()`` resets ``usage`` to a fresh
+    ``AgentUsage``, so the clone's ``_check_budget`` would compare against
+    zero and ``max_total_tokens`` / ``max_cost_usd`` would effectively be
+    granted again to every sub-run. Copying the parent's running totals
+    into the clone makes the lifetime caps keep binding across the planned
+    flow. Only the scalar totals are seeded; ``iterations`` and the
+    per-tool dicts stay empty so they remain a pure delta.
+
+    Returns a baseline snapshot of the seeded scalars for
+    :func:`_merge_usage_delta`.
+    """
+    baseline = AgentUsage()
+    for field_name in _USAGE_SCALAR_FIELDS:
+        value = getattr(parent_usage, field_name)
+        setattr(clone_usage, field_name, value)
+        setattr(baseline, field_name, value)
+    return baseline
+
+
+def _merge_usage_delta(
+    parent_usage: AgentUsage, clone_usage: AgentUsage, baseline: AgentUsage
+) -> None:
+    """Fold a clone's OWN spend into the parent, excluding the seeded baseline.
+
+    Scalar totals are merged as ``clone - baseline`` so the parent totals
+    seeded by :func:`_seed_usage_from_parent` are never double-counted.
+    ``iterations`` and the per-tool dicts start empty on the clone, so they
+    are merged wholesale.
+    """
+    for field_name in _USAGE_SCALAR_FIELDS:
+        delta = getattr(clone_usage, field_name) - getattr(baseline, field_name)
+        setattr(parent_usage, field_name, getattr(parent_usage, field_name) + delta)
+    parent_usage.iterations.extend(clone_usage.iterations)
+    for tool_name, count in clone_usage.tool_usage.items():
+        parent_usage.tool_usage[tool_name] = parent_usage.tool_usage.get(tool_name, 0) + count
+    for tool_name, tokens in clone_usage.tool_tokens.items():
+        parent_usage.tool_tokens[tool_name] = parent_usage.tool_tokens.get(tool_name, 0) + tokens
 
 
 # ---------------------------------------------------------------------------
@@ -220,6 +303,13 @@ async def arun_with_planning(
     executor = agent._clone_for_isolation()
     executor.config.planning = None
 
+    # Budget continuity (review finding): seed both clones with the parent's
+    # running totals so max_total_tokens / max_cost_usd bind across the whole
+    # planned flow instead of resetting per clone. The baselines let the
+    # finally-merge below fold back only each clone's own spend.
+    planner_baseline = _seed_usage_from_parent(planner.usage, agent.usage)
+    executor_baseline = _seed_usage_from_parent(executor.usage, agent.usage)
+
     pattern = _ApprovablePlanAndExecute(
         planner=planner,
         executors={_EXECUTOR_NAME: executor},
@@ -227,33 +317,36 @@ async def arun_with_planning(
         cancellation_token=agent.config.cancellation_token,
     )
     try:
-        graph_result = await pattern.arun(prompt)
-    except _PlanRejected:
-        warnings.warn(
-            "Plan rejected by plan_approval_handler; falling back to standard "
-            "(non-planned) execution.",
-            UserWarning,
-            stacklevel=2,
+        try:
+            graph_result = await pattern.arun(prompt)
+        except _PlanRejected:
+            warnings.warn(
+                "Plan rejected by plan_approval_handler; falling back to standard "
+                "(non-planned) execution.",
+                UserWarning,
+                stacklevel=2,
+            )
+            return None
+
+        plan_dicts = list(graph_result.state.data.get("__plan__", []))
+        steps_executed = len(graph_result.node_results)
+
+        synthesis_msg = Message(
+            role=Role.USER,
+            content=_SYNTHESIS_PROMPT.format(
+                task=prompt, results=graph_result.content or "(no step output)"
+            ),
         )
-        agent.usage.merge(planner.usage)
-        return None
-
-    plan_dicts = list(graph_result.state.data.get("__plan__", []))
-    steps_executed = len(graph_result.node_results)
-
-    synthesis_msg = Message(
-        role=Role.USER,
-        content=_SYNTHESIS_PROMPT.format(
-            task=prompt, results=graph_result.content or "(no step output)"
-        ),
-    )
-    final = await executor.arun(
-        [synthesis_msg], response_format=response_format, parent_run_id=parent_run_id
-    )
-
-    # Aggregate sub-run usage into the parent agent (budget/cost continuity).
-    agent.usage.merge(planner.usage)
-    agent.usage.merge(executor.usage)
+        final = await executor.arun(
+            [synthesis_msg], response_format=response_format, parent_run_id=parent_run_id
+        )
+    finally:
+        # Usage continuity (review finding): merge sub-run usage into the
+        # parent on EVERY exit path — success, plan rejection, or an
+        # exception from pattern.arun / the synthesis call — exactly once.
+        # Delta-merge so the seeded baselines are not double-counted.
+        _merge_usage_delta(agent.usage, planner.usage, planner_baseline)
+        _merge_usage_delta(agent.usage, executor.usage, executor_baseline)
 
     all_tool_calls: List[ToolCall] = []
     for results in graph_result.node_results.values():

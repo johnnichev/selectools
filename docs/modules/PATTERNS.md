@@ -167,23 +167,56 @@ every step, and the synthesis call.
 
 **Complexity gate.** Simple single-step inputs skip planning entirely. A
 cheap local heuristic scores the prompt (sequence connectives like "then" /
-"finally", numbered or bulleted lists, 3+ sentences, semicolons, length over
-~120 estimated tokens); planning triggers when the score reaches
+"finally", numbered or bulleted lists, 3+ sentences, length over ~120
+estimated tokens); planning triggers when the score reaches
 `min_complexity` (default `2`). Set `always=True` to plan every input.
+Bare punctuation is deliberately not a signal: semicolons appear in pasted
+code far more often than as clause separators, so a prompt like
+`"Refactor x = 1; y = 2 in my code"` does not trigger planning.
 
 **Plan approval.** With `auto_approve=False`, `plan_approval_handler` is
 required. It receives the structured plan (`List[PlanStep]`) and returns
 `True` (approve), `False` (reject — the agent falls back to a standard run
-with a one-time warning), or an edited `List[PlanStep]`.
+with a one-time warning), or an edited `List[PlanStep]`. The handler must
+be **sync**: an `async def` handler raises `TypeError` when the plan is
+ready for approval (its coroutine could never equal `True` or a list, so it
+would otherwise look like a silent rejection).
 
 **Interplay.** Streaming runs (`astream()`, or `run()` with a
 `stream_handler`) skip planning with a one-time `UserWarning` per agent.
 Structured output works: `response_format` is applied to the final synthesis
 call. `enabled=False` (or leaving `planning` unset) is a zero-overhead no-op.
 
-**Known gap.** `result.trace` is the synthesis run's trace (the plan is
+**Budgets.** `max_total_tokens` / `max_cost_usd` bind across the whole
+planned flow: the planner and executor clones are seeded with the parent's
+running totals, and every sub-run's usage is merged back into the parent on
+every exit path (success, plan rejection, or a mid-flow exception), so a
+planned run cannot spend multiples of the configured cap. When a cap trips
+inside a step, the step's graceful "budget exceeded" message becomes that
+step's output and the plan **continues** — subsequent steps and the final
+synthesis call then trip the same cap before reaching the provider, so the
+final answer degrades to the budget message rather than raising.
+
+**Cancellation.** The agent's `cancellation_token` is shared with the
+pattern and checked between steps, so remaining steps are skipped after a
+mid-plan cancellation — but the final synthesis call still runs, and its
+graceful "cancelled" message becomes the final answer (no exception is
+raised, matching the non-planned cancellation contract).
+
+**Step exceptions.** `PlanAndExecuteAgent` swallows per-step exceptions:
+the step is marked failed and execution continues (the adapter configures
+no replanner). A provider error that would propagate out of a normal
+`run()` is therefore absorbed when planning engages — the failed step just
+contributes no output to the synthesis prompt. The planner call and the
+synthesis call are *not* protected; exceptions there propagate to the
+caller (with all sub-run usage already merged into `agent.usage`).
+
+**Known gaps.** `result.trace` is the synthesis run's trace (the plan is
 attached under `trace.metadata["planning"]`); per-step traces are not merged
-because `PlanAndExecuteAgent` does not aggregate traces.
+because `PlanAndExecuteAgent` does not aggregate traces. When the agent has
+no `memory`, a planned run does not update the parent's in-process
+`_history` (the clones run memory-less; the turn is persisted to `memory`
+only when one is attached).
 
 | `PlanningConfig` field | Type | Default | Description |
 |------------------------|------|---------|-------------|
@@ -191,7 +224,7 @@ because `PlanAndExecuteAgent` does not aggregate traces.
 | `provider` | `Provider` | `None` | Planner-call provider override |
 | `model` | `str` | `None` | Planner-call model override |
 | `auto_approve` | `bool` | `True` | Execute plans without approval |
-| `plan_approval_handler` | `Callable` | `None` | Required when `auto_approve=False` |
+| `plan_approval_handler` | `Callable` (sync) | `None` | Required when `auto_approve=False` |
 | `reasoning` | `bool` | `True` | Put the plan in `result.reasoning` |
 | `always` | `bool` | `False` | Bypass the complexity gate |
 | `min_complexity` | `int` | `2` | Heuristic score needed to trigger planning |
