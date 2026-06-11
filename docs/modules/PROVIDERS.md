@@ -920,6 +920,90 @@ The provider falls through to the next on:
 
 ---
 
+## RouterProvider
+
+**Stability:** <span class="badge-beta">beta</span>
+
+### Overview
+
+`RouterProvider` wraps multiple providers organized in cost tiers (cheapest to priciest) and routes each request to the cheapest tier capable of handling it, based on a deterministic rule-based complexity classification. On retriable failure it escalates to the next tier up, reusing `FallbackProvider`'s retry detection and circuit breaker.
+
+### Usage
+
+```python
+from selectools.providers import RouterProvider
+from selectools import Agent, OpenAIProvider, AnthropicProvider
+
+router = RouterProvider(
+    providers={
+        "fast": OpenAIProvider(default_model="gpt-5.4-nano"),           # $0.10/1M input
+        "smart": AnthropicProvider(default_model="claude-sonnet-4-6"),  # $3/1M input
+        "power": OpenAIProvider(default_model="gpt-5.4-pro"),           # $30/1M input
+    },
+    strategy="cost_optimized",  # or "quality_first", "balanced"
+)
+
+agent = Agent(tools, provider=router)
+```
+
+Each tier's model comes from the provider's `default_model` attribute (or an explicit `tier_models={"fast": "gpt-5.4-nano"}` override) and replaces the agent's `model` argument when that tier serves a request.
+
+### Complexity Classification
+
+The classifier (`selectools.providers.router.classify_complexity`) is rule-based and deterministic — no LLM call. Signals are additive:
+
+| Signal | Points |
+|---|---|
+| Input tokens ≥ `complex_token_threshold` (default 1500) | +2 |
+| Input tokens ≥ `moderate_token_threshold` (default 400) | +1 |
+| Tool count ≥ `complex_tool_threshold` (default 8) | +2 |
+| Tool count ≥ `moderate_tool_threshold` (default 4) | +1 |
+| Code block (triple backticks) present | +2 |
+| Reasoning keyword ("step by step", "analyze", "refactor", ...) | +2 |
+| Multi-part question (≥2 `?` or a numbered list) | +1 |
+| Structured-output keyword ("json", "schema", "markdown table", ...) | +1 |
+
+Score ≥ 4 → `complex`; score ≥ 2 → `moderate`; else `simple`. All thresholds, score boundaries, and keyword lists are configurable via `RouterConfig`. Input tokens are estimated with `selectools.token_estimation.estimate_tokens` over the system prompt plus all messages; keyword and structure detection runs on the latest user message.
+
+### Strategies
+
+| Strategy | simple | moderate | complex | On failure |
+|---|---|---|---|---|
+| `cost_optimized` | cheapest tier | middle tier | top tier | escalate up-tier |
+| `balanced` | middle tier | middle tier | top tier | escalate up-tier |
+| `quality_first` | top tier | top tier | top tier | degrade down-tier |
+
+### Tier Ordering
+
+- The `providers` dict is treated as cheapest-first by convention.
+- When every tier's model is known to the pricing registry (`selectools.pricing`), the ordering is verified and re-sorted by cost (a warning is logged on disagreement).
+- `tier_order=["fast", "smart", "power"]` overrides both.
+
+### Failure Escalation
+
+Internally each escalation chain is a `FallbackProvider` over the remaining tiers, so `RouterProvider` inherits its semantics: retriable errors (429, 5xx, timeouts, 529 Overloaded, ...) trigger escalation; non-retriable errors (auth failures) propagate immediately; tiers that fail repeatedly are circuit-broken (`circuit_breaker_threshold`, `circuit_breaker_cooldown`). Streams never switch tiers after the first chunk has been yielded.
+
+### Inspecting Routing Decisions
+
+```python
+router.tier_used        # tier that served the most recent request, e.g. "smart"
+router.complexity_used  # "simple" | "moderate" | "complex"
+router.tier_order       # resolved cheapest-first ordering
+
+# Callbacks
+RouterProvider(..., on_route=lambda complexity, tier: ...,
+               on_escalation=lambda failed_tier, next_tier, exc: ...)
+```
+
+`UsageStats` is untouched — cost and provider attribution flow through from whichever underlying provider served the request.
+
+### Limitations / Future Work
+
+- The roadmap's "quality threshold" re-route (retry a pricier tier when the cheap answer is low-quality) is deferred: scoring answer quality without an LLM judge is guesswork. An optional LLM-based classifier/judge is future work.
+- Circuit-breaker state is tracked per escalation chain, not globally across chains.
+
+---
+
 ## Observability Integrations (v0.21.0)
 
 Two new observer implementations let you ship agent traces to external observability platforms.
@@ -998,3 +1082,4 @@ Both observers implement the standard `AgentObserver` protocol and can be compos
 | 01 | [`01_hello_world.py`](https://github.com/johnnichev/selectools/blob/main/examples/01_hello_world.py) | Minimal agent with a single provider |
 | 17 | [`17_rag_multi_provider.py`](https://github.com/johnnichev/selectools/blob/main/examples/17_rag_multi_provider.py) | RAG across multiple provider backends |
 | 25 | [`25_provider_fallback.py`](https://github.com/johnnichev/selectools/blob/main/examples/25_provider_fallback.py) | FallbackProvider with circuit breaker failover |
+| 102 | [`102_router_provider.py`](https://github.com/johnnichev/selectools/blob/main/examples/102_router_provider.py) | RouterProvider cost-optimized tier routing (offline) |
