@@ -129,9 +129,22 @@ class FakeRedis:
         self._evict_if_expired(key)
         return self._store.get(key)
 
-    def set(self, key: str, value: str) -> None:
+    def set(
+        self,
+        key: str,
+        value: str,
+        nx: bool = False,
+        ex: Optional[int] = None,
+    ) -> Optional[bool]:
+        self._evict_if_expired(key)
+        if nx and key in self._store:
+            return None
         self._store[key] = value
-        self._ttls.pop(key, None)
+        if ex is not None:
+            self._ttls[key] = time.time() + ex
+        else:
+            self._ttls.pop(key, None)
+        return True
 
     def setex(self, key: str, ttl: int, value: str) -> None:
         self._store[key] = value
@@ -357,6 +370,12 @@ class TestRegexConfirmParser:
             "pode remover",
             "yes",
             "Yes!",
+            "yes.",
+            "yes, please",
+            "yes please",
+            "sim!",
+            "sim, por favor",
+            "sí porfa",
             "yep",
             "yeah",
             "confirm",
@@ -364,12 +383,38 @@ class TestRegexConfirmParser:
             "sí",
             "si",
             "sí, borra",
+            "yes, delete it",
             "puedes borrar",
             "puede eliminar",
         ],
     )
     def test_confirms(self, parser: RegexConfirmParser, msg: str) -> None:
         assert parser.is_confirm(msg)
+
+    @pytest.mark.parametrize(
+        "msg",
+        [
+            # PR review BLOCKER repros: bare confirm tokens followed by
+            # arbitrary trailing content MUST NOT parse as confirmation —
+            # each of these fired a destructive action under regex-v1.
+            "yes, but tell me more first",
+            "yeah right, as if",
+            "confirm what exactly?",
+            "sim, mas antes me explica",
+            # Same family: token + non-politeness trailing words.
+            "yes and also show me the report",
+            "yep that reminds me, what's my balance?",
+            "confirmado o pagamento do mês passado?",
+            "si quieres puedo mirar mañana",
+        ],
+    )
+    def test_blocker_repros_must_not_confirm(self, parser: RegexConfirmParser, msg: str) -> None:
+        """Review finding 1 (BLOCKER): non-confirmations parsed as confirm."""
+        assert not parser.is_confirm(msg)
+
+    def test_parser_version_bumped_for_v2_anchoring(self, parser: RegexConfirmParser) -> None:
+        """Records persist parser_version; the v2 semantics need a new tag."""
+        assert parser.version == "regex-v2:pt-en-es"
 
     @pytest.mark.parametrize(
         "msg",
@@ -515,17 +560,68 @@ class TestInMemoryPendingStore:
         assert store.get("u4") is not None
 
     def test_executor_exception_consumes_pending(self) -> None:
-        """A failing executor must not leave the action re-confirmable."""
+        """A failing executor must not leave the action re-confirmable.
+
+        Review finding 5: the raise must NOT propagate out of the
+        webhook-facing path. It becomes ConfirmOutcome(status="failed")
+        with the record consumed (one-shot, no re-arm) and only the
+        exception TYPE NAME recorded in the outcome.
+        """
         store = InMemoryPendingStore()
 
         def boom() -> str:
-            raise RuntimeError("db down")
+            raise RuntimeError("db down: secret-host:5432")
 
         store.stash("u1", kind="k", preview="p", executor=boom)
-        with pytest.raises(RuntimeError):
-            store.pop_if_confirmed("u1", "yes")
+        outcome = store.pop_if_confirmed("u1", "yes")
+        assert outcome is not None
+        assert outcome.status == "failed"
+        assert outcome.executed is False
+        assert outcome.result is None
+        assert outcome.record.status == "consumed"
+        # Type name only — full exception text must not leak into the outcome.
+        assert outcome.record.outcome == "error: RuntimeError"
+        assert "secret-host" not in (outcome.record.outcome or "")
+        # One-shot semantics: consumed, never re-armed, never retried.
         assert store.get("u1") is None
         assert store.pop_if_confirmed("u1", "yes") is None
+
+    def test_executor_exception_failed_outcome_redis(self) -> None:
+        """Review finding 5, Redis path: same failed-outcome contract."""
+        store = _make_redis_store(FakeRedis())
+
+        def boom() -> str:
+            raise ValueError("bad target")
+
+        store.stash("u1", kind="k", preview="p", executor=boom)
+        outcome = store.pop_if_confirmed("u1", "yes")
+        assert outcome is not None and outcome.status == "failed"
+        assert outcome.record.outcome == "error: ValueError"
+        assert store.get("u1") is None
+        assert store.pop_if_confirmed("u1", "yes") is None
+
+    def test_pop_with_expected_id_mismatch_disarms_and_returns_none(self) -> None:
+        """Review finding 6: a claim pinned to a stale identity must not
+        execute the (different) action that got claimed — disarm + None."""
+        store = InMemoryPendingStore()
+        fired: List[str] = []
+        first = store.stash("u1", kind="a", preview="A", executor=lambda: fired.append("a") or "a")
+        observed_id = first.pending_action_id
+        # The action is re-stashed between the observer's get() and the pop
+        # (drop + stash simulates the narrow re-stash race).
+        store.drop("u1")
+        store.stash("u1", kind="b", preview="B", executor=lambda: fired.append("b") or "b")
+        outcome = store.pop_if_confirmed("u1", "yes", expected_id=observed_id)
+        assert outcome is None
+        assert fired == []
+        # The ambiguously-claimed action is disarmed, not left armed.
+        assert store.get("u1") is None
+
+    def test_pop_with_matching_expected_id_executes(self) -> None:
+        store = InMemoryPendingStore()
+        record = store.stash("u1", kind="k", preview="p", executor=lambda: "ok")
+        outcome = store.pop_if_confirmed("u1", "yes", expected_id=record.pending_action_id)
+        assert outcome is not None and outcome.status == "executed"
 
 
 # ---------------------------------------------------------------------------
@@ -625,6 +721,55 @@ class TestChannelAgent:
 
     def test_stash_pending_outside_channel_run_is_noop(self) -> None:
         assert stash_pending(kind="k", preview="p", executor=lambda: "ok") is None
+
+    def test_custom_parser_is_single_source_of_decision(self) -> None:
+        """Review finding 2: a parser handed to ChannelAgent must also drive
+        the store's pop_if_confirmed re-parse. Under the old wiring the
+        channel parser said "confirm", the store parser said "not a
+        confirm", and the user got a false "No pending action to confirm"
+        ack with the action still armed (until the drop)."""
+
+        class AbsolutelyParser:
+            version = "test-absolutely-v1"
+
+            def is_confirm(self, msg: str) -> bool:
+                return (msg or "").strip().lower() == "absolutely"
+
+            def is_cancel(self, msg: str) -> bool:
+                return False
+
+        store = InMemoryPendingStore()
+        fired: List[str] = []
+        provider = _TextProvider("llm reply")
+        agent = Agent(tools=[_noop_tool()], provider=provider, config=AgentConfig(max_iterations=3))
+        channel = ChannelAgent(agent, store=store, parser=AbsolutelyParser())
+        # Store and channel now share one parser instance.
+        assert channel.parser is store.parser
+        store.stash("u1", kind="k", preview="p", executor=lambda: fired.append("x") or "done")
+        result = channel.ask_channel("u1", "absolutely")
+        assert fired == ["x"]
+        assert result.content == "done"
+        assert provider.call_count == 0
+
+    def test_executor_failure_returns_failure_ack_not_raise(self) -> None:
+        """Review finding 5: ask_channel must not propagate executor raises
+        to the webhook layer; it returns a failure ack and the action is
+        consumed (a webhook retry must not fall through to the LLM as a
+        fresh message NOR re-execute)."""
+        store = InMemoryPendingStore()
+        provider = _TextProvider("llm reply")
+        agent = Agent(tools=[_noop_tool()], provider=provider, config=AgentConfig(max_iterations=3))
+        channel = ChannelAgent(agent, store=store)
+
+        def boom() -> str:
+            raise RuntimeError("db down")
+
+        store.stash("u1", kind="k", preview="Delete INV-42", executor=boom)
+        result = channel.ask_channel("u1", "yes")  # must not raise
+        assert "Delete INV-42" in result.content
+        assert "failed" in result.content.lower()
+        assert provider.call_count == 0
+        assert store.get("u1") is None
 
     def test_pending_scoped_to_channel_and_conversation(self) -> None:
         store = InMemoryPendingStore()
@@ -791,6 +936,82 @@ class TestRedisPendingStore:
         assert loaded.channel_id == "wa"
         assert loaded.conversation_id == "c9"
         assert loaded.args_digest == record.args_digest
+
+    def test_stash_is_atomic_set_nx(self) -> None:
+        """Review finding 3: stash must be a single atomic SET NX EX, not
+        GET -> check -> SETEX. A concurrent duplicate stash that lands in
+        the old check-then-act window must lose, not overwrite."""
+        fake = FakeRedis()
+        store = _make_redis_store(fake)
+
+        original_set = fake.set
+        calls: List[Dict[str, Any]] = []
+
+        def spying_set(key: str, value: str, nx: bool = False, ex: Optional[int] = None) -> Any:
+            calls.append({"nx": nx, "ex": ex})
+            return original_set(key, value, nx=nx, ex=ex)
+
+        fake.set = spying_set  # type: ignore[method-assign]
+        store.stash("u1", kind="a", preview="A", executor=lambda: "a")
+        assert calls and calls[-1]["nx"] is True and calls[-1]["ex"] is not None
+
+        # Simulate the concurrent-duplicate hazard: a twin initiating
+        # webhook whose pre-existing GET-based check would have seen
+        # nothing (the key appears between its check and its write). With
+        # SET NX the second writer must fail and raise — never overwrite
+        # preview A with executor B.
+        with pytest.raises(PendingActionExistsError):
+            store.stash("u1", kind="b", preview="B", executor=lambda: "b")
+        outcome = store.pop_if_confirmed("u1", "yes")
+        assert outcome is not None and outcome.result == "a"
+
+    def test_stash_retries_over_subsecond_expired_record(self) -> None:
+        """Server-side TTL is whole seconds; a record can be sub-second
+        expired while the key still exists. stash must clear it and retry
+        the atomic SET NX instead of raising."""
+        store = _make_redis_store(FakeRedis())
+        store.stash("u1", kind="a", preview="A", executor=lambda: "a", ttl_seconds=0.01)
+        time.sleep(0.05)
+        record = store.stash("u1", kind="b", preview="B", executor=lambda: "b")
+        assert record.kind == "b"
+
+    def test_executor_registry_purges_expired_on_stash(self) -> None:
+        """Review finding 4: TTL-expired closures must not leak forever in
+        long-running workers — stash opportunistically purges them."""
+        store = _make_redis_store(FakeRedis())
+        for i in range(10):
+            store.stash(f"u{i}", kind="k", preview="p", executor=lambda: "ok", ttl_seconds=0.01)
+        assert len(store._executors) == 10
+        time.sleep(0.05)
+        store.stash("fresh", kind="k", preview="p", executor=lambda: "ok", ttl_seconds=60)
+        assert len(store._executors) == 1
+
+    def test_executor_registry_lru_cap(self) -> None:
+        """Review finding 4: the registry is capped (mirrors InMemory's
+        max_entries) so even unexpired closures cannot grow unboundedly."""
+        store = _make_redis_store(FakeRedis(), max_executor_entries=3)
+        records = [
+            store.stash(f"u{i}", kind="k", preview="p", executor=lambda: "ok", ttl_seconds=60)
+            for i in range(5)
+        ]
+        assert len(store._executors) == 3
+        # Oldest closures were evicted; newest survive.
+        assert records[0].pending_action_id not in store._executors
+        assert records[4].pending_action_id in store._executors
+
+    def test_pop_with_expected_id_mismatch_disarms_redis(self) -> None:
+        """Review finding 6, Redis path."""
+        store = _make_redis_store(FakeRedis())
+        fired: List[str] = []
+        first = store.stash("u1", kind="a", preview="A", executor=lambda: fired.append("a") or "a")
+        store.drop("u1")
+        second = store.stash("u1", kind="b", preview="B", executor=lambda: fired.append("b") or "b")
+        outcome = store.pop_if_confirmed("u1", "yes", expected_id=first.pending_action_id)
+        assert outcome is None
+        assert fired == []
+        assert store.get("u1") is None
+        # The claimed record's closure is purged too — fully disarmed.
+        assert second.pending_action_id not in store._executors
 
     def test_missing_redis_raises_import_error(self) -> None:
         from unittest.mock import patch

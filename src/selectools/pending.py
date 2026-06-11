@@ -252,6 +252,10 @@ class ConfirmOutcome:
     - ``"no_executor"``: no closure and no factory could run the action
       (e.g. the confirming webhook landed on a fresh process). Nothing
       executed; a fresh confirmation cycle is required.
+    - ``"failed"``: guards passed but the executor RAISED. The record is
+      consumed (one-shot — a duplicate webhook neither retries nor falls
+      through to the LLM). ``record.outcome`` carries only the exception
+      type name (``"error: <TypeName>"``); full detail goes to logging.
 
     In every non-``executed`` case the pending action has been removed —
     a stale destructive action is never left armed.
@@ -289,16 +293,36 @@ class ConfirmParser(Protocol):
 
 # Only unambiguous confirmations (Sheriff bug-hunt #10): "ok", "claro",
 # "pode", "isso" are common PT-BR acknowledgments in NON-destructive replies
-# and must never fire a pending destructive action. Spanish bare "si" is the
-# conditional "if" mid-sentence, so it only confirms as the entire message;
-# the accented "sí" is unambiguous anywhere at the start.
-_CONFIRM_RE = re.compile(
-    r"^(?:"
-    r"(?:sim|sí|confirmo|confirma(?:r|do)?)\b"
-    r"|si\s*[.!]?\s*$"
-    r"|pode\s+(?:apagar|deletar|cancelar|remover)\b"
-    r"|puedes?\s+(?:borrar|eliminar|cancelar)\b"
-    r"|(?:yes|yep|yeah|confirm(?:ed)?)\b"
+# and must never fire a pending destructive action.
+#
+# v2 anchoring (PR #73 review BLOCKER): bare confirmation tokens confirm
+# only as the WHOLE message. v1 used a prefix match (``re.match`` + ``\b``),
+# so "yes, but tell me more first", "yeah right, as if", "confirm what
+# exactly?" and "sim, mas antes me explica" all fired a destructive action.
+# Allowed trailing content after a bare token is EXACTLY: optional
+# punctuation (``.,!``), at most one politeness marker ("please",
+# "por favor", "porfa"), and optional punctuation again. Anything else
+# (a clause, a question, a condition) means the message is NOT a pure
+# confirmation and must not execute.
+_CONFIRM_WORD = r"(?:sim|s[ií]|yes|yep|yeah|confirm(?:ado|ar|ed|o|a)?)"
+_TRAILING_POLITENESS = r"(?:please|por\s+favor|porfa)"
+_CONFIRM_BARE_RE = re.compile(
+    rf"^\s*{_CONFIRM_WORD}\s*[.,!]*\s*(?:{_TRAILING_POLITENESS}\s*[.,!]*\s*)?$",
+    flags=re.IGNORECASE,
+)
+# Destructive verb phrases RESTATE the proposed intent ("pode apagar",
+# "puedes borrar", "yes, delete it", "sí, borra"), so they may appear with
+# other words around them: the first two branches match anywhere in the
+# message; the third requires a leading confirm token immediately followed
+# by a destructive imperative.
+_CONFIRM_VERB_RE = re.compile(
+    r"(?:"
+    r"\bpode\s+(?:apagar|deletar|excluir|cancelar|remover)\b"
+    r"|\bpuedes?\s+(?:borrar|eliminar|cancelar)\b"
+    rf"|^\s*{_CONFIRM_WORD}\s*[.,!]*\s+(?:please\s+)?"
+    r"(?:delete|remove|cancel|erase|drop"
+    r"|apaga|apague|deleta|delete|exclui|remove|cancela"
+    r"|borra|b[oó]rralo|elimina|elim[ií]nalo)\b"
     r")",
     flags=re.IGNORECASE,
 )
@@ -315,19 +339,31 @@ class RegexConfirmParser:
     Patterns lifted from Sheriff's proven set and extended with Spanish.
     The bias is conservative: a false negative costs the user a retype; a
     false positive fires a destructive action.
+
+    v2 semantics (PR #73 review): a BARE confirmation token ("sim", "sí",
+    "si", "yes", "yep", "yeah", "confirm", "confirmed", "confirmo",
+    "confirmar", "confirmado", "confirma") confirms only as the whole
+    message — trailing ``.,!`` punctuation and a single politeness marker
+    ("please" / "por favor" / "porfa") are the only extra content allowed.
+    Destructive verb phrases that restate the intent ("pode apagar",
+    "puedes borrar", "yes, delete it", "sí, borra") still confirm with
+    surrounding words. A message whose first word is a negation
+    ("no, delete it") NEVER confirms — ambiguity resolves to not-confirm.
     """
 
-    version: str = "regex-v1:pt-en-es"
+    version: str = "regex-v2:pt-en-es"
 
     def is_confirm(self, msg: str) -> bool:
         stripped = (msg or "").strip()
-        return bool(stripped and _CONFIRM_RE.match(stripped))
+        if not stripped or _CANCEL_RE.match(stripped):
+            # A leading negation ("no, delete it", "não, pode apagar")
+            # makes the message ambiguous at best — never confirm on it.
+            return False
+        return bool(_CONFIRM_BARE_RE.match(stripped) or _CONFIRM_VERB_RE.search(stripped))
 
     def is_cancel(self, msg: str) -> bool:
         stripped = (msg or "").strip()
-        if not stripped or _CONFIRM_RE.match(stripped):
-            return False
-        return bool(_CANCEL_RE.match(stripped))
+        return bool(stripped and _CANCEL_RE.match(stripped))
 
 
 # ---------------------------------------------------------------------------
@@ -390,11 +426,23 @@ class PendingActionStore(Protocol):
         channel_id: Optional[str] = None,
         conversation_id: Optional[str] = None,
         args_digest: Optional[str] = None,
+        expected_id: Optional[str] = None,
     ) -> Optional[ConfirmOutcome]:
         """Atomically claim and execute the pending action iff the message
         confirms AND every guard passes. ``None`` means: no pending for this
-        scope, the message is not a confirmation, or a twin request won the
-        claim — in all three cases the caller must NOT execute anything.
+        scope, the message is not a confirmation, a twin request won the
+        claim, or the claimed record's id differs from ``expected_id`` — in
+        all cases the caller must NOT execute anything.
+
+        ``expected_id`` pins the claim to the exact record the caller
+        observed (e.g. via ``get``); if a different record was re-stashed
+        in between, the claim disarms it and returns ``None`` instead of
+        executing an action the user never previewed in this turn.
+
+        A non-``None`` outcome may still be non-executed: ``expired``,
+        ``digest_mismatch``, ``no_executor``, or ``failed`` (the executor
+        raised; the action is consumed and never retried). Check
+        ``outcome.executed`` before treating it as success.
         """
         ...
 
@@ -467,7 +515,26 @@ def _guarded_execute(
         )
         return ConfirmOutcome(status="no_executor", record=replace(record, status=_CANCELLED))
     confirmed = replace(record, status=_CONFIRMED)
-    result = executor()
+    try:
+        result = executor()
+    except Exception as exc:
+        # PR #73 review finding 5: an executor raise must not propagate raw
+        # to the webhook layer with no audit trail (a webhook retry would
+        # then fall through to the LLM as a fresh message). The record is
+        # consumed — one-shot semantics, no re-arm, no automatic retry —
+        # and the outcome records only the exception TYPE name; the full
+        # detail goes to logging, never into user-facing/persisted text.
+        logger.warning(
+            "pending: executor for %s (kind=%s) raised %s: %s",
+            record.pending_action_id,
+            record.kind,
+            type(exc).__name__,
+            exc,
+        )
+        return ConfirmOutcome(
+            status="failed",
+            record=replace(confirmed, status=_CONSUMED, outcome=f"error: {type(exc).__name__}"),
+        )
     return ConfirmOutcome(
         status="executed",
         record=replace(confirmed, status=_CONSUMED, outcome=result),
@@ -570,6 +637,7 @@ class InMemoryPendingStore:
         channel_id: Optional[str] = None,
         conversation_id: Optional[str] = None,
         args_digest: Optional[str] = None,
+        expected_id: Optional[str] = None,
     ) -> Optional[ConfirmOutcome]:
         if not self.parser.is_confirm(message):
             return None
@@ -580,6 +648,19 @@ class InMemoryPendingStore:
             # No pending for this scope, or a twin webhook won the claim.
             return None
         record, executor = entry
+        if expected_id is not None and record.pending_action_id != expected_id:
+            # PR #73 review finding 6: the record was re-stashed between the
+            # caller's get() and this claim. The claimed action was never
+            # previewed in this turn — disarm it (already popped) and treat
+            # as no-pending. Never execute under an identity mismatch.
+            logger.warning(
+                "pending: claimed record %s does not match expected id %s "
+                "(kind=%s) — disarming without execution",
+                record.pending_action_id,
+                expected_id,
+                record.kind,
+            )
+            return None
         return _guarded_execute(record, executor, args_digest)
 
     def drop(
@@ -631,6 +712,7 @@ class RedisPendingStore:
         prefix: str = "selectools:pending:",
         parser: Optional[ConfirmParser] = None,
         default_ttl_seconds: float = DEFAULT_TTL_SECONDS,
+        max_executor_entries: int = 5000,
     ) -> None:
         try:
             import redis as redis_lib  # type: ignore[import-untyped]
@@ -644,10 +726,24 @@ class RedisPendingStore:
         self._prefix = prefix
         self.parser: ConfirmParser = parser if parser is not None else RegexConfirmParser()
         self._default_ttl = default_ttl_seconds
+        self._max_executor_entries = max_executor_entries
         self._lock = threading.RLock()
         # Process-local. See class docstring — closures are never persisted.
-        self._executors: Dict[str, Executor] = {}
+        # PR #73 review finding 4: entries carry their expires_at so the
+        # no-reply path (TTL expiry with no confirming webhook) cannot leak
+        # closures forever — expired entries are purged on each stash, and
+        # an LRU cap (mirroring InMemoryPendingStore's max_entries) bounds
+        # the registry even before expiry. An evicted closure degrades to
+        # the documented ``no_executor``/factory path, never to a leak.
+        self._executors: "OrderedDict[str, Tuple[Executor, float]]" = OrderedDict()
         self._factories: Dict[str, ExecutorFactory] = {}
+
+    def _purge_expired_executors_locked(self) -> None:
+        """Drop registry entries whose record TTL has passed. Caller holds the lock."""
+        now = time.time()
+        stale = [pid for pid, (_, expires_at) in self._executors.items() if now > expires_at]
+        for pid in stale:
+            del self._executors[pid]
 
     def _key(self, user_id: str, channel_id: Optional[str], conversation_id: Optional[str]) -> str:
         return f"{self._prefix}{_scope_key(user_id, channel_id, conversation_id)}"
@@ -676,14 +772,6 @@ class RedisPendingStore:
         conversation_id: Optional[str] = None,
     ) -> PendingAction:
         key = self._key(user_id, channel_id, conversation_id)
-        existing_raw = self._client.get(key)
-        if existing_raw is not None:
-            existing = PendingAction.from_dict(json.loads(existing_raw))
-            if not existing.is_expired():
-                raise PendingActionExistsError(
-                    f"scope for user {user_id!r} already has an unexpired pending "
-                    f"{existing.kind!r}; refusing to replace with {kind!r}"
-                )
         record = _build_record(
             user_id,
             kind,
@@ -695,13 +783,47 @@ class RedisPendingStore:
             conversation_id,
             self.parser.version,
         )
+        payload = json.dumps(record.to_dict(), ensure_ascii=False)
         # Server-side TTL is the primary expiry; expires_at in the record is
         # the precise sub-second guard checked at claim time.
         ttl = max(1, math.ceil(record.expires_at - record.requested_at))
-        self._client.setex(key, ttl, json.dumps(record.to_dict(), ensure_ascii=False))
-        with self._lock:
-            self._executors[record.pending_action_id] = executor
-        return record
+        # PR #73 review finding 3: the write must be atomic SET NX EX, not
+        # GET -> check -> SETEX. Two concurrent duplicate initiating
+        # webhooks in the old check-then-act window could both pass the
+        # check and the loser's SETEX overwrote the winner — the user then
+        # saw preview A while executor B was armed. With NX exactly one
+        # writer wins; the loser raises PendingActionExistsError.
+        for _ in range(2):
+            if self._client.set(key, payload, nx=True, ex=ttl):
+                with self._lock:
+                    self._purge_expired_executors_locked()
+                    self._executors[record.pending_action_id] = (executor, record.expires_at)
+                    while len(self._executors) > self._max_executor_entries:
+                        evicted_id, _ = self._executors.popitem(last=False)
+                        logger.warning(
+                            "pending: LRU-evicted executor closure %s (cap=%d reached); "
+                            "confirmation will need a registered factory",
+                            evicted_id,
+                            self._max_executor_entries,
+                        )
+                return record
+            existing_raw = self._client.get(key)
+            if existing_raw is not None:
+                existing = PendingAction.from_dict(json.loads(existing_raw))
+                if not existing.is_expired():
+                    raise PendingActionExistsError(
+                        f"scope for user {user_id!r} already has an unexpired pending "
+                        f"{existing.kind!r}; refusing to replace with {kind!r}"
+                    )
+                # Sub-second expired (record guard) but the whole-second
+                # server TTL has not fired yet: clear it and retry the
+                # atomic SET NX once.
+                self._client.delete(key)
+            # else: the key vanished between SET NX and GET (claimed or
+            # server-expired) — retry the atomic write once.
+        raise PendingActionExistsError(
+            f"scope for user {user_id!r} is contended; could not stash {kind!r} atomically"
+        )
 
     def get(
         self,
@@ -726,6 +848,7 @@ class RedisPendingStore:
         channel_id: Optional[str] = None,
         conversation_id: Optional[str] = None,
         args_digest: Optional[str] = None,
+        expected_id: Optional[str] = None,
     ) -> Optional[ConfirmOutcome]:
         if not self.parser.is_confirm(message):
             return None
@@ -736,8 +859,21 @@ class RedisPendingStore:
             return None
         record = PendingAction.from_dict(json.loads(raw))
         with self._lock:
-            executor: Optional[Executor] = self._executors.pop(record.pending_action_id, None)
+            entry = self._executors.pop(record.pending_action_id, None)
             factory = self._factories.get(record.kind)
+        if expected_id is not None and record.pending_action_id != expected_id:
+            # PR #73 review finding 6: see InMemoryPendingStore — never
+            # execute under an identity mismatch; the claimed record (and
+            # its closure) are disarmed and the caller sees no-pending.
+            logger.warning(
+                "pending: claimed record %s does not match expected id %s "
+                "(kind=%s) — disarming without execution",
+                record.pending_action_id,
+                expected_id,
+                record.kind,
+            )
+            return None
+        executor: Optional[Executor] = entry[0] if entry is not None else None
         if executor is None and factory is not None:
             executor = factory(record)
         return _guarded_execute(record, executor, args_digest)
@@ -877,7 +1013,12 @@ class ChannelAgent:
         agent: The wrapped ``selectools.Agent``.
         store: Pending-action backend. Defaults to a fresh
             :class:`InMemoryPendingStore`.
-        parser: Confirm parser. Defaults to the store's parser.
+        parser: Confirm parser. When given, it is assigned onto the store
+            as well — the store re-parses the message inside
+            ``pop_if_confirmed``, so the channel and the store MUST share
+            one parser (PR #73 review finding 2: a divergent pair acked
+            "No pending action to confirm", swallowed the message, and
+            left the action armed). Defaults to the store's parser.
     """
 
     def __init__(
@@ -888,7 +1029,11 @@ class ChannelAgent:
     ) -> None:
         self.agent = agent
         self.store: PendingActionStore = store if store is not None else InMemoryPendingStore()
-        self.parser: ConfirmParser = parser if parser is not None else self.store.parser
+        if parser is not None:
+            # Single source of decision: the store's pop_if_confirmed is the
+            # final gate, so the channel-level parser must BE the store's.
+            self.store.parser = parser
+        self.parser: ConfirmParser = self.store.parser
 
     def ask_channel(
         self,
@@ -924,16 +1069,34 @@ class ChannelAgent:
                 return _ack(f"Cancelled: {preview}")
             if self.parser.is_confirm(message):
                 outcome = self.store.pop_if_confirmed(
-                    user_id, message, args_digest=args_digest, **scope
+                    user_id,
+                    message,
+                    args_digest=args_digest,
+                    # Pin the claim to the exact record observed above: if a
+                    # different action was re-stashed in between, the store
+                    # disarms it and reports no-pending instead of executing
+                    # something this turn never previewed (review finding 6).
+                    expected_id=pending.pending_action_id,
+                    **scope,
                 )
                 if outcome is None:
-                    # Twin webhook won the claim between get() and the pop.
+                    # Twin webhook won the claim between get() and the pop,
+                    # or the claimed record was not the one observed.
                     return _ack("No pending action to confirm.")
                 if outcome.executed:
                     return _ack(outcome.result or "")
                 if outcome.status == "expired":
                     return _ack(
                         f"That confirmation expired: {outcome.record.preview}. Please start over."
+                    )
+                if outcome.status == "failed":
+                    # The executor raised (review finding 5): the action is
+                    # consumed — one-shot, no automatic retry — and the raw
+                    # exception never reaches the webhook layer.
+                    return _ack(
+                        f"Confirmed, but the action failed while executing: "
+                        f"{outcome.record.preview}. It was not retried — please "
+                        "check the result and request it again if needed."
                     )
                 # digest_mismatch | no_executor: never execute a stale or
                 # unresolvable action — ask for a fresh confirmation cycle.
