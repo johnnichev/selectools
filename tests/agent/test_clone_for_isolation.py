@@ -53,6 +53,22 @@ class TestCloneForIsolationPublic:
         assert clone.config.observers is not agent.config.observers
         assert clone.config.observers == [obs]
 
+    def test_empty_default_observer_list_not_shared(self) -> None:
+        """Regression: with the default observers=[] the clone must still get
+        its OWN list. The old truthiness guard skipped the copy for empty
+        lists, so parent and all clones shared one list object and an
+        observer appended on a clone fired on siblings."""
+        agent = _make_agent()
+        clone = agent.clone_for_isolation()
+
+        assert clone.config.observers is not agent.config.observers
+
+        class _Obs(AgentObserver):
+            pass
+
+        clone.config.observers.append(_Obs())
+        assert agent.config.observers == []
+
     def test_fresh_history_and_usage_memory_dropped(self) -> None:
         agent = Agent(
             tools=[_noop],
@@ -86,4 +102,4 @@ class TestCloneForIsolationDeprecatedAlias:
 
     def test_alias_marked_deprecated(self) -> None:
         assert getattr(Agent._clone_for_isolation, "__stability__", None) == "deprecated"
-        assert getattr(Agent._clone_for_isolation, "__deprecated_since__", None) == "0.25.0"
+        assert getattr(Agent._clone_for_isolation, "__deprecated_since__", None) == "1.0.0"

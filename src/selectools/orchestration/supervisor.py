@@ -31,7 +31,6 @@ Usage::
 from __future__ import annotations
 
 import asyncio
-import json
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum

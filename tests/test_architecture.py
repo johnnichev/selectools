@@ -184,6 +184,8 @@ def test_export_resolves(name: str) -> None:
 
 V1_WART_REMOVAL_ADDITIONS = [
     "Pipeline",
+    "Step",
+    "StepResult",
     "compose",
     "step",
     "parallel",
@@ -191,6 +193,7 @@ V1_WART_REMOVAL_ADDITIONS = [
     "retry",
     "cache_step",
     "RouterProvider",
+    "RouterConfig",
 ]
 
 

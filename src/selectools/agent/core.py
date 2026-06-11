@@ -1272,15 +1272,14 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         clone = copy.copy(self)
         if self.config is not None:
             clone.config = copy.copy(self.config)
-            if getattr(self.config, "observers", None):
-                clone.config.observers = list(self.config.observers)
+            clone.config.observers = list(getattr(self.config, "observers", None) or [])
         clone._history = []
         clone.usage = AgentUsage()
         clone.memory = None
         clone.analytics = None
         return clone
 
-    @deprecated(since="0.25.0", replacement="clone_for_isolation")
+    @deprecated(since="1.0.0", replacement="clone_for_isolation")
     def _clone_for_isolation(self) -> "Agent":
         """Deprecated alias for :meth:`clone_for_isolation`."""
         return self.clone_for_isolation()

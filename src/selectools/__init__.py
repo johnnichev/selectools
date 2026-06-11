@@ -158,7 +158,7 @@ from .providers.gemini_provider import GeminiProvider
 from .providers.litellm_provider import LiteLLMProvider
 from .providers.ollama_provider import OllamaProvider
 from .providers.openai_provider import OpenAIProvider
-from .providers.router import RouterProvider
+from .providers.router import RouterConfig, RouterProvider
 from .providers.stubs import LocalProvider
 from .results import Ambiguous, Artifact, NotFound, ToolResult, emit_artifact
 from .sessions import (
@@ -214,12 +214,15 @@ __all__ = [
     "OllamaProvider",
     "LiteLLMProvider",
     "RouterProvider",
+    "RouterConfig",
     "LocalProvider",
     "FallbackProvider",
     "ToolRegistry",
     "tool",
     # Pipeline composition (public since 0.19.3, @beta)
     "Pipeline",
+    "Step",
+    "StepResult",
     "compose",
     "step",
     "parallel",

@@ -115,7 +115,7 @@ Symbols that were importable but missing from `selectools.__all__` are now decla
 This matters if you use `from selectools import *` or lint against the public API:
 
 - **Pipeline family:** `Pipeline`, `Step`, `StepResult`, `step`, `branch`, `parallel`,
-  `retry`, `cache_step`
+  `retry`, `cache_step`, `compose`
 - **Router provider:** `RouterProvider`, `RouterConfig` (these two were previously
   importable only from `selectools.providers`; the top-level re-export is new)
 
