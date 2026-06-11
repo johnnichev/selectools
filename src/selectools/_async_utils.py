@@ -14,9 +14,10 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
+import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Awaitable, Callable, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional, TypeVar
 
 T = TypeVar("T")
 
@@ -63,34 +64,49 @@ def run_sync(coro: Awaitable[T]) -> T:
     return future.result()
 
 
-class aclosing:  # noqa: N801 — intentionally matches stdlib contextlib.aclosing
-    """Async context manager that calls ``aclose()`` on exit.
+if not TYPE_CHECKING and sys.version_info >= (3, 10):
+    # Canonical runtime path: stdlib ``contextlib.aclosing`` (added in
+    # Python 3.10). Re-exported here so consumer modules keep importing
+    # from ``selectools._async_utils`` unchanged.
+    #
+    # Type checkers analyze the class below instead (``not TYPE_CHECKING``)
+    # because stdlib ``aclosing`` is generic over ``SupportsAclose`` while
+    # ``Provider.astream`` is typed as ``AsyncIterable`` (no ``aclose`` in
+    # the protocol). Tag-week TODO: tighten ``astream`` return types to
+    # ``AsyncGenerator``, then collapse this to a bare
+    # ``from contextlib import aclosing``.
+    from contextlib import aclosing
+else:  # pragma: no cover — Python 3.9 fallback + type-checker signature; delete at the v1.0.0 tag.
 
-    BUG-33 / Pydantic AI PRs #4476, #4205: ``async for item in gen:``
-    without a context manager leaks the async generator when the loop
-    body raises — ``gen.__aexit__`` runs under GC instead of
-    deterministically. ``contextlib.aclosing`` fixes this, but was only
-    added in Python 3.10 and selectools supports 3.9+. This class is a
-    drop-in backport that works on any Python version.
+    class aclosing:  # noqa: N801 — intentionally matches stdlib contextlib.aclosing
+        """Async context manager that calls ``aclose()`` on exit.
 
-    Usage::
+        BUG-33 / Pydantic AI PRs #4476, #4205: ``async for item in gen:``
+        without a context manager leaks the async generator when the loop
+        body raises — ``gen.__aexit__`` runs under GC instead of
+        deterministically. ``contextlib.aclosing`` fixes this, but was only
+        added in Python 3.10. This branch is a drop-in backport kept only
+        so the code keeps executing on a 3.9 interpreter during the v1.0
+        release-train window; the package metadata already requires 3.10+.
 
-        async with aclosing(provider.astream(...)) as gen:
-            async for item in gen:
-                if stop_condition(item):
-                    break  # provider gen gets aclose()'d on exit
-    """
+        Usage::
 
-    def __init__(self, thing: Any) -> None:
-        self._thing = thing
+            async with aclosing(provider.astream(...)) as gen:
+                async for item in gen:
+                    if stop_condition(item):
+                        break  # provider gen gets aclose()'d on exit
+        """
 
-    async def __aenter__(self) -> Any:
-        """Return the wrapped async iterable so callers can iterate it."""
-        return self._thing
+        def __init__(self, thing: Any) -> None:
+            self._thing = thing
 
-    async def __aexit__(self, *_exc: Any) -> None:
-        """Call ``aclose()`` on the wrapped async iterable on exit."""
-        await self._thing.aclose()
+        async def __aenter__(self) -> Any:
+            """Return the wrapped async iterable so callers can iterate it."""
+            return self._thing
+
+        async def __aexit__(self, *_exc: Any) -> None:
+            """Call ``aclose()`` on the wrapped async iterable on exit."""
+            await self._thing.aclose()
 
 
 async def run_in_executor_copyctx(
