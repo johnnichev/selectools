@@ -5,6 +5,119 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Agent-as-API** (`@beta`, #68) — `selectools.serve.AgentAPI` turns any
+  Agent (or list of agents) into a production Starlette ASGI app:
+  `POST /v1/chat`, `POST /v1/chat/stream` (SSE), session CRUD under
+  `/v1/sessions`, and `GET /v1/health`. Per-user session isolation via a
+  `user_id` header, optional bearer-token auth (`auth_key=`,
+  constant-time compare), any `SessionStore` backend via `session_store=`,
+  multi-agent routing by `config.name`. CLI:
+  `selectools serve agent.yaml --api --port 8000`. Sync-only providers
+  fall back to a threadpool single-chunk stream. Closes the Agent-as-API
+  P0 roadmap item.
+- **Anthropic prompt caching** (#67, closes #57) — opt-in
+  `cache_system=True` / `cache_tools=True` on `AnthropicProvider` add
+  `cache_control: ephemeral` markers to the system prompt (block form)
+  and the last tool (caches the full tool list) across `complete`,
+  `acomplete`, `stream`, and `astream`. New optional `UsageStats` fields
+  `cache_creation_input_tokens` / `cache_read_input_tokens` expose hit
+  rates. Defaults off; behavior unchanged unless enabled.
+- **KnowledgeBackend** (`@beta`, #69, closes #60) — pluggable blob
+  persistence for `KnowledgeMemory` on ephemeral infrastructure
+  (Railway, Lambda, Cloud Run): scratch on disk during the request,
+  snapshot to a backend between requests. `KnowledgeBackend` protocol
+  (`load_bytes`/`save_bytes`), `SupabaseKnowledgeBackend` (PostgREST
+  table, configurable table/key/data columns, DDL template in docs) and
+  `RedisKnowledgeBackend` (optional TTL) in
+  `selectools.knowledge_backends`, plus `KnowledgeMemory(backend=...)`
+  and `flush()`. Corrupt blobs degrade to a fresh start with a warning;
+  unpacking rejects unsafe paths.
+
+- **ToolResult base class + Artifact side-channel** (`@beta`, #72,
+  closes #59) — new `selectools.results` module: frozen
+  `ToolResult` base with a `kind` ClassVar discriminator, built-in
+  `Ambiguous`/`NotFound` results, and an `Artifact` dataclass
+  (`url`, `mime_type`, `filename`, `sha256`, `size`, `role`,
+  `retention`) emitted from tools via contextvar-backed
+  `emit_artifact()` and surfaced on `AgentResult.artifacts`.
+  `Tool._serialize_result` now re-injects `kind` (ClassVars are
+  excluded from `dataclasses.asdict()`); thread-pool tool execution
+  paths gained per-submission `contextvars.copy_context()` so
+  emission works from timeout and parallel executors.
+- **Deferred confirmation flow** (`@beta`, #73, closes #58) — new
+  `selectools.pending` module for chat-channel destructive tools
+  where the user's "yes" arrives as a separate webhook turn:
+  `PendingAction` record (scoped to user/channel/conversation,
+  SHA-256 args digest, TTL, pending → confirmed/cancelled/expired/
+  consumed lifecycle), `PendingActionStore` protocol with
+  `InMemoryPendingStore` and `RedisPendingStore` (atomic `GETDEL`
+  claim, Redis >= 6.2; closures never serialized — process-local
+  registry + per-kind executor factories), pluggable
+  `ConfirmParser` with PT/EN/ES `RegexConfirmParser`,
+  `PendingConfirmation` ToolResult, `stash_pending()`, and a
+  `ChannelAgent.ask_channel()` wrapper. Confirmation only executes
+  when user/conversation scope, TTL, and args digest all match;
+  duplicate webhook delivery executes exactly once.
+- **LiteLLMProvider** (`@beta`, #74) — instant access to 100+ models
+  (`deepseek/...`, `groq/...`, `bedrock/...`) by delegating to the
+  `litellm` library, which normalizes everything to OpenAI wire format.
+  Reuses the shared `_OpenAICompatibleBase` machinery (message/tool
+  mapping, streaming assembly, malformed-JSON-safe argument parsing).
+  Cost via litellm's local cost map. Optional dep:
+  `pip install selectools[litellm]`.
+- **RouterProvider** (`@beta`, #75) — cost-optimized model routing
+  across provider tiers. Deterministic rule-based complexity classifier
+  (input tokens, tool count, code blocks, reasoning keywords,
+  multi-part questions; configurable thresholds), three strategies
+  (`cost_optimized`, `balanced`, `quality_first`), failure escalation
+  built on `FallbackProvider` (circuit breaker, no tier-switch
+  mid-stream), tier ordering verified against the pricing registry,
+  `on_route`/`on_escalation` callbacks.
+- **A2A protocol** (`@beta`, #76) — agent-to-agent communication:
+  `A2AServer` (Starlette) serving `GET /.well-known/agent.json` (Agent
+  Card auto-generated from AgentConfig; system prompt never leaked) and
+  `POST /a2a` (JSON-RPC 2.0: `message/send`, `tasks/get`,
+  `tasks/cancel`; optional bearer auth), plus async `A2AClient` with
+  `discover()`/`send_task()` and sync wrappers. Task lifecycle states
+  wired for future async backends.
+- **Toolbox expansion** (#77) — 15 new tools across 6 categories
+  (toolbox: 33 → 48): safe calculator (`ast`-whitelist interpreter, no
+  eval/exec, exponent guards), email (stdlib SMTP/IMAP), PDF text/table
+  extraction (pdfplumber), Slack, Notion, and Linear integrations. All
+  deps lazy via the new `toolbox` extra; credentials via env vars and
+  never echoed in errors.
+- **UnifiedMemory** (`@beta`, #78) — tiered memory orchestrating
+  ConversationMemory (short-term), KnowledgeMemory (long-term with
+  rule-scored auto-promotion and content-hash dedup), EntityMemory, and
+  a new date-keyed `EpisodicMemory` with retention pruning. Token-aware
+  context compaction at 70% budget (optional `summarizer=`), federated
+  `recall()` with a documented merge rule, optional `scorer=` hook.
+  Standalone class; AgentConfig wiring deferred.
+- **Cross-session search** (`@beta`, #79) — `search(query,
+  namespace=None, limit=5)` on all four SessionStore backends, returning
+  `SessionSearchResult(session_id, score, matched_messages)`. SQLite
+  uses a purely-additive FTS5 index with lazy backfill for pre-feature
+  databases (LIKE-scan fallback when FTS5 is unavailable); JsonFile and
+  Redis do documented linear scans; Supabase filters server-side via
+  PostgREST `ilike` with in-process re-scoring.
+
+### Fixed
+
+- **Gemini tool-schema sanitization** (#70, refs #66) — two selectools
+  schema shapes were hard 400s on the Gemini API: bare `list` parameters
+  (`{"type": "array"}` without `items`) and `Dict[K, V]` parameters
+  (`additionalProperties`, unsupported by Gemini's Schema proto). Schemas
+  are now sanitized recursively before sending. Additionally, all four
+  Gemini entry points log a loud warning (model + `finish_reason`) when a
+  tool-equipped response contains neither text nor tool calls — the
+  silent-empty-loop signature of `gemini-2.5-flash-lite`'s known
+  function-calling unreliability, now documented in
+  `docs/COMPATIBILITY.md`.
+
 ## [0.23.0] - 2026-04-18 — Supabase Sessions + Builder RAG
 
 ### Added

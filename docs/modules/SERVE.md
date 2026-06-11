@@ -179,6 +179,7 @@ Errors use a standardized envelope with proper status codes (401 unauthorized, 4
 
 - **Auth:** pass `auth_key="sk-..."` and every route except `/v1/health` requires `Authorization: Bearer <key>`.
 - **Per-user isolation:** clients send a `user_id` header (or `x-user-id`). Sessions are namespaced per user -- one user can never read, write, or delete another user's sessions. Requests without the header share the `"default"` namespace.
+- **Trust model:** `user_id` is a self-asserted header, not an authenticated identity. All callers share the single `auth_key`, so isolation protects against accidental cross-tenant reads, not malicious clients. Deploy `AgentAPI` behind your own backend (which authenticates end users and sets `user_id` server-side); do not expose it directly to untrusted clients that can choose their own headers.
 - **Session persistence:** pass any `SessionStore` backend (`JsonFileSessionStore`, `SQLiteSessionStore`, `RedisSessionStore`, `SupabaseSessionStore`) via `session_store=`. Defaults to an in-memory store.
 - **Multi-agent:** `AgentAPI(agents=[a, b])` routes by `config.name` via the optional `"agent"` request field; the first agent is the default.
 

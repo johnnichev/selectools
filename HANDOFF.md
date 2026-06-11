@@ -1,98 +1,101 @@
 # Session Handoff
 
-## What I Was Doing
+## What I Was Doing (2026-06-10)
 
-Shipping v0.22.0: 3 rounds of competitive bug mining (9 repos, ~325k combined stars) + verification pass + cookbook expansion + doc sweep. 38 bugs fixed, 30 cookbook recipes, 94 examples. Now ready for P0 competitive features before tagging.
+Single-evening parallel-subagent mega-session: cleared all 5 open issues,
+shipped all 4 P1 roadmap features, 2 P2 features, and the Agent-as-API
+P0 item. 13 PRs total (#67-#79): 3 merged, 10 awaiting John's clicks.
 
 ## Current State
 
-- **Branch:** `v0.22.0-round4-features` (1 commit ahead of main)
-- **Main:** `2238a2f` — squash-merged PR #55 with rounds 1-3 (34 bugs + cookbook + examples + docs)
-- **Last commit:** `0614dfe` — BUG-36/37/38/39 verification-pass fixes
-- **Tests passing:** yes — 5,064 passed, 3 skipped, 0 failed
-- **Version:** `0.22.0` in `__init__.py` and `pyproject.toml` (no git tag yet)
-- **Working tree:** clean
+- **Branch:** `chore/v0.24-integration` (PR #71 — consolidated CHANGELOG
+  for ALL of #67-#79, example renumber, AgentAPI trust-model docs, this
+  handoff)
+- **Main:** `0520b20` — #67, #68, #69 merged; external #65 also landed
+- **Integration rehearsal PASSED:** all 10 open branches merged locally
+  in queue order with ZERO conflicts; combined suite **5,663 passed /
+  0 failed**; mkdocs build clean. The merge queue is mechanical.
+- **CI:** green on every PR that has checks (#73 gets CI only after #72
+  merges and it retargets to main — stacked PR, workflow filters on
+  base=main).
+- **Version:** still `0.23.0`. The Unreleased CHANGELOG assumes v0.24.0.
 
-## What's Left for v0.22.0
+## Merge Queue (John's clicks, IN ORDER)
 
-### P0 Features (competitive gap closure — not started)
+1. **#70** — Gemini schema sanitization + loud empty-candidate warning
+2. **#71** — integration sweep (CHANGELOG for everything, docs, handoff)
+3. **#72** — ToolResult base + Artifact side-channel (closes #59)
+4. **#73** — deferred confirmation flow (closes #58) — WAIT for its CI
+   after #72 merges
+5. **#74** — LiteLLMProvider (100+ models)
+6. **#75** — RouterProvider (cost-optimized routing)
+7. **#76** — A2A protocol (server + client)
+8. **#77** — toolbox expansion (15 tools, 6 categories)
+9. **#78** — UnifiedMemory (tiered, auto-promotion)
+10. **#79** — cross-session search (4 backends)
+11. Close **#66** with a pointer to #70 (model-side flash-lite issue;
+    diagnosis in the PR body). #57/#58/#59/#60 auto-close.
+12. Tag **v0.24.0** (CHANGELOG is ready; this is a hefty minor).
 
-These are from the original competitive gap analysis (`project_competitive_gap_analysis.md`). They're what every competitor (Agno, PraisonAI) already has. Ship before tagging v0.22.0.
+The auto-mode classifier blocks agent-side `gh pr merge`/`gh issue
+comment`; allow-rule snippet is in the 2026-06-10 daily note.
 
-1. **Tool-call loop detection** (PraisonAI, P0, Low effort ~4h)
-   - Detect agents stuck in repetitive tool-call cycles
-   - 3 detectors: repeat (same tool+args N times), poll-no-progress (tool called but output unchanged), ping-pong (A->B->A->B)
-   - stdlib only, no new deps
-   - Target: new module `src/selectools/loop_detection.py` + wire into `agent/core.py` main loop
-   - Use `/brainstorming` then `/writing-plans` then `/subagent-driven-development`
+## What Shipped (13 PRs)
 
-2. **Agentic memory (memory-as-tool)** (Agno, P0, Low effort ~4h)
-   - Agent decides when to store/recall via tool calls vs always-on passive memory
-   - Two new tools: `remember(key, value)` and `recall(query)` backed by existing `KnowledgeMemory` or `EntityMemory`
-   - Target: new `src/selectools/toolbox/memory_tools.py` or extend `entity_memory.py`
-   - Cookbook recipe + example already have placeholders in the 30-recipe cookbook
+Wave 1 (issues): #67 Anthropic prompt caching (merged), #68 Agent-as-API
+(merged, P0 done), #69 KnowledgeBackend (merged), #70 Gemini fixes,
+#72 ToolResult/Artifact, #73 deferred confirmation.
 
-3. **Agent-as-API (production serve enhancement)** (Agno, P0, Medium effort ~8h)
-   - Enhanced `selectools serve` with per-user session isolation, auth middleware, streaming SSE
-   - Existing: `serve/app.py` + `serve/cli.py` + `serve/_starlette_app.py` already work
-   - Gap: no per-user isolation, no auth, limited streaming
-   - Target: extend `serve/` module
+Wave 2 (roadmap): #74 LiteLLM, #75 Router, #76 A2A, #77 toolbox,
+#78 UnifiedMemory, #79 session search. Plus #71 integration sweep.
 
-### Remaining Bugs (deferred — need architecture decisions)
+Suite: 5,064 → 5,663 tests (~600 new). Blog draft about the session:
+vault `01-projects/content/selectools-parallel-subagent-shipping-day.md`.
 
-4. **BUG-35: Parallel interrupt ID collision** (graph.py:1473)
-   - Second child's interrupt state silently dropped in `ParallelGroupNode`
-   - Root cause: `if child_interrupted and interrupted_child_state is None` — first-wins pattern
-   - Fix options: (a) collect all interrupted states + merge all `_interrupt_responses` (minimal), (b) support multi-interrupt resume API (full), (c) raise clear error when >1 child interrupts (safety net)
-   - Recommendation: option (a) for v0.22.0, option (b) for v0.23.0
+## Next Steps (after merge queue)
 
-5. **BUG-40: Pipeline `_is_subtype` weak validation** (pipeline.py:67)
-   - `hasattr(output, "__origin__") -> return True` short-circuits on any generic
-   - DX improvement, not correctness — mismatched pipelines fail at runtime, not composition time
-   - Low priority, defer to v0.23.0
-
-## Bugs Already Shipped (38 total across 3 rounds + verification)
-
-### Round 1 (BUG-01 to BUG-22): Agno + PraisonAI
-Streaming tool-call drops, typing.Literal crashes, asyncio.run re-entry, HITL interrupts (parallel/subgraph/multi-interrupt), ConversationMemory thread safety, think-tag stripping, RAG batch limits, MCP concurrent race, str->typed coercion, Union typing, GraphState fail-fast, session namespace, summary cap, cancelled-result persistence, AgentTrace lock, async observer logging, clone isolation, OTel/Langfuse locks, vector store dedup, Optional[T] handling.
-
-### Round 2 (BUG-23 to BUG-26): LangChain + LlamaIndex
-Reranker top_k=0 falsy fallback, _dedup_search_results text-only keying, in-memory filter operator-dict silent-ignore, Gemini provider or-0 usage metadata.
-
-### Round 3 (BUG-27 to BUG-34): LiteLLM + Pydantic AI + Haystack
-FallbackProvider retry list (529/504/408/522/524), Azure deployment-name family detection, bare list/dict tool schemas, pipeline.parallel shared input, malformed tool-call JSON silent drop, run_in_executor drops contextvars (5 sites), astream missing aclosing, max_iterations shared with structured-retry budget.
-
-### Verification Pass (BUG-36 to BUG-39): Confirmed from rounds 2+3
-Vector store ref mutation (defensive copy), Cohere embedder batch limit (96), Gemini streaming ToolCall dedup, Gemini parallel tool result grouping (same-role merge).
-
-## Key Decisions Made
-
-- **v0.22.0 scope expanded** to include P0 features because the tag hasn't been pushed yet. PR #55 was squash-merged to main; the new branch `v0.22.0-round4-features` continues from that merge commit.
-- **Cookbook expanded from 7 to 30 recipes** covering all round-2/3 features + general gaps.
-- **CLAUDE.md pitfalls 27-30 added** for: aclosing, contextvars propagation, malformed JSON recovery, structured retry budget.
-- **Bug methodology validated**: "grep selectools source to confirm live" directive is mandatory for all future research prompts.
-- **6 NOT-APPLICABLE verifications** closed permanently: time-travel resume, multi-producer join, Anthropic thinking+tool_choice, MCP pending-future, streaming merge collision, provider config round-trip.
-
-## Research Saved (for future rounds)
-
-All competitive research is in Claude memory files:
-- Round 1: `project_competitive_agno.md`, `_praisonai.md`, `_superagent.md`
-- Round 2: `project_competitive_langchain.md`, `_langgraph.md`, `_crewai.md`, `_n8n.md`, `_llamaindex.md`, `_autogen.md`
-- Round 3: `project_competitive_litellm.md`, `_pydantic_ai.md`, `_haystack.md`
-- Gap analyses: `project_competitive_gap_analysis.md`, `_round2.md`, `_round3.md`
-- Backlog: `project_competitive_research_backlog.md` (rounds 4-7 targets)
-
-Obsidian articles:
-- `Clovis/01-projects/content/blog-draft-competitor-bug-hunt.md` (round 1)
-- `Clovis/01-projects/content/selectools-round2-competitor-bug-hunt.md` (round 2)
-- `Clovis/01-projects/content/selectools-round3-competitor-bug-hunt.md` (round 3)
+- **Sheriff adoption** (after v0.24.0 on PyPI): enable Anthropic prompt
+  caching; replace its SupabaseSessionStore copy, knowledge.py shim, and
+  pending_actions.py with the upstream versions. Each is a small PR in
+  ~/projects/sheriff.
+- **Remaining P2 items all need core.py / AgentConfig sign-off** (John's
+  decision): tool result compression, agent-level HITL, planning-as-
+  config, UnifiedMemory config wiring (`MemoryConfig(unified=True)`).
+- **Remaining backlog:** prompt registry/versioning, durable execution,
+  code sandbox, Bedrock-native provider (LiteLLM covers it meanwhile),
+  P3 items.
+- **v1.0.0 prep** is the next big arc: API freeze, migration guide,
+  stability promotion of the new @beta surface after it bakes.
 
 ## Watch Out For
 
-- **`_parse_tool_call_arguments` return type changed** in BUG-31 from `dict` to `Tuple[Dict, Optional[str]]`. Ollama's override was updated. Any new provider that overrides this method MUST return the tuple.
-- **`run_in_executor_copyctx`** is now the ONLY way to schedule sync work from async contexts. Raw `loop.run_in_executor()` is forbidden (pitfall #28). Test `test_bug32_five_executor_sites_use_contextvar_helper` catches violations.
-- **`aclosing`** from `_async_utils.py` is a Python 3.9 backport. Replace with `contextlib.aclosing` when dropping 3.9.
-- **Structured retry budget** (BUG-34): outer loop uses `while ctx.iteration < max_iterations + ctx.structured_retries`. Loop-detection feature must account for this.
-- **`ToolCall.parse_error`** is a new field (BUG-31). It's `Optional[str]` default `None` — existing serialized data is fine, but code iterating ToolCall fields explicitly may need updating.
-- **Gemini `_format_messages` now merges consecutive same-role Content** (BUG-39). Tests asserting position-based indexing must use content-presence checks instead.
-- **`element_type`** is a new field on `ToolParameter` (BUG-29). `to_schema()` emits `items`/`additionalProperties` when populated.
+- **Venv fixed mid-session**: hypothesis/starlette/python-multipart were
+  missing (silently skipping serve tests); httpx was added to the serve
+  extras by #76. `.venv` has NO ruff (use system) and NO mkdocs (use
+  ~/Library/Python/3.9/bin/mkdocs). Stale 0.8.0 editable .pth: always
+  test with `PYTHONPATH=$PWD/src`.
+- **`Tool._serialize_result` re-injects `kind`** for ToolResult
+  subclasses (#72) — ClassVars never survive `asdict()`.
+- **Thread-pool tool execution copies contextvars per submission**
+  (#72); `Context.run` raises on concurrent re-entry of one Context.
+- **`RedisPendingStore` needs Redis >= 6.2** (GETDEL claim); closures
+  never serialized — cross-process confirms need
+  `register_executor_factory`.
+- **RouterProvider** classifier is deterministic by design; breaker
+  state is per-escalation-chain; auth errors propagate (only retriable
+  errors escalate).
+- **A2A** follows the JSON-RPC v0.2.x wire shape, not the newest gRPC
+  revision (documented deviation); uses `canceled` spec spelling.
+- **LiteLLMProvider**: set `AgentConfig(model="provider/model")` to
+  match the provider's model — agent passes config.model per call (same
+  caveat as Ollama).
+- **SQLite session search**: FTS5 index is additive; old DBs backfill
+  lazily on first search; bm25 is near-zero on tiny corpora so score =
+  hit count + bm25 tiebreak.
+- **`AgentAPI` trust model**: `user_id` is self-asserted (SERVE.md).
+- **Gemini schemas sanitized before send** (#70); flash-lite + tools is
+  unreliable upstream (docs/COMPATIBILITY.md) — don't re-litigate.
+- **examples numbering**: 97 agent-as-api, 98 knowledge backend (renamed
+  in #71), 99 tool results, 100 deferred confirmation, 101 litellm,
+  102 router, 103 a2a, 104 toolbox, 105 session search, 106 unified
+  memory.
