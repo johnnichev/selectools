@@ -24,7 +24,7 @@ Usage::
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
 
 if TYPE_CHECKING:
     from ..cache import Cache
@@ -78,6 +78,26 @@ class ToolConfig:
         compress_model: Model override for compression calls. Defaults to the
             agent's effective model. A fast/cheap model is recommended.
             Default: None.
+        require_approval: Agent-level human-in-the-loop gate. A list of tool
+            names (or the string ``"*"`` for all tools) that must be approved
+            before executing — the centralized equivalent of marking each tool
+            with ``requires_approval=True``. Gated calls are routed to
+            ``approval_handler`` (or ``confirm_action`` as fallback). A denied
+            call returns a standardized "denied by approval handler" tool
+            result; the loop continues and the model sees the denial.
+            Default: None (no agent-level gate).
+        approval_handler: Sync or async callable receiving an
+            ``selectools.policy.ApprovalRequest`` (tool name, args, reason,
+            preview) and returning a truthy value to approve or falsy to deny.
+            Used for every ``review`` policy decision when set (takes
+            precedence over ``confirm_action``). Async handlers work from both
+            ``run()`` and ``arun()``/``astream()``. Default: None.
+
+    Raises:
+        ValueError: If ``require_approval`` is set without an
+            ``approval_handler`` or ``confirm_action`` — gated tools would be
+            unconditionally denied, which is a misconfiguration (use
+            ``ToolPolicy(deny=[...])`` to hard-block tools instead).
     """
 
     timeout_seconds: Optional[float] = None
@@ -89,6 +109,17 @@ class ToolConfig:
     compress_threshold: int = 2000
     compress_provider: Optional["Provider"] = None
     compress_model: Optional[str] = None
+    require_approval: Optional[Union[str, List[str]]] = None
+    approval_handler: Optional[Any] = None  # ApprovalHandler type
+
+    def __post_init__(self) -> None:
+        if self.require_approval and self.approval_handler is None and self.confirm_action is None:
+            raise ValueError(
+                "ToolConfig.require_approval is set but neither approval_handler "
+                "nor confirm_action is configured — gated tools would always be "
+                "denied. Provide an approval_handler, or use "
+                "ToolPolicy(deny=[...]) to hard-block tools instead."
+            )
 
 
 @dataclass

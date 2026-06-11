@@ -54,7 +54,7 @@ def _get_parallel_dispatch_executor() -> ThreadPoolExecutor:
 
 from .._async_utils import run_in_executor_copyctx
 from ..coherence import CoherenceResult, acheck_coherence, check_coherence
-from ..policy import PolicyDecision, PolicyResult, ToolPolicy
+from ..policy import ApprovalRequest, PolicyDecision, PolicyResult, ToolPolicy
 from ..security import screen_output as screen_tool_output
 from ..trace import StepType, TraceStep
 from ..types import Message, Role
@@ -302,6 +302,95 @@ class _ToolExecutorMixin:
             )
         return None
 
+    # ------------------------------------------------------------------
+    # Agent-level human-in-the-loop (ROADMAP P2)
+    # ------------------------------------------------------------------
+
+    def _config_requires_approval(self, tool_name: str) -> bool:
+        """True if ToolConfig.require_approval gates this tool ("*" gates all)."""
+        tcfg = self.config.tool
+        gated = getattr(tcfg, "require_approval", None)
+        if not gated:
+            return False
+        if isinstance(gated, str):
+            return gated == "*" or gated == tool_name
+        return "*" in gated or tool_name in gated
+
+    @staticmethod
+    def _build_approval_request(
+        tool_name: str, tool_args: Dict[str, Any], reason: str
+    ) -> ApprovalRequest:
+        """Build the structured request passed to the approval handler."""
+        args_repr = ", ".join(f"{k}={v!r}" for k, v in tool_args.items())
+        preview = f"{tool_name}({args_repr})"
+        if len(preview) > 200:
+            preview = preview[:197] + "..."
+        return ApprovalRequest(
+            tool_name=tool_name, tool_args=tool_args, reason=reason, preview=preview
+        )
+
+    def _run_approval_handler(
+        self,
+        handler: Callable[..., Any],
+        tool_name: str,
+        tool_args: Dict[str, Any],
+        reason: str,
+    ) -> Optional[str]:
+        """Invoke the approval handler from the sync path. Returns error string or None.
+
+        Async handlers are executed via ``asyncio.run`` on the shared worker
+        pool so they work from plain ``run()`` (even when the caller itself is
+        inside an event loop).
+        """
+        request = self._build_approval_request(tool_name, tool_args, reason)
+        try:
+            # Reuse the shared module-level executor — never create a new
+            # ThreadPoolExecutor per call (pitfall #20).
+            executor = _get_tool_timeout_executor()
+            ctx_copy = contextvars.copy_context()
+            if inspect.iscoroutinefunction(handler):
+                future = executor.submit(ctx_copy.run, asyncio.run, handler(request))
+            else:
+                future = executor.submit(ctx_copy.run, handler, request)
+            approved = future.result(timeout=self.config.approval_timeout)
+        except FuturesTimeoutError:
+            return f"Tool '{tool_name}' approval timed out after {self.config.approval_timeout}s"
+        except Exception as exc:
+            return f"Tool '{tool_name}' approval failed: {exc}"
+        if not approved:
+            return f"Tool '{tool_name}' denied by approval handler: {reason}"
+        return None
+
+    async def _arun_approval_handler(
+        self,
+        handler: Callable[..., Any],
+        tool_name: str,
+        tool_args: Dict[str, Any],
+        reason: str,
+    ) -> Optional[str]:
+        """Async counterpart of :meth:`_run_approval_handler`."""
+        request = self._build_approval_request(tool_name, tool_args, reason)
+        try:
+            if inspect.iscoroutinefunction(handler):
+                approved = await asyncio.wait_for(
+                    handler(request), timeout=self.config.approval_timeout
+                )
+            else:
+                # BUG-32: propagate caller contextvars (OTel / Langfuse)
+                # into the handler worker thread.
+                loop = asyncio.get_running_loop()
+                approved = await asyncio.wait_for(
+                    run_in_executor_copyctx(loop, None, lambda: handler(request)),
+                    timeout=self.config.approval_timeout,
+                )
+        except asyncio.TimeoutError:
+            return f"Tool '{tool_name}' approval timed out after {self.config.approval_timeout}s"
+        except Exception as exc:
+            return f"Tool '{tool_name}' approval failed: {exc}"
+        if not approved:
+            return f"Tool '{tool_name}' denied by approval handler: {reason}"
+        return None
+
     def _check_policy(
         self,
         tool_name: str,
@@ -309,9 +398,12 @@ class _ToolExecutorMixin:
         run_id: str = "",
     ) -> Optional[str]:
         """Evaluate tool policy and confirm_action. Returns error string or None."""
-        # Check per-tool requires_approval flag even without a ToolPolicy
+        # Check per-tool requires_approval flag and the agent-level
+        # ToolConfig.require_approval gate even without a ToolPolicy
         tool_obj = self._tools_by_name.get(tool_name) if hasattr(self, "_tools_by_name") else None
-        tool_requires_approval = tool_obj and getattr(tool_obj, "requires_approval", False)
+        tool_flag = bool(tool_obj and getattr(tool_obj, "requires_approval", False))
+        config_gated = self._config_requires_approval(tool_name)
+        tool_requires_approval = tool_flag or config_gated
 
         if not self.config.tool_policy and not tool_requires_approval:
             return None
@@ -329,7 +421,9 @@ class _ToolExecutorMixin:
             result = PolicyResult(
                 decision=PolicyDecision.REVIEW,
                 reason=f"Tool '{tool_name}' requires approval",
-                matched_rule="tool.requires_approval",
+                matched_rule=(
+                    "tool.requires_approval" if tool_flag else "tool_config.require_approval"
+                ),
             )
             decision_str = result.decision.value
 
@@ -350,6 +444,11 @@ class _ToolExecutorMixin:
             return f"Tool '{tool_name}' denied by policy: {result.reason}"
 
         if result.decision == PolicyDecision.REVIEW:
+            approval_handler = getattr(self.config.tool, "approval_handler", None)
+            if approval_handler is not None:
+                return self._run_approval_handler(
+                    approval_handler, tool_name, tool_args, result.reason
+                )
             if self.config.confirm_action is None:
                 return f"Tool '{tool_name}' requires approval but no confirm_action configured: {result.reason}"
             if inspect.iscoroutinefunction(self.config.confirm_action):
@@ -389,9 +488,12 @@ class _ToolExecutorMixin:
         run_id: str = "",
     ) -> Optional[str]:
         """Async version of _check_policy."""
-        # Check per-tool requires_approval flag even without a ToolPolicy
+        # Check per-tool requires_approval flag and the agent-level
+        # ToolConfig.require_approval gate even without a ToolPolicy
         tool_obj = self._tools_by_name.get(tool_name) if hasattr(self, "_tools_by_name") else None
-        tool_requires_approval = tool_obj and getattr(tool_obj, "requires_approval", False)
+        tool_flag = bool(tool_obj and getattr(tool_obj, "requires_approval", False))
+        config_gated = self._config_requires_approval(tool_name)
+        tool_requires_approval = tool_flag or config_gated
 
         if not self.config.tool_policy and not tool_requires_approval:
             return None
@@ -409,7 +511,9 @@ class _ToolExecutorMixin:
             result = PolicyResult(
                 decision=PolicyDecision.REVIEW,
                 reason=f"Tool '{tool_name}' requires approval",
-                matched_rule="tool.requires_approval",
+                matched_rule=(
+                    "tool.requires_approval" if tool_flag else "tool_config.require_approval"
+                ),
             )
             decision_str = result.decision.value
 
@@ -438,6 +542,11 @@ class _ToolExecutorMixin:
             return f"Tool '{tool_name}' denied by policy: {result.reason}"
 
         if result.decision == PolicyDecision.REVIEW:
+            approval_handler = getattr(self.config.tool, "approval_handler", None)
+            if approval_handler is not None:
+                return await self._arun_approval_handler(
+                    approval_handler, tool_name, tool_args, result.reason
+                )
             if self.config.confirm_action is None:
                 return f"Tool '{tool_name}' requires approval but no confirm_action configured: {result.reason}"
             try:

@@ -1584,6 +1584,55 @@ config = AgentConfig(
 | `review` + no callback | Deny with error message to LLM |
 | `deny` | Return error to LLM, never execute |
 
+### Agent-Level Approval Gate (`require_approval` + `approval_handler`)
+
+> `@beta` — introduced for the ROADMAP P2 "Agent-Level Human-in-the-Loop" item.
+
+Standalone agents (no `AgentGraph` required) can gate named tools behind an approval
+handler, centralizing what `@tool(requires_approval=True)` does per-tool:
+
+```python
+from selectools import Agent, AgentConfig, ApprovalRequest
+from selectools.agent.config_groups import ToolConfig
+
+def my_callback(request: ApprovalRequest) -> bool:   # sync or async
+    print(request.preview)      # e.g. send_email(to='a@b.com', subject='hi')
+    print(request.tool_name, request.tool_args, request.reason)
+    return ask_human(request)   # truthy = execute, falsy = deny
+
+config = AgentConfig(tool=ToolConfig(
+    require_approval=["execute_shell", "send_email"],   # or "*" for all tools
+    approval_handler=my_callback,
+    approval_timeout=60,
+))
+```
+
+**Semantics:**
+
+- A tool is gated when it appears in `require_approval` (or `"*"` is used) **OR** it was
+  defined with `requires_approval=True` — config and tool-level gates compose with OR.
+- `approval_handler` receives a structured `ApprovalRequest` (`tool_name`, `tool_args`,
+  `reason`, one-line `preview`) and returns a bool. When set, it services **every**
+  `review` decision (config gate, tool flag, and `ToolPolicy` review rules) and takes
+  precedence over `confirm_action`.
+- **Deny** → the tool is not executed; the model sees a standardized
+  `Tool '<name>' denied by approval handler: <reason>` tool result and the loop continues
+  (mirrors `confirm_action` denial).
+- **Async handlers work from `run()` too**: from the sync path the coroutine executes via
+  `asyncio.run` on the shared worker pool; from `arun()`/`astream()` it is awaited
+  natively. Sync handlers run in an executor with contextvars propagated.
+- Handler exceptions and `approval_timeout` expiries deny the call (with the error in the
+  tool result) — the loop never crashes.
+- `ToolPolicy` `deny` rules still win unconditionally; the handler is never consulted.
+- **Fail-fast validation**: `ToolConfig(require_approval=[...])` without an
+  `approval_handler` or `confirm_action` raises `ValueError` at construction — an
+  unapprovable gate would silently deny every call and burn iterations. Use
+  `ToolPolicy(deny=[...])` to hard-block tools instead.
+
+For out-of-loop confirmation (WhatsApp/Telegram webhook turns), see
+[Deferred Confirmation](TOOLS.md#deferred-confirmation-for-chat-channels).
+See `examples/108_agent_hitl.py` for an offline runnable demo.
+
 ---
 
 ## Terminal Actions
