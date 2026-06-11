@@ -1,8 +1,8 @@
 """
 Observer protocol for agent lifecycle events.
 
-Provides a class-based alternative to the hooks dict for structured
-observability integrations (Langfuse, OpenTelemetry, Datadog, etc.).
+Structured observability integrations (Langfuse, OpenTelemetry, Datadog,
+etc.) subscribe to agent lifecycle events by subclassing AgentObserver.
 
 Every callback receives a ``run_id`` so observers can correlate events
 across concurrent requests without closures or thread-local state.
@@ -1741,95 +1741,6 @@ class SimpleStepObserver(AgentObserver):
             total_cost=total_cost,
             duration_ms=duration_ms,
         )
-
-
-# ======================================================================
-# Hooks compatibility adapter (internal)
-# ======================================================================
-
-
-class _HooksAdapter(AgentObserver):
-    """Internal adapter that wraps a legacy ``hooks`` dict as an :class:`AgentObserver`.
-
-    This allows the hooks dict to be routed through the single observer
-    notification path, eliminating the need for parallel ``_call_hook()``
-    calls throughout the agent loop.
-
-    Not part of the public API — do **not** add to ``__all__``.
-    """
-
-    def __init__(self, hooks: Dict[str, Any]) -> None:
-        self._hooks = hooks
-
-    def _call(self, hook_name: str, *args: Any) -> None:
-        fn = self._hooks.get(hook_name)
-        if fn:
-            try:
-                fn(*args)
-            except Exception:  # noqa: BLE001 # nosec B110
-                pass
-
-    # -- Run-level events --------------------------------------------------
-
-    def on_run_start(self, run_id: str, messages: List[Message], system_prompt: str) -> None:
-        self._call("on_agent_start", messages)
-
-    def on_run_end(self, run_id: str, result: AgentResult) -> None:
-        self._call("on_agent_end", result.message, result.usage)
-
-    # -- LLM-level events --------------------------------------------------
-
-    def on_llm_start(
-        self, run_id: str, messages: List[Message], model: str, system_prompt: str
-    ) -> None:
-        self._call("on_llm_start", messages, model)
-
-    def on_llm_end(self, run_id: str, response: str, usage: Optional[UsageStats]) -> None:
-        self._call("on_llm_end", response, usage)
-
-    # -- Tool-level events -------------------------------------------------
-
-    def on_tool_start(
-        self, run_id: str, call_id: str, tool_name: str, tool_args: Dict[str, Any]
-    ) -> None:
-        self._call("on_tool_start", tool_name, tool_args)
-
-    def on_tool_end(
-        self,
-        run_id: str,
-        call_id: str,
-        tool_name: str,
-        result: str,
-        duration_ms: float,
-    ) -> None:
-        self._call("on_tool_end", tool_name, result, duration_ms / 1000)
-
-    def on_tool_error(
-        self,
-        run_id: str,
-        call_id: str,
-        tool_name: str,
-        error: Exception,
-        tool_args: Dict[str, Any],
-        duration_ms: float,
-    ) -> None:
-        self._call("on_tool_error", tool_name, error, tool_args)
-
-    def on_tool_chunk(self, run_id: str, call_id: str, tool_name: str, chunk: str) -> None:
-        self._call("on_tool_chunk", tool_name, chunk)
-
-    # -- Iteration-level events --------------------------------------------
-
-    def on_iteration_start(self, run_id: str, iteration: int, messages: List[Message]) -> None:
-        self._call("on_iteration_start", iteration, messages)
-
-    def on_iteration_end(self, run_id: str, iteration: int, response: str) -> None:
-        self._call("on_iteration_end", iteration, response)
-
-    # -- Error events ------------------------------------------------------
-
-    def on_error(self, run_id: str, error: Exception, context: Dict[str, Any]) -> None:
-        self._call("on_error", error, context)
 
 
 __all__ = ["AgentObserver", "AsyncAgentObserver", "LoggingObserver", "SimpleStepObserver"]

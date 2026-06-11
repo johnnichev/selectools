@@ -432,31 +432,6 @@ class TestObservers:
 
         assert len(events) >= 20
 
-    def test_hooks_adapter(self):
-        """Test the deprecated hooks adapter (HooksAdapter)."""
-        calls: Dict[str, list] = {}
-
-        def track(name: str):
-            def fn(*args):
-                calls.setdefault(name, []).append(args)
-
-            return fn
-
-        with pytest.warns(DeprecationWarning):
-            agent = _make_agent(
-                hooks={
-                    "on_agent_start": track("on_agent_start"),
-                    "on_agent_end": track("on_agent_end"),
-                    "on_tool_start": track("on_tool_start"),
-                    "on_tool_end": track("on_tool_end"),
-                    "on_iteration_start": track("on_iteration_start"),
-                    "on_iteration_end": track("on_iteration_end"),
-                }
-            )
-        agent.run("Hello")
-        assert "on_agent_start" in calls
-        assert "on_agent_end" in calls
-
 
 # ── 6. agent/config.py (lines 217-226, 283-285, 294-295, 303-306, 316-318) ──
 
@@ -2466,48 +2441,6 @@ class TestObserverAdditional:
         obs.on_stall_detected("r1", "node_a", 3)
         obs.on_loop_detected("r1", "node_a", 2)
         obs.on_supervisor_replan("r1", 1, "new plan text")
-
-    def test_hooks_adapter_iteration_events(self):
-        """Ensure HooksAdapter forwards iteration events."""
-        calls: list = []
-
-        def on_iteration_start(iteration, messages):
-            calls.append(("start", iteration))
-
-        def on_iteration_end(iteration, response):
-            calls.append(("end", iteration))
-
-        with pytest.warns(DeprecationWarning):
-            agent = _make_agent(
-                hooks={
-                    "on_iteration_start": on_iteration_start,
-                    "on_iteration_end": on_iteration_end,
-                }
-            )
-        agent.run("Hello")
-        assert any(c[0] == "start" for c in calls)
-        assert any(c[0] == "end" for c in calls)
-
-    def test_hooks_adapter_error_event(self):
-        """HooksAdapter should forward error events."""
-        errors: list = []
-
-        def on_error(error, context):
-            errors.append(str(error))
-
-        class ErrorProvider(LocalProvider):
-            def complete(self, **kwargs):
-                raise RuntimeError("boom")
-
-        with pytest.warns(DeprecationWarning):
-            agent = Agent(
-                [greet],
-                provider=ErrorProvider(),
-                config=AgentConfig(model="test", hooks={"on_error": on_error}),
-            )
-        with pytest.raises(RuntimeError):
-            agent.run("Hello")
-        assert len(errors) >= 1
 
 
 # ── 28. serve/_starlette_app.py — watch file and eval routes ────────────────

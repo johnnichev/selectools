@@ -45,7 +45,7 @@ This gives you at least two minor releases to migrate.
 Deprecated APIs emit a `DeprecationWarning` on every call or instantiation:
 
 ```
-DeprecationWarning: hooks is deprecated since v0.16. Use AgentObserver instead.
+DeprecationWarning: <api> is deprecated since vX.Y. Use <replacement> instead.
 ```
 
 Python silences `DeprecationWarning` by default in application code. To surface them during development:

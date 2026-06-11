@@ -7,7 +7,7 @@ Tests cover:
 - Chunk callback invocation
 - Analytics tracking for streaming
 - Error handling mid-stream
-- Integration with hooks
+- Integration with observers
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from typing import AsyncGenerator, Generator
 import pytest
 
 from selectools import Agent, AgentConfig, Message, Role, Tool, ToolParameter, tool
+from selectools.observer import AgentObserver
 from tests.core.test_framework import FakeProvider
 
 
@@ -261,15 +262,22 @@ class TestStreamingWithAnalytics:
         assert non_stream_metrics.total_chunks == 0
 
 
-class TestStreamingWithHooks:
-    """Test streaming integration with observability hooks."""
+class _ChunkRecorder(AgentObserver):
+    """Records (tool_name, chunk) pairs from on_tool_chunk events."""
 
-    def test_on_tool_chunk_hook_invoked(self) -> None:
-        """Test that on_tool_chunk hook is called for each chunk."""
-        chunks_received = []
+    def __init__(self, sink: list) -> None:
+        self.sink = sink
 
-        def on_tool_chunk(tool_name: str, chunk: str) -> None:
-            chunks_received.append((tool_name, chunk))
+    def on_tool_chunk(self, run_id: str, call_id: str, tool_name: str, chunk: str) -> None:
+        self.sink.append((tool_name, chunk))
+
+
+class TestStreamingWithObservers:
+    """Test streaming integration with observers."""
+
+    def test_on_tool_chunk_observer_invoked(self) -> None:
+        """Test that on_tool_chunk fires for each chunk."""
+        chunks_received: list = []
 
         provider = FakeProvider(
             responses=[
@@ -278,7 +286,7 @@ class TestStreamingWithHooks:
             ]
         )
         config = AgentConfig(
-            hooks={"on_tool_chunk": on_tool_chunk},
+            observers=[_ChunkRecorder(chunks_received)],
             max_iterations=2,
         )
         agent = Agent(tools=[simple_stream], provider=provider, config=config)
@@ -293,11 +301,8 @@ class TestStreamingWithHooks:
         ]
 
     def test_on_tool_chunk_not_called_for_non_streaming(self) -> None:
-        """Test that on_tool_chunk is not called for non-streaming tools."""
-        chunks_received = []
-
-        def on_tool_chunk(tool_name: str, chunk: str) -> None:
-            chunks_received.append((tool_name, chunk))
+        """Test that on_tool_chunk does not fire for non-streaming tools."""
+        chunks_received: list = []
 
         provider = FakeProvider(
             responses=[
@@ -306,7 +311,7 @@ class TestStreamingWithHooks:
             ]
         )
         config = AgentConfig(
-            hooks={"on_tool_chunk": on_tool_chunk},
+            observers=[_ChunkRecorder(chunks_received)],
             max_iterations=2,
         )
         agent = Agent(tools=[non_streaming], provider=provider, config=config)
@@ -316,12 +321,9 @@ class TestStreamingWithHooks:
         assert len(chunks_received) == 0
 
     @pytest.mark.asyncio
-    async def test_on_tool_chunk_hook_async(self) -> None:
-        """Test on_tool_chunk hook with async agent."""
-        chunks_received = []
-
-        def on_tool_chunk(tool_name: str, chunk: str) -> None:
-            chunks_received.append((tool_name, chunk))
+    async def test_on_tool_chunk_observer_async(self) -> None:
+        """Test on_tool_chunk with async agent."""
+        chunks_received: list = []
 
         provider = FakeProvider(
             responses=[
@@ -330,7 +332,7 @@ class TestStreamingWithHooks:
             ]
         )
         config = AgentConfig(
-            hooks={"on_tool_chunk": on_tool_chunk},
+            observers=[_ChunkRecorder(chunks_received)],
             max_iterations=2,
         )
         agent = Agent(tools=[async_stream], provider=provider, config=config)

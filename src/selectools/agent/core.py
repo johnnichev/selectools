@@ -181,21 +181,6 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         self._system_prompt = self.prompt_builder.build(self.tools)
         self._history: List[Message] = []
 
-        # Hooks deprecation: wrap hooks dict as an observer adapter
-        if self.config.hooks:
-            import warnings
-
-            warnings.warn(
-                "AgentConfig.hooks is deprecated and will be removed in a future version. "
-                "Use AgentConfig.observers with AgentObserver subclasses instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            from ..observer import _HooksAdapter
-
-            adapter = _HooksAdapter(self.config.hooks)
-            self.config.observers = [adapter] + list(self.config.observers)
-
         # Auto-load session from store if configured (only if no memory was provided)
         if self.config.session_store and self.config.session_id and self.memory is None:
             loaded = self.config.session_store.load(self.config.session_id)

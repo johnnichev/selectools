@@ -7,7 +7,7 @@ Tests that Ollama provider and Analytics work well with:
 - Cost Tracking (v0.5.0)
 - Pre-built Toolbox (v0.5.1)
 - Tool Validation (v0.5.2)
-- Observability Hooks (v0.5.2)
+- Observers (replaced hooks in v0.16)
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ import pytest
 
 from selectools import Agent, AgentConfig, Message, Role, Tool, ToolParameter
 from selectools.memory import ConversationMemory
+from selectools.observer import AgentObserver
 from selectools.providers.stubs import LocalProvider
 from selectools.toolbox import get_tools_by_category
 from tests.core.test_framework import FakeProvider
@@ -53,6 +54,31 @@ def counter_tool() -> Tool:
         parameters=[],
         function=count,
     )
+
+
+class _TagRecorder(AgentObserver):
+    """Records lifecycle event tags in order."""
+
+    def __init__(self, sink: list) -> None:
+        self.sink = sink
+
+    def on_run_start(self, run_id, messages, system_prompt) -> None:
+        self.sink.append("agent_start")
+
+    def on_run_end(self, run_id, result) -> None:
+        self.sink.append("agent_end")
+
+    def on_tool_start(self, run_id, call_id, tool_name, tool_args) -> None:
+        self.sink.append("tool_start")
+
+    def on_tool_end(self, run_id, call_id, tool_name, result, duration_ms) -> None:
+        self.sink.append("tool_end")
+
+    def on_tool_error(self, run_id, call_id, tool_name, error, tool_args, duration_ms) -> None:
+        self.sink.append("tool_error")
+
+    def on_llm_end(self, run_id, response, usage) -> None:
+        self.sink.append("llm_end")
 
 
 class TestOllamaIntegration:
@@ -122,18 +148,9 @@ class TestOllamaIntegration:
 class TestAnalyticsIntegration:
     """Test Analytics integration with existing features."""
 
-    def test_analytics_with_observability_hooks(self, simple_tool: Tool) -> None:
-        """Test that analytics and hooks work together."""
-        hook_calls = {"tool_start": 0, "tool_end": 0, "llm_end": 0}
-
-        def on_tool_start(name: str, args: Any) -> None:
-            hook_calls["tool_start"] += 1
-
-        def on_tool_end(name: str, result: Any, duration: Any) -> None:
-            hook_calls["tool_end"] += 1
-
-        def on_llm_end(response: Any, usage: Any) -> None:
-            hook_calls["llm_end"] += 1
+    def test_analytics_with_observers(self, simple_tool: Tool) -> None:
+        """Test that analytics and observers work together."""
+        events: list = []
 
         provider = FakeProvider(
             responses=[
@@ -143,20 +160,16 @@ class TestAnalyticsIntegration:
         )
         config = AgentConfig(
             enable_analytics=True,
-            hooks={
-                "on_tool_start": on_tool_start,
-                "on_tool_end": on_tool_end,
-                "on_llm_end": on_llm_end,
-            },
+            observers=[_TagRecorder(events)],
         )
         agent = Agent(tools=[simple_tool], provider=provider, config=config)
 
         agent.run([Message(role=Role.USER, content="Greet Dave")])
 
-        # Verify both hooks and analytics were triggered
-        assert hook_calls["tool_start"] >= 1
-        assert hook_calls["tool_end"] >= 1
-        assert hook_calls["llm_end"] >= 1
+        # Verify both observers and analytics were triggered
+        assert events.count("tool_start") >= 1
+        assert events.count("tool_end") >= 1
+        assert events.count("llm_end") >= 1
 
         analytics = agent.get_analytics()
         metrics = analytics.get_metrics("greet")
@@ -309,11 +322,8 @@ class TestCombinedFeatures:
     """Test combinations of multiple v0.6.0 and previous features."""
 
     def test_all_features_together(self, simple_tool: Tool) -> None:
-        """Test Ollama-like provider with analytics, hooks, memory, and cost tracking."""
-        hook_calls = []
-
-        def log_hook(event: str, *args: Any) -> None:
-            hook_calls.append(event)
+        """Test Ollama-like provider with analytics, observers, memory, and cost tracking."""
+        hook_calls: list = []
 
         provider = FakeProvider(
             responses=[
@@ -328,12 +338,7 @@ class TestCombinedFeatures:
             enable_analytics=True,
             cost_warning_threshold=0.05,
             max_iterations=5,
-            hooks={
-                "on_agent_start": lambda msgs: log_hook("agent_start"),
-                "on_tool_start": lambda name, args: log_hook("tool_start"),
-                "on_tool_end": lambda name, res, dur: log_hook("tool_end"),
-                "on_agent_end": lambda res, usage: log_hook("agent_end"),
-            },
+            observers=[_TagRecorder(hook_calls)],
         )
         agent = Agent(tools=[simple_tool], provider=provider, config=config, memory=memory)
 
@@ -346,7 +351,7 @@ class TestCombinedFeatures:
         assert response2.role == Role.ASSISTANT
 
         # Verify all features worked together
-        # 1. Hooks were called
+        # 1. Observer events fired
         assert "agent_start" in hook_calls
         assert hook_calls.count("tool_start") >= 1  # At least one tool call
 
@@ -390,12 +395,9 @@ class TestCombinedFeatures:
         assert agent.total_cost >= 0.0  # Cost tracking still works
         assert len(memory.get_history()) >= 1  # Memory still has history
 
-    def test_toolbox_with_analytics_and_hooks(self) -> None:
+    def test_toolbox_with_analytics_and_observers(self) -> None:
         """Test pre-built toolbox tools with analytics and observability."""
-        hook_events = []
-
-        def track_event(event: str) -> None:
-            hook_events.append(event)
+        hook_events: list = []
 
         # Get file tools from toolbox
         file_tools = get_tools_by_category("file")
@@ -409,17 +411,13 @@ class TestCombinedFeatures:
         config = AgentConfig(
             enable_analytics=True,
             max_iterations=3,
-            hooks={
-                "on_tool_start": lambda *args: track_event("tool_start"),
-                "on_tool_end": lambda *args: track_event("tool_end"),
-                "on_tool_error": lambda *args: track_event("tool_error"),
-            },
+            observers=[_TagRecorder(hook_events)],
         )
         agent = Agent(tools=file_tools, provider=provider, config=config)
 
         agent.run([Message(role=Role.USER, content="Check if test.txt exists")])
 
-        # Verify toolbox tools work with analytics and hooks
+        # Verify toolbox tools work with analytics and observers
         assert "tool_start" in hook_events
         # Tool may succeed or fail, both should be tracked
         assert ("tool_end" in hook_events) or ("tool_error" in hook_events)

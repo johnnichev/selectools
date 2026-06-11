@@ -1,24 +1,23 @@
 """
-Observability Hooks — lifecycle callbacks and tool validation at registration time.
+Observability — lifecycle observers and tool validation at registration time.
 
-NOTE: For production observability (Langfuse, Datadog, OpenTelemetry), prefer
-the class-based AgentObserver protocol introduced in v0.14.0. It provides
-run_id/call_id correlation, 15 lifecycle events, and a built-in LoggingObserver.
-See examples/28_agent_observer.py for the recommended approach.
-
-This example demonstrates the original hooks dict API, which still works and
-is useful for quick one-off monitoring.
+The legacy ``AgentConfig.hooks`` dict (deprecated in v0.16) has been removed.
+This example uses the class-based :class:`AgentObserver` protocol, which
+provides run_id/call_id correlation, 31 lifecycle events, and a built-in
+LoggingObserver. See examples/28_agent_observer.py for a deeper dive and
+docs/decisions/002-observer-replaces-hooks.md for the rationale.
 
 Prerequisites: OPENAI_API_KEY (examples 01-05)
 Run: python examples/12_observability_hooks.py
 """
 
 import time
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 from selectools import (
     Agent,
     AgentConfig,
+    AgentObserver,
     Message,
     Role,
     Tool,
@@ -118,14 +117,77 @@ def demo_tool_validation() -> None:
 
 
 # =============================================================================
-# Feature 2: Observability Hooks
+# Feature 2: Lifecycle Observers
 # =============================================================================
 
 
-def demo_observability_hooks() -> None:
-    """Demonstrate observability hooks for monitoring and debugging."""
+class MetricsObserver(AgentObserver):
+    """Collects session metrics and prints lifecycle events as they fire.
+
+    Every callback receives a ``run_id`` (and tool callbacks a ``call_id``)
+    so events can be correlated across concurrent runs.
+    """
+
+    def __init__(self) -> None:
+        self.metrics: Dict[str, Any] = {
+            "agent_starts": 0,
+            "iterations": 0,
+            "tool_calls": [],
+            "llm_calls": 0,
+            "total_tokens": 0,
+        }
+
+    def on_run_start(self, run_id: str, messages: List[Message], system_prompt: str) -> None:
+        self.metrics["agent_starts"] += 1
+        print(f"\n🚀 Agent started with {len(messages)} message(s)")
+
+    def on_iteration_start(self, run_id: str, iteration: int, messages: List[Message]) -> None:
+        self.metrics["iterations"] = iteration
+        print(f"\n🔄 Iteration {iteration} starting...")
+
+    def on_tool_start(
+        self, run_id: str, call_id: str, tool_name: str, tool_args: Dict[str, Any]
+    ) -> None:
+        print(f"   🔧 Calling tool: {tool_name}")
+        print(f"      Args: {tool_args}")
+
+    def on_tool_end(
+        self, run_id: str, call_id: str, tool_name: str, result: str, duration_ms: float
+    ) -> None:
+        self.metrics["tool_calls"].append({"name": tool_name, "duration": duration_ms / 1000})
+        print(f"   ✅ Tool completed: {tool_name}")
+        print(f"      Duration: {duration_ms / 1000:.3f}s")
+        print(f"      Result preview: {result[:50]}...")
+
+    def on_llm_start(
+        self, run_id: str, messages: List[Message], model: str, system_prompt: str
+    ) -> None:
+        self.metrics["llm_calls"] += 1
+        print(f"   🤖 LLM call #{self.metrics['llm_calls']} to {model}")
+
+    def on_llm_end(self, run_id: str, response: str, usage: Optional[Any]) -> None:
+        if usage:
+            self.metrics["total_tokens"] += usage.total_tokens
+            print(f"   📊 Tokens: {usage.total_tokens} (${usage.cost_usd:.6f})")
+
+    def on_run_end(self, run_id: str, result: Any) -> None:
+        print(f"\n✨ Agent finished!")
+        print(f"   Final response length: {len(result.message.content)} characters")
+        print(f"\n📊 Session Metrics:")
+        print(f"   - Total iterations: {self.metrics['iterations']}")
+        print(f"   - Total LLM calls: {self.metrics['llm_calls']}")
+        print(f"   - Total tool calls: {len(self.metrics['tool_calls'])}")
+        print(f"   - Total tokens used: {self.metrics['total_tokens']}")
+        if self.metrics["tool_calls"]:
+            print(f"\n   Tool breakdown:")
+            for call in self.metrics["tool_calls"]:
+                print(f"     - {call['name']}: {call['duration']:.3f}s")
+
+
+def demo_observability() -> None:
+    """Demonstrate lifecycle observers for monitoring and debugging."""
     print("\n" + "=" * 70)
-    print("FEATURE 2: OBSERVABILITY HOOKS")
+    print("FEATURE 2: LIFECYCLE OBSERVERS")
     print("=" * 70)
 
     # Create some demo tools
@@ -140,79 +202,19 @@ def demo_observability_hooks() -> None:
         time.sleep(0.05)  # Simulate work
         return f"Result: {eval(expression)}"  # Don't do this in production!
 
-    # Set up hooks for monitoring
-    metrics: Dict[str, Any] = {
-        "agent_starts": 0,
-        "iterations": 0,
-        "tool_calls": [],
-        "llm_calls": 0,
-        "total_tokens": 0,
-    }
-
-    def on_agent_start(messages: Any) -> None:
-        metrics["agent_starts"] += 1
-        print(f"\n🚀 Agent started with {len(messages)} message(s)")
-
-    def on_iteration_start(iteration: Any, messages: Any) -> None:
-        metrics["iterations"] = iteration
-        print(f"\n🔄 Iteration {iteration} starting...")
-
-    def on_tool_start(tool_name: str, tool_args: Any) -> None:
-        print(f"   🔧 Calling tool: {tool_name}")
-        print(f"      Args: {tool_args}")
-
-    def on_tool_end(tool_name: str, result: str, duration: float) -> None:
-        metrics["tool_calls"].append({"name": tool_name, "duration": duration})
-        print(f"   ✅ Tool completed: {tool_name}")
-        print(f"      Duration: {duration:.3f}s")
-        print(f"      Result preview: {result[:50]}...")
-
-    def on_llm_start(messages: Any, model: str) -> None:
-        metrics["llm_calls"] += 1
-        print(f"   🤖 LLM call #{metrics['llm_calls']} to {model}")
-
-    def on_llm_end(response: Any, usage: Any) -> None:
-        if usage:
-            metrics["total_tokens"] += usage.total_tokens
-            print(f"   📊 Tokens: {usage.total_tokens} (${usage.cost_usd:.6f})")
-
-    def on_agent_end(response: Any, usage: Any) -> None:
-        print(f"\n✨ Agent finished!")
-        print(f"   Final response length: {len(response.content)} characters")
-        print(f"\n📊 Session Metrics:")
-        print(f"   - Total iterations: {metrics['iterations']}")
-        print(f"   - Total LLM calls: {metrics['llm_calls']}")
-        print(f"   - Total tool calls: {len(metrics['tool_calls'])}")
-        print(f"   - Total tokens used: {metrics['total_tokens']}")
-        print(f"   - Total cost: ${usage.total_cost_usd:.6f}")
-        if metrics["tool_calls"]:
-            print(f"\n   Tool breakdown:")
-            for call in metrics["tool_calls"]:
-                print(f"     - {call['name']}: {call['duration']:.3f}s")
-
-    # Create agent with hooks
+    # Create agent with an observer
     agent = Agent(
         tools=[search, calculate],
         provider=provider,
         config=AgentConfig(
             max_iterations=5,
-            hooks={
-                "on_agent_start": on_agent_start,
-                "on_agent_end": on_agent_end,
-                "on_iteration_start": on_iteration_start,
-                "on_tool_start": on_tool_start,
-                "on_tool_end": on_tool_end,
-                "on_llm_start": on_llm_start,
-                "on_llm_end": on_llm_end,
-            },
+            observers=[MetricsObserver()],
         ),
     )
 
     # Run agent
     print("\n📝 User query: 'What is 2+2 and search for Python tutorials'")
-    response = agent.run(
-        [Message(role=Role.USER, content="What is 2+2 and search for Python tutorials")]
-    )
+    agent.run([Message(role=Role.USER, content="What is 2+2 and search for Python tutorials")])
 
     print("\n💡 Benefits:")
     print("   - Real-time monitoring of agent behavior")
@@ -225,6 +227,40 @@ def demo_observability_hooks() -> None:
 # =============================================================================
 # Combined Example: Production-Ready Agent
 # =============================================================================
+
+
+class AuditLogObserver(AgentObserver):
+    """Appends structured audit events for tool calls, errors, and completion."""
+
+    def __init__(self) -> None:
+        self.logs: List[Dict[str, Any]] = []
+
+    def _log(self, event: str, *args: Any) -> None:
+        self.logs.append({"event": event, "timestamp": time.time(), "args": args})
+
+    def on_tool_start(
+        self, run_id: str, call_id: str, tool_name: str, tool_args: Dict[str, Any]
+    ) -> None:
+        self._log("tool_start", tool_name, tool_args)
+
+    def on_tool_end(
+        self, run_id: str, call_id: str, tool_name: str, result: str, duration_ms: float
+    ) -> None:
+        self._log("tool_end", tool_name, duration_ms)
+
+    def on_tool_error(
+        self,
+        run_id: str,
+        call_id: str,
+        tool_name: str,
+        error: Exception,
+        tool_args: Dict[str, Any],
+        duration_ms: float,
+    ) -> None:
+        self._log("tool_error", tool_name, str(error))
+
+    def on_run_end(self, run_id: str, result: Any) -> None:
+        self._log("agent_end", result.usage.total_cost_usd)
 
 
 def demo_production_ready() -> None:
@@ -245,29 +281,20 @@ def demo_production_ready() -> None:
 
     print(f"   ✓ Tool '{process_feedback.name}' validated and registered")
 
-    print("\n✅ Setting up observability hooks...")
-    logs = []
+    print("\n✅ Setting up the audit-log observer...")
+    audit = AuditLogObserver()
+    print("   ✓ Observer configured for: tool calls, errors, and completion")
 
-    def log_hook(event: str, *args: Any) -> None:
-        logs.append({"event": event, "timestamp": time.time(), "args": args})
-
-    print("   ✓ Hooks configured for: tool calls, errors, and completion")
-
-    agent = Agent(
+    Agent(
         tools=[process_feedback],
         provider=provider,
         config=AgentConfig(
             max_iterations=3,
-            hooks={
-                "on_tool_start": lambda name, args: log_hook("tool_start", name, args),
-                "on_tool_end": lambda name, result, dur: log_hook("tool_end", name, dur),
-                "on_tool_error": lambda name, error, args: log_hook("tool_error", name, str(error)),
-                "on_agent_end": lambda resp, usage: log_hook("agent_end", usage.total_cost_usd),
-            },
+            observers=[audit],
         ),
     )
 
-    print(f"\n✨ Agent ready! {len(logs)} events logged so far")
+    print(f"\n✨ Agent ready! {len(audit.logs)} events logged so far")
     print("\n💡 This agent is production-ready:")
     print("   ✓ Tools validated at startup (fail fast)")
     print("   ✓ All actions monitored and logged")
@@ -282,14 +309,14 @@ def demo_production_ready() -> None:
 
 if __name__ == "__main__":
     print("=" * 70)
-    print(" Selectools v0.5.2 - Tool Validation & Observability Hooks Demo")
+    print(" Selectools - Tool Validation & Lifecycle Observers Demo")
     print("=" * 70)
 
     # Demo 1: Tool Validation
     demo_tool_validation()
 
-    # Demo 2: Observability Hooks
-    demo_observability_hooks()
+    # Demo 2: Lifecycle Observers
+    demo_observability()
 
     # Demo 3: Combined (Production-Ready)
     demo_production_ready()

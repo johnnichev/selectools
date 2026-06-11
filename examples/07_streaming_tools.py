@@ -11,7 +11,19 @@ from pathlib import Path
 from typing import AsyncGenerator, Generator
 
 from selectools import Agent, AgentConfig, Message, Role, tool
+from selectools.observer import AgentObserver
 from selectools.providers import LocalProvider
+
+
+class ChunkObserver(AgentObserver):
+    """Adapts a (tool_name, chunk) callback to the observer protocol."""
+
+    def __init__(self, callback) -> None:
+        self.callback = callback
+
+    def on_tool_chunk(self, run_id: str, call_id: str, tool_name: str, chunk: str) -> None:
+        self.callback(tool_name, chunk)
+
 
 # === Define streaming tools ===
 
@@ -144,7 +156,7 @@ def demo_basic_streaming() -> None:
 
     config = AgentConfig(
         verbose=False,
-        hooks={"on_tool_chunk": display_chunk},
+        observers=[ChunkObserver(display_chunk)],
         max_iterations=3,
     )
 
@@ -173,7 +185,7 @@ def demo_log_search_streaming() -> None:
 
     config = AgentConfig(
         verbose=False,
-        hooks={"on_tool_chunk": display_chunk},
+        observers=[ChunkObserver(display_chunk)],
         max_iterations=3,
     )
 
@@ -202,7 +214,7 @@ async def demo_async_streaming() -> None:
 
     config = AgentConfig(
         verbose=False,
-        hooks={"on_tool_chunk": display_chunk},
+        observers=[ChunkObserver(display_chunk)],
         max_iterations=3,
     )
 
@@ -238,7 +250,7 @@ def demo_streaming_with_analytics() -> None:
     config = AgentConfig(
         verbose=False,
         enable_analytics=True,
-        hooks={"on_tool_chunk": count_chunks},
+        observers=[ChunkObserver(count_chunks)],
         max_iterations=5,
     )
 
@@ -287,7 +299,7 @@ def demo_toolbox_streaming(tmp_path: Path) -> None:
 
     config = AgentConfig(
         verbose=False,
-        hooks={"on_tool_chunk": display_chunk},
+        observers=[ChunkObserver(display_chunk)],
         max_iterations=3,
     )
 
@@ -306,7 +318,7 @@ def demo_toolbox_streaming(tmp_path: Path) -> None:
 
     config2 = AgentConfig(
         verbose=False,
-        hooks={"on_tool_chunk": display_chunk},
+        observers=[ChunkObserver(display_chunk)],
         max_iterations=3,
     )
 

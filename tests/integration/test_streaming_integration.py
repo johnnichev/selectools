@@ -2,7 +2,7 @@
 Integration tests for streaming tools with other features.
 
 Tests streaming integration with:
-- Observability hooks
+- Observers
 - Analytics tracking
 - Conversation memory
 - Cost tracking
@@ -19,6 +19,7 @@ from typing import Any, AsyncGenerator, Generator
 import pytest
 
 from selectools import Agent, AgentConfig, ConversationMemory, Message, Role, tool
+from selectools.observer import AgentObserver
 from tests.core.test_framework import FakeProvider
 
 
@@ -35,15 +36,44 @@ def get_info(name: str) -> str:
     return f"Info about {name}"
 
 
-class TestStreamingWithHooks:
-    """Test streaming integration with observability hooks."""
+class _EventRecorder(AgentObserver):
+    """Records lifecycle event tags in order."""
 
-    def test_streaming_with_all_hooks(self) -> None:
-        """Test streaming with complete set of hooks."""
-        hook_events = []
+    def __init__(self, sink: list) -> None:
+        self.sink = sink
 
-        def track(event_name: str, *args: Any, **kwargs: Any) -> None:
-            hook_events.append(event_name)
+    def on_run_start(self, run_id, messages, system_prompt) -> None:
+        self.sink.append("agent_start")
+
+    def on_run_end(self, run_id, result) -> None:
+        self.sink.append("agent_end")
+
+    def on_tool_start(self, run_id, call_id, tool_name, tool_args) -> None:
+        self.sink.append("tool_start")
+
+    def on_tool_chunk(self, run_id, call_id, tool_name, chunk) -> None:
+        self.sink.append("tool_chunk")
+
+    def on_tool_end(self, run_id, call_id, tool_name, result, duration_ms) -> None:
+        self.sink.append("tool_end")
+
+
+class _ChunkRecorder(AgentObserver):
+    """Records raw chunks from on_tool_chunk events."""
+
+    def __init__(self, sink: list) -> None:
+        self.sink = sink
+
+    def on_tool_chunk(self, run_id, call_id, tool_name, chunk) -> None:
+        self.sink.append(chunk)
+
+
+class TestStreamingWithObservers:
+    """Test streaming integration with observers."""
+
+    def test_streaming_with_all_events(self) -> None:
+        """Test streaming with the complete set of lifecycle events."""
+        hook_events: list = []
 
         provider = FakeProvider(
             responses=[
@@ -52,13 +82,7 @@ class TestStreamingWithHooks:
             ]
         )
         config = AgentConfig(
-            hooks={
-                "on_agent_start": lambda *a, **k: track("agent_start"),
-                "on_tool_start": lambda *a, **k: track("tool_start"),
-                "on_tool_chunk": lambda *a, **k: track("tool_chunk"),
-                "on_tool_end": lambda *a, **k: track("tool_end"),
-                "on_agent_end": lambda *a, **k: track("agent_end"),
-            },
+            observers=[_EventRecorder(hook_events)],
             max_iterations=2,
         )
         agent = Agent(tools=[stream_numbers], provider=provider, config=config)
@@ -72,12 +96,9 @@ class TestStreamingWithHooks:
         assert "agent_end" in hook_events
 
     @pytest.mark.asyncio
-    async def test_streaming_with_async_hooks(self) -> None:
-        """Test streaming works with async agent and hooks."""
-        hook_events = []
-
-        def track(event_name: str, *args: Any, **kwargs: Any) -> None:
-            hook_events.append(event_name)
+    async def test_streaming_with_async_observers(self) -> None:
+        """Test streaming works with async agent and observers."""
+        hook_events: list = []
 
         provider = FakeProvider(
             responses=[
@@ -86,27 +107,22 @@ class TestStreamingWithHooks:
             ]
         )
         config = AgentConfig(
-            hooks={
-                "on_tool_chunk": lambda *a, **k: track("chunk"),
-            },
+            observers=[_ChunkRecorder(hook_events)],
             max_iterations=2,
         )
         agent = Agent(tools=[stream_numbers], provider=provider, config=config)
 
         await agent.arun([Message(role=Role.USER, content="Stream numbers")])
 
-        assert hook_events.count("chunk") == 3
+        assert len(hook_events) == 3
 
 
 class TestStreamingWithAnalytics:
     """Test streaming integration with analytics."""
 
     def test_streaming_analytics_with_observability(self) -> None:
-        """Test analytics and hooks work together for streaming."""
-        chunks_received = []
-
-        def on_chunk(tool_name: str, chunk: str) -> None:
-            chunks_received.append(chunk)
+        """Test analytics and observers work together for streaming."""
+        chunks_received: list = []
 
         provider = FakeProvider(
             responses=[
@@ -116,7 +132,7 @@ class TestStreamingWithAnalytics:
         )
         config = AgentConfig(
             enable_analytics=True,
-            hooks={"on_tool_chunk": on_chunk},
+            observers=[_ChunkRecorder(chunks_received)],
             max_iterations=2,
         )
         agent = Agent(tools=[stream_numbers], provider=provider, config=config)
@@ -129,7 +145,7 @@ class TestStreamingWithAnalytics:
         assert metrics.total_chunks == 4
         assert metrics.streaming_calls == 1
 
-        # Check hooks
+        # Check observer events
         assert len(chunks_received) == 4
 
     def test_streaming_analytics_summary_shows_chunks(self) -> None:
@@ -227,11 +243,8 @@ class TestStreamingCombinedFeatures:
     """Test streaming with multiple features enabled simultaneously."""
 
     def test_all_features_with_streaming(self) -> None:
-        """Test streaming with analytics, hooks, memory, and cost tracking."""
-        hook_events = []
-
-        def track_event(event_name: str, *args: Any, **kwargs: Any) -> None:
-            hook_events.append(event_name)
+        """Test streaming with analytics, observers, memory, and cost tracking."""
+        hook_events: list = []
 
         memory = ConversationMemory(max_messages=10)
         provider = FakeProvider(
@@ -243,13 +256,7 @@ class TestStreamingCombinedFeatures:
         )
         config = AgentConfig(
             enable_analytics=True,
-            hooks={
-                "on_agent_start": lambda *a, **k: track_event("agent_start"),
-                "on_tool_start": lambda *a, **k: track_event("tool_start"),
-                "on_tool_chunk": lambda *a, **k: track_event("tool_chunk"),
-                "on_tool_end": lambda *a, **k: track_event("tool_end"),
-                "on_agent_end": lambda *a, **k: track_event("agent_end"),
-            },
+            observers=[_EventRecorder(hook_events)],
             max_iterations=5,
         )
         agent = Agent(
@@ -258,7 +265,7 @@ class TestStreamingCombinedFeatures:
 
         response = agent.run([Message(role=Role.USER, content="Run both tools")])
 
-        # Verify hooks
+        # Verify observer events
         assert "agent_start" in hook_events
         assert hook_events.count("tool_start") == 2  # Both tools called
         assert hook_events.count("tool_chunk") == 5  # Only streaming tool has chunks
@@ -292,10 +299,7 @@ class TestStreamingCombinedFeatures:
                 await asyncio.sleep(0.001)
                 yield f"Async{i} "
 
-        chunks = []
-
-        def on_chunk(tool_name: str, chunk: str) -> None:
-            chunks.append(chunk)
+        chunks: list = []
 
         memory = ConversationMemory(max_messages=10)
         provider = FakeProvider(
@@ -306,7 +310,7 @@ class TestStreamingCombinedFeatures:
         )
         config = AgentConfig(
             enable_analytics=True,
-            hooks={"on_tool_chunk": on_chunk},
+            observers=[_ChunkRecorder(chunks)],
             max_iterations=2,
         )
         agent = Agent(tools=[async_stream], provider=provider, config=config, memory=memory)
@@ -321,10 +325,7 @@ class TestStreamingCombinedFeatures:
 
     def test_streaming_reset_analytics_preserves_other_features(self) -> None:
         """Test resetting analytics doesn't affect streaming or other features."""
-        chunks = []
-
-        def on_chunk(tool_name: str, chunk: str) -> None:
-            chunks.append(chunk)
+        chunks: list = []
 
         memory = ConversationMemory(max_messages=10)
         provider = FakeProvider(
@@ -335,7 +336,7 @@ class TestStreamingCombinedFeatures:
         )
         config = AgentConfig(
             enable_analytics=True,
-            hooks={"on_tool_chunk": on_chunk},
+            observers=[_ChunkRecorder(chunks)],
             max_iterations=2,
         )
         agent = Agent(tools=[stream_numbers], provider=provider, config=config, memory=memory)
@@ -351,7 +352,7 @@ class TestStreamingCombinedFeatures:
 
         # Verify streaming still works but analytics is empty
         assert len(analytics.get_all_metrics()) == 0
-        assert len(chunks) == 3  # Hooks still worked
+        assert len(chunks) == 3  # Observer still worked
         assert len(memory.get_history()) > 0  # Memory still has data
 
 
@@ -384,18 +385,15 @@ class TestStreamingToolboxIntegration:
         assert metrics.streaming_calls == 1
         assert metrics.total_chunks > 0  # Should have multiple chunks
 
-    def test_toolbox_csv_streaming_with_hooks(self, tmp_path: Path) -> None:
-        """Test CSV streaming with hooks."""
+    def test_toolbox_csv_streaming_with_observers(self, tmp_path: Path) -> None:
+        """Test CSV streaming with observers."""
         from selectools.toolbox.data_tools import process_csv_stream
 
         # Create test CSV
         test_csv = tmp_path / "test.csv"
         test_csv.write_text("name,value\nA,1\nB,2\n")
 
-        chunks = []
-
-        def on_chunk(tool_name: str, chunk: str) -> None:
-            chunks.append(chunk)
+        chunks: list = []
 
         provider = FakeProvider(
             responses=[
@@ -403,7 +401,7 @@ class TestStreamingToolboxIntegration:
                 "CSV processed!",
             ]
         )
-        config = AgentConfig(hooks={"on_tool_chunk": on_chunk}, max_iterations=2)
+        config = AgentConfig(observers=[_ChunkRecorder(chunks)], max_iterations=2)
         agent = Agent(tools=[process_csv_stream], provider=provider, config=config)
 
         agent.run([Message(role=Role.USER, content="Process CSV")])

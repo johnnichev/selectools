@@ -47,7 +47,7 @@ Selectools is a production-ready Python framework for building AI agents with to
 - **Production-Ready**: Robust error handling, retry logic, timeouts, and validation
 - **RAG Support**: 4 embedding providers, 4 vector stores, document loaders
 - **Developer-Friendly**: Type hints, `@tool` decorator, automatic schema inference
-- **Observable**: `AgentObserver` + `AsyncAgentObserver` protocol (46 events with `run_id`), `LoggingObserver`, `SimpleStepObserver`, analytics, usage tracking, and cost monitoring (legacy hooks deprecated)
+- **Observable**: `AgentObserver` + `AsyncAgentObserver` protocol (46 events with `run_id`), `LoggingObserver`, `SimpleStepObserver`, analytics, usage tracking, and cost monitoring (legacy hooks removed in v1.0)
 - **Native Tool Calling**: OpenAI, Anthropic, and Gemini native function calling APIs
 - **Streaming**: E2E token-level streaming with native tool call support via `Agent.astream`
 - **Parallel Execution**: Concurrent tool execution via `asyncio.gather` / `ThreadPoolExecutor`
@@ -307,7 +307,7 @@ Class-based lifecycle observability:
 - Built-in `LoggingObserver` for structured JSON log output
 - OpenTelemetry span export via `AgentTrace.to_otel_spans()`
 - Designed for Langfuse, Datadog, custom integrations
-- Legacy hooks (`AgentConfig(hooks={...})`) are deprecated in favor of observers
+- Legacy hooks (`AgentConfig(hooks={...})`) were removed in v1.0 in favor of observers
 
 ### 15. Model Registry (`models.py`)
 
@@ -479,7 +479,7 @@ graph LR
 - `on_error`, `on_guardrail_triggered`, `on_coherence_blocked`, ...
 - `AsyncAgentObserver` for async-native observers
 
-Legacy hooks (`AgentConfig(hooks={...})`) are deprecated. Use `AgentConfig(observers=[...])` instead.
+Legacy hooks (`AgentConfig(hooks={...})`) were removed in v1.0. Use `AgentConfig(observers=[...])` instead.
 
 **Benefit:** Full visibility into agent behavior.
 
@@ -631,7 +631,7 @@ config = AgentConfig(observers=[MyObserver()])
 agent = Agent(tools=[...], provider=provider, config=config)
 ```
 
-> **Note:** Legacy hooks (`AgentConfig(hooks={...})`) are deprecated. Use `observers` instead.
+> **Note:** Legacy hooks (`AgentConfig(hooks={...})`) were removed in v1.0. Use `observers` instead.
 
 ---
 
