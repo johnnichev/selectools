@@ -11,6 +11,12 @@ This module provides a collection of ready-to-use tools for:
 - Web search and scraping (DuckDuckGo, URL scraping)
 - GitHub API (repos, files, issues)
 - Database queries (SQLite, PostgreSQL)
+- Calculator (safe math evaluation, unit conversion)
+- Email (SMTP send, IMAP inbox reading)
+- PDF extraction (text, tables)
+- Slack (send, read channel, search)
+- Notion (create, search, update pages)
+- Linear (create, list, update issues)
 
 Usage:
     from selectools.toolbox import get_all_tools, file_tools, web_tools
@@ -31,13 +37,19 @@ from ..tools import Tool
 
 # Import all tool modules
 from . import (
+    calculator_tools,
     code_tools,
     data_tools,
     datetime_tools,
     db_tools,
+    email_tools,
     file_tools,
     github_tools,
+    linear_tools,
+    notion_tools,
+    pdf_tools,
     search_tools,
+    slack_tools,
     text_tools,
     web_tools,
 )
@@ -52,6 +64,12 @@ __all__ = [
     "search_tools",
     "github_tools",
     "db_tools",
+    "calculator_tools",
+    "email_tools",
+    "pdf_tools",
+    "slack_tools",
+    "notion_tools",
+    "linear_tools",
     "get_all_tools",
     "get_tools_by_category",
 ]
@@ -133,6 +151,42 @@ def get_all_tools() -> List[Tool]:
     # Database tools
     tools.extend([db_tools.query_sqlite, db_tools.query_postgres])
 
+    # Calculator tools
+    tools.extend([calculator_tools.evaluate_expression, calculator_tools.unit_convert])
+
+    # Email tools
+    tools.extend([email_tools.send_email, email_tools.read_inbox])
+
+    # PDF tools
+    tools.extend([pdf_tools.extract_pdf_text, pdf_tools.extract_pdf_tables])
+
+    # Slack tools
+    tools.extend(
+        [
+            slack_tools.slack_send_message,
+            slack_tools.slack_read_channel,
+            slack_tools.slack_search_messages,
+        ]
+    )
+
+    # Notion tools
+    tools.extend(
+        [
+            notion_tools.notion_create_page,
+            notion_tools.notion_search,
+            notion_tools.notion_update_page,
+        ]
+    )
+
+    # Linear tools
+    tools.extend(
+        [
+            linear_tools.linear_create_issue,
+            linear_tools.linear_list_issues,
+            linear_tools.linear_update_issue,
+        ]
+    )
+
     return tools
 
 
@@ -141,7 +195,9 @@ def get_tools_by_category(category: str) -> List[Tool]:
     Get tools from a specific category.
 
     Args:
-        category: Tool category ('file', 'web', 'data', 'datetime', 'text')
+        category: Tool category ('file', 'web', 'data', 'datetime', 'text',
+            'code', 'search', 'github', 'database', 'calculator', 'email',
+            'pdf', 'slack', 'notion', 'linear')
 
     Returns:
         List of Tool objects from the specified category
@@ -189,6 +245,24 @@ def get_tools_by_category(category: str) -> List[Tool]:
             github_tools.github_list_issues,
         ],
         "database": [db_tools.query_sqlite, db_tools.query_postgres],
+        "calculator": [calculator_tools.evaluate_expression, calculator_tools.unit_convert],
+        "email": [email_tools.send_email, email_tools.read_inbox],
+        "pdf": [pdf_tools.extract_pdf_text, pdf_tools.extract_pdf_tables],
+        "slack": [
+            slack_tools.slack_send_message,
+            slack_tools.slack_read_channel,
+            slack_tools.slack_search_messages,
+        ],
+        "notion": [
+            notion_tools.notion_create_page,
+            notion_tools.notion_search,
+            notion_tools.notion_update_page,
+        ],
+        "linear": [
+            linear_tools.linear_create_issue,
+            linear_tools.linear_list_issues,
+            linear_tools.linear_update_issue,
+        ],
     }
 
     if category not in categories:
