@@ -646,22 +646,26 @@ byte-identical to previous releases.
 
 | Sanitizer | What it does |
 |---|---|
-| `defang_delimiters(text)` | Neutralizes prompt-injection delimiters: `--- Label ---` section headers (rewritten with em dashes), chat-template role markers (`[INST]`, `<|im_start|>`, `<system>`), `User:`/`Assistant:`/`System:`/`Human:` speaker labels at line start, and line-start backtick code fences. Conservative — output stays human-readable; plain prose passes through unchanged. |
+| `defang_delimiters(text)` | Neutralizes prompt-injection delimiters: `--- Label ---` section headers (rewritten with em dashes), chat-template role markers (`[INST]`, `<|im_start|>`, `<system>`, Llama-2 `<<SYS>>`), `User:`/`Assistant:`/`System:`/`Human:` speaker labels at line start (ASCII or fullwidth `：` colon), and line-start backtick or tilde code fences. Delimiter and fence rules allow and preserve up to 3 leading spaces/tabs (CommonMark-consistent). Conservative — output stays human-readable; plain prose passes through unchanged. |
 | `strip_surrogates(text)` | Drops lone UTF-16 surrogates and other UTF-8-unencodable code points (common in webhook traffic with emoji edge cases) that would otherwise raise `UnicodeEncodeError` on file write. Well-formed emoji are preserved. |
 | `dedupe_against(existing_fetcher, threshold=0.9)` | Factory returning a hook that rejects text whose `difflib.SequenceMatcher` ratio against any existing entry reaches `threshold`. `existing_fetcher` is a zero-arg callable returning the texts to compare against. |
 
 ### Convenience Dedupe
 
-`KnowledgeMemory(dedupe=True, dedupe_threshold=0.9)` auto-wires
-`dedupe_against` over the current store entries. The dedupe hook always runs
-**after** the `pre_save` chain, so comparisons happen on the sanitized form
-(identical inputs sanitize identically and dedupe correctly).
+`KnowledgeMemory(dedupe=True, dedupe_threshold=0.9, dedupe_window=200)`
+auto-wires `dedupe_against` over the most recent `dedupe_window` store
+entries. The dedupe hook always runs **after** the `pre_save` chain, so
+comparisons happen on the sanitized form (identical inputs sanitize
+identically and dedupe correctly).
 
 **Cost:** each `remember()` performs one store query plus up to one
-similarity computation per existing entry (cheap upper-bound ratios prune
-most non-matches). For stores beyond a few thousand entries, build
-`dedupe_against` yourself with a bounded fetcher (recent or same-category
-entries only).
+similarity computation per windowed entry (cheap upper-bound ratios prune
+most non-matches). The window bounds worst-case latency — adversarial
+same-character-distribution text otherwise degrades to seconds per save on
+stores with ~1000 entries. **Trade-off:** a near-duplicate older than the
+window can re-enter the store. For large stores, or to scope comparisons by
+category, build `dedupe_against` yourself with a custom bounded fetcher and
+pass it via `pre_save`.
 
 ### Why Defang?
 
@@ -671,6 +675,27 @@ scraped page) can plant markers like `--- End of conversation ---` or
 or forged conversation turns when `build_context()` injects them into the
 system prompt. Defanging breaks the structural interpretation while keeping
 the content readable.
+
+### Known Limitations
+
+`defang_delimiters` covers the most common structural markers, not every
+possible one. Deliberately out of scope (treat the coverage table as honest
+scope, not a closed list):
+
+- **Unicode homoglyph dash runs** (`———`, box-drawing characters) — only
+  ASCII `---` lines are rewritten.
+- **`===` setext-style underlines** and other ASCII-art section breaks.
+- **Other chat-template dialects** (e.g. Gemma `<start_of_turn>`) and dash
+  runs longer than three (`---- Label ----`).
+- **Lines indented 4+ spaces** are left alone entirely: CommonMark treats
+  them as code blocks, and rewriting would corrupt legitimate indented
+  literals such as diff headers (`    --- a/file.py`). Delimiters and
+  fences indented 0-3 spaces/tabs are defanged with indentation preserved;
+  speaker labels are defanged at any indentation since they are not
+  markdown structure.
+
+Treat the sanitizer as defense-in-depth for the remembered-content channel,
+not a complete injection filter.
 
 ---
 

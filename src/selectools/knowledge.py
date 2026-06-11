@@ -631,12 +631,19 @@ class KnowledgeMemory:
             Built-ins live in ``selectools.knowledge_sanitizers``.
         dedupe: If ``True``, append a near-duplicate rejection hook (beta)
             that runs after all ``pre_save`` hooks, comparing the sanitized
-            text against current store entries via
-            ``difflib.SequenceMatcher``.  Costs one store query plus up to
-            one similarity computation per existing entry on every
+            text against the ``dedupe_window`` most recent store entries
+            via ``difflib.SequenceMatcher``.  Costs one store query plus up
+            to one similarity computation per windowed entry on every
             ``remember()``.
         dedupe_threshold: Similarity ratio at or above which ``dedupe``
             rejects the new entry.  Default: 0.9.
+        dedupe_window: Number of most-recent entries the ``dedupe`` hook
+            compares against.  Default: 200.  Bounds the per-save cost
+            (similarity is worst-case O(len(a) * len(b)) per comparison);
+            the trade-off is that a near-duplicate older than the window
+            can re-enter the store.  For large stores or custom windows by
+            category, wire ``knowledge_sanitizers.dedupe_against`` yourself
+            with a bounded fetcher via ``pre_save``.
     """
 
     def __init__(
@@ -650,11 +657,13 @@ class KnowledgeMemory:
         pre_save: Optional[Union[PreSaveHook, Sequence[PreSaveHook]]] = None,
         dedupe: bool = False,
         dedupe_threshold: float = 0.9,
+        dedupe_window: int = 200,
     ) -> None:
         self._directory = directory
         self._recent_days = recent_days
         self._max_context_chars = max_context_chars
         self._max_entries = max_entries
+        self._dedupe_window = dedupe_window
         self._lock = threading.Lock()
         self._backend = backend
         os.makedirs(directory, exist_ok=True)
@@ -674,7 +683,14 @@ class KnowledgeMemory:
         self._pre_save_hooks = hooks
 
     def _existing_contents(self) -> List[str]:
-        return [e.content for e in self._store.query(limit=self._max_entries + 1000)]
+        # Bound the dedupe comparison set to the most recent entries
+        # (review finding PR #84): similarity is worst-case
+        # O(len(a) * len(b)) per comparison, so an unbounded fetcher
+        # degrades remember() latency as the store grows.  The store query
+        # orders by importance, so re-sort by recency before windowing.
+        entries = self._store.query(limit=self._max_entries + 1000)
+        entries.sort(key=lambda e: e.created_at, reverse=True)
+        return [e.content for e in entries[: self._dedupe_window]]
 
     def _apply_pre_save(self, content: str) -> Optional[str]:
         """Run *content* through the pre_save hook chain.

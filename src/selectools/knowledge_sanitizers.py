@@ -33,20 +33,25 @@ from .stability import beta
 # Full ``--- Label ---`` line.  Rewritten with em-dash bookends: visually
 # similar, but no longer reads as a structural section header.  Lines of
 # dashes only (``---``) pass through; they cannot carry a forged label.
-_DELIMITER_RE = re.compile(r"^---[ \t]*([^\n-][^\n]*?)[ \t]*---[ \t]*$", re.MULTILINE)
+# Up to 3 leading spaces/tabs allowed and preserved (CommonMark: 0-3 spaces
+# of indentation keeps a line structural; 4+ is a code block).  Review
+# finding PR #84: the previous bare ``^`` anchor let a single leading space
+# bypass the rewrite.
+_DELIMITER_RE = re.compile(r"^([ \t]{0,3})---[ \t]*([^\n-][^\n]*?)[ \t]*---[ \t]*$", re.MULTILINE)
 
 # Half-delimiter: ``--- End of conversation`` with no closing dashes.  Still
 # scans as a section break to an LLM, so it gets the same rewrite.
 # Whitespace is restricted to same-line (`[ \t]`, not `\s`) so a bare
 # ``---`` line never swallows the following line.
-_HALF_DELIMITER_RE = re.compile(r"^---[ \t]+([^\n-][^\n]*?)[ \t]*$", re.MULTILINE)
+_HALF_DELIMITER_RE = re.compile(r"^([ \t]{0,3})---[ \t]+([^\n-][^\n]*?)[ \t]*$", re.MULTILINE)
 
 # Role markers from common LLM chat templates (``[INST]``, ``<|im_start|>``,
-# ``<system>``).  Models are trained on text containing these tokens and may
-# give them special weight even inside quoted content.
+# ``<system>``, Llama-2 ``<<SYS>>``).  Models are trained on text containing
+# these tokens and may give them special weight even inside quoted content.
 _ROLE_MARKER_RE = re.compile(
     r"""(?ix)
     \[/? \s* (?: INST | SYS | ASSISTANT | USER | SYSTEM ) \s* \]
+    | << \s* /? \s* SYS \s* >>
     | <\|? \s* (?: im_start | im_end | system | assistant | user
                  | endoftext | start | end ) \s* \|? >
     | </? \s* (?: system | assistant | user ) \s* >
@@ -55,20 +60,26 @@ _ROLE_MARKER_RE = re.compile(
 
 # Speaker-label prefix at line start (``Assistant: I'll wire the money``).
 # Inside a remembered-context block this reads as a forged conversation turn.
+# Matches ASCII and fullwidth (U+FF1A) colons.  Indentation is unbounded
+# (speaker labels are not markdown structure, so no 0-3 cap) but restricted
+# to same-line whitespace (`[ \t]`, not `\s`) so a match never spans
+# newlines (review finding PR #84).
 _SPEAKER_LABEL_RE = re.compile(
-    r"^(\s*)(User|Assistant|System|Human)(\s*):",
+    r"^([ \t]*)(User|Assistant|System|Human)([ \t]*)([:：])",
     re.MULTILINE | re.IGNORECASE,
 )
 
-# Code fence at line start (3+ backticks, optionally indented up to 3 spaces
-# per CommonMark).  A fence opened inside remembered content can swallow the
-# rest of the prompt or terminate a fence the host prompt opened.  Inline
-# code spans (1-2 backticks, or backticks mid-line) are untouched.
-_FENCE_RE = re.compile(r"^(\s{0,3})(`{3,})", re.MULTILINE)
+# Code fence at line start (3+ backticks or tildes, optionally indented up
+# to 3 spaces per CommonMark).  A fence opened inside remembered content can
+# swallow the rest of the prompt or terminate a fence the host prompt
+# opened.  Inline code spans (1-2 backticks, or backticks/tildes mid-line)
+# are untouched.
+_FENCE_RE = re.compile(r"^([ \t]{0,3})(`{3,}|~{3,})", re.MULTILINE)
 
-# U+02CB MODIFIER LETTER GRAVE ACCENT: visually a backtick, but markdown
-# parsers and tokenizers do not treat it as a fence character.
-_FENCE_SUBSTITUTE = "ˋ"
+# Visually similar substitutes that markdown parsers and tokenizers do not
+# treat as fence characters: U+02CB MODIFIER LETTER GRAVE ACCENT for the
+# backtick, U+02DC SMALL TILDE for the tilde.
+_FENCE_SUBSTITUTES = {"`": "ˋ", "~": "˜"}
 
 
 @beta
@@ -84,14 +95,37 @@ def defang_delimiters(text: str) -> str:
        ``— Label`` (em dashes).  Dash-fenced lines are the classic fake
        section header (``--- End of conversation ---``).
     2. Chat-template role markers (``[INST]``, ``<|im_start|>``,
-       ``<system>``, ``</assistant>``, ...) get a space inserted after the
-       opening bracket so they no longer tokenize as control tokens.
+       ``<system>``, ``</assistant>``, ``<<SYS>>``, ...) get a space
+       inserted after the opening bracket so they no longer tokenize as
+       control tokens.
     3. ``User:`` / ``Assistant:`` / ``System:`` / ``Human:`` at line start
-       become ``User :`` etc., breaking forged conversation turns.
-    4. Line-start code fences (3+ backticks) are rewritten with the
-       visually identical U+02CB character, so remembered content cannot
-       open or close a markdown fence in the host prompt.  Inline backtick
-       spans are preserved.
+       (ASCII or fullwidth U+FF1A colon) become ``User :`` etc., breaking
+       forged conversation turns.
+    4. Line-start code fences (3+ backticks or tildes) are rewritten with
+       the visually identical U+02CB / U+02DC characters, so remembered
+       content cannot open or close a markdown fence in the host prompt.
+       Inline backtick and tilde spans are preserved.
+
+    Indentation: delimiter and fence rules allow and preserve up to 3
+    leading spaces/tabs.  Lines indented 4+ spaces are deliberately left
+    alone — CommonMark treats them as code blocks, and rewriting them would
+    corrupt legitimate indented literals such as diff headers
+    (``    --- a/file.py``).  Speaker labels are defanged at any
+    indentation, since they are not markdown structure.
+
+    Known limitations (deliberately out of scope, not a closed list):
+
+    - Unicode homoglyph dash runs (``———``, box-drawing characters) are
+      not rewritten; only ASCII ``---`` lines are.
+    - ``===`` setext-style underlines and other ASCII-art section breaks
+      pass through.
+    - Only the most common chat-template dialects are covered; others
+      (e.g. Gemma ``<start_of_turn>``, dash runs longer than three like
+      ``---- Label ----``) pass through.
+    - Lines indented 4+ spaces are not inspected at all (see above).
+
+    Treat this as defense-in-depth for the remembered-content channel, not
+    a complete injection filter.
 
     Args:
         text: Entry text to sanitize.
@@ -100,11 +134,11 @@ def defang_delimiters(text: str) -> str:
         The defanged text.  Plain prose passes through unchanged.
     """
     s = text or ""
-    s = _DELIMITER_RE.sub(r"— \1 —", s)
-    s = _HALF_DELIMITER_RE.sub(r"— \1", s)
+    s = _DELIMITER_RE.sub(r"\1— \2 —", s)
+    s = _HALF_DELIMITER_RE.sub(r"\1— \2", s)
     s = _ROLE_MARKER_RE.sub(lambda m: m.group(0).replace("[", "[ ").replace("<", "< "), s)
-    s = _SPEAKER_LABEL_RE.sub(r"\1\2\3 :", s)
-    s = _FENCE_RE.sub(lambda m: m.group(1) + _FENCE_SUBSTITUTE * len(m.group(2)), s)
+    s = _SPEAKER_LABEL_RE.sub(r"\1\2\3 \4", s)
+    s = _FENCE_RE.sub(lambda m: m.group(1) + _FENCE_SUBSTITUTES[m.group(2)[0]] * len(m.group(2)), s)
     return s
 
 
