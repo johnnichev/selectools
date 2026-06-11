@@ -102,6 +102,7 @@ nav:
   - Get Started:
     - Quickstart: QUICKSTART.md
     - Migration Guides: MIGRATION.md
+    - Migrating to 1.0: MIGRATION_1.0.md
     - Cookbook: COOKBOOK.md
     - API Keys: KEYS.md
     - Architecture: ARCHITECTURE.md
@@ -155,7 +156,8 @@ nav:
     - A2A Protocol: modules/A2A.md
     - Agent Templates: modules/TEMPLATES.md
   - Reference:
-    - Security Audit: SECURITY.md
+    - Security Audit: SECURITY_AUDIT.md
+    - Security Audit (v0.19.2): SECURITY.md
     - Audit Logging: modules/AUDIT.md
     - Screening: modules/SECURITY.md
     - Error Handling: modules/EXCEPTIONS.md

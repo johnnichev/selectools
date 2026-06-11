@@ -4,9 +4,14 @@
 
 | Version | Supported           |
 | ------- | ------------------- |
-| 0.16.x  | Yes                 |
-| 0.15.x  | Security fixes only |
-| < 0.15  | No                  |
+| 0.24.x  | Yes                 |
+| 0.23.x  | Security fixes only |
+| < 0.23  | No                  |
+
+When v1.0.0 ships, the `1.x` line becomes the supported series and `0.24.x` moves to
+security-fixes-only for a transition window of at least two minor releases (i.e. until
+v1.2.0), matching the [deprecation policy](https://selectools.dev/DEPRECATION_POLICY/).
+Older 0.x releases will not receive fixes after 1.0.
 
 ## Reporting a Vulnerability
 
