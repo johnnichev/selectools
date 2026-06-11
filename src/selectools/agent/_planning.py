@@ -13,7 +13,7 @@ Design notes
   prompt, or plan rejected) and the normal agent loop proceeds unchanged.
   ``PlanningConfig`` defaulting to ``None`` on ``AgentConfig`` keeps the
   disabled path byte-identical and zero-overhead.
-- The agent is cloned twice via ``Agent._clone_for_isolation()``: once as
+- The agent is cloned twice via ``Agent.clone_for_isolation()``: once as
   the planner (with optional ``PlanningConfig.provider``/``model``
   overrides) and once as the single executor named ``"executor"``. Both
   clones get ``config.planning = None`` so planned sub-runs can never
@@ -32,7 +32,7 @@ Design notes
   the per-step ``AgentResult`` objects inside the pattern and are not
   merged, because ``PlanAndExecuteAgent`` returns an empty
   ``GraphResult.trace``.
-- Budget continuity: ``_clone_for_isolation()`` gives each clone a fresh
+- Budget continuity: ``clone_for_isolation()`` gives each clone a fresh
   ``AgentUsage``, which would silently reset ``max_total_tokens`` /
   ``max_cost_usd`` for the planned sub-runs. Each clone's usage is
   therefore seeded with the parent's current scalar totals so the
@@ -193,7 +193,7 @@ _USAGE_SCALAR_FIELDS = (
 def _seed_usage_from_parent(clone_usage: AgentUsage, parent_usage: AgentUsage) -> AgentUsage:
     """Seed a fresh clone ``AgentUsage`` with the parent's scalar totals.
 
-    ``Agent._clone_for_isolation()`` resets ``usage`` to a fresh
+    ``Agent.clone_for_isolation()`` resets ``usage`` to a fresh
     ``AgentUsage``, so the clone's ``_check_budget`` would compare against
     zero and ``max_total_tokens`` / ``max_cost_usd`` would effectively be
     granted again to every sub-run. Copying the parent's running totals
@@ -292,7 +292,7 @@ async def arun_with_planning(
     if not cfg.always and _complexity_score(prompt) < cfg.min_complexity:
         return None
 
-    planner = agent._clone_for_isolation()
+    planner = agent.clone_for_isolation()
     planner.config.planning = None
     if cfg.provider is not None:
         planner.provider = cfg.provider
@@ -300,7 +300,7 @@ async def arun_with_planning(
         planner.config.model = cfg.model
         planner._current_model = cfg.model
 
-    executor = agent._clone_for_isolation()
+    executor = agent.clone_for_isolation()
     executor.config.planning = None
 
     # Budget continuity (review finding): seed both clones with the parent's

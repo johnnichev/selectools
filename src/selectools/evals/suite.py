@@ -209,7 +209,7 @@ class EvalSuite:
 
     def _run_case(self, case: TestCase) -> CaseResult:
         """Execute a single test case synchronously and evaluate it."""
-        clone = self.agent._clone_for_isolation()
+        clone = self.agent.clone_for_isolation()
         start = time.perf_counter()
 
         try:
@@ -226,7 +226,7 @@ class EvalSuite:
 
     async def _arun_case(self, case: TestCase) -> CaseResult:
         """Execute a single test case asynchronously and evaluate it."""
-        clone = self.agent._clone_for_isolation()
+        clone = self.agent.clone_for_isolation()
         start = time.perf_counter()
 
         try:

@@ -47,7 +47,7 @@ Selectools is a production-ready Python framework for building AI agents with to
 - **Production-Ready**: Robust error handling, retry logic, timeouts, and validation
 - **RAG Support**: 4 embedding providers, 4 vector stores, document loaders
 - **Developer-Friendly**: Type hints, `@tool` decorator, automatic schema inference
-- **Observable**: `AgentObserver` + `AsyncAgentObserver` protocol (46 events with `run_id`), `LoggingObserver`, `SimpleStepObserver`, analytics, usage tracking, and cost monitoring (legacy hooks deprecated)
+- **Observable**: `AgentObserver` + `AsyncAgentObserver` protocol (46 events with `run_id`), `LoggingObserver`, `SimpleStepObserver`, analytics, usage tracking, and cost monitoring (legacy hooks removed in v1.0)
 - **Native Tool Calling**: OpenAI, Anthropic, and Gemini native function calling APIs
 - **Streaming**: E2E token-level streaming with native tool call support via `Agent.astream`
 - **Parallel Execution**: Concurrent tool execution via `asyncio.gather` / `ThreadPoolExecutor`
@@ -307,7 +307,7 @@ Class-based lifecycle observability:
 - Built-in `LoggingObserver` for structured JSON log output
 - OpenTelemetry span export via `AgentTrace.to_otel_spans()`
 - Designed for Langfuse, Datadog, custom integrations
-- Legacy hooks (`AgentConfig(hooks={...})`) are deprecated in favor of observers
+- Legacy hooks (`AgentConfig(hooks={...})`) were removed in v1.0 in favor of observers
 
 ### 15. Model Registry (`models.py`)
 
@@ -384,7 +384,7 @@ graph LR
 - **agent/core.py** depends on: types, tools, prompt, parser, structured, trace, policy, providers, memory, usage, observer, cache, sessions, entity_memory, knowledge_graph, knowledge, guardrails, security
 - **providers/** each depend on: types, usage, pricing, and their SDK
 - **rag/** depends on: embeddings, types
-- **evals/** depends on: agent (for `_clone_for_isolation`), types, providers
+- **evals/** depends on: agent (for `clone_for_isolation`), types, providers
 - **orchestration/** depends on: agent, types, trace, observer
 - **serve/** depends on: agent, orchestration, pipeline, templates
 
@@ -393,7 +393,7 @@ graph LR
 - **Core modules** (`types`, `tools`, `agent`) have minimal dependencies
 - **Providers** depend only on core modules and their SDK
 - **RAG system** is self-contained, depends on `agent` only for `RAGAgent`
-- **Eval framework** depends on `agent` (for `_clone_for_isolation`) and `types` (for `Message`, `AgentResult`)
+- **Eval framework** depends on `agent` (for `clone_for_isolation`) and `types` (for `Message`, `AgentResult`)
 - **Optional dependencies** (ChromaDB, Pinecone, etc.) are lazy-loaded
 
 ---
@@ -479,7 +479,7 @@ graph LR
 - `on_error`, `on_guardrail_triggered`, `on_coherence_blocked`, ...
 - `AsyncAgentObserver` for async-native observers
 
-Legacy hooks (`AgentConfig(hooks={...})`) are deprecated. Use `AgentConfig(observers=[...])` instead.
+Legacy hooks (`AgentConfig(hooks={...})`) were removed in v1.0. Use `AgentConfig(observers=[...])` instead.
 
 **Benefit:** Full visibility into agent behavior.
 
@@ -631,7 +631,7 @@ config = AgentConfig(observers=[MyObserver()])
 agent = Agent(tools=[...], provider=provider, config=config)
 ```
 
-> **Note:** Legacy hooks (`AgentConfig(hooks={...})`) are deprecated. Use `observers` instead.
+> **Note:** Legacy hooks (`AgentConfig(hooks={...})`) were removed in v1.0. Use `observers` instead.
 
 ---
 

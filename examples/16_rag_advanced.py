@@ -101,7 +101,7 @@ Key Features of Selectools:
    - Automatic cost tracking and warnings
    - Tool usage analytics
    - Streaming tool results
-   - Observability hooks for monitoring
+   - Observer events for monitoring
 
 3. RAG Features (v0.8.0)
    - Multi-provider embeddings (OpenAI, Anthropic, Gemini, Cohere)

@@ -3286,7 +3286,7 @@ def test_bug18_lifecycle_has_done_callback_helper():
     )
 
 
-# ---- BUG-19: ``_clone_for_isolation`` shallow-copies config ----
+# ---- BUG-19: ``clone_for_isolation`` shallow-copies config ----
 # Source: PraisonAI #1260. ``Agent.batch()`` clones agents via ``copy.copy``;
 # without also copying ``config`` and ``config.observers``, batch clones
 # shared the same observer list and were vulnerable to cross-clone bleed
@@ -3312,8 +3312,8 @@ def test_bug19_clone_isolates_observer_list():
         config=AgentConfig(observers=[obs]),
     )
 
-    assert hasattr(agent, "_clone_for_isolation"), "_clone_for_isolation must exist"
-    clone = agent._clone_for_isolation()
+    assert hasattr(agent, "clone_for_isolation"), "clone_for_isolation must exist"
+    clone = agent.clone_for_isolation()
 
     assert clone.config is not agent.config, (
         "Clone should have its own config instance, not share the source config"
@@ -3345,7 +3345,7 @@ def test_bug19_clone_without_observers_does_not_crash():
         provider=provider,
         config=AgentConfig(),
     )
-    clone = agent._clone_for_isolation()
+    clone = agent.clone_for_isolation()
     assert clone.config is not None
     assert clone.config.observers == []
 

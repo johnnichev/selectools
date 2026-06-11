@@ -80,7 +80,7 @@ The **Agent** class is the central orchestrator of the selectools framework. It 
 5. **Execution Traces**: Record structured timeline of every step (`AgentTrace`)
 6. **Reasoning Visibility**: Extract and surface *why* the agent chose a tool
 7. **Error Recovery**: Handle failures with retries and backoff
-8. **Observability**: Invoke lifecycle hooks for monitoring
+8. **Observability**: Notify lifecycle observers for monitoring
 9. **Cost Tracking**: Monitor token usage and costs
 10. **Analytics**: Track tool usage patterns (optional)
 11. **Parallel Execution**: Execute independent tool calls concurrently
@@ -332,7 +332,7 @@ class AgentConfig:
     # Observability
     verbose: bool = False
     enable_analytics: bool = False
-    hooks: Optional[Hooks] = None
+    observers: List[AgentObserver] = field(default_factory=list)
 
     # Execution mode
     routing_only: bool = False
@@ -600,88 +600,47 @@ The agent automatically detects and handles async tools via `tool.is_async` flag
 
 ---
 
-## Hook System
+## Hook System (Removed)
 
-> **Deprecated in v0.16.5** — `AgentConfig.hooks` emits a `DeprecationWarning` and is
-> internally wrapped via `_HooksAdapter` into the observer pipeline. Use `AgentObserver`
-> or `AsyncAgentObserver` instead. Hooks continue to function but will be removed in a
-> future release.
+> **Removed in v1.0** — `AgentConfig.hooks` (deprecated since v0.16.5) has been removed.
+> Passing `hooks=` to `AgentConfig` now raises `TypeError`. Use `AgentObserver` or
+> `AsyncAgentObserver` instead. See `docs/MIGRATION_1.0.md` and
+> `docs/decisions/002-observer-replaces-hooks.md`.
 
-### Available Hooks
+Migration is mechanical — each hook key maps to an observer method with richer
+arguments (`run_id`, and `call_id` for tool events):
 
-```python
-hooks = {
-    # Agent lifecycle
-    "on_agent_start": lambda messages: ...,
-    "on_agent_end": lambda response, usage: ...,
+| Legacy hook key | Observer method |
+|---|---|
+| `on_agent_start` | `on_run_start(run_id, messages, system_prompt)` |
+| `on_agent_end` | `on_run_end(run_id, result)` |
+| `on_iteration_start` | `on_iteration_start(run_id, iteration, messages)` |
+| `on_iteration_end` | `on_iteration_end(run_id, iteration, response)` |
+| `on_tool_start` | `on_tool_start(run_id, call_id, tool_name, tool_args)` |
+| `on_tool_chunk` | `on_tool_chunk(run_id, call_id, tool_name, chunk)` |
+| `on_tool_end` | `on_tool_end(run_id, call_id, tool_name, result, duration_ms)` |
+| `on_tool_error` | `on_tool_error(run_id, call_id, tool_name, error, tool_args, duration_ms)` |
+| `on_llm_start` | `on_llm_start(run_id, messages, model, system_prompt)` |
+| `on_llm_end` | `on_llm_end(run_id, response, usage)` |
+| `on_error` | `on_error(run_id, error, context)` |
 
-    # Iteration lifecycle
-    "on_iteration_start": lambda iteration, messages: ...,
-    "on_iteration_end": lambda iteration, response: ...,
-
-    # Tool lifecycle
-    "on_tool_start": lambda tool_name, args: ...,
-    "on_tool_chunk": lambda tool_name, chunk: ...,  # Streaming tools
-    "on_tool_end": lambda tool_name, result, duration: ...,
-    "on_tool_error": lambda tool_name, error, args: ...,
-
-    # LLM lifecycle
-    "on_llm_start": lambda messages, model: ...,
-    "on_llm_end": lambda response, usage: ...,
-
-    # Error handling
-    "on_error": lambda error, context: ...,
-}
-
-config = AgentConfig(hooks=hooks)
-```
-
-### Hook Invocation
+Note: hook `duration` was in **seconds**; observer `duration_ms` is in **milliseconds**.
 
 ```python
-def _call_hook(self, hook_name: str, *args, **kwargs):
-    if not self.config.hooks or hook_name not in self.config.hooks:
-        return
+# Before (removed)
+config = AgentConfig(hooks={"on_tool_start": lambda name, args: log(name)})
 
-    try:
-        self.config.hooks[hook_name](*args, **kwargs)
-    except Exception:
-        # Silently ignore hook errors to prevent breaking agent
-        pass
+# After
+from selectools import AgentObserver
+
+class ToolLogger(AgentObserver):
+    def on_tool_start(self, run_id, call_id, tool_name, tool_args):
+        log(tool_name)
+
+config = AgentConfig(observers=[ToolLogger()])
 ```
 
-**Design Decision:** Hook errors never break the agent. They're for observability, not control flow.
-
-### Use Cases
-
-#### Logging
-
-```python
-def log_tool(tool_name, args):
-    logger.info(f"Calling {tool_name} with {args}")
-
-config = AgentConfig(hooks={"on_tool_start": log_tool})
-```
-
-#### Metrics
-
-```python
-def track_duration(tool_name, result, duration):
-    metrics.histogram("tool_duration", duration, tags={"tool": tool_name})
-
-config = AgentConfig(hooks={"on_tool_end": track_duration})
-```
-
-#### Debugging
-
-```python
-def debug_iteration(iteration, messages):
-    print(f"=== Iteration {iteration} ===")
-    for msg in messages:
-        print(f"{msg.role}: {msg.content[:100]}")
-
-config = AgentConfig(hooks={"on_iteration_start": debug_iteration})
-```
+**Design Decision (unchanged):** Observer errors never break the agent. They're for observability, not control flow.
 
 ---
 
@@ -690,7 +649,7 @@ config = AgentConfig(hooks={"on_iteration_start": debug_iteration})
 **File:** `src/selectools/observer.py`
 **Classes:** `AgentObserver`, `LoggingObserver`
 
-The **AgentObserver** protocol is a class-based alternative to the hooks dict, designed for structured observability integrations (Langfuse, OpenTelemetry, Datadog). Every callback receives a **`run_id`** for cross-request correlation, and tool callbacks also receive a **`call_id`** for matching parallel tool start/end pairs.
+The **AgentObserver** protocol is the class-based notification system for structured observability integrations (Langfuse, OpenTelemetry, Datadog). Every callback receives a **`run_id`** for cross-request correlation, and tool callbacks also receive a **`call_id`** for matching parallel tool start/end pairs.
 
 ### Quick Start
 
@@ -763,17 +722,15 @@ Output:
 {"event": "tool_end", "run_id": "a3f2...", "tool": "search", "duration_ms": 45.2}
 ```
 
-### Observer vs Hooks
+### Why Observers (vs the removed hooks dict)
 
-| Aspect | Hooks (`dict`) | AgentObserver |
+| Aspect | Hooks (`dict`, removed in v1.0) | AgentObserver |
 |---|---|---|
 | **Correlation** | Manual (closures, thread-local) | Built-in `run_id` + `call_id` |
 | **Multiple consumers** | One callback per event | Multiple observers |
 | **Event coverage** | 8 events | 31 events (including batch, fallback, retry, memory, budget, cancellation, model switch) |
 | **Type safety** | Dict keys are strings | Protocol methods with signatures |
 | **Use case** | Quick debugging, simple logging | Production observability (Langfuse, OTel, Datadog) |
-
-Both systems work together — hooks and observers fire independently for the same events.
 
 ### AsyncAgentObserver
 
@@ -1881,16 +1838,19 @@ agent = Agent(
 response = agent.run([Message(role=Role.USER, content="test")])
 ```
 
-### Mocking Hooks
+### Recording Observer Events
 
 ```python
-def test_agent_with_hooks():
+from selectools import AgentObserver
+
+def test_agent_with_observer():
     called = []
 
-    def track_calls(tool_name, args):
-        called.append((tool_name, args))
+    class Recorder(AgentObserver):
+        def on_tool_start(self, run_id, call_id, tool_name, tool_args):
+            called.append((tool_name, tool_args))
 
-    config = AgentConfig(hooks={"on_tool_start": track_calls})
+    config = AgentConfig(observers=[Recorder()])
     agent = Agent(tools=[...], provider=provider, config=config)
 
     agent.run([...])

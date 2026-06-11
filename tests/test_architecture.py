@@ -164,6 +164,50 @@ def test_all_exports_importable() -> None:
     assert not missing, f"Names in __all__ that are not importable: {', '.join(missing)}"
 
 
+def _public_names() -> list[str]:
+    import selectools
+
+    return list(selectools.__all__)
+
+
+@pytest.mark.parametrize("name", _public_names())
+def test_export_resolves(name: str) -> None:
+    """Every symbol in selectools.__all__ must resolve from the top level.
+
+    Seed for the upcoming CI marker gate: once every export carries a
+    stability marker, this test will also assert ``__stability__``.
+    """
+    import selectools
+
+    assert hasattr(selectools, name), f"selectools.{name} is in __all__ but does not resolve"
+
+
+V1_WART_REMOVAL_ADDITIONS = [
+    "Pipeline",
+    "Step",
+    "StepResult",
+    "compose",
+    "step",
+    "parallel",
+    "branch",
+    "retry",
+    "cache_step",
+    "RouterProvider",
+    "RouterConfig",
+]
+
+
+@pytest.mark.parametrize("name", V1_WART_REMOVAL_ADDITIONS)
+def test_reconciled_exports_carry_stability_marker(name: str) -> None:
+    """Names re-added to __all__ in the v1.0 wart-removal pass must be @beta."""
+    import selectools
+
+    obj = getattr(selectools, name)
+    assert getattr(obj, "__stability__", None) == "beta", (
+        f"selectools.{name} must carry the @beta stability marker"
+    )
+
+
 # ---------------------------------------------------------------------------
 # 6. StepType enum has no duplicates
 # ---------------------------------------------------------------------------

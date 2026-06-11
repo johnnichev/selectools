@@ -8,7 +8,7 @@ import pytest
 
 from selectools import Agent, AgentConfig, InMemoryCache
 from selectools.cache import CacheKeyBuilder
-from selectools.observer import AsyncAgentObserver
+from selectools.observer import AgentObserver, AsyncAgentObserver
 from selectools.tools import Tool, ToolParameter
 from selectools.types import Message, Role, ToolCall
 from selectools.usage import UsageStats
@@ -393,27 +393,28 @@ class TestStreamingBypassesCache:
 
 class TestCacheHooksIntegration:
     def test_on_llm_end_fires_on_cache_hit(self) -> None:
-        """on_llm_end hook should fire even on cache hits."""
+        """on_llm_end observer event should fire even on cache hits."""
         provider = FakeCachingProvider()
         cache = InMemoryCache(max_size=10, default_ttl=60)
         hook_calls: list[tuple[str, object]] = []
 
-        def on_llm_end(response: str, usage: object) -> None:
-            hook_calls.append((response, usage))
+        class _LlmEndRecorder(AgentObserver):
+            def on_llm_end(self, run_id, response, usage) -> None:
+                hook_calls.append((response, usage))
 
         config = AgentConfig(
             max_iterations=1,
             cache=cache,
-            hooks={"on_llm_end": on_llm_end},
+            observers=[_LlmEndRecorder()],
         )
         agent = Agent(tools=[_dummy_tool()], provider=provider, config=config)
 
-        # First call: miss -> hook fires from provider call
+        # First call: miss -> event fires from provider call
         agent.run([Message(role=Role.USER, content="Hi")])
         first_hook_count = len(hook_calls)
         assert first_hook_count >= 1
 
-        # Second call: hit -> hook should still fire
+        # Second call: hit -> event should still fire
         agent.reset()
         agent.run([Message(role=Role.USER, content="Hi")])
         assert len(hook_calls) > first_hook_count

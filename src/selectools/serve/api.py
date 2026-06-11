@@ -381,9 +381,8 @@ class AgentAPI:
         # the shared _history, cross-contaminating subsequent requests. The
         # session history is passed in explicitly, so the clone (fresh
         # history/usage, memory dropped) keeps behavior identical minus the
-        # leak. _clone_for_isolation is underscore-private today; promoting
-        # it to a public API is a follow-up.
-        runner = agent._clone_for_isolation()
+        # leak.
+        runner = agent.clone_for_isolation()
         try:
             result: AgentResult = await run_in_threadpool(runner.run, messages)
         except Exception as exc:
@@ -433,7 +432,7 @@ class AgentAPI:
         user_msg = Message(role=Role.USER, content=input_text)
         messages = memory.get_history() + [user_msg]
         # Same per-request isolation as _chat: never run on the shared agent.
-        runner = agent._clone_for_isolation()
+        runner = agent.clone_for_isolation()
 
         async def _events() -> AsyncIterator[bytes]:
             chunks: List[str] = []

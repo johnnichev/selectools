@@ -658,7 +658,7 @@ class TestEvalSuiteIntegration:
             return responses[idx]
 
         clone.run = MagicMock(side_effect=run_side_effect)
-        agent._clone_for_isolation = MagicMock(return_value=clone)
+        agent.clone_for_isolation = MagicMock(return_value=clone)
         return agent
 
     def test_all_pass(self) -> None:
@@ -704,7 +704,7 @@ class TestEvalSuiteIntegration:
         agent.provider = MagicMock()
         clone = MagicMock()
         clone.run = MagicMock(side_effect=RuntimeError("API error"))
-        agent._clone_for_isolation = MagicMock(return_value=clone)
+        agent.clone_for_isolation = MagicMock(return_value=clone)
 
         suite = EvalSuite(agent=agent, cases=[TestCase(input="boom")])
         report = suite.run()

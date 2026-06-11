@@ -328,12 +328,11 @@ class A2AServer:
         try:
             # Run on an isolated clone: Agent.run mutates shared _history (and
             # memory), which would leak caller A's conversation into caller B's
-            # provider context and race under concurrency. _clone_for_isolation
+            # provider context and race under concurrency. clone_for_isolation
             # (same mechanism run_batch uses) shares tools/provider/config but
             # gives fresh history/usage and drops memory — correct for A2A v1,
-            # which has no session model. It is underscore-private today;
-            # promoting it to a public API is a follow-up.
-            clone = self._agent._clone_for_isolation()
+            # which has no session model.
+            clone = self._agent.clone_for_isolation()
             result = await run_in_threadpool(clone.run, [Message(role=Role.USER, content=prompt)])
         except Exception as exc:
             # Agent failure is a task-level outcome, not a transport error.

@@ -23,10 +23,6 @@ if TYPE_CHECKING:
     from ..sessions import SessionStore
     from ..usage import AgentUsage
 
-# Hook type definitions
-HookCallable = Callable[..., None]
-Hooks = Dict[str, HookCallable]
-
 ConfirmAction = Union[
     Callable[[str, Dict[str, Any], str], bool],
     Callable[[str, Dict[str, Any], str], Coroutine[Any, Any, bool]],
@@ -57,24 +53,10 @@ class AgentConfig:
         cost_warning_threshold: Print warning when total cost exceeds this USD amount. None = no warnings. Default: None.
         enable_analytics: Enable detailed analytics tracking. Default: False.
         system_prompt: Custom system instructions to replace the default prompt. Default: None (uses built-in instructions).
-        hooks: Optional dict of lifecycle hooks for observability. Default: None.
-               Available hooks:
-               - 'on_agent_start': Called at start of run/arun with (messages,)
-               - 'on_agent_end': Called at end with (response, usage)
-               - 'on_iteration_start': Called at start of each iteration with (iteration_num, messages)
-               - 'on_iteration_end': Called at end of each iteration with (iteration_num, response)
-               - 'on_tool_start': Called before tool execution with (tool_name, tool_args)
-               - 'on_tool_chunk': Called for each chunk from streaming tools with (tool_name, chunk)
-               - 'on_tool_end': Called after tool execution with (tool_name, result, duration)
-               - 'on_tool_error': Called on tool error with (tool_name, error, tool_args)
-               - 'on_llm_start': Called before LLM call with (messages, model)
-               - 'on_llm_end': Called after LLM call with (response, usage)
-               - 'on_error': Called on any error with (error, context)
-        observers: List of AgentObserver instances for structured lifecycle events.
-               Observers receive richer data than hooks (run_id, call_id, system_prompt)
-               and are the recommended integration path for tracing systems like
-               Langfuse, OpenTelemetry, and Datadog.  Existing hooks continue to
-               work unchanged.  Default: [].
+        observers: List of AgentObserver instances for structured lifecycle events
+               (run_id, call_id, system_prompt). The recommended integration path
+               for tracing systems like Langfuse, OpenTelemetry, and Datadog.
+               Default: [].
         routing_only: If True, returns tool selection without executing it. Default: False.
         parallel_tool_execution: Execute multiple tool calls concurrently when the LLM
                requests more than one tool in a single response. Uses asyncio.gather for
@@ -155,7 +137,6 @@ class AgentConfig:
     cost_warning_threshold: Optional[float] = None
     enable_analytics: bool = False
     system_prompt: Optional[str] = None
-    hooks: Optional[Hooks] = None
     observers: List[AgentObserver] = field(default_factory=list)
     routing_only: bool = False
     parallel_tool_execution: bool = True
@@ -370,18 +351,6 @@ class AgentConfig:
                 enabled=self.compress_context,
                 threshold=self.compress_threshold,
                 keep_recent=self.compress_keep_recent,
-            )
-
-        # Hooks deprecation (existing logic)
-        if self.hooks is not None:
-            import warnings
-
-            warnings.warn(
-                "AgentConfig.hooks is deprecated and will be removed in a future "
-                "version. Use AgentConfig.observers with AgentObserver subclasses "
-                "instead.",
-                DeprecationWarning,
-                stacklevel=2,
             )
 
         # -- Planning-as-config: auto-unpack dicts (for YAML / dict configs) --

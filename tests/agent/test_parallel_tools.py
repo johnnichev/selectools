@@ -10,7 +10,7 @@ Tests cover:
 - Parallel sync execution (run) proves wall-clock speedup
 - Result ordering is preserved regardless of completion order
 - Error handling: one tool failure doesn't break the others
-- Hooks fire for every tool
+- Observer events fire for every tool
 - Disabling parallel execution falls back to sequential
 - Single tool call does not use parallel path
 """
@@ -24,6 +24,7 @@ from typing import Any, List, Tuple
 import pytest
 
 from selectools import Agent, AgentConfig, Message, Role, tool
+from selectools.observer import AgentObserver
 from selectools.types import ToolCall
 from selectools.usage import UsageStats
 
@@ -341,10 +342,28 @@ class TestParallelUnknownTool:
         assert "Unknown tool" in tool_results[1].content
 
 
-class TestParallelHooks:
-    """Verify hooks fire for all tools in a parallel batch."""
+class _ToolNameRecorder(AgentObserver):
+    """Records tool names for start/end/error events."""
 
-    def test_hooks_fire_for_all_parallel_tools(self) -> None:
+    def __init__(self, started: List[str], ended: List[str], errors: List[str]) -> None:
+        self.started = started
+        self.ended = ended
+        self.errors = errors
+
+    def on_tool_start(self, run_id, call_id, tool_name, tool_args) -> None:
+        self.started.append(tool_name)
+
+    def on_tool_end(self, run_id, call_id, tool_name, result, duration_ms) -> None:
+        self.ended.append(tool_name)
+
+    def on_tool_error(self, run_id, call_id, tool_name, error, tool_args, duration_ms) -> None:
+        self.errors.append(tool_name)
+
+
+class TestParallelObserverEvents:
+    """Verify observer events fire for all tools in a parallel batch."""
+
+    def test_events_fire_for_all_parallel_tools(self) -> None:
         """on_tool_start and on_tool_end should fire for each parallel tool."""
         started: List[str] = []
         ended: List[str] = []
@@ -360,10 +379,7 @@ class TestParallelHooks:
             config=AgentConfig(
                 max_iterations=3,
                 parallel_tool_execution=True,
-                hooks={
-                    "on_tool_start": lambda name, args: started.append(name),
-                    "on_tool_end": lambda name, result, dur: ended.append(name),
-                },
+                observers=[_ToolNameRecorder(started, ended, [])],
             ),
         )
         agent.run([Message(role=Role.USER, content="go")])
@@ -373,7 +389,7 @@ class TestParallelHooks:
         assert "slow_tool_a" in ended
         assert "slow_tool_b" in ended
 
-    def test_error_hooks_fire_for_failed_parallel_tools(self) -> None:
+    def test_error_events_fire_for_failed_parallel_tools(self) -> None:
         """on_tool_error fires for failed tools in a parallel batch."""
         errors: List[str] = []
 
@@ -388,9 +404,7 @@ class TestParallelHooks:
             config=AgentConfig(
                 max_iterations=3,
                 parallel_tool_execution=True,
-                hooks={
-                    "on_tool_error": lambda name, exc, args: errors.append(name),
-                },
+                observers=[_ToolNameRecorder([], [], errors)],
             ),
         )
         agent.run([Message(role=Role.USER, content="go")])

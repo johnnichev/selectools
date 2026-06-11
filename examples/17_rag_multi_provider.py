@@ -47,7 +47,7 @@ The framework is built on three main layers:
    - Manages conversation state and memory
    - Orchestrates tool execution
    - Tracks usage and costs
-   - Provides observability hooks
+   - Provides observer events
 
 3. Tool Layer
    - Defines callable functions with schemas

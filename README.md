@@ -1096,7 +1096,7 @@ Examples are numbered by difficulty. Start from 01 and work your way up.
 | 09 | `09_caching.py` | InMemoryCache, RedisCache, cache stats | Yes |
 | 10 | `10_routing_mode.py` | Routing mode, intent classification | Yes |
 | 11 | `11_tool_analytics.py` | Call counts, success rates, timing | Yes |
-| 12 | `12_observability_hooks.py` | Lifecycle hooks, tool validation | Yes |
+| 12 | `12_observability_hooks.py` | Lifecycle observers, tool validation | Yes |
 | 13 | `13_dynamic_tools.py` | ToolLoader, plugins, hot-reload | Yes |
 | 14 | `14_rag_basic.py` | RAG pipeline, document loading, vector search | Yes + `[rag]` |
 | 15 | `15_semantic_search.py` | Pure semantic search, metadata filtering | Yes + `[rag]` |

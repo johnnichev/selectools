@@ -6,7 +6,7 @@ Design notes:
   Semantic similarity between *different natural-language queries* is tested standalone (not through
   the agent loop) because CacheKeyBuilder keys aren't natural language.
 
-- Prompt Compression: EvalSuite._run_case() calls _clone_for_isolation(), which sets
+- Prompt Compression: EvalSuite._run_case() calls clone_for_isolation(), which sets
   clone.memory = None. Compression requires existing conversation history, so it cannot be
   triggered through EvalSuite's standard run path. These evals test compression by calling
   agent.run() directly (not via EvalSuite) and then verify the result via EvalSuite's
@@ -257,7 +257,7 @@ def test_eval_suite_semantic_cache_natural_language_similarity():
 # Feature 2: Prompt Compression
 # ===========================================================================
 #
-# EvalSuite limitation: _clone_for_isolation() sets clone.memory = None, so pre-populated
+# EvalSuite limitation: clone_for_isolation() sets clone.memory = None, so pre-populated
 # history is always cleared before the eval case runs.  Compression requires enough messages
 # in _history to exceed the threshold; with clone.memory = None the history only contains
 # the single test input, which is never large enough.

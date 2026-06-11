@@ -915,13 +915,16 @@ async def stream_api(url: str) -> AsyncGenerator[str, None]:
 
 ### Chunk Callbacks
 
-The agent can register a callback to receive chunks:
+An observer can receive chunks via `on_tool_chunk`:
 
 ```python
-def on_chunk(tool_name: str, chunk: str):
-    print(f"[{tool_name}] {chunk}", end='', flush=True)
+from selectools import AgentObserver
 
-config = AgentConfig(hooks={'on_tool_chunk': on_chunk})
+class ChunkPrinter(AgentObserver):
+    def on_tool_chunk(self, run_id, call_id, tool_name, chunk):
+        print(f"[{tool_name}] {chunk}", end='', flush=True)
+
+config = AgentConfig(observers=[ChunkPrinter()])
 agent = Agent(tools=[process_file], provider=provider, config=config)
 ```
 

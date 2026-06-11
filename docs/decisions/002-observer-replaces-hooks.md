@@ -1,6 +1,6 @@
 # ADR-002: Observer Pattern Replaces Hooks Dict
 
-**Status**: Accepted (hooks deprecated, not yet removed)
+**Status**: Accepted (hooks removed in v1.0)
 **Date**: 2026-03-15
 **Deciders**: Core maintainers
 

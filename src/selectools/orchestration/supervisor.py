@@ -31,7 +31,6 @@ Usage::
 from __future__ import annotations
 
 import asyncio
-import json
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
@@ -46,6 +45,7 @@ if TYPE_CHECKING:
     from .checkpoint import CheckpointStore
 
 from .._async_utils import run_sync
+from .._json_utils import safe_json_parse
 from ..stability import beta
 from ..types import Message, Role
 from ..usage import UsageStats
@@ -148,26 +148,9 @@ Respond with ONLY a JSON array:
 """
 
 
-def _safe_json_parse(text: str, default: Any = None) -> Any:
-    """Try to extract and parse JSON from an LLM response."""
-    text = text.strip()
-    # Strip markdown code fences
-    if text.startswith("```"):
-        lines = text.splitlines()
-        text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        # Try extracting first JSON array or object
-        import re
-
-        m = re.search(r"(\[.*\]|\{.*\})", text, re.DOTALL)
-        if m:
-            try:
-                return json.loads(m.group(1))
-            except json.JSONDecodeError:
-                pass
-    return default
+# Compat re-export: the parser moved to selectools._json_utils so patterns
+# can share it without reaching into orchestration internals.
+_safe_json_parse = safe_json_parse
 
 
 @beta
