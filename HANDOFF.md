@@ -2,99 +2,100 @@
 
 ## What I Was Doing (2026-06-10)
 
-Six-track session via parallel subagents (worktree + branch + PR each):
-all 5 open issues plus the Agent-as-API P0 roadmap item. The issue
-tracker is now fully cleared — everything is merged or one click away.
+Single-evening parallel-subagent mega-session: cleared all 5 open issues,
+shipped all 4 P1 roadmap features, 2 P2 features, and the Agent-as-API
+P0 item. 13 PRs total (#67-#79): 3 merged, 10 awaiting John's clicks.
 
 ## Current State
 
-- **Branch:** `chore/v0.24-integration` (PR #71 — CHANGELOG, example
-  renumber, AgentAPI trust-model docs, this handoff)
-- **Main:** `0520b20` — PRs #67, #68, #69 squash-merged; external PR #65
-  (entity-memory extraction-failure logging) also landed
-- **Tests:** 5,250 passed / 0 failed on main; 5,358 passed on the #73
-  stack (locally, `-k "not e2e"`); CI green everywhere it has run
-- **Version:** still `0.23.0`, no new tag. Unreleased CHANGELOG section
-  assumes the work ships as v0.24.0.
+- **Branch:** `chore/v0.24-integration` (PR #71 — consolidated CHANGELOG
+  for ALL of #67-#79, example renumber, AgentAPI trust-model docs, this
+  handoff)
+- **Main:** `0520b20` — #67, #68, #69 merged; external #65 also landed
+- **Integration rehearsal PASSED:** all 10 open branches merged locally
+  in queue order with ZERO conflicts; combined suite **5,663 passed /
+  0 failed**; mkdocs build clean. The merge queue is mechanical.
+- **CI:** green on every PR that has checks (#73 gets CI only after #72
+  merges and it retargets to main — stacked PR, workflow filters on
+  base=main).
+- **Version:** still `0.23.0`. The Unreleased CHANGELOG assumes v0.24.0.
 
 ## Merge Queue (John's clicks, IN ORDER)
 
-The auto-mode classifier blocks agent-side merges and issue comments;
-allow rules for `gh pr merge` / `gh issue comment` are drafted in the
-2026-06-10 daily note if wanted.
+1. **#70** — Gemini schema sanitization + loud empty-candidate warning
+2. **#71** — integration sweep (CHANGELOG for everything, docs, handoff)
+3. **#72** — ToolResult base + Artifact side-channel (closes #59)
+4. **#73** — deferred confirmation flow (closes #58) — WAIT for its CI
+   after #72 merges
+5. **#74** — LiteLLMProvider (100+ models)
+6. **#75** — RouterProvider (cost-optimized routing)
+7. **#76** — A2A protocol (server + client)
+8. **#77** — toolbox expansion (15 tools, 6 categories)
+9. **#78** — UnifiedMemory (tiered, auto-promotion)
+10. **#79** — cross-session search (4 backends)
+11. Close **#66** with a pointer to #70 (model-side flash-lite issue;
+    diagnosis in the PR body). #57/#58/#59/#60 auto-close.
+12. Tag **v0.24.0** (CHANGELOG is ready; this is a hefty minor).
 
-1. **PR #70** — Gemini schema sanitization + loud empty-candidate
-   warning (refs #66). CI green.
-2. **PR #71** — integration sweep (CHANGELOG for ALL of #67-#73,
-   example renumber 97→98, SERVE.md trust model, this handoff).
-3. **PR #72** — ToolResult base + Artifact side-channel (closes #59).
-   CI green, 25 new tests.
-4. **PR #73** — deferred confirmation flow (closes #58). STACKED on
-   #72: CI cannot run until #72 merges (workflow only triggers on
-   base=main); it retargets automatically. WAIT for its CI before
-   merging. 84 new tests, full suite green locally.
-5. Close **#66** with a comment pointing at PR #70 (diagnosis is in the
-   PR body: model-side flash-lite FC unreliability, live-reproduced;
-   schema conversion exonerated). #57/#58/#59/#60 auto-close.
-6. Consider tagging **v0.24.0** (4 features + 1 fix bundle is a solid
-   minor release; CHANGELOG is already written for it).
+The auto-mode classifier blocks agent-side `gh pr merge`/`gh issue
+comment`; allow-rule snippet is in the 2026-06-10 daily note.
 
-## What Shipped Today (6 PRs)
+## What Shipped (13 PRs)
 
-1. **#67 MERGED** (closes #57) — Anthropic prompt caching:
-   `cache_system`/`cache_tools`, all 4 paths, cache token fields on
-   `UsageStats`.
-2. **#68 MERGED** — Agent-as-API: `serve/api.py` `AgentAPI` (chat, SSE,
-   session CRUD, per-user namespaces, bearer auth, CLI `--api`).
-   **Competitive P0 backlog now empty.**
-3. **#69 MERGED** (closes #60) — `KnowledgeBackend` protocol +
-   Supabase/Redis adapters for `KnowledgeMemory`; Sheriff-compatible
-   via configurable table/key/data columns.
-4. **#70 OPEN** — Gemini fixes (see merge queue).
-5. **#72 OPEN** (closes #59) — `selectools.results`: `ToolResult` base
-   (kind ClassVar + serializer re-injection — `asdict()` drops
-   ClassVars), `Ambiguous`/`NotFound`, `Artifact` (sha256/size per
-   review feedback), contextvar `emit_artifact()` →
-   `AgentResult.artifacts`. Fixed 2 thread-pool context-propagation
-   gaps in `_tool_executor.py`.
-6. **#73 OPEN** (closes #58) — `selectools.pending`: full deferred
-   confirmation stack per rpelevin's review spec (record binding,
-   digest guards, exactly-once consume, PT/EN/ES parser,
-   `ChannelAgent`). Sheriff/Clovis can delete their bespoke
-   pending-action code.
+Wave 1 (issues): #67 Anthropic prompt caching (merged), #68 Agent-as-API
+(merged, P0 done), #69 KnowledgeBackend (merged), #70 Gemini fixes,
+#72 ToolResult/Artifact, #73 deferred confirmation.
+
+Wave 2 (roadmap): #74 LiteLLM, #75 Router, #76 A2A, #77 toolbox,
+#78 UnifiedMemory, #79 session search. Plus #71 integration sweep.
+
+Suite: 5,064 → 5,663 tests (~600 new). Blog draft about the session:
+vault `01-projects/content/selectools-parallel-subagent-shipping-day.md`.
 
 ## Next Steps (after merge queue)
 
-- **Downstream adoption:** Sheriff can (a) enable Anthropic prompt
-  caching, (b) swap its `SupabaseSessionStore` + knowledge.py shim +
-  `pending_actions.py` for the upstream versions. Each is a small PR in
+- **Sheriff adoption** (after v0.24.0 on PyPI): enable Anthropic prompt
+  caching; replace its SupabaseSessionStore copy, knowledge.py shim, and
+  pending_actions.py with the upstream versions. Each is a small PR in
   ~/projects/sheriff.
-- **Roadmap:** P0 done → P1: LiteLLM provider wrapper, cost-optimized
-  RouterProvider, A2A protocol, toolbox expansion — or pivot to v1.0.0
-  stable-release prep (API freeze, migration guide).
-- Issue #66 stays informational (model-side); nothing left to build.
+- **Remaining P2 items all need core.py / AgentConfig sign-off** (John's
+  decision): tool result compression, agent-level HITL, planning-as-
+  config, UnifiedMemory config wiring (`MemoryConfig(unified=True)`).
+- **Remaining backlog:** prompt registry/versioning, durable execution,
+  code sandbox, Bedrock-native provider (LiteLLM covers it meanwhile),
+  P3 items.
+- **v1.0.0 prep** is the next big arc: API freeze, migration guide,
+  stability promotion of the new @beta surface after it bakes.
 
 ## Watch Out For
 
-- **Shared venv was fixed mid-session:** `hypothesis`, `starlette`,
-  `python-multipart` were missing and silently skipping serve tests.
-  Also: `.venv` has NO ruff — use system `ruff`. And the editable
-  install is stale (0.8.0 .pth) — always test with `PYTHONPATH=$PWD/src`.
+- **Venv fixed mid-session**: hypothesis/starlette/python-multipart were
+  missing (silently skipping serve tests); httpx was added to the serve
+  extras by #76. `.venv` has NO ruff (use system) and NO mkdocs (use
+  ~/Library/Python/3.9/bin/mkdocs). Stale 0.8.0 editable .pth: always
+  test with `PYTHONPATH=$PWD/src`.
 - **`Tool._serialize_result` re-injects `kind`** for ToolResult
-  instances (#72). ClassVar fields never survive `asdict()` — don't
-  "simplify" that away.
-- **Thread-pool tool execution now copies contextvars per submission**
-  (#72): `Context.run` raises if one Context is entered concurrently —
-  each submission needs its OWN copy.
-- **`RedisPendingStore` requires Redis >= 6.2** (GETDEL atomic claim).
-  Executor closures are never serialized; cross-process confirms need
-  `register_executor_factory(kind, ...)`.
-- **`AgentAPI` trust model:** `user_id` is self-asserted; deploy behind
-  a backend that authenticates end users (documented in SERVE.md).
-- **`UsageStats` gained 2 trailing Optional fields**; exhaustive field
-  iteration may need updating.
+  subclasses (#72) — ClassVars never survive `asdict()`.
+- **Thread-pool tool execution copies contextvars per submission**
+  (#72); `Context.run` raises on concurrent re-entry of one Context.
+- **`RedisPendingStore` needs Redis >= 6.2** (GETDEL claim); closures
+  never serialized — cross-process confirms need
+  `register_executor_factory`.
+- **RouterProvider** classifier is deterministic by design; breaker
+  state is per-escalation-chain; auth errors propagate (only retriable
+  errors escalate).
+- **A2A** follows the JSON-RPC v0.2.x wire shape, not the newest gRPC
+  revision (documented deviation); uses `canceled` spec spelling.
+- **LiteLLMProvider**: set `AgentConfig(model="provider/model")` to
+  match the provider's model — agent passes config.model per call (same
+  caveat as Ollama).
+- **SQLite session search**: FTS5 index is additive; old DBs backfill
+  lazily on first search; bm25 is near-zero on tiny corpora so score =
+  hit count + bm25 tiebreak.
+- **`AgentAPI` trust model**: `user_id` is self-asserted (SERVE.md).
 - **Gemini schemas sanitized before send** (#70); flash-lite + tools is
-  unreliable upstream — see docs/COMPATIBILITY.md, don't re-litigate.
-- **examples numbering:** 97 (agent-as-api), 98 (knowledge backend,
-  renamed in #71), 99 (tool results, #72), 100 (deferred confirmation,
-  #73).
+  unreliable upstream (docs/COMPATIBILITY.md) — don't re-litigate.
+- **examples numbering**: 97 agent-as-api, 98 knowledge backend (renamed
+  in #71), 99 tool results, 100 deferred confirmation, 101 litellm,
+  102 router, 103 a2a, 104 toolbox, 105 session search, 106 unified
+  memory.

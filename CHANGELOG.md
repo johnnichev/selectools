@@ -62,6 +62,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ChannelAgent.ask_channel()` wrapper. Confirmation only executes
   when user/conversation scope, TTL, and args digest all match;
   duplicate webhook delivery executes exactly once.
+- **LiteLLMProvider** (`@beta`, #74) — instant access to 100+ models
+  (`deepseek/...`, `groq/...`, `bedrock/...`) by delegating to the
+  `litellm` library, which normalizes everything to OpenAI wire format.
+  Reuses the shared `_OpenAICompatibleBase` machinery (message/tool
+  mapping, streaming assembly, malformed-JSON-safe argument parsing).
+  Cost via litellm's local cost map. Optional dep:
+  `pip install selectools[litellm]`.
+- **RouterProvider** (`@beta`, #75) — cost-optimized model routing
+  across provider tiers. Deterministic rule-based complexity classifier
+  (input tokens, tool count, code blocks, reasoning keywords,
+  multi-part questions; configurable thresholds), three strategies
+  (`cost_optimized`, `balanced`, `quality_first`), failure escalation
+  built on `FallbackProvider` (circuit breaker, no tier-switch
+  mid-stream), tier ordering verified against the pricing registry,
+  `on_route`/`on_escalation` callbacks.
+- **A2A protocol** (`@beta`, #76) — agent-to-agent communication:
+  `A2AServer` (Starlette) serving `GET /.well-known/agent.json` (Agent
+  Card auto-generated from AgentConfig; system prompt never leaked) and
+  `POST /a2a` (JSON-RPC 2.0: `message/send`, `tasks/get`,
+  `tasks/cancel`; optional bearer auth), plus async `A2AClient` with
+  `discover()`/`send_task()` and sync wrappers. Task lifecycle states
+  wired for future async backends.
+- **Toolbox expansion** (#77) — 15 new tools across 6 categories
+  (toolbox: 33 → 48): safe calculator (`ast`-whitelist interpreter, no
+  eval/exec, exponent guards), email (stdlib SMTP/IMAP), PDF text/table
+  extraction (pdfplumber), Slack, Notion, and Linear integrations. All
+  deps lazy via the new `toolbox` extra; credentials via env vars and
+  never echoed in errors.
+- **UnifiedMemory** (`@beta`, #78) — tiered memory orchestrating
+  ConversationMemory (short-term), KnowledgeMemory (long-term with
+  rule-scored auto-promotion and content-hash dedup), EntityMemory, and
+  a new date-keyed `EpisodicMemory` with retention pruning. Token-aware
+  context compaction at 70% budget (optional `summarizer=`), federated
+  `recall()` with a documented merge rule, optional `scorer=` hook.
+  Standalone class; AgentConfig wiring deferred.
+- **Cross-session search** (`@beta`, #79) — `search(query,
+  namespace=None, limit=5)` on all four SessionStore backends, returning
+  `SessionSearchResult(session_id, score, matched_messages)`. SQLite
+  uses a purely-additive FTS5 index with lazy backfill for pre-feature
+  databases (LIKE-scan fallback when FTS5 is unavailable); JsonFile and
+  Redis do documented linear scans; Supabase filters server-side via
+  PostgREST `ilike` with in-process re-scoring.
 
 ### Fixed
 
