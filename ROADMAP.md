@@ -102,10 +102,23 @@ Agent-as-API (AgentAPI: REST + SSE + session CRUD + auth) → A2A protocol
 → Gemini schema sanitization + flash-lite compat
 → 106 runnable examples, 5968 tests total
 
-v1.0.0 🟡 Stable Release
-API freeze → Stability markers on all modules → Deprecation policy
-→ Security audit published → Compatibility matrix → 0.x→1.0 migration guide
-→ PyPI classifier: Production/Stable
+v0.25.0 ✅ Hardening & v1.0 Prep
+Planning-as-config (AgentConfig(planning=...)) → Agent-level HITL
+(ToolConfig(require_approval=...)) → Tool result compression
+→ Knowledge pre-save sanitizers → Pending intent hooks (pop_if_intent,
+tighten_ttl) → Stability marking sweep: 433 public symbols 100% marked
+(205 stable / 228 beta), 19 beta→stable promotions, __stability__ on all
+123 public modules, CI gate → Wart removal: clone_for_isolation() public,
+__all__ reconciled (+11 exports), AgentConfig.hooks REMOVED (BREAKING)
+→ Security audit published (docs/SECURITY_AUDIT.md) → 0.x→1.0 migration
+guide → Compatibility matrix refresh
+→ 111 runnable examples, 7268 tests total
+
+v1.0.0 🟡 Stable Release (bake window — code-complete)
+API freeze ✅ (warts removed in v0.25) → Stability markers on all modules ✅
+→ Security audit published ✅ → Compatibility matrix ✅
+→ 0.x→1.0 migration guide ✅ → Deprecation policy
+→ Remaining at tag time: drop Python 3.9 → PyPI classifier: Production/Stable
 
 ---
 
@@ -609,7 +622,7 @@ result = await client.send_task("Research quantum computing trends")
 
 ### P2 — Important but Not Urgent
 
-#### Tool Result Compression
+#### Tool Result Compression ✅ Shipped in v0.25.0 (#87)
 **Source:** Agno's `compress_tool_results=True`
 **Gap:** selectools has CompressConfig for prompt compression but doesn't compress individual tool results. Verbose tool outputs (e.g., web scrape returning 10KB HTML) waste context.
 **Spec:** When enabled, tool results exceeding a character threshold are summarized by a fast LLM before being added to the conversation.
@@ -654,7 +667,7 @@ config = AgentConfig(memory=MemoryConfig(
 **Implementation:** New `unified_memory.py` orchestrating existing memory backends.
 **Effort:** High (5-7 days). Requires importance scoring + lifecycle management.
 
-#### Agent-Level Human-in-the-Loop
+#### Agent-Level Human-in-the-Loop ✅ Shipped in v0.25.0 (#88)
 **Source:** Agno's approval workflows
 **Gap:** selectools has InterruptRequest in graphs + ConfirmAction in ToolConfig. But a standalone Agent can't pause mid-execution for approval on arbitrary conditions (e.g., confidence below threshold, cost above limit).
 **Spec:** Extend InterruptRequest to work outside of AgentGraph:
@@ -667,7 +680,7 @@ config = AgentConfig(tool=ToolConfig(
 **Implementation:** Lift InterruptRequest + checkpoint machinery from orchestration to agent level. Integrate with tool execution path.
 **Effort:** Medium (3-4 days).
 
-#### Planning-as-Config Flag
+#### Planning-as-Config Flag ✅ Shipped in v0.25.0 (#86)
 **Source:** PraisonAI's `planning=True`
 **Gap:** selectools has PlanAndExecuteAgent as a separate pattern class. Users can't add planning to any existing agent with a config flag.
 **Spec:** When `planning=True`, the agent auto-decomposes complex inputs before executing:

@@ -30,6 +30,24 @@ result = AgentGraph.chain(planner, writer, reviewer).run("Write a blog post")
 # selectools serve agent.yaml
 ```
 
+## What's New in v0.25
+
+### v0.25.0 — Hardening & v1.0 Prep
+
+Five new features plus the final v1.0 groundwork: the entire 433-symbol public surface is now stability-marked (205 stable, 228 beta) with a CI gate, the long-deprecated `AgentConfig.hooks` is removed, and the security audit is published.
+
+- **Planning-as-config** — `AgentConfig(planning=PlanningConfig(...))` adds plan→execute→synthesize to any agent via isolated clones, with a complexity gate, cross-clone budget caps, and a plan approval handler.
+- **Agent-level HITL** — `ToolConfig(require_approval=[...], approval_handler=...)` gates tool execution behind a sync or async approval callback (fail-closed, denials memoized per run).
+- **Tool result compression** — `ToolConfig(compress_results=True)` summarizes oversized tool results via a one-shot LLM call before they enter context, with raw-text retention for stop conditions and loop detection.
+- **Knowledge pre-save sanitization** — `pre_save` hook on `KnowledgeMemory` plus built-in sanitizers: `defang_delimiters` (prompt-injection markers), `strip_surrogates`, `dedupe_against`.
+- **Pending intent hooks** — `pop_if_intent` (structured confirm/cancel from chat buttons, bypasses the text parser) and `tighten_ttl` (id-pinned atomic Lua rewrite on Redis).
+- **Stability marking sweep** — 100% of the public surface marked; 19 beta→stable promotions (AgentGraph + orchestration core, all 5 pattern agents, checkpoint stores, `RedisSessionStore`, `AzureOpenAIProvider`, ...); module-level `__stability__` on all 123 public modules; CI gate enforces markers forever.
+- **Wart removal** — `Agent.clone_for_isolation()` is public (`@beta`); `__all__` reconciled (11 documented symbols now exported, incl. the Pipeline family and `RouterProvider`); **BREAKING**: `AgentConfig(hooks=...)` now raises `TypeError` (deprecated since v0.16) — migrate to `AgentObserver` via `docs/MIGRATION_1.0.md`.
+- **Security audit published** — `docs/SECURITY_AUDIT.md`: bandit clean at medium/high, all 73 `nosec` suppressions justified, pip-audit pass, SBOM regenerated.
+- **Protocol isinstance fix** — stability markers no longer break third-party `isinstance` checks against `Cache`/`KnowledgeStore`/`CheckpointStore` on Python 3.9–3.11.
+
+See `CHANGELOG.md` for the full entry (7,268 tests, 111 examples).
+
 ## What's New in v0.24
 
 ### v0.24.0 — Production Interop
@@ -585,7 +603,7 @@ report.to_html("report.html")
 - **111 Examples**: Multi-agent graphs, RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions (incl. Supabase), entity memory, knowledge graph, eval framework, advanced agent patterns, stability markers, HTML trace viewer, agent-as-API, A2A, routing, unified memory, and more
 - **Built-in Eval Framework**: 50 evaluators (30 deterministic + 21 LLM-as-judge), A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing
 - **AgentObserver Protocol**: 46 lifecycle events with `run_id` correlation, `LoggingObserver`, `SimpleStepObserver`, OTel export
-- **6187 Tests**: Unit, integration, regression, and E2E with real API calls
+- **7268 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 
@@ -1211,7 +1229,7 @@ pytest tests/ -x -q          # All tests
 pytest tests/ -k "not e2e"   # Skip E2E (no API keys needed)
 ```
 
-6187 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, orchestration, pipelines, agent patterns, stability markers, trace viewer, serve API, A2A, routing, and E2E integration with real API calls.
+7268 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, orchestration, pipelines, agent patterns, stability markers, trace viewer, serve API, A2A, routing, and E2E integration with real API calls.
 
 ## License
 
