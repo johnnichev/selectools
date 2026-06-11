@@ -11,6 +11,10 @@ Tests cover:
 
 from __future__ import annotations
 
+# pickle is safe here: round-tripping objects constructed in this very test
+# file (trusted, in-process) — pickling IS the behavior under test.
+import pickle
+
 import pytest
 
 from selectools import (
@@ -25,6 +29,15 @@ from selectools import (
     ToolParameter,
     ToolValidationError,
     tool,
+)
+from selectools.exceptions import (
+    BudgetExceededError,
+    CancellationError,
+    GraphExecutionError,
+    MCPConnectionError,
+    MCPError,
+    MCPToolError,
+    MemoryLimitExceededError,
 )
 from selectools.providers.stubs import LocalProvider
 
@@ -474,6 +487,54 @@ class TestAgentErrorHandling:
         # Agent should handle errors and continue
         response = agent.run([Message(role=Role.USER, content="Call test_tool with wrong params")])
         assert response.role == Role.ASSISTANT
+
+
+# =============================================================================
+# Pickle round-trip (#95 review): exceptions must survive pickling
+# =============================================================================
+
+
+class TestExceptionPickling:
+    """Custom exceptions whose multi-arg ``__init__`` does not replay from
+    ``self.args`` need ``__reduce__``; without it ``pickle.loads`` raises
+    TypeError (multiprocessing / concurrent.futures propagate worker
+    exceptions by pickle). Sweep of every custom exception in
+    ``selectools.exceptions``.
+    """
+
+    @pytest.mark.parametrize(
+        "exc",
+        [
+            ToolValidationError("calc", "x", "missing", "add x"),
+            ToolValidationError("calc", "x", "missing"),
+            ToolExecutionError("calc", ValueError("boom"), {"x": 1}),
+            ProviderConfigurationError("OpenAI", "api_key", "OPENAI_API_KEY"),
+            ProviderConfigurationError("OpenAI", "api_key"),
+            MemoryLimitExceededError(12, 10, "messages"),
+            MemoryLimitExceededError(2048, 1024, "tokens"),
+            GraphExecutionError("graph", "node", RuntimeError("x"), 3),
+            BudgetExceededError("over budget", 100, 1.5),
+            CancellationError("stopped"),
+            MCPError("mcp failed"),
+            MCPConnectionError("connect failed"),
+            MCPToolError("tool failed"),
+            SelectoolsError("base"),
+        ],
+        ids=lambda e: type(e).__name__,
+    )
+    def test_pickle_round_trip_preserves_attributes(self, exc: SelectoolsError) -> None:
+        restored = pickle.loads(pickle.dumps(exc))
+
+        assert type(restored) is type(exc)
+        assert str(restored) == str(exc)
+        for key, value in vars(exc).items():
+            restored_value = getattr(restored, key)
+            if isinstance(value, BaseException):
+                # Exceptions compare by identity; compare type + rendering.
+                assert type(restored_value) is type(value)
+                assert str(restored_value) == str(value)
+            else:
+                assert restored_value == value
 
 
 # =============================================================================

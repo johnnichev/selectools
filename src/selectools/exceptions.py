@@ -9,7 +9,7 @@ These exceptions provide PyTorch-style error messages with:
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
 from .stability import beta, stable
 
@@ -42,6 +42,13 @@ class ToolValidationError(SelectoolsError):
 
         super().__init__(message)
 
+    def __reduce__(self) -> Tuple[Any, ...]:
+        # Exception's default __reduce__ replays ``self.args`` (the rendered
+        # message) into __init__, which raises TypeError for the multi-arg
+        # signature above. Replay the original constructor args instead so
+        # instances survive pickle (multiprocessing, concurrent.futures).
+        return (self.__class__, (self.tool_name, self.param_name, self.issue, self.suggestion))
+
 
 @stable
 class ToolExecutionError(SelectoolsError):
@@ -64,6 +71,11 @@ class ToolExecutionError(SelectoolsError):
         message += f"\n{'=' * 60}\n"
 
         super().__init__(message)
+
+    def __reduce__(self) -> Tuple[Any, ...]:
+        # See ToolValidationError.__reduce__ — requires ``error`` itself to
+        # be picklable, which holds for built-in and well-behaved exceptions.
+        return (self.__class__, (self.tool_name, self.error, self.params))
 
 
 @stable
@@ -88,6 +100,10 @@ class ProviderConfigurationError(SelectoolsError):
         message += f"\n{'=' * 60}\n"
 
         super().__init__(message)
+
+    def __reduce__(self) -> Tuple[Any, ...]:
+        # See ToolValidationError.__reduce__.
+        return (self.__class__, (self.provider_name, self.missing_config, self.env_var))
 
 
 @stable
@@ -116,6 +132,10 @@ class MemoryLimitExceededError(SelectoolsError):
         message += f"\n{'=' * 60}\n"
 
         super().__init__(message)
+
+    def __reduce__(self) -> Tuple[Any, ...]:
+        # See ToolValidationError.__reduce__.
+        return (self.__class__, (self.current, self.limit, self.limit_type))
 
 
 @stable
@@ -146,6 +166,11 @@ class GraphExecutionError(SelectoolsError):
         message += f"\n{'=' * 60}\n"
 
         super().__init__(message)
+
+    def __reduce__(self) -> Tuple[Any, ...]:
+        # See ToolValidationError.__reduce__ — requires ``error`` itself to
+        # be picklable, which holds for built-in and well-behaved exceptions.
+        return (self.__class__, (self.graph_name, self.node_name, self.error, self.step))
 
 
 @stable
