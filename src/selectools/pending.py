@@ -302,8 +302,14 @@ class ConfirmOutcome:
       ``expires_at``.
 
     Except for ``kind_mismatch`` and ``ignored``, every non-``executed``
-    status means the pending action has been removed — a stale destructive
-    action is never left armed.
+    status means the pending action is disarmed — a stale destructive
+    action is never left armed. On :class:`InMemoryPendingStore` (and on
+    every claiming path) disarmed also means *removed*. The one precise
+    exception is ``"expired"`` from :class:`RedisPendingStore`'s
+    ``pop_if_intent``, which deliberately reports expiry WITHOUT claiming:
+    the key persists inert for up to ~1s until the whole-second server-side
+    TTL reaps it (the expiry guard refuses execution on every path in the
+    meantime; claiming would risk disarming a live same-scope re-stash).
     """
 
     status: str
