@@ -127,6 +127,20 @@ from .patterns import (
     TeamLeadAgent,
     TeamLeadResult,
 )
+from .pending import (
+    ChannelAgent,
+    ConfirmOutcome,
+    ConfirmParser,
+    InMemoryPendingStore,
+    PendingAction,
+    PendingActionExistsError,
+    PendingActionStore,
+    PendingConfirmation,
+    RedisPendingStore,
+    RegexConfirmParser,
+    compute_args_digest,
+    stash_pending,
+)
 from .pipeline import Pipeline, Step, StepResult, branch, cache_step, parallel, retry, step
 from .policy import PolicyDecision, PolicyResult, ToolPolicy
 from .pricing import PRICING, calculate_cost, calculate_embedding_cost, get_model_pricing
@@ -230,6 +244,19 @@ __all__ = [
     "NotFound",
     "Artifact",
     "emit_artifact",
+    # Deferred confirmation flow (issue #58)
+    "PendingAction",
+    "PendingActionStore",
+    "PendingActionExistsError",
+    "InMemoryPendingStore",
+    "RedisPendingStore",
+    "ConfirmOutcome",
+    "ConfirmParser",
+    "RegexConfirmParser",
+    "PendingConfirmation",
+    "ChannelAgent",
+    "stash_pending",
+    "compute_args_digest",
     # Stability markers
     "stable",
     "beta",
