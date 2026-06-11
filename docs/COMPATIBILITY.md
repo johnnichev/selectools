@@ -106,6 +106,30 @@ Install extras as needed: `pip install selectools[rag,evals,mcp,postgres,serve]`
 |-------------------|-------------|-------|
 | `1.0.0+` | ✅ | Full support |
 
+#### Model note: function calling on `gemini-2.5-flash-lite`
+
+`gemini-2.5-flash-lite` supports function calling, but it is markedly less reliable at it
+than `gemini-2.5-flash`. It is known to intermittently return an **empty candidate**
+(often `finish_reason=MALFORMED_FUNCTION_CALL` or `UNEXPECTED_TOOL_CALL`) instead of a
+function call — see [issue #66](https://github.com/johnnichev/selectools/issues/66) and
+upstream reports (e.g. [litellm#16651](https://github.com/BerriAI/litellm/issues/16651),
+[deepagents#417](https://github.com/langchain-ai/deepagents/issues/417)). When this
+happens inside an `Agent` loop, the iteration produces neither text nor a tool call.
+
+`GeminiProvider` logs a `WARNING` (logger `selectools.providers.gemini_provider`)
+whenever a tool-equipped response contains neither text nor tool calls, including the
+`finish_reason`. If you see this warning repeatedly with `gemini-2.5-flash-lite`,
+switch to `gemini-2.5-flash`, simplify your tool schemas, or reduce the number of tools
+per request.
+
+`GeminiProvider` also sanitizes tool schemas for Gemini's API, which rejects two shapes
+that other providers accept (both were hard 400 errors before sanitization):
+
+- bare `list` parameters (`{"type": "array"}` without `items`) — a permissive
+  `items: {"type": "string"}` is injected
+- `Dict[K, V]` parameters (`additionalProperties`) — stripped; the parameter degrades
+  to a plain `object`
+
 ### Ollama
 
 Ollama is accessed via the OpenAI-compatible API (`OllamaProvider` inherits `_OpenAICompatProvider`).

@@ -8,9 +8,10 @@ See: https://ai.google.dev/gemini-api/docs/migrate
 from __future__ import annotations
 
 import base64
+import logging
 import os
 import uuid
-from typing import TYPE_CHECKING, Any, AsyncIterable, Iterable, List, Union
+from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, Iterable, List, Union
 
 if TYPE_CHECKING:
     from ..tools.base import Tool
@@ -23,6 +24,72 @@ from ..stability import stable
 from ..types import Message, Role, ToolCall
 from ..usage import UsageStats
 from .base import Provider, ProviderError
+
+logger = logging.getLogger(__name__)
+
+
+def _sanitize_schema_for_gemini(schema: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Recursively adapt a JSON-schema dict to what Gemini's v1beta API accepts.
+
+    BUG-40 (issue #66 investigation): two selectools schema shapes are hard
+    400s on the Gemini API (verified live, both flash and flash-lite):
+
+    - ``{"type": "array"}`` without ``items`` -> "parameters.properties[x].items:
+      missing field". Bare ``list`` parameters emit exactly this. Gemini requires
+      ``items`` for ARRAY, so inject a permissive string-element schema.
+    - ``additionalProperties`` (emitted for ``Dict[K, V]`` parameters since
+      BUG-29) -> "Unknown name 'additional_properties'". Gemini's Schema proto
+      does not support it, so strip it; the parameter degrades to a plain
+      OBJECT, which Gemini accepts.
+    """
+    cleaned: Dict[str, Any] = {k: v for k, v in schema.items() if k != "additionalProperties"}
+    if cleaned.get("type") == "array" and "items" not in cleaned:
+        cleaned["items"] = {"type": "string"}
+    properties = cleaned.get("properties")
+    if isinstance(properties, dict):
+        cleaned["properties"] = {
+            key: _sanitize_schema_for_gemini(value) if isinstance(value, dict) else value
+            for key, value in properties.items()
+        }
+    items = cleaned.get("items")
+    if isinstance(items, dict):
+        cleaned["items"] = _sanitize_schema_for_gemini(items)
+    return cleaned
+
+
+def _candidate_finish_reason(response: Any) -> str:
+    """Best-effort extraction of the first candidate's finish_reason as a string."""
+    candidates = getattr(response, "candidates", None)
+    if not candidates:
+        return "unknown"
+    finish_reason = getattr(candidates[0], "finish_reason", None)
+    if finish_reason is None:
+        return "unknown"
+    return getattr(finish_reason, "name", None) or str(finish_reason)
+
+
+def _warn_empty_tool_response(model_name: str, finish_reason: str) -> None:
+    """
+    Surface tool-equipped responses that contain neither text nor tool calls.
+
+    Issue #66: some Gemini models (notably gemini-2.5-flash-lite) can return
+    an empty candidate (often finish_reason=MALFORMED_FUNCTION_CALL or
+    UNEXPECTED_TOOL_CALL) instead of a function call. Silently returning an
+    empty Message makes the agent loop to max_iterations with no signal, so
+    log loudly instead.
+    """
+    logger.warning(
+        "Gemini returned neither text nor a tool call for a tool-equipped request "
+        "(model=%s, finish_reason=%s). Some Gemini models — notably "
+        "gemini-2.5-flash-lite — are known to emit empty candidates (frequently "
+        "finish_reason=MALFORMED_FUNCTION_CALL or UNEXPECTED_TOOL_CALL) instead of a "
+        "function call. The agent will treat this as an empty response and may loop "
+        "to max_iterations. Consider gemini-2.5-flash, simplifying tool schemas, or "
+        "retrying. See https://github.com/johnnichev/selectools/issues/66.",
+        model_name,
+        finish_reason,
+    )
 
 
 @stable
@@ -153,6 +220,11 @@ class GeminiProvider(Provider):
                         )
                     )
 
+        # Issue #66: a tool-equipped response with neither text nor tool calls
+        # would silently no-op the agent loop. Surface it loudly.
+        if tools and not content_text and not tool_calls:
+            _warn_empty_tool_response(model_name, _candidate_finish_reason(response))
+
         # Extract usage stats from response
         # BUG-26 / LangChain #36500: use `is not None` guard instead of `or 0`
         # to avoid conflating None (unknown) with 0 (legitimate cached-prompt
@@ -236,14 +308,22 @@ class GeminiProvider(Provider):
         # ToolCall per chunk. Track seen (name, args) pairs and only yield
         # once per unique tool invocation.
         _seen_tool_calls: set = set()
+        # Issue #66: track whether the stream produced anything at all so an
+        # empty tool-equipped response is surfaced instead of silently no-oping.
+        _yielded_any = False
+        _last_finish_reason = "unknown"
 
         try:
             for chunk in stream:
+                chunk_finish_reason = _candidate_finish_reason(chunk)
+                if chunk_finish_reason != "unknown":
+                    _last_finish_reason = chunk_finish_reason
                 try:
                     chunk_text = chunk.text
                 except ValueError:
                     chunk_text = None
                 if chunk_text:
+                    _yielded_any = True
                     yield chunk_text
 
                 candidates = chunk.candidates if hasattr(chunk, "candidates") else None
@@ -273,6 +353,7 @@ class GeminiProvider(Provider):
                                         if raw_sig
                                         else None
                                     )
+                                    _yielded_any = True
                                     yield ToolCall(
                                         tool_name=call_name,
                                         parameters=(
@@ -287,6 +368,9 @@ class GeminiProvider(Provider):
             raise
         except Exception as exc:
             raise ProviderError(f"Gemini streaming failed mid-stream: {exc}") from exc
+
+        if tools and not _yielded_any:
+            _warn_empty_tool_response(model_name, _last_finish_reason)
 
     def _format_contents(self, system_prompt: str, messages: List[Message]) -> List:
         """
@@ -430,18 +514,6 @@ class GeminiProvider(Provider):
 
     def _map_tool_to_gemini(self, tool: Tool) -> Any:
         """Convert a selectools.Tool to Gemini tool schema."""
-        # Helper to recursively convert JSON schema dict to types.Schema?
-        # Actually, types.Tool accepts function_declarations.
-        # FunctionDeclaration accepts parameters as types.Schema.
-        # The SDK might auto-convert dict to Schema if we are lucky, or we pass dict directly?
-        # Documentation suggests we can pass dicts in some places, but let's be safe.
-        # For now, we'll try constructing the tool with a list of dicts if the SDK supports it,
-        # or just types.FunctionDeclaration with kwargs.
-        # We will iterate and construct FunctionDeclaration objects.
-        # Ideally we'd convert the parameters dict to Schema.
-        # But writing a full converter here is complex.
-        # Let's hope the SDK accepts the dict or we can use a helper.
-        # Check if types.Schema has a from_payload or similar?
         from google.genai import types
 
         schema = tool.schema()
@@ -450,7 +522,11 @@ class GeminiProvider(Provider):
                 types.FunctionDeclaration(
                     name=schema["name"],
                     description=schema["description"],
-                    parameters=schema["parameters"],
+                    # BUG-40: Gemini rejects `additionalProperties` and bare
+                    # arrays without `items` with hard 400s — sanitize first.
+                    # The SDK coerces JSON-schema dicts to types.Schema via
+                    # pydantic validation (verified live).
+                    parameters=_sanitize_schema_for_gemini(schema["parameters"]),  # type: ignore[arg-type]
                 )
             ]
         )
@@ -534,6 +610,10 @@ class GeminiProvider(Provider):
                         )
                     )
 
+        # Issue #66: see complete() — surface empty tool-equipped responses.
+        if tools and not content_text and not tool_calls:
+            _warn_empty_tool_response(model_name, _candidate_finish_reason(response))
+
         # Extract usage stats (BUG-26: see complete() for context)
         usage = response.usage_metadata if hasattr(response, "usage_metadata") else None
         prompt_tokens = (
@@ -611,14 +691,21 @@ class GeminiProvider(Provider):
 
         # BUG-38: same dedup logic as sync stream() — see comment there.
         _seen_tool_calls: set = set()
+        # Issue #66: same empty-stream detection as sync stream().
+        _yielded_any = False
+        _last_finish_reason = "unknown"
 
         try:
             async for chunk in stream:
+                chunk_finish_reason = _candidate_finish_reason(chunk)
+                if chunk_finish_reason != "unknown":
+                    _last_finish_reason = chunk_finish_reason
                 try:
                     chunk_text = chunk.text
                 except ValueError:
                     chunk_text = None
                 if chunk_text:
+                    _yielded_any = True
                     yield chunk_text
 
                 candidates = chunk.candidates if hasattr(chunk, "candidates") else None
@@ -647,6 +734,7 @@ class GeminiProvider(Provider):
                                         if raw_sig
                                         else None
                                     )
+                                    _yielded_any = True
                                     yield ToolCall(
                                         tool_name=call_name,
                                         parameters=(
@@ -661,6 +749,9 @@ class GeminiProvider(Provider):
             raise
         except Exception as exc:
             raise ProviderError(f"Gemini async streaming failed mid-stream: {exc}") from exc
+
+        if tools and not _yielded_any:
+            _warn_empty_tool_response(model_name, _last_finish_reason)
 
 
 __all__ = ["GeminiProvider"]
