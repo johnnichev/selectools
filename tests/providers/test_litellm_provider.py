@@ -303,6 +303,37 @@ class TestComplete:
 
 
 # ======================================================================
+# Reserved litellm_kwargs keys
+# ======================================================================
+
+
+class TestReservedKwargs:
+    @pytest.mark.parametrize(
+        "key,value",
+        [
+            ("messages", [{"role": "user", "content": "hi"}]),
+            ("stream", True),
+            ("tools", []),
+            ("temperature", 0.7),
+            ("max_tokens", 256),
+        ],
+    )
+    def test_reserved_key_raises_at_construction(self, key: str, value: Any) -> None:
+        fake = _make_fake_litellm(response=_response())
+
+        with pytest.raises(ValueError, match=key):
+            _make_provider(fake, model="groq/llama-3.1-70b", **{key: value})
+
+    def test_benign_kwarg_still_flows_through(self) -> None:
+        fake = _make_fake_litellm(response=_response())
+        provider = _make_provider(fake, model="groq/llama-3.1-70b", api_version="x")
+
+        provider.complete(model="groq/llama-3.1-70b", system_prompt="s", messages=_USER_MSG)
+
+        assert fake.calls[0]["api_version"] == "x"
+
+
+# ======================================================================
 # Tool-call parsing
 # ======================================================================
 
@@ -353,6 +384,28 @@ class TestToolCallParsing:
         assert tc.parameters == {}
         assert tc.parse_error is not None
         assert "invalid JSON" in tc.parse_error
+
+    def test_non_str_non_dict_arguments_set_parse_error(self) -> None:
+        # Mirrors Ollama's third branch: a list (or any other type) must not
+        # raise an uncaught TypeError from json.loads.
+        fake = _make_fake_litellm(
+            response=_response(
+                content=None,
+                tool_calls=[_tool_call(arguments=["not", "valid"])],  # type: ignore[arg-type]
+            )
+        )
+        provider = _make_provider(fake, model="groq/llama-3.1-70b")
+
+        msg, _ = provider.complete(
+            model="groq/llama-3.1-70b", system_prompt="s", messages=_USER_MSG
+        )
+
+        assert msg.tool_calls is not None
+        tc = msg.tool_calls[0]
+        assert tc.parameters == {}
+        assert tc.parse_error is not None
+        assert "unsupported tool arguments type" in tc.parse_error
+        assert "list" in tc.parse_error
 
     def test_missing_tool_call_id_generates_one(self) -> None:
         fake = _make_fake_litellm(

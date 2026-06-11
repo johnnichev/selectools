@@ -395,6 +395,11 @@ provider = LiteLLMProvider(
 - The agent passes `AgentConfig.model` to the provider on every call, so set
   it to the same `provider/model` string (or use `model_selector` to switch
   between litellm-routed models mid-run).
+- **Reserved kwargs:** per-call arguments built by the agent loop take
+  precedence over `**litellm_kwargs` defaults, so the keys the base supplies
+  on every call -- `model`, `messages`, `stream`, `tools`, `temperature`,
+  `max_tokens` -- are reserved and raise `ValueError` at construction. Set
+  temperature/max_tokens on `AgentConfig` instead.
 - **Cost:** `UsageStats.cost_usd` comes from `litellm.cost_per_token` (a local
   lookup against litellm's cost map, no extra API call). Models missing from
   the cost map report `0.0`. Prompt-cache token fields stay `None` because

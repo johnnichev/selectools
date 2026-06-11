@@ -33,6 +33,15 @@ from ..stability import beta
 from ._openai_compat import _OpenAICompatibleBase, _parse_tool_args
 from .base import ProviderError
 
+# Keys the base class supplies on every completion call. Allowing them in
+# **litellm_kwargs would either be silently overridden (the merge puts
+# per-call kwargs last) or, worse, leak into non-streaming paths
+# (stream=True would make litellm return a stream wrapper into
+# _parse_response). Reject them at construction instead.
+_RESERVED_LITELLM_KWARGS = frozenset(
+    {"model", "messages", "stream", "tools", "temperature", "max_tokens"}
+)
+
 
 def _import_litellm() -> Any:
     """Lazy-import litellm, raising a helpful error on failure."""
@@ -86,7 +95,13 @@ class LiteLLMProvider(_OpenAICompatibleBase):
             proxies).
         **litellm_kwargs: Extra keyword arguments forwarded to every
             ``litellm.completion``/``acompletion`` call, e.g.
-            ``drop_params=True`` or ``num_retries=2``.
+            ``drop_params=True`` or ``num_retries=2``. Per-call arguments
+            built by the agent loop take precedence over these defaults,
+            so keys the base class supplies on every call -- ``model``,
+            ``messages``, ``stream``, ``tools``, ``temperature``,
+            ``max_tokens`` -- are reserved and raise ``ValueError`` at
+            construction. Set temperature/max_tokens on ``AgentConfig``
+            instead.
 
     Example:
         >>> provider = LiteLLMProvider(model="groq/llama-3.1-70b")
@@ -106,6 +121,14 @@ class LiteLLMProvider(_OpenAICompatibleBase):
         **litellm_kwargs: Any,
     ) -> None:
         load_default_env()
+        reserved = _RESERVED_LITELLM_KWARGS.intersection(litellm_kwargs)
+        if reserved:
+            raise ValueError(
+                f"litellm_kwargs key(s) {sorted(reserved)} are reserved: the agent "
+                "loop supplies them on every call, so defaults here would be "
+                "silently overridden (or, for 'stream', corrupt non-streaming "
+                "calls). Use AgentConfig for temperature/max_tokens."
+            )
         self._litellm = _import_litellm()
 
         defaults: Dict[str, Any] = dict(litellm_kwargs)
@@ -150,12 +173,16 @@ class LiteLLMProvider(_OpenAICompatibleBase):
 
         litellm normalizes to the OpenAI shape (JSON string), but some
         routed backends hand back already-parsed dicts -- accept both,
-        mirroring the Ollama override.
+        mirroring the Ollama override. Anything else (list, None, ...)
+        is surfaced as a parse error instead of an uncaught TypeError
+        from ``json.loads``.
         """
         arguments = tc.function.arguments
         if isinstance(arguments, dict):
             return arguments, None
-        return _parse_tool_args(arguments)
+        if isinstance(arguments, str):
+            return _parse_tool_args(arguments)
+        return {}, f"unsupported tool arguments type: {type(arguments).__name__}"
 
     def _initial_tool_call_id(self, tc_delta: Any) -> Optional[str]:
         # Not every litellm-routed backend supplies an ID on the first delta.
