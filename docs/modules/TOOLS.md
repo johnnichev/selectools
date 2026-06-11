@@ -513,6 +513,82 @@ execution path. Outside an agent run, `emit_artifact()` is a safe no-op that sti
 
 ---
 
+## Deferred Confirmation for Chat Channels
+
+> All symbols are `@beta` (introduced for issue #58). APIs may change in a minor release.
+
+The built-in approval gate (`Tool.requires_approval` + `AgentConfig.confirm_action`) blocks the
+agent loop while a confirm decision is awaited — wrong for chat-channel agents (WhatsApp,
+Telegram, Slack DM, SMS), where the user's "yes" arrives as a **separate webhook turn**. The
+`selectools.pending` module provides the out-of-loop pattern instead:
+
+```python
+from selectools import Agent, tool
+from selectools.pending import (
+    ChannelAgent, InMemoryPendingStore, PendingConfirmation, stash_pending,
+)
+
+@tool(description="Delete an invoice (destructive)")
+def delete_invoice(invoice_id: str) -> PendingConfirmation:
+    preview = f"Delete invoice {invoice_id}"
+    stash_pending(
+        kind="delete_invoice",
+        preview=preview,
+        executor=lambda: do_delete(invoice_id),   # runs on a LATER turn
+        args={"invoice_id": invoice_id},          # digest-bound side effect
+    )
+    return PendingConfirmation(
+        action="delete_invoice",
+        preview=preview,
+        user_prompt="Reply 'yes' to confirm or 'no' to cancel.",
+    )
+
+channel = ChannelAgent(agent, store=InMemoryPendingStore())
+
+# Webhook turn 1: previews, stashes, asks. Nothing executes.
+channel.ask_channel("user-1", "delete invoice INV-42")
+# Webhook turn 2: confirm fires the stashed executor; the LLM is bypassed.
+channel.ask_channel("user-1", "yes")
+```
+
+`ChannelAgent.ask_channel(user_id, message, *, channel_id=None, conversation_id=None)` routes
+each inbound turn: a **cancel** ("não", "no", "cancel") drops the pending and acks; a
+**confirm** ("sim", "yes", "sí") atomically claims and executes it; anything else drops the
+pending (the user moved on — a destructive action must never stay armed behind an unrelated
+reply) and dispatches to the wrapped agent normally, with the channel scope installed so tools
+can call `stash_pending()` (same `ContextVar` mechanism as `emit_artifact()`).
+
+**The safety model** (one confirmation, one exact side effect): each `PendingAction` records the
+user/channel/conversation scope, the preview shown, a canonical SHA-256 `args_digest` of the
+proposed arguments, `requested_at`/`expires_at` (default TTL 60s), the confirm-parser version,
+and a `pending → confirmed | cancelled | expired | consumed` status lifecycle.
+`pop_if_confirmed` executes only when **all** guards pass — same scope, still pending, TTL not
+expired, digest unchanged — and duplicate webhook delivery executes **once** (atomic claim:
+in-memory lock, or a single `GETDEL` on Redis).
+
+**Stores:**
+
+- `InMemoryPendingStore` — thread-safe, TTL-bounded, LRU-capped (default 5000 scopes). Pending
+  actions do not survive a restart; the user re-asks.
+- `RedisPendingStore` — multi-instance. Mirrors `RedisSessionStore` (lazy `import redis`, key
+  prefix, server-side TTL). Only the **record** is persisted — executor closures are never
+  pickled into Redis. Closures live in a process-local registry keyed by `pending_action_id`;
+  when the confirming webhook lands on a different process, register an executor **factory** per
+  kind with `register_executor_factory(kind, factory)` — it rebuilds the executor from the
+  persisted record (`record.args`). With neither closure nor factory the claim resolves to
+  `no_executor` and nothing executes. Requires Redis >= 6.2 (`GETDEL`).
+
+**Confirm parsing** is pluggable via the `ConfirmParser` protocol. The built-in
+`RegexConfirmParser` (version `regex-v1:pt-en-es`) accepts only unambiguous confirmations —
+"ok"/"claro"/"pode" are common PT-BR acknowledgments in non-destructive replies and never fire a
+pending action; Spanish bare "si" mid-sentence is the conditional "if", so it only confirms as
+the entire message.
+
+See [`examples/100_deferred_confirmation.py`](https://github.com/johnnichev/selectools/blob/main/examples/100_deferred_confirmation.py)
+for a complete offline two-turn webhook simulation.
+
+---
+
 ## Decorator Pattern
 
 ### Basic Usage
@@ -1222,6 +1298,7 @@ def log_message(msg: str) -> str:
 | 27 | [`27_tool_policy.py`](https://github.com/johnnichev/selectools/blob/main/examples/27_tool_policy.py) | Allow/review/deny rules with ToolPolicy |
 | 38 | [`38_terminal_tools.py`](https://github.com/johnnichev/selectools/blob/main/examples/38_terminal_tools.py) | Terminal tools that stop the agent loop |
 | 99 | [`99_tool_results_artifacts.py`](https://github.com/johnnichev/selectools/blob/main/examples/99_tool_results_artifacts.py) | Typed ToolResult returns + artifact side-channel |
+| 100 | [`100_deferred_confirmation.py`](https://github.com/johnnichev/selectools/blob/main/examples/100_deferred_confirmation.py) | Deferred confirmation for chat-channel destructive tools |
 
 ---
 
