@@ -81,6 +81,9 @@ evals = [
 mcp = [
     "mcp>=1.0.0,<2.0.0",
 ]
+litellm = [
+    "litellm>=1.0.0",
+]
 postgres = [
     "psycopg2-binary>=2.9.0",
 ]
