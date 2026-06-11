@@ -3,7 +3,7 @@
 **Version audited:** v0.24.0
 **Audit date:** 2026-06-11
 **Tools:** [Bandit](https://bandit.readthedocs.io/) 1.8.6 static analysis + manual review of all `# nosec` annotations + [pip-audit](https://pypi.org/project/pip-audit/) 2.9.0 dependency scan
-**Result:** Zero Bandit findings at medium severity or above. All suppressed warnings are justified. Three known advisories in transitive (not directly declared) dependencies, all with released fixes.
+**Result:** Zero Bandit findings at medium severity or above. All suppressed warnings are justified. Three known advisories in transitive (not directly declared) dependencies; fixes are announced upstream but not yet released.
 **SBOM:** [`sbom.json`](https://github.com/johnnichev/selectools/blob/main/sbom.json) — CycloneDX 1.6, regenerated for v0.24.0 with `cyclonedx-py` 7.3.0
 
 This supersedes the [v0.19.2 audit](SECURITY.md). To report a vulnerability, see the
@@ -226,8 +226,12 @@ urllib3  2.6.3   PYSEC-2026-141      2.7.0
 - **No advisories in selectools' directly declared dependencies** (`openai`, `anthropic`,
   `google-genai`, `numpy`).
 - `requests` and `urllib3` are **transitive** dependencies pulled in by the provider SDKs.
-  selectools does not pin or constrain either package, so consumers can (and should)
-  upgrade in place: `pip install -U "requests>=2.33.0" "urllib3>=2.7.0"`.
+  The fix versions listed by the advisories (`requests` 2.33.0, `urllib3` 2.7.0) are
+  **announced but not yet released on PyPI** — at the time of this audit the latest
+  published releases are `requests` 2.32.5 and `urllib3` 2.6.3, so the exposure stands
+  until the fixed versions ship. selectools does not pin or constrain either package;
+  upgrade in place as soon as the fixes are available:
+  `pip install -U "requests>=2.33.0" "urllib3>=2.7.0"`.
 
 **Process:** dependency audits are run before every release tag with:
 
