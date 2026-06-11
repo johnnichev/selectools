@@ -10,8 +10,6 @@ from __future__ import annotations
 
 import pytest
 
-from selectools.a2a.server import A2AServer, _extract_prompt
-from selectools.a2a.types import INVALID_PARAMS
 from selectools.pending import RegexConfirmParser
 from selectools.types import AgentResult, Message, Role
 
@@ -36,21 +34,30 @@ class _FakeAgent:
         return AgentResult(message=Message(role=Role.ASSISTANT, content="ok"), iterations=1)
 
 
-def _testclient(server: A2AServer):
-    from starlette.testclient import TestClient
+@pytest.fixture()
+def a2a_server_mod():
+    """a2a.server imports starlette at module level; the core CI matrix
+    installs no extras (same optional-dep discipline as PR #97), so the
+    a2a findings gate on starlette while the parser tests always run."""
+    pytest.importorskip("starlette")
+    from selectools.a2a import server
 
-    return TestClient(server, raise_server_exceptions=False)
+    return server
 
 
 class TestA2ANonDictPart:
-    def test_extract_prompt_tolerates_non_dict_parts(self) -> None:
+    def test_extract_prompt_tolerates_non_dict_parts(self, a2a_server_mod) -> None:
         # Must not raise AttributeError on a stray non-dict list element.
-        out = _extract_prompt([{"kind": "text", "text": "hi"}, "garbage"])
+        out = a2a_server_mod._extract_prompt([{"kind": "text", "text": "hi"}, "garbage"])
         assert out == "hi"
 
-    def test_message_send_non_dict_part_is_invalid_params_not_500(self) -> None:
-        server = A2AServer(agent=_FakeAgent())
-        client = _testclient(server)
+    def test_message_send_non_dict_part_is_invalid_params_not_500(self, a2a_server_mod) -> None:
+        from starlette.testclient import TestClient
+
+        from selectools.a2a.types import INVALID_PARAMS
+
+        server = a2a_server_mod.A2AServer(agent=_FakeAgent())
+        client = TestClient(server, raise_server_exceptions=False)
         body = {
             "jsonrpc": "2.0",
             "id": 1,
