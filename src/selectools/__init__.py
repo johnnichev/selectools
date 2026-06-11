@@ -135,6 +135,7 @@ from .providers.anthropic_provider import AnthropicProvider
 from .providers.azure_openai_provider import AzureOpenAIProvider
 from .providers.fallback import FallbackProvider
 from .providers.gemini_provider import GeminiProvider
+from .providers.litellm_provider import LiteLLMProvider
 from .providers.ollama_provider import OllamaProvider
 from .providers.openai_provider import OpenAIProvider
 from .providers.stubs import LocalProvider
@@ -188,6 +189,7 @@ __all__ = [
     "AnthropicProvider",
     "GeminiProvider",
     "OllamaProvider",
+    "LiteLLMProvider",
     "LocalProvider",
     "FallbackProvider",
     "ToolRegistry",

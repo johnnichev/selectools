@@ -165,7 +165,8 @@ All providers support namespace imports from the `selectools.providers` package:
 
 ```python
 from selectools.providers import (
-    OpenAIProvider, AzureOpenAIProvider, AnthropicProvider, GeminiProvider, OllamaProvider
+    OpenAIProvider, AzureOpenAIProvider, AnthropicProvider, GeminiProvider, OllamaProvider,
+    LiteLLMProvider,
 )
 ```
 
@@ -341,6 +342,76 @@ prefix (e.g., `gpt-5-mini`), no override is needed.
 > **Implementation note**: `AzureOpenAIProvider` extends `OpenAIProvider`, overriding
 > only the client initialization to use `AzureOpenAI` / `AsyncAzureOpenAI` from the
 > OpenAI SDK. All complete/stream/acomplete/astream behaviour is inherited.
+
+### LiteLLM Provider
+
+**Stability:** <span class="badge-beta">beta</span>
+
+Instant access to 100+ models (DeepSeek, Groq, Mistral, Together, Cohere,
+Fireworks, Bedrock, ...) by delegating to the [litellm](https://docs.litellm.ai)
+library. litellm routes `provider/model` identifiers to the right backend and
+normalizes everything to the OpenAI wire format.
+
+```bash
+pip install selectools[litellm]
+```
+
+```python
+from selectools import Agent, AgentConfig
+from selectools.providers import LiteLLMProvider
+
+provider = LiteLLMProvider(model="deepseek/deepseek-chat")
+provider = LiteLLMProvider(model="groq/llama-3.1-70b")
+provider = LiteLLMProvider(model="bedrock/anthropic.claude-3-sonnet")
+
+agent = Agent(
+    tools,
+    provider=provider,
+    config=AgentConfig(model="groq/llama-3.1-70b"),  # match the provider model
+)
+
+# Features:
+# - 100+ models through one adapter (litellm handles provider-specific quirks)
+# - Full protocol: complete / acomplete / stream / astream
+# - Native tool calling (OpenAI tool schema, translated per backend by litellm)
+# - Cost tracking via litellm's own cost map
+```
+
+**Configuration:**
+
+```python
+provider = LiteLLMProvider(
+    model="groq/llama-3.1-70b",
+    api_key="gsk_...",                  # Optional; litellm reads GROQ_API_KEY etc. when omitted
+    api_base="https://my-proxy/v1",     # Optional gateway/proxy override
+    drop_params=True,                   # Extra kwargs forwarded to every litellm call
+)
+```
+
+**Notes:**
+
+- `litellm` is a lazy optional import: constructing the provider without it
+  installed raises `ImportError` pointing at `pip install selectools[litellm]`.
+- The agent passes `AgentConfig.model` to the provider on every call, so set
+  it to the same `provider/model` string (or use `model_selector` to switch
+  between litellm-routed models mid-run).
+- **Reserved kwargs:** per-call arguments built by the agent loop take
+  precedence over `**litellm_kwargs` defaults, so the keys the base supplies
+  on every call -- `model`, `messages`, `stream`, `tools`, `temperature`,
+  `max_tokens` -- are reserved and raise `ValueError` at construction. Set
+  temperature/max_tokens on `AgentConfig` instead.
+- **Cost:** `UsageStats.cost_usd` comes from `litellm.cost_per_token` (a local
+  lookup against litellm's cost map, no extra API call). Models missing from
+  the cost map report `0.0`. Prompt-cache token fields stay `None` because
+  litellm does not report cache usage uniformly across backends.
+- Native providers remain the choice for maximum control; LiteLLM is the
+  long-tail solution.
+
+> **Implementation note**: `LiteLLMProvider` inherits the shared
+> `_OpenAICompatibleBase` (same Template Method base as OpenAI/Ollama) and
+> adapts `litellm.completion` / `litellm.acompletion` to the OpenAI SDK client
+> surface through a small shim, so message formatting, streaming assembly, and
+> malformed-tool-JSON handling are identical to the native OpenAI provider.
 
 ### Local Provider (Testing)
 
