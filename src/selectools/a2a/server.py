@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import hmac
 import json
+import logging
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -59,7 +60,11 @@ if TYPE_CHECKING:
 
 __all__ = ["A2AServer"]
 
+logger = logging.getLogger(__name__)
+
 _RequestId = Union[str, int, None]
+
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
 
 def _now_iso() -> str:
@@ -105,6 +110,20 @@ class A2AServer:
     Supported JSON-RPC methods: ``message/send`` (and the legacy
     ``tasks/send`` alias), ``tasks/get``, ``tasks/cancel``.
 
+    Trust model (v1):
+        - **Single shared tenant.** One bearer token grants full access:
+          any authenticated caller can read every stored task (including
+          other callers' inputs and outputs) via ``tasks/get``. Do not
+          share one server between mutually untrusting parties.
+        - **Do not run unauthenticated on a public interface.** Without
+          ``auth_token`` anyone who can reach the port can run the agent
+          and read all tasks. :meth:`serve` logs a warning in that case.
+        - **Per-request agent isolation.** Each ``message/send`` runs on
+          an isolated clone of the agent (fresh history and usage, no
+          memory), so callers never see each other's conversation context.
+          A2A v1 has no session model, so agent memory is intentionally
+          dropped: every request starts from a clean slate.
+
     Args:
         agent: The :class:`Agent` to expose. Its ``config.name`` and tools
             populate the Agent Card.
@@ -118,6 +137,12 @@ class A2AServer:
         url: Public URL of the A2A endpoint advertised in the Agent Card.
         version: Agent version advertised in the card (defaults to the
             selectools package version).
+        max_tasks: Maximum number of completed tasks kept in the in-memory
+            store (default 2000). Oldest tasks are evicted first (FIFO);
+            an evicted task id returns ``-32001`` from ``tasks/get``.
+        max_body_bytes: Maximum accepted ``POST /a2a`` body size in bytes
+            (default 1 MiB). Larger bodies are rejected with JSON-RPC
+            ``-32600`` before parsing.
 
     Example::
 
@@ -135,6 +160,8 @@ class A2AServer:
         description: Optional[str] = None,
         url: str = "",
         version: Optional[str] = None,
+        max_tasks: int = 2000,
+        max_body_bytes: int = 1_048_576,
     ) -> None:
         self._agent = agent
         self._auth_token = auth_token
@@ -142,6 +169,8 @@ class A2AServer:
         self._description = description or f"selectools agent {self._name!r} served over A2A"
         self._url = url
         self._version = version or __version__
+        self._max_tasks = max_tasks
+        self._max_body_bytes = max_body_bytes
         self._tasks: Dict[str, Dict[str, Any]] = {}
         self._tasks_lock = threading.Lock()
         self._app = Starlette(
@@ -157,6 +186,13 @@ class A2AServer:
 
     def serve(self, port: int = 8000, host: str = "0.0.0.0") -> None:  # nosec B104
         """Run the server with uvicorn (blocking)."""
+        if self._auth_token is None and host not in _LOOPBACK_HOSTS:
+            logger.warning(
+                "A2AServer is starting unauthenticated on non-loopback host %r: "
+                "anyone who can reach this port can run the agent and read all "
+                "stored tasks. Pass auth_token=... to require a bearer token.",
+                host,
+            )
         try:
             import uvicorn
         except ImportError as exc:  # pragma: no cover - depends on env
@@ -214,8 +250,15 @@ class A2AServer:
         denied = self._check_auth(request)
         if denied:
             return denied
+        raw = await request.body()
+        if len(raw) > self._max_body_bytes:
+            return _rpc_error(
+                None,
+                INVALID_REQUEST,
+                f"Invalid request: body exceeds {self._max_body_bytes} bytes",
+            )
         try:
-            body = json.loads(await request.body())
+            body = json.loads(raw)
         except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
             return _rpc_error(None, PARSE_ERROR, "Parse error: request body is not valid JSON")
         if not isinstance(body, dict):
@@ -283,17 +326,30 @@ class A2AServer:
             "artifacts": [],
         }
         try:
-            result = await run_in_threadpool(
-                self._agent.run, [Message(role=Role.USER, content=prompt)]
-            )
+            # Run on an isolated clone: Agent.run mutates shared _history (and
+            # memory), which would leak caller A's conversation into caller B's
+            # provider context and race under concurrency. _clone_for_isolation
+            # (same mechanism run_batch uses) shares tools/provider/config but
+            # gives fresh history/usage and drops memory — correct for A2A v1,
+            # which has no session model. It is underscore-private today;
+            # promoting it to a public API is a follow-up.
+            clone = self._agent._clone_for_isolation()
+            result = await run_in_threadpool(clone.run, [Message(role=Role.USER, content=prompt)])
         except Exception as exc:
             # Agent failure is a task-level outcome, not a transport error.
+            # Only the exception type goes to the remote caller — exception
+            # messages can contain internal URLs/paths. Full detail is logged.
+            logger.warning(
+                "A2A task %s failed: %s: %s", task_id, type(exc).__name__, exc, exc_info=True
+            )
             task["status"] = {
                 "state": TaskState.FAILED,
                 "timestamp": _now_iso(),
                 "message": {
                     "role": "agent",
-                    "parts": [{"kind": "text", "text": f"{type(exc).__name__}: {exc}"}],
+                    "parts": [
+                        {"kind": "text", "text": f"Agent execution failed ({type(exc).__name__})"}
+                    ],
                     "messageId": uuid.uuid4().hex,
                     "kind": "message",
                 },
@@ -316,6 +372,11 @@ class A2AServer:
     def _store_task(self, task: Dict[str, Any]) -> None:
         with self._tasks_lock:
             self._tasks[task["id"]] = task
+            # Bounded FIFO: dicts preserve insertion order, so the first key
+            # is always the oldest task. Caps memory (tasks retain the full
+            # inbound message + output) at max_tasks entries.
+            while len(self._tasks) > self._max_tasks:
+                self._tasks.pop(next(iter(self._tasks)))
 
     def _tasks_get(self, request_id: _RequestId, params: Dict[str, Any]) -> JSONResponse:
         task_id = params.get("id")
@@ -329,12 +390,17 @@ class A2AServer:
         task_id = params.get("id")
         with self._tasks_lock:
             task = self._tasks.get(task_id) if isinstance(task_id, str) else None
-        if task is None:
-            return _rpc_error(request_id, TASK_NOT_FOUND, f"Task not found: {task_id!r}")
-        # Synchronous v1: every stored task is already terminal.
-        if task["status"]["state"] in TaskState.TERMINAL:
-            return _rpc_error(
-                request_id, TASK_NOT_CANCELABLE, f"Task {task_id!r} is in a terminal state"
-            )
-        task["status"] = {"state": TaskState.CANCELED, "timestamp": _now_iso()}  # pragma: no cover
-        return _rpc_result(request_id, task)  # pragma: no cover
+            if task is None:
+                return _rpc_error(request_id, TASK_NOT_FOUND, f"Task not found: {task_id!r}")
+            # Synchronous v1: every stored task is already terminal.
+            if task["status"]["state"] in TaskState.TERMINAL:
+                return _rpc_error(
+                    request_id, TASK_NOT_CANCELABLE, f"Task {task_id!r} is in a terminal state"
+                )
+            # State check + mutation stay under the lock so a concurrent
+            # cancel/store cannot interleave between them.
+            task["status"] = {  # pragma: no cover
+                "state": TaskState.CANCELED,
+                "timestamp": _now_iso(),
+            }
+            return _rpc_result(request_id, task)  # pragma: no cover

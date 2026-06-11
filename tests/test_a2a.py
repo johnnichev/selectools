@@ -193,7 +193,98 @@ class TestMessageSend:
         task = body["result"]
         assert task["status"]["state"] == TaskState.FAILED == "failed"
         detail = task["status"]["message"]["parts"][0]["text"]
-        assert detail
+        assert detail == "Agent execution failed (RuntimeError)"
+
+    def test_agent_failure_does_not_leak_exception_detail(self):
+        # Provider/tool exception strings can contain internal URLs or paths;
+        # remote callers must only see the exception type, not its message.
+        client = TestClient(make_server(agent=make_failing_agent()))
+        task = send_text(client, "boom").json()["result"]
+        detail = task["status"]["message"]["parts"][0]["text"]
+        assert "kaboom" not in detail
+
+
+# ─── Per-request agent isolation ─────────────────────────────────────────────
+
+
+class TestRequestIsolation:
+    def test_no_cross_caller_context_leak(self):
+        # Two sequential requests from different callers: the second
+        # provider call must NOT see the first caller's text (A2A v1 has
+        # no session model, so every request starts from a clean slate).
+        agent = make_agent(responses=["reply A", "reply B"])
+        provider = agent.provider
+        client = TestClient(A2AServer(agent=agent))
+        r1 = send_text(client, "caller-A-secret-payload")
+        assert r1.json()["result"]["status"]["state"] == "completed"
+        r2 = send_text(client, "caller-B question")
+        assert r2.json()["result"]["status"]["state"] == "completed"
+        contents = [m.content or "" for m in provider.last_messages]
+        assert any("caller-B question" in c for c in contents)
+        assert not any("caller-A-secret-payload" in c for c in contents)
+
+    def test_shared_agent_history_not_mutated(self):
+        agent = make_agent()
+        client = TestClient(A2AServer(agent=agent))
+        send_text(client, "hi")
+        send_text(client, "hi again")
+        assert agent._history == []
+
+
+# ─── Task store bounds + body size guard ─────────────────────────────────────
+
+
+class TestTaskStoreBounds:
+    def test_fifo_eviction(self):
+        client = TestClient(make_server(max_tasks=2))
+        ids = [send_text(client, f"msg {i}").json()["result"]["id"] for i in range(3)]
+        # Oldest task evicted first.
+        r0 = rpc(client, "tasks/get", {"id": ids[0]})
+        assert r0.json()["error"]["code"] == -32001
+        for tid in ids[1:]:
+            assert rpc(client, "tasks/get", {"id": tid}).json()["result"]["id"] == tid
+
+    def test_oversized_body_rejected(self):
+        client = TestClient(make_server(max_body_bytes=200))
+        r = send_text(client, "x" * 1000)
+        body = r.json()
+        assert body["error"]["code"] == -32600
+        assert "body" in body["error"]["message"].lower()
+
+    def test_body_within_limit_accepted(self):
+        client = TestClient(make_server(max_body_bytes=10_000))
+        assert send_text(client, "hi").json()["result"]["status"]["state"] == "completed"
+
+
+# ─── serve() open-endpoint warning ───────────────────────────────────────────
+
+
+class TestServeWarning:
+    def _fake_uvicorn(self, monkeypatch):
+        import sys
+        import types
+
+        fake = types.ModuleType("uvicorn")
+        fake.run = lambda *args, **kwargs: None
+        monkeypatch.setitem(sys.modules, "uvicorn", fake)
+
+    def test_warns_when_unauthenticated_on_public_host(self, monkeypatch, caplog):
+        import logging
+
+        self._fake_uvicorn(monkeypatch)
+        server = make_server()
+        with caplog.at_level(logging.WARNING, logger="selectools.a2a.server"):
+            server.serve(host="0.0.0.0")  # nosec B104
+        assert any("unauthenticated" in r.getMessage() for r in caplog.records)
+
+    def test_no_warning_on_loopback_or_with_token(self, monkeypatch, caplog):
+        import logging
+
+        self._fake_uvicorn(monkeypatch)
+        with caplog.at_level(logging.WARNING, logger="selectools.a2a.server"):
+            make_server().serve(host="127.0.0.1")
+            make_server(auth_token="sk-secret").serve(host="0.0.0.0")  # nosec B104
+        assert not any("unauthenticated" in r.getMessage() for r in caplog.records)
 
 
 # ─── JSON-RPC error codes ────────────────────────────────────────────────────

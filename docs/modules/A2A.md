@@ -33,6 +33,29 @@ uvicorn my_module:server --port 8000
 | `/.well-known/agent.json` | GET | never | Agent Card discovery |
 | `/a2a` | POST | bearer (optional) | JSON-RPC 2.0 message handler |
 
+### Trust model (v1)
+
+- **Single shared tenant.** One bearer token grants full access: any
+  authenticated caller can read every stored task — including other
+  callers' inputs and outputs — via `tasks/get`. Do not share one server
+  between mutually untrusting parties.
+- **Do not run unauthenticated on a public interface.** Without
+  `auth_token`, anyone who can reach the port can run the agent and read
+  all stored tasks. `serve()` logs a warning when started without a
+  token on a non-loopback host.
+- **Per-request agent isolation.** Each `message/send` runs on an
+  isolated clone of the agent (fresh history and usage, memory dropped),
+  so callers never see each other's conversation context. A2A v1 has no
+  session model: every request starts from a clean slate, with no
+  cross-request memory.
+- **Bounded resources.** The in-memory task store keeps at most
+  `max_tasks` tasks (default 2000, FIFO eviction — an evicted id returns
+  `-32001` from `tasks/get`), and bodies larger than `max_body_bytes`
+  (default 1 MiB) are rejected with `-32600` before parsing.
+- **Sanitized errors.** When the agent raises, remote callers only see
+  the exception type (`Agent execution failed (RuntimeError)`); the full
+  detail goes to the server log at warning level.
+
 ### Agent Card
 
 The card is auto-generated from the agent's metadata: `config.name`,
@@ -121,12 +144,13 @@ later without changing the wire format.
 |---|---|
 | Invalid bearer token | HTTP `401` (before any JSON-RPC handling) |
 | Body is not valid JSON | JSON-RPC error `-32700` |
+| Body larger than `max_body_bytes` | JSON-RPC error `-32600` (checked before parsing) |
 | Not a valid JSON-RPC 2.0 request | JSON-RPC error `-32600` |
 | Unknown method | JSON-RPC error `-32601` |
 | Missing/invalid `message` or no text part | JSON-RPC error `-32602` |
-| Unknown task id (`tasks/get`/`tasks/cancel`) | JSON-RPC error `-32001` |
+| Unknown (or evicted) task id (`tasks/get`/`tasks/cancel`) | JSON-RPC error `-32001` |
 | Task not cancelable | JSON-RPC error `-32002` |
-| **Agent raises during the run** | Task with `status.state = "failed"` and the error detail in `status.message` — *not* a transport-level error |
+| **Agent raises during the run** | Task with `status.state = "failed"` and the exception *type* (not its message) in `status.message` — *not* a transport-level error |
 
 ### Text-first v1
 

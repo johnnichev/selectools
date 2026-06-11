@@ -133,6 +133,70 @@ class TestChat:
         assert any("second question" in c for c in contents)
 
 
+# ─── Per-request agent isolation ─────────────────────────────────────────────
+
+
+class TestRequestIsolation:
+    def test_no_cross_caller_context_leak(self):
+        # Two sequential requests from different callers (separate sessions):
+        # the second provider call must NOT contain the first caller's text.
+        agent = make_agent(responses=["reply A", "reply B"])
+        client = make_client(AgentAPI(agents=[agent]))
+        r1 = client.post(
+            "/v1/chat", json={"input": "caller-A-secret-payload"}, headers={"user_id": "alice"}
+        )
+        assert r1.status_code == 200
+        r2 = client.post(
+            "/v1/chat", json={"input": "caller-B question"}, headers={"user_id": "bob"}
+        )
+        assert r2.status_code == 200
+        contents = [m.content or "" for m in agent.provider.last_messages]
+        assert any("caller-B question" in c for c in contents)
+        assert not any("caller-A-secret-payload" in c for c in contents)
+
+    def test_shared_agent_history_not_mutated(self):
+        agent = make_agent()
+        client = make_client(AgentAPI(agents=[agent]))
+        client.post("/v1/chat", json={"input": "hi"})
+        client.post("/v1/chat", json={"input": "hi again"})
+        assert agent._history == []
+
+    def test_stream_no_cross_caller_context_leak(self):
+        agent = make_agent(responses=["reply A", "reply B"])
+        client = make_client(AgentAPI(agents=[agent]))
+        r1 = client.post(
+            "/v1/chat/stream", json={"input": "caller-A-secret-payload"}, headers={"user_id": "a"}
+        )
+        assert r1.status_code == 200
+        r2 = client.post(
+            "/v1/chat/stream", json={"input": "caller-B question"}, headers={"user_id": "b"}
+        )
+        assert r2.status_code == 200
+        contents = [m.content or "" for m in agent.provider.last_messages]
+        assert any("caller-B question" in c for c in contents)
+        assert not any("caller-A-secret-payload" in c for c in contents)
+
+
+# ─── Error sanitization ──────────────────────────────────────────────────────
+
+
+class TestErrorSanitization:
+    def test_chat_error_does_not_leak_exception_detail(self):
+        from tests.conftest import SharedErrorProvider
+
+        agent = Agent(
+            tools=[_noop_tool()],
+            provider=SharedErrorProvider(exception=RuntimeError("internal-url-do-not-leak")),
+            config=AgentConfig(name="boom", model="fake-model", max_retries=0),
+        )
+        client = make_client(AgentAPI(agents=[agent]))
+        r = client.post("/v1/chat", json={"input": "hi"})
+        assert r.status_code == 500
+        err = r.json()["error"]
+        assert err["message"] == "Agent execution failed (RuntimeError)"
+        assert "internal-url-do-not-leak" not in json.dumps(err)
+
+
 # ─── Auth ────────────────────────────────────────────────────────────────────
 
 
