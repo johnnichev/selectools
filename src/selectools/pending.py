@@ -381,6 +381,19 @@ _CANCEL_RE = re.compile(
     r"^(?:ainda\s+n[aã]o|n[aã]o|nao|no|cancel\w*|deixa|nada|nunca|never|olvida\w*)\b",
     flags=re.IGNORECASE,
 )
+# A negation appearing ANYWHERE disqualifies the restated-verb branches
+# (PR #73 review: the leading-negation guard in _CANCEL_RE only covers the
+# first word). "se você não pode apagar" / "tú no puedes borrar" restate the
+# destructive verb behind a mid-sentence negation, which _CONFIRM_VERB_RE
+# matches anywhere — flipping a refusal into a destructive CONFIRM. The bias
+# is conservative (a false negative costs a retype; a false positive fires a
+# destructive action), so any negation token vetoes the verb-phrase branch.
+# Bare confirmations are whole-message anchored and cannot carry a negation,
+# so they are unaffected.
+_NEGATION_ANYWHERE_RE = re.compile(
+    r"\b(?:n[aã]o|nunca|jamais|never|no)\b",
+    flags=re.IGNORECASE,
+)
 
 
 @beta
@@ -410,7 +423,15 @@ class RegexConfirmParser:
             # A leading negation ("no, delete it", "não, pode apagar")
             # makes the message ambiguous at best — never confirm on it.
             return False
-        return bool(_CONFIRM_BARE_RE.match(stripped) or _CONFIRM_VERB_RE.search(stripped))
+        if _CONFIRM_BARE_RE.match(stripped):
+            return True
+        # Restated-verb branch: it matches the destructive verb ANYWHERE, so a
+        # non-leading negation ("se você não pode apagar") would otherwise read
+        # as a confirm. Veto on any negation token (conservative: prefer a
+        # false negative over firing a destructive action).
+        if _NEGATION_ANYWHERE_RE.search(stripped):
+            return False
+        return bool(_CONFIRM_VERB_RE.search(stripped))
 
     def is_cancel(self, msg: str) -> bool:
         stripped = (msg or "").strip()
