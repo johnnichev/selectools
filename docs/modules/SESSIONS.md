@@ -47,7 +47,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
 
 **Added in:** v0.16.0
 **File:** `src/selectools/sessions.py`
-**Classes:** `SessionStore`, `JsonFileSessionStore`, `SQLiteSessionStore`, `RedisSessionStore`, `SupabaseSessionStore`
+**Classes:** `SessionStore`, `SessionSearchResult`, `JsonFileSessionStore`, `SQLiteSessionStore`, `RedisSessionStore`, `SupabaseSessionStore`
 
 ## Table of Contents
 
@@ -61,6 +61,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
 8. [Choosing a Backend](#choosing-a-backend)
 9. [Best Practices](#best-practices)
 10. [Namespace Isolation](#namespace-isolation)
+11. [Cross-Session Search](#cross-session-search)
 
 ---
 
@@ -611,11 +612,90 @@ saved before this feature.
 
 ---
 
+## Cross-Session Search
+
+**Stability:** beta
+
+All four backends implement `search(query, namespace=None, limit=5)` —
+free-text search over the **content of user and assistant messages**
+across every stored session. This is how an agent "remembers what we
+discussed last Tuesday."
+
+```python
+from selectools.sessions import SQLiteSessionStore
+
+store = SQLiteSessionStore("sessions.db")
+results = store.search("billing discrepancy", namespace="user:alice", limit=5)
+for r in results:
+    print(r.session_id, r.score, r.matched_messages)
+    memory = store.load(r.session_id, namespace="user:alice")
+```
+
+Each result is a frozen `SessionSearchResult` dataclass:
+
+| Field | Type | Description |
+|---|---|---|
+| `session_id` | `str` | Matched session. With a `namespace` argument, the bare id (pass straight back to `load(id, namespace=...)`). Without one, follows the same convention as `list()` for the backend |
+| `score` | `float` | Relevance, higher is better. Only comparable within one result set |
+| `matched_messages` | `List[str]` | Length-capped snippets of matched user/assistant messages, most relevant first (max 5 per session) |
+
+The query is split on whitespace; a session matches when **any** term
+occurs (case-insensitive) in any user/assistant message. Tool messages
+and metadata are never searched. Expired sessions are skipped.
+
+### Per-Backend Semantics
+
+| Backend | Mechanism | Scoring | Cost |
+|---|---|---|---|
+| `SQLiteSessionStore` | FTS5 virtual table over message content, built on `save()` | Each matching message scores 1.0 plus a bounded bm25 tiebreak in [0, 1) — hit count strictly dominates, bm25 breaks ties | Index lookup — fast even for many sessions |
+| `JsonFileSessionStore` | Linear scan over session files | Case-insensitive term frequency | O(sessions), reads every file |
+| `RedisSessionStore` | `SCAN` over the key prefix + in-process matching (RediSearch not required) | Case-insensitive term frequency | O(sessions) round-trips, transfers every payload |
+| `SupabaseSessionStore` | PostgREST `ilike` on the JSON text projection `memory_json->>messages` (one request per term, terms JSON-escaped to match the projection) + in-process scoring | Case-insensitive term frequency | One round-trip per term, transfers matched payloads, no server-side ranking |
+
+Supabase note: each per-term candidate select carries an explicit
+`limit(1000)`. PostgREST deployments can enforce a server-side
+`max-rows` setting that silently truncates unbounded selects, so the
+explicit cap keeps behavior deterministic instead of
+server-config-dependent. If a single term can match more than 1000
+rows in your table, use a proper `tsvector` index plus a dedicated RPC
+instead of `search()`.
+
+### SQLite Index Migration
+
+The FTS5 index tables (`session_messages_fts`, `session_search_index`)
+are created automatically and are purely **additive** — the `sessions`
+table and its rows are never modified. Databases created before this
+feature are upgraded transparently: sessions saved by older versions
+are indexed lazily on `search()`, as are rows later rewritten by a
+search-unaware older library version sharing the database (detected
+via `indexed_at < updated_at`). FTS5 availability is probed directly
+on open with a temp-schema virtual table, so a database created on an
+FTS5-enabled build and reopened on a build without FTS5 degrades
+cleanly instead of erroring. If the SQLite build lacks FTS5 (rare),
+`search()` emits a `RuntimeWarning` and degrades to a LIKE scan with
+term-frequency scoring.
+
+### Third-Party Stores
+
+`search` is a `@beta` addition to the `SessionStore` protocol. Stores
+written before it existed do not implement it: explicit subclasses of
+`SessionStore` inherit a default that raises `NotImplementedError`;
+purely structural implementations raise `AttributeError`.
+Feature-detect with:
+
+```python
+if callable(getattr(store, "search", None)):
+    results = store.search("invoice")
+```
+
+---
+
 ## API Reference
 
 | Class | Description |
 |---|---|
-| `SessionStore` | Protocol defining save/load/list/delete/exists interface |
+| `SessionStore` | Protocol defining save/load/list/delete/exists/search interface |
+| `SessionSearchResult` | Frozen result of `search()`: `session_id`, `score`, `matched_messages` |
 | `JsonFileSessionStore(directory, ttl_seconds)` | File-based backend, one JSON file per session |
 | `SQLiteSessionStore(db_path, ttl_seconds)` | SQLite-backed backend, single database file |
 | `RedisSessionStore(url, prefix, ttl_seconds)` | Redis-backed backend for distributed deployments |
@@ -646,6 +726,7 @@ saved before this feature.
 
 | # | Script | Description |
 |---|--------|-------------|
+| 105 | [`105_session_search.py`](https://github.com/johnnichev/selectools/blob/main/examples/105_session_search.py) | Cross-session search with SQLite FTS5 and JSON file backends |
 | 33 | [`33_persistent_sessions.py`](https://github.com/johnnichev/selectools/blob/main/examples/33_persistent_sessions.py) | Persistent sessions with JSON and SQLite |
 | 20 | [`20_customer_support_bot.py`](https://github.com/johnnichev/selectools/blob/main/examples/20_customer_support_bot.py) | Production bot with session persistence |
 | 04 | [`04_conversation_memory.py`](https://github.com/johnnichev/selectools/blob/main/examples/04_conversation_memory.py) | Conversation memory (sessions persist this) |

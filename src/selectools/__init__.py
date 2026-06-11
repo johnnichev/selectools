@@ -144,6 +144,7 @@ from .sessions import (
     JsonFileSessionStore,
     RedisSessionStore,
     SessionMetadata,
+    SessionSearchResult,
     SessionStore,
     SQLiteSessionStore,
     SupabaseSessionStore,
@@ -285,6 +286,7 @@ __all__ = [
     # Sessions
     "SessionStore",
     "SessionMetadata",
+    "SessionSearchResult",
     "JsonFileSessionStore",
     "SQLiteSessionStore",
     "RedisSessionStore",
