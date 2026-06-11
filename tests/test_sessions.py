@@ -536,3 +536,221 @@ class TestAgentSessionIntegration:
         )
         result = agent.run("Hello")
         assert result.content == "response"
+
+
+# ======================================================================
+# Cross-session search
+# ======================================================================
+
+
+def _search_memory(*contents: str) -> ConversationMemory:
+    """Build a memory alternating USER/ASSISTANT roles over *contents*."""
+    mem = ConversationMemory(max_messages=50)
+    for i, c in enumerate(contents):
+        role = Role.USER if i % 2 == 0 else Role.ASSISTANT
+        mem.add(Message(role=role, content=c))
+    return mem
+
+
+class TestJsonFileSessionStoreSearch:
+    def test_match_in_one_of_several_sessions(self, tmp_path: "os.PathLike[str]") -> None:
+        store = JsonFileSessionStore(directory=str(tmp_path))
+        store.save("s1", _search_memory("The weather is sunny", "Indeed it is"))
+        store.save("s2", _search_memory("I found a billing discrepancy", "Looking into the bill"))
+        store.save("s3", _search_memory("Tell me about dragons", "Dragons breathe fire"))
+
+        results = store.search("billing discrepancy")
+        assert len(results) == 1
+        assert results[0].session_id == "s2"
+        assert results[0].score > 0
+        assert any("billing" in m.lower() for m in results[0].matched_messages)
+
+    def test_namespace_filtering(self, tmp_path: "os.PathLike[str]") -> None:
+        store = JsonFileSessionStore(directory=str(tmp_path))
+        store.save("s1", _search_memory("quartz crystal"), namespace="agent-a")
+        store.save("s1", _search_memory("quartz pebble"), namespace="agent-b")
+        store.save("s2", _search_memory("quartz boulder"))
+
+        results = store.search("quartz", namespace="agent-a")
+        assert len(results) == 1
+        assert results[0].session_id == "s1"
+        # Returned id loads with the same namespace
+        assert store.load(results[0].session_id, namespace="agent-a") is not None
+
+    def test_no_match_returns_empty_list(self, tmp_path: "os.PathLike[str]") -> None:
+        store = JsonFileSessionStore(directory=str(tmp_path))
+        store.save("s1", _search_memory("hello world"))
+        assert store.search("xylophone") == []
+
+    def test_limit(self, tmp_path: "os.PathLike[str]") -> None:
+        store = JsonFileSessionStore(directory=str(tmp_path))
+        for i in range(6):
+            store.save(f"s{i}", _search_memory(f"quartz number {i}"))
+        assert len(store.search("quartz", limit=3)) == 3
+        assert len(store.search("quartz", limit=10)) == 6
+
+    def test_score_ordering_more_hits_ranks_higher(self, tmp_path: "os.PathLike[str]") -> None:
+        store = JsonFileSessionStore(directory=str(tmp_path))
+        store.save("one-hit", _search_memory("quartz here", "nothing", "nothing else"))
+        store.save("three-hits", _search_memory("quartz here", "quartz there", "quartz everywhere"))
+
+        results = store.search("quartz")
+        assert [r.session_id for r in results] == ["three-hits", "one-hit"]
+        assert results[0].score > results[1].score
+
+    def test_case_insensitive(self, tmp_path: "os.PathLike[str]") -> None:
+        store = JsonFileSessionStore(directory=str(tmp_path))
+        store.save("s1", _search_memory("QUARTZ Crystal"))
+        results = store.search("quartz")
+        assert len(results) == 1
+
+    def test_tool_messages_not_searched(self, tmp_path: "os.PathLike[str]") -> None:
+        store = JsonFileSessionStore(directory=str(tmp_path))
+        mem = ConversationMemory(max_messages=50)
+        mem.add(Message(role=Role.USER, content="run the tool"))
+        mem.add(Message(role=Role.TOOL, content="quartz in tool output", tool_name="t"))
+        store.save("s1", mem)
+        assert store.search("quartz") == []
+
+    def test_snippet_length_capped(self, tmp_path: "os.PathLike[str]") -> None:
+        store = JsonFileSessionStore(directory=str(tmp_path))
+        long_msg = ("lorem ipsum " * 100) + "quartz" + (" dolor sit" * 100)
+        store.save("s1", _search_memory(long_msg))
+        results = store.search("quartz")
+        assert len(results) == 1
+        snippet = results[0].matched_messages[0]
+        assert len(snippet) <= 200
+        assert "quartz" in snippet
+
+
+class TestSQLiteSessionStoreSearch:
+    def _store(self, tmp_path: "os.PathLike[str]") -> SQLiteSessionStore:
+        return SQLiteSessionStore(db_path=str(os.path.join(str(tmp_path), "sessions.db")))
+
+    def test_match_in_one_of_several_sessions(self, tmp_path: "os.PathLike[str]") -> None:
+        store = self._store(tmp_path)
+        store.save("s1", _search_memory("The weather is sunny", "Indeed it is"))
+        store.save("s2", _search_memory("I found a billing discrepancy", "Looking into the bill"))
+        store.save("s3", _search_memory("Tell me about dragons", "Dragons breathe fire"))
+
+        results = store.search("billing discrepancy")
+        assert results[0].session_id == "s2"
+        assert results[0].score > 0
+        assert any("billing" in m.lower() for m in results[0].matched_messages)
+
+    def test_namespace_filtering(self, tmp_path: "os.PathLike[str]") -> None:
+        store = self._store(tmp_path)
+        store.save("s1", _search_memory("quartz crystal"), namespace="agent-a")
+        store.save("s1", _search_memory("quartz pebble"), namespace="agent-b")
+        store.save("s2", _search_memory("quartz boulder"))
+
+        results = store.search("quartz", namespace="agent-a")
+        assert len(results) == 1
+        assert results[0].session_id == "s1"
+        assert store.load(results[0].session_id, namespace="agent-a") is not None
+
+    def test_no_match_returns_empty_list(self, tmp_path: "os.PathLike[str]") -> None:
+        store = self._store(tmp_path)
+        store.save("s1", _search_memory("hello world"))
+        assert store.search("xylophone") == []
+
+    def test_limit(self, tmp_path: "os.PathLike[str]") -> None:
+        store = self._store(tmp_path)
+        for i in range(6):
+            store.save(f"s{i}", _search_memory(f"quartz number {i}"))
+        assert len(store.search("quartz", limit=3)) == 3
+        assert len(store.search("quartz", limit=10)) == 6
+
+    def test_fts5_ranking_sanity(self, tmp_path: "os.PathLike[str]") -> None:
+        store = self._store(tmp_path)
+        assert store._fts_enabled is True
+        store.save("one-hit", _search_memory("quartz here", "nothing at all", "nothing else"))
+        store.save("three-hits", _search_memory("quartz here", "quartz there", "quartz everywhere"))
+
+        results = store.search("quartz")
+        assert [r.session_id for r in results] == ["three-hits", "one-hit"]
+        assert results[0].score > results[1].score
+
+    def test_old_database_upgrade_path(self, tmp_path: "os.PathLike[str]") -> None:
+        """A DB created before the search feature must be searchable and intact."""
+        import sqlite3
+
+        db_path = os.path.join(str(tmp_path), "old.db")
+        conn = sqlite3.connect(db_path)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute(
+            """
+            CREATE TABLE sessions (
+                session_id TEXT PRIMARY KEY,
+                memory_json TEXT NOT NULL,
+                message_count INTEGER NOT NULL DEFAULT 0,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL
+            )
+            """
+        )
+        now = time.time()
+        old_mem = _search_memory("legacy quartz conversation", "noted")
+        conn.execute(
+            "INSERT INTO sessions VALUES (?, ?, ?, ?, ?)",
+            ("legacy", json.dumps(old_mem.to_dict()), len(old_mem), now, now),
+        )
+        conn.commit()
+        conn.close()
+
+        store = SQLiteSessionStore(db_path=db_path)
+        results = store.search("quartz")
+        assert [r.session_id for r in results] == ["legacy"]
+
+        # Existing data untouched: load still round-trips
+        loaded = store.load("legacy")
+        assert loaded is not None
+        assert loaded.get_history()[0].content == "legacy quartz conversation"
+
+        # New saves are searchable alongside lazily indexed old rows
+        store.save("fresh", _search_memory("fresh quartz too"))
+        ids = {r.session_id for r in store.search("quartz")}
+        assert ids == {"legacy", "fresh"}
+
+    def test_like_fallback_warns_and_matches(self, tmp_path: "os.PathLike[str]") -> None:
+        store = self._store(tmp_path)
+        store.save("s1", _search_memory("quartz crystal", "nothing"))
+        store.save("s2", _search_memory("plain talk"))
+        store._fts_enabled = False
+
+        with pytest.warns(RuntimeWarning, match="FTS5"):
+            results = store.search("quartz")
+        assert [r.session_id for r in results] == ["s1"]
+
+    def test_delete_removes_from_search(self, tmp_path: "os.PathLike[str]") -> None:
+        store = self._store(tmp_path)
+        store.save("s1", _search_memory("quartz crystal"))
+        assert store.search("quartz")
+        store.delete("s1")
+        assert store.search("quartz") == []
+
+    def test_tool_messages_not_searched(self, tmp_path: "os.PathLike[str]") -> None:
+        store = self._store(tmp_path)
+        mem = ConversationMemory(max_messages=50)
+        mem.add(Message(role=Role.USER, content="run the tool"))
+        mem.add(Message(role=Role.TOOL, content="quartz in tool output", tool_name="t"))
+        store.save("s1", mem)
+        assert store.search("quartz") == []
+
+
+class TestSessionStoreProtocolSearch:
+    def test_default_search_raises_not_implemented(self) -> None:
+        from selectools.sessions import SessionStore
+
+        class LegacyStore(SessionStore):
+            pass
+
+        with pytest.raises(NotImplementedError):
+            LegacyStore().search("anything")
+
+    def test_search_result_is_frozen(self) -> None:
+        from selectools.sessions import SessionSearchResult
+
+        result = SessionSearchResult(session_id="s", score=1.0, matched_messages=["m"])
+        with pytest.raises(Exception):
+            result.score = 2.0  # type: ignore[misc]
