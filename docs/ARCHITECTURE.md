@@ -384,7 +384,7 @@ graph LR
 - **agent/core.py** depends on: types, tools, prompt, parser, structured, trace, policy, providers, memory, usage, observer, cache, sessions, entity_memory, knowledge_graph, knowledge, guardrails, security
 - **providers/** each depend on: types, usage, pricing, and their SDK
 - **rag/** depends on: embeddings, types
-- **evals/** depends on: agent (for `_clone_for_isolation`), types, providers
+- **evals/** depends on: agent (for `clone_for_isolation`), types, providers
 - **orchestration/** depends on: agent, types, trace, observer
 - **serve/** depends on: agent, orchestration, pipeline, templates
 
@@ -393,7 +393,7 @@ graph LR
 - **Core modules** (`types`, `tools`, `agent`) have minimal dependencies
 - **Providers** depend only on core modules and their SDK
 - **RAG system** is self-contained, depends on `agent` only for `RAGAgent`
-- **Eval framework** depends on `agent` (for `_clone_for_isolation`) and `types` (for `Message`, `AgentResult`)
+- **Eval framework** depends on `agent` (for `clone_for_isolation`) and `types` (for `Message`, `AgentResult`)
 - **Optional dependencies** (ChromaDB, Pinecone, etc.) are lazy-loaded
 
 ---

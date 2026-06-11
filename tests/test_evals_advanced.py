@@ -54,7 +54,7 @@ def _make_mock_agent(responses: List[Any]) -> MagicMock:
         return responses[idx]
 
     clone.run = MagicMock(side_effect=run_side_effect)
-    agent._clone_for_isolation = MagicMock(return_value=clone)
+    agent.clone_for_isolation = MagicMock(return_value=clone)
     return agent
 
 

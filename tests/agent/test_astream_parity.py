@@ -716,7 +716,7 @@ class TestAstreamAgentResult:
 
 
 # ---------------------------------------------------------------------------
-# Tests: Agent.name, Agent.__call__, GraphExecutionError, _clone_for_isolation
+# Tests: Agent.name, Agent.__call__, GraphExecutionError, clone_for_isolation
 # ---------------------------------------------------------------------------
 
 
@@ -776,7 +776,7 @@ class TestCloneForIsolation:
             memory=ConversationMemory(max_messages=10),
         )
         agent._history = [Message(role=Role.USER, content="old")]
-        clone = agent._clone_for_isolation()
+        clone = agent.clone_for_isolation()
 
         assert clone._history == []
         assert clone.memory is None

@@ -20,7 +20,7 @@ from ..prompt import PromptBuilder
 from ..providers.base import Provider, ProviderError
 from ..providers.openai_provider import OpenAIProvider
 from ..results import Artifact, _begin_artifact_collection
-from ..stability import stable
+from ..stability import beta, deprecated, stable
 from ..structured import (
     ResponseFormat,
     build_schema_instruction,
@@ -928,7 +928,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
 
         def _run_one(prompt: str) -> AgentResult:
             nonlocal completed
-            clone = self._clone_for_isolation()
+            clone = self.clone_for_isolation()
             try:
                 result = clone.run(prompt, response_format=response_format)
             except Exception as exc:
@@ -993,7 +993,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
 
         async def _run_one(prompt: str) -> AgentResult:
             nonlocal completed
-            clone = self._clone_for_isolation()
+            clone = self.clone_for_isolation()
             async with semaphore:
                 try:
                     result = await clone.arun(prompt, response_format=response_format)
@@ -1257,17 +1257,32 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             self._unwire_fallback_observer()
             self._system_prompt = saved_system_prompt
 
-    def _clone_for_isolation(self) -> "Agent":
-        """Create a lightweight clone for batch processing with isolated state.
+    @beta
+    def clone_for_isolation(self) -> "Agent":
+        """Create a lightweight clone of this agent with isolated per-run state.
 
-        BUG-19 / PraisonAI #1260: the shallow ``copy.copy(self)`` left batch
-        clones sharing the same ``self.config`` object, including the
-        ``config.observers`` list. Mutating config state (e.g. appending an
-        observer, swapping the list) on one clone would bleed into sibling
-        clones running in other threads. We shallow-copy the config and
-        duplicate the observer list so each clone has an independent list;
-        individual observer instances remain shared because BUG-17/BUG-20
-        already made them thread-safe.
+        Used wherever one configured agent must serve concurrent or repeated
+        runs without cross-contamination: :meth:`batch`/:meth:`abatch`, eval
+        suites, the serve API, the A2A server, and planning sub-runs.
+
+        Sharing/isolation semantics:
+
+        - **Shared with the parent**: ``tools``, ``provider``, ``parser``,
+          ``prompt_builder``, and individual observer instances (observers
+          are thread-safe by contract).
+        - **Copied**: ``config`` is shallow-copied and its ``observers`` list
+          is duplicated, so mutating the clone's config (e.g. appending an
+          observer or overriding the model) never bleeds into the parent or
+          sibling clones (BUG-19 / PraisonAI #1260).
+        - **Fresh**: ``_history`` starts empty and ``usage`` is a new
+          :class:`AgentUsage` — the clone accumulates its own tokens/cost.
+        - **Dropped**: ``memory`` and ``analytics`` are set to ``None``;
+          callers that need conversation state must pass full message lists
+          explicitly.
+
+        Returns:
+            A new ``Agent`` sharing tools/provider with this one but with
+            fresh history and usage, an independent config, and no memory.
         """
         clone = copy.copy(self)
         if self.config is not None:
@@ -1279,6 +1294,11 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         clone.memory = None
         clone.analytics = None
         return clone
+
+    @deprecated(since="0.25.0", replacement="clone_for_isolation")
+    def _clone_for_isolation(self) -> "Agent":
+        """Deprecated alias for :meth:`clone_for_isolation`."""
+        return self.clone_for_isolation()
 
     # Async methods
     async def astream(
