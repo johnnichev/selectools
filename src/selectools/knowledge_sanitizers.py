@@ -81,6 +81,25 @@ _FENCE_RE = re.compile(r"^([ \t]{0,3})(`{3,}|~{3,})", re.MULTILINE)
 # backtick, U+02DC SMALL TILDE for the tilde.
 _FENCE_SUBSTITUTES = {"`": "ˋ", "~": "˜"}
 
+# Whitespace already sitting after an opening bracket inside a matched role
+# marker. Collapsed before the defang space is inserted so the rewrite is
+# canonical: ``[INST]`` and ``[  INST]`` both become ``[ INST]``, and
+# re-running the sanitizer is a no-op (idempotency — see _defang_role_marker).
+_POST_BRACKET_WS_RE = re.compile(r"(?<=[\[<])[ \t]+")
+
+
+def _defang_role_marker(match: "re.Match[str]") -> str:
+    """Rewrite a role marker into its canonical defanged form.
+
+    Canonical means a fixed point: applying ``defang_delimiters`` to its own
+    output must change nothing (sheriff#302 review note 9 — the previous
+    naive ``replace("[", "[ ")`` added one more space per pass because
+    ``_ROLE_MARKER_RE``'s ``\\s*`` also matches the already-defanged form,
+    causing per-turn churn in any pipeline that re-sanitizes stored text).
+    """
+    collapsed = _POST_BRACKET_WS_RE.sub("", match.group(0))
+    return collapsed.replace("[", "[ ").replace("<", "< ")
+
 
 @beta
 def defang_delimiters(text: str) -> str:
@@ -88,6 +107,12 @@ def defang_delimiters(text: str) -> str:
 
     Conservative by design: every rewrite keeps the content human-readable
     and meaning-preserving; only the *structural* interpretation is broken.
+
+    Idempotent: every rewrite produces a fixed point, so
+    ``defang_delimiters(defang_delimiters(x)) == defang_delimiters(x)``.
+    Pipelines that re-sanitize already-stored text on every turn (e.g.
+    Sheriff's per-message knowledge pass) must not churn entries with one
+    extra space per pass (sheriff#302 review note 9).
 
     What is defanged, and why:
 
@@ -136,8 +161,12 @@ def defang_delimiters(text: str) -> str:
     s = text or ""
     s = _DELIMITER_RE.sub(r"\1— \2 —", s)
     s = _HALF_DELIMITER_RE.sub(r"\1— \2", s)
-    s = _ROLE_MARKER_RE.sub(lambda m: m.group(0).replace("[", "[ ").replace("<", "< "), s)
-    s = _SPEAKER_LABEL_RE.sub(r"\1\2\3 \4", s)
+    s = _ROLE_MARKER_RE.sub(_defang_role_marker, s)
+    # Canonical single space before the colon (``\3``, any pre-existing
+    # whitespace, is dropped rather than kept): ``User:`` and ``User  :``
+    # both become ``User :``, so re-sanitizing is a no-op (sheriff#302
+    # review note 9 — keeping ``\3`` added one space per pass).
+    s = _SPEAKER_LABEL_RE.sub(r"\1\2 \4", s)
     s = _FENCE_RE.sub(lambda m: m.group(1) + _FENCE_SUBSTITUTES[m.group(2)[0]] * len(m.group(2)), s)
     return s
 
