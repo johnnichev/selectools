@@ -722,6 +722,122 @@ class TestSQLiteSessionStoreSearch:
             results = store.search("quartz")
         assert [r.session_id for r in results] == ["s1"]
 
+    def test_fts5_detection_cross_build_reuse(
+        self, tmp_path: "os.PathLike[str]", monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A DB created on an FTS5 build, reopened on a non-FTS5 build, must degrade.
+
+        SQLite short-circuits ``CREATE VIRTUAL TABLE IF NOT EXISTS`` on
+        table-name existence BEFORE resolving the module, so against an
+        existing table the create "succeeds" even when fts5 is unavailable;
+        only later reads/writes of the virtual table raise.  The connection
+        wrapper below mirrors exactly that verified behavior, so the store
+        exercises its real code paths.
+        """
+        import sqlite3
+        from typing import Any
+
+        db_path = os.path.join(str(tmp_path), "sessions.db")
+        fts_store = SQLiteSessionStore(db_path=db_path)
+        assert fts_store._fts_enabled is True
+        fts_store.save("old", _search_memory("legacy quartz conversation"))
+
+        class NoFts5Connection:
+            """Simulates a sqlite build without FTS5 against an existing DB."""
+
+            def __init__(self, conn: Any) -> None:
+                self._conn = conn
+
+            def _check(self, sql: str) -> None:
+                if "__fts5_probe__" in sql:
+                    raise sqlite3.OperationalError("no such module: fts5")
+                if "session_messages_fts" in sql and "IF NOT EXISTS" not in sql:
+                    # Real access to the virtual table fails; IF NOT EXISTS
+                    # short-circuits silently on the existing table name.
+                    raise sqlite3.OperationalError("no such module: fts5")
+
+            def execute(self, sql: str, *args: Any) -> Any:
+                self._check(sql)
+                return self._conn.execute(sql, *args)
+
+            def executemany(self, sql: str, *args: Any) -> Any:
+                self._check(sql)
+                return self._conn.executemany(sql, *args)
+
+            def __getattr__(self, name: str) -> Any:
+                return getattr(self._conn, name)
+
+        real_connect = sqlite3.connect
+        monkeypatch.setattr(
+            sqlite3, "connect", lambda *a, **kw: NoFts5Connection(real_connect(*a, **kw))
+        )
+
+        store = SQLiteSessionStore(db_path=db_path)
+        # Pre-fix this failed open: _fts_enabled stayed True and
+        # save()/delete()/search() raised "no such module: fts5".
+        assert store._fts_enabled is False
+
+        store.save("new", _search_memory("fresh quartz too"))
+        with pytest.warns(RuntimeWarning, match="FTS5"):
+            results = store.search("quartz")
+        assert {r.session_id for r in results} == {"old", "new"}
+        assert store.delete("new") is True
+
+    def test_bm25_bounded_hit_count_dominates(self, tmp_path: "os.PathLike[str]") -> None:
+        """One rare-term hit must not outscore three common-term hits.
+
+        bm25's IDF makes a single rare-term match score ~ln(N) while a
+        common term scores near zero; summing the raw rank unbounded
+        inverted the documented "more matches ranks higher" invariant on
+        IDF-skewed corpora.  The bounded per-message contribution
+        ``1 + r/(1+r)`` keeps hit count strictly dominant.
+        """
+        store = self._store(tmp_path)
+        # Inflate the corpus so "commonword" has rock-bottom IDF and the
+        # rare term a huge one (the old formula needs ~1000 messages to
+        # invert: 1 rare hit ~10 points vs 3 common hits ~3 points).
+        for i in range(40):
+            store.save(
+                f"filler-{i}",
+                _search_memory(*[f"commonword filler {i} {j}" for j in range(25)]),
+            )
+        store.save("rare-once", _search_memory("the zyzzyva appeared once"))
+        store.save(
+            "common-thrice",
+            _search_memory("commonword one", "commonword two", "commonword three"),
+        )
+
+        results = store.search("zyzzyva commonword", limit=100)
+        ids = [r.session_id for r in results]
+        assert "common-thrice" in ids and "rare-once" in ids
+        assert ids.index("common-thrice") < ids.index("rare-once")
+
+    def test_backfill_reindexes_stale_rows(self, tmp_path: "os.PathLike[str]") -> None:
+        """Rows rewritten by a search-unaware (older) writer get re-indexed.
+
+        Mixed-version protection: an older library version updates
+        ``sessions`` without maintaining the FTS index, leaving
+        ``indexed_at < updated_at``.  The next search must re-index.
+        """
+        import sqlite3
+
+        db_path = os.path.join(str(tmp_path), "sessions.db")
+        store = SQLiteSessionStore(db_path=db_path)
+        store.save("s1", _search_memory("original topaz topic"))
+        assert [r.session_id for r in store.search("topaz")] == ["s1"]
+
+        new_mem = _search_memory("now about obsidian instead")
+        conn = sqlite3.connect(db_path)
+        conn.execute(
+            "UPDATE sessions SET memory_json = ?, updated_at = ? WHERE session_id = ?",
+            (json.dumps(new_mem.to_dict()), time.time() + 1, "s1"),
+        )
+        conn.commit()
+        conn.close()
+
+        assert store.search("topaz") == []
+        assert [r.session_id for r in store.search("obsidian")] == ["s1"]
+
     def test_delete_removes_from_search(self, tmp_path: "os.PathLike[str]") -> None:
         store = self._store(tmp_path)
         store.save("s1", _search_memory("quartz crystal"))

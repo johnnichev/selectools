@@ -623,3 +623,21 @@ class TestSupabaseSessionStoreSearch:
         mem.add(Message(role=Role.TOOL, content="quartz in tool output", tool_name="t"))
         store.save("s1", mem)
         assert store.search("quartz") == []
+
+    def test_search_term_with_quote_and_backslash(self) -> None:
+        """Terms with JSON-escaped characters must match the jsonb text projection.
+
+        In the ``memory_json->>messages`` projection, quotes and
+        backslashes appear escaped (``\\"`` and ``\\\\``), so a raw term
+        like ``C:\\Users`` never matches unless the ilike pattern is
+        JSON-escaped the same way.
+        """
+        store = _make_store()
+        store.save("s1", _search_memory(r"the file lives in C:\Users\john"))
+        store.save("s2", _search_memory('she said "quartz" loudly'))
+
+        results = store.search(r"C:\Users\john")
+        assert [r.session_id for r in results] == ["s1"]
+
+        results = store.search('"quartz"')
+        assert [r.session_id for r in results] == ["s2"]

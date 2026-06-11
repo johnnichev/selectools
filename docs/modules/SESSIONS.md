@@ -647,10 +647,18 @@ and metadata are never searched. Expired sessions are skipped.
 
 | Backend | Mechanism | Scoring | Cost |
 |---|---|---|---|
-| `SQLiteSessionStore` | FTS5 virtual table over message content, built on `save()` | bm25 per message, summed per session plus hit count | Index lookup — fast even for many sessions |
+| `SQLiteSessionStore` | FTS5 virtual table over message content, built on `save()` | Each matching message scores 1.0 plus a bounded bm25 tiebreak in [0, 1) — hit count strictly dominates, bm25 breaks ties | Index lookup — fast even for many sessions |
 | `JsonFileSessionStore` | Linear scan over session files | Case-insensitive term frequency | O(sessions), reads every file |
 | `RedisSessionStore` | `SCAN` over the key prefix + in-process matching (RediSearch not required) | Case-insensitive term frequency | O(sessions) round-trips, transfers every payload |
-| `SupabaseSessionStore` | PostgREST `ilike` on `memory_json->>messages` (one request per term) + in-process scoring | Case-insensitive term frequency | One round-trip per term, transfers matched payloads, no server-side ranking |
+| `SupabaseSessionStore` | PostgREST `ilike` on the JSON text projection `memory_json->>messages` (one request per term, terms JSON-escaped to match the projection) + in-process scoring | Case-insensitive term frequency | One round-trip per term, transfers matched payloads, no server-side ranking |
+
+Supabase note: each per-term candidate select carries an explicit
+`limit(1000)`. PostgREST deployments can enforce a server-side
+`max-rows` setting that silently truncates unbounded selects, so the
+explicit cap keeps behavior deterministic instead of
+server-config-dependent. If a single term can match more than 1000
+rows in your table, use a proper `tsvector` index plus a dedicated RPC
+instead of `search()`.
 
 ### SQLite Index Migration
 
@@ -658,9 +666,14 @@ The FTS5 index tables (`session_messages_fts`, `session_search_index`)
 are created automatically and are purely **additive** — the `sessions`
 table and its rows are never modified. Databases created before this
 feature are upgraded transparently: sessions saved by older versions
-are indexed lazily on the first `search()` call. If the SQLite build
-lacks FTS5 (rare), `search()` emits a `RuntimeWarning` and degrades to
-a LIKE scan with term-frequency scoring.
+are indexed lazily on `search()`, as are rows later rewritten by a
+search-unaware older library version sharing the database (detected
+via `indexed_at < updated_at`). FTS5 availability is probed directly
+on open with a temp-schema virtual table, so a database created on an
+FTS5-enabled build and reopened on a build without FTS5 degrades
+cleanly instead of erroring. If the SQLite build lacks FTS5 (rare),
+`search()` emits a `RuntimeWarning` and degrades to a LIKE scan with
+term-frequency scoring.
 
 ### Third-Party Stores
 

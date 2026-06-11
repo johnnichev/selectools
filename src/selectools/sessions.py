@@ -77,6 +77,11 @@ class SessionSearchResult:
 _SEARCHED_ROLES = ("user", "assistant")
 _SNIPPET_MAX_LEN = 160
 _MAX_SNIPPETS_PER_SESSION = 5
+# Explicit cap on each per-term candidate select in SupabaseSessionStore
+# .search().  PostgREST deployments may enforce a server-side ``max-rows``
+# that silently truncates unbounded selects; an explicit limit keeps the
+# behavior deterministic rather than server-config-dependent.
+_SUPABASE_SEARCH_CANDIDATE_LIMIT = 1000
 
 
 def _search_terms(query: str) -> List[str]:
@@ -456,6 +461,15 @@ class SQLiteSessionStore:
             # rows.  Pre-existing sessions are indexed lazily on first
             # search (see _backfill_search_index).
             try:
+                # Probe FTS5 availability directly before touching the real
+                # table: ``CREATE VIRTUAL TABLE IF NOT EXISTS`` short-circuits
+                # on table-name existence BEFORE resolving the module, so a
+                # database created on an FTS5 build and reopened on a build
+                # without FTS5 would otherwise "succeed" here and only fail
+                # later, inside save()/delete()/search().  The temp-schema
+                # probe has no persistent side effects.
+                conn.execute("CREATE VIRTUAL TABLE temp.__fts5_probe__ USING fts5(x)")
+                conn.execute("DROP TABLE temp.__fts5_probe__")
                 conn.execute(
                     """
                     CREATE VIRTUAL TABLE IF NOT EXISTS session_messages_fts
@@ -630,10 +644,12 @@ class SQLiteSessionStore:
     ) -> List[SessionSearchResult]:
         """Full-text search over message content via an FTS5 index.
 
-        Uses bm25 ranking; a session's score is the summed relevance of its
-        matching messages, so sessions with more (and better) matches rank
-        higher.  Sessions saved before this feature existed are indexed
-        lazily on first search — existing rows are never modified.
+        Each matching message contributes a bounded score: 1.0 for the hit
+        plus a bm25-derived tiebreak in [0, 1), so sessions with more
+        matching messages always rank higher and bm25 relevance only breaks
+        ties.  Sessions saved before this feature existed (or updated by
+        older library versions that do not maintain the index) are indexed
+        lazily on search — existing rows are never modified.
 
         If the SQLite build lacks FTS5, degrades to an in-process scan with
         term-frequency scoring (a ``RuntimeWarning`` is emitted).
@@ -657,13 +673,19 @@ class SQLiteSessionStore:
             conn.close()
 
     def _backfill_search_index(self, conn: Any) -> None:
-        """Lazily index sessions saved before the FTS index existed."""
+        """Lazily (re)index sessions the FTS index does not cover.
+
+        Catches both rows that predate the index (no ``session_search_index``
+        entry) and rows rewritten by a search-unaware writer — e.g. an older
+        library version sharing the database — whose ``indexed_at`` lags the
+        session's ``updated_at``.
+        """
         rows = conn.execute(
             """
             SELECT s.session_id, s.memory_json
             FROM sessions s
             LEFT JOIN session_search_index i ON i.session_key = s.session_id
-            WHERE i.session_key IS NULL
+            WHERE i.session_key IS NULL OR i.indexed_at < s.updated_at
             """
         ).fetchall()
         for key, memory_json in rows:
@@ -721,10 +743,15 @@ class SQLiteSessionStore:
                 continue
             sids[key] = sid
             # bm25() is lower-is-better (negative for matches).  Each
-            # matching message contributes 1 plus its negated bm25 rank, so
-            # sessions with more matches always rank higher and bm25 breaks
-            # ties by relevance.
-            scores[key] = scores.get(key, 0.0) + 1.0 - rank
+            # matching message contributes 1.0 plus a bounded relevance
+            # tiebreak r/(1+r) where r = max(0, -rank), keeping the
+            # per-message contribution in [1, 2).  Hit count therefore
+            # strictly dominates and bm25 only breaks ties: an unbounded
+            # rank let a single rare-term hit (IDF-driven bm25 of 9+)
+            # outscore several common-term hits, inverting the documented
+            # "more matches ranks higher" invariant.
+            r = max(0.0, -rank)
+            scores[key] = scores.get(key, 0.0) + 1.0 + r / (1.0 + r)
             bucket = snippets.setdefault(key, [])
             if len(bucket) < _MAX_SNIPPETS_PER_SESSION:
                 bucket.append(_make_snippet(content, terms))
@@ -1203,24 +1230,38 @@ class SupabaseSessionStore:
         The ``memory_json`` column is ``jsonb``, so the filter targets the
         text projection of its ``messages`` array
         (``memory_json->>messages``) with one ``ilike '%term%'`` request
-        per query term.  Matched rows are then scored in-process with term
-        frequency, which also discards false positives from the coarse
-        server-side filter (e.g. matches inside tool messages or metadata).
+        per query term.  Because string contents appear JSON-escaped in
+        that projection (quotes as ``\\"``, backslashes as ``\\\\``), each
+        term is JSON-escaped the same way before building the pattern, so
+        terms like ``C:\\Users`` still match.  Matched rows are then scored
+        in-process with term frequency, which also discards false positives
+        from the coarse server-side filter (e.g. matches inside tool
+        messages or metadata).
 
         Limits: one round-trip per term; full ``memory_json`` payloads of
         every server-side match are transferred; no server-side ranking.
-        For heavy workloads add a proper ``tsvector`` index and a dedicated
-        RPC instead.
+        Each per-term candidate set is explicitly capped at
+        ``_SUPABASE_SEARCH_CANDIDATE_LIMIT`` (1000) rows — note that
+        PostgREST's server-side ``max-rows`` setting may otherwise truncate
+        result sets on large tables at a server-configured (and therefore
+        nondeterministic from the client's perspective) point.  For tables
+        where matches may exceed the cap, add a proper ``tsvector`` index
+        and a dedicated RPC instead.
         """
         terms = _search_terms(query)
         if not terms or limit <= 0:
             return []
         rows_by_key: Dict[str, Dict[str, Any]] = {}
         for term in terms:
+            # Match the JSON text projection: escape the term exactly as
+            # jsonb renders string contents (json.dumps minus the
+            # surrounding quotes).
+            escaped_term = json.dumps(term, ensure_ascii=False)[1:-1]
             response = (
                 self._client.table(self._table)
                 .select("session_id,memory_json")
-                .ilike("memory_json->>messages", f"%{term}%")
+                .ilike("memory_json->>messages", f"%{escaped_term}%")
+                .limit(_SUPABASE_SEARCH_CANDIDATE_LIMIT)
                 .execute()
             )
             for row in response.data or []:
