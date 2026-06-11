@@ -94,6 +94,10 @@ def _extract_prompt(parts: List[Dict[str, Any]]) -> str:
     """
     chunks: List[str] = []
     for part in parts:
+        if not isinstance(part, dict):
+            # Defensive: validation rejects non-dict parts up front, but a
+            # stray list element must never crash prompt assembly.
+            continue
         kind = part.get("kind")
         if kind == "text" and isinstance(part.get("text"), str):
             chunks.append(part["text"])
@@ -300,6 +304,8 @@ class A2AServer:
         parts = message.get("parts")
         if not isinstance(parts, list) or not parts:
             return None, "'message.parts' must be a non-empty array"
+        if not all(isinstance(p, dict) for p in parts):
+            return None, "every entry in 'message.parts' must be an object"
         if not any(
             isinstance(p, dict) and p.get("kind") == "text" and isinstance(p.get("text"), str)
             for p in parts
