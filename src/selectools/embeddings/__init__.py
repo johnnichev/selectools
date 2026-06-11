@@ -3,6 +3,8 @@
 from .provider import EmbeddingProvider
 
 # Providers are imported conditionally as they depend on optional packages
+__stability__ = "beta"
+
 __all__ = [
     "EmbeddingProvider",
 ]

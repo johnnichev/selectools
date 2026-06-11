@@ -14,6 +14,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
+from ..stability import beta
 from .vector_store import Document, SearchResult, _validate_filter
 
 _SPLIT_RE = re.compile(r"[^a-z0-9]+")
@@ -138,6 +139,7 @@ class _IndexedDoc:
     doc_len: int = 0
 
 
+@beta
 class BM25:
     """
     Okapi BM25 keyword search engine.

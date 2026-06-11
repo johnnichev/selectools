@@ -7,7 +7,10 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
+from ..stability import beta
 
+
+@beta
 @dataclass
 class MCPServerConfig:
     """Configuration for connecting to an MCP server.

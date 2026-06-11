@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, List, Optional
 
+from ..stability import beta
 from .bm25 import BM25
 from .chunking import ContextualChunker, RecursiveTextSplitter, SemanticChunker, TextSplitter
 from .hybrid import FusionMethod, HybridSearcher
@@ -15,6 +16,8 @@ from .vector_store import Document, SearchResult, VectorStore
 if TYPE_CHECKING:
     from ..agent import Agent, AgentConfig
     from ..providers.base import Provider
+
+__stability__ = "beta"
 
 __all__ = [
     "Document",
@@ -51,6 +54,7 @@ except ImportError:
     pass
 
 
+@beta
 class RAGAgent:
     """
     High-level API for creating RAG-enabled agents.

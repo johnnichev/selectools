@@ -7,7 +7,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import List
 
+from ..stability import beta
 
+
+@beta
 class EmbeddingProvider(ABC):
     """
     Abstract base class for embedding providers.

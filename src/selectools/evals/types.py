@@ -119,6 +119,7 @@ class TestCase:
     response_format: Optional[Any] = None
 
 
+@stable
 @dataclass
 class EvalFailure:
     """A single assertion failure within a test case."""
@@ -145,6 +146,7 @@ class CaseResult:
     tool_calls: List[str] = field(default_factory=list)
 
 
+@stable
 @dataclass
 class EvalMetadata:
     """Metadata about an eval run."""

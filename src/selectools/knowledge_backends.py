@@ -214,6 +214,8 @@ class RedisKnowledgeBackend:
             self._client.set(self._key, data)
 
 
+__stability__ = "beta"
+
 __all__ = [
     "SupabaseKnowledgeBackend",
     "RedisKnowledgeBackend",

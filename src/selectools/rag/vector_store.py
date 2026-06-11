@@ -8,10 +8,13 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+from ..stability import beta
+
 if TYPE_CHECKING:
     from ..embeddings.provider import EmbeddingProvider
 
 
+@beta
 @dataclass
 class Document:
     """
@@ -33,6 +36,7 @@ class Document:
             self.metadata = {}
 
 
+@beta
 @dataclass
 class SearchResult:
     """
@@ -106,6 +110,7 @@ def _dedup_search_results(results: List["SearchResult"]) -> List["SearchResult"]
     return out
 
 
+@beta
 class VectorStore(ABC):
     """
     Abstract base class for vector store implementations.

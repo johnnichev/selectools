@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
+from ..stability import beta
 from .vector_store import Document
 
 # Private IP networks that must be blocked to prevent SSRF
@@ -70,6 +71,7 @@ def _validate_url(url: str) -> None:
                 )
 
 
+@beta
 class DocumentLoader:
     """
     Load documents from various sources.

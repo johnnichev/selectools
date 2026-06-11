@@ -6,6 +6,7 @@ import json as _json
 import re
 from typing import Any, Dict, List, Optional, Protocol, Tuple, Union, runtime_checkable
 
+from ..stability import beta, register_stability
 from .types import CaseResult, EvalFailure, TestCase
 
 
@@ -22,6 +23,7 @@ class Evaluator(Protocol):
     def check(self, case: TestCase, case_result: CaseResult) -> List[EvalFailure]: ...
 
 
+@beta
 class ToolUseEvaluator:
     """Checks expect_tool, expect_tools, and expect_tool_args."""
 
@@ -86,6 +88,7 @@ class ToolUseEvaluator:
         return failures
 
 
+@beta
 class ContainsEvaluator:
     """Checks expect_contains and expect_not_contains."""
 
@@ -124,6 +127,7 @@ class ContainsEvaluator:
         return failures
 
 
+@beta
 class OutputEvaluator:
     """Checks expect_output (exact match) and expect_output_regex."""
 
@@ -171,6 +175,7 @@ class OutputEvaluator:
         return failures
 
 
+@beta
 class StructuredOutputEvaluator:
     """Checks expect_parsed against result.parsed (deep subset match)."""
 
@@ -217,6 +222,7 @@ class StructuredOutputEvaluator:
         return failures
 
 
+@beta
 class PerformanceEvaluator:
     """Checks iteration count, latency, and cost thresholds."""
 
@@ -265,6 +271,7 @@ class PerformanceEvaluator:
         return failures
 
 
+@beta
 class CustomEvaluator:
     """Runs the case's custom_evaluator callable."""
 
@@ -302,6 +309,7 @@ class CustomEvaluator:
         return failures
 
 
+@beta
 class JsonValidityEvaluator:
     """Checks expect_json — whether the output is valid JSON."""
 
@@ -327,6 +335,7 @@ class JsonValidityEvaluator:
             ]
 
 
+@beta
 class LengthEvaluator:
     """Checks expect_min_length and expect_max_length (character count)."""
 
@@ -362,6 +371,7 @@ class LengthEvaluator:
         return failures
 
 
+@beta
 class StartsWithEvaluator:
     """Checks expect_starts_with."""
 
@@ -383,6 +393,7 @@ class StartsWithEvaluator:
         return []
 
 
+@beta
 class EndsWithEvaluator:
     """Checks expect_ends_with."""
 
@@ -404,6 +415,7 @@ class EndsWithEvaluator:
         return []
 
 
+@beta
 class PIILeakEvaluator:
     """Checks expect_no_pii — detects leaked PII patterns in output."""
 
@@ -438,6 +450,7 @@ class PIILeakEvaluator:
         return []
 
 
+@beta
 class InjectionResistanceEvaluator:
     """Checks expect_no_injection — detects prompt injection patterns in output."""
 
@@ -473,6 +486,7 @@ class InjectionResistanceEvaluator:
         return []
 
 
+@beta
 class WordCountEvaluator:
     """Checks expect_min_words and expect_max_words."""
 
@@ -505,6 +519,7 @@ class WordCountEvaluator:
         return failures
 
 
+@beta
 class ToolOrderEvaluator:
     """Checks expect_tool_order — tools called in expected sequence."""
 
@@ -527,6 +542,7 @@ class ToolOrderEvaluator:
         return []
 
 
+@beta
 class UniqueToolsEvaluator:
     """Checks expect_unique_tools — no duplicate tool calls."""
 
@@ -549,6 +565,7 @@ class UniqueToolsEvaluator:
         return []
 
 
+@beta
 class RefusalEvaluator:
     """Checks expect_refusal — agent should refuse harmful/invalid requests."""
 
@@ -579,6 +596,7 @@ class RefusalEvaluator:
         return []
 
 
+@beta
 class SentimentEvaluator:
     """Checks expect_sentiment — simple keyword-based sentiment detection."""
 
@@ -662,6 +680,7 @@ class SentimentEvaluator:
         return []
 
 
+@beta
 class PythonValidityEvaluator:
     """Checks expect_valid_python — whether output is valid Python code."""
 
@@ -688,6 +707,7 @@ class PythonValidityEvaluator:
             ]
 
 
+@beta
 class SQLValidityEvaluator:
     """Checks expect_valid_sql — basic SQL syntax validation."""
 
@@ -728,6 +748,7 @@ class SQLValidityEvaluator:
         return []
 
 
+@beta
 class URLValidityEvaluator:
     """Checks expect_valid_urls — all URLs in the output are well-formed."""
 
@@ -764,6 +785,7 @@ class URLValidityEvaluator:
         return []
 
 
+@beta
 class MarkdownFormatEvaluator:
     """Checks expect_markdown — output uses markdown formatting."""
 
@@ -797,6 +819,7 @@ class MarkdownFormatEvaluator:
         return []
 
 
+@beta
 class ReadabilityEvaluator:
     """Checks expect_readability_gte — Flesch Reading Ease score.
 
@@ -851,6 +874,7 @@ def _count_syllables(word: str) -> int:
     return max(1, groups)
 
 
+@beta
 class AgentTrajectoryEvaluator:
     """Checks expect_trajectory — tool names must appear as an in-order subsequence.
 
@@ -888,6 +912,7 @@ class AgentTrajectoryEvaluator:
         return []
 
 
+@beta
 class ToolEfficiencyEvaluator:
     """Checks expect_max_tools — agent should not call more tools than needed."""
 
@@ -910,6 +935,7 @@ class ToolEfficiencyEvaluator:
         return []
 
 
+@beta
 class SemanticSimilarityEvaluator:
     """Checks expect_semantic_similarity_gte — TF-IDF cosine similarity against reference.
 
@@ -980,6 +1006,7 @@ def _tf_cosine(text_a: str, text_b: str) -> float:
     return dot / (norm_a * norm_b)
 
 
+@beta
 class MultiTurnCoherenceEvaluator:
     """Checks expect_coherent_turns — heuristic contradiction detector.
 
@@ -1019,6 +1046,7 @@ class MultiTurnCoherenceEvaluator:
         return []
 
 
+@beta
 class JsonSchemaEvaluator:
     """Checks expect_json_schema — parses response as JSON, then validates against schema.
 
@@ -1100,6 +1128,7 @@ def _validate_json_schema(data: Any, schema: Dict[str, Any]) -> List[str]:
     return violations
 
 
+@beta
 class KeywordDensityEvaluator:
     """Checks expect_keywords (all must appear) and expect_keyword_density_min.
 
@@ -1154,6 +1183,7 @@ class KeywordDensityEvaluator:
         return failures
 
 
+@beta
 class ForbiddenWordsEvaluator:
     """Checks expect_no_keywords — none of the listed words may appear in the response.
 
@@ -1215,3 +1245,9 @@ DEFAULT_EVALUATORS: List[Any] = [
     KeywordDensityEvaluator(),
     ForbiddenWordsEvaluator(),
 ]
+
+
+# Evaluator is @runtime_checkable: a ``__stability__`` class attribute would become
+# a structural protocol member on Python 3.9-3.11 and break ``isinstance()``
+# for implementations that do not define it, so it is registered instead.
+register_stability("Evaluator", "beta")

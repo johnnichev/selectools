@@ -24,6 +24,8 @@ from .trace_store import (
     TraceSummary,
 )
 
+__stability__ = "beta"
+
 __all__ = [
     "TraceStore",
     "TraceSummary",

@@ -7,9 +7,11 @@ import inspect
 from typing import Any, Dict, List, Optional
 
 from .. import __version__
+from ..stability import beta
 from ..tools.base import Tool
 
 
+@beta
 class MCPServer:
     """Expose selectools @tool functions as an MCP server.
 

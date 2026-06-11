@@ -11,6 +11,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+from ..stability import beta
 from .bm25 import BM25
 from .vector_store import Document, SearchResult
 
@@ -19,6 +20,7 @@ if TYPE_CHECKING:
     from .vector_store import VectorStore
 
 
+@beta
 class FusionMethod(Enum):
     """Score fusion strategies for combining retrieval results."""
 
@@ -29,6 +31,7 @@ class FusionMethod(Enum):
     """Weighted linear combination of min-max normalised scores."""
 
 
+@beta
 class HybridSearcher:
     """
     Hybrid search combining vector similarity and BM25 keyword retrieval.

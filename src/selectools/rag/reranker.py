@@ -12,11 +12,13 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
+from ..stability import beta
 from .vector_store import SearchResult
 
 logger = logging.getLogger(__name__)
 
 
+@beta
 class Reranker(ABC):
     """
     Abstract base class for reranker implementations.
@@ -53,6 +55,7 @@ class Reranker(ABC):
         pass
 
 
+@beta
 class CohereReranker(Reranker):
     """
     Reranker using the Cohere Rerank API.
@@ -135,6 +138,7 @@ class CohereReranker(Reranker):
         return reranked
 
 
+@beta
 class JinaReranker(Reranker):
     """
     Reranker using the Jina AI Rerank API.

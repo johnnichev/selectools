@@ -7,9 +7,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+from ..stability import beta
 from .types import CaseVerdict
 
 
+@beta
 @dataclass
 class RegressionResult:
     """Result of comparing current run against a baseline."""
@@ -25,6 +27,7 @@ class RegressionResult:
         return len(self.regressions) > 0 or self.accuracy_delta < -0.01
 
 
+@beta
 class BaselineStore:
     """Persist and load eval baselines for regression detection.
 

@@ -9,9 +9,11 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import Any, Generator, List
 
+from ..stability import beta
 from .config import MCPServerConfig
 
 
+@beta
 def mcp_tools(config: MCPServerConfig) -> "_MCPToolsContext":
     """Connect to an MCP server and get selectools Tool objects.
 
@@ -78,6 +80,8 @@ def __getattr__(name: str) -> Any:
         return MCPServer
     raise AttributeError(f"module 'selectools.mcp' has no attribute {name}")
 
+
+__stability__ = "beta"
 
 __all__ = [
     "MCPServerConfig",
