@@ -5,6 +5,43 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Pending intent hooks** (`@beta`, #85, closes #82) — chat-channel
+  button flows can now adopt the pending store: `pop_if_intent`
+  (structured confirm/cancel/ignore, bypasses the text parser),
+  `tighten_ttl` (id-pinned atomic Lua rewrite on Redis — never
+  lengthens, never resurrects a claimed action), `kind_mismatch`
+  preserves the pending (a stale button for a different prompt must
+  neither fire nor disarm it), unknown intents coerce to "ignore"
+  with a warning. Built from Sheriff's Twilio quick-reply flow.
+- **Knowledge pre-save sanitization** (`@beta`, #84, closes #83) —
+  `pre_save` hook (transform or reject) on `KnowledgeMemory` plus
+  built-in sanitizers: `defang_delimiters` (prompt-injection markers:
+  dash/role/speaker/fences incl. `<<SYS>>`, `~~~`, fullwidth colons,
+  leading-indent variants), `strip_surrogates`, and `dedupe_against`
+  with a bounded default window. Known limitations documented.
+- **Planning-as-config** (`@beta`, #86) — `AgentConfig(planning=
+  PlanningConfig(...))` adds plan→execute→synthesize to any agent by
+  wrapping the PlanAndExecute pattern via isolated clones. Complexity
+  gate skips simple prompts; budget caps bind across the planned flow
+  (clones seeded from parent usage); approval handler can approve,
+  reject, or edit the plan.
+- **Tool result compression** (`@beta`, #87) — `ToolConfig(
+  compress_results=True, compress_threshold=...)` summarizes oversized
+  tool results via a one-shot LLM call before they enter context, with
+  fidelity-preserving prompt, raw-text retention for stop conditions
+  and loop detection, compressed-reuse on cache hits, gather-batched
+  async parallel compression, and loud truncation fallback.
+- **Agent-level HITL** (`@beta`, #88) — `ToolConfig(require_approval=
+  [...], approval_handler=...)` gates tool execution behind a sync or
+  async approval callback (fail-closed on handler errors, awaitable
+  results properly awaited, timed-out approvals cancelled, denials
+  memoized per run). Composes with `Tool.requires_approval` and
+  `ToolPolicy` (deny always wins).
+
 ## [0.24.0] - 2026-06-10 — Production Interop
 
 ### Added
