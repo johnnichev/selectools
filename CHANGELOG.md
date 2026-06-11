@@ -37,6 +37,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `flush()`. Corrupt blobs degrade to a fresh start with a warning;
   unpacking rejects unsafe paths.
 
+- **ToolResult base class + Artifact side-channel** (`@beta`, #72,
+  closes #59) — new `selectools.results` module: frozen
+  `ToolResult` base with a `kind` ClassVar discriminator, built-in
+  `Ambiguous`/`NotFound` results, and an `Artifact` dataclass
+  (`url`, `mime_type`, `filename`, `sha256`, `size`, `role`,
+  `retention`) emitted from tools via contextvar-backed
+  `emit_artifact()` and surfaced on `AgentResult.artifacts`.
+  `Tool._serialize_result` now re-injects `kind` (ClassVars are
+  excluded from `dataclasses.asdict()`); thread-pool tool execution
+  paths gained per-submission `contextvars.copy_context()` so
+  emission works from timeout and parallel executors.
+- **Deferred confirmation flow** (`@beta`, #73, closes #58) — new
+  `selectools.pending` module for chat-channel destructive tools
+  where the user's "yes" arrives as a separate webhook turn:
+  `PendingAction` record (scoped to user/channel/conversation,
+  SHA-256 args digest, TTL, pending → confirmed/cancelled/expired/
+  consumed lifecycle), `PendingActionStore` protocol with
+  `InMemoryPendingStore` and `RedisPendingStore` (atomic `GETDEL`
+  claim, Redis >= 6.2; closures never serialized — process-local
+  registry + per-kind executor factories), pluggable
+  `ConfirmParser` with PT/EN/ES `RegexConfirmParser`,
+  `PendingConfirmation` ToolResult, `stash_pending()`, and a
+  `ChannelAgent.ask_channel()` wrapper. Confirmation only executes
+  when user/conversation scope, TTL, and args digest all match;
+  duplicate webhook delivery executes exactly once.
+
 ### Fixed
 
 - **Gemini tool-schema sanitization** (#70, refs #66) — two selectools
