@@ -18,10 +18,11 @@ if TYPE_CHECKING:
     from ..observer import AgentObserver
 
 from .._async_utils import run_sync
-from ..stability import beta
+from ..stability import beta, stable
 from ..types import Message, Role
 
 
+@stable
 @dataclass
 class ReflectionRound:
     """The output of one actor→critic cycle."""
@@ -32,6 +33,7 @@ class ReflectionRound:
     approved: bool
 
 
+@stable
 @dataclass
 class ReflectiveResult:
     """Result of a ReflectiveAgent run."""
@@ -45,7 +47,7 @@ class ReflectiveResult:
         return len(self.rounds)
 
 
-@beta
+@stable
 class ReflectiveAgent:
     """Actor-Critic loop: actor drafts, critic evaluates, actor revises.
 

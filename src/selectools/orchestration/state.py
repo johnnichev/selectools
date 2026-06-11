@@ -18,12 +18,13 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 if TYPE_CHECKING:
     from ..types import AgentResult, Message
 
-from ..stability import beta
+from ..stability import register_stability, stable
 
 STATE_KEY_LAST_OUTPUT: str = "__last_output__"
+register_stability("STATE_KEY_LAST_OUTPUT", "stable")
 
 
-@beta
+@stable
 class MergePolicy(str, Enum):
     """Policy for merging parallel branch states.
 
@@ -37,7 +38,7 @@ class MergePolicy(str, Enum):
     APPEND = "append"
 
 
-@beta
+@stable
 class ContextMode(str, Enum):
     """Controls what conversation history is forwarded to a node's agent.
 
@@ -55,7 +56,7 @@ class ContextMode(str, Enum):
     CUSTOM = "custom"
 
 
-@beta
+@stable
 @dataclass
 class GraphState:
     """Shared context passed between nodes in an AgentGraph.
@@ -173,7 +174,7 @@ class GraphState:
         return cls(messages=[Message(role=Role.USER, content=prompt)])
 
 
-@beta
+@stable
 @dataclass
 class InterruptRequest:
     """Yielded from generator nodes to pause execution for human input.
@@ -194,7 +195,7 @@ class InterruptRequest:
     interrupt_key: str = ""
 
 
-@beta
+@stable
 @dataclass
 class Scatter:
     """Returned from routing functions to create dynamic parallel branches.
@@ -211,6 +212,7 @@ class Scatter:
     state_patch: Dict[str, Any] = field(default_factory=dict)
 
 
+@stable
 class GraphEventType(str, Enum):
     """Type of a GraphEvent yielded from AgentGraph.astream()."""
 
@@ -228,6 +230,7 @@ class GraphEventType(str, Enum):
     ERROR = "error"
 
 
+@stable
 @dataclass
 class GraphEvent:
     """A single event yielded from AgentGraph.astream().
@@ -272,16 +275,19 @@ class _Update:
     patch: Dict[str, Any]
 
 
+@stable
 def goto(node_name: str) -> _Goto:
     """Return a routing directive that sends execution to a specific node."""
     return _Goto(node_name=node_name)
 
 
+@stable
 def update(patch: Dict[str, Any]) -> _Update:
     """Return a state mutation directive to apply before routing."""
     return _Update(patch=patch)
 
 
+@stable
 def merge_states(states: List[GraphState], policy: MergePolicy) -> GraphState:
     """Merge a list of parallel branch states into a single GraphState.
 

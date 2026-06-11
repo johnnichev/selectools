@@ -38,7 +38,7 @@ from typing import (
 
 from .._async_utils import run_in_executor_copyctx, run_sync
 from ..exceptions import GraphExecutionError
-from ..stability import beta
+from ..stability import beta, stable
 from ..trace import AgentTrace, StepType, TraceStep
 from ..types import AgentResult, Message, Role
 from ..usage import UsageStats
@@ -74,6 +74,7 @@ if TYPE_CHECKING:
 _STATE_KEY_PENDING_INTERRUPT: str = "__pending_interrupt_key__"
 
 
+@stable
 class ErrorPolicy(str, Enum):
     """How the graph handles node execution errors.
 
@@ -87,6 +88,7 @@ class ErrorPolicy(str, Enum):
     RETRY = "retry"
 
 
+@stable
 @dataclass
 class GraphResult:
     """Result of a complete graph execution.
@@ -166,7 +168,7 @@ def _merge_usage(base: UsageStats, added: Any) -> UsageStats:
     )
 
 
-@beta
+@stable
 class AgentGraph:
     """Directed graph of agent nodes with routing, parallelism, and HITL support.
 

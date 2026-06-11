@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
+from ..stability import stable
 from .state import STATE_KEY_LAST_OUTPUT, ContextMode, GraphState
 
 if TYPE_CHECKING:
@@ -19,6 +20,7 @@ if TYPE_CHECKING:
     from .graph import ErrorPolicy
 
 
+@stable
 @dataclass
 class GraphNode:
     """A single node in an AgentGraph.
@@ -49,6 +51,7 @@ class GraphNode:
     error_policy: Optional[Any] = None  # Optional[ErrorPolicy]
 
 
+@stable
 @dataclass
 class ParallelGroupNode:
     """A first-class node that fans out to child nodes and merges results.
@@ -78,6 +81,7 @@ class ParallelGroupNode:
             self.merge_policy = MergePolicy.LAST_WINS
 
 
+@stable
 @dataclass
 class SubgraphNode:
     """Wraps an AgentGraph as a node with explicit state key mapping.
@@ -106,6 +110,7 @@ def _last_user_message(msgs: List[Any]) -> Optional[Any]:
     return None
 
 
+@stable
 def default_input_transform(state: GraphState) -> List[Any]:
     """Default input transform: reads STATE_KEY_LAST_OUTPUT from state.data.
 
@@ -125,6 +130,7 @@ def default_input_transform(state: GraphState) -> List[Any]:
     return list(state.messages)
 
 
+@stable
 def default_output_transform(result: Any, state: GraphState) -> GraphState:
     """Default output transform: appends assistant message and writes STATE_KEY_LAST_OUTPUT.
 
@@ -140,6 +146,7 @@ def default_output_transform(result: Any, state: GraphState) -> GraphState:
     return state
 
 
+@stable
 def build_context_messages(node: GraphNode, state: GraphState) -> List[Any]:
     """Build the input message list for a node based on its context_mode.
 

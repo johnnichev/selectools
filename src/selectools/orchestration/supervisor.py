@@ -46,13 +46,14 @@ if TYPE_CHECKING:
 
 from .._async_utils import run_sync
 from .._json_utils import safe_json_parse
-from ..stability import beta
+from ..stability import beta, stable
 from ..types import Message, Role
 from ..usage import UsageStats
 from .graph import AgentGraph, ErrorPolicy, GraphResult, _merge_usage
 from .state import STATE_KEY_LAST_OUTPUT, ContextMode, GraphState
 
 
+@stable
 class SupervisorStrategy(str, Enum):
     """Coordination strategy for SupervisorAgent.
 
@@ -68,6 +69,7 @@ class SupervisorStrategy(str, Enum):
     MAGENTIC = "magentic"
 
 
+@stable
 @dataclass
 class ModelSplit:
     """Use separate models for planning and execution.
@@ -153,7 +155,7 @@ Respond with ONLY a JSON array:
 _safe_json_parse = safe_json_parse
 
 
-@beta
+@stable
 class SupervisorAgent:
     """High-level multi-agent coordinator.
 

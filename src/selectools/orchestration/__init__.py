@@ -58,6 +58,8 @@ from .state import (
 )
 from .supervisor import ModelSplit, SupervisorAgent, SupervisorStrategy
 
+__stability__ = "beta"
+
 __all__ = [
     # Core graph
     "AgentGraph",
