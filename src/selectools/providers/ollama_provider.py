@@ -137,4 +137,6 @@ class OllamaProvider(_OpenAICompatibleBase):
         return tc_delta.id or f"call_{uuid.uuid4().hex}"
 
 
+__stability__ = "stable"
+
 __all__ = ["OllamaProvider"]

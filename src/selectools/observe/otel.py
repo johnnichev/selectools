@@ -234,4 +234,6 @@ class OTelObserver(AgentObserver):
         span.end()
 
 
+__stability__ = "beta"
+
 __all__ = ["OTelObserver"]

@@ -235,6 +235,8 @@ class VectorStore(ABC):
             )
 
 
+__stability__ = "beta"
+
 __all__ = [
     "Document",
     "SearchResult",

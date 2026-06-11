@@ -582,6 +582,8 @@ class ContextualChunker:
         return [d.text for d in docs]
 
 
+__stability__ = "beta"
+
 __all__ = [
     "TextSplitter",
     "RecursiveTextSplitter",

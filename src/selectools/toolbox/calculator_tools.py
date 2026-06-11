@@ -330,3 +330,11 @@ def unit_convert(value: float, from_unit: str, to_unit: str) -> str:
     units = _CATEGORIES[src_category]
     converted = float(value) * units[src] / units[dst]
     return f"{_format_quantity(float(value))} {src} = {_format_quantity(converted)} {dst}"
+
+
+__stability__ = "stable"
+
+__all__ = [
+    "evaluate_expression",
+    "unit_convert",
+]

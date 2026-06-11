@@ -206,4 +206,6 @@ class ToolLoader:
         return ToolLoader.from_file(file_path)
 
 
+__stability__ = "stable"
+
 __all__ = ["ToolLoader"]

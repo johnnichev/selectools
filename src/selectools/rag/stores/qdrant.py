@@ -426,4 +426,6 @@ class QdrantVectorStore(VectorStore):
         return f"QdrantVectorStore(collection={self.collection_name!r}, url={self.url!r})"
 
 
+__stability__ = "beta"
+
 __all__ = ["QdrantVectorStore"]

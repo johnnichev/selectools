@@ -161,3 +161,11 @@ def execute_shell(command: str, timeout: int = 30) -> str:
         return f"Error: Command timed out after {timeout} seconds."
     except Exception as e:
         return f"Error executing command: {e}"
+
+
+__stability__ = "stable"
+
+__all__ = [
+    "execute_python",
+    "execute_shell",
+]

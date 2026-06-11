@@ -271,3 +271,16 @@ def truncate_text(text: str, max_length: int = 100, suffix: str = "...") -> str:
         return text[:truncate_at] + suffix
     except Exception as e:
         return f"❌ Error truncating text: {e}"
+
+
+__stability__ = "stable"
+
+__all__ = [
+    "count_text",
+    "search_text",
+    "replace_text",
+    "extract_emails",
+    "extract_urls",
+    "convert_case",
+    "truncate_text",
+]

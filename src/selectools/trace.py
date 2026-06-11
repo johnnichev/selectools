@@ -543,4 +543,6 @@ def trace_to_json(trace: "AgentTrace") -> str:
     return json.dumps(dataclasses.asdict(trace), default=_default)  # type: ignore[arg-type]
 
 
+__stability__ = "stable"
+
 __all__ = ["TraceStep", "AgentTrace", "StepType", "trace_to_html", "trace_to_json"]

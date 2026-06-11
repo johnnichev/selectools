@@ -603,6 +603,8 @@ def _format_history(history: List[Any]) -> str:
     return "\n".join(lines) if lines else "No steps taken yet."
 
 
+__stability__ = "beta"
+
 __all__ = [
     "SupervisorAgent",
     "SupervisorStrategy",

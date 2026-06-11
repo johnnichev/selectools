@@ -580,4 +580,6 @@ class DocumentLoader:
             return [Document(text=text, metadata={"source": source})]
 
 
+__stability__ = "beta"
+
 __all__ = ["DocumentLoader"]

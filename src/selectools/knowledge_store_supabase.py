@@ -14,10 +14,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from .knowledge import KnowledgeEntry
+from .stability import beta
 
 _logger = logging.getLogger(__name__)
 
 
+@beta
 class SupabaseKnowledgeStore:
     """Supabase-backed knowledge store for cloud-native or multi-service use.
 
@@ -189,5 +191,7 @@ class SupabaseKnowledgeStore:
             _logger.warning("SupabaseKnowledgeStore.prune failed: %s", exc)
             return 0
 
+
+__stability__ = "beta"
 
 __all__ = ["SupabaseKnowledgeStore"]

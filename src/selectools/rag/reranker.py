@@ -250,4 +250,6 @@ class JinaReranker(Reranker):
         return reranked
 
 
+__stability__ = "beta"
+
 __all__ = ["Reranker", "CohereReranker", "JinaReranker"]

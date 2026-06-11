@@ -194,3 +194,14 @@ def read_file_stream(filepath: str, encoding: str = "utf-8") -> Generator[str, N
         yield f"❌ Error: Permission denied reading: {filepath}\n"
     except Exception as e:
         yield f"❌ Error reading file: {e}\n"
+
+
+__stability__ = "stable"
+
+__all__ = [
+    "read_file",
+    "write_file",
+    "list_files",
+    "file_exists",
+    "read_file_stream",
+]

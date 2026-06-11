@@ -140,4 +140,6 @@ class PIIGuardrail(Guardrail):
         )
 
 
+__stability__ = "stable"
+
 __all__ = ["PIIGuardrail", "PIIMatch"]

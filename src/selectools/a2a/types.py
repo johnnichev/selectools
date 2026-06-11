@@ -13,6 +13,8 @@ from typing import Any, Dict, List, Optional
 
 from ..stability import beta
 
+__stability__ = "beta"
+
 __all__ = ["A2AError", "AgentCard", "AgentSkill", "A2ATask", "TaskState"]
 
 # A2A JSON-RPC protocol version advertised in the Agent Card.

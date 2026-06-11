@@ -495,6 +495,8 @@ class KnowledgeGraphMemory:
 # for implementations that do not define it, so it is registered instead.
 register_stability("TripleStore", "beta")
 
+__stability__ = "beta"
+
 __all__ = [
     "Triple",
     "TripleStore",

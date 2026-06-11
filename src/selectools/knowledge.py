@@ -958,6 +958,8 @@ class KnowledgeMemory:
 # for implementations that do not define it, so it is registered instead.
 register_stability("KnowledgeStore", "stable")
 
+__stability__ = "beta"
+
 __all__ = [
     "KnowledgeEntry",
     "KnowledgeStore",

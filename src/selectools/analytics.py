@@ -339,4 +339,6 @@ class AgentAnalytics:
         self._metrics.clear()
 
 
+__stability__ = "stable"
+
 __all__ = ["ToolMetrics", "AgentAnalytics"]

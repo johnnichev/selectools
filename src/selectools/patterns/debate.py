@@ -133,4 +133,6 @@ class DebateAgent:
         return DebateResult(conclusion=conclusion, rounds=rounds)
 
 
+__stability__ = "beta"
+
 __all__ = ["DebateAgent", "DebateRound", "DebateResult"]

@@ -88,6 +88,8 @@ class GuardrailError(Exception):
         super().__init__(f"Guardrail '{guardrail_name}' blocked: {reason}")
 
 
+__stability__ = "stable"
+
 __all__ = [
     "Guardrail",
     "GuardrailAction",

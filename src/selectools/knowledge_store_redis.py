@@ -14,10 +14,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from .knowledge import KnowledgeEntry
+from .stability import beta
 
 _logger = logging.getLogger(__name__)
 
 
+@beta
 class RedisKnowledgeStore:
     """Redis-backed knowledge store for distributed or multi-process use.
 
@@ -236,5 +238,7 @@ class RedisKnowledgeStore:
             _logger.warning("RedisKnowledgeStore.prune failed: %s", exc)
             return 0
 
+
+__stability__ = "beta"
 
 __all__ = ["RedisKnowledgeStore"]

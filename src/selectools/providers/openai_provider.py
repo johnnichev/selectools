@@ -85,4 +85,6 @@ class OpenAIProvider(_OpenAICompatibleBase):
         return args
 
 
+__stability__ = "stable"
+
 __all__ = ["OpenAIProvider"]

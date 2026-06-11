@@ -392,6 +392,8 @@ class SQLiteCheckpointStore:
 # for implementations that do not define it, so it is registered instead.
 register_stability("CheckpointStore", "stable")
 
+__stability__ = "beta"
+
 __all__ = [
     "CheckpointMetadata",
     "CheckpointStore",

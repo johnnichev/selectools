@@ -85,4 +85,6 @@ class PromptBuilder:
 register_stability("DEFAULT_SYSTEM_INSTRUCTIONS", "stable")
 register_stability("REASONING_STRATEGIES", "stable")
 
+__stability__ = "stable"
+
 __all__ = ["PromptBuilder", "DEFAULT_SYSTEM_INSTRUCTIONS", "REASONING_STRATEGIES"]

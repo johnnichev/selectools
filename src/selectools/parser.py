@@ -13,6 +13,7 @@ from .stability import stable
 from .types import ToolCall
 
 
+@stable
 @dataclass
 class ParseResult:
     """Result of attempting to parse a tool call."""
@@ -118,5 +119,7 @@ class ToolCallParser:
                         break
         return candidates
 
+
+__stability__ = "stable"
 
 __all__ = ["ToolCallParser", "ParseResult"]

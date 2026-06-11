@@ -201,6 +201,14 @@ def get_stability(obj: Any, name: Optional[str] = None) -> Optional[str]:
     return None
 
 
+# The stability API is itself part of the v1.0 contract. ``stable``/``beta``/
+# ``deprecated`` carry their markers at their definition sites above; the
+# remaining three are marked here (the dict via the registry, the functions
+# via the same direct-attribute pattern as the decorators).
+register_stability("STABILITY_REGISTRY", "stable")
+register_stability.__stability__ = "stable"  # type: ignore[attr-defined]
+get_stability.__stability__ = "stable"  # type: ignore[attr-defined]
+
 __stability__ = "stable"
 
 __all__ = [

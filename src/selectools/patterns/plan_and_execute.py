@@ -222,4 +222,6 @@ class PlanAndExecuteAgent:
         return steps
 
 
+__stability__ = "beta"
+
 __all__ = ["PlanAndExecuteAgent", "PlanStep"]

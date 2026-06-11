@@ -183,6 +183,8 @@ def build_context_messages(node: GraphNode, state: GraphState) -> List[Any]:
     return default_input_transform(state)
 
 
+__stability__ = "beta"
+
 __all__ = [
     "GraphNode",
     "ParallelGroupNode",

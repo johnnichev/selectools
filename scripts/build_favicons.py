@@ -12,6 +12,7 @@ just Pillow. Output goes back into landing/ where the deploy workflow picks it u
 
 Run: python3 scripts/build_favicons.py
 """
+
 from __future__ import annotations
 
 from pathlib import Path

@@ -157,4 +157,6 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
         return self._dimension
 
 
+__stability__ = "beta"
+
 __all__ = ["GeminiEmbeddingProvider"]

@@ -252,4 +252,6 @@ class EntityMemory:
         return mem
 
 
+__stability__ = "stable"
+
 __all__ = ["Entity", "EntityMemory"]

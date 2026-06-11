@@ -155,3 +155,11 @@ def http_post(
         return f"❌ Error making request: {e}"
     except Exception as e:
         return f"❌ Unexpected error: {e}"
+
+
+__stability__ = "stable"
+
+__all__ = [
+    "http_get",
+    "http_post",
+]

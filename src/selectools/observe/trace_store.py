@@ -394,6 +394,8 @@ class JSONLTraceStore:
 # for implementations that do not define it, so it is registered instead.
 register_stability("TraceStore", "beta")
 
+__stability__ = "beta"
+
 __all__ = [
     "TraceStore",
     "TraceSummary",

@@ -155,4 +155,6 @@ def estimate_run_tokens(
     )
 
 
+__stability__ = "stable"
+
 __all__ = ["TokenEstimate", "estimate_tokens", "estimate_run_tokens"]

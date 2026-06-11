@@ -218,4 +218,6 @@ def _cosine_similarity(a: List[float], b: List[float]) -> float:
     return dot / (norm_a * norm_b)
 
 
+__stability__ = "stable"
+
 __all__ = ["SemanticCache"]

@@ -26,6 +26,8 @@ from .._async_utils import run_sync
 from ..stability import beta
 from .types import A2AError, A2ATask, AgentCard
 
+__stability__ = "beta"
+
 __all__ = ["A2AClient"]
 
 

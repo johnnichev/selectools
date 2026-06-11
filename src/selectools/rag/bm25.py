@@ -405,4 +405,6 @@ class BM25:
         return True
 
 
+__stability__ = "beta"
+
 __all__ = ["BM25"]

@@ -150,4 +150,6 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         return self._dimension
 
 
+__stability__ = "beta"
+
 __all__ = ["OpenAIEmbeddingProvider"]

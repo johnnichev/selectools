@@ -1,5 +1,7 @@
 """Vector store implementations."""
 
+__stability__ = "beta"
+
 __all__ = []
 
 # Try to import optional vector store implementations

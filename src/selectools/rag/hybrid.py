@@ -312,4 +312,6 @@ class HybridSearcher:
         return None
 
 
+__stability__ = "beta"
+
 __all__ = ["FusionMethod", "HybridSearcher"]

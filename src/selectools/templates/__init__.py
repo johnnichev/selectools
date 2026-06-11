@@ -22,6 +22,8 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+from ..stability import beta
+
 if TYPE_CHECKING:
     from ..agent.core import Agent
     from ..providers.base import Provider
@@ -35,6 +37,7 @@ _TEMPLATES: Dict[str, str] = {
 }
 
 
+@beta
 def from_yaml(path: str, provider: Optional["Provider"] = None) -> "Agent":
     """Create an Agent from a YAML configuration file.
 
@@ -79,6 +82,7 @@ def from_yaml(path: str, provider: Optional["Provider"] = None) -> "Agent":
     return _build_agent_from_dict(raw, provider=provider, base_dir=config_path.parent)
 
 
+@beta
 def from_dict(config: Any, provider: Optional["Provider"] = None) -> "Agent":
     """Create an Agent from a configuration dictionary.
 
@@ -89,6 +93,7 @@ def from_dict(config: Any, provider: Optional["Provider"] = None) -> "Agent":
     return _build_agent_from_dict(config, provider=provider)
 
 
+@beta
 def load_template(
     name: str,
     provider: "Provider",
@@ -117,6 +122,7 @@ def load_template(
     return build_fn(provider=provider, **overrides)  # type: ignore[no-any-return]
 
 
+@beta
 def list_templates() -> List[str]:
     """Return names of all available templates."""
     return sorted(_TEMPLATES.keys())
@@ -255,6 +261,8 @@ def _resolve_tools(tool_specs: List[Any], base_dir: Optional[Path] = None) -> li
                             tools.append(obj)
     return tools
 
+
+__stability__ = "beta"
 
 __all__ = [
     "from_yaml",

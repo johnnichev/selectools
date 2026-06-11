@@ -366,4 +366,6 @@ class FallbackProvider:
         return None
 
 
+__stability__ = "stable"
+
 __all__ = ["FallbackProvider"]

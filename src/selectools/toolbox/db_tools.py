@@ -198,3 +198,11 @@ def query_postgres(connection_string: str, sql: str, max_rows: int = 100) -> str
     finally:
         if conn:
             conn.close()
+
+
+__stability__ = "stable"
+
+__all__ = [
+    "query_sqlite",
+    "query_postgres",
+]

@@ -199,3 +199,12 @@ def slack_search_messages(query: str, count: int = 10, token: Optional[str] = No
         return _slack_error(exc)
     except Exception as exc:
         return f"Error searching Slack: {type(exc).__name__}"
+
+
+__stability__ = "stable"
+
+__all__ = [
+    "slack_send_message",
+    "slack_read_channel",
+    "slack_search_messages",
+]

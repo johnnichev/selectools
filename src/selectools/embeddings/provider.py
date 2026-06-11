@@ -74,4 +74,6 @@ class EmbeddingProvider(ABC):
         pass
 
 
+__stability__ = "beta"
+
 __all__ = ["EmbeddingProvider"]

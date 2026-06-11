@@ -357,4 +357,6 @@ class HybridSearchTool:
         return [r for r in results if r.score >= self.score_threshold]
 
 
+__stability__ = "beta"
+
 __all__ = ["RAGTool", "SemanticSearchTool", "HybridSearchTool"]

@@ -754,4 +754,6 @@ class GeminiProvider(Provider):
             _warn_empty_tool_response(model_name, _last_finish_reason)
 
 
+__stability__ = "stable"
+
 __all__ = ["GeminiProvider"]

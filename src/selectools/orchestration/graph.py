@@ -1830,6 +1830,8 @@ class AgentGraph:
         print()
 
 
+__stability__ = "beta"
+
 __all__ = [
     "AgentGraph",
     "GraphResult",

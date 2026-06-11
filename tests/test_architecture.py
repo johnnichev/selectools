@@ -302,38 +302,154 @@ def test_all_models_have_required_fields() -> None:
 #    ``@runtime_checkable`` Protocols (where a class attribute would become a
 #    structural member on Python 3.9-3.11 and break ``isinstance()``).
 #
-# The ONLY exclusion is module references re-exported through ``__all__``
-# (e.g. ``selectools.rag`` in the top-level ``__all__``): those declare their
-# own module-level ``__stability__``, asserted separately below. There is no
-# name-based exclusion list — a future unmarked public symbol fails this gate.
+# There is no name-based exclusion list — a future unmarked public symbol
+# fails this gate. Only two conventions narrow the surface:
+#
+# - Module references re-exported through ``__all__`` (e.g. ``selectools.rag``
+#   in the top-level ``__all__``, or the toolbox category modules in
+#   ``toolbox.__all__``) are asserted to carry a module-level
+#   ``__stability__`` themselves, in-line in the symbol test.
+# - ``_``-prefixed names are private by convention even when they appear in an
+#   ``__all__`` for internal wiring (e.g. ``orchestration.state._Goto``) and
+#   are not part of the public contract.
+#
+# ``PUBLIC_SUBMODULES`` is the full set of modules reachable by a ``pkgutil``
+# walk that declare an ``__all__`` (``_``-prefixed modules are internal by
+# convention). ``test_public_submodules_list_is_exhaustive`` regenerates the
+# walk on every run, so a new module with an ``__all__`` cannot ship without
+# joining this gate.
 
 VALID_STABILITY_LEVELS = {"stable", "beta", "deprecated"}
 
+# Genuinely internal modules that declare an ``__all__`` but are deliberately
+# kept out of the public gate. Empty today — add a module here ONLY with an
+# explanatory comment and a deliberate decision that its surface is internal.
+INTERNAL_MODULES_WITH_ALL: "set[str]" = set()
+
 PUBLIC_SUBMODULES = [
     "a2a",
+    "a2a.client",
+    "a2a.server",
+    "a2a.types",
     "agent",
+    "agent.config_groups",
+    "analytics",
+    "audit",
     "cache",
+    "cache_redis",
+    "cache_semantic",
+    "cancellation",
+    "checkpoint_postgres",
+    "coherence",
+    "compose",
     "embeddings",
+    "embeddings.anthropic",
+    "embeddings.cohere",
+    "embeddings.gemini",
+    "embeddings.openai",
+    "embeddings.provider",
+    "entity_memory",
+    "env",
     "evals",
     "exceptions",
     "guardrails",
+    "guardrails.base",
+    "guardrails.format",
+    "guardrails.length",
+    "guardrails.pii",
+    "guardrails.pipeline",
+    "guardrails.topic",
+    "guardrails.toxicity",
+    "knowledge",
     "knowledge_backends",
+    "knowledge_graph",
+    "knowledge_sanitizers",
+    "knowledge_store_redis",
+    "knowledge_store_supabase",
     "mcp",
+    "memory",
     "models",
     "observe",
+    "observe.langfuse",
+    "observe.otel",
+    "observe.trace_store",
+    "observer",
     "orchestration",
+    "orchestration.checkpoint",
+    "orchestration.graph",
+    "orchestration.node",
+    "orchestration.state",
+    "orchestration.supervisor",
+    "parser",
     "patterns",
+    "patterns.debate",
+    "patterns.plan_and_execute",
+    "patterns.reflective",
+    "patterns.team_lead",
     "pending",
+    "pipeline",
+    "policy",
     "pricing",
+    "prompt",
     "providers",
+    "providers.anthropic_provider",
+    "providers.azure_openai_provider",
+    "providers.base",
+    "providers.fallback",
+    "providers.gemini_provider",
+    "providers.litellm_provider",
+    "providers.ollama_provider",
+    "providers.openai_provider",
+    "providers.router",
+    "providers.stubs",
     "rag",
+    "rag.bm25",
+    "rag.chunking",
+    "rag.hybrid",
+    "rag.loaders",
+    "rag.reranker",
+    "rag.stores",
+    "rag.stores.chroma",
+    "rag.stores.faiss",
+    "rag.stores.memory",
+    "rag.stores.pgvector",
+    "rag.stores.pinecone",
+    "rag.stores.qdrant",
+    "rag.stores.sqlite",
+    "rag.tools",
+    "rag.vector_store",
     "results",
+    "security",
     "serve",
+    "serve.api",
     "sessions",
+    "stability",
+    "structured",
+    "templates",
+    "token_estimation",
     "toolbox",
+    "toolbox.calculator_tools",
+    "toolbox.code_tools",
+    "toolbox.data_tools",
+    "toolbox.datetime_tools",
+    "toolbox.db_tools",
+    "toolbox.email_tools",
+    "toolbox.file_tools",
+    "toolbox.github_tools",
+    "toolbox.linear_tools",
+    "toolbox.memory_tools",
+    "toolbox.notion_tools",
+    "toolbox.pdf_tools",
+    "toolbox.search_tools",
+    "toolbox.slack_tools",
+    "toolbox.text_tools",
+    "toolbox.web_tools",
     "tools",
+    "tools.loader",
+    "trace",
     "types",
     "unified_memory",
+    "usage",
 ]
 
 # Module-level stability promises (the ROADMAP v1.0 taxonomy): "stable" for
@@ -341,29 +457,128 @@ PUBLIC_SUBMODULES = [
 # still allowed to move in a minor release.
 EXPECTED_MODULE_STABILITY = {
     "a2a": "beta",
+    "a2a.client": "beta",
+    "a2a.server": "beta",
+    "a2a.types": "beta",
     "agent": "stable",
+    "agent.config_groups": "stable",
+    "analytics": "stable",
+    "audit": "stable",
     "cache": "stable",
+    "cache_redis": "stable",
+    "cache_semantic": "stable",
+    "cancellation": "stable",
+    "checkpoint_postgres": "stable",
+    "coherence": "beta",
+    "compose": "beta",
     "embeddings": "beta",
+    "embeddings.anthropic": "beta",
+    "embeddings.cohere": "beta",
+    "embeddings.gemini": "beta",
+    "embeddings.openai": "beta",
+    "embeddings.provider": "beta",
+    "entity_memory": "stable",
+    "env": "stable",
     "evals": "beta",
     "exceptions": "stable",
     "guardrails": "stable",
+    "guardrails.base": "stable",
+    "guardrails.format": "stable",
+    "guardrails.length": "stable",
+    "guardrails.pii": "stable",
+    "guardrails.pipeline": "stable",
+    "guardrails.topic": "stable",
+    "guardrails.toxicity": "stable",
+    "knowledge": "beta",
     "knowledge_backends": "beta",
+    "knowledge_graph": "beta",
+    "knowledge_sanitizers": "beta",
+    "knowledge_store_redis": "beta",
+    "knowledge_store_supabase": "beta",
     "mcp": "beta",
+    "memory": "stable",
     "models": "stable",
     "observe": "beta",
+    "observe.langfuse": "beta",
+    "observe.otel": "beta",
+    "observe.trace_store": "beta",
+    "observer": "stable",
     "orchestration": "beta",
+    "orchestration.checkpoint": "beta",
+    "orchestration.graph": "beta",
+    "orchestration.node": "beta",
+    "orchestration.state": "beta",
+    "orchestration.supervisor": "beta",
+    "parser": "stable",
     "patterns": "beta",
+    "patterns.debate": "beta",
+    "patterns.plan_and_execute": "beta",
+    "patterns.reflective": "beta",
+    "patterns.team_lead": "beta",
     "pending": "beta",
+    "pipeline": "beta",
+    "policy": "beta",
     "pricing": "stable",
+    "prompt": "stable",
     "providers": "stable",
+    "providers.anthropic_provider": "stable",
+    "providers.azure_openai_provider": "stable",
+    "providers.base": "stable",
+    "providers.fallback": "stable",
+    "providers.gemini_provider": "stable",
+    "providers.litellm_provider": "beta",
+    "providers.ollama_provider": "stable",
+    "providers.openai_provider": "stable",
+    "providers.router": "beta",
+    "providers.stubs": "beta",
     "rag": "beta",
+    "rag.bm25": "beta",
+    "rag.chunking": "beta",
+    "rag.hybrid": "beta",
+    "rag.loaders": "beta",
+    "rag.reranker": "beta",
+    "rag.stores": "beta",
+    "rag.stores.chroma": "beta",
+    "rag.stores.faiss": "beta",
+    "rag.stores.memory": "beta",
+    "rag.stores.pgvector": "beta",
+    "rag.stores.pinecone": "beta",
+    "rag.stores.qdrant": "beta",
+    "rag.stores.sqlite": "beta",
+    "rag.tools": "beta",
+    "rag.vector_store": "beta",
     "results": "beta",
+    "security": "stable",
     "serve": "beta",
+    "serve.api": "beta",
     "sessions": "stable",
+    "stability": "stable",
+    "structured": "stable",
+    "templates": "beta",
+    "token_estimation": "stable",
     "toolbox": "stable",
+    "toolbox.calculator_tools": "stable",
+    "toolbox.code_tools": "stable",
+    "toolbox.data_tools": "stable",
+    "toolbox.datetime_tools": "stable",
+    "toolbox.db_tools": "stable",
+    "toolbox.email_tools": "stable",
+    "toolbox.file_tools": "stable",
+    "toolbox.github_tools": "stable",
+    "toolbox.linear_tools": "stable",
+    "toolbox.memory_tools": "stable",
+    "toolbox.notion_tools": "stable",
+    "toolbox.pdf_tools": "stable",
+    "toolbox.search_tools": "stable",
+    "toolbox.slack_tools": "stable",
+    "toolbox.text_tools": "stable",
+    "toolbox.web_tools": "stable",
     "tools": "stable",
+    "tools.loader": "stable",
+    "trace": "stable",
     "types": "stable",
     "unified_memory": "beta",
+    "usage": "stable",
 }
 
 
@@ -372,8 +587,65 @@ def _all_public_symbols() -> "list[tuple[str, str]]":
     for mod_name in ["selectools"] + [f"selectools.{s}" for s in PUBLIC_SUBMODULES]:
         mod = importlib.import_module(mod_name)
         for name in mod.__all__:
+            # ``_``-prefixed names are private by convention even when listed
+            # in an ``__all__`` for internal wiring (orchestration.state
+            # exports ``_Goto``/``_Update``, rag.vector_store exports two
+            # ``_``-helpers for its store implementations).
+            if name.startswith("_"):
+                continue
             cases.append((mod_name, name))
     return cases
+
+
+def _walked_modules_with_all() -> "list[str]":
+    """Every selectools module reachable by a pkgutil walk that has an ``__all__``.
+
+    ``_``-prefixed modules (and anything below them) are internal by
+    convention and excluded.
+    """
+    import pkgutil
+
+    import selectools
+
+    walked: "list[str]" = []
+    for info in pkgutil.walk_packages(selectools.__path__, prefix="selectools."):
+        short = info.name[len("selectools.") :]
+        if any(part.startswith("_") for part in short.split(".")):
+            continue
+        mod = importlib.import_module(info.name)
+        if hasattr(mod, "__all__"):
+            walked.append(short)
+    return sorted(walked)
+
+
+def test_public_submodules_list_is_exhaustive() -> None:
+    """The gate enumerates EVERY module with an ``__all__`` — no holes.
+
+    A module that declares an ``__all__`` is declaring a public surface; it
+    must either be listed in ``PUBLIC_SUBMODULES`` (and thereby have all of
+    its symbols marked) or be deliberately excluded via
+    ``INTERNAL_MODULES_WITH_ALL`` with an explanatory comment.
+    """
+    walked = set(_walked_modules_with_all())
+    gated = set(PUBLIC_SUBMODULES)
+    missing = walked - gated - INTERNAL_MODULES_WITH_ALL
+    assert not missing, (
+        f"Modules with an __all__ missing from the stability gate: "
+        f"{sorted(missing)}. Add them to PUBLIC_SUBMODULES (and "
+        f"EXPECTED_MODULE_STABILITY), or — only for genuinely internal "
+        f"surfaces — to INTERNAL_MODULES_WITH_ALL with a comment."
+    )
+    stale = gated - walked
+    assert not stale, (
+        f"PUBLIC_SUBMODULES entries that no longer exist or lost their __all__: {sorted(stale)}"
+    )
+    overlap = gated & INTERNAL_MODULES_WITH_ALL
+    assert not overlap, f"Modules cannot be both public and internal: {sorted(overlap)}"
+    assert set(EXPECTED_MODULE_STABILITY) == gated, (
+        "EXPECTED_MODULE_STABILITY must pin a level for exactly the modules "
+        "in PUBLIC_SUBMODULES; diff: "
+        f"{sorted(set(EXPECTED_MODULE_STABILITY) ^ gated)}"
+    )
 
 
 @pytest.mark.parametrize(
@@ -395,7 +667,17 @@ def test_every_public_symbol_has_stability_marker(mod_name: str, symbol: str) ->
     mod = importlib.import_module(mod_name)
     obj = getattr(mod, symbol)
     if inspect.ismodule(obj):
-        pytest.skip("module reference: covered by test_public_submodule_declares_module_stability")
+        # A module re-exported through __all__ (selectools.rag, the toolbox
+        # category modules, ...) must itself declare a module-level
+        # __stability__ — asserted here so module refs cannot dodge the gate
+        # by pointing at a test that does not enumerate them.
+        ref_level = getattr(obj, "__stability__", None)
+        assert ref_level in VALID_STABILITY_LEVELS, (
+            f"{mod_name}.{symbol} re-exports module {obj.__name__}, which has "
+            f"no module-level __stability__ (got {ref_level!r}). Set "
+            f'__stability__ = "stable"|"beta" in {obj.__name__}.'
+        )
+        return
     level = get_stability(obj, symbol)
     assert level in VALID_STABILITY_LEVELS, (
         f"{mod_name}.{symbol} has no stability marker. Decorate it with "

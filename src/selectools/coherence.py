@@ -202,4 +202,6 @@ async def acheck_coherence(
         )
 
 
+__stability__ = "beta"
+
 __all__ = ["CoherenceResult", "acheck_coherence", "check_coherence"]

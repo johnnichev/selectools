@@ -234,3 +234,11 @@ def scrape_url(url: str, selector: Optional[str] = None) -> str:
         return f"Error: Could not connect to {url}: {e.reason}"
     except Exception as e:
         return f"Error fetching URL: {e}"
+
+
+__stability__ = "stable"
+
+__all__ = [
+    "web_search",
+    "scrape_url",
+]

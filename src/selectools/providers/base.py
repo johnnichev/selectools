@@ -128,4 +128,6 @@ class Provider(Protocol):
 # for implementations that do not define it, so it is registered instead.
 register_stability("Provider", "stable")
 
+__stability__ = "stable"
+
 __all__ = ["Provider", "ProviderError"]

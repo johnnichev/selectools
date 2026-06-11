@@ -8,7 +8,10 @@ import os
 from pathlib import Path
 from typing import Iterable
 
+from .stability import stable
 
+
+@stable
 def load_env_if_present(candidate_paths: Iterable[Path]) -> None:
     """Load key=value pairs from the first .env-style file that exists."""
     for env_path in candidate_paths:
@@ -28,6 +31,7 @@ def load_env_if_present(candidate_paths: Iterable[Path]) -> None:
             continue
 
 
+@stable
 def load_default_env() -> None:
     """Load from common locations: cwd/.env and project root .env."""
     cwd = Path.cwd()
@@ -37,5 +41,7 @@ def load_default_env() -> None:
     ]
     load_env_if_present(default_candidates)
 
+
+__stability__ = "stable"
 
 __all__ = ["load_default_env", "load_env_if_present"]

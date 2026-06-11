@@ -1743,4 +1743,6 @@ class SimpleStepObserver(AgentObserver):
         )
 
 
+__stability__ = "stable"
+
 __all__ = ["AgentObserver", "AsyncAgentObserver", "LoggingObserver", "SimpleStepObserver"]

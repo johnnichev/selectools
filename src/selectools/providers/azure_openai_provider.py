@@ -149,4 +149,6 @@ class AzureOpenAIProvider(OpenAIProvider):
         return ProviderError(f"Azure OpenAI {operation} failed: {exc}")
 
 
+__stability__ = "stable"
+
 __all__ = ["AzureOpenAIProvider"]

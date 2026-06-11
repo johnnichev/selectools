@@ -719,4 +719,6 @@ class AnthropicProvider(Provider):
             raise ProviderError(f"Anthropic async streaming failed mid-stream: {exc}") from exc
 
 
+__stability__ = "stable"
+
 __all__ = ["AnthropicProvider"]
