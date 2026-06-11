@@ -60,12 +60,14 @@ _ROLE_MARKER_RE = re.compile(
 
 # Speaker-label prefix at line start (``Assistant: I'll wire the money``).
 # Inside a remembered-context block this reads as a forged conversation turn.
-# Matches ASCII and fullwidth (U+FF1A) colons.  Indentation is unbounded
+# Matches ASCII and fullwidth (U+FF1A) colons.  Covers English and
+# Brazilian-Portuguese labels (Usuário/Sistema/Assistente/Humano) so
+# pt-BR consumers (Sheriff) need no supplement.  Indentation is unbounded
 # (speaker labels are not markdown structure, so no 0-3 cap) but restricted
 # to same-line whitespace (`[ \t]`, not `\s`) so a match never spans
 # newlines (review finding PR #84).
 _SPEAKER_LABEL_RE = re.compile(
-    r"^([ \t]*)(User|Assistant|System|Human)([ \t]*)([:：])",
+    r"^([ \t]*)(User|Assistant|System|Human|Usu[aá]rio|Sistema|Assistente|Humano)([ \t]*)([:：])",
     re.MULTILINE | re.IGNORECASE,
 )
 

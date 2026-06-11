@@ -1,8 +1,8 @@
 {
   "components": [
     {
-      "bom-ref": "requirements-L2",
-      "description": "requirements line 2: anthropic==0.75.0",
+      "bom-ref": "requirements-L1",
+      "description": "requirements line 1: anthropic==0.75.0",
       "externalReferences": [
         {
           "comment": "implicit dist url",
@@ -16,8 +16,8 @@
       "version": "0.75.0"
     },
     {
-      "bom-ref": "requirements-L3",
-      "description": "requirements line 3: google-genai==1.47.0",
+      "bom-ref": "requirements-L2",
+      "description": "requirements line 2: google-genai==1.47.0",
       "externalReferences": [
         {
           "comment": "implicit dist url",
@@ -31,8 +31,8 @@
       "version": "1.47.0"
     },
     {
-      "bom-ref": "requirements-L4",
-      "description": "requirements line 4: numpy==2.0.2",
+      "bom-ref": "requirements-L3",
+      "description": "requirements line 3: numpy==2.0.2",
       "externalReferences": [
         {
           "comment": "implicit dist url",
@@ -46,8 +46,8 @@
       "version": "2.0.2"
     },
     {
-      "bom-ref": "requirements-L1",
-      "description": "requirements line 1: openai==1.109.1",
+      "bom-ref": "requirements-L4",
+      "description": "requirements line 4: openai==1.109.1",
       "externalReferences": [
         {
           "comment": "implicit dist url",
@@ -136,7 +136,7 @@
       "type": "application",
       "version": "0.25.0"
     },
-    "timestamp": "2026-06-11T20:43:54.212332+00:00",
+    "timestamp": "2026-06-11T21:05:39.349549+00:00",
     "tools": {
       "components": [
         {
@@ -240,7 +240,7 @@
       ]
     }
   },
-  "serialNumber": "urn:uuid:d2611a4f-8e02-4076-b893-ea0bad9ca102",
+  "serialNumber": "urn:uuid:3616efc9-4ef2-497b-84d5-759808859241",
   "version": 1,
   "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
   "bomFormat": "CycloneDX",

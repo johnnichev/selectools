@@ -87,6 +87,12 @@ class GuardrailError(Exception):
         self.reason = reason
         super().__init__(f"Guardrail '{guardrail_name}' blocked: {reason}")
 
+    def __reduce__(self) -> "tuple[type, tuple[str, str]]":
+        # Default exception pickling replays the rendered message into the
+        # two-arg __init__ and fails; reconstruct from the original args
+        # (same fix family as selectools.exceptions, PR #100).
+        return (self.__class__, (self.guardrail_name, self.reason))
+
 
 __stability__ = "stable"
 

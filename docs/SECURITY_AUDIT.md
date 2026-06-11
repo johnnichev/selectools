@@ -257,7 +257,7 @@ wrong shape for this repo. To regenerate:
 
 ```bash
 pip install cyclonedx-bom
-pip freeze | grep -E "^(openai|anthropic|google-genai|numpy)==" > /tmp/core-reqs.txt
+pip freeze | grep -E "^(openai|anthropic|google-genai|numpy)==" | sort > /tmp/core-reqs.txt
 cyclonedx-py requirements /tmp/core-reqs.txt --pyproject pyproject.toml \
   --spec-version 1.6 --output-format JSON -o sbom.json
 ```

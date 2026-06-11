@@ -39,6 +39,8 @@ from selectools.exceptions import (
     MCPToolError,
     MemoryLimitExceededError,
 )
+from selectools.guardrails.base import GuardrailError
+from selectools.loop_detection import LoopDetectedError
 from selectools.providers.stubs import LocalProvider
 
 # =============================================================================
@@ -498,8 +500,10 @@ class TestExceptionPickling:
     """Custom exceptions whose multi-arg ``__init__`` does not replay from
     ``self.args`` need ``__reduce__``; without it ``pickle.loads`` raises
     TypeError (multiprocessing / concurrent.futures propagate worker
-    exceptions by pickle). Sweep of every custom exception in
-    ``selectools.exceptions``.
+    exceptions by pickle). Sweep of every custom multi-arg exception in
+    the package: ``selectools.exceptions`` plus ``GuardrailError``
+    (guardrails/base.py) and ``LoopDetectedError`` (loop_detection.py),
+    which had the identical defect (PR #100 review finding).
     """
 
     @pytest.mark.parametrize(
@@ -519,6 +523,8 @@ class TestExceptionPickling:
             MCPConnectionError("connect failed"),
             MCPToolError("tool failed"),
             SelectoolsError("base"),
+            GuardrailError("pii_screen", "credit card detected"),
+            LoopDetectedError("repeat loop", detector="generic_repeat", details={"count": 12}),
         ],
         ids=lambda e: type(e).__name__,
     )
