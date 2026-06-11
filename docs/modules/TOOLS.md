@@ -513,6 +513,58 @@ execution path. Outside an agent run, `emit_artifact()` is a safe no-op that sti
 
 ---
 
+## Tool Result Compression
+
+Verbose tool outputs (a web scrape returning 10KB of HTML, a query dumping hundreds of rows)
+waste context window on every subsequent iteration. When enabled, tool results exceeding a
+character threshold are summarized by a one-shot LLM call **before** being appended to the
+conversation.
+
+```python
+from selectools import Agent, AgentConfig
+from selectools.agent.config_groups import ToolConfig
+
+config = AgentConfig(
+    tool=ToolConfig(
+        compress_results=True,
+        compress_threshold=2000,        # chars; strict greater-than
+        compress_provider=cheap_provider,  # optional dedicated provider
+        compress_model="gpt-5-mini",       # optional model override
+    ),
+)
+agent = Agent(tools=[scrape_page], provider=provider, config=config)
+```
+
+The model sees a marked summary instead of the raw output:
+
+```
+[compressed from 9482 chars] 500 rows; ids 1-500; total=$12,403.50; ...
+```
+
+**Behavior and guarantees:**
+
+| Rule | Detail |
+|---|---|
+| Zero overhead when disabled | Default `compress_results=False`; one attribute check per tool result |
+| Fidelity-preserving prompt | The summarizer is instructed to keep numbers, IDs, URLs, paths, and error text verbatim |
+| Marked output | Compressed results are prefixed `[compressed from N chars]` so the model knows it is reading a summary |
+| Failure fallback | If the compression call fails (or returns empty), the result is truncated to `compress_threshold` chars with a `[truncated from N chars; compression failed]` marker — the tool loop never crashes |
+| Never longer | If the marked summary would be longer than the original, the raw result is kept |
+| Terminal exemption | Results of `terminal=True` tools and `stop_condition` matches are never compressed — they become `AgentResult.content` verbatim |
+| Error exemption | Tool errors, policy denials, and coherence failures are never compressed |
+| Cache hits exempt | Cached results are appended as stored (compressing them on every hit would re-bill the summarizer) |
+| Loop detection unaffected | `LoopDetector` compares raw tool outputs, not the (non-deterministic) summaries |
+
+**Provider and cost:** with no `compress_provider`, the agent's own provider is used; with no
+`compress_model`, the agent's effective model is used — meaning each oversized tool result costs
+one extra completion at your main model's rates. Point `compress_provider`/`compress_model` at a
+fast, cheap model for production use. Compression usage is added to `AgentResult.usage`.
+
+Works in `run()`, `arun()`, `astream()`, and both sequential and parallel tool execution.
+See `examples/107_tool_result_compression.py` for an offline runnable demo.
+
+---
+
 ## Deferred Confirmation for Chat Channels
 
 > All symbols are `@beta` (introduced for issue #58). APIs may change in a minor release.

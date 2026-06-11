@@ -66,6 +66,14 @@ if TYPE_CHECKING:
     from .core import _RunContext
 
 
+_COMPRESS_SYSTEM_PROMPT = (
+    "You compress verbose tool outputs for an AI agent. Produce a faithful, dense "
+    "summary of the tool output. Preserve exactly, verbatim: all numbers, "
+    "identifiers, URLs, file paths, error messages, and key data values. Never "
+    "invent or add information that is not in the input. Output only the summary."
+)
+
+
 class _ToolExecutorMixin:
     """Mixin that provides tool execution methods for the Agent class.
 
@@ -73,6 +81,127 @@ class _ToolExecutorMixin:
     analytics, _tools_by_name, etc.) which are expected to be provided by the
     Agent class that inherits from this mixin.
     """
+
+    # ------------------------------------------------------------------
+    # Tool result compression (ROADMAP P2)
+    # ------------------------------------------------------------------
+
+    def _tool_compression_candidate(self, tool: Optional["Tool"], result: str) -> bool:
+        """Cheap gate deciding whether tool-result compression should be attempted.
+
+        Returns False (with zero extra work) when compression is disabled, the
+        result is within the threshold, or the tool is terminal (its result
+        becomes the agent's final answer and must stay verbatim).
+        """
+        tcfg = self.config.tool
+        if tcfg is None or not getattr(tcfg, "compress_results", False):
+            return False
+        if tool is None or getattr(tool, "terminal", False):
+            return False
+        return len(result) > tcfg.compress_threshold
+
+    def _stop_condition_hit(self, tool_name: str, result: str) -> bool:
+        """True if config.stop_condition fires for this result (terminal path)."""
+        return bool(self.config.stop_condition and self.config.stop_condition(tool_name, result))
+
+    def _compression_fallback(self, result: str) -> str:
+        """Truncation-with-marker fallback used when summarization fails."""
+        threshold = self.config.tool.compress_threshold
+        return f"[truncated from {len(result)} chars; compression failed] {result[:threshold]}"
+
+    def _build_compression_request(self, tool_name: str, result: str) -> Message:
+        """Build the one-shot user message for the compression call."""
+        return Message(
+            role=Role.USER,
+            content=(
+                f"Summarize the following output from tool '{tool_name}'. Preserve "
+                "all numbers, IDs, URLs, file paths, and error text verbatim:\n\n" + result
+            ),
+        )
+
+    def _finish_compression(
+        self,
+        completion: Any,
+        original: str,
+        tool_name: str,
+        trace: Optional["AgentTrace"],
+    ) -> str:
+        """Shared tail of the sync/async compression paths.
+
+        Unpacks the provider response, records usage, applies the fidelity
+        marker, and never returns something longer than the original.
+        """
+        msg = completion[0] if isinstance(completion, tuple) else completion
+        if isinstance(completion, tuple) and completion[1] is not None:
+            self.usage.add_usage(completion[1])
+        summary = (msg.content or "").strip()
+        if not summary:
+            raise ValueError("compression returned empty summary")
+        compressed = f"[compressed from {len(original)} chars] {summary}"
+        if len(compressed) >= len(original):
+            return original  # compression made it worse — keep the raw result
+        if trace is not None:
+            trace.add(
+                TraceStep(
+                    type=StepType.PROMPT_COMPRESSED,
+                    tool_name=tool_name,
+                    summary=(f"Tool result compressed: {len(original)}→{len(compressed)} chars"),
+                )
+            )
+        return compressed
+
+    def _compression_max_tokens(self) -> int:
+        """Token budget for the summary: comfortably under the char threshold."""
+        threshold = self.config.tool.compress_threshold
+        return max(128, min(1000, threshold // 4))
+
+    def _compress_tool_result(
+        self,
+        tool_name: str,
+        result: str,
+        trace: Optional["AgentTrace"] = None,
+    ) -> str:
+        """Summarize an oversized tool result via a one-shot LLM call (sync).
+
+        Falls back to truncation-with-marker on ANY failure — never crashes
+        the tool loop.
+        """
+        tcfg = self.config.tool
+        try:
+            provider = tcfg.compress_provider or self.provider
+            model = tcfg.compress_model or self._effective_model
+            completion = provider.complete(
+                model=model,
+                system_prompt=_COMPRESS_SYSTEM_PROMPT,
+                messages=[self._build_compression_request(tool_name, result)],
+                max_tokens=self._compression_max_tokens(),
+                timeout=self.config.request_timeout,
+            )
+            return self._finish_compression(completion, result, tool_name, trace)
+        except Exception:
+            return self._compression_fallback(result)
+
+    async def _acompress_tool_result(
+        self,
+        tool_name: str,
+        result: str,
+        trace: Optional["AgentTrace"] = None,
+    ) -> str:
+        """Async counterpart of :meth:`_compress_tool_result`."""
+        tcfg = self.config.tool
+        try:
+            provider = tcfg.compress_provider or self.provider
+            model = tcfg.compress_model or self._effective_model
+            completion = await provider.acomplete(
+                model=model,
+                system_prompt=_COMPRESS_SYSTEM_PROMPT,
+                messages=[self._build_compression_request(tool_name, result)],
+                max_tokens=self._compression_max_tokens(),
+                timeout=self.config.request_timeout,
+            )
+            return self._finish_compression(completion, result, tool_name, trace)
+        except Exception:
+            return self._compression_fallback(result)
 
     def _screen_tool_result(self, tool_name: str, result: str) -> str:
         """Screen a tool result for prompt injection if the tool or config requires it."""
@@ -390,6 +519,7 @@ class _ToolExecutorMixin:
             tool: Optional[Tool]
             chunk_count: int
             error_step_type: "StepType" = StepType.ERROR
+            cached: bool = False
 
         def _run_one(tc: ToolCall) -> _Result:
             tool_name = tc.tool_name
@@ -422,7 +552,7 @@ class _ToolExecutorMixin:
             # Tool result cache check
             cached_result = self._check_tool_cache(tool, parameters)
             if cached_result is not None:
-                return _Result(tc, cached_result, False, 0.0, tool, 0)
+                return _Result(tc, cached_result, False, 0.0, tool, 0, cached=True)
 
             call_id = tc.id or ""
             start = time.time()
@@ -549,11 +679,22 @@ class _ToolExecutorMixin:
                     run_id=run_id,
                 )
             else:
+                # Tool result compression runs here in the dispatching thread
+                # (after workers returned), never inside the worker pool.
+                message_content = r.result
+                if (
+                    not r.cached
+                    and self._tool_compression_candidate(r.tool, r.result)
+                    and not self._stop_condition_hit(r.tool_call.tool_name, r.result)
+                ):
+                    message_content = self._compress_tool_result(
+                        r.tool_call.tool_name, r.result, trace
+                    )
                 self._append_tool_result(
-                    r.result,
+                    message_content,
                     r.tool_call.tool_name,
                     r.tool_call.id,
-                    tool_result=r.result,
+                    tool_result=message_content,
                     run_id=run_id,
                 )
 
@@ -593,6 +734,7 @@ class _ToolExecutorMixin:
             tool: Optional[Tool]
             chunk_count: int
             error_step_type: "StepType" = StepType.ERROR
+            cached: bool = False
 
         async def _run_one(tc: ToolCall) -> _Result:
             tool_name = tc.tool_name
@@ -628,7 +770,7 @@ class _ToolExecutorMixin:
             # Tool result cache check
             cached_result = self._check_tool_cache(tool, parameters)
             if cached_result is not None:
-                return _Result(tc, cached_result, False, 0.0, tool, 0)
+                return _Result(tc, cached_result, False, 0.0, tool, 0, cached=True)
 
             start = time.time()
             if run_id:
@@ -759,11 +901,22 @@ class _ToolExecutorMixin:
                     run_id=run_id,
                 )
             else:
+                # Tool result compression runs here on the event loop (after
+                # asyncio.gather returned), never inside tool coroutines.
+                message_content = r.result
+                if (
+                    not r.cached
+                    and self._tool_compression_candidate(r.tool, r.result)
+                    and not self._stop_condition_hit(r.tool_call.tool_name, r.result)
+                ):
+                    message_content = await self._acompress_tool_result(
+                        r.tool_call.tool_name, r.result, trace
+                    )
                 self._append_tool_result(
-                    r.result,
+                    message_content,
                     r.tool_call.tool_name,
                     r.tool_call.id,
-                    tool_result=r.result,
+                    tool_result=message_content,
                     run_id=run_id,
                 )
 
@@ -980,9 +1133,22 @@ class _ToolExecutorMixin:
                     + self.usage.iterations[-1].total_tokens
                 )
 
+            # Tool result compression: the model sees the compressed text, but
+            # ctx.all_tool_results keeps the raw result (loop detection needs
+            # deterministic outputs) and terminal checks run on the raw result.
+            message_content = result
+            if self._tool_compression_candidate(tool, result) and not self._stop_condition_hit(
+                tool_name, result
+            ):
+                message_content = self._compress_tool_result(tool_name, result, ctx.trace)
+
             ctx.all_tool_results.append(result)
             self._append_tool_result(
-                result, tool_name, tool_call.id, tool_result=result, run_id=ctx.run_id
+                message_content,
+                tool_name,
+                tool_call.id,
+                tool_result=message_content,
+                run_id=ctx.run_id,
             )
 
             # --- Terminal tool check ---
@@ -1196,9 +1362,20 @@ class _ToolExecutorMixin:
                     + self.usage.iterations[-1].total_tokens
                 )
 
+            # Tool result compression (see sync counterpart for invariants).
+            message_content = result
+            if self._tool_compression_candidate(tool, result) and not self._stop_condition_hit(
+                tool_name, result
+            ):
+                message_content = await self._acompress_tool_result(tool_name, result, ctx.trace)
+
             ctx.all_tool_results.append(result)
             self._append_tool_result(
-                result, tool_name, tool_call.id, tool_result=result, run_id=ctx.run_id
+                message_content,
+                tool_name,
+                tool_call.id,
+                tool_result=message_content,
+                run_id=ctx.run_id,
             )
 
             # --- Terminal tool check ---
