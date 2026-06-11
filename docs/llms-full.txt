@@ -289,7 +289,7 @@ agent = Agent(
 
 ## Step 9: Monitor with AgentObserver
 
-For production observability, use `AgentObserver` — a class-based protocol with 45 lifecycle events. Every callback gets a `run_id` for cross-request correlation. For simpler integrations, use `SimpleStepObserver` which routes all events to a single callback:
+For production observability, use `AgentObserver` — a class-based protocol with 46 lifecycle events. Every callback gets a `run_id` for cross-request correlation. For simpler integrations, use `SimpleStepObserver` which routes all events to a single callback:
 
 ```python
 from selectools import Agent, AgentConfig
@@ -586,7 +586,7 @@ You now know the core API. Here is where to go from here:
 | Add audit logging | [Audit Guide](modules/AUDIT.md) |
 | Screen tool outputs for injection | [Security Guide](modules/SECURITY.md) |
 | Enable coherence checking | [Security Guide — Coherence](modules/SECURITY.md#coherence-checking) |
-| Use 24 pre-built tools | [Toolbox Guide](modules/TOOLBOX.md) |
+| Use 48 pre-built tools | [Toolbox Guide](modules/TOOLBOX.md) |
 | Handle errors gracefully | [Exceptions Guide](modules/EXCEPTIONS.md) |
 | Look up model pricing at runtime | [Models Guide — Pricing API](modules/MODELS.md#programmatic-pricing-api) |
 | Use structured output helpers | [Agent Guide — Structured Helpers](modules/AGENT.md#standalone-helpers) |
@@ -2553,7 +2553,7 @@ print(result.content)
 !!! tip "See Also"
     - [Agent](AGENT.md) -- how agents use tools in the execution loop
     - [Dynamic Tools](DYNAMIC_TOOLS.md) -- ToolLoader, hot-reload, plugin systems
-    - [Toolbox](TOOLBOX.md) -- 24 pre-built tools (file, web, data, datetime, text)
+    - [Toolbox](TOOLBOX.md) -- 48 pre-built tools (file, web, data, datetime, text)
 
 ---
 
@@ -13528,7 +13528,7 @@ from selectools import Agent, AgentConfig, OpenAIProvider
 from selectools.toolbox import get_all_tools
 
 agent = Agent(
-    tools=get_all_tools(),           # all 24 tools
+    tools=get_all_tools(),           # all 48 tools
     provider=OpenAIProvider(),
     config=AgentConfig(max_iterations=5),
 )
@@ -13546,7 +13546,7 @@ print(result.content)
 ```python
 from selectools.toolbox import get_all_tools
 
-tools = get_all_tools()  # List[Tool], 24 tools
+tools = get_all_tools()  # List[Tool], 48 tools
 ```
 
 ### By Category
@@ -13729,7 +13729,7 @@ agent = Agent(
 
 | Function | Description |
 |---|---|
-| `get_all_tools()` | Returns all 24 tools as `List[Tool]` |
+| `get_all_tools()` | Returns all 48 tools as `List[Tool]` |
 | `get_tools_by_category(category)` | Returns tools for one category (`"file"`, `"web"`, `"data"`, `"datetime"`, `"text"`) |
 | `selectools.toolbox.file_tools` | Module with 5 file tools |
 | `selectools.toolbox.web_tools` | Module with 2 web tools |
@@ -17079,7 +17079,7 @@ Resilient provider orchestration:
 
 Class-based lifecycle observability:
 
-- 45 event methods with `run_id` correlation for concurrent requests
+- 46 event methods with `run_id` correlation for concurrent requests
 - `call_id` for matching parallel tool start/end pairs
 - `AsyncAgentObserver` provides async equivalents of all observer events
 - Built-in `LoggingObserver` for structured JSON log output
@@ -17249,7 +17249,7 @@ graph LR
 
 **Problem:** Black box behavior makes debugging hard.
 
-**Solution:** `AgentObserver` protocol (45 lifecycle events including 13 graph events, `run_id` correlation):
+**Solution:** `AgentObserver` protocol (46 lifecycle events including 13 graph events, `run_id` correlation):
 
 - `on_run_start/end`, `on_iteration_start/end`
 - `on_tool_start/end/error/chunk`

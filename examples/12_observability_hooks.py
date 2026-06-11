@@ -3,7 +3,7 @@ Observability — lifecycle observers and tool validation at registration time.
 
 The legacy ``AgentConfig.hooks`` dict (deprecated in v0.16) has been removed.
 This example uses the class-based :class:`AgentObserver` protocol, which
-provides run_id/call_id correlation, 31 lifecycle events, and a built-in
+provides run_id/call_id correlation, 46 lifecycle events, and a built-in
 LoggingObserver. See examples/28_agent_observer.py for a deeper dive and
 docs/decisions/002-observer-replaces-hooks.md for the rationale.
 

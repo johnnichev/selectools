@@ -1,7 +1,7 @@
 # Compatibility Matrix
 
 **Added in:** v0.19.2
-**Updated:** v0.19.2
+**Updated:** v0.24.0
 
 This page documents the tested combinations of Python versions, provider SDKs, and optional
 dependencies. All combinations in the CI matrix are validated on every commit.
@@ -19,13 +19,19 @@ dependencies. All combinations in the CI matrix are validated on every commit.
 | 3.13   | ✅ Supported | Yes |
 | < 3.9  | ❌ Not supported | — |
 
+!!! warning "Python 3.9 support ends at v1.0.0"
+    Python 3.9 reached upstream end-of-life in October 2025. selectools will drop
+    Python 3.9 support at the **v1.0.0** release; the minimum will become Python 3.10.
+    All 0.x releases (including the final 0.24.x series) continue to support 3.9.
+    See [MIGRATION_1.0](MIGRATION_1.0.md) for details.
+
 ---
 
 ## Operating Systems
 
 | OS | Status |
 |----|--------|
-| Linux (Ubuntu latest) | ✅ CI-tested |
+| Linux (Ubuntu latest) | ✅ CI-tested (full 3.9–3.13 matrix) |
 | macOS | ✅ Tested (dev environment) |
 | Windows | ⚠️ Not CI-tested — likely works, not guaranteed |
 
@@ -37,7 +43,7 @@ These are always installed with `pip install selectools`.
 
 | Package | Required version | Notes |
 |---------|-----------------|-------|
-| `openai` | `>=1.30.0, <2.0.0` | OpenAI provider + all OpenAI-compatible endpoints |
+| `openai` | `>=1.30.0, <2.0.0` | OpenAI provider + all OpenAI-compatible endpoints (Ollama, Azure) |
 | `anthropic` | `>=0.28.0, <1.0.0` | Anthropic provider |
 | `google-genai` | `>=1.0.0` | Gemini provider |
 | `numpy` | `>=1.24.0, <3.0.0` | Vector operations in RAG |
@@ -46,17 +52,20 @@ These are always installed with `pip install selectools`.
 
 ## Optional Dependencies
 
-Install extras as needed: `pip install selectools[rag,evals,mcp,postgres,serve]`
+Install extras as needed: `pip install "selectools[rag,evals,mcp,litellm,postgres,supabase,toolbox,observe,serve]"`
 
-### `[rag]` — Vector stores and embeddings
+### `[rag]` — Vector stores, embeddings, and loaders
 
 | Package | Required version | What it enables |
 |---------|-----------------|-----------------|
 | `chromadb` | `>=0.4.0` | ChromaVectorStore |
 | `pinecone-client` | `>=3.0.0` | PineconeVectorStore |
-| `voyageai` | `>=0.2.0` | VoyageEmbedding provider |
-| `cohere` | `>=5.0.0` | CohereEmbedding provider + reranker |
+| `qdrant-client` | `>=1.7.0` | QdrantVectorStore |
+| `faiss-cpu` | `>=1.7.0` | FAISSVectorStore |
+| `voyageai` | `>=0.2.0` | Voyage embeddings (Anthropic's recommended embedding partner) |
+| `cohere` | `>=5.0.0` | Cohere embeddings + reranker |
 | `pypdf` | `>=4.0.0` | PDFLoader |
+| `beautifulsoup4` | `>=4.12.0` | HTML loading/extraction in document loaders |
 
 ### `[evals]` — Eval framework
 
@@ -70,17 +79,92 @@ Install extras as needed: `pip install selectools[rag,evals,mcp,postgres,serve]`
 |---------|-----------------|-----------------|
 | `mcp` | `>=1.0.0, <2.0.0` | MCPClient, MCPServer, mcp_tools() |
 
+### `[litellm]` — LiteLLM meta-provider
+
+| Package | Required version | What it enables |
+|---------|-----------------|-----------------|
+| `litellm` | `>=1.0.0` | LiteLLMProvider (100+ models through one interface) |
+
 ### `[postgres]` — PostgreSQL backends
 
 | Package | Required version | What it enables |
 |---------|-----------------|-----------------|
-| `psycopg2-binary` | `>=2.9.0` | PostgresCheckpointStore, PostgresSessionStore |
+| `psycopg2-binary` | `>=2.9.0` | PostgresCheckpointStore, PgVectorStore |
+
+### `[supabase]` — Supabase backends
+
+| Package | Required version | What it enables |
+|---------|-----------------|-----------------|
+| `supabase` | `>=2.0.0` | SupabaseSessionStore, SupabaseKnowledgeStore |
+
+### `[toolbox]` — Built-in tool integrations
+
+| Package | Required version | What it enables |
+|---------|-----------------|-----------------|
+| `requests` | `>=2.28.0` | HTTP tools (web requests) |
+| `slack-sdk` | `>=3.27.0` | Slack tools (send/read/search messages) |
+| `pdfplumber` | `>=0.11.0` | PDF extraction tools |
+
+### `[observe]` — Observability integrations
+
+| Package | Required version | What it enables |
+|---------|-----------------|-----------------|
+| `opentelemetry-api` | `>=1.20.0` | OTelObserver (OpenTelemetry spans) |
+| `langfuse` | `>=2.0.0` | LangfuseObserver (Langfuse tracing) |
 
 ### `[serve]` — Agent serving
 
 | Package | Required version | What it enables |
 |---------|-----------------|-----------------|
 | `pyyaml` | `>=6.0.0` | YAML agent config (`selectools serve agent.yaml`) |
+| `starlette` | `>=0.27.0` | AgentAPI / A2AServer ASGI apps |
+| `uvicorn[standard]` | `>=0.24.0` | Built-in ASGI server for `selectools serve` |
+| `httpx` | `>=0.24.0` | A2AClient and HTTP transport |
+
+---
+
+## Providers
+
+Nine providers ship with the core package (no extra needed unless noted):
+
+| Provider | Class | Requires |
+|----------|-------|----------|
+| OpenAI | `OpenAIProvider` | core |
+| Azure OpenAI | `AzureOpenAIProvider` | core |
+| Anthropic | `AnthropicProvider` | core |
+| Google Gemini | `GeminiProvider` | core |
+| Ollama | `OllamaProvider` | core (Ollama server running locally) |
+| LiteLLM | `LiteLLMProvider` | `[litellm]` extra |
+| Fallback chain | `FallbackProvider` | core |
+| Router | `RouterProvider` | core |
+| Local stub | `LocalProvider` | core (testing/offline) |
+
+## Vector Stores
+
+Seven vector store backends:
+
+| Store | Requires |
+|-------|----------|
+| `InMemoryVectorStore` | core (stdlib + numpy) |
+| `SQLiteVectorStore` | core (stdlib) |
+| `ChromaVectorStore` | `[rag]` (`chromadb`) |
+| `PineconeVectorStore` | `[rag]` (`pinecone-client`) |
+| `QdrantVectorStore` | `[rag]` (`qdrant-client`) |
+| `FAISSVectorStore` | `[rag]` (`faiss-cpu`) |
+| `PgVectorStore` | `[postgres]` (`psycopg2-binary` + pgvector extension) |
+
+## Session and Checkpoint Backends
+
+| Backend | Type | Requires |
+|---------|------|----------|
+| `JsonFileSessionStore` | sessions | core (stdlib) |
+| `SQLiteSessionStore` | sessions | core (stdlib) |
+| `RedisSessionStore` | sessions | `redis>=4.0.0` (not a declared extra — install manually) |
+| `SupabaseSessionStore` | sessions | `[supabase]` |
+| `InMemoryCheckpointStore` | checkpoints | core |
+| `FileCheckpointStore` | checkpoints | core (stdlib) |
+| `SQLiteCheckpointStore` | checkpoints | core (stdlib) |
+| `PostgresCheckpointStore` | checkpoints | `[postgres]` |
 
 ---
 
@@ -135,6 +219,12 @@ that other providers accept (both were hard 400 errors before sanitization):
 Ollama is accessed via the OpenAI-compatible API (`OllamaProvider` inherits `_OpenAICompatProvider`).
 No extra package required. Tested with Ollama server `0.3.x+`.
 
+### LiteLLM
+
+`LiteLLMProvider` routes through the `litellm` package (`[litellm]` extra) and inherits
+its model coverage. Compatibility with individual upstream models follows LiteLLM's own
+support matrix.
+
 ---
 
 ## Optional Backend Compatibility
@@ -142,7 +232,8 @@ No extra package required. Tested with Ollama server `0.3.x+`.
 | Backend | Package | Min version | Notes |
 |---------|---------|------------|-------|
 | Redis (cache/sessions/knowledge) | `redis` | `>=4.0.0` | Not a declared extra — install manually |
-| Supabase (knowledge store) | `supabase` | `>=2.0.0` | Not a declared extra — install manually |
+| Supabase (sessions/knowledge) | `supabase` | `>=2.0.0` | Declared extra: `selectools[supabase]` |
+| PostgreSQL (checkpoints/pgvector) | `psycopg2-binary` | `>=2.9.0` | Declared extra: `selectools[postgres]` |
 | SQLite (sessions/checkpoints/vectors) | stdlib | — | Always available |
 | In-memory (cache/vectors/checkpoints) | stdlib | — | Always available |
 

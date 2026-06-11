@@ -37,7 +37,7 @@ print(result.content)
 !!! tip "See Also"
     - [Agent](AGENT.md) -- how agents use tools in the execution loop
     - [Dynamic Tools](DYNAMIC_TOOLS.md) -- ToolLoader, hot-reload, plugin systems
-    - [Toolbox](TOOLBOX.md) -- 24 pre-built tools (file, web, data, datetime, text)
+    - [Toolbox](TOOLBOX.md) -- 48 pre-built tools (file, web, data, datetime, text, code, search, and more)
 
 ---
 

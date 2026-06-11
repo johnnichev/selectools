@@ -55,7 +55,7 @@ from selectools.serve import AgentAPI
 api = AgentAPI(agent, auth_key="secret")  # ASGI app: uvicorn main:api
 ```
 
-See `CHANGELOG.md` for the full entry (5,968 tests, 106 examples).
+See `CHANGELOG.md` for the full entry (6,187 tests, 111 examples).
 
 ## What's New in v0.23
 
@@ -542,7 +542,7 @@ report.to_html("report.html")
 | **Eval Framework** | 50 built-in evaluators (30 deterministic + 21 LLM-as-judge). A/B testing, regression detection, snapshot testing, HTML reports, JUnit XML, CI integration. |
 | **Multi-Agent Orchestration** | `AgentGraph` for directed agent graphs, `SupervisorAgent` with 4 strategies, HITL via generator nodes, parallel execution, checkpointing, subgraph composition. |
 | **Composable Pipelines** | `Pipeline` + `@step` + `|` operator + `parallel()` + `branch()` — chain agents, tools, and transforms with plain Python. |
-| **AgentObserver Protocol** | 45-event lifecycle observer with `run_id`/`call_id` correlation. Built-in `LoggingObserver` + `SimpleStepObserver`. |
+| **AgentObserver Protocol** | 46-event lifecycle observer with `run_id`/`call_id` correlation. Built-in `LoggingObserver` + `SimpleStepObserver`. |
 | **Runtime Controls** | Token/cost budget limits, cooperative cancellation, per-tool approval gates, model switching per iteration. |
 | **Production Hardened** | Retries with backoff, per-tool timeouts, iteration caps, cost warnings, observability hooks + observers. |
 | **Library-First** | Not a framework. No magic globals, no hidden state. Use as much or as little as you need. |
@@ -582,10 +582,10 @@ report.to_html("report.html")
 - **Conversation Branching**: `ConversationMemory.branch()` and `SessionStore.branch()` for A/B exploration and checkpointing
 - **Multi-Agent Orchestration**: `AgentGraph` with routing, parallel execution, HITL, checkpointing; `SupervisorAgent` with 4 strategies (plan_and_execute, round_robin, dynamic, magentic)
 - **Composable Pipelines**: `Pipeline` + `@step` + `|` operator + `parallel()` + `branch()` — chain agents, tools, and transforms
-- **106 Examples**: Multi-agent graphs, RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions (incl. Supabase), entity memory, knowledge graph, eval framework, advanced agent patterns, stability markers, HTML trace viewer, agent-as-API, A2A, routing, unified memory, and more
+- **111 Examples**: Multi-agent graphs, RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions (incl. Supabase), entity memory, knowledge graph, eval framework, advanced agent patterns, stability markers, HTML trace viewer, agent-as-API, A2A, routing, unified memory, and more
 - **Built-in Eval Framework**: 50 evaluators (30 deterministic + 21 LLM-as-judge), A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing
-- **AgentObserver Protocol**: 45 lifecycle events with `run_id` correlation, `LoggingObserver`, `SimpleStepObserver`, OTel export
-- **5968 Tests**: Unit, integration, regression, and E2E with real API calls
+- **AgentObserver Protocol**: 46 lifecycle events with `run_id` correlation, `LoggingObserver`, `SimpleStepObserver`, OTel export
+- **6187 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 
@@ -911,7 +911,7 @@ agent = Agent(
 )
 ```
 
-45 lifecycle events: run, LLM, tool, iteration, batch, policy, structured output, fallback, retry, memory trim, guardrail, coherence, screening, session, entity, KG, budget exceeded, cancelled, prompt compressed, plus 13 graph events (graph start/end, node start/end, routing, interrupt, resume, parallel, stall, loop, supervisor replan). See `observer.py` for full reference.
+46 lifecycle events: run, LLM, tool, iteration, batch, policy, structured output, fallback, retry, memory trim, guardrail, coherence, screening, session, entity, KG, budget exceeded, cancelled, prompt compressed, plus 13 graph events (graph start/end, node start/end, routing, interrupt, resume, parallel, stall, loop, supervisor replan). See `observer.py` for full reference.
 
 ### E2E Streaming & Parallel Execution
 
@@ -1087,7 +1087,7 @@ Examples are numbered by difficulty. Start from 01 and work your way up.
 |---|---|---|---|
 | 01 | `01_hello_world.py` | First agent, `@tool`, `ask()` | No |
 | 02 | `02_search_weather.py` | ToolRegistry, multiple tools | No |
-| 03 | `03_toolbox.py` | 24 pre-built tools (file, data, text, datetime, web) | No |
+| 03 | `03_toolbox.py` | 48 pre-built tools (file, data, text, datetime, web, code, search, and more) | No |
 | 04 | `04_conversation_memory.py` | Multi-turn memory | Yes |
 | 05 | `05_cost_tracking.py` | Token counting, cost warnings | Yes |
 | 06 | `06_async_agent.py` | `arun()`, concurrent agents, FastAPI | Yes |
@@ -1211,7 +1211,7 @@ pytest tests/ -x -q          # All tests
 pytest tests/ -k "not e2e"   # Skip E2E (no API keys needed)
 ```
 
-5968 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, orchestration, pipelines, agent patterns, stability markers, trace viewer, serve API, A2A, routing, and E2E integration with real API calls.
+6187 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, orchestration, pipelines, agent patterns, stability markers, trace viewer, serve API, A2A, routing, and E2E integration with real API calls.
 
 ## License
 

@@ -73,40 +73,174 @@
     },
     {
       "ref": "requirements-L4"
+    },
+    {
+      "ref": "root-component"
     }
   ],
   "metadata": {
     "component": {
-      "type": "library",
-      "bom-ref": "selectools@0.19.2",
-      "name": "selectools",
-      "version": "0.19.2",
-      "description": "Production-ready AI agents with tool calling, RAG, and multi-agent orchestration",
-      "licenses": [
-        {
-          "license": {
-            "id": "Apache-2.0"
-          }
-        }
-      ],
-      "purl": "pkg:pypi/selectools@0.19.2",
+      "bom-ref": "root-component",
+      "description": "Production-ready Python framework for AI agents with multi-agent graphs, hybrid RAG, guardrails, audit logging, 50 evaluators, and a visual builder. Supports OpenAI, Anthropic, Gemini, Ollama. By NichevLabs.",
       "externalReferences": [
         {
-          "type": "website",
+          "comment": "from pyproject urls: Documentation",
+          "type": "documentation",
           "url": "https://selectools.dev"
         },
         {
+          "comment": "from pyproject urls: Issues",
+          "type": "issue-tracker",
+          "url": "https://github.com/johnnichev/selectools/issues"
+        },
+        {
+          "comment": "from pyproject urls: NichevLabs",
+          "type": "other",
+          "url": "https://nichevlabs.com"
+        },
+        {
+          "comment": "from pyproject urls: Builder",
+          "type": "other",
+          "url": "https://selectools.dev/builder/"
+        },
+        {
+          "comment": "from pyproject urls: Examples",
+          "type": "other",
+          "url": "https://selectools.dev/examples/"
+        },
+        {
+          "comment": "from pyproject urls: Changelog",
+          "type": "release-notes",
+          "url": "https://github.com/johnnichev/selectools/blob/main/CHANGELOG.md"
+        },
+        {
+          "comment": "from pyproject urls: Repository",
           "type": "vcs",
           "url": "https://github.com/johnnichev/selectools"
         },
         {
-          "type": "distribution",
-          "url": "https://pypi.org/project/selectools/"
+          "comment": "from pyproject urls: Homepage",
+          "type": "website",
+          "url": "https://selectools.dev"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "acknowledgement": "declared",
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "name": "selectools",
+      "type": "application",
+      "version": "0.24.0"
+    },
+    "timestamp": "2026-06-11T16:32:44.088711+00:00",
+    "tools": {
+      "components": [
+        {
+          "description": "CycloneDX Software Bill of Materials (SBOM) generator for Python projects and environments",
+          "externalReferences": [
+            {
+              "type": "build-system",
+              "url": "https://github.com/CycloneDX/cyclonedx-python/actions"
+            },
+            {
+              "type": "distribution",
+              "url": "https://pypi.org/project/cyclonedx-bom/"
+            },
+            {
+              "type": "documentation",
+              "url": "https://cyclonedx-bom-tool.readthedocs.io/"
+            },
+            {
+              "type": "issue-tracker",
+              "url": "https://github.com/CycloneDX/cyclonedx-python/issues"
+            },
+            {
+              "type": "license",
+              "url": "https://github.com/CycloneDX/cyclonedx-python/blob/main/LICENSE"
+            },
+            {
+              "type": "release-notes",
+              "url": "https://github.com/CycloneDX/cyclonedx-python/blob/main/CHANGELOG.md"
+            },
+            {
+              "type": "vcs",
+              "url": "https://github.com/CycloneDX/cyclonedx-python/"
+            },
+            {
+              "type": "website",
+              "url": "https://github.com/CycloneDX/cyclonedx-python/#readme"
+            }
+          ],
+          "group": "CycloneDX",
+          "licenses": [
+            {
+              "license": {
+                "acknowledgement": "declared",
+                "id": "Apache-2.0"
+              }
+            }
+          ],
+          "name": "cyclonedx-py",
+          "type": "application",
+          "version": "7.3.0"
+        },
+        {
+          "description": "Python library for CycloneDX",
+          "externalReferences": [
+            {
+              "type": "build-system",
+              "url": "https://github.com/CycloneDX/cyclonedx-python-lib/actions"
+            },
+            {
+              "type": "distribution",
+              "url": "https://pypi.org/project/cyclonedx-python-lib/"
+            },
+            {
+              "type": "documentation",
+              "url": "https://cyclonedx-python-library.readthedocs.io/"
+            },
+            {
+              "type": "issue-tracker",
+              "url": "https://github.com/CycloneDX/cyclonedx-python-lib/issues"
+            },
+            {
+              "type": "license",
+              "url": "https://github.com/CycloneDX/cyclonedx-python-lib/blob/main/LICENSE"
+            },
+            {
+              "type": "release-notes",
+              "url": "https://github.com/CycloneDX/cyclonedx-python-lib/blob/main/CHANGELOG.md"
+            },
+            {
+              "type": "vcs",
+              "url": "https://github.com/CycloneDX/cyclonedx-python-lib"
+            },
+            {
+              "type": "website",
+              "url": "https://github.com/CycloneDX/cyclonedx-python-lib/#readme"
+            }
+          ],
+          "group": "CycloneDX",
+          "licenses": [
+            {
+              "license": {
+                "acknowledgement": "declared",
+                "id": "Apache-2.0"
+              }
+            }
+          ],
+          "name": "cyclonedx-python-lib",
+          "type": "library",
+          "version": "11.7.0"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:f028de18-01d7-4b80-81b9-7f9e27ecac64",
+  "serialNumber": "urn:uuid:a1f54cbc-da48-4da5-9294-96dbd56a338e",
   "version": 1,
   "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
   "bomFormat": "CycloneDX",
