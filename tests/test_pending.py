@@ -134,10 +134,13 @@ class FakeRedis:
         key: str,
         value: str,
         nx: bool = False,
+        xx: bool = False,
         ex: Optional[int] = None,
     ) -> Optional[bool]:
         self._evict_if_expired(key)
         if nx and key in self._store:
+            return None
+        if xx and key not in self._store:
             return None
         self._store[key] = value
         if ex is not None:
@@ -1022,3 +1025,437 @@ class TestRedisPendingStore:
 
     def test_default_ttl_constant(self) -> None:
         assert DEFAULT_TTL_SECONDS == 60.0
+
+
+# ---------------------------------------------------------------------------
+# Intent-scoped pops + TTL tightening (issue #82) — both stores
+# ---------------------------------------------------------------------------
+
+
+class _RejectAllParser:
+    """Parser that never confirms or cancels — proves intent pops bypass it."""
+
+    version: str = "reject-all-v1"
+
+    def is_confirm(self, msg: str) -> bool:
+        return False
+
+    def is_cancel(self, msg: str) -> bool:
+        return False
+
+
+def _make_store(kind: str, **kwargs: Any) -> Any:
+    if kind == "memory":
+        return InMemoryPendingStore(**kwargs)
+    return _make_redis_store(FakeRedis(), **kwargs)
+
+
+@pytest.fixture(params=["memory", "redis"])
+def any_store(request: Any) -> Any:
+    """A fresh store of each backend, for backend-parity tests."""
+    return _make_store(request.param)
+
+
+class TestPopIfIntent:
+    def test_confirm_intent_executes_bypassing_parser(self, any_store: Any) -> None:
+        """A structured "confirm" fires the executor with NO text parsing."""
+        any_store.parser = _RejectAllParser()
+        fired: List[str] = []
+        any_store.stash(
+            "user-1",
+            kind="delete_invoice",
+            preview="Delete invoice INV-42",
+            executor=lambda: fired.append("boom") or "deleted",
+        )
+        outcome = any_store.pop_if_intent("user-1", "confirm")
+        assert outcome is not None
+        assert outcome.executed
+        assert outcome.status == "executed"
+        assert outcome.result == "deleted"
+        assert fired == ["boom"]
+        assert any_store.get("user-1") is None
+
+    def test_cancel_intent_pops_without_executing(self, any_store: Any) -> None:
+        any_store.parser = _RejectAllParser()
+        fired: List[str] = []
+        any_store.stash(
+            "user-1",
+            kind="delete_invoice",
+            preview="Delete invoice INV-42",
+            executor=lambda: fired.append("boom") or "deleted",
+        )
+        outcome = any_store.pop_if_intent("user-1", "cancel")
+        assert outcome is not None
+        assert outcome.status == "cancelled"
+        assert not outcome.executed
+        assert outcome.record.status == "cancelled"
+        assert fired == []
+        assert any_store.get("user-1") is None
+
+    def test_no_pending_returns_none(self, any_store: Any) -> None:
+        assert any_store.pop_if_intent("user-1", "confirm") is None
+
+    def test_kind_mismatch_preserves_pending(self, any_store: Any) -> None:
+        """A button minted for a DIFFERENT prompt must not pop this pending."""
+        fired: List[str] = []
+        record = any_store.stash(
+            "user-1",
+            kind="delete_invoice",
+            preview="Delete invoice INV-42",
+            executor=lambda: fired.append("boom") or "deleted",
+        )
+        outcome = any_store.pop_if_intent("user-1", "confirm", expected_kind="cancel_subscription")
+        assert outcome is not None
+        assert outcome.status == "kind_mismatch"
+        assert not outcome.executed
+        assert fired == []
+        # PRESERVED: the pending is still armed for the user's live flow.
+        still = any_store.get("user-1")
+        assert still is not None
+        assert still.pending_action_id == record.pending_action_id
+        assert still.status == "pending"
+        # A later matching confirm still executes.
+        ok = any_store.pop_if_intent("user-1", "confirm", expected_kind="delete_invoice")
+        assert ok is not None and ok.executed
+        assert fired == ["boom"]
+
+    def test_cancel_with_kind_mismatch_preserves_pending(self, any_store: Any) -> None:
+        """A stale cancel button must not silently drop an unrelated pending."""
+        fired: List[str] = []
+        any_store.stash(
+            "user-1",
+            kind="delete_invoice",
+            preview="Delete invoice INV-42",
+            executor=lambda: fired.append("boom") or "deleted",
+        )
+        outcome = any_store.pop_if_intent("user-1", "cancel", expected_kind="other_flow")
+        assert outcome is not None
+        assert outcome.status == "kind_mismatch"
+        assert any_store.get("user-1") is not None
+        assert fired == []
+
+    def test_expected_id_mismatch_preserves_pending(self, any_store: Any) -> None:
+        """A button pinned to a different record id is a stale replay."""
+        fired: List[str] = []
+        record = any_store.stash(
+            "user-1",
+            kind="delete_invoice",
+            preview="Delete invoice INV-42",
+            executor=lambda: fired.append("boom") or "deleted",
+        )
+        outcome = any_store.pop_if_intent("user-1", "confirm", expected_id="someone-else")
+        assert outcome is not None
+        assert outcome.status == "kind_mismatch"
+        assert fired == []
+        still = any_store.get("user-1")
+        assert still is not None and still.pending_action_id == record.pending_action_id
+
+    def test_matching_kind_and_id_executes(self, any_store: Any) -> None:
+        fired: List[str] = []
+        record = any_store.stash(
+            "user-1",
+            kind="delete_invoice",
+            preview="Delete invoice INV-42",
+            executor=lambda: fired.append("boom") or "deleted",
+        )
+        outcome = any_store.pop_if_intent(
+            "user-1",
+            "confirm",
+            expected_kind="delete_invoice",
+            expected_id=record.pending_action_id,
+        )
+        assert outcome is not None and outcome.executed
+        assert fired == ["boom"]
+
+    def test_duplicate_button_delivery_executes_once(self, any_store: Any) -> None:
+        fired: List[str] = []
+        any_store.stash(
+            "user-1",
+            kind="delete_invoice",
+            preview="Delete invoice INV-42",
+            executor=lambda: fired.append("boom") or "deleted",
+        )
+        first = any_store.pop_if_intent("user-1", "confirm")
+        second = any_store.pop_if_intent("user-1", "confirm")
+        assert first is not None and first.executed
+        assert second is None
+        assert fired == ["boom"]
+
+    def test_duplicate_button_delivery_executes_once_concurrent(self, any_store: Any) -> None:
+        fired: List[str] = []
+        any_store.stash(
+            "user-1",
+            kind="delete_invoice",
+            preview="Delete invoice INV-42",
+            executor=lambda: fired.append("boom") or "deleted",
+        )
+        outcomes: List[Optional[ConfirmOutcome]] = []
+        barrier = threading.Barrier(4)
+
+        def worker() -> None:
+            barrier.wait()
+            outcomes.append(any_store.pop_if_intent("user-1", "confirm"))
+
+        threads = [threading.Thread(target=worker) for _ in range(4)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        executed = [o for o in outcomes if o is not None and o.executed]
+        assert len(executed) == 1
+        assert fired == ["boom"]
+
+    def test_ignore_intent_tightens_ttl_and_preserves(self, any_store: Any) -> None:
+        fired: List[str] = []
+        record = any_store.stash(
+            "user-1",
+            kind="delete_invoice",
+            preview="Delete invoice INV-42",
+            executor=lambda: fired.append("boom") or "deleted",
+            ttl_seconds=300.0,
+        )
+        before = time.time()
+        outcome = any_store.pop_if_intent("user-1", "ignore", ignore_ttl_seconds=5.0)
+        assert outcome is not None
+        assert outcome.status == "ignored"
+        assert not outcome.executed
+        assert fired == []
+        # TTL was tightened from ~300s to ~5s; the record stays armed.
+        assert outcome.record.expires_at <= before + 5.0 + 1.0
+        assert outcome.record.expires_at < record.expires_at
+        still = any_store.get("user-1")
+        assert still is not None
+        assert still.pending_action_id == record.pending_action_id
+        # The executor is KEPT: confirming within the tightened window runs it.
+        ok = any_store.pop_if_intent("user-1", "confirm")
+        assert ok is not None and ok.executed
+        assert fired == ["boom"]
+
+    def test_ignore_then_expire_does_not_execute(self, any_store: Any) -> None:
+        """The Sheriff ignore_button flow: tighten, lapse, late confirm refused."""
+        fired: List[str] = []
+        any_store.stash(
+            "user-1",
+            kind="delete_invoice",
+            preview="Delete invoice INV-42",
+            executor=lambda: fired.append("boom") or "deleted",
+            ttl_seconds=300.0,
+        )
+        outcome = any_store.pop_if_intent("user-1", "ignore", ignore_ttl_seconds=0.01)
+        assert outcome is not None and outcome.status == "ignored"
+        time.sleep(0.05)
+        late = any_store.pop_if_intent("user-1", "confirm")
+        assert fired == []
+        if late is not None:
+            assert late.status == "expired"
+        assert any_store.get("user-1") is None
+
+    def test_ignore_never_lengthens_ttl(self, any_store: Any) -> None:
+        record = any_store.stash(
+            "user-1",
+            kind="delete_invoice",
+            preview="Delete invoice INV-42",
+            executor=lambda: "deleted",
+            ttl_seconds=3.0,
+        )
+        outcome = any_store.pop_if_intent("user-1", "ignore", ignore_ttl_seconds=600.0)
+        assert outcome is not None and outcome.status == "ignored"
+        assert outcome.record.expires_at == record.expires_at
+
+    def test_unknown_intent_treated_as_ignore(self, any_store: Any) -> None:
+        """Malformed/future button payloads must never fire or drop the pending."""
+        fired: List[str] = []
+        any_store.stash(
+            "user-1",
+            kind="delete_invoice",
+            preview="Delete invoice INV-42",
+            executor=lambda: fired.append("boom") or "deleted",
+        )
+        outcome = any_store.pop_if_intent("user-1", "frobnicate")
+        assert outcome is not None
+        assert outcome.status == "ignored"
+        assert fired == []
+        assert any_store.get("user-1") is not None
+
+    def test_expired_pending_reports_expired_and_clears(self, any_store: Any) -> None:
+        fired: List[str] = []
+        any_store.stash(
+            "user-1",
+            kind="delete_invoice",
+            preview="Delete invoice INV-42",
+            executor=lambda: fired.append("boom") or "deleted",
+            ttl_seconds=0.01,
+        )
+        time.sleep(0.05)
+        outcome = any_store.pop_if_intent("user-1", "confirm")
+        assert fired == []
+        if outcome is not None:
+            assert outcome.status == "expired"
+        assert any_store.get("user-1") is None
+
+    def test_scoped_to_channel_and_conversation(self, any_store: Any) -> None:
+        fired: List[str] = []
+        any_store.stash(
+            "user-1",
+            kind="delete_invoice",
+            preview="Delete invoice INV-42",
+            executor=lambda: fired.append("boom") or "deleted",
+            channel_id="whatsapp",
+            conversation_id="conv-1",
+        )
+        assert any_store.pop_if_intent("user-1", "confirm") is None
+        assert any_store.pop_if_intent("user-1", "confirm", channel_id="whatsapp") is None
+        assert fired == []
+        outcome = any_store.pop_if_intent(
+            "user-1", "confirm", channel_id="whatsapp", conversation_id="conv-1"
+        )
+        assert outcome is not None and outcome.executed
+        assert fired == ["boom"]
+
+    def test_negative_ignore_ttl_raises(self, any_store: Any) -> None:
+        any_store.stash("user-1", kind="k", preview="P", executor=lambda: "x", ttl_seconds=60.0)
+        with pytest.raises(ValueError):
+            any_store.pop_if_intent("user-1", "ignore", ignore_ttl_seconds=-1.0)
+
+    def test_redis_confirm_intent_uses_factory_across_processes(self) -> None:
+        """Intent pops honor the same factory fallback as pop_if_confirmed."""
+        fake = FakeRedis()
+        store = _make_redis_store(fake)
+        store.stash(
+            "user-1",
+            kind="delete_invoice",
+            preview="Delete invoice INV-42",
+            executor=lambda: "closure-ran",
+            args={"invoice_id": "INV-42"},
+        )
+        # Simulate the confirming webhook landing on a fresh process.
+        store._executors.clear()
+        store.register_executor_factory(
+            "delete_invoice", lambda rec: lambda: f"factory-ran:{rec.args['invoice_id']}"
+        )
+        outcome = store.pop_if_intent("user-1", "confirm")
+        assert outcome is not None and outcome.executed
+        assert outcome.result == "factory-ran:INV-42"
+
+    def test_redis_kind_mismatch_keeps_executor_registered(self) -> None:
+        """Preserving the pending must also preserve its closure."""
+        store = _make_redis_store(FakeRedis())
+        fired: List[str] = []
+        record = store.stash(
+            "user-1",
+            kind="delete_invoice",
+            preview="Delete invoice INV-42",
+            executor=lambda: fired.append("boom") or "deleted",
+        )
+        outcome = store.pop_if_intent("user-1", "confirm", expected_kind="other")
+        assert outcome is not None and outcome.status == "kind_mismatch"
+        assert record.pending_action_id in store._executors
+        ok = store.pop_if_intent("user-1", "confirm")
+        assert ok is not None and ok.executed
+        assert fired == ["boom"]
+
+
+class TestTightenTtl:
+    def test_shortens_expiry_and_keeps_executor(self, any_store: Any) -> None:
+        fired: List[str] = []
+        record = any_store.stash(
+            "user-1",
+            kind="delete_invoice",
+            preview="Delete invoice INV-42",
+            executor=lambda: fired.append("boom") or "deleted",
+            ttl_seconds=300.0,
+        )
+        before = time.time()
+        updated = any_store.tighten_ttl("user-1", 5.0)
+        assert updated is not None
+        assert updated.pending_action_id == record.pending_action_id
+        assert updated.expires_at <= before + 5.0 + 1.0
+        assert updated.expires_at < record.expires_at
+        # Executor survives: a confirm inside the tightened window executes.
+        outcome = any_store.pop_if_confirmed("user-1", "yes")
+        assert outcome is not None and outcome.executed
+        assert fired == ["boom"]
+
+    def test_never_lengthens(self, any_store: Any) -> None:
+        record = any_store.stash(
+            "user-1",
+            kind="delete_invoice",
+            preview="Delete invoice INV-42",
+            executor=lambda: "deleted",
+            ttl_seconds=2.0,
+        )
+        updated = any_store.tighten_ttl("user-1", 600.0)
+        assert updated is not None
+        assert updated.expires_at == record.expires_at
+
+    def test_tighten_then_expire_blocks_confirmation(self, any_store: Any) -> None:
+        fired: List[str] = []
+        any_store.stash(
+            "user-1",
+            kind="delete_invoice",
+            preview="Delete invoice INV-42",
+            executor=lambda: fired.append("boom") or "deleted",
+            ttl_seconds=300.0,
+        )
+        assert any_store.tighten_ttl("user-1", 0.01) is not None
+        time.sleep(0.05)
+        outcome = any_store.pop_if_confirmed("user-1", "yes")
+        assert fired == []
+        if outcome is not None:
+            assert outcome.status == "expired"
+        assert any_store.get("user-1") is None
+
+    def test_no_pending_returns_none(self, any_store: Any) -> None:
+        assert any_store.tighten_ttl("user-1", 10.0) is None
+
+    def test_expired_pending_returns_none(self, any_store: Any) -> None:
+        any_store.stash("user-1", kind="k", preview="P", executor=lambda: "x", ttl_seconds=0.01)
+        time.sleep(0.05)
+        assert any_store.tighten_ttl("user-1", 10.0) is None
+
+    def test_expected_id_mismatch_returns_none_and_preserves(self, any_store: Any) -> None:
+        record = any_store.stash(
+            "user-1", kind="k", preview="P", executor=lambda: "x", ttl_seconds=300.0
+        )
+        assert any_store.tighten_ttl("user-1", 5.0, expected_id="other-id") is None
+        still = any_store.get("user-1")
+        assert still is not None
+        assert still.expires_at == record.expires_at
+
+    def test_negative_seconds_raises(self, any_store: Any) -> None:
+        any_store.stash("user-1", kind="k", preview="P", executor=lambda: "x")
+        with pytest.raises(ValueError):
+            any_store.tighten_ttl("user-1", -1.0)
+
+    def test_redis_tighten_does_not_resurrect_claimed_key(self) -> None:
+        """SET XX: a concurrently-claimed record must not be written back."""
+        fake = FakeRedis()
+        store = _make_redis_store(fake)
+        store.stash("user-1", kind="k", preview="P", executor=lambda: "x", ttl_seconds=300.0)
+        # Claim the key out from under tighten_ttl (twin webhook confirmed).
+        key = next(iter(fake._store))
+        original_get = fake.get
+
+        def racing_get(k: str) -> Optional[str]:
+            value = original_get(k)
+            fake.getdel(k)  # the twin claims AFTER our read, BEFORE our write
+            return value
+
+        fake.get = racing_get  # type: ignore[method-assign]
+        assert store.tighten_ttl("user-1", 5.0) is None
+        assert key not in fake._store
+
+    def test_redis_tighten_updates_server_ttl(self) -> None:
+        fake = FakeRedis()
+        store = _make_redis_store(fake)
+        store.stash("user-1", kind="k", preview="P", executor=lambda: "x", ttl_seconds=300.0)
+        store.tighten_ttl("user-1", 5.0)
+        key = next(iter(fake._store))
+        assert fake._ttls[key] <= time.time() + 6.0
+
+
+class TestIgnoreTtlDefault:
+    def test_default_ignore_ttl_constant(self) -> None:
+        from selectools.pending import DEFAULT_IGNORE_TTL_SECONDS
+
+        assert DEFAULT_IGNORE_TTL_SECONDS == 10.0

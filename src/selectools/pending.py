@@ -19,6 +19,16 @@ otherwise rebuilds (proven shape: Sheriff's ``core/pending_actions.py``):
    bypassed; if it cancels, the action is dropped; anything else drops the
    pending (the user moved on) and falls through to the normal agent path.
 
+Button flows (issue #82): quick-reply buttons (Twilio, Telegram inline
+keyboards) deliver the decision as a STRUCTURED payload, not free text.
+``pop_if_intent`` bypasses the parser and takes ``"confirm" | "cancel" |
+"ignore"`` plus optional ``expected_kind``/``expected_id`` pins minted into
+the button; a pin mismatch PRESERVES the pending (``kind_mismatch``) — a
+stale button replay must neither fire nor disarm the user's live flow. An
+"ignore" tap keeps the pending but tightens its TTL via ``tighten_ttl``
+(default 10s) so a mis-tap is recoverable without leaving a destructive op
+armed for the original window.
+
 Safety model (rpelevin's review spec): the confirmation is bound to ONE
 exact proposed side effect. :class:`PendingAction` records who asked
 (user/channel/conversation scope), what was previewed, a canonical
@@ -102,6 +112,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "DEFAULT_TTL_SECONDS",
+    "DEFAULT_IGNORE_TTL_SECONDS",
     "PendingAction",
     "PendingActionExistsError",
     "ConfirmOutcome",
@@ -121,6 +132,15 @@ __all__ = [
 # destructive action proposed minutes earlier. Users who take longer simply
 # re-ask — annoying, not destructive.
 DEFAULT_TTL_SECONDS: float = 60.0
+
+# TTL applied by the "ignore" intent (issue #82, Sheriff round-13 F11): an
+# unrecognized/stale button tap PRESERVES the pending but tightens its window
+# to a few seconds. Pre-fix in Sheriff, the original TTL (up to 24h) stuck,
+# so a user who tapped the wrong button could come back minutes later and a
+# "sim" to an unrelated question auto-fired the stale destructive action.
+# 10s keeps the legitimate "oh, let me retype my answer" path alive without
+# leaving a destructive op armed for a long window.
+DEFAULT_IGNORE_TTL_SECONDS: float = 10.0
 
 # Statuses for the PendingAction lifecycle.
 _PENDING = "pending"
@@ -241,7 +261,7 @@ class PendingAction:
 @beta
 @dataclass(frozen=True)
 class ConfirmOutcome:
-    """Result of a confirmed ``pop_if_confirmed`` claim.
+    """Result of a ``pop_if_confirmed`` or ``pop_if_intent`` claim.
 
     ``status`` values:
 
@@ -256,9 +276,28 @@ class ConfirmOutcome:
       consumed (one-shot — a duplicate webhook neither retries nor falls
       through to the LLM). ``record.outcome`` carries only the exception
       type name (``"error: <TypeName>"``); full detail goes to logging.
+    - ``"cancelled"`` (``pop_if_intent`` only): a structured cancel claimed
+      and dropped the pending. Nothing executed.
+    - ``"kind_mismatch"`` (``pop_if_intent`` only): the button's
+      ``expected_kind``/``expected_id`` does not match the pending action.
+      Nothing executed and — unlike every other status — the pending action
+      is PRESERVED. Rationale: a digest mismatch means THIS action mutated
+      after the user previewed it, so the confirmation is tainted and the
+      action is disarmed; a kind/id mismatch means the button belonged to a
+      DIFFERENT prompt entirely (stale Twilio replay, out-of-order
+      delivery), so the observed pending is still the user's live,
+      previewed intent and a stale button must be able to neither fire nor
+      disarm it. The user's next text reply can still confirm or cancel.
+    - ``"ignored"`` (``pop_if_intent`` only): an "ignore" (or unrecognized)
+      intent. Nothing executed; the pending action is PRESERVED with its
+      TTL tightened to at most ``ignore_ttl_seconds`` (executor kept), so a
+      mis-tap doesn't kill the flow but the destructive op cannot stay
+      armed for the original long window. ``record`` carries the tightened
+      ``expires_at``.
 
-    In every non-``executed`` case the pending action has been removed —
-    a stale destructive action is never left armed.
+    Except for ``kind_mismatch`` and ``ignored``, every non-``executed``
+    status means the pending action has been removed — a stale destructive
+    action is never left armed.
     """
 
     status: str
@@ -446,6 +485,62 @@ class PendingActionStore(Protocol):
         """
         ...
 
+    def pop_if_intent(
+        self,
+        user_id: str,
+        intent: str,
+        *,
+        expected_kind: Optional[str] = None,
+        channel_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+        expected_id: Optional[str] = None,
+        ignore_ttl_seconds: float = DEFAULT_IGNORE_TTL_SECONDS,
+    ) -> Optional[ConfirmOutcome]:
+        """Claim the pending action given a pre-classified structured intent.
+
+        Issue #82: chat-channel button webhooks (Twilio quick replies,
+        Telegram inline keyboards) deliver the user's decision as a
+        STRUCTURED payload, not free text — the text parser is bypassed
+        entirely. ``intent`` is ``"confirm"``, ``"cancel"``, or
+        ``"ignore"``; any other value is treated as ``"ignore"`` (a
+        malformed or future payload must never fire or drop a pending).
+
+        ``expected_kind``/``expected_id`` pin the claim to the action the
+        button was minted for. On mismatch the pending is PRESERVED and the
+        outcome is ``"kind_mismatch"`` — see :class:`ConfirmOutcome` for why
+        this deliberately differs from the disarm-on-``digest_mismatch``
+        behavior of :meth:`pop_if_confirmed`.
+
+        Returns ``None`` when there is no pending action for this scope (or
+        a twin webhook won the claim). Otherwise a :class:`ConfirmOutcome`
+        with status ``executed | expired | no_executor | failed | cancelled
+        | kind_mismatch | ignored``.
+        """
+        ...
+
+    def tighten_ttl(
+        self,
+        user_id: str,
+        seconds: float,
+        *,
+        channel_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+        expected_id: Optional[str] = None,
+    ) -> Optional[PendingAction]:
+        """Shorten the pending action's ``expires_at`` to now + ``seconds``.
+
+        Never lengthens: if the action already expires sooner, it is left
+        untouched (and returned as-is). The executor/registry entry is KEPT
+        — the action stays confirmable inside the tightened window.
+
+        ``expected_id`` restricts the tighten to the exact record the caller
+        observed; on mismatch nothing changes and ``None`` is returned.
+
+        Returns the (possibly updated) record, or ``None`` when there is no
+        unexpired pending action for this scope.
+        """
+        ...
+
     def drop(
         self,
         user_id: str,
@@ -484,6 +579,38 @@ def _build_record(
         status=_PENDING,
         args=dict(args) if args is not None else None,
     )
+
+
+def _target_mismatch(
+    record: PendingAction,
+    expected_kind: Optional[str],
+    expected_id: Optional[str],
+) -> bool:
+    """Whether a button's pinned target differs from the pending action.
+
+    True means the tap was minted for a DIFFERENT prompt (stale replay,
+    out-of-order delivery) — the caller must preserve the pending and report
+    ``kind_mismatch`` instead of claiming it.
+    """
+    if expected_kind is not None and expected_kind != record.kind:
+        logger.warning(
+            "pending: button kind %r does not match pending %s (kind=%s) — "
+            "preserving the pending action",
+            expected_kind,
+            record.pending_action_id,
+            record.kind,
+        )
+        return True
+    if expected_id is not None and expected_id != record.pending_action_id:
+        logger.warning(
+            "pending: button target id %s does not match pending %s (kind=%s) — "
+            "preserving the pending action",
+            expected_id,
+            record.pending_action_id,
+            record.kind,
+        )
+        return True
+    return False
 
 
 def _guarded_execute(
@@ -662,6 +789,77 @@ class InMemoryPendingStore:
             )
             return None
         return _guarded_execute(record, executor, args_digest)
+
+    def pop_if_intent(
+        self,
+        user_id: str,
+        intent: str,
+        *,
+        expected_kind: Optional[str] = None,
+        channel_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+        expected_id: Optional[str] = None,
+        ignore_ttl_seconds: float = DEFAULT_IGNORE_TTL_SECONDS,
+    ) -> Optional[ConfirmOutcome]:
+        if ignore_ttl_seconds < 0:
+            raise ValueError("ignore_ttl_seconds must be >= 0")
+        effective = intent if intent in ("confirm", "cancel") else "ignore"
+        key = _scope_key(user_id, channel_id, conversation_id)
+        with self._lock:
+            entry = self._pending.get(key)
+            if entry is None:
+                return None
+            record, executor = entry
+            if record.is_expired():
+                self._pending.pop(key, None)
+                return ConfirmOutcome(status="expired", record=replace(record, status=_EXPIRED))
+            if _target_mismatch(record, expected_kind, expected_id):
+                # PRESERVE: the button belonged to a different prompt (see
+                # ConfirmOutcome docstring). The record stays armed as-is.
+                return ConfirmOutcome(status="kind_mismatch", record=record)
+            if effective == "ignore":
+                now = time.time()
+                new_expires = min(record.expires_at, now + ignore_ttl_seconds)
+                if new_expires < record.expires_at:
+                    record = replace(record, expires_at=new_expires)
+                    self._pending[key] = (record, executor)
+                return ConfirmOutcome(status="ignored", record=record)
+            self._pending.pop(key, None)
+            if effective == "cancel":
+                return ConfirmOutcome(status="cancelled", record=replace(record, status=_CANCELLED))
+        # "confirm": the claim happened inside the lock; the executor runs
+        # outside it (same rationale as pop_if_confirmed).
+        return _guarded_execute(record, executor, None)
+
+    def tighten_ttl(
+        self,
+        user_id: str,
+        seconds: float,
+        *,
+        channel_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+        expected_id: Optional[str] = None,
+    ) -> Optional[PendingAction]:
+        if seconds < 0:
+            raise ValueError("seconds must be >= 0")
+        key = _scope_key(user_id, channel_id, conversation_id)
+        now = time.time()
+        with self._lock:
+            entry = self._pending.get(key)
+            if entry is None:
+                return None
+            record, executor = entry
+            if record.is_expired(now):
+                self._pending.pop(key, None)
+                return None
+            if expected_id is not None and record.pending_action_id != expected_id:
+                return None
+            new_expires = min(record.expires_at, now + seconds)
+            if new_expires >= record.expires_at:
+                return record
+            updated = replace(record, expires_at=new_expires)
+            self._pending[key] = (updated, executor)
+            return updated
 
     def drop(
         self,
@@ -877,6 +1075,135 @@ class RedisPendingStore:
         if executor is None and factory is not None:
             executor = factory(record)
         return _guarded_execute(record, executor, args_digest)
+
+    def pop_if_intent(
+        self,
+        user_id: str,
+        intent: str,
+        *,
+        expected_kind: Optional[str] = None,
+        channel_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+        expected_id: Optional[str] = None,
+        ignore_ttl_seconds: float = DEFAULT_IGNORE_TTL_SECONDS,
+    ) -> Optional[ConfirmOutcome]:
+        if ignore_ttl_seconds < 0:
+            raise ValueError("ignore_ttl_seconds must be >= 0")
+        effective = intent if intent in ("confirm", "cancel") else "ignore"
+        key = self._key(user_id, channel_id, conversation_id)
+        # Preserve-guards (kind/id pins, ignore) must run BEFORE the claim,
+        # so the flow is observe-then-act: GET, validate, then GETDEL only
+        # for claiming intents. The post-claim id re-check below closes the
+        # observe/claim race (review finding 6 semantics).
+        raw = self._client.get(key)
+        if raw is None:
+            return None
+        record = PendingAction.from_dict(json.loads(raw))
+        if record.is_expired():
+            claimed = self._claim_observed(key, record.pending_action_id)
+            if claimed is None:
+                return None
+            with self._lock:
+                self._executors.pop(record.pending_action_id, None)
+            return ConfirmOutcome(status="expired", record=replace(record, status=_EXPIRED))
+        if _target_mismatch(record, expected_kind, expected_id):
+            # PRESERVE: nothing was claimed; the record (and its closure)
+            # stay armed. See ConfirmOutcome for the kind-vs-digest rationale.
+            return ConfirmOutcome(status="kind_mismatch", record=record)
+        if effective == "ignore":
+            updated = self.tighten_ttl(
+                user_id,
+                ignore_ttl_seconds,
+                channel_id=channel_id,
+                conversation_id=conversation_id,
+                expected_id=record.pending_action_id,
+            )
+            if updated is None:
+                # Claimed (or replaced) between the GET and the tighten —
+                # a twin webhook won; report no-pending.
+                return None
+            return ConfirmOutcome(status="ignored", record=updated)
+        claimed = self._claim_observed(key, record.pending_action_id)
+        if claimed is None:
+            return None
+        with self._lock:
+            entry = self._executors.pop(record.pending_action_id, None)
+            factory = self._factories.get(record.kind)
+        if effective == "cancel":
+            return ConfirmOutcome(status="cancelled", record=replace(record, status=_CANCELLED))
+        executor: Optional[Executor] = entry[0] if entry is not None else None
+        if executor is None and factory is not None:
+            executor = factory(record)
+        return _guarded_execute(record, executor, None)
+
+    def _claim_observed(self, key: str, observed_id: str) -> Optional[PendingAction]:
+        """Atomically claim ``key`` iff it still holds the observed record.
+
+        ``GETDEL`` then an id re-check: when a different record was stashed
+        between the caller's GET and this claim, the claimed action was
+        never validated against the caller's guards — it is disarmed (kept
+        popped, closure purged) and ``None`` is returned, mirroring the
+        ``expected_id`` semantics of ``pop_if_confirmed`` (finding 6). Never
+        executes or restores anything.
+        """
+        raw = self._client.getdel(key)
+        if raw is None:
+            return None
+        claimed = PendingAction.from_dict(json.loads(raw))
+        if claimed.pending_action_id != observed_id:
+            with self._lock:
+                self._executors.pop(claimed.pending_action_id, None)
+            logger.warning(
+                "pending: claimed record %s does not match observed id %s "
+                "(kind=%s) — disarming without execution",
+                claimed.pending_action_id,
+                observed_id,
+                claimed.kind,
+            )
+            return None
+        return claimed
+
+    def tighten_ttl(
+        self,
+        user_id: str,
+        seconds: float,
+        *,
+        channel_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+        expected_id: Optional[str] = None,
+    ) -> Optional[PendingAction]:
+        if seconds < 0:
+            raise ValueError("seconds must be >= 0")
+        key = self._key(user_id, channel_id, conversation_id)
+        raw = self._client.get(key)
+        if raw is None:
+            return None
+        record = PendingAction.from_dict(json.loads(raw))
+        if record.is_expired():
+            return None
+        if expected_id is not None and record.pending_action_id != expected_id:
+            return None
+        now = time.time()
+        new_expires = min(record.expires_at, now + seconds)
+        if new_expires >= record.expires_at:
+            return record
+        updated = replace(record, expires_at=new_expires)
+        payload = json.dumps(updated.to_dict(), ensure_ascii=False)
+        ttl = max(1, math.ceil(new_expires - now))
+        # SET XX: rewrite only while the key still exists — a record claimed
+        # between the GET above and this write must NOT be resurrected.
+        # Without Lua/WATCH (deliberately avoided, see class docstring) a
+        # same-scope drop+re-stash inside the GET->SET window could be
+        # overwritten by the OLD previewed record — bounded harm: it expires
+        # within ``seconds`` and nothing ever executes from this path.
+        if not self._client.set(key, payload, xx=True, ex=ttl):
+            return None
+        with self._lock:
+            entry = self._executors.get(record.pending_action_id)
+            if entry is not None:
+                # Keep the registry purge horizon in sync with the new TTL.
+                self._executors[record.pending_action_id] = (entry[0], new_expires)
+        return updated
 
     def drop(
         self,

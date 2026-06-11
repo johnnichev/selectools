@@ -578,6 +578,47 @@ in-memory lock, or a single `GETDEL` on Redis).
   persisted record (`record.args`). With neither closure nor factory the claim resolves to
   `no_executor` and nothing executes. Requires Redis >= 6.2 (`GETDEL`).
 
+**Button / quick-reply flows** (issue #82): Twilio quick replies, Telegram inline keyboards and
+similar channels deliver the user's decision as a **structured payload**, not free text. Webhooks
+for those taps call `pop_if_intent` on the store directly — it bypasses the confirm parser:
+
+```python
+# Button webhook: payload carries a pre-classified intent + the action kind
+# (and optionally the pending_action_id) the button was minted for.
+outcome = store.pop_if_intent(
+    user_id,
+    intent,                            # "confirm" | "cancel" | "ignore"
+    expected_kind="delete_invoice",    # pin: which prompt minted this button
+    expected_id=pending_action_id,     # optional identity pin
+)
+if outcome is None:
+    ack("Nothing pending.")            # no pending, or a twin webhook won the claim
+elif outcome.executed:
+    ack(outcome.result)
+elif outcome.status == "cancelled":
+    ack(f"Cancelled: {outcome.record.preview}")
+elif outcome.status == "kind_mismatch":
+    ack("That button was for an earlier prompt.")   # pending PRESERVED
+elif outcome.status == "ignored":
+    ack("Okay — reply sim/não to finish.")          # pending kept, TTL tightened
+```
+
+- A `kind`/`id` pin mismatch returns `"kind_mismatch"` and **preserves** the pending action.
+  This deliberately differs from `digest_mismatch` (which disarms): a digest mismatch means
+  *this* action mutated after the user previewed it — the confirmation is tainted, disarm it; a
+  kind mismatch means the button belonged to a **different prompt** (stale replay, out-of-order
+  delivery) — the observed pending is still the user's live intent and a stale button must be
+  able to neither fire nor disarm it. The user's next text reply can still confirm or cancel.
+- An `"ignore"` intent (or any unrecognized intent string — malformed/future payloads must never
+  fire or drop a pending) returns `"ignored"`: the pending and its executor are kept, but its TTL
+  is tightened to at most `ignore_ttl_seconds` (default `DEFAULT_IGNORE_TTL_SECONDS = 10.0`), so
+  a mis-tap is recoverable without leaving a destructive op armed for the original window.
+- `tighten_ttl(user_id, seconds, *, channel_id=None, conversation_id=None, expected_id=None)` is
+  also available standalone on both stores. It only ever **shortens** `expires_at` (never
+  lengthens), keeps the executor/registry entry, and returns the updated record (or `None` when
+  nothing unexpired matches). On Redis the rewrite uses `SET XX` + a refreshed server-side TTL so
+  a concurrently-claimed record is never resurrected.
+
 **Confirm parsing** is pluggable via the `ConfirmParser` protocol. The built-in
 `RegexConfirmParser` (version `regex-v1:pt-en-es`) accepts only unambiguous confirmations —
 "ok"/"claro"/"pode" are common PT-BR acknowledgments in non-destructive replies and never fire a
@@ -585,7 +626,9 @@ pending action; Spanish bare "si" mid-sentence is the conditional "if", so it on
 the entire message.
 
 See [`examples/100_deferred_confirmation.py`](https://github.com/johnnichev/selectools/blob/main/examples/100_deferred_confirmation.py)
-for a complete offline two-turn webhook simulation.
+for a complete offline two-turn webhook simulation, and
+[`examples/110_quick_reply_buttons.py`](https://github.com/johnnichev/selectools/blob/main/examples/110_quick_reply_buttons.py)
+for the structured button-intent flow (`pop_if_intent` + `tighten_ttl`).
 
 ---
 
