@@ -20,9 +20,9 @@ if TYPE_CHECKING:
     from ..observer import AgentObserver
 
 from .._async_utils import run_sync
+from .._json_utils import safe_json_parse as _safe_json_parse
 from ..orchestration.graph import GraphResult
 from ..orchestration.state import GraphState
-from ..orchestration.supervisor import _safe_json_parse
 from ..stability import beta
 from ..trace import AgentTrace
 from ..types import Message, Role
