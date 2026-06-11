@@ -1612,17 +1612,31 @@ config = AgentConfig(tool=ToolConfig(
 - A tool is gated when it appears in `require_approval` (or `"*"` is used) **OR** it was
   defined with `requires_approval=True` — config and tool-level gates compose with OR.
 - `approval_handler` receives a structured `ApprovalRequest` (`tool_name`, `tool_args`,
-  `reason`, one-line `preview`) and returns a bool. When set, it services **every**
-  `review` decision (config gate, tool flag, and `ToolPolicy` review rules) and takes
-  precedence over `confirm_action`.
+  `reason`, one-line `preview`) and returns a bool. **Any non-bool return value fails
+  CLOSED** — coroutines, generators, mocks, and other accidentally-truthy objects deny
+  the call instead of approving it. When set, it services **every** `review` decision
+  (config gate, tool flag, and `ToolPolicy` review rules) and takes precedence over
+  `confirm_action`. `request.tool_args` is a defensive copy — mutating it never changes
+  what the tool executes with.
 - **Deny** → the tool is not executed; the model sees a standardized
   `Tool '<name>' denied by approval handler: <reason>` tool result and the loop continues
-  (mirrors `confirm_action` denial).
+  (mirrors `confirm_action` denial). Denials are **memoized per (tool name, args) within
+  the run**: if the model retries the identical denied call on a later iteration, the
+  stored denial is returned without re-paging the human. Approvals are never memoized —
+  every approved call is re-requested.
 - **Async handlers work from `run()` too**: from the sync path the coroutine executes via
   `asyncio.run` on the shared worker pool; from `arun()`/`astream()` it is awaited
-  natively. Sync handlers run in an executor with contextvars propagated.
+  natively. Both plain coroutine functions and class instances with `async def __call__`
+  are detected. Sync handlers run in an executor with contextvars propagated.
 - Handler exceptions and `approval_timeout` expiries deny the call (with the error in the
-  tool result) — the loop never crashes.
+  tool result) — the loop never crashes. Timed-out approval futures are cancelled so a
+  still-queued handler never fires after the call was already denied.
+- **Pool contention**: blocking handlers (and async handlers invoked from sync `run()`)
+  each occupy one slot of the shared 16-worker `selectools_tool_timeout` pool — the same
+  pool that enforces `timeout_seconds` for ALL agents in the process. Sixteen concurrent
+  approvals waiting on humans will stall tool-timeout enforcement everywhere; keep
+  handlers prompt, set `approval_timeout` deliberately, and prefer the async entry points
+  for high-concurrency deployments.
 - `ToolPolicy` `deny` rules still win unconditionally; the handler is never consulted.
 - **Fail-fast validation**: `ToolConfig(require_approval=[...])` without an
   `approval_handler` or `confirm_action` raises `ValueError` at construction — an

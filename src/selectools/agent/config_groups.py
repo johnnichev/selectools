@@ -58,7 +58,16 @@ class ToolConfig:
         timeout_seconds: Maximum execution time for each tool call. None = no timeout.
         policy: Optional ToolPolicy with allow/review/deny rules.
         confirm_action: Callback invoked for tools whose policy decision is ``review``.
-        approval_timeout: Seconds to wait for a confirm_action response.
+        approval_timeout: Seconds to wait for a confirm_action or
+            approval_handler response. NOTE: while waiting, blocking sync
+            handlers (and async handlers invoked from sync ``run()``) each
+            occupy one slot of the shared 16-worker
+            ``selectools_tool_timeout`` thread pool, which also serves
+            tool-timeout enforcement across ALL agents in the process. Many
+            concurrent long-blocking approvals can exhaust the pool — keep
+            handlers prompt and this timeout deliberate. Timed-out approval
+            futures are cancelled so still-queued handlers never fire after
+            the call was denied.
         parallel_execution: Execute multiple tool calls concurrently.
         compress_results: When True, tool results longer than ``compress_threshold``
             characters are summarized by a one-shot LLM call before being appended
@@ -92,10 +101,17 @@ class ToolConfig:
             Default: None (no agent-level gate).
         approval_handler: Sync or async callable receiving an
             ``selectools.policy.ApprovalRequest`` (tool name, args, reason,
-            preview) and returning a truthy value to approve or falsy to deny.
-            Used for every ``review`` policy decision when set (takes
-            precedence over ``confirm_action``). Async handlers work from both
-            ``run()`` and ``arun()``/``astream()``. Default: None.
+            preview) and returning a bool: ``True`` to approve, ``False`` to
+            deny. Any non-bool return value (coroutine, generator, mock, ...)
+            fails CLOSED and denies the call. Used for every ``review``
+            policy decision when set (takes precedence over
+            ``confirm_action``). Async handlers — both coroutine functions
+            and instances with ``async def __call__`` — work from both
+            ``run()`` and ``arun()``/``astream()``. ``request.tool_args`` is
+            a defensive copy: mutating it never changes what the tool
+            executes with. Denials are memoized per (tool name, args) within
+            a run so an identical retried call does not re-page the human;
+            approvals are re-requested every time. Default: None.
 
     Raises:
         ValueError: If ``compress_provider`` is set without an explicit
