@@ -152,6 +152,7 @@ nav:
   - Deploy:
     - Visual Builder: modules/builder.md
     - Serve & Deploy: modules/SERVE.md
+    - A2A Protocol: modules/A2A.md
     - Agent Templates: modules/TEMPLATES.md
   - Reference:
     - Security Audit: SECURITY.md

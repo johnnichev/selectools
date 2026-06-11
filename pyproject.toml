@@ -99,6 +99,7 @@ serve = [
     "pyyaml>=6.0.0",
     "starlette>=0.27.0",
     "uvicorn[standard]>=0.24.0",
+    "httpx>=0.24.0",
 ]
 
 [project.scripts]
