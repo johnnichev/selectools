@@ -1,10 +1,10 @@
-# Security Audit — v0.24.0
+# Security Audit — v0.25.0
 
-**Version audited:** v0.24.0
+**Version audited:** v0.25.0
 **Audit date:** 2026-06-11
 **Tools:** [Bandit](https://bandit.readthedocs.io/) 1.8.6 static analysis + manual review of all `# nosec` annotations + [pip-audit](https://pypi.org/project/pip-audit/) 2.9.0 dependency scan
-**Result:** Zero Bandit findings at medium severity or above. All suppressed warnings are justified. Three known advisories in transitive (not directly declared) dependencies; fixes are announced upstream but not yet released.
-**SBOM:** [`sbom.json`](https://github.com/johnnichev/selectools/blob/main/sbom.json) — CycloneDX 1.6, regenerated for v0.24.0 with `cyclonedx-py` 7.3.0
+**Result:** Zero Bandit findings at medium severity or above. All suppressed warnings are justified. Three known advisories in transitive (not directly declared) dependencies; fixed versions are released upstream but require Python >= 3.10 (see assessment below).
+**SBOM:** [`sbom.json`](https://github.com/johnnichev/selectools/blob/main/sbom.json) — CycloneDX 1.6, regenerated for v0.25.0 with `cyclonedx-py` 7.3.0
 
 This supersedes the [v0.19.2 audit](SECURITY.md). To report a vulnerability, see the
 [Security Policy](https://github.com/johnnichev/selectools/blob/main/SECURITY.md).
@@ -14,7 +14,7 @@ This supersedes the [v0.19.2 audit](SECURITY.md). To report a vulnerability, see
 ## Scope and Methodology
 
 1. Full `bandit -r src/ -ll -q -c pyproject.toml` scan of `src/selectools/`
-2. Manual review of every `# nosec` annotation — **73 annotations across 35 files**
+2. Manual review of every `# nosec` annotation — **72 annotations across 34 files**
 3. `pip-audit` scan of the four core production dependencies and their resolved transitive tree
 4. SBOM regeneration and verification
 5. Review of the framework's defensive layers (threat-model summary below)
@@ -46,7 +46,7 @@ This is also a release gate: tags are not cut while the Bandit job is red.
 
 ---
 
-## Current Results (v0.24.0)
+## Current Results (v0.25.0)
 
 ```text
 $ bandit -r src/ -ll -q -c pyproject.toml
@@ -58,17 +58,20 @@ $ echo $?
 |----------|----------|
 | High     | 0 |
 | Medium   | 0 |
-| Low (suppressed via config/annotations, all reviewed below) | 73 annotated sites |
+| Low (suppressed via config/annotations, all reviewed below) | 72 annotated sites |
 
 ---
 
 ## Annotation-by-Annotation Review
 
-All 73 `# nosec` annotations were re-reviewed for this audit, grouped by check.
+All 72 `# nosec` annotations were re-reviewed for this audit, grouped by check.
 
-### B110 — Bare exception swallowing (28 sites)
+### B110 — Bare exception swallowing (27 sites)
 
-**Files:** `observer.py`, `token_estimation.py`, `agent/_lifecycle.py` (4), `agent/_memory_manager.py` (5), `agent/core.py` (2), `providers/fallback.py` (4), `providers/router.py`, `mcp/client.py` (3), `mcp/multi.py` (2), `orchestration/checkpoint.py`, `orchestration/state.py`, `orchestration/supervisor.py`, `evals/suite.py`, `evals/serve.py`
+**Files:** `token_estimation.py`, `agent/_lifecycle.py` (4), `agent/_memory_manager.py` (5), `agent/core.py` (2), `providers/fallback.py` (4), `providers/router.py`, `mcp/client.py` (3), `mcp/multi.py` (2), `orchestration/checkpoint.py`, `orchestration/state.py`, `orchestration/supervisor.py`, `evals/suite.py`, `evals/serve.py`
+
+(One fewer site than the v0.24.0 audit: `observer.py` no longer carries a
+`# nosec B110` annotation after the #84–#88 hardening passes.)
 
 **Pattern:** `except Exception:  # nosec B110` inside observer notification loops, best-effort
 cleanup paths, provider fallback bookkeeping, and MCP tool discovery.
@@ -83,10 +86,10 @@ underlying provider error.
 **Risk:** None. The agent's own error handling is unaffected; only side-effect callbacks
 are silenced.
 
-### B608 and SQL construction (20 sites)
+### B608 and SQL construction (19 sites)
 
 **Files:** `checkpoint_postgres.py` (6), `sessions.py`, `knowledge.py`, `knowledge_graph.py`,
-`observe/trace_store.py`, `rag/stores/pgvector.py` (9, several as bare `# nosec` with inline
+`observe/trace_store.py`, `rag/stores/pgvector.py` (8, several as bare `# nosec` with inline
 justification), `rag/stores/sqlite.py` (1)
 
 **Pattern:** Table names interpolated into SQL with f-strings
@@ -226,11 +229,12 @@ urllib3  2.6.3   PYSEC-2026-141      2.7.0
 - **No advisories in selectools' directly declared dependencies** (`openai`, `anthropic`,
   `google-genai`, `numpy`).
 - `requests` and `urllib3` are **transitive** dependencies pulled in by the provider SDKs.
-  The fix versions listed by the advisories (`requests` 2.33.0, `urllib3` 2.7.0) are
-  **announced but not yet released on PyPI** — at the time of this audit the latest
-  published releases are `requests` 2.32.5 and `urllib3` 2.6.3, so the exposure stands
-  until the fixed versions ship. selectools does not pin or constrain either package;
-  upgrade in place as soon as the fixes are available:
+  The fixed versions are **released on PyPI** (`requests` 2.33.0 on 2026-03-25, latest
+  2.34.2; `urllib3` 2.7.0 on 2026-05-07) but both **require Python >= 3.10**. selectools
+  supports Python 3.9, where the latest installable releases remain `requests` 2.32.5 and
+  `urllib3` 2.6.3 — the table above reflects a Python 3.9 resolution, and the exposure
+  stands on 3.9 environments. selectools does not pin or constrain either package; on
+  Python >= 3.10, upgrade in place:
   `pip install -U "requests>=2.33.0" "urllib3>=2.7.0"`.
 
 **Process:** dependency audits are run before every release tag with:
@@ -245,8 +249,11 @@ pip-audit  # in the deployment environment, audits the resolved tree
 ## SBOM
 
 [`sbom.json`](https://github.com/johnnichev/selectools/blob/main/sbom.json) was regenerated
-for this audit (root component `selectools@0.24.0`, CycloneDX spec 1.6, 4 core production
-dependencies). To regenerate:
+for this audit (root component `selectools@0.25.0`, CycloneDX spec 1.6, 4 core production
+dependencies). `requirements` mode against the four pinned core dependencies plus
+`--pyproject` for the root-component metadata is the canonical method — `environment`
+mode would inventory the whole venv (90+ components, no selectools root) and is the
+wrong shape for this repo. To regenerate:
 
 ```bash
 pip install cyclonedx-bom
