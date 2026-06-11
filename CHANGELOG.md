@@ -5,6 +5,51 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Agent-as-API** (`@beta`, #68) — `selectools.serve.AgentAPI` turns any
+  Agent (or list of agents) into a production Starlette ASGI app:
+  `POST /v1/chat`, `POST /v1/chat/stream` (SSE), session CRUD under
+  `/v1/sessions`, and `GET /v1/health`. Per-user session isolation via a
+  `user_id` header, optional bearer-token auth (`auth_key=`,
+  constant-time compare), any `SessionStore` backend via `session_store=`,
+  multi-agent routing by `config.name`. CLI:
+  `selectools serve agent.yaml --api --port 8000`. Sync-only providers
+  fall back to a threadpool single-chunk stream. Closes the Agent-as-API
+  P0 roadmap item.
+- **Anthropic prompt caching** (#67, closes #57) — opt-in
+  `cache_system=True` / `cache_tools=True` on `AnthropicProvider` add
+  `cache_control: ephemeral` markers to the system prompt (block form)
+  and the last tool (caches the full tool list) across `complete`,
+  `acomplete`, `stream`, and `astream`. New optional `UsageStats` fields
+  `cache_creation_input_tokens` / `cache_read_input_tokens` expose hit
+  rates. Defaults off; behavior unchanged unless enabled.
+- **KnowledgeBackend** (`@beta`, #69, closes #60) — pluggable blob
+  persistence for `KnowledgeMemory` on ephemeral infrastructure
+  (Railway, Lambda, Cloud Run): scratch on disk during the request,
+  snapshot to a backend between requests. `KnowledgeBackend` protocol
+  (`load_bytes`/`save_bytes`), `SupabaseKnowledgeBackend` (PostgREST
+  table, configurable table/key/data columns, DDL template in docs) and
+  `RedisKnowledgeBackend` (optional TTL) in
+  `selectools.knowledge_backends`, plus `KnowledgeMemory(backend=...)`
+  and `flush()`. Corrupt blobs degrade to a fresh start with a warning;
+  unpacking rejects unsafe paths.
+
+### Fixed
+
+- **Gemini tool-schema sanitization** (#70, refs #66) — two selectools
+  schema shapes were hard 400s on the Gemini API: bare `list` parameters
+  (`{"type": "array"}` without `items`) and `Dict[K, V]` parameters
+  (`additionalProperties`, unsupported by Gemini's Schema proto). Schemas
+  are now sanitized recursively before sending. Additionally, all four
+  Gemini entry points log a loud warning (model + `finish_reason`) when a
+  tool-equipped response contains neither text nor tool calls — the
+  silent-empty-loop signature of `gemini-2.5-flash-lite`'s known
+  function-calling unreliability, now documented in
+  `docs/COMPATIBILITY.md`.
+
 ## [0.23.0] - 2026-04-18 — Supabase Sessions + Builder RAG
 
 ### Added

@@ -21,7 +21,7 @@ Table DDL (run once in your Supabase project):
     alter table public.selectools_knowledge enable row level security;
 
 Prerequisites: pip install selectools[supabase]
-Run: python examples/97_knowledge_backend.py
+Run: python examples/98_knowledge_backend.py
 """
 
 from __future__ import annotations
