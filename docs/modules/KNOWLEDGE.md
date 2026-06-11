@@ -569,7 +569,7 @@ alter table public.selectools_knowledge enable row level security;
 
 The blob is stored as readable text in the `data` column (UTF-8 JSON archive;
 non-UTF-8 payloads fall back to `b64:`-prefixed base64). To reuse an existing
-table, override the layout:
+table, override the layout **and switch to `write_mode="update"`**:
 
 ```python
 SupabaseKnowledgeBackend(
@@ -578,8 +578,21 @@ SupabaseKnowledgeBackend(
     table_name="users",
     key_column="user_id",
     data_column="memory_text",
+    write_mode="update",   # row must pre-exist (e.g. created by an auth trigger)
 )
 ```
+
+> **Warning — NOT NULL columns break the default upsert.** The default
+> `write_mode="upsert"` issues `INSERT ... ON CONFLICT DO UPDATE` with a
+> partial `{key, data, updated_at}` payload. Postgres validates NOT NULL
+> constraints on the *proposed insert tuple* **before** conflict arbitration,
+> so any NOT-NULL-no-default column outside that payload (e.g. `users.email`)
+> raises `not_null_violation` (error 23502) on every save — even when the row
+> already exists. `write_mode="update"` issues a plain
+> `UPDATE ... WHERE key_column = key` instead (Sheriff runs this update-by-key
+> pattern in production, sheriff#302) and raises a clear `RuntimeError` when
+> the row doesn't exist yet. Keep the default `"upsert"` for the dedicated
+> `selectools_knowledge` table above.
 
 ### RedisKnowledgeBackend
 

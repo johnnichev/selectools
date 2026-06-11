@@ -30,6 +30,8 @@ from .stability import beta
 
 _B64_MARKER = "b64:"
 
+_WRITE_MODES = ("upsert", "update")
+
 
 def _validate_key(key: str) -> None:
     """Reject keys that could cause collisions or storage problems."""
@@ -86,6 +88,12 @@ class SupabaseKnowledgeBackend:
         table_name: Postgres table to use.  Default: ``"selectools_knowledge"``.
         key_column: Primary-key column name.  Default: ``"key"``.
         data_column: Text column holding the blob.  Default: ``"data"``.
+        write_mode: How ``save_bytes`` writes the row.  ``"upsert"`` (default)
+            issues ``INSERT ... ON CONFLICT DO UPDATE`` and is right for the
+            dedicated table below.  ``"update"`` issues a plain
+            ``UPDATE ... WHERE key_column = key`` and requires the row to
+            already exist — use it when reusing a table you don't fully
+            control (see the warning below).
 
     Required table DDL (run once in your Supabase project)::
 
@@ -95,7 +103,10 @@ class SupabaseKnowledgeBackend:
             updated_at timestamptz not null default now()
         );
 
-    To reuse an existing table (e.g. Sheriff's ``users.memory_text``)::
+    To reuse an existing table (e.g. Sheriff's ``users.memory_text``), pass
+    ``write_mode="update"`` — the row must already exist (Sheriff's auth
+    trigger guarantees it; sheriff#302 ships exactly this update-by-key
+    pattern in production)::
 
         SupabaseKnowledgeBackend(
             client,
@@ -103,7 +114,20 @@ class SupabaseKnowledgeBackend:
             table_name="users",
             key_column="user_id",
             data_column="memory_text",
+            write_mode="update",
         )
+
+    .. warning::
+
+        Do **not** use the default ``write_mode="upsert"`` against a table
+        that has NOT NULL columns without defaults beyond the key and data
+        columns (e.g. ``users.email``).  PostgREST translates the upsert to
+        ``INSERT ... ON CONFLICT DO UPDATE``, and Postgres validates NOT NULL
+        constraints on the *proposed insert tuple* **before** conflict
+        arbitration — so the partial-column payload raises
+        ``not_null_violation`` (error 23502) on every save, even when the
+        row already exists and the ``DO UPDATE`` half would never touch the
+        offending column.  ``write_mode="update"`` sidesteps this entirely.
     """
 
     def __init__(
@@ -113,6 +137,7 @@ class SupabaseKnowledgeBackend:
         table_name: str = "selectools_knowledge",
         key_column: str = "key",
         data_column: str = "data",
+        write_mode: str = "upsert",
     ) -> None:
         try:
             import supabase as supabase_lib  # type: ignore[import-untyped]  # noqa: F401
@@ -123,11 +148,14 @@ class SupabaseKnowledgeBackend:
             ) from exc
 
         _validate_key(key)
+        if write_mode not in _WRITE_MODES:
+            raise ValueError(f"write_mode must be one of {_WRITE_MODES}, got {write_mode!r}")
         self._client = client
         self._key = key
         self._table = table_name
         self._key_column = key_column
         self._data_column = data_column
+        self._write_mode = write_mode
 
     def load_bytes(self) -> Optional[bytes]:
         """Return the stored blob for this key, or ``None`` if absent."""
@@ -146,13 +174,37 @@ class SupabaseKnowledgeBackend:
         return _decode_text(str(value))
 
     def save_bytes(self, data: bytes) -> None:
-        """Upsert *data* under this key (idempotent on repeated saves)."""
+        """Write *data* under this key (idempotent on repeated saves).
+
+        ``write_mode="upsert"`` inserts-or-updates the row;
+        ``write_mode="update"`` updates an existing row and raises
+        ``RuntimeError`` when no row matches the key.
+        """
         from datetime import datetime, timezone
+
+        encoded = _encode_text(data)
+        updated_at = datetime.now(timezone.utc).isoformat()
+
+        if self._write_mode == "update":
+            response = (
+                self._client.table(self._table)
+                .update({self._data_column: encoded, "updated_at": updated_at})
+                .eq(self._key_column, self._key)
+                .execute()
+            )
+            if not response.data:
+                raise RuntimeError(
+                    f"write_mode='update' matched no row in {self._table!r} for "
+                    f"{self._key_column}={self._key!r} — the row must pre-exist "
+                    "in update mode (create it first, or use write_mode='upsert' "
+                    "with a dedicated table)"
+                )
+            return
 
         payload = {
             self._key_column: self._key,
-            self._data_column: _encode_text(data),
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            self._data_column: encoded,
+            "updated_at": updated_at,
         }
         self._client.table(self._table).upsert(payload, on_conflict=self._key_column).execute()
 

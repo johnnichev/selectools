@@ -27,15 +27,38 @@ class FakeResponse:
         self.data = data
 
 
-class FakeQueryBuilder:
-    """Chains .select/.eq/.limit/.upsert and returns a FakeResponse."""
+class FakeNotNullViolation(Exception):
+    """Stand-in for postgrest's APIError code 23502 (not_null_violation).
 
-    def __init__(self, store: Dict[str, Dict[str, Any]], table: str) -> None:
+    Mirrors Sheriff's FakeSupabase (sheriff#302): a fake table configured
+    with NOT-NULL-no-default columns rejects partial-payload upserts exactly
+    like PostgREST, so the partial-column-upsert bug class can't pass tests.
+    """
+
+
+def _raise_not_null(col: str, table: str) -> None:
+    raise FakeNotNullViolation(
+        f'null value in column "{col}" of relation "{table}" '
+        "violates not-null constraint (code 23502)"
+    )
+
+
+class FakeQueryBuilder:
+    """Chains .select/.eq/.limit/.upsert/.update and returns a FakeResponse."""
+
+    def __init__(
+        self,
+        store: Dict[str, Dict[str, Any]],
+        table: str,
+        not_null_no_default: tuple = (),
+    ) -> None:
         self._store = store
         self._table = table
+        self._not_null_no_default = not_null_no_default
         self._op = "select"
         self._upsert_payload: Optional[Dict[str, Any]] = None
         self._upsert_kwargs: Dict[str, Any] = {}
+        self._update_payload: Optional[Dict[str, Any]] = None
         self._filters: List[tuple] = []
         self._select_cols: Optional[str] = None
         self._limit_n: Optional[int] = None
@@ -58,9 +81,22 @@ class FakeQueryBuilder:
         self._upsert_kwargs = kwargs
         return self
 
+    def update(self, payload: Dict[str, Any]) -> "FakeQueryBuilder":
+        self._op = "update"
+        self._update_payload = payload
+        return self
+
     def execute(self) -> FakeResponse:
         if self._op == "upsert":
             payload = self._upsert_payload or {}
+            # INSERT ... ON CONFLICT semantics: Postgres validates the
+            # proposed insert tuple against NOT NULL constraints BEFORE
+            # conflict arbitration.  A NOT-NULL-no-default column absent
+            # from the payload fails the whole statement (23502) even when
+            # the conflicting row already exists.
+            for col in self._not_null_no_default:
+                if payload.get(col) is None:
+                    _raise_not_null(col, self._table)
             conflict_col = self._upsert_kwargs.get("on_conflict")
             key = payload.get(conflict_col) if conflict_col else None
             if key is None:
@@ -69,6 +105,19 @@ class FakeQueryBuilder:
             existing = table_rows.get(key, {})
             table_rows[key] = {**existing, **payload}
             return FakeResponse(data=[table_rows[key]])
+
+        if self._op == "update":
+            payload = self._update_payload or {}
+            for col in self._not_null_no_default:
+                if col in payload and payload[col] is None:
+                    _raise_not_null(col, self._table)
+            matched = []
+            for row in self._store.get(self._table, {}).values():
+                if all(row.get(col) == val for col, val in self._filters):
+                    row.update(payload)
+                    matched.append(dict(row))
+            # PostgREST UPDATE matching zero rows: empty data, no error.
+            return FakeResponse(data=matched)
 
         rows = list(self._store.get(self._table, {}).values())
         for col, val in self._filters:
@@ -82,13 +131,18 @@ class FakeQueryBuilder:
 
 
 class FakeSupabaseClient:
-    """Minimal fake for supabase.Client — supports .table(name)."""
+    """Minimal fake for supabase.Client — supports .table(name).
 
-    def __init__(self) -> None:
+    ``not_null_no_default`` maps table name -> columns that are NOT NULL
+    with no default, enforced on upserts like real Postgres.
+    """
+
+    def __init__(self, not_null_no_default: Optional[Dict[str, tuple]] = None) -> None:
         self._data: Dict[str, Dict[str, Any]] = {}
+        self._not_null_no_default = not_null_no_default or {}
 
     def table(self, name: str) -> FakeQueryBuilder:
-        return FakeQueryBuilder(self._data, name)
+        return FakeQueryBuilder(self._data, name, self._not_null_no_default.get(name, ()))
 
 
 # ======================================================================
@@ -136,6 +190,14 @@ class TestConstruction:
     def test_too_long_key_rejected(self) -> None:
         with pytest.raises(ValueError):
             _make_backend(key="x" * 513)
+
+    def test_invalid_write_mode_rejected(self) -> None:
+        with pytest.raises(ValueError, match="write_mode"):
+            _make_backend(write_mode="merge")
+
+    def test_valid_write_modes_accepted(self) -> None:
+        _make_backend(write_mode="upsert")
+        _make_backend(write_mode="update")
 
 
 # ======================================================================
@@ -211,6 +273,88 @@ class TestSaveLoad:
         backend.save_bytes(b"x")
         row = client._data["selectools_knowledge"]["user-1"]
         assert "updated_at" in row
+
+
+# ======================================================================
+# write_mode (issue #89 — NOT NULL columns break partial-column upserts)
+# ======================================================================
+
+
+def _users_table_client() -> FakeSupabaseClient:
+    """A fake client whose ``users`` table has ``email NOT NULL`` (no
+    default) — the Sheriff-style shared table from the docstring recipe."""
+    return FakeSupabaseClient(not_null_no_default={"users": ("email",)})
+
+
+def _seed_user_row(client: FakeSupabaseClient, user_id: str = "u1") -> None:
+    client._data.setdefault("users", {})[user_id] = {
+        "user_id": user_id,
+        "email": "john@example.com",
+        "memory_text": None,
+    }
+
+
+def _users_backend(client: FakeSupabaseClient, **kwargs: Any) -> SupabaseKnowledgeBackend:
+    return _make_backend(
+        client,
+        key="u1",
+        table_name="users",
+        key_column="user_id",
+        data_column="memory_text",
+        **kwargs,
+    )
+
+
+class TestWriteMode:
+    def test_upsert_against_not_null_table_raises(self) -> None:
+        # Regression pin for issue #89: the partial {key, data, updated_at}
+        # upsert fails NOT NULL validation on the proposed insert tuple
+        # even though the row already exists.
+        client = _users_table_client()
+        _seed_user_row(client)
+        backend = _users_backend(client)  # default write_mode="upsert"
+        with pytest.raises(FakeNotNullViolation, match="23502"):
+            backend.save_bytes(b"memory payload")
+
+    def test_update_mode_succeeds_against_not_null_table(self) -> None:
+        client = _users_table_client()
+        _seed_user_row(client)
+        backend = _users_backend(client, write_mode="update")
+        backend.save_bytes(b"memory payload")
+        row = client._data["users"]["u1"]
+        assert row["memory_text"] == "memory payload"
+        assert row["email"] == "john@example.com"  # untouched
+        assert backend.load_bytes() == b"memory payload"
+
+    def test_update_mode_round_trip_overwrites(self) -> None:
+        client = _users_table_client()
+        _seed_user_row(client)
+        backend = _users_backend(client, write_mode="update")
+        backend.save_bytes(b"v1")
+        backend.save_bytes(b"v2")
+        assert backend.load_bytes() == b"v2"
+
+    def test_update_mode_zero_rows_raises_clear_error(self) -> None:
+        client = _users_table_client()  # no row seeded
+        backend = _users_backend(client, write_mode="update")
+        with pytest.raises(RuntimeError, match="must pre-exist"):
+            backend.save_bytes(b"memory payload")
+
+    def test_update_mode_sets_updated_at(self) -> None:
+        client = _users_table_client()
+        _seed_user_row(client)
+        backend = _users_backend(client, write_mode="update")
+        backend.save_bytes(b"x")
+        assert "updated_at" in client._data["users"]["u1"]
+
+    def test_default_dedicated_table_upsert_unchanged(self) -> None:
+        # Dedicated selectools_knowledge table (key + data NOT NULL, both
+        # always present in the payload): default upsert keeps working.
+        client = FakeSupabaseClient(not_null_no_default={"selectools_knowledge": ("key", "data")})
+        backend = _make_backend(client)
+        backend.save_bytes(b"v1")
+        backend.save_bytes(b"v2")  # idempotent re-save, no pre-existing row needed
+        assert backend.load_bytes() == b"v2"
 
 
 # ======================================================================
