@@ -54,6 +54,7 @@ from .knowledge import (
     KnowledgeEntry,
     KnowledgeMemory,
     KnowledgeStore,
+    PreSaveHook,
     SQLiteKnowledgeStore,
 )
 from .knowledge_backends import (
@@ -66,6 +67,11 @@ from .knowledge_graph import (
     SQLiteTripleStore,
     Triple,
     TripleStore,
+)
+from .knowledge_sanitizers import (
+    dedupe_against,
+    defang_delimiters,
+    strip_surrogates,
 )
 from .loop_detection import (
     BaseDetector,
@@ -334,6 +340,11 @@ __all__ = [
     "KnowledgeBackend",
     "SupabaseKnowledgeBackend",
     "RedisKnowledgeBackend",
+    # Knowledge pre-save sanitizers (beta)
+    "PreSaveHook",
+    "defang_delimiters",
+    "strip_surrogates",
+    "dedupe_against",
     # Token estimation
     "TokenEstimate",
     "estimate_tokens",

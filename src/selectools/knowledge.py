@@ -33,11 +33,25 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    Sequence,
+    Union,
+    runtime_checkable,
+)
 
+from .knowledge_sanitizers import dedupe_against
 from .stability import beta, stable
 
 _logger = logging.getLogger(__name__)
+
+PreSaveHook = Callable[[str], Optional[str]]
+"""A pre-save sanitizer: returns transformed text, or ``None`` to reject the entry."""
 
 # ======================================================================
 # KnowledgeEntry — structured entry for the new store-based API
@@ -609,6 +623,20 @@ class KnowledgeMemory:
         backend: Optional ``KnowledgeBackend`` that persists the directory
             as a single blob between processes.  Restored on init, saved
             after ``remember()`` / ``prune_old_logs()`` / ``flush()``.
+        pre_save: Optional sanitization hook (or sequence of hooks) applied
+            to entry text before persistence (beta).  Each hook receives the
+            text and returns the transformed text, or ``None`` to reject the
+            entry entirely (silently skipped, logged at debug level).
+            Sequences are applied in order; ``None`` short-circuits.
+            Built-ins live in ``selectools.knowledge_sanitizers``.
+        dedupe: If ``True``, append a near-duplicate rejection hook (beta)
+            that runs after all ``pre_save`` hooks, comparing the sanitized
+            text against current store entries via
+            ``difflib.SequenceMatcher``.  Costs one store query plus up to
+            one similarity computation per existing entry on every
+            ``remember()``.
+        dedupe_threshold: Similarity ratio at or above which ``dedupe``
+            rejects the new entry.  Default: 0.9.
     """
 
     def __init__(
@@ -619,6 +647,9 @@ class KnowledgeMemory:
         max_context_chars: int = 5000,
         max_entries: int = 50,
         backend: Optional[KnowledgeBackend] = None,
+        pre_save: Optional[Union[PreSaveHook, Sequence[PreSaveHook]]] = None,
+        dedupe: bool = False,
+        dedupe_threshold: float = 0.9,
     ) -> None:
         self._directory = directory
         self._recent_days = recent_days
@@ -632,6 +663,35 @@ class KnowledgeMemory:
             if blob is not None:
                 _unpack_directory(directory, blob)
         self._store = store or FileKnowledgeStore(directory)
+        hooks: List[PreSaveHook] = []
+        if pre_save is not None:
+            if callable(pre_save):
+                hooks.append(pre_save)
+            else:
+                hooks.extend(pre_save)
+        if dedupe:
+            hooks.append(dedupe_against(self._existing_contents, threshold=dedupe_threshold))
+        self._pre_save_hooks = hooks
+
+    def _existing_contents(self) -> List[str]:
+        return [e.content for e in self._store.query(limit=self._max_entries + 1000)]
+
+    def _apply_pre_save(self, content: str) -> Optional[str]:
+        """Run *content* through the pre_save hook chain.
+
+        Returns the transformed content, or ``None`` if any hook rejected
+        the entry (short-circuits the remaining hooks).
+        """
+        for hook in self._pre_save_hooks:
+            result = hook(content)
+            if result is None:
+                _logger.debug(
+                    "pre_save hook %s rejected knowledge entry; skipping save",
+                    getattr(hook, "__name__", repr(hook)),
+                )
+                return None
+            content = result
+        return content
 
     @property
     def directory(self) -> str:
@@ -681,8 +741,13 @@ class KnowledgeMemory:
             metadata: Arbitrary key-value pairs.
 
         Returns:
-            The entry ID.
+            The entry ID, or an empty string if a ``pre_save`` hook rejected
+            the entry (nothing is persisted in that case).
         """
+        processed = self._apply_pre_save(content)
+        if processed is None:
+            return ""
+        content = processed
         entry = KnowledgeEntry(
             content=content,
             category=category,
@@ -879,4 +944,5 @@ __all__ = [
     "FileKnowledgeStore",
     "SQLiteKnowledgeStore",
     "KnowledgeMemory",
+    "PreSaveHook",
 ]
