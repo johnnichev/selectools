@@ -1051,6 +1051,21 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             >>> result = agent.run([Message(role=Role.USER, content="Hello")])
         """
         messages = self._normalize_messages(messages)
+
+        # Planning-as-config (ROADMAP P2): delegate to the PlanAndExecute
+        # adapter; a None return means planning did not engage.
+        if self.config.planning is not None and self.config.planning.enabled:
+            from ._planning import run_with_planning, warn_streaming_planning_skip
+
+            if stream_handler is not None:
+                warn_streaming_planning_skip(self)
+            else:
+                planned = run_with_planning(
+                    self, messages, response_format=response_format, parent_run_id=parent_run_id
+                )
+                if planned is not None:
+                    return planned
+
         saved_system_prompt = self._system_prompt
         ctx: Optional[_RunContext] = None
         try:
@@ -1285,6 +1300,14 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             AgentResult: The final result object (yielded at the very end).
         """
         messages = self._normalize_messages(messages)
+
+        # Planning-as-config: streaming cannot use the planned flow — warn
+        # once per agent instance and run the normal streaming loop.
+        if self.config.planning is not None and self.config.planning.enabled:
+            from ._planning import warn_streaming_planning_skip
+
+            warn_streaming_planning_skip(self)
+
         saved_system_prompt = self._system_prompt
         ctx: Optional[_RunContext] = None
         try:
@@ -1693,6 +1716,21 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             AgentResult with the final response and tool call metadata.
         """
         messages = self._normalize_messages(messages)
+
+        # Planning-as-config (ROADMAP P2): delegate to the PlanAndExecute
+        # adapter; a None return means planning did not engage.
+        if self.config.planning is not None and self.config.planning.enabled:
+            from ._planning import arun_with_planning, warn_streaming_planning_skip
+
+            if stream_handler is not None:
+                warn_streaming_planning_skip(self)
+            else:
+                planned = await arun_with_planning(
+                    self, messages, response_format=response_format, parent_run_id=parent_run_id
+                )
+                if planned is not None:
+                    return planned
+
         saved_system_prompt = self._system_prompt
         ctx: Optional[_RunContext] = None
         try:

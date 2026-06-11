@@ -4,7 +4,7 @@ __version__ = "0.24.0"
 
 # Import submodules (lazy loading for optional dependencies)
 from . import embeddings, evals, guardrails, models, observe, patterns, rag, toolbox
-from .agent import Agent, AgentConfig
+from .agent import Agent, AgentConfig, PlanningConfig
 from .agent.config_groups import (
     BudgetConfig,
     CoherenceConfig,
@@ -190,6 +190,7 @@ from .usage import AgentUsage, UsageStats
 __all__ = [
     "Agent",
     "AgentConfig",
+    "PlanningConfig",
     "AgentResult",
     "AgentAnalytics",
     "ToolMetrics",
