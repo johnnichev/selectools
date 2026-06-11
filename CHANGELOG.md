@@ -5,6 +5,38 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.25.1] - 2026-06-12 — Idempotent Sanitizers & Picklable Exceptions
+
+### Fixed
+
+- **`defang_delimiters` is now idempotent** (#100) — role-marker and
+  speaker-label rewrites previously added one space per pass
+  (`User:` → `User :` → `User  :`), causing per-turn knowledge-blob
+  churn for downstream consumers (observed in Sheriff production).
+  Canonical rewrites + a 32-corpus `f(f(x)) == f(x)` regression pin.
+- **Exception pickling** (#100) — seven multi-arg exceptions
+  (`ToolValidationError`, `ToolExecutionError`,
+  `ProviderConfigurationError`, `MemoryLimitExceededError`,
+  `GraphExecutionError`, `GuardrailError`, `LoopDetectedError`) failed
+  `pickle.loads` with TypeError, breaking multiprocessing /
+  concurrent.futures error propagation. All now implement
+  `__reduce__`; full-protocol round-trip tests pin the family.
+
+### Added
+
+- **PT-BR speaker labels** in `defang_delimiters` (#100) —
+  `Usuário/Sistema/Assistente/Humano` join the English set, so
+  Brazilian-Portuguese consumers need no local supplement.
+
+### Changed
+
+- Security audit re-stamped for v0.25 (#100): bandit zero med/high,
+  72 nosec annotations re-justified, SBOM regenerated at 0.25.x with a
+  sort-stable recipe. The requests/urllib3 advisories now have released
+  fixes on Python >= 3.10 (selectools' 3.9 floor drops at v1.0).
+- Hypothesis property `test_full_metadata_filter_always_matches` runs
+  with `deadline=None` (deadline flakes under parallel CI load).
+
 ## [0.25.0] - 2026-06-11 — Hardening & v1.0 Prep
 
 ### Added
