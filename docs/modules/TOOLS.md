@@ -610,14 +610,18 @@ elif outcome.status == "ignored":
   delivery) — the observed pending is still the user's live intent and a stale button must be
   able to neither fire nor disarm it. The user's next text reply can still confirm or cancel.
 - An `"ignore"` intent (or any unrecognized intent string — malformed/future payloads must never
-  fire or drop a pending) returns `"ignored"`: the pending and its executor are kept, but its TTL
+  fire or drop a pending, but they ARE logged as a warning; intents are normalized with
+  strip + lowercase first) returns `"ignored"`: the pending and its executor are kept, but its TTL
   is tightened to at most `ignore_ttl_seconds` (default `DEFAULT_IGNORE_TTL_SECONDS = 10.0`), so
   a mis-tap is recoverable without leaving a destructive op armed for the original window.
 - `tighten_ttl(user_id, seconds, *, channel_id=None, conversation_id=None, expected_id=None)` is
   also available standalone on both stores. It only ever **shortens** `expires_at` (never
   lengthens), keeps the executor/registry entry, and returns the updated record (or `None` when
-  nothing unexpired matches). On Redis the rewrite uses `SET XX` + a refreshed server-side TTL so
-  a concurrently-claimed record is never resurrected.
+  nothing unexpired matches). On Redis the rewrite is an id-pinned Lua compare-and-set (with a
+  refreshed server-side TTL): the key is rewritten only while it still holds the observed
+  `pending_action_id`, so a concurrently-claimed record is never resurrected and a record
+  re-stashed for the same scope mid-rewrite is never overwritten — the tighten just misses and
+  returns `None`.
 
 **Confirm parsing** is pluggable via the `ConfirmParser` protocol. The built-in
 `RegexConfirmParser` (version `regex-v1:pt-en-es`) accepts only unambiguous confirmations —

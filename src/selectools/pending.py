@@ -288,6 +288,8 @@ class ConfirmOutcome:
       delivery), so the observed pending is still the user's live,
       previewed intent and a stale button must be able to neither fire nor
       disarm it. The user's next text reply can still confirm or cancel.
+      Both pins share this one status: an ``expected_id`` mismatch also
+      reports ``kind_mismatch``, not a separate code.
     - ``"ignored"`` (``pop_if_intent`` only): an "ignore" (or unrecognized)
       intent. Nothing executed; the pending action is PRESERVED with its
       TTL tightened to at most ``ignore_ttl_seconds`` (executor kept), so a
@@ -501,9 +503,11 @@ class PendingActionStore(Protocol):
         Issue #82: chat-channel button webhooks (Twilio quick replies,
         Telegram inline keyboards) deliver the user's decision as a
         STRUCTURED payload, not free text — the text parser is bypassed
-        entirely. ``intent`` is ``"confirm"``, ``"cancel"``, or
-        ``"ignore"``; any other value is treated as ``"ignore"`` (a
-        malformed or future payload must never fire or drop a pending).
+        entirely. ``intent`` is normalized (strip + lowercase) and must be
+        ``"confirm"``, ``"cancel"``, or ``"ignore"``; any other value is
+        treated as ``"ignore"`` with a logged warning (a malformed or
+        future payload must never fire or drop a pending — but never
+        silently either).
 
         ``expected_kind``/``expected_id`` pin the claim to the action the
         button was minted for. On mismatch the pending is PRESERVED and the
@@ -611,6 +615,25 @@ def _target_mismatch(
         )
         return True
     return False
+
+
+_VALID_INTENTS = ("confirm", "cancel", "ignore")
+
+
+def _normalize_intent(intent: str) -> str:
+    """Normalize a structured button intent; coerce unknowns to ``ignore``.
+
+    Case and surrounding whitespace are forgiven ("Confirm\\n" from a sloppy
+    webhook payload is still a confirm). Anything else is fail-safe coerced
+    to ``ignore`` — a malformed or future payload must never fire or drop a
+    pending — but LOUDLY (review finding 2): silent coercion hid integration
+    bugs where a misspelled payload key downgraded every confirm to ignore.
+    """
+    normalized = (intent or "").strip().lower()
+    if normalized in _VALID_INTENTS:
+        return normalized
+    logger.warning("pending: unrecognized intent %r treated as ignore", intent)
+    return "ignore"
 
 
 def _guarded_execute(
@@ -803,7 +826,7 @@ class InMemoryPendingStore:
     ) -> Optional[ConfirmOutcome]:
         if ignore_ttl_seconds < 0:
             raise ValueError("ignore_ttl_seconds must be >= 0")
-        effective = intent if intent in ("confirm", "cancel") else "ignore"
+        effective = _normalize_intent(intent)
         key = _scope_key(user_id, channel_id, conversation_id)
         with self._lock:
             entry = self._pending.get(key)
@@ -876,6 +899,21 @@ class InMemoryPendingStore:
         return replace(entry[0], status=_CANCELLED)
 
 
+# Id-pinned compare-and-set for tighten_ttl (review finding 1). SET XX only
+# proves that *a* key exists — not that it is still the observed record. In
+# the GET -> SET window a twin webhook can claim record A and the same scope
+# can stash a NEW record B; a plain SET XX would then overwrite live B with
+# re-armed A (destroying B and, via a registered factory, letting A execute
+# twice). The script rewrites the key ONLY while it still holds the observed
+# pending_action_id, atomically server-side.
+_TIGHTEN_TTL_LUA = (
+    "local v = redis.call('GET', KEYS[1]) "
+    "if v and cjson.decode(v).pending_action_id == ARGV[1] then "
+    "redis.call('SET', KEYS[1], ARGV[2], 'EX', ARGV[3]) return 1 end "
+    "return 0"
+)
+
+
 @beta
 class RedisPendingStore:
     """Redis-backed pending-action store for multi-instance deployments.
@@ -900,8 +938,11 @@ class RedisPendingStore:
     resolution) run AFTER the claim; any guard failure means the record has
     already been removed, so a stale destructive action is never left armed.
     ``GETDEL`` was chosen over ``WATCH``/``MULTI`` (retry loops, more round
-    trips) and Lua (heavier dependency surface for fakes/tests) because the
-    desired semantics — exactly-once claim — map onto one command.
+    trips) because the desired semantics — exactly-once claim — map onto one
+    command. The only operation with no single-command equivalent is the
+    id-pinned TTL rewrite in :meth:`tighten_ttl`, which uses a four-line Lua
+    ``EVAL`` (compare ``pending_action_id``, then ``SET EX``) so a record
+    claimed-or-replaced mid-rewrite is neither resurrected nor overwritten.
     """
 
     def __init__(
@@ -1089,7 +1130,7 @@ class RedisPendingStore:
     ) -> Optional[ConfirmOutcome]:
         if ignore_ttl_seconds < 0:
             raise ValueError("ignore_ttl_seconds must be >= 0")
-        effective = intent if intent in ("confirm", "cancel") else "ignore"
+        effective = _normalize_intent(intent)
         key = self._key(user_id, channel_id, conversation_id)
         # Preserve-guards (kind/id pins, ignore) must run BEFORE the claim,
         # so the flow is observe-then-act: GET, validate, then GETDEL only
@@ -1100,11 +1141,11 @@ class RedisPendingStore:
             return None
         record = PendingAction.from_dict(json.loads(raw))
         if record.is_expired():
-            claimed = self._claim_observed(key, record.pending_action_id)
-            if claimed is None:
-                return None
-            with self._lock:
-                self._executors.pop(record.pending_action_id, None)
+            # Report expired WITHOUT claiming (review NOTE 3a): the record
+            # guard already refuses execution and the server-side TTL reaps
+            # the key on its own — a GETDEL here could race a same-scope
+            # re-stash and disarm the user's LIVE record instead of the
+            # expired one. The stash path tolerates sub-second-expired keys.
             return ConfirmOutcome(status="expired", record=replace(record, status=_EXPIRED))
         if _target_mismatch(record, expected_kind, expected_id):
             # PRESERVE: nothing was claimed; the record (and its closure)
@@ -1126,15 +1167,19 @@ class RedisPendingStore:
         claimed = self._claim_observed(key, record.pending_action_id)
         if claimed is None:
             return None
+        # From here on, use the CLAIMED record, not the observed snapshot
+        # (review NOTE 3b): same id, but a concurrent tighten_ttl may have
+        # rewritten expires_at between the GET and the claim — guards and
+        # outcomes must reflect what was actually removed from Redis.
         with self._lock:
-            entry = self._executors.pop(record.pending_action_id, None)
-            factory = self._factories.get(record.kind)
+            entry = self._executors.pop(claimed.pending_action_id, None)
+            factory = self._factories.get(claimed.kind)
         if effective == "cancel":
-            return ConfirmOutcome(status="cancelled", record=replace(record, status=_CANCELLED))
+            return ConfirmOutcome(status="cancelled", record=replace(claimed, status=_CANCELLED))
         executor: Optional[Executor] = entry[0] if entry is not None else None
         if executor is None and factory is not None:
-            executor = factory(record)
-        return _guarded_execute(record, executor, None)
+            executor = factory(claimed)
+        return _guarded_execute(claimed, executor, None)
 
     def _claim_observed(self, key: str, observed_id: str) -> Optional[PendingAction]:
         """Atomically claim ``key`` iff it still holds the observed record.
@@ -1190,13 +1235,15 @@ class RedisPendingStore:
         updated = replace(record, expires_at=new_expires)
         payload = json.dumps(updated.to_dict(), ensure_ascii=False)
         ttl = max(1, math.ceil(new_expires - now))
-        # SET XX: rewrite only while the key still exists — a record claimed
-        # between the GET above and this write must NOT be resurrected.
-        # Without Lua/WATCH (deliberately avoided, see class docstring) a
-        # same-scope drop+re-stash inside the GET->SET window could be
-        # overwritten by the OLD previewed record — bounded harm: it expires
-        # within ``seconds`` and nothing ever executes from this path.
-        if not self._client.set(key, payload, xx=True, ex=ttl):
+        # Id-pinned compare-and-set (review finding 1): the Lua script
+        # rewrites the key ONLY while it still holds the observed record's
+        # pending_action_id. A record claimed between the GET above and this
+        # write is never resurrected, and a same-scope re-stash inside that
+        # window is never overwritten — the rewrite simply misses and the
+        # caller sees ``None`` (a twin won).
+        if not self._client.eval(
+            _TIGHTEN_TTL_LUA, 1, key, record.pending_action_id, payload, str(ttl)
+        ):
             return None
         with self._lock:
             entry = self._executors.get(record.pending_action_id)

@@ -17,6 +17,7 @@ tests/test_sessions_redis.py).
 from __future__ import annotations
 
 import json
+import logging
 import threading
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -168,6 +169,27 @@ class FakeRedis:
                 self._ttls.pop(k, None)
                 removed += 1
         return removed
+
+    def eval(self, script: str, numkeys: int, *keys_and_args: Any) -> int:
+        """Narrow EVAL handler for the id-pinned tighten_ttl rewrite ONLY.
+
+        NOT Python ``eval()``: this mimics the redis-py client's ``EVAL``
+        command (server-side Lua). The script string is never executed —
+        it is only sanity-checked, and the fake applies the fixed
+        ``_TIGHTEN_TTL_LUA`` semantics: rewrite the key (with a refreshed
+        TTL) iff it still holds the observed pending_action_id. Atomic by
+        construction — a single Python call, like a real Redis script.
+        """
+        if "pending_action_id" not in script or numkeys != 1:
+            raise NotImplementedError("FakeRedis.eval only supports the tighten_ttl script")
+        key, observed_id, payload, ttl = keys_and_args
+        self._evict_if_expired(key)
+        current = self._store.get(key)
+        if current is None or json.loads(current).get("pending_action_id") != observed_id:
+            return 0
+        self._store[key] = payload
+        self._ttls[key] = time.time() + int(ttl)
+        return 1
 
 
 def _make_redis_store(fake_redis: FakeRedis, **kwargs: Any) -> RedisPendingStore:
@@ -1109,11 +1131,14 @@ class TestPopIfIntent:
         assert outcome.status == "kind_mismatch"
         assert not outcome.executed
         assert fired == []
-        # PRESERVED: the pending is still armed for the user's live flow.
+        # PRESERVED: the pending is still armed for the user's live flow,
+        # with its window untouched (review NOTE 3c: a mismatch must not
+        # tighten or refresh expires_at either).
         still = any_store.get("user-1")
         assert still is not None
         assert still.pending_action_id == record.pending_action_id
         assert still.status == "pending"
+        assert still.expires_at == record.expires_at
         # A later matching confirm still executes.
         ok = any_store.pop_if_intent("user-1", "confirm", expected_kind="delete_invoice")
         assert ok is not None and ok.executed
@@ -1262,8 +1287,15 @@ class TestPopIfIntent:
         assert outcome is not None and outcome.status == "ignored"
         assert outcome.record.expires_at == record.expires_at
 
-    def test_unknown_intent_treated_as_ignore(self, any_store: Any) -> None:
-        """Malformed/future button payloads must never fire or drop the pending."""
+    def test_unknown_intent_treated_as_ignore(
+        self, any_store: Any, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Malformed/future button payloads must never fire or drop the pending.
+
+        Review finding 2: the coercion must be LOUD — a silent downgrade to
+        ignore hid integration bugs where a misspelled payload key turned
+        every confirm into an ignore.
+        """
         fired: List[str] = []
         any_store.stash(
             "user-1",
@@ -1271,11 +1303,34 @@ class TestPopIfIntent:
             preview="Delete invoice INV-42",
             executor=lambda: fired.append("boom") or "deleted",
         )
-        outcome = any_store.pop_if_intent("user-1", "frobnicate")
+        with caplog.at_level(logging.WARNING, logger="selectools.pending"):
+            outcome = any_store.pop_if_intent("user-1", "frobnicate")
         assert outcome is not None
         assert outcome.status == "ignored"
         assert fired == []
         assert any_store.get("user-1") is not None
+        assert any(
+            "unrecognized intent" in rec.message and "'frobnicate'" in rec.message
+            for rec in caplog.records
+        )
+
+    def test_intent_normalized_before_matching(
+        self, any_store: Any, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Review finding 2: case/whitespace variants are valid intents, not
+        coerced to ignore — '  Confirm \\n' from a sloppy webhook confirms."""
+        fired: List[str] = []
+        any_store.stash(
+            "user-1",
+            kind="delete_invoice",
+            preview="Delete invoice INV-42",
+            executor=lambda: fired.append("boom") or "deleted",
+        )
+        with caplog.at_level(logging.WARNING, logger="selectools.pending"):
+            outcome = any_store.pop_if_intent("user-1", "  Confirm \n")
+        assert outcome is not None and outcome.executed
+        assert fired == ["boom"]
+        assert not any("unrecognized intent" in rec.message for rec in caplog.records)
 
     def test_expired_pending_reports_expired_and_clears(self, any_store: Any) -> None:
         fired: List[str] = []
@@ -1444,6 +1499,60 @@ class TestTightenTtl:
         fake.get = racing_get  # type: ignore[method-assign]
         assert store.tighten_ttl("user-1", 5.0) is None
         assert key not in fake._store
+
+    def test_redis_tighten_does_not_overwrite_restashed_record(self) -> None:
+        """Review finding 1: the rewrite is pinned to the OBSERVED identity.
+
+        Interleaving: tighten GETs record A -> a twin webhook confirms
+        (claims) A and the same scope stashes a NEW pending B -> tighten's
+        write lands. With plain SET XX the write would overwrite live B with
+        re-armed A: a duplicate confirm + a registered factory would then
+        execute A twice, and B would be destroyed. The id-pinned Lua
+        compare-and-set must instead miss: B survives untouched and A never
+        re-arms.
+        """
+        fake = FakeRedis()
+        store = _make_redis_store(fake)
+        fired: List[str] = []
+        record_a = store.stash(
+            "user-1",
+            kind="delete_invoice",
+            preview="Delete invoice INV-42",
+            executor=lambda: fired.append("A") or "A-ran",
+            ttl_seconds=300.0,
+        )
+        original_get = fake.get
+        state: Dict[str, Any] = {}
+
+        def racing_get(k: str) -> Optional[str]:
+            value = original_get(k)
+            fake.get = original_get  # type: ignore[method-assign]  # race fires once
+            # Twin webhook claims+executes A...
+            fake.getdel(k)
+            store._executors.pop(record_a.pending_action_id, None)
+            # ...and the same scope immediately stashes a NEW pending B.
+            state["record_b"] = store.stash(
+                "user-1",
+                kind="delete_invoice",
+                preview="Delete invoice INV-99",
+                executor=lambda: fired.append("B") or "B-ran",
+                ttl_seconds=300.0,
+            )
+            return value
+
+        fake.get = racing_get  # type: ignore[method-assign]
+        assert store.tighten_ttl("user-1", 5.0) is None
+        record_b = state["record_b"]
+        # B survives untouched (id AND window) — it was never overwritten.
+        still = store.get("user-1")
+        assert still is not None
+        assert still.pending_action_id == record_b.pending_action_id
+        assert still.expires_at == record_b.expires_at
+        # A never re-arms: the next confirm executes B, and only B.
+        outcome = store.pop_if_intent("user-1", "confirm")
+        assert outcome is not None and outcome.executed
+        assert outcome.result == "B-ran"
+        assert fired == ["B"]
 
     def test_redis_tighten_updates_server_ttl(self) -> None:
         fake = FakeRedis()
