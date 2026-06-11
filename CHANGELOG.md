@@ -5,7 +5,7 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.25.0] - 2026-06-11 — Hardening & v1.0 Prep
 
 ### Added
 
@@ -41,6 +41,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   results properly awaited, timed-out approvals cancelled, denials
   memoized per run). Composes with `Tool.requires_approval` and
   `ToolPolicy` (deny always wins).
+
+### Added (docs/infra)
+
+- **Security audit published** (#91) — `docs/SECURITY_AUDIT.md`:
+  bandit clean at medium/high severity, all 73 `nosec` suppressions
+  individually justified, pip-audit pass, SBOM regenerated.
+- **0.x → 1.0 migration guide** (#91) — `docs/MIGRATION_1.0.md`
+  covering the hooks removal mapping and the beta→stable promotion
+  table.
+- **Compatibility matrix refresh** (#91) — `docs/COMPATIBILITY.md`
+  re-verified across providers.
+- **Real-Redis Lua smoke tests** (#93) — the `tighten_ttl` atomic
+  Lua path now exercised against a live Redis, not just fakes.
+- **Docs count corrections** (#92) — lifecycle event count, examples
+  gallery, stale counts swept post-0.24.
+
+### Changed
+
+- **`Agent._clone_for_isolation` is now public
+  `Agent.clone_for_isolation()`** (`@beta`, #94) — the isolated-clone
+  mechanism behind planning-as-config and the pattern agents is part
+  of the supported surface. The underscore alias is kept as a
+  deprecated shim for one release.
+- **`__all__` reconciled** (#94) — 11 documented-but-unexported
+  symbols are now importable from `selectools`: the Pipeline family
+  (including `compose`, `Step`, `StepResult`), `RouterProvider`, and
+  `RouterConfig`.
+- **Stability marking sweep** (#95) — 100% of the 433-symbol public
+  surface now carries an explicit stability marker (205 stable,
+  228 beta). 19 beta→stable promotions: `AgentGraph`/`GraphState` and
+  the orchestration core, all 5 pattern agents, the checkpoint stores
+  (including Postgres), `trace_to_html`, `SimpleStepObserver`,
+  `RedisSessionStore`, and `AzureOpenAIProvider` — full table in
+  `docs/MIGRATION_1.0.md`. All 123 public modules declare a
+  module-level `__stability__`, and a CI architecture gate enforces
+  markers on every future public symbol.
+
+### Removed (BREAKING)
+
+- **`AgentConfig.hooks`** (#94) — deprecated since v0.16 with a
+  migration window that expired in v0.18. `AgentConfig(hooks=...)`
+  now raises `TypeError`. Migrate to `AgentObserver`; the full
+  hook-to-observer mapping is in `docs/MIGRATION_1.0.md`.
+
+### Fixed
+
+- **Runtime-checkable Protocol isinstance regression** (#95) — on
+  Python 3.9–3.11 the stability markers became structural members of
+  runtime-checkable Protocols, breaking third-party `isinstance`
+  checks against `Cache`, `KnowledgeStore`, and `CheckpointStore`.
+  Markers are no longer counted as protocol members.
+
+### Stats
+
+- 7,268 tests, 111 examples, 433 public symbols (205 stable,
+  228 beta) across 123 public modules — 100% stability-marked with a
+  CI gate.
 
 ## [0.24.0] - 2026-06-10 — Production Interop
 

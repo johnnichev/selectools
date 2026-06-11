@@ -50,7 +50,7 @@ print(result.usage)     # Token counts + cost
 4. [Configuration](#configuration)
 5. [Retry and Error Handling](#retry-and-error-handling)
 6. [Sync vs Async Execution](#sync-vs-async-execution)
-7. [Hook System](#hook-system)
+7. [Hook System (Removed)](#hook-system-removed)
 8. [AgentObserver Protocol](#agentobserver-protocol)
 9. [Memory Integration](#memory-integration)
 10. [Streaming](#streaming)

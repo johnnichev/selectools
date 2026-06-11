@@ -5,6 +5,100 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.25.0] - 2026-06-11 — Hardening & v1.0 Prep
+
+### Added
+
+- **Pending intent hooks** (`@beta`, #85, closes #82) — chat-channel
+  button flows can now adopt the pending store: `pop_if_intent`
+  (structured confirm/cancel/ignore, bypasses the text parser),
+  `tighten_ttl` (id-pinned atomic Lua rewrite on Redis — never
+  lengthens, never resurrects a claimed action), `kind_mismatch`
+  preserves the pending (a stale button for a different prompt must
+  neither fire nor disarm it), unknown intents coerce to "ignore"
+  with a warning. Built from Sheriff's Twilio quick-reply flow.
+- **Knowledge pre-save sanitization** (`@beta`, #84, closes #83) —
+  `pre_save` hook (transform or reject) on `KnowledgeMemory` plus
+  built-in sanitizers: `defang_delimiters` (prompt-injection markers:
+  dash/role/speaker/fences incl. `<<SYS>>`, `~~~`, fullwidth colons,
+  leading-indent variants), `strip_surrogates`, and `dedupe_against`
+  with a bounded default window. Known limitations documented.
+- **Planning-as-config** (`@beta`, #86) — `AgentConfig(planning=
+  PlanningConfig(...))` adds plan→execute→synthesize to any agent by
+  wrapping the PlanAndExecute pattern via isolated clones. Complexity
+  gate skips simple prompts; budget caps bind across the planned flow
+  (clones seeded from parent usage); approval handler can approve,
+  reject, or edit the plan.
+- **Tool result compression** (`@beta`, #87) — `ToolConfig(
+  compress_results=True, compress_threshold=...)` summarizes oversized
+  tool results via a one-shot LLM call before they enter context, with
+  fidelity-preserving prompt, raw-text retention for stop conditions
+  and loop detection, compressed-reuse on cache hits, gather-batched
+  async parallel compression, and loud truncation fallback.
+- **Agent-level HITL** (`@beta`, #88) — `ToolConfig(require_approval=
+  [...], approval_handler=...)` gates tool execution behind a sync or
+  async approval callback (fail-closed on handler errors, awaitable
+  results properly awaited, timed-out approvals cancelled, denials
+  memoized per run). Composes with `Tool.requires_approval` and
+  `ToolPolicy` (deny always wins).
+
+### Added (docs/infra)
+
+- **Security audit published** (#91) — `docs/SECURITY_AUDIT.md`:
+  bandit clean at medium/high severity, all 73 `nosec` suppressions
+  individually justified, pip-audit pass, SBOM regenerated.
+- **0.x → 1.0 migration guide** (#91) — `docs/MIGRATION_1.0.md`
+  covering the hooks removal mapping and the beta→stable promotion
+  table.
+- **Compatibility matrix refresh** (#91) — `docs/COMPATIBILITY.md`
+  re-verified across providers.
+- **Real-Redis Lua smoke tests** (#93) — the `tighten_ttl` atomic
+  Lua path now exercised against a live Redis, not just fakes.
+- **Docs count corrections** (#92) — lifecycle event count, examples
+  gallery, stale counts swept post-0.24.
+
+### Changed
+
+- **`Agent._clone_for_isolation` is now public
+  `Agent.clone_for_isolation()`** (`@beta`, #94) — the isolated-clone
+  mechanism behind planning-as-config and the pattern agents is part
+  of the supported surface. The underscore alias is kept as a
+  deprecated shim for one release.
+- **`__all__` reconciled** (#94) — 11 documented-but-unexported
+  symbols are now importable from `selectools`: the Pipeline family
+  (including `compose`, `Step`, `StepResult`), `RouterProvider`, and
+  `RouterConfig`.
+- **Stability marking sweep** (#95) — 100% of the 433-symbol public
+  surface now carries an explicit stability marker (205 stable,
+  228 beta). 19 beta→stable promotions: `AgentGraph`/`GraphState` and
+  the orchestration core, all 5 pattern agents, the checkpoint stores
+  (including Postgres), `trace_to_html`, `SimpleStepObserver`,
+  `RedisSessionStore`, and `AzureOpenAIProvider` — full table in
+  `docs/MIGRATION_1.0.md`. All 123 public modules declare a
+  module-level `__stability__`, and a CI architecture gate enforces
+  markers on every future public symbol.
+
+### Removed (BREAKING)
+
+- **`AgentConfig.hooks`** (#94) — deprecated since v0.16 with a
+  migration window that expired in v0.18. `AgentConfig(hooks=...)`
+  now raises `TypeError`. Migrate to `AgentObserver`; the full
+  hook-to-observer mapping is in `docs/MIGRATION_1.0.md`.
+
+### Fixed
+
+- **Runtime-checkable Protocol isinstance regression** (#95) — on
+  Python 3.9–3.11 the stability markers became structural members of
+  runtime-checkable Protocols, breaking third-party `isinstance`
+  checks against `Cache`, `KnowledgeStore`, and `CheckpointStore`.
+  Markers are no longer counted as protocol members.
+
+### Stats
+
+- 7,268 tests, 111 examples, 433 public symbols (205 stable,
+  228 beta) across 123 public modules — 100% stability-marked with a
+  CI gate.
+
 ## [0.24.0] - 2026-06-10 — Production Interop
 
 ### Added
