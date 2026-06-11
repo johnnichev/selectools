@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, List, Optional, Union
 
-from ..stability import stable
+from ..stability import beta, stable
 
 if TYPE_CHECKING:
     from ..cache import Cache
@@ -199,6 +199,11 @@ class AgentConfig:
     trace: Optional[Any] = None  # TraceConfig
     compress: Optional[Any] = None  # CompressConfig
 
+    # -- Planning-as-config (ROADMAP P2). See PlanningConfig below and
+    # agent/_planning.py for the adapter. Self-contained: default None means
+    # zero overhead and byte-identical behavior.
+    planning: Optional["PlanningConfig"] = None
+
     def __post_init__(self) -> None:  # noqa: D105
         from .config_groups import (
             BudgetConfig,
@@ -371,3 +376,78 @@ class AgentConfig:
                 DeprecationWarning,
                 stacklevel=2,
             )
+
+        # -- Planning-as-config: auto-unpack dicts (for YAML / dict configs) --
+        if isinstance(self.planning, dict):
+            self.planning = PlanningConfig(**self.planning)
+
+
+if TYPE_CHECKING:
+    from ..patterns.plan_and_execute import PlanStep
+
+PlanApprovalHandler = Callable[[List["PlanStep"]], Union[bool, List["PlanStep"]]]
+"""Contract for :attr:`PlanningConfig.plan_approval_handler`.
+
+The handler receives the structured plan (a ``List[PlanStep]``) before any
+step executes and must return one of:
+
+- ``True`` — approve the plan as-is (in-place edits to the steps are kept).
+- ``False`` — reject the plan; the agent falls back to standard
+  (non-planned) execution with a one-time ``UserWarning``.
+- ``List[PlanStep]`` — an edited plan to execute instead (step order,
+  count, and ``task`` text may be changed; executor dispatch is internal).
+"""
+
+
+@beta
+@dataclass
+class PlanningConfig:
+    """Opt-in planning for any Agent: plan -> (approve) -> execute -> synthesize.
+
+    When ``enabled`` and the input passes the complexity gate, the agent
+    delegates to the existing ``PlanAndExecuteAgent`` pattern built from its
+    own provider/tools (see ``agent/_planning.py``), then synthesizes a final
+    answer. Disabled (the default) is a zero-overhead no-op.
+
+    Attributes:
+        enabled: Master switch. Default: False.
+        provider: Optional provider override for the planner call only.
+            Defaults to the agent's own provider. Default: None.
+        model: Optional model override for the planner call only.
+            Defaults to the agent's own model. Default: None.
+        auto_approve: If True, plans execute immediately. If False, a
+            ``plan_approval_handler`` is required and is called with the
+            structured plan before execution. Default: True.
+        plan_approval_handler: Callable receiving ``List[PlanStep]`` and
+            returning ``True`` (approve), ``False`` (reject; the agent falls
+            back to standard execution), or an edited ``List[PlanStep]``.
+            Required when ``auto_approve=False``. Default: None.
+        reasoning: Include the generated plan as the result's ``reasoning``
+            text (and under ``trace.metadata["planning"]``). Default: True.
+        always: Skip the complexity gate and plan every input. Default: False.
+        min_complexity: Minimum heuristic complexity score required to
+            trigger planning. The score is a cheap local heuristic (sequence
+            connectives, lists, sentence count, length — no LLM call); see
+            ``agent/_planning.py``. Simple single-step inputs score 1, so the
+            default of 2 skips planning for them. Default: 2.
+    """
+
+    enabled: bool = False
+    provider: Optional["Provider"] = None
+    model: Optional[str] = None
+    auto_approve: bool = True
+    plan_approval_handler: Optional[PlanApprovalHandler] = None
+    reasoning: bool = True
+    always: bool = False
+    min_complexity: int = 2
+
+    def __post_init__(self) -> None:  # noqa: D105
+        if self.enabled and not self.auto_approve and self.plan_approval_handler is None:
+            raise ValueError(
+                "PlanningConfig(auto_approve=False) requires a plan_approval_handler. "
+                "It receives the structured plan (List[PlanStep]) and must return "
+                "True (approve), False (reject -> standard execution), or an edited "
+                "List[PlanStep]."
+            )
+        if self.min_complexity < 1:
+            raise ValueError("PlanningConfig.min_complexity must be >= 1")

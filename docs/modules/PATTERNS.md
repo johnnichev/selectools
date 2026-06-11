@@ -136,6 +136,68 @@ If a step raises an exception and `replanner=True`, the planner is re-called wit
 | `cancellation_token` | `CancellationToken` | `None` | Cooperative cancellation |
 | `max_cost_usd` | `float` | `None` | Cost budget (informational) |
 
+### Planning-as-config (beta)
+
+Any `Agent` can opt into the plan → (approve) → execute → synthesize flow
+without wiring `PlanAndExecuteAgent` manually — set
+`AgentConfig(planning=PlanningConfig(...))`:
+
+```python
+from selectools import Agent, AgentConfig, PlanningConfig
+
+config = AgentConfig(
+    planning=PlanningConfig(
+        enabled=True,
+        provider=None,      # planner provider override (defaults to the agent's)
+        model=None,         # planner model override (defaults to the agent's)
+        auto_approve=True,  # False requires plan_approval_handler
+        reasoning=True,     # surface the plan via result.reasoning
+    )
+)
+agent = Agent(tools, provider=provider, config=config)
+result = agent.run("Research X, then write a summary, and finally review it.")
+print(result.reasoning)                      # the generated plan
+print(result.trace.metadata["planning"])     # plan + steps_executed
+```
+
+Internally the agent clones itself into a planner and a single executor and
+delegates to `PlanAndExecuteAgent`, then runs one final synthesis call. The
+result is a normal `AgentResult` with usage aggregated across the planner,
+every step, and the synthesis call.
+
+**Complexity gate.** Simple single-step inputs skip planning entirely. A
+cheap local heuristic scores the prompt (sequence connectives like "then" /
+"finally", numbered or bulleted lists, 3+ sentences, semicolons, length over
+~120 estimated tokens); planning triggers when the score reaches
+`min_complexity` (default `2`). Set `always=True` to plan every input.
+
+**Plan approval.** With `auto_approve=False`, `plan_approval_handler` is
+required. It receives the structured plan (`List[PlanStep]`) and returns
+`True` (approve), `False` (reject — the agent falls back to a standard run
+with a one-time warning), or an edited `List[PlanStep]`.
+
+**Interplay.** Streaming runs (`astream()`, or `run()` with a
+`stream_handler`) skip planning with a one-time `UserWarning` per agent.
+Structured output works: `response_format` is applied to the final synthesis
+call. `enabled=False` (or leaving `planning` unset) is a zero-overhead no-op.
+
+**Known gap.** `result.trace` is the synthesis run's trace (the plan is
+attached under `trace.metadata["planning"]`); per-step traces are not merged
+because `PlanAndExecuteAgent` does not aggregate traces.
+
+| `PlanningConfig` field | Type | Default | Description |
+|------------------------|------|---------|-------------|
+| `enabled` | `bool` | `False` | Master switch |
+| `provider` | `Provider` | `None` | Planner-call provider override |
+| `model` | `str` | `None` | Planner-call model override |
+| `auto_approve` | `bool` | `True` | Execute plans without approval |
+| `plan_approval_handler` | `Callable` | `None` | Required when `auto_approve=False` |
+| `reasoning` | `bool` | `True` | Put the plan in `result.reasoning` |
+| `always` | `bool` | `False` | Bypass the complexity gate |
+| `min_complexity` | `int` | `2` | Heuristic score needed to trigger planning |
+
+See `examples/109_planning_as_config.py` for a fully offline demo.
+
 ---
 
 ## ReflectiveAgent
