@@ -174,8 +174,8 @@ def _public_names() -> list[str]:
 def test_export_resolves(name: str) -> None:
     """Every symbol in selectools.__all__ must resolve from the top level.
 
-    Seed for the upcoming CI marker gate: once every export carries a
-    stability marker, this test will also assert ``__stability__``.
+    The stability marker itself is asserted by the v1.0 marking gate below
+    (``test_every_public_symbol_has_stability_marker``).
     """
     import selectools
 
@@ -284,3 +284,137 @@ def test_all_models_have_required_fields() -> None:
     for model in ALL_MODELS:
         assert model.id, f"Model with empty id found (provider={model.provider})"
         assert model.provider, f"Model {model.id} has empty provider"
+
+
+# ---------------------------------------------------------------------------
+# 9. v1.0 stability marking gate
+# ---------------------------------------------------------------------------
+#
+# Every public symbol — top-level ``selectools.__all__`` plus every public
+# submodule's ``__all__`` — must carry a stability marker. Markers come from
+# one of two places (both resolved by ``selectools.stability.get_stability``):
+#
+# 1. A ``__stability__`` attribute set by ``@stable``/``@beta``/``@deprecated``
+#    on the symbol itself (inherited markers do NOT count: every public
+#    subclass must be marked explicitly).
+# 2. An entry in ``selectools.stability.STABILITY_REGISTRY`` for symbols that
+#    cannot carry the attribute: module-level constants, typing aliases, and
+#    ``@runtime_checkable`` Protocols (where a class attribute would become a
+#    structural member on Python 3.9-3.11 and break ``isinstance()``).
+#
+# The ONLY exclusion is module references re-exported through ``__all__``
+# (e.g. ``selectools.rag`` in the top-level ``__all__``): those declare their
+# own module-level ``__stability__``, asserted separately below. There is no
+# name-based exclusion list — a future unmarked public symbol fails this gate.
+
+VALID_STABILITY_LEVELS = {"stable", "beta", "deprecated"}
+
+PUBLIC_SUBMODULES = [
+    "a2a",
+    "agent",
+    "cache",
+    "embeddings",
+    "evals",
+    "exceptions",
+    "guardrails",
+    "knowledge_backends",
+    "mcp",
+    "models",
+    "observe",
+    "orchestration",
+    "patterns",
+    "pending",
+    "pricing",
+    "providers",
+    "rag",
+    "results",
+    "serve",
+    "sessions",
+    "toolbox",
+    "tools",
+    "types",
+    "unified_memory",
+]
+
+# Module-level stability promises (the ROADMAP v1.0 taxonomy): "stable" for
+# core modules whose public surface is majority-stable, "beta" for everything
+# still allowed to move in a minor release.
+EXPECTED_MODULE_STABILITY = {
+    "a2a": "beta",
+    "agent": "stable",
+    "cache": "stable",
+    "embeddings": "beta",
+    "evals": "beta",
+    "exceptions": "stable",
+    "guardrails": "stable",
+    "knowledge_backends": "beta",
+    "mcp": "beta",
+    "models": "stable",
+    "observe": "beta",
+    "orchestration": "beta",
+    "patterns": "beta",
+    "pending": "beta",
+    "pricing": "stable",
+    "providers": "stable",
+    "rag": "beta",
+    "results": "beta",
+    "serve": "beta",
+    "sessions": "stable",
+    "toolbox": "stable",
+    "tools": "stable",
+    "types": "stable",
+    "unified_memory": "beta",
+}
+
+
+def _all_public_symbols() -> "list[tuple[str, str]]":
+    cases: "list[tuple[str, str]]" = []
+    for mod_name in ["selectools"] + [f"selectools.{s}" for s in PUBLIC_SUBMODULES]:
+        mod = importlib.import_module(mod_name)
+        for name in mod.__all__:
+            cases.append((mod_name, name))
+    return cases
+
+
+@pytest.mark.parametrize(
+    "mod_name,symbol",
+    _all_public_symbols(),
+    ids=[f"{m}.{n}" for m, n in _all_public_symbols()],
+)
+def test_every_public_symbol_has_stability_marker(mod_name: str, symbol: str) -> None:
+    """v1.0 gate: every public symbol must carry a stability marker.
+
+    Fails on any future addition to any public ``__all__`` that is neither
+    decorated with ``@stable``/``@beta``/``@deprecated`` nor registered via
+    ``selectools.stability.register_stability``.
+    """
+    import inspect
+
+    from selectools.stability import get_stability
+
+    mod = importlib.import_module(mod_name)
+    obj = getattr(mod, symbol)
+    if inspect.ismodule(obj):
+        pytest.skip("module reference: covered by test_public_submodule_declares_module_stability")
+    level = get_stability(obj, symbol)
+    assert level in VALID_STABILITY_LEVELS, (
+        f"{mod_name}.{symbol} has no stability marker. Decorate it with "
+        f"@stable/@beta/@deprecated, or, if it cannot carry attributes "
+        f"(constant, typing alias, runtime-checkable Protocol), call "
+        f'register_stability("{symbol}", "<level>") at its definition site.'
+    )
+
+
+@pytest.mark.parametrize("submodule", PUBLIC_SUBMODULES)
+def test_public_submodule_declares_module_stability(submodule: str) -> None:
+    """Every public submodule must declare a module-level ``__stability__``."""
+    mod = importlib.import_module(f"selectools.{submodule}")
+    level = getattr(mod, "__stability__", None)
+    assert level in VALID_STABILITY_LEVELS, (
+        f"selectools.{submodule} must declare a module-level __stability__ (got {level!r})"
+    )
+    assert level == EXPECTED_MODULE_STABILITY[submodule], (
+        f"selectools.{submodule}.__stability__ is {level!r} but the v1.0 "
+        f"taxonomy expects {EXPECTED_MODULE_STABILITY[submodule]!r}; update "
+        f"EXPECTED_MODULE_STABILITY only with a deliberate stability decision."
+    )

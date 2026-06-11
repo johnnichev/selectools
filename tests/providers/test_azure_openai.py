@@ -262,9 +262,10 @@ class TestAzureOpenAIProviderTemplateMethods:
         assert provider.supports_async is True
 
     def test_stability_marker(self) -> None:
+        # Promoted @beta -> @stable in the v1.0 stability marking sweep.
         from selectools.providers.azure_openai_provider import AzureOpenAIProvider
 
-        assert getattr(AzureOpenAIProvider, "__stability__", None) == "beta"
+        assert getattr(AzureOpenAIProvider, "__stability__", None) == "stable"
 
 
 # ---------------------------------------------------------------------------
