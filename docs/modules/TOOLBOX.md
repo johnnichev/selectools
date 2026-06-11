@@ -1,11 +1,11 @@
 ---
-description: "33 pre-built tools for file I/O, web requests, data processing, datetime, text, code, search, GitHub, and databases"
+description: "48 pre-built tools for file I/O, web requests, data processing, datetime, text, code, search, GitHub, databases, calculator, email, PDF, Slack, Notion, and Linear"
 tags:
   - tools
   - built-in
 ---
 
-# Toolbox: 33 Pre-Built Tools
+# Toolbox: 48 Pre-Built Tools
 
 **Import:** `from selectools.toolbox import get_all_tools`
 
@@ -16,11 +16,12 @@ from selectools import Agent, AgentConfig, Message, Role
 from selectools.providers.stubs import LocalProvider
 from selectools.toolbox import get_all_tools, get_tools_by_category
 
-# Load all 33 pre-built tools across 9 categories
+# Load all 48 pre-built tools across 15 categories
 all_tools = get_all_tools()
 print(f"Loaded {len(all_tools)} tools")
 
-# Or load by category: file, web, data, datetime, text, code, search, github, db
+# Or load by category: file, web, data, datetime, text, code, search, github,
+# database, calculator, email, pdf, slack, notion, linear
 text_tools = get_tools_by_category("text")
 data_tools = get_tools_by_category("data")
 
@@ -43,9 +44,9 @@ print(result.content)
 
 ---
 
-**Added in:** v0.12.0 | **Expanded in:** v0.21.0
+**Added in:** v0.12.0 | **Expanded in:** v0.21.0, v0.23.0
 
-The toolbox provides **33 ready-to-use tools** across 9 categories that you can give to an agent immediately — no implementation needed.
+The toolbox provides **48 ready-to-use tools** across 15 categories that you can give to an agent immediately — no implementation needed.
 
 ---
 
@@ -56,7 +57,7 @@ from selectools import Agent, AgentConfig, OpenAIProvider
 from selectools.toolbox import get_all_tools
 
 agent = Agent(
-    tools=get_all_tools(),           # all 33 tools
+    tools=get_all_tools(),           # all 48 tools
     provider=OpenAIProvider(),
     config=AgentConfig(max_iterations=5),
 )
@@ -74,7 +75,7 @@ print(result.content)
 ```python
 from selectools.toolbox import get_all_tools
 
-tools = get_all_tools()  # List[Tool], 33 tools
+tools = get_all_tools()  # List[Tool], 48 tools
 ```
 
 ### By Category
@@ -90,7 +91,13 @@ text_tools   = get_tools_by_category("text")       # 7 tools
 code_tools   = get_tools_by_category("code")       # 2 tools  (v0.21.0)
 search_tools = get_tools_by_category("search")     # 2 tools  (v0.21.0)
 gh_tools     = get_tools_by_category("github")     # 3 tools  (v0.21.0)
-db_tools     = get_tools_by_category("db")         # 2 tools  (v0.21.0)
+db_tools     = get_tools_by_category("database")   # 2 tools  (v0.21.0)
+calc_tools   = get_tools_by_category("calculator") # 2 tools  (v0.23.0)
+email_tools  = get_tools_by_category("email")      # 2 tools  (v0.23.0)
+pdf_tools    = get_tools_by_category("pdf")        # 2 tools  (v0.23.0)
+slack_tools  = get_tools_by_category("slack")      # 3 tools  (v0.23.0)
+notion_tools = get_tools_by_category("notion")     # 3 tools  (v0.23.0)
+linear_tools = get_tools_by_category("linear")     # 3 tools  (v0.23.0)
 ```
 
 ### Individual Tools
@@ -105,6 +112,12 @@ from selectools.toolbox.code_tools import execute_python, execute_shell       # 
 from selectools.toolbox.search_tools import web_search, scrape_url            # v0.21.0
 from selectools.toolbox.github_tools import github_search_repos, github_get_file  # v0.21.0
 from selectools.toolbox.db_tools import query_sqlite, query_postgres          # v0.21.0
+from selectools.toolbox.calculator_tools import evaluate_expression, unit_convert  # v0.23.0
+from selectools.toolbox.email_tools import send_email, read_inbox             # v0.23.0
+from selectools.toolbox.pdf_tools import extract_pdf_text, extract_pdf_tables  # v0.23.0
+from selectools.toolbox.slack_tools import slack_send_message, slack_read_channel  # v0.23.0
+from selectools.toolbox.notion_tools import notion_create_page, notion_search  # v0.23.0
+from selectools.toolbox.linear_tools import linear_create_issue, linear_list_issues  # v0.23.0
 ```
 
 ---
@@ -336,6 +349,165 @@ agent.ask("Query the database at ./app.db: SELECT name, email FROM users LIMIT 5
 
 ---
 
+## Calculator Tools (2) — v0.23.0
+
+| Tool | Description | Parameters |
+|---|---|---|
+| `evaluate_expression` | Safely evaluate a math expression | `expression` |
+| `unit_convert` | Convert length/mass/temperature/data units | `value`, `from_unit`, `to_unit` |
+
+No dependencies — pure standard library.
+
+!!! info "Security"
+    `evaluate_expression` parses input with `ast` and walks the tree against an
+    explicit whitelist of nodes, operators, math functions, and constants. It never
+    calls `eval()`/`exec()`, rejects names, attribute access, subscripts, lambdas,
+    and comprehensions, and guards `**` operand sizes against memory/CPU bombs.
+
+Supported: `+ - * / // % **`, parentheses, `pi`/`e`/`tau`, and `abs`, `round`,
+`min`, `max`, `sqrt`, `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `log`, `log2`,
+`log10`, `exp`, `floor`, `ceil`, `degrees`, `radians`.
+
+```python
+agent = Agent(
+    tools=get_tools_by_category("calculator"),
+    provider=provider,
+    config=AgentConfig(max_iterations=3),
+)
+
+agent.ask("What is sqrt(2) * 10 ** 3?")
+agent.ask("Convert 26.2 miles to km and 98.6 F to C")
+```
+
+Units: length (mm, cm, m, km, in, ft, yd, mi), mass (mg, g, kg, t, oz, lb),
+temperature (c, f, k), data (b, kb, mb, gb, tb, kib, mib, gib, tib).
+
+---
+
+## Email Tools (2) — v0.23.0
+
+| Tool | Description | Parameters |
+|---|---|---|
+| `send_email` | Send mail via SMTP with STARTTLS (or SSL on port 465) | `to`, `subject`, `body`, `smtp_host`, `smtp_port`, `username`, `password`, `from_addr` |
+| `read_inbox` | Read latest messages via IMAP (read-only) | `limit=5`, `imap_host`, `imap_port`, `username`, `password`, `folder="INBOX"` |
+
+Standard library only (`smtplib`/`imaplib`). Connection settings fall back to
+environment variables: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`,
+`SMTP_FROM` and `IMAP_HOST`, `IMAP_PORT`, `IMAP_USERNAME`, `IMAP_PASSWORD`.
+
+!!! warning "Credentials"
+    Prefer env vars over passing passwords as tool parameters — parameters flow
+    through the LLM conversation. Passwords are never echoed in tool output or
+    error messages.
+
+```python
+agent = Agent(
+    tools=get_tools_by_category("email"),
+    provider=provider,
+    config=AgentConfig(max_iterations=3),
+)
+
+agent.ask("Email a status summary to team@example.com")
+agent.ask("Summarize my 5 most recent emails")
+```
+
+---
+
+## PDF Tools (2) — v0.23.0
+
+| Tool | Description | Parameters |
+|---|---|---|
+| `extract_pdf_text` | Extract text from a PDF | `path`, `pages=None` (e.g. `"1-3,5"`) |
+| `extract_pdf_tables` | Extract tables as pipe-delimited rows | `path`, `pages=None` |
+
+Requires `pdfplumber` (`pip install selectools[toolbox]`). The import is lazy —
+the toolbox loads fine without it.
+
+```python
+agent = Agent(
+    tools=get_tools_by_category("pdf"),
+    provider=provider,
+    config=AgentConfig(max_iterations=3),
+)
+
+agent.ask("Extract the tables from invoice.pdf pages 1-2 and total the amounts")
+```
+
+---
+
+## Slack Tools (3) — v0.23.0
+
+| Tool | Description | Parameters |
+|---|---|---|
+| `slack_send_message` | Send a message to a channel or DM | `channel`, `text`, `token=None` |
+| `slack_read_channel` | Read recent channel history | `channel`, `limit=10`, `token=None` |
+| `slack_search_messages` | Search messages across the workspace | `query`, `count=10`, `token=None` |
+
+Requires `slack-sdk` (`pip install selectools[toolbox]`). Token via the
+`SLACK_BOT_TOKEN` env var or the `token` parameter. `slack_search_messages`
+needs a *user* token (`xoxp-`) with the `search:read` scope — Slack does not
+allow bot tokens on the search API.
+
+```python
+agent = Agent(
+    tools=get_tools_by_category("slack"),
+    provider=provider,
+    config=AgentConfig(max_iterations=3),
+)
+
+agent.ask("Post 'deploy finished' to #releases")
+agent.ask("Summarize the last 20 messages in C0123456789")
+```
+
+---
+
+## Notion Tools (3) — v0.23.0
+
+| Tool | Description | Parameters |
+|---|---|---|
+| `notion_create_page` | Create a page under a parent page | `parent_page_id`, `title`, `content=""`, `api_key=None` |
+| `notion_search` | Search pages/databases shared with the integration | `query`, `max_results=5`, `api_key=None` |
+| `notion_update_page` | Rename and/or archive a page | `page_id`, `title=None`, `archived=None`, `api_key=None` |
+
+Uses the Notion REST API v1 via `requests` (`pip install selectools[toolbox]`).
+Token via the `NOTION_API_KEY` env var. The integration must be shared with the
+pages it operates on.
+
+```python
+agent = Agent(
+    tools=get_tools_by_category("notion"),
+    provider=provider,
+    config=AgentConfig(max_iterations=3),
+)
+
+agent.ask("Find my 'Roadmap' page and add a child page titled 'Q3 Plan'")
+```
+
+---
+
+## Linear Tools (3) — v0.23.0
+
+| Tool | Description | Parameters |
+|---|---|---|
+| `linear_create_issue` | Create an issue in a team | `team_id`, `title`, `description=""`, `api_key=None` |
+| `linear_list_issues` | List recent issues (optionally by team) | `team_id=None`, `limit=10`, `api_key=None` |
+| `linear_update_issue` | Update title/description/state | `issue_id`, `title=None`, `description=None`, `state_id=None`, `api_key=None` |
+
+Uses the Linear GraphQL API via `requests` (`pip install selectools[toolbox]`).
+Key via the `LINEAR_API_KEY` env var.
+
+```python
+agent = Agent(
+    tools=get_tools_by_category("linear"),
+    provider=provider,
+    config=AgentConfig(max_iterations=3),
+)
+
+agent.ask("List my open issues and create a follow-up issue for the flaky test")
+```
+
+---
+
 ## Combining with Custom Tools
 
 Toolbox tools are regular `Tool` objects — mix them freely with your own:
@@ -362,8 +534,8 @@ agent = Agent(
 
 | Function | Description |
 |---|---|
-| `get_all_tools()` | Returns all 33 tools as `List[Tool]` |
-| `get_tools_by_category(category)` | Returns tools for one category (`"file"`, `"web"`, `"data"`, `"datetime"`, `"text"`, `"code"`, `"search"`, `"github"`, `"db"`) |
+| `get_all_tools()` | Returns all 48 tools as `List[Tool]` |
+| `get_tools_by_category(category)` | Returns tools for one category (`"file"`, `"web"`, `"data"`, `"datetime"`, `"text"`, `"code"`, `"search"`, `"github"`, `"database"`, `"calculator"`, `"email"`, `"pdf"`, `"slack"`, `"notion"`, `"linear"`) |
 | `selectools.toolbox.file_tools` | Module with 5 file tools |
 | `selectools.toolbox.web_tools` | Module with 2 web tools |
 | `selectools.toolbox.data_tools` | Module with 6 data tools |
@@ -373,6 +545,12 @@ agent = Agent(
 | `selectools.toolbox.search_tools` | Module with 2 web search tools (v0.21.0) |
 | `selectools.toolbox.github_tools` | Module with 3 GitHub tools (v0.21.0) |
 | `selectools.toolbox.db_tools` | Module with 2 database tools (v0.21.0) |
+| `selectools.toolbox.calculator_tools` | Module with 2 calculator tools (v0.23.0) |
+| `selectools.toolbox.email_tools` | Module with 2 email tools (v0.23.0) |
+| `selectools.toolbox.pdf_tools` | Module with 2 PDF tools (v0.23.0) |
+| `selectools.toolbox.slack_tools` | Module with 3 Slack tools (v0.23.0) |
+| `selectools.toolbox.notion_tools` | Module with 3 Notion tools (v0.23.0) |
+| `selectools.toolbox.linear_tools` | Module with 3 Linear tools (v0.23.0) |
 
 ---
 
@@ -390,3 +568,4 @@ agent = Agent(
 |---|--------|-------------|
 | 03 | [`03_toolbox.py`](https://github.com/johnnichev/selectools/blob/main/examples/03_toolbox.py) | Working demo of all 33 pre-built tools across 9 categories |
 | 13 | [`13_dynamic_tools.py`](https://github.com/johnnichev/selectools/blob/main/examples/13_dynamic_tools.py) | Loading tools dynamically from files and directories |
+| 104 | [`104_toolbox_expansion.py`](https://github.com/johnnichev/selectools/blob/main/examples/104_toolbox_expansion.py) | Calculator, email, PDF, Slack, Notion, and Linear tools (v0.23.0) |

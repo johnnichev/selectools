@@ -57,6 +57,44 @@ class TestToolboxAPI:
         with pytest.raises(ValueError, match="Invalid category"):
             get_tools_by_category("invalid_category")
 
+    def test_expanded_categories_registered(self) -> None:
+        """v0.23 expansion: calculator/email/pdf/slack/notion/linear categories."""
+        expected = {
+            "calculator": 2,
+            "email": 2,
+            "pdf": 2,
+            "slack": 3,
+            "notion": 3,
+            "linear": 3,
+        }
+        for category, count in expected.items():
+            tools = get_tools_by_category(category)
+            assert len(tools) == count, f"category '{category}' expected {count} tools"
+            assert all(hasattr(t, "name") and hasattr(t, "function") for t in tools)
+
+    def test_expanded_tools_in_get_all_tools(self) -> None:
+        """All 15 expansion tools must be returned by get_all_tools()."""
+        names = {t.name for t in get_all_tools()}
+        expected = {
+            "evaluate_expression",
+            "unit_convert",
+            "send_email",
+            "read_inbox",
+            "extract_pdf_text",
+            "extract_pdf_tables",
+            "slack_send_message",
+            "slack_read_channel",
+            "slack_search_messages",
+            "notion_create_page",
+            "notion_search",
+            "notion_update_page",
+            "linear_create_issue",
+            "linear_list_issues",
+            "linear_update_issue",
+        }
+        missing = expected - names
+        assert not missing, f"Missing from get_all_tools(): {missing}"
+
 
 # =============================================================================
 # File Tools Tests
