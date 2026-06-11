@@ -582,10 +582,32 @@ EXPECTED_MODULE_STABILITY = {
 }
 
 
+# Sentinel symbol for modules that cannot import in this environment because
+# an OPTIONAL dependency is absent (CI's core matrix installs no extras).
+# The gate still emits one parametrized case for such a module so its
+# existence is visible in the test report; the case skips with the reason.
+_OPTIONAL_DEP_SENTINEL = "<optional-dependency-missing>"
+
+
+def _import_or_none(mod_name: str) -> "tuple[object | None, str | None]":
+    """Import a module, returning (module, None) or (None, missing-dep reason).
+
+    Only ImportError/ModuleNotFoundError are treated as "optional dependency
+    absent" — any other exception is a real bug and propagates.
+    """
+    try:
+        return importlib.import_module(mod_name), None
+    except ImportError as exc:  # pragma: no cover - depends on installed extras
+        return None, str(exc)
+
+
 def _all_public_symbols() -> "list[tuple[str, str]]":
     cases: "list[tuple[str, str]]" = []
     for mod_name in ["selectools"] + [f"selectools.{s}" for s in PUBLIC_SUBMODULES]:
-        mod = importlib.import_module(mod_name)
+        mod, missing = _import_or_none(mod_name)
+        if mod is None:
+            cases.append((mod_name, _OPTIONAL_DEP_SENTINEL))
+            continue
         for name in mod.__all__:
             # ``_``-prefixed names are private by convention even when listed
             # in an ``__all__`` for internal wiring (orchestration.state
@@ -612,7 +634,14 @@ def _walked_modules_with_all() -> "list[str]":
         short = info.name[len("selectools.") :]
         if any(part.startswith("_") for part in short.split(".")):
             continue
-        mod = importlib.import_module(info.name)
+        mod, _missing = _import_or_none(info.name)
+        if mod is None:
+            # Optional-dependency module not importable in this environment;
+            # if it is gated it will be exercised in environments that
+            # install the extras (and skipped-with-reason here).
+            if short in PUBLIC_SUBMODULES:
+                walked.append(short)
+            continue
         if hasattr(mod, "__all__"):
             walked.append(short)
     return sorted(walked)
@@ -664,8 +693,17 @@ def test_every_public_symbol_has_stability_marker(mod_name: str, symbol: str) ->
 
     from selectools.stability import get_stability
 
-    mod = importlib.import_module(mod_name)
-    obj = getattr(mod, symbol)
+    if symbol == _OPTIONAL_DEP_SENTINEL:
+        pytest.skip(f"{mod_name} requires an optional dependency not installed here")
+    mod, missing = _import_or_none(mod_name)
+    if mod is None:
+        pytest.skip(f"{mod_name} optional dependency missing: {missing}")
+    try:
+        obj = getattr(mod, symbol)
+    except ImportError as exc:
+        # Lazy __getattr__ exports (serve.AgentAPI, a2a.A2AServer) raise
+        # ImportError when their optional backend is absent.
+        pytest.skip(f"{mod_name}.{symbol} optional dependency missing: {exc}")
     if inspect.ismodule(obj):
         # A module re-exported through __all__ (selectools.rag, the toolbox
         # category modules, ...) must itself declare a module-level
@@ -690,7 +728,9 @@ def test_every_public_symbol_has_stability_marker(mod_name: str, symbol: str) ->
 @pytest.mark.parametrize("submodule", PUBLIC_SUBMODULES)
 def test_public_submodule_declares_module_stability(submodule: str) -> None:
     """Every public submodule must declare a module-level ``__stability__``."""
-    mod = importlib.import_module(f"selectools.{submodule}")
+    mod, missing = _import_or_none(f"selectools.{submodule}")
+    if mod is None:
+        pytest.skip(f"selectools.{submodule} optional dependency missing: {missing}")
     level = getattr(mod, "__stability__", None)
     assert level in VALID_STABILITY_LEVELS, (
         f"selectools.{submodule} must declare a module-level __stability__ (got {level!r})"
