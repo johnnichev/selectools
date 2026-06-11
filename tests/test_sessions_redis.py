@@ -473,3 +473,71 @@ class TestRedisKeyCollisionFix:
         sessions = store.list()
         ids = {s.session_id for s in sessions}
         assert ids == {"a:b", "c:d"}
+
+
+# ======================================================================
+# Cross-session search
+# ======================================================================
+
+
+def _search_memory(*contents: str) -> ConversationMemory:
+    """Build a memory alternating USER/ASSISTANT roles over *contents*."""
+    mem = ConversationMemory(max_messages=50)
+    for i, c in enumerate(contents):
+        role = Role.USER if i % 2 == 0 else Role.ASSISTANT
+        mem.add(Message(role=role, content=c))
+    return mem
+
+
+class TestRedisSessionStoreSearch:
+    def test_match_in_one_of_several_sessions(self) -> None:
+        store = _make_redis_store(FakeRedis())
+        store.save("s1", _search_memory("The weather is sunny", "Indeed it is"))
+        store.save("s2", _search_memory("I found a billing discrepancy", "Looking into it"))
+        store.save("s3", _search_memory("Tell me about dragons", "Dragons breathe fire"))
+
+        results = store.search("billing discrepancy")
+        assert len(results) == 1
+        assert results[0].session_id == "s2"
+        assert results[0].score > 0
+        assert any("billing" in m.lower() for m in results[0].matched_messages)
+
+    def test_namespace_filtering(self) -> None:
+        store = _make_redis_store(FakeRedis())
+        store.save("s1", _search_memory("quartz crystal"), namespace="agent-a")
+        store.save("s1", _search_memory("quartz pebble"), namespace="agent-b")
+        store.save("s2", _search_memory("quartz boulder"))
+
+        results = store.search("quartz", namespace="agent-a")
+        assert len(results) == 1
+        assert results[0].session_id == "s1"
+        assert store.load(results[0].session_id, namespace="agent-a") is not None
+
+    def test_no_match_returns_empty_list(self) -> None:
+        store = _make_redis_store(FakeRedis())
+        store.save("s1", _search_memory("hello world"))
+        assert store.search("xylophone") == []
+
+    def test_limit(self) -> None:
+        store = _make_redis_store(FakeRedis())
+        for i in range(6):
+            store.save(f"s{i}", _search_memory(f"quartz number {i}"))
+        assert len(store.search("quartz", limit=3)) == 3
+        assert len(store.search("quartz", limit=10)) == 6
+
+    def test_score_ordering_more_hits_ranks_higher(self) -> None:
+        store = _make_redis_store(FakeRedis())
+        store.save("one-hit", _search_memory("quartz here", "nothing", "nothing else"))
+        store.save("three-hits", _search_memory("quartz here", "quartz there", "quartz everywhere"))
+
+        results = store.search("quartz")
+        assert [r.session_id for r in results] == ["three-hits", "one-hit"]
+        assert results[0].score > results[1].score
+
+    def test_tool_messages_not_searched(self) -> None:
+        store = _make_redis_store(FakeRedis())
+        mem = ConversationMemory(max_messages=50)
+        mem.add(Message(role=Role.USER, content="run the tool"))
+        mem.add(Message(role=Role.TOOL, content="quartz in tool output", tool_name="t"))
+        store.save("s1", mem)
+        assert store.search("quartz") == []

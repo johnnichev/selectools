@@ -28,11 +28,11 @@ from typing import Any
 
 from .app import AgentRouter, BuilderServer, create_app
 
-__all__ = ["AgentAPI", "AgentRouter", "BuilderServer", "create_app"]
+__all__ = ["A2AServer", "AgentAPI", "AgentRouter", "BuilderServer", "create_app"]
 
 
 def __getattr__(name: str) -> Any:
-    """Lazily import AgentAPI so this package imports without starlette."""
+    """Lazily import Starlette-backed apps so this package imports without starlette."""
     if name == "AgentAPI":
         try:
             from .api import AgentAPI
@@ -42,4 +42,13 @@ def __getattr__(name: str) -> Any:
                 "Install it with: pip install selectools[serve]"
             ) from exc
         return AgentAPI
+    if name == "A2AServer":
+        try:
+            from ..a2a.server import A2AServer
+        except ImportError as exc:
+            raise ImportError(
+                "A2AServer requires the 'starlette' package. "
+                "Install it with: pip install selectools[serve]"
+            ) from exc
+        return A2AServer
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

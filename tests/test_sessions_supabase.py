@@ -55,7 +55,11 @@ class FakeQueryBuilder:
         return self
 
     def eq(self, col: str, val: Any) -> "FakeQueryBuilder":
-        self._filters.append((col, val))
+        self._filters.append(("eq", col, val))
+        return self
+
+    def ilike(self, col: str, pattern: str) -> "FakeQueryBuilder":
+        self._filters.append(("ilike", col, pattern))
         return self
 
     def limit(self, n: int) -> "FakeQueryBuilder":
@@ -71,6 +75,23 @@ class FakeQueryBuilder:
     def delete(self) -> "FakeQueryBuilder":
         self._op = "delete"
         return self
+
+    @staticmethod
+    def _ilike_match(row: Dict[str, Any], col: str, pattern: str) -> bool:
+        """Approximate PostgREST ILIKE for ``col`` or ``col->>path`` on `%term%` patterns."""
+        import json as _json
+
+        if "->>" in col:
+            base, _, path = col.partition("->>")
+            value: Any = row.get(base)
+            if isinstance(value, dict):
+                value = value.get(path)
+            if not isinstance(value, str):
+                value = _json.dumps(value, ensure_ascii=False)
+        else:
+            value = row.get(col)
+        needle = pattern.strip("%").lower()
+        return needle in str(value).lower()
 
     # terminal
 
@@ -96,9 +117,12 @@ class FakeQueryBuilder:
                 table_rows[key] = payload
             return FakeResponse(data=[table_rows[key]])
 
-        # Apply eq filters
-        for col, val in self._filters:
-            rows = [r for r in rows if r.get(col) == val]
+        # Apply filters
+        for op, col, val in self._filters:
+            if op == "eq":
+                rows = [r for r in rows if r.get(col) == val]
+            elif op == "ilike":
+                rows = [r for r in rows if self._ilike_match(r, col, val)]
 
         if self._op == "delete":
             deleted = rows[:]
@@ -531,3 +555,89 @@ class TestSupabaseSessionStoreTopLevelImport:
         assert hasattr(selectools, "SupabaseSessionStore")
         assert selectools.SupabaseSessionStore is SupabaseSessionStore
         assert "SupabaseSessionStore" in selectools.__all__
+
+
+# ======================================================================
+# Cross-session search
+# ======================================================================
+
+
+def _search_memory(*contents: str) -> ConversationMemory:
+    """Build a memory alternating USER/ASSISTANT roles over *contents*."""
+    mem = ConversationMemory(max_messages=50)
+    for i, c in enumerate(contents):
+        role = Role.USER if i % 2 == 0 else Role.ASSISTANT
+        mem.add(Message(role=role, content=c))
+    return mem
+
+
+class TestSupabaseSessionStoreSearch:
+    def test_match_in_one_of_several_sessions(self) -> None:
+        store = _make_store()
+        store.save("s1", _search_memory("The weather is sunny", "Indeed it is"))
+        store.save("s2", _search_memory("I found a billing discrepancy", "Looking into it"))
+        store.save("s3", _search_memory("Tell me about dragons", "Dragons breathe fire"))
+
+        results = store.search("billing discrepancy")
+        assert len(results) == 1
+        assert results[0].session_id == "s2"
+        assert results[0].score > 0
+        assert any("billing" in m.lower() for m in results[0].matched_messages)
+
+    def test_namespace_filtering(self) -> None:
+        store = _make_store()
+        store.save("s1", _search_memory("quartz crystal"), namespace="agent-a")
+        store.save("s1", _search_memory("quartz pebble"), namespace="agent-b")
+        store.save("s2", _search_memory("quartz boulder"))
+
+        results = store.search("quartz", namespace="agent-a")
+        assert len(results) == 1
+        assert results[0].session_id == "s1"
+        assert store.load(results[0].session_id, namespace="agent-a") is not None
+
+    def test_no_match_returns_empty_list(self) -> None:
+        store = _make_store()
+        store.save("s1", _search_memory("hello world"))
+        assert store.search("xylophone") == []
+
+    def test_limit(self) -> None:
+        store = _make_store()
+        for i in range(6):
+            store.save(f"s{i}", _search_memory(f"quartz number {i}"))
+        assert len(store.search("quartz", limit=3)) == 3
+        assert len(store.search("quartz", limit=10)) == 6
+
+    def test_score_ordering_more_hits_ranks_higher(self) -> None:
+        store = _make_store()
+        store.save("one-hit", _search_memory("quartz here", "nothing", "nothing else"))
+        store.save("three-hits", _search_memory("quartz here", "quartz there", "quartz everywhere"))
+
+        results = store.search("quartz")
+        assert [r.session_id for r in results] == ["three-hits", "one-hit"]
+        assert results[0].score > results[1].score
+
+    def test_tool_messages_not_searched(self) -> None:
+        store = _make_store()
+        mem = ConversationMemory(max_messages=50)
+        mem.add(Message(role=Role.USER, content="run the tool"))
+        mem.add(Message(role=Role.TOOL, content="quartz in tool output", tool_name="t"))
+        store.save("s1", mem)
+        assert store.search("quartz") == []
+
+    def test_search_term_with_quote_and_backslash(self) -> None:
+        """Terms with JSON-escaped characters must match the jsonb text projection.
+
+        In the ``memory_json->>messages`` projection, quotes and
+        backslashes appear escaped (``\\"`` and ``\\\\``), so a raw term
+        like ``C:\\Users`` never matches unless the ilike pattern is
+        JSON-escaped the same way.
+        """
+        store = _make_store()
+        store.save("s1", _search_memory(r"the file lives in C:\Users\john"))
+        store.save("s2", _search_memory('she said "quartz" loudly'))
+
+        results = store.search(r"C:\Users\john")
+        assert [r.session_id for r in results] == ["s1"]
+
+        results = store.search('"quartz"')
+        assert [r.session_id for r in results] == ["s2"]

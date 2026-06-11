@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import hmac
 import json
+import logging
 import threading
 import time
 import uuid
@@ -63,6 +64,8 @@ if TYPE_CHECKING:
     from ..agent.core import Agent
 
 __all__ = ["AgentAPI"]
+
+logger = logging.getLogger(__name__)
 
 
 # ─── In-memory session store (default backend) ───────────────────────────────
@@ -357,10 +360,22 @@ class AgentAPI:
 
         user_msg = Message(role=Role.USER, content=input_text)
         messages = memory.get_history() + [user_msg]
+        # Run on an isolated clone: Agent.run appends every caller's turn to
+        # the shared _history, cross-contaminating subsequent requests. The
+        # session history is passed in explicitly, so the clone (fresh
+        # history/usage, memory dropped) keeps behavior identical minus the
+        # leak. _clone_for_isolation is underscore-private today; promoting
+        # it to a public API is a follow-up.
+        runner = agent._clone_for_isolation()
         try:
-            result: AgentResult = await run_in_threadpool(agent.run, messages)
+            result: AgentResult = await run_in_threadpool(runner.run, messages)
         except Exception as exc:
-            return _error(str(exc), type(exc).__name__, 500)
+            # Only the exception type reaches the client — exception messages
+            # can contain internal URLs/paths. Full detail goes to the log.
+            logger.warning(
+                "Agent %r run failed: %s: %s", agent_name, type(exc).__name__, exc, exc_info=True
+            )
+            return _error(f"Agent execution failed ({type(exc).__name__})", type(exc).__name__, 500)
 
         output = result.content or ""
         self._persist_turn(
@@ -400,13 +415,15 @@ class AgentAPI:
 
         user_msg = Message(role=Role.USER, content=input_text)
         messages = memory.get_history() + [user_msg]
+        # Same per-request isolation as _chat: never run on the shared agent.
+        runner = agent._clone_for_isolation()
 
         async def _events() -> AsyncIterator[bytes]:
             chunks: List[str] = []
             final: Optional[AgentResult] = None
             try:
-                if getattr(agent.provider, "supports_async", True):
-                    async for item in agent.astream(messages):
+                if getattr(runner.provider, "supports_async", True):
+                    async for item in runner.astream(messages):
                         if isinstance(item, AgentResult):
                             final = item
                         elif isinstance(item, StreamChunk) and item.content:
@@ -415,15 +432,25 @@ class AgentAPI:
                             yield f"data: {json.dumps(payload)}\n\n".encode()
                 else:
                     # Sync-only provider: run in a thread and emit one chunk.
-                    final = await run_in_threadpool(agent.run, messages)
+                    final = await run_in_threadpool(runner.run, messages)
                     if final.content:
                         chunks.append(final.content)
                         payload = {"type": "chunk", "content": final.content}
                         yield f"data: {json.dumps(payload)}\n\n".encode()
             except Exception as exc:
+                logger.warning(
+                    "Agent %r stream failed: %s: %s",
+                    agent_name,
+                    type(exc).__name__,
+                    exc,
+                    exc_info=True,
+                )
                 err_payload = {
                     "type": "error",
-                    "error": {"message": str(exc), "type": type(exc).__name__},
+                    "error": {
+                        "message": f"Agent execution failed ({type(exc).__name__})",
+                        "type": type(exc).__name__,
+                    },
                 }
                 yield f"data: {json.dumps(err_payload)}\n\n".encode()
                 yield b"data: [DONE]\n\n"

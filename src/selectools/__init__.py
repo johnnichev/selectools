@@ -149,6 +149,7 @@ from .providers.anthropic_provider import AnthropicProvider
 from .providers.azure_openai_provider import AzureOpenAIProvider
 from .providers.fallback import FallbackProvider
 from .providers.gemini_provider import GeminiProvider
+from .providers.litellm_provider import LiteLLMProvider
 from .providers.ollama_provider import OllamaProvider
 from .providers.openai_provider import OpenAIProvider
 from .providers.stubs import LocalProvider
@@ -157,6 +158,7 @@ from .sessions import (
     JsonFileSessionStore,
     RedisSessionStore,
     SessionMetadata,
+    SessionSearchResult,
     SessionStore,
     SQLiteSessionStore,
     SupabaseSessionStore,
@@ -167,6 +169,16 @@ from .token_estimation import TokenEstimate, estimate_run_tokens, estimate_token
 from .tools import Tool, ToolParameter, ToolRegistry, tool
 from .trace import AgentTrace, StepType, TraceStep, trace_to_html, trace_to_json
 from .types import AgentResult, ContentPart, Message, Role, ToolCall, image_message, text_content
+from .unified_memory import (
+    DEFAULT_IMPORTANCE_RULES,
+    Episode,
+    EpisodicMemory,
+    ImportanceRule,
+    InMemoryKnowledgeStore,
+    RecallResult,
+    UnifiedMemory,
+    score_importance,
+)
 from .usage import AgentUsage, UsageStats
 
 __all__ = [
@@ -192,6 +204,7 @@ __all__ = [
     "AnthropicProvider",
     "GeminiProvider",
     "OllamaProvider",
+    "LiteLLMProvider",
     "LocalProvider",
     "FallbackProvider",
     "ToolRegistry",
@@ -300,6 +313,7 @@ __all__ = [
     # Sessions
     "SessionStore",
     "SessionMetadata",
+    "SessionSearchResult",
     "JsonFileSessionStore",
     "SQLiteSessionStore",
     "RedisSessionStore",
@@ -330,6 +344,15 @@ __all__ = [
     "InMemoryTripleStore",
     "SQLiteTripleStore",
     "KnowledgeGraphMemory",
+    # Unified Memory (tiered memory with auto-promotion)
+    "UnifiedMemory",
+    "EpisodicMemory",
+    "Episode",
+    "ImportanceRule",
+    "InMemoryKnowledgeStore",
+    "RecallResult",
+    "DEFAULT_IMPORTANCE_RULES",
+    "score_importance",
     # Submodules (for lazy loading)
     "embeddings",
     "observe",

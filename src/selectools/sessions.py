@@ -11,8 +11,9 @@ import json
 import os
 import threading
 import time
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Protocol
+import warnings
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Protocol, Tuple
 
 from .memory import ConversationMemory
 from .stability import beta, stable
@@ -46,6 +47,82 @@ class SessionMetadata:
     message_count: int
     created_at: float
     updated_at: float
+
+
+@beta
+@dataclass(frozen=True)
+class SessionSearchResult:
+    """One session matched by :meth:`SessionStore.search`.
+
+    Attributes:
+        session_id: Identifier of the matched session.  When ``search`` was
+            called with a ``namespace``, this is the bare session_id (so it
+            can be passed straight back to ``load(session_id, namespace=...)``).
+            When searching across all namespaces, it follows the same
+            convention as ``list()`` for the backend in use.
+        score: Relevance score.  Higher is more relevant.  Scores are only
+            comparable within a single result set — backends use different
+            scoring functions (FTS5 bm25 for SQLite, term frequency elsewhere).
+        matched_messages: Snippets (length-capped) of the user/assistant
+            messages that matched the query, most relevant first.
+    """
+
+    session_id: str
+    score: float
+    matched_messages: List[str] = field(default_factory=list)
+
+
+# -- shared search helpers -------------------------------------------------
+
+_SEARCHED_ROLES = ("user", "assistant")
+_SNIPPET_MAX_LEN = 160
+_MAX_SNIPPETS_PER_SESSION = 5
+# Explicit cap on each per-term candidate select in SupabaseSessionStore
+# .search().  PostgREST deployments may enforce a server-side ``max-rows``
+# that silently truncates unbounded selects; an explicit limit keeps the
+# behavior deterministic rather than server-config-dependent.
+_SUPABASE_SEARCH_CANDIDATE_LIMIT = 1000
+
+
+def _search_terms(query: str) -> List[str]:
+    """Split *query* into lowercase whitespace-delimited terms."""
+    return [t for t in query.lower().split() if t]
+
+
+def _make_snippet(content: str, terms: List[str], max_len: int = _SNIPPET_MAX_LEN) -> str:
+    """Return *content* trimmed to ``max_len`` chars, centered on the first match."""
+    if len(content) <= max_len:
+        return content
+    low = content.lower()
+    positions = [p for p in (low.find(t) for t in terms) if p != -1]
+    first = min(positions) if positions else 0
+    start = max(0, first - max_len // 4)
+    end = start + max_len - 6  # leave room for ellipses
+    prefix = "..." if start > 0 else ""
+    suffix = "..." if end < len(content) else ""
+    return f"{prefix}{content[start:end]}{suffix}"
+
+
+def _score_memory_dict(memory_data: Dict[str, Any], terms: List[str]) -> Tuple[float, List[str]]:
+    """Term-frequency score a serialized ``ConversationMemory`` dict.
+
+    Counts case-insensitive occurrences of each term in the ``content`` of
+    user and assistant messages.  Returns ``(score, snippets)`` where
+    *snippets* are the matched message contents, length-capped.
+    """
+    score = 0
+    snippets: List[str] = []
+    for msg in memory_data.get("messages", []):
+        if msg.get("role") not in _SEARCHED_ROLES:
+            continue
+        content = msg.get("content") or ""
+        low = content.lower()
+        hits = sum(low.count(t) for t in terms)
+        if hits:
+            score += hits
+            if len(snippets) < _MAX_SNIPPETS_PER_SESSION:
+                snippets.append(_make_snippet(content, terms))
+    return float(score), snippets
 
 
 @stable
@@ -98,6 +175,43 @@ class SessionStore(Protocol):
             ValueError: If *source_id* does not exist.
         """
         ...
+
+    @beta
+    def search(
+        self,
+        query: str,
+        namespace: Optional[str] = None,
+        limit: int = 5,
+    ) -> List[SessionSearchResult]:
+        """Search message content across stored sessions.
+
+        Matches *query* terms (case-insensitive) against the ``content`` of
+        user and assistant messages in every stored session.
+
+        Args:
+            query: Free-text query.  Split on whitespace; a session matches
+                if any term occurs in any user/assistant message.
+            namespace: Restrict the search to sessions saved under this
+                namespace.  ``None`` searches all sessions.
+            limit: Maximum number of sessions to return.
+
+        Returns:
+            Up to *limit* :class:`SessionSearchResult` ordered by descending
+            relevance score.
+
+        Note:
+            ``search`` is a ``@beta`` addition to the protocol.  Third-party
+            stores written before it existed do not implement it: explicit
+            subclasses of ``SessionStore`` inherit this default, which raises
+            ``NotImplementedError``; purely structural implementations raise
+            ``AttributeError``.  Feature-detect with
+            ``callable(getattr(store, "search", None))``.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement search(). "
+            "Cross-session search is a @beta protocol addition; "
+            "implement search() or upgrade the store."
+        )
 
 
 # ======================================================================
@@ -254,6 +368,49 @@ class JsonFileSessionStore:
             raise ValueError(f"Session {source_id!r} not found")
         self.save(new_id, memory)
 
+    @beta
+    def search(
+        self,
+        query: str,
+        namespace: Optional[str] = None,
+        limit: int = 5,
+    ) -> List[SessionSearchResult]:
+        """Linear scan over session files with term-frequency scoring.
+
+        Cost is O(total sessions): every ``.json`` file in the directory is
+        read and scored in-process.  Fine at this backend's intended scale.
+        Expired sessions are skipped (but not purged — search is read-only).
+        """
+        terms = _search_terms(query)
+        if not terms or limit <= 0:
+            return []
+        results: List[SessionSearchResult] = []
+        with self._lock:
+            for fname in os.listdir(self._directory):
+                if not fname.endswith(".json"):
+                    continue
+                path = os.path.join(self._directory, fname)
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                except (json.JSONDecodeError, OSError):
+                    continue
+                if self._is_expired(data):
+                    continue
+                if namespace is not None and data.get("namespace") != namespace:
+                    continue
+                score, snippets = _score_memory_dict(data.get("memory", {}), terms)
+                if score > 0:
+                    results.append(
+                        SessionSearchResult(
+                            session_id=data["session_id"],
+                            score=score,
+                            matched_messages=snippets,
+                        )
+                    )
+        results.sort(key=lambda r: (-r.score, r.session_id))
+        return results[:limit]
+
 
 # ======================================================================
 # SQLite backend
@@ -279,6 +436,7 @@ class SQLiteSessionStore:
     ) -> None:
         self._db_path = db_path
         self._default_ttl = default_ttl
+        self._fts_enabled = True
         self._init_db()
 
     def _init_db(self) -> None:
@@ -298,6 +456,38 @@ class SQLiteSessionStore:
                 )
                 """
             )
+            # Search index tables are purely additive: databases created
+            # before this feature gain them here without touching existing
+            # rows.  Pre-existing sessions are indexed lazily on first
+            # search (see _backfill_search_index).
+            try:
+                # Probe FTS5 availability directly before touching the real
+                # table: ``CREATE VIRTUAL TABLE IF NOT EXISTS`` short-circuits
+                # on table-name existence BEFORE resolving the module, so a
+                # database created on an FTS5 build and reopened on a build
+                # without FTS5 would otherwise "succeed" here and only fail
+                # later, inside save()/delete()/search().  The temp-schema
+                # probe has no persistent side effects.
+                conn.execute("CREATE VIRTUAL TABLE temp.__fts5_probe__ USING fts5(x)")
+                conn.execute("DROP TABLE temp.__fts5_probe__")
+                conn.execute(
+                    """
+                    CREATE VIRTUAL TABLE IF NOT EXISTS session_messages_fts
+                    USING fts5(content, session_key UNINDEXED)
+                    """
+                )
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS session_search_index (
+                        session_key TEXT PRIMARY KEY,
+                        indexed_at REAL NOT NULL
+                    )
+                    """
+                )
+            except sqlite3.OperationalError:
+                # SQLite build without FTS5 (rare): search degrades to a
+                # LIKE scan over the sessions table.
+                self._fts_enabled = False
             conn.commit()
         finally:
             conn.close()
@@ -312,6 +502,28 @@ class SQLiteSessionStore:
             return False
         return (time.time() - updated_at) > self._default_ttl
 
+    def _index_session(self, conn: Any, key: str, memory_data: Dict[str, Any]) -> None:
+        """(Re)build FTS rows for one session inside an open transaction."""
+        conn.execute("DELETE FROM session_messages_fts WHERE session_key = ?", (key,))
+        rows = [
+            (msg.get("content"), key)
+            for msg in memory_data.get("messages", [])
+            if msg.get("role") in _SEARCHED_ROLES and msg.get("content")
+        ]
+        if rows:
+            conn.executemany(
+                "INSERT INTO session_messages_fts (content, session_key) VALUES (?, ?)",
+                rows,
+            )
+        conn.execute(
+            """
+            INSERT INTO session_search_index (session_key, indexed_at)
+            VALUES (?, ?)
+            ON CONFLICT(session_key) DO UPDATE SET indexed_at = excluded.indexed_at
+            """,
+            (key, time.time()),
+        )
+
     # -- public API --------------------------------------------------------
 
     def save(
@@ -321,7 +533,8 @@ class SQLiteSessionStore:
         namespace: Optional[str] = None,
     ) -> None:
         now = time.time()
-        memory_json = json.dumps(memory.to_dict(), ensure_ascii=False)
+        memory_dict = memory.to_dict()
+        memory_json = json.dumps(memory_dict, ensure_ascii=False)
         msg_count = len(memory)
         key = _make_key(session_id, namespace)
         conn = self._conn()
@@ -342,6 +555,8 @@ class SQLiteSessionStore:
                 """,
                 (key, memory_json, msg_count, created_at, now),
             )
+            if self._fts_enabled:
+                self._index_session(conn, key, memory_dict)
             conn.commit()
         finally:
             conn.close()
@@ -391,6 +606,9 @@ class SQLiteSessionStore:
         conn = self._conn()
         try:
             cursor = conn.execute("DELETE FROM sessions WHERE session_id = ?", (key,))
+            if self._fts_enabled:
+                conn.execute("DELETE FROM session_messages_fts WHERE session_key = ?", (key,))
+                conn.execute("DELETE FROM session_search_index WHERE session_key = ?", (key,))
             conn.commit()
             return int(cursor.rowcount) > 0
         finally:
@@ -416,6 +634,170 @@ class SQLiteSessionStore:
         if memory is None:
             raise ValueError(f"Session {source_id!r} not found")
         self.save(new_id, memory)
+
+    @beta
+    def search(
+        self,
+        query: str,
+        namespace: Optional[str] = None,
+        limit: int = 5,
+    ) -> List[SessionSearchResult]:
+        """Full-text search over message content via an FTS5 index.
+
+        Each matching message contributes a bounded score: 1.0 for the hit
+        plus a bm25-derived tiebreak in [0, 1), so sessions with more
+        matching messages always rank higher and bm25 relevance only breaks
+        ties.  Sessions saved before this feature existed (or updated by
+        older library versions that do not maintain the index) are indexed
+        lazily on search — existing rows are never modified.
+
+        If the SQLite build lacks FTS5, degrades to an in-process scan with
+        term-frequency scoring (a ``RuntimeWarning`` is emitted).
+        """
+        terms = _search_terms(query)
+        if not terms or limit <= 0:
+            return []
+        if not self._fts_enabled:
+            warnings.warn(
+                "This SQLite build lacks FTS5; session search is degrading to a "
+                "LIKE scan over the sessions table.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            return self._search_scan(terms, namespace, limit)
+        conn = self._conn()
+        try:
+            self._backfill_search_index(conn)
+            return self._search_fts(conn, terms, namespace, limit)
+        finally:
+            conn.close()
+
+    def _backfill_search_index(self, conn: Any) -> None:
+        """Lazily (re)index sessions the FTS index does not cover.
+
+        Catches both rows that predate the index (no ``session_search_index``
+        entry) and rows rewritten by a search-unaware writer — e.g. an older
+        library version sharing the database — whose ``indexed_at`` lags the
+        session's ``updated_at``.
+        """
+        rows = conn.execute(
+            """
+            SELECT s.session_id, s.memory_json
+            FROM sessions s
+            LEFT JOIN session_search_index i ON i.session_key = s.session_id
+            WHERE i.session_key IS NULL OR i.indexed_at < s.updated_at
+            """
+        ).fetchall()
+        for key, memory_json in rows:
+            try:
+                memory_data = json.loads(memory_json)
+            except json.JSONDecodeError:
+                memory_data = {}
+            self._index_session(conn, key, memory_data)
+        if rows:
+            conn.commit()
+
+    def _valid_keys(self, conn: Any) -> Optional[set]:
+        """Return non-expired session keys, or ``None`` when TTL is off."""
+        if self._default_ttl is None:
+            return None
+        rows = conn.execute("SELECT session_id, updated_at FROM sessions").fetchall()
+        return {key for key, updated_at in rows if not self._is_expired_ts(updated_at)}
+
+    @staticmethod
+    def _strip_namespace(key: str, namespace: Optional[str]) -> Optional[str]:
+        """Return the result session_id for *key*, or ``None`` if filtered out.
+
+        With a namespace, only ``"{namespace}:..."`` keys match and the
+        prefix is stripped so the id can be passed back to ``load``.
+        """
+        if namespace is None:
+            return key
+        prefix = f"{namespace}:"
+        if not key.startswith(prefix):
+            return None
+        return key[len(prefix) :]
+
+    def _search_fts(
+        self, conn: Any, terms: List[str], namespace: Optional[str], limit: int
+    ) -> List[SessionSearchResult]:
+        match_expr = " OR ".join('"' + t.replace('"', '""') + '"' for t in terms)
+        rows = conn.execute(
+            """
+            SELECT session_key, content, bm25(session_messages_fts) AS rank
+            FROM session_messages_fts
+            WHERE session_messages_fts MATCH ?
+            ORDER BY rank
+            """,
+            (match_expr,),
+        ).fetchall()
+        valid_keys = self._valid_keys(conn)
+        scores: Dict[str, float] = {}
+        snippets: Dict[str, List[str]] = {}
+        sids: Dict[str, str] = {}
+        for key, content, rank in rows:
+            if valid_keys is not None and key not in valid_keys:
+                continue
+            sid = self._strip_namespace(key, namespace)
+            if sid is None:
+                continue
+            sids[key] = sid
+            # bm25() is lower-is-better (negative for matches).  Each
+            # matching message contributes 1.0 plus a bounded relevance
+            # tiebreak r/(1+r) where r = max(0, -rank), keeping the
+            # per-message contribution in [1, 2).  Hit count therefore
+            # strictly dominates and bm25 only breaks ties: an unbounded
+            # rank let a single rare-term hit (IDF-driven bm25 of 9+)
+            # outscore several common-term hits, inverting the documented
+            # "more matches ranks higher" invariant.
+            r = max(0.0, -rank)
+            scores[key] = scores.get(key, 0.0) + 1.0 + r / (1.0 + r)
+            bucket = snippets.setdefault(key, [])
+            if len(bucket) < _MAX_SNIPPETS_PER_SESSION:
+                bucket.append(_make_snippet(content, terms))
+        results = [
+            SessionSearchResult(session_id=sids[key], score=score, matched_messages=snippets[key])
+            for key, score in scores.items()
+        ]
+        results.sort(key=lambda r: (-r.score, r.session_id))
+        return results[:limit]
+
+    def _search_scan(
+        self, terms: List[str], namespace: Optional[str], limit: int
+    ) -> List[SessionSearchResult]:
+        """LIKE-prefiltered scan fallback for SQLite builds without FTS5."""
+        clauses = " OR ".join(["lower(memory_json) LIKE ? ESCAPE '\\'"] * len(terms))
+        params = [
+            "%" + t.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+            for t in terms
+        ]
+        conn = self._conn()
+        try:
+            rows = conn.execute(
+                # clauses is built from a repeated constant; terms are bound params
+                f"SELECT session_id, memory_json, updated_at FROM sessions WHERE {clauses}",  # nosec B608
+                params,
+            ).fetchall()
+        finally:
+            conn.close()
+        results: List[SessionSearchResult] = []
+        for key, memory_json, updated_at in rows:
+            if self._is_expired_ts(updated_at):
+                continue
+            sid = self._strip_namespace(key, namespace)
+            if sid is None:
+                continue
+            try:
+                memory_data = json.loads(memory_json)
+            except json.JSONDecodeError:
+                continue
+            score, matched = _score_memory_dict(memory_data, terms)
+            if score > 0:
+                results.append(
+                    SessionSearchResult(session_id=sid, score=score, matched_messages=matched)
+                )
+        results.sort(key=lambda r: (-r.score, r.session_id))
+        return results[:limit]
 
 
 # ======================================================================
@@ -583,6 +965,67 @@ class RedisSessionStore:
         if memory is None:
             raise ValueError(f"Session {source_id!r} not found")
         self.save(new_id, memory)
+
+    @beta
+    def search(
+        self,
+        query: str,
+        namespace: Optional[str] = None,
+        limit: int = 5,
+    ) -> List[SessionSearchResult]:
+        """Linear SCAN over the key prefix with in-process matching.
+
+        RediSearch is NOT assumed: every session under the prefix is
+        fetched (one ``GET`` per data key plus one for its metadata) and
+        scored in-process with term frequency.  Cost is O(total sessions)
+        in round-trips and transfers every payload — fine for hundreds of
+        sessions, not for very large fleets.
+        """
+        terms = _search_terms(query)
+        if not terms or limit <= 0:
+            return []
+        meta_prefix = f"{self._prefix}__meta__"
+        results: List[SessionSearchResult] = []
+        seen: set = set()
+        cursor: int = 0
+        while True:
+            cursor, keys = self._client.scan(cursor=cursor, match=f"{self._prefix}*", count=100)
+            for key in keys:
+                if key.startswith(meta_prefix) or key in seen:
+                    continue
+                seen.add(key)
+                composite = key[len(self._prefix) :]
+                sid, ns = self._resolve_identity(composite)
+                if namespace is not None:
+                    if ns != namespace:
+                        continue
+                raw = self._client.get(key)
+                if raw is None:
+                    continue
+                try:
+                    memory_data = json.loads(raw)
+                except (json.JSONDecodeError, TypeError):
+                    continue
+                score, snippets = _score_memory_dict(memory_data, terms)
+                if score > 0:
+                    results.append(
+                        SessionSearchResult(session_id=sid, score=score, matched_messages=snippets)
+                    )
+            if cursor == 0:
+                break
+        results.sort(key=lambda r: (-r.score, r.session_id))
+        return results[:limit]
+
+    def _resolve_identity(self, composite: str) -> "Tuple[str, Optional[str]]":
+        """Map a composite storage key to ``(session_id, namespace)`` via metadata."""
+        meta_raw = self._client.get(f"{self._prefix}__meta__{composite}")
+        if meta_raw:
+            try:
+                meta = json.loads(meta_raw)
+                return meta.get("session_id", composite), meta.get("namespace")
+            except (json.JSONDecodeError, TypeError, AttributeError):
+                pass
+        return composite, None
 
 
 # ======================================================================
@@ -775,10 +1218,76 @@ class SupabaseSessionStore:
             raise ValueError(f"Session {source_id!r} not found")
         self.save(new_id, memory)
 
+    @beta
+    def search(
+        self,
+        query: str,
+        namespace: Optional[str] = None,
+        limit: int = 5,
+    ) -> List[SessionSearchResult]:
+        """Server-prefiltered search via PostgREST ``ilike``.
+
+        The ``memory_json`` column is ``jsonb``, so the filter targets the
+        text projection of its ``messages`` array
+        (``memory_json->>messages``) with one ``ilike '%term%'`` request
+        per query term.  Because string contents appear JSON-escaped in
+        that projection (quotes as ``\\"``, backslashes as ``\\\\``), each
+        term is JSON-escaped the same way before building the pattern, so
+        terms like ``C:\\Users`` still match.  Matched rows are then scored
+        in-process with term frequency, which also discards false positives
+        from the coarse server-side filter (e.g. matches inside tool
+        messages or metadata).
+
+        Limits: one round-trip per term; full ``memory_json`` payloads of
+        every server-side match are transferred; no server-side ranking.
+        Each per-term candidate set is explicitly capped at
+        ``_SUPABASE_SEARCH_CANDIDATE_LIMIT`` (1000) rows — note that
+        PostgREST's server-side ``max-rows`` setting may otherwise truncate
+        result sets on large tables at a server-configured (and therefore
+        nondeterministic from the client's perspective) point.  For tables
+        where matches may exceed the cap, add a proper ``tsvector`` index
+        and a dedicated RPC instead.
+        """
+        terms = _search_terms(query)
+        if not terms or limit <= 0:
+            return []
+        rows_by_key: Dict[str, Dict[str, Any]] = {}
+        for term in terms:
+            # Match the JSON text projection: escape the term exactly as
+            # jsonb renders string contents (json.dumps minus the
+            # surrounding quotes).
+            escaped_term = json.dumps(term, ensure_ascii=False)[1:-1]
+            response = (
+                self._client.table(self._table)
+                .select("session_id,memory_json")
+                .ilike("memory_json->>messages", f"%{escaped_term}%")
+                .limit(_SUPABASE_SEARCH_CANDIDATE_LIMIT)
+                .execute()
+            )
+            for row in response.data or []:
+                rows_by_key[row["session_id"]] = row
+        results: List[SessionSearchResult] = []
+        for key, row in rows_by_key.items():
+            sid = key
+            if namespace is not None:
+                prefix = f"{namespace}:"
+                if not key.startswith(prefix):
+                    continue
+                sid = key[len(prefix) :]
+            memory_data = row.get("memory_json") or {}
+            score, snippets = _score_memory_dict(memory_data, terms)
+            if score > 0:
+                results.append(
+                    SessionSearchResult(session_id=sid, score=score, matched_messages=snippets)
+                )
+        results.sort(key=lambda r: (-r.score, r.session_id))
+        return results[:limit]
+
 
 __all__ = [
     "SessionStore",
     "SessionMetadata",
+    "SessionSearchResult",
     "JsonFileSessionStore",
     "SQLiteSessionStore",
     "RedisSessionStore",
