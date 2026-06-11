@@ -5,7 +5,7 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.24.0] - 2026-06-10 — Production Interop
 
 ### Added
 
@@ -48,7 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   excluded from `dataclasses.asdict()`); thread-pool tool execution
   paths gained per-submission `contextvars.copy_context()` so
   emission works from timeout and parallel executors.
-- **Deferred confirmation flow** (`@beta`, #73, closes #58) — new
+- **Deferred confirmation flow** (`@beta`, #80, closes #58) — new
   `selectools.pending` module for chat-channel destructive tools
   where the user's "yes" arrives as a separate webhook turn:
   `PendingAction` record (scoped to user/channel/conversation,
@@ -117,6 +117,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   silent-empty-loop signature of `gemini-2.5-flash-lite`'s known
   function-calling unreliability, now documented in
   `docs/COMPATIBILITY.md`.
+
+### Stats
+
+- 5,968 tests, 106 examples, 8 new feature modules (`serve/api`, `a2a/`,
+  `knowledge_backends`, `pending`, `results`, `unified_memory`,
+  `providers/litellm_provider`, `providers/router`) plus 6 new toolbox
+  modules.
 
 ## [0.23.0] - 2026-04-18 — Supabase Sessions + Builder RAG
 

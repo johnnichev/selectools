@@ -56,7 +56,7 @@ from starlette.routing import Route
 
 from .. import __version__
 from ..memory import ConversationMemory
-from ..sessions import SessionMetadata, SessionStore, _make_key
+from ..sessions import SessionMetadata, SessionSearchResult, SessionStore, _make_key
 from ..stability import beta
 from ..types import AgentResult, Message, Role, StreamChunk
 
@@ -132,6 +132,23 @@ class _InMemorySessionStore:
         key = _make_key(session_id, namespace)
         with self._lock:
             return key in self._data
+
+    def search(
+        self,
+        query: str,
+        namespace: Optional[str] = None,
+        limit: int = 5,
+    ) -> List[SessionSearchResult]:
+        """Search is not supported by the default in-memory store.
+
+        Pass a persistent ``SessionStore`` backend (SQLite, JSON file,
+        Redis, Supabase) to ``AgentAPI(session_store=...)`` for
+        cross-session search.
+        """
+        raise NotImplementedError(
+            "_InMemorySessionStore does not support search(); "
+            "use a persistent SessionStore backend (e.g. SQLiteSessionStore)."
+        )
 
     def branch(self, source_id: str, new_id: str) -> None:
         memory = self.load(source_id)

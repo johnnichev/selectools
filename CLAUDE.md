@@ -1,6 +1,6 @@
 # Selectools — Agent Instructions
 
-Production-ready Python library for AI agents with tool calling, RAG, and multi-agent orchestration. OpenAI, Anthropic, Gemini, Ollama. Python 3.9+, src-layout, pytest, MkDocs Material.
+Production-ready Python library for AI agents with tool calling, RAG, and multi-agent orchestration. OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama, LiteLLM (100+ models), RouterProvider. Python 3.9+, src-layout, pytest, MkDocs Material.
 
 - **Version**: `src/selectools/__init__.py`
 - **PyPI**: https://pypi.org/project/selectools/

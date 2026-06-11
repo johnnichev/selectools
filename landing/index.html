@@ -44,7 +44,7 @@
     "url": "https://selectools.dev/",
     "downloadUrl": "https://pypi.org/project/selectools/",
     "installUrl": "https://pypi.org/project/selectools/",
-    "softwareVersion": "0.23.0",
+    "softwareVersion": "0.24.0",
     "datePublished": "2026-04-01",
     "dateModified": "2026-04-07",
     "inLanguage": "en",
@@ -79,7 +79,7 @@
     },
     "featureList": [
       "Multi-provider LLM support (OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama, with FallbackProvider)",
-      "Tool calling with 33 pre-built tools across 9 categories",
+      "Tool calling with 48 pre-built tools across 15 categories",
       "Hybrid RAG search (BM25 + vector + reciprocal rank fusion + cross-encoder reranking)",
       "Multi-agent orchestration with AgentGraph (routing, parallel, checkpointing)",
       "50 built-in evaluators for agent testing (30 deterministic + 20 LLM-as-judge)",
@@ -87,7 +87,7 @@
       "Visual drag-and-drop agent builder with 8 node types and 7 templates",
       "Composable pipelines with @step decorator and @pipeline operator",
       "Token-level streaming with native tool call support",
-      "Compatibility matrix across Python 3.9 to 3.13 (95% coverage, 5332 tests)"
+      "Compatibility matrix across Python 3.9 to 3.13 (95% coverage, 5968 tests)"
     ],
     "keywords": "python, ai agent, llm, tool calling, rag, hybrid search, multi-agent, langchain alternative, openai, anthropic, gemini, ollama, agent framework, mcp, model context protocol"
   }
@@ -182,7 +182,7 @@
         "name": "What LLM providers does Selectools support?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Selectools supports 5 LLM providers: OpenAI (GPT-4, GPT-5, o-series), Azure OpenAI Service, Anthropic (Claude), Google Gemini, and Ollama (local models), plus a FallbackProvider for automatic failover with circuit breaker. It includes pricing data for 152 models across all providers."
+          "text": "Selectools supports 6 LLM providers: OpenAI (GPT-4, GPT-5, o-series), Azure OpenAI Service, Anthropic (Claude), Google Gemini, Ollama (local models), and LiteLLM (100+ models: DeepSeek, Groq, Bedrock, and more), plus a FallbackProvider for automatic failover with circuit breaker and a RouterProvider for cost-optimized model routing. It includes pricing data for 152 models across all providers."
         }
       },
       {
@@ -230,7 +230,7 @@
         "name": "Is Selectools production-ready?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Yes. 5,203 tests at 95% coverage, published security audit, SBOM (CycloneDX), formal deprecation policy, @stable/@beta markers on every public API, compatibility matrix for Python 3.9-3.13. Migration guides for 4 frameworks. Apache-2.0 licensed."
+          "text": "Yes. 5,968 tests at 95% coverage, published security audit, SBOM (CycloneDX), formal deprecation policy, @stable/@beta markers on every public API, compatibility matrix for Python 3.9-3.13. Migration guides for 4 frameworks. Apache-2.0 licensed."
         }
       },
       {
@@ -4191,7 +4191,7 @@
       font-size: 8px;
     }
 
-    /* Card 7: 5332 - animated counter */
+    /* Card 7: 5968 - animated counter */
     .stat-viz-counter {
       font-family: var(--font-mono);
       font-size: 38px;
@@ -4450,7 +4450,7 @@
 <div class="status-bar">
   <div class="status-items">
     <div class="status-item"><span class="status-val">152</span> models</div>
-    <div class="status-item"><span class="status-val">5332</span> tests</div>
+    <div class="status-item"><span class="status-val">5968</span> tests</div>
     <div class="status-item"><span class="status-val">95%</span> coverage</div>
     <div class="status-item"><span class="status-val">88</span> examples</div>
     <div class="status-item"><span class="status-val">50</span> evaluators</div>
@@ -5067,7 +5067,7 @@ result = agent.<span class="fn">run</span>(<span class="str">"Find our refund po
       <div class="ent-exhibit">
         <span class="ent-exhibit__label">tests passing</span>
         <div class="ent-counter">
-          <span class="ent-counter__num" data-target="5332">0</span>
+          <span class="ent-counter__num" data-target="5968">0</span>
         </div>
         <p class="ent-exhibit__caption">Unit, integration, and e2e. Green on every commit.</p>
       </div>
@@ -5437,11 +5437,11 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
         <div class="stat-card__compare">measured across 1000 runs</div>
       </div>
 
-      <!-- Card 7: 5332 - animated counter -->
+      <!-- Card 7: 5968 - animated counter -->
       <div class="stat-card stat-card--tests">
         <span class="stat-card__label"><span class="exec-dot" aria-hidden="true"></span> tests passing</span>
         <div class="stat-card__viz">
-          <div class="stat-viz-counter" data-counter-target="5332">0</div>
+          <div class="stat-viz-counter" data-counter-target="5968">0</div>
         </div>
         <div class="stat-card__metric" style="font-size:24px">95% coverage</div>
         <div class="stat-card__sub">unit, integration, e2e</div>
@@ -5639,7 +5639,7 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
         </div>
         <div class="path__body">
           <span class="path__label">Learn by example</span>
-          <h3 class="path__title">96 examples, all runnable.</h3>
+          <h3 class="path__title">106 examples, all runnable.</h3>
           <p class="path__desc">From hello-world to multi-agent debate. Browse, copy, run. Each one is self-contained with realistic mock data.</p>
           <span class="path__cta">Browse the gallery &rarr;</span>
         </div>
@@ -5711,7 +5711,7 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
               <span class="repl__q-cat">providers</span>
             </summary>
             <div class="repl__q-answer">
-              Five providers: OpenAI (GPT-4, GPT-5, o-series), Azure OpenAI Service, Anthropic (Claude), Google Gemini, and Ollama (local models), plus a FallbackProvider for automatic failover with circuit breaker. Includes pricing data for 152 models. For testing without any API key, use the built-in <code>LocalProvider</code>.
+              Six providers: OpenAI (GPT-4, GPT-5, o-series), Azure OpenAI Service, Anthropic (Claude), Google Gemini, Ollama (local models), and LiteLLM (100+ models), plus a FallbackProvider for automatic failover with circuit breaker and a RouterProvider for cost-optimized routing. Includes pricing data for 152 models. For testing without any API key, use the built-in <code>LocalProvider</code>.
             </div>
           </details>
 
@@ -5788,7 +5788,7 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
               <span class="repl__q-cat">concepts</span>
             </summary>
             <div class="repl__q-answer">
-              Yes. 5,203 tests at 95% coverage (including 40 real API evaluations), published security audit, SBOM (CycloneDX 1.6), formal deprecation policy, <code>@stable</code>/<code>@beta</code> markers on every public API, and a compatibility matrix covering Python 3.9 to 3.13. Migration guides for LangChain, CrewAI, AutoGen, and LlamaIndex. Apache-2.0 licensed.
+              Yes. 5,968 tests at 95% coverage (including 40 real API evaluations), published security audit, SBOM (CycloneDX 1.6), formal deprecation policy, <code>@stable</code>/<code>@beta</code> markers on every public API, and a compatibility matrix covering Python 3.9 to 3.13. Migration guides for LangChain, CrewAI, AutoGen, and LlamaIndex. Apache-2.0 licensed.
             </div>
           </details>
 

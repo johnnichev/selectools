@@ -1,6 +1,6 @@
 # Selectools
 
-> Selectools is a production-ready Python library for building AI agents with tool calling, RAG, and multi-agent orchestration. One pip install. No DSL. Supports OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama. v0.23.0, 5332 tests at 95% coverage, Apache-2.0.
+> Selectools is a production-ready Python library for building AI agents with tool calling, RAG, and multi-agent orchestration. One pip install. No DSL. Supports OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama, and 100+ models via LiteLLM. v0.24.0, 5968 tests at 95% coverage, Apache-2.0.
 
 Selectools uses a single `Agent` class with native tool calling. No chains, no expression language, no complex abstractions. It includes built-in features that other frameworks charge for or split into separate packages: 50 evaluators, hybrid RAG search (BM25 + vector), guardrails, audit logging, multi-agent orchestration, and a visual drag-drop builder. Free, local, MIT-compatible.
 
@@ -33,7 +33,7 @@ result = agent.run("Find our refund policy")
 
 - [Agent](https://selectools.dev/modules/AGENT/): Agent class, AgentConfig, AgentResult — the central orchestrator
 - [Tools](https://selectools.dev/modules/TOOLS/): @tool decorator, Tool class, ToolLoader, ToolRegistry
-- [Toolbox](https://selectools.dev/modules/TOOLBOX/): 33 pre-built tools (file I/O, HTTP/web, data parsing, datetime, text, code execution, search, GitHub, database)
+- [Toolbox](https://selectools.dev/modules/TOOLBOX/): 48 pre-built tools (file I/O, HTTP/web, data parsing, datetime, text, code execution, search, GitHub, database, calculator, email, PDF, Slack, Notion, Linear)
 - [Memory](https://selectools.dev/modules/MEMORY/): ConversationMemory with sliding window and summarize-on-trim
 - [Streaming](https://selectools.dev/modules/STREAMING/): Token-level astream() with tool call support
 
@@ -46,7 +46,7 @@ result = agent.run("Find our refund policy")
 
 ## Providers
 
-- [Providers](https://selectools.dev/modules/PROVIDERS/): OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama + FallbackProvider
+- [Providers](https://selectools.dev/modules/PROVIDERS/): OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama, LiteLLM (100+ models) + FallbackProvider + RouterProvider (cost-optimized routing)
 - [Models](https://selectools.dev/modules/MODELS/): 152 models with built-in pricing data
 
 ## Multi-Agent
@@ -86,6 +86,11 @@ result = agent.run("Find our refund policy")
 - [Loop Detection](https://selectools.dev/modules/LOOP_DETECTION/): LoopDetector flags repeat, stall, and ping-pong tool-call patterns (v0.22.0)
 - [Sessions](https://selectools.dev/modules/SESSIONS/): SessionStore protocol with 4 backends — JSON, SQLite, Redis, Supabase (v0.23.0)
 - [Visual Builder](https://selectools.dev/modules/builder/): Drag-drop AgentGraph builder with first-class Retriever (RAG) + Session Store nodes (v0.23.0)
+- [Agent-as-API](https://selectools.dev/modules/SERVE/): AgentAPI — production REST endpoints (chat, SSE streaming, session CRUD, bearer auth) from any agent (v0.24.0)
+- [A2A Protocol](https://selectools.dev/modules/A2A/): Agent Card discovery + JSON-RPC 2.0 agent-to-agent messaging (v0.24.0)
+- [Unified Memory](https://selectools.dev/modules/UNIFIED_MEMORY/): Tiered conversation/knowledge/entity/episodic memory with auto-promotion and compaction (v0.24.0)
+- [Knowledge Memory](https://selectools.dev/modules/KNOWLEDGE/): Cross-session knowledge with Supabase/Redis blob backends (v0.24.0)
+- [Sessions](https://selectools.dev/modules/SESSIONS/): Cross-session search() on all 4 backends (v0.24.0)
 - [Stability Markers](https://selectools.dev/modules/STABILITY/): @stable, @beta, @deprecated
 - [Changelog](https://selectools.dev/CHANGELOG/): Release history
-- [Examples Gallery](https://selectools.dev/examples/): 96 runnable scripts with categories
+- [Examples Gallery](https://selectools.dev/examples/): 106 runnable scripts with categories
