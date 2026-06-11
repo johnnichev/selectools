@@ -1,8 +1,8 @@
 {
   "components": [
     {
-      "bom-ref": "requirements-L2",
-      "description": "requirements line 2: anthropic==0.75.0",
+      "bom-ref": "requirements-L1",
+      "description": "requirements line 1: anthropic==0.75.0",
       "externalReferences": [
         {
           "comment": "implicit dist url",
@@ -16,8 +16,8 @@
       "version": "0.75.0"
     },
     {
-      "bom-ref": "requirements-L3",
-      "description": "requirements line 3: google-genai==1.47.0",
+      "bom-ref": "requirements-L2",
+      "description": "requirements line 2: google-genai==1.47.0",
       "externalReferences": [
         {
           "comment": "implicit dist url",
@@ -31,8 +31,8 @@
       "version": "1.47.0"
     },
     {
-      "bom-ref": "requirements-L4",
-      "description": "requirements line 4: numpy==2.0.2",
+      "bom-ref": "requirements-L3",
+      "description": "requirements line 3: numpy==2.0.2",
       "externalReferences": [
         {
           "comment": "implicit dist url",
@@ -46,8 +46,8 @@
       "version": "2.0.2"
     },
     {
-      "bom-ref": "requirements-L1",
-      "description": "requirements line 1: openai==1.109.1",
+      "bom-ref": "requirements-L4",
+      "description": "requirements line 4: openai==1.109.1",
       "externalReferences": [
         {
           "comment": "implicit dist url",
@@ -134,9 +134,9 @@
       ],
       "name": "selectools",
       "type": "application",
-      "version": "0.24.0"
+      "version": "0.25.0"
     },
-    "timestamp": "2026-06-11T16:32:44.088711+00:00",
+    "timestamp": "2026-06-11T21:05:39.349549+00:00",
     "tools": {
       "components": [
         {
@@ -235,12 +235,12 @@
           ],
           "name": "cyclonedx-python-lib",
           "type": "library",
-          "version": "11.7.0"
+          "version": "9.1.0"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:a1f54cbc-da48-4da5-9294-96dbd56a338e",
+  "serialNumber": "urn:uuid:3616efc9-4ef2-497b-84d5-759808859241",
   "version": 1,
   "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
   "bomFormat": "CycloneDX",

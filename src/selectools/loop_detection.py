@@ -50,6 +50,21 @@ class LoopDetectedError(SelectoolsError):
         self.details = details
         super().__init__(message)
 
+    def __reduce__(self) -> "tuple[Any, ...]":
+        # Keyword-only args defeat default exception pickling; rebuild via a
+        # partial-style tuple (same fix family as selectools.exceptions).
+        return (
+            _rebuild_loop_detected_error,
+            (self.args[0] if self.args else "", self.detector, self.details),
+        )
+
+
+def _rebuild_loop_detected_error(
+    message: str, detector: str, details: Dict[str, Any]
+) -> "LoopDetectedError":
+    """Unpickle helper for :class:`LoopDetectedError` (kw-only ctor)."""
+    return LoopDetectedError(message, detector=detector, details=details)
+
 
 @beta
 @dataclass

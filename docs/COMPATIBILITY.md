@@ -1,7 +1,7 @@
 # Compatibility Matrix
 
 **Added in:** v0.19.2
-**Updated:** v0.24.0
+**Updated:** v0.25.0
 
 This page documents the tested combinations of Python versions, provider SDKs, and optional
 dependencies. All combinations in the CI matrix are validated on every commit.

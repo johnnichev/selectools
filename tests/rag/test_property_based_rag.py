@@ -210,7 +210,12 @@ class TestVectorStoreFilterProperties:
             max_size=5,
         )
     )
-    @settings(max_examples=150)
+    # deadline=None: flaked twice in 48h (2026-06-09 and 2026-06-10 CI runs)
+    # and never reproduces in isolation — the per-example 200ms Hypothesis
+    # deadline trips under parallel xdist load, not a logic failure. Only
+    # the wall-clock deadline (a documented non-determinism source) is
+    # disabled; the property itself is unweakened.
+    @settings(max_examples=150, deadline=None)
     def test_full_metadata_filter_always_matches(self, metadata) -> None:
         """A filter equal to the full metadata must match the document."""
         from selectools.rag.stores.memory import InMemoryVectorStore
