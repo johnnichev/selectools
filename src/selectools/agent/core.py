@@ -19,6 +19,7 @@ from ..parser import ToolCallParser
 from ..prompt import PromptBuilder
 from ..providers.base import Provider, ProviderError
 from ..providers.openai_provider import OpenAIProvider
+from ..results import Artifact, _begin_artifact_collection
 from ..stability import stable
 from ..structured import (
     ResponseFormat,
@@ -63,6 +64,9 @@ class _RunContext:
     last_tool_args: Dict[str, Any] = field(default_factory=dict)
     reasoning_history: List[str] = field(default_factory=list)
     terminal_tool_result: Optional[str] = None
+    # Per-run artifact collector list (shared with the results contextvar so
+    # tools can append via emit_artifact() during execution).
+    artifacts: List[Artifact] = field(default_factory=list)
 
 
 @stable
@@ -427,6 +431,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             history_checkpoint=history_checkpoint,
             response_format=response_format,
             user_text_for_coherence=user_text_for_coherence,
+            artifacts=_begin_artifact_collection(),
         )
 
     def _finalize_run(
@@ -457,6 +462,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             trace=ctx.trace,
             provider_used=getattr(self.provider, "provider_used", None),
             usage=copy.deepcopy(self.usage),
+            artifacts=list(ctx.artifacts),
         )
         self._notify_observers("on_run_end", ctx.run_id, result)
         return result
@@ -557,6 +563,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             trace=ctx.trace,
             provider_used=getattr(self.provider, "provider_used", None),
             usage=copy.deepcopy(self.usage),
+            artifacts=list(ctx.artifacts),
         )
         self._notify_observers("on_run_end", ctx.run_id, result)
         return result
@@ -611,6 +618,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             trace=ctx.trace,
             provider_used=getattr(self.provider, "provider_used", None),
             usage=copy.deepcopy(self.usage),
+            artifacts=list(ctx.artifacts),
         )
         self._notify_observers("on_run_end", ctx.run_id, result)
         return result
@@ -637,6 +645,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             trace=ctx.trace,
             provider_used=getattr(self.provider, "provider_used", None),
             usage=copy.deepcopy(self.usage),
+            artifacts=list(ctx.artifacts),
         )
         self._notify_observers("on_run_end", ctx.run_id, result)
         return result

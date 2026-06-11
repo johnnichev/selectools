@@ -52,12 +52,13 @@ print(result.content)
 3. [Schema Generation](#schema-generation)
 4. [Parameter Validation](#parameter-validation)
 5. [Tool Execution](#tool-execution)
-6. [Decorator Pattern](#decorator-pattern)
-7. [Tool Registry](#tool-registry)
-8. [Streaming Tools](#streaming-tools)
-9. [Injected Parameters](#injected-parameters)
-10. [Type Hint Support](#type-hint-support)
-11. [Implementation Details](#implementation-details)
+6. [Typed Results and Artifacts](#typed-results-and-artifacts)
+7. [Decorator Pattern](#decorator-pattern)
+8. [Tool Registry](#tool-registry)
+9. [Streaming Tools](#streaming-tools)
+10. [Injected Parameters](#injected-parameters)
+11. [Type Hint Support](#type-hint-support)
+12. [Implementation Details](#implementation-details)
 
 ---
 
@@ -412,6 +413,103 @@ def __init__(self, name, description, parameters, function, ...):
     # ...
     self.is_async = inspect.iscoroutinefunction(function) or inspect.isasyncgenfunction(function)
 ```
+
+---
+
+## Typed Results and Artifacts
+
+> Both features are `@beta` (introduced for issue #59). APIs may change in a minor release.
+
+### ToolResult — typed returns the next LLM turn can reason over
+
+Instead of hand-rolling `{"kind": "ambiguous", ...}` dicts, subclass `ToolResult` and declare a
+`kind` discriminator as a `ClassVar`:
+
+```python
+from dataclasses import dataclass
+from typing import ClassVar
+
+from selectools import Ambiguous, NotFound, ToolResult, tool
+
+@dataclass(frozen=True)
+class RateLimited(ToolResult):
+    kind: ClassVar[str] = "rate_limited"
+    retry_after: int = 0
+
+@tool()
+def find_customer(query: str):
+    """Look up a customer by name."""
+    rows = db.search(query)
+    if not rows:
+        return NotFound(entity="customer", query=query)
+    if len(rows) > 1:
+        return Ambiguous(entity="customer", query=query, matches=[r.summary() for r in rows])
+    return rows[0].summary()
+```
+
+`Tool._serialize_result` turns the instance into the JSON the model sees, with `kind` first:
+
+```json
+{"kind": "not_found", "entity": "customer", "query": "acme"}
+```
+
+**Built-ins:** `Ambiguous(entity, query, matches)` and `NotFound(entity, query)`.
+
+**Epistemics — results are observations, not truth claims.** `not_found` means "this tool
+observed no match from this source at this time", NOT "the entity does not exist". Same for
+`ambiguous`. The base class is deliberately small; subclasses that need provenance should add
+their own `source` or evidence-reference field so downstream audit/review tooling has a stable
+boundary to consume.
+
+**Serializer note (the `ClassVar` footgun):** `ClassVar` annotations are excluded from
+`dataclasses.fields()` by design, so `dataclasses.asdict()` silently drops `kind`. The fix lives
+in the serializer, not the model — `_serialize_result` re-injects it explicitly for `ToolResult`
+instances:
+
+```python
+if isinstance(result, ToolResult):
+    return json.dumps({"kind": type(result).kind, **asdict(result)}, default=str)
+```
+
+### Artifacts — files delivered out-of-band from the reply text
+
+Tools that produce files (charts, PDFs, audio, CSV exports) should not stuff URLs into the
+reply string — small models reformat or omit them. Call `emit_artifact()` during execution
+instead; the agent collects per-run and surfaces everything on `AgentResult.artifacts`:
+
+```python
+from selectools import Agent, emit_artifact, tool
+
+@tool()
+def render_chart(title: str) -> str:
+    """Render a sales chart as PNG."""
+    url, digest, nbytes = chart_service.render(title)
+    emit_artifact(
+        url,
+        mime_type="image/png",
+        filename=f"{title}.png",
+        sha256=digest,
+        size=nbytes,
+        role="primary",
+    )
+    return "chart rendered"  # keep the reply LLM-friendly
+
+result = agent.run("Chart Q2 sales")
+for artifact in result.artifacts:
+    channel.send_media(artifact.url)  # Twilio <Media>, Slack upload, email attachment, ...
+```
+
+`Artifact` fields: `url`, `mime_type`, `filename`, `sha256`, `size`, `role`
+(e.g. `"primary"`, `"preview"`), `retention` (e.g. `"30d"`).
+
+**Why more than a URL?** URLs rot and signed links expire, and some consumers must never store
+the artifact body. `sha256` and `size` let them identify which artifact was produced anyway.
+
+**Concurrency:** the collector is a `ContextVar` set per run, so concurrent runs (asyncio tasks,
+`batch()` clones) stay isolated. Tool-execution sites that hop threads (timeout pool, parallel
+dispatch, sync-tools-from-async) copy the caller's context, so `emit_artifact()` works in every
+execution path. Outside an agent run, `emit_artifact()` is a safe no-op that still returns the
+`Artifact`.
 
 ---
 
@@ -1123,6 +1221,7 @@ def log_message(msg: str) -> str:
 | 13 | [`13_dynamic_tools.py`](https://github.com/johnnichev/selectools/blob/main/examples/13_dynamic_tools.py) | ToolLoader for dynamic loading and hot-reload |
 | 27 | [`27_tool_policy.py`](https://github.com/johnnichev/selectools/blob/main/examples/27_tool_policy.py) | Allow/review/deny rules with ToolPolicy |
 | 38 | [`38_terminal_tools.py`](https://github.com/johnnichev/selectools/blob/main/examples/38_terminal_tools.py) | Terminal tools that stop the agent loop |
+| 99 | [`99_tool_results_artifacts.py`](https://github.com/johnnichev/selectools/blob/main/examples/99_tool_results_artifacts.py) | Typed ToolResult returns + artifact side-channel |
 
 ---
 
