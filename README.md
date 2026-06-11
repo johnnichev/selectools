@@ -30,6 +30,33 @@ result = AgentGraph.chain(planner, writer, reviewer).run("Write a blog post")
 # selectools serve agent.yaml
 ```
 
+## What's New in v0.24
+
+### v0.24.0 — Production Interop
+
+Twelve features focused on running agents in production and connecting them to everything else: serve agents as REST APIs, talk to other agents over A2A, reach 100+ models through LiteLLM, route by cost, and persist memory anywhere.
+
+- **Agent-as-API** — `selectools.serve.AgentAPI` turns any Agent (or list of agents) into a production Starlette ASGI app: `POST /v1/chat`, SSE streaming, session CRUD, bearer auth, per-user session isolation. CLI: `selectools serve agent.yaml --api --port 8000`.
+- **A2A protocol** — `A2AServer` + `A2AClient` for agent-to-agent communication: Agent Card discovery (`/.well-known/agent.json`) and JSON-RPC 2.0 `message/send`/`tasks/get`/`tasks/cancel`.
+- **LiteLLMProvider** — instant access to 100+ models (DeepSeek, Groq, Bedrock, ...) via `pip install selectools[litellm]`.
+- **RouterProvider** — cost-optimized routing across model tiers with a deterministic complexity classifier and failure escalation.
+- **Anthropic prompt caching** — opt-in `cache_system=True` / `cache_tools=True` with cache hit-rate fields on `UsageStats`.
+- **UnifiedMemory** — tiered memory orchestrating conversation, knowledge, entity, and the new episodic tier, with token-aware compaction and federated `recall()`.
+- **Cross-session search** — `store.search(query)` on all four SessionStore backends (FTS5-accelerated on SQLite).
+- **KnowledgeBackend** — Supabase/Redis blob persistence for `KnowledgeMemory` on ephemeral infrastructure (Railway, Lambda, Cloud Run).
+- **ToolResult + Artifact** — typed tool results with a `kind` discriminator, plus an `emit_artifact()` side-channel surfaced on `AgentResult.artifacts`.
+- **Deferred confirmation flow** — `selectools.pending` for chat-channel destructive tools where the user's "yes" arrives as a separate webhook turn.
+- **Toolbox expansion** — 15 new tools (33 → 48): safe calculator, email, PDF extraction, Slack, Notion, Linear.
+- **Gemini schema sanitization** — bare `list` and `Dict[K, V]` tool parameters no longer 400 on the Gemini API; loud warnings for flash-lite's silent-empty-response failure mode.
+
+```python
+from selectools.serve import AgentAPI
+
+api = AgentAPI(agent, auth_key="secret")  # ASGI app: uvicorn main:api
+```
+
+See `CHANGELOG.md` for the full entry (5,968 tests, 106 examples).
+
 ## What's New in v0.23
 
 ### v0.23.0 — Supabase Sessions + Builder RAG
@@ -499,7 +526,15 @@ report.to_html("report.html")
 | **Audit Logging** | JSONL audit trail with privacy controls (redact, hash, omit) and daily rotation. |
 | **Tool Output Screening** | Prompt injection detection with 15 built-in patterns. Per-tool or global. |
 | **Coherence Checking** | LLM-based verification that tool calls match user intent — catches injection-driven tool misuse. |
-| **Persistent Sessions** | `SessionStore` with JSON file, SQLite, and Redis backends. Auto-save/load with TTL expiry. |
+| **Persistent Sessions** | `SessionStore` with JSON file, SQLite, Redis, and Supabase backends. Auto-save/load with TTL expiry, cross-session `search()`. |
+| **Agent-as-API** | `AgentAPI` serves any agent as a Starlette REST API — chat, SSE streaming, session CRUD, bearer auth, per-user session isolation. |
+| **A2A Protocol** | `A2AServer` + `A2AClient`: Agent Card discovery and JSON-RPC 2.0 messaging between agents. |
+| **LiteLLM Bridge** | `LiteLLMProvider` unlocks 100+ models (DeepSeek, Groq, Bedrock, ...) through one provider class. |
+| **Cost-Based Routing** | `RouterProvider` classifies request complexity and routes to model tiers with automatic failure escalation. |
+| **Unified Memory** | `UnifiedMemory` orchestrates conversation, knowledge, entity, and episodic tiers with token-aware compaction and federated `recall()`. |
+| **Typed Tool Results** | `ToolResult` base with `kind` discriminator; `emit_artifact()` side-channel surfaces files/URLs on `AgentResult.artifacts`. |
+| **Deferred Confirmation** | `selectools.pending` — confirm destructive chat-channel tools across webhook turns with TTL, scope, and args-digest matching. |
+| **Prompt Caching** | Anthropic `cache_system`/`cache_tools` markers with cache hit-rate fields on `UsageStats`. |
 | **Entity Memory** | LLM-based entity extraction with deduplication, LRU pruning, and system prompt injection. |
 | **Knowledge Graph** | Relationship triple extraction with in-memory and SQLite storage and keyword-based querying. |
 | **Cross-Session Knowledge** | Daily logs + persistent facts with auto-registered `remember` tool. |
@@ -514,7 +549,9 @@ report.to_html("report.html")
 
 ## What's Included
 
-- **5 LLM Providers**: OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama + FallbackProvider (auto-failover)
+- **6 LLM Providers**: OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama, LiteLLM (100+ models) + FallbackProvider (auto-failover) + RouterProvider (cost-based routing)
+- **Agent-as-API**: `AgentAPI` — production REST endpoints (chat, SSE streaming, sessions) from any agent
+- **A2A Protocol**: Agent Card discovery + JSON-RPC 2.0 agent-to-agent messaging
 - **Structured Output**: Pydantic / JSON Schema `response_format` with auto-retry
 - **Execution Traces**: `result.trace` with typed timeline of every agent step
 - **Reasoning Visibility**: `result.reasoning` explains *why* the agent chose a tool
@@ -527,9 +564,14 @@ report.to_html("report.html")
 - **Dynamic Tool Loading**: Plugin system with hot-reload support
 - **Response Caching**: InMemoryCache and RedisCache with stats tracking
 - **152 Model Registry**: Type-safe constants with pricing and metadata
-- **Pre-built Toolbox**: 24 tools for files, data, text, datetime, web
-- **Persistent Sessions**: 3 backends (JSON file, SQLite, Redis) with TTL
+- **Pre-built Toolbox**: 48 tools for files, data, text, datetime, web, code, search, GitHub, DB, calculator, email, PDF, Slack, Notion, Linear
+- **Persistent Sessions**: 4 backends (JSON file, SQLite, Redis, Supabase) with TTL and cross-session search
 - **Entity Memory**: LLM-based named entity extraction and tracking
+- **Unified Memory**: tiered conversation/knowledge/entity/episodic memory with token-aware compaction
+- **Knowledge Backends**: Supabase/Redis blob persistence for KnowledgeMemory on ephemeral infra
+- **Typed Tool Results**: `ToolResult` base class + `Artifact` side-channel via `emit_artifact()`
+- **Deferred Confirmation**: `selectools.pending` for chat-channel destructive-tool confirmation
+- **Anthropic Prompt Caching**: `cache_system`/`cache_tools` with hit-rate visibility on `UsageStats`
 - **Knowledge Graph**: Triple extraction with in-memory and SQLite storage
 - **Cross-Session Knowledge**: Daily logs + persistent memory with `remember` tool, pluggable stores (File, SQLite), importance scoring, TTL
 - **Token Budget & Cancellation**: `max_total_tokens`, `max_cost_usd` hard limits; `CancellationToken` for cooperative stopping
@@ -540,10 +582,10 @@ report.to_html("report.html")
 - **Conversation Branching**: `ConversationMemory.branch()` and `SessionStore.branch()` for A/B exploration and checkpointing
 - **Multi-Agent Orchestration**: `AgentGraph` with routing, parallel execution, HITL, checkpointing; `SupervisorAgent` with 4 strategies (plan_and_execute, round_robin, dynamic, magentic)
 - **Composable Pipelines**: `Pipeline` + `@step` + `|` operator + `parallel()` + `branch()` — chain agents, tools, and transforms
-- **96 Examples**: Multi-agent graphs, RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions (incl. Supabase), entity memory, knowledge graph, eval framework, advanced agent patterns, stability markers, HTML trace viewer, and more
+- **106 Examples**: Multi-agent graphs, RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions (incl. Supabase), entity memory, knowledge graph, eval framework, advanced agent patterns, stability markers, HTML trace viewer, agent-as-API, A2A, routing, unified memory, and more
 - **Built-in Eval Framework**: 50 evaluators (30 deterministic + 21 LLM-as-judge), A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing
 - **AgentObserver Protocol**: 45 lifecycle events with `run_id` correlation, `LoggingObserver`, `SimpleStepObserver`, OTel export
-- **5332 Tests**: Unit, integration, regression, and E2E with real API calls
+- **5968 Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 
@@ -889,6 +931,8 @@ See [docs/modules/STREAMING.md](https://github.com/johnnichev/selectools/blob/ma
 | **Anthropic** | Yes | Yes | Yes | Paid |
 | **Gemini** | Yes | Yes | Yes | Free tier |
 | **Ollama** | Yes | No | No | Free (local) |
+| **LiteLLM** | Yes | Yes | Yes | Varies (100+ models) |
+| **Router** | Yes | Yes | Yes | Varies (cost-routes tiers) |
 | **Fallback** | Yes | Yes | Yes | Varies (wraps others) |
 | **Local** | No | No | No | Free (testing) |
 
@@ -1167,7 +1211,7 @@ pytest tests/ -x -q          # All tests
 pytest tests/ -k "not e2e"   # Skip E2E (no API keys needed)
 ```
 
-5332 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, orchestration, pipelines, agent patterns, stability markers, trace viewer, and E2E integration with real API calls.
+5968 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, orchestration, pipelines, agent patterns, stability markers, trace viewer, serve API, A2A, routing, and E2E integration with real API calls.
 
 ## License
 

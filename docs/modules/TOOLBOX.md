@@ -566,6 +566,6 @@ agent = Agent(
 
 | # | Script | Description |
 |---|--------|-------------|
-| 03 | [`03_toolbox.py`](https://github.com/johnnichev/selectools/blob/main/examples/03_toolbox.py) | Working demo of all 33 pre-built tools across 9 categories |
+| 03 | [`03_toolbox.py`](https://github.com/johnnichev/selectools/blob/main/examples/03_toolbox.py) | Working demo of all 48 pre-built tools across 15 categories |
 | 13 | [`13_dynamic_tools.py`](https://github.com/johnnichev/selectools/blob/main/examples/13_dynamic_tools.py) | Loading tools dynamically from files and directories |
 | 104 | [`104_toolbox_expansion.py`](https://github.com/johnnichev/selectools/blob/main/examples/104_toolbox_expansion.py) | Calculator, email, PDF, Slack, Notion, and Linear tools (v0.23.0) |

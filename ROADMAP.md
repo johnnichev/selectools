@@ -90,6 +90,18 @@ SupabaseSessionStore → 4th SessionStore backend (JSON/SQLite/Redis/Supabase)
 → 8 post-ship code-gen fixes in builder (embedder class names, HybridSearcher params, etc.)
 → 96 runnable examples, 5332 tests total
 
+v0.24.0 ✅ Production Interop
+Agent-as-API (AgentAPI: REST + SSE + session CRUD + auth) → A2A protocol
+(Agent Card + JSON-RPC 2.0 server/client) → LiteLLMProvider (100+ models)
+→ RouterProvider (cost-optimized tier routing) → Anthropic prompt caching
+→ UnifiedMemory (conversation/knowledge/entity/episodic tiers)
+→ Cross-session search on all 4 SessionStore backends
+→ KnowledgeBackend (Supabase/Redis) → ToolResult base + Artifact side-channel
+→ Deferred confirmation flow (selectools.pending)
+→ Toolbox expansion: 15 new tools (33 → 48)
+→ Gemini schema sanitization + flash-lite compat
+→ 106 runnable examples, 5968 tests total
+
 v1.0.0 🟡 Stable Release
 API freeze → Stability markers on all modules → Deprecation policy
 → Security audit published → Compatibility matrix → 0.x→1.0 migration guide
@@ -483,7 +495,7 @@ agent = Agent(tools, provider=provider, config=AgentConfig(
 **Implementation:** New `agent/memory_tools.py` that wraps KnowledgeMemory as Tool objects. Inject into tool list during `_prepare_run()` when `agentic_memory=True`.
 **Effort:** Low (1-2 days). Wraps existing KnowledgeMemory.
 
-#### Agent-as-API (Production Serve)
+#### Agent-as-API (Production Serve) ✅ Shipped in v0.24.0 (#68)
 **Source:** Agno's `AgentOS` — one line generates production FastAPI app
 **Gap:** selectools serve/ has builder UI + playground, but no auto-generated production REST API. Users who want to deploy a selectools agent as an API must write their own FastAPI wrapper.
 **Spec:** Auto-generate production endpoints from any Agent:
@@ -508,7 +520,7 @@ Or via CLI: `selectools serve agent.yaml --api --port 8000`
 
 ### P1 — Ship Soon (High Impact, Medium Effort)
 
-#### LiteLLM Provider Wrapper
+#### LiteLLM Provider Wrapper ✅ Shipped in v0.24.0 (#74)
 **Source:** PraisonAI (24+ providers via litellm), Agno (40+ native providers)
 **Gap:** selectools has 5 native providers (OpenAI, Anthropic, Gemini, Ollama, Azure OpenAI). Enterprise users need DeepSeek, Mistral, Groq, Together, Cohere, Fireworks, Bedrock, and more.
 **Spec:** A `LiteLLMProvider` that delegates to the `litellm` library, instantly supporting 100+ models.
@@ -525,7 +537,7 @@ Must implement full Provider protocol: complete/acomplete/stream/astream, tool c
 **Effort:** Medium (2-3 days). litellm handles the hard provider-specific work.
 **Note:** Native providers remain for maximum control; LiteLLM is the "long tail" solution.
 
-#### Cost-Optimized Model Router
+#### Cost-Optimized Model Router ✅ Shipped in v0.24.0 (#75)
 **Source:** PraisonAI's "Model Router" / "RouterAgent"
 **Gap:** selectools has FallbackProvider for reliability (try primary → secondary on failure) and pricing.py with cost data for 152 models, but no cost-optimized routing. Users manually pick models.
 **Spec:** A `RouterProvider` that wraps multiple providers and routes based on task complexity + cost:
@@ -548,7 +560,7 @@ agent = Agent(tools, provider=router)
 **Implementation:** New `providers/router.py`. Complexity classifier can be rule-based (tool count, input length, keyword detection) or LLM-based. Builds on FallbackProvider architecture.
 **Effort:** Medium (3-5 days). Routing logic is the novel part.
 
-#### A2A Protocol (Agent-to-Agent Communication)
+#### A2A Protocol (Agent-to-Agent Communication) ✅ Shipped in v0.24.0 (#76)
 **Source:** PraisonAI, Google-backed emerging standard
 **Gap:** selectools has MCP for tool interop but no agent-to-agent communication protocol. Already in existing backlog for v0.22.0.
 **Spec:** Two HTTP endpoints on existing Starlette serve infrastructure:
@@ -572,7 +584,7 @@ result = await client.send_task("Research quantum computing trends")
 **Implementation:** New `a2a/` module with server.py + client.py. Server builds on serve/_starlette_app.py. Agent Card auto-generated from AgentConfig metadata.
 **Effort:** Medium (3-5 days). Two routes + JSON-RPC message handler.
 
-#### Expanded Toolbox (40 → 80+ tools)
+#### Expanded Toolbox (40 → 80+ tools) ✅ Partially shipped in v0.24.0 (#77: calculator, email, PDF, Slack, Notion, Linear — toolbox now 48 tools)
 **Source:** Agno has 131 built-in tools across 15 categories
 **Gap:** selectools has 40+ tools across 10 categories. Missing enterprise-critical categories: communication (Slack, Discord, Email), project management (Notion, Linear, Jira), cloud (AWS S3, GCS), media (image generation).
 **Priority additions (by user demand):**
@@ -607,7 +619,7 @@ config = AgentConfig(tool=ToolConfig(compress_results=True, compress_threshold=2
 **Implementation:** Add compression step in `_process_response()` after tool execution, before appending to messages. Use CompressConfig's existing compression logic.
 **Effort:** Low (1 day).
 
-#### Session History Search
+#### Session History Search ✅ Shipped in v0.24.0 (#79)
 **Source:** Agno's cross-session query capability
 **Gap:** selectools session stores support save/load by session_id but can't search across sessions. An agent can't "remember what we discussed last Tuesday."
 **Spec:** Add `search(query, user_id, limit)` method to SessionStore protocol. SQLiteSessionStore and RedisSessionStore implement full-text or embedding-based search.
@@ -619,7 +631,7 @@ results = store.search("billing discrepancy", user_id="user-123", limit=5)
 **Implementation:** Add FTS5 index to SQLiteSessionStore. Add `SEARCH` command to RedisSessionStore. Protocol change requires @beta marker.
 **Effort:** Medium (2-3 days).
 
-#### Memory Tiering with Auto-Promotion
+#### Memory Tiering with Auto-Promotion ✅ Shipped in v0.24.0 (#78, standalone `UnifiedMemory`; AgentConfig wiring deferred)
 **Source:** PraisonAI's 4-tier memory with importance scoring
 **Gap:** selectools has ConversationMemory, EntityMemory, KnowledgeMemory, KnowledgeGraphMemory as separate systems. They don't compose into a unified lifecycle with auto-promotion.
 **Spec:** A `UnifiedMemory` that orchestrates all four:

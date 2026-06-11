@@ -3,7 +3,7 @@ hide:
   - navigation
   - toc
 title: Selectools Documentation
-description: Selectools is a production-ready Python library for building AI agents with tool calling, RAG, multi-agent orchestration, 50 built-in evaluators, and a visual drag-drop builder. Free, open source, Apache-2.0. Supports OpenAI, Anthropic, Gemini, Ollama.
+description: Selectools is a production-ready Python library for building AI agents with tool calling, RAG, multi-agent orchestration, 50 built-in evaluators, and a visual drag-drop builder. Free, open source, Apache-2.0. Supports OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama, and 100+ models via LiteLLM.
 ---
 
 ```
@@ -74,7 +74,7 @@ pip install selectools
 
     ---
 
-    33 production-ready tools: web search, code execution, file ops, RAG, SQL, Python, more.
+    48 production-ready tools: web search, code execution, file ops, SQL, calculator, email, PDF, Slack, Notion, Linear, more.
 
     [:octicons-arrow-right-24: Toolbox](modules/TOOLBOX.md)
 
@@ -109,6 +109,38 @@ pip install selectools
     50 built-in evaluators (30 deterministic + 20 LLM-as-judge) with HTML reports and JUnit XML.
 
     [:octicons-arrow-right-24: Eval framework](modules/EVALS.md)
+
+-   :material-api:{ .lg .middle } **Agent-as-API**
+
+    ---
+
+    `AgentAPI` serves any agent as a production REST API: chat, SSE streaming, session CRUD, bearer auth.
+
+    [:octicons-arrow-right-24: Serve module](modules/SERVE.md)
+
+-   :material-lan-connect:{ .lg .middle } **A2A Protocol**
+
+    ---
+
+    Agent-to-agent communication: Agent Card discovery and JSON-RPC 2.0 task messaging.
+
+    [:octicons-arrow-right-24: A2A module](modules/A2A.md)
+
+-   :material-call-split:{ .lg .middle } **Providers & Routing**
+
+    ---
+
+    6 LLM providers (incl. 100+ models via LiteLLM), cost-optimized `RouterProvider`, auto-failover `FallbackProvider`, Anthropic prompt caching.
+
+    [:octicons-arrow-right-24: Providers](modules/PROVIDERS.md)
+
+-   :material-brain:{ .lg .middle } **Memory & Sessions**
+
+    ---
+
+    Tiered `UnifiedMemory`, 4 session backends with cross-session search, Supabase/Redis knowledge persistence.
+
+    [:octicons-arrow-right-24: Unified Memory](modules/UNIFIED_MEMORY.md)
 
 </div>
 
