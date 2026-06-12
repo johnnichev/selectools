@@ -27,9 +27,25 @@ PRICING: Dict[str, Dict[str, float]] = {
 }
 register_stability("PRICING", "stable")
 
+# Prompt-caching multipliers, applied to the model's prompt (input) rate.
+# Anthropic's published rates (https://platform.claude.com/docs/en/build-with-claude/prompt-caching):
+# - cache reads bill at 0.1x the base input price
+# - cache writes with the 5-minute TTL bill at 1.25x the base input price.
+#   selectools' cache_system/cache_tools emit {"type": "ephemeral"} markers,
+#   which default to the 5-minute TTL. (1-hour-TTL writes bill at 2x, but
+#   selectools never requests that TTL.)
+CACHE_READ_COST_MULTIPLIER = 0.1
+CACHE_WRITE_COST_MULTIPLIER = 1.25
+
 
 @stable
-def calculate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> float:
+def calculate_cost(
+    model: str,
+    prompt_tokens: int,
+    completion_tokens: int,
+    cache_read_input_tokens: int = 0,
+    cache_creation_input_tokens: int = 0,
+) -> float:
     """
     Calculate cost in USD for given token usage.
 
@@ -37,8 +53,16 @@ def calculate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> fl
 
     Args:
         model: Model name (e.g., "gpt-4o", "claude-3-5-sonnet-20241022").
-        prompt_tokens: Number of prompt/input tokens.
+        prompt_tokens: Number of prompt/input tokens billed at the full rate.
+            For Anthropic responses this is ``usage.input_tokens``, which
+            already excludes cached tokens.
         completion_tokens: Number of completion/output tokens.
+        cache_read_input_tokens: Tokens served from the provider prompt cache
+            (Anthropic prompt caching). Billed at 0.1x the prompt rate.
+        cache_creation_input_tokens: Tokens written to the provider prompt
+            cache (Anthropic prompt caching, 5-minute TTL — what selectools'
+            ``cache_system``/``cache_tools`` produce). Billed at 1.25x the
+            prompt rate.
 
     Returns:
         Estimated cost in USD. Returns 0.0 if model pricing is unknown or for local models.
@@ -46,6 +70,7 @@ def calculate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> fl
     Note:
         - Local models (not in pricing table) are assumed to be free ($0.00)
         - Logs a warning if the model is not found in the pricing table
+        - Cache token counts default to 0, so existing callers are unaffected
     """
     if model not in MODELS_BY_ID:
         logger.warning(
@@ -57,8 +82,16 @@ def calculate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> fl
     model_info = MODELS_BY_ID[model]
     prompt_cost = (prompt_tokens / 1_000_000) * model_info.prompt_cost
     completion_cost = (completion_tokens / 1_000_000) * model_info.completion_cost
+    cache_read_cost = (
+        (cache_read_input_tokens / 1_000_000) * model_info.prompt_cost * CACHE_READ_COST_MULTIPLIER
+    )
+    cache_write_cost = (
+        (cache_creation_input_tokens / 1_000_000)
+        * model_info.prompt_cost
+        * CACHE_WRITE_COST_MULTIPLIER
+    )
 
-    return prompt_cost + completion_cost
+    return prompt_cost + completion_cost + cache_read_cost + cache_write_cost
 
 
 @stable
