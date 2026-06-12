@@ -37,7 +37,7 @@ print(result.content)
 ```
 
 !!! tip "See Also"
-    - [Models](MODELS.md) - 152-model registry with pricing data
+    - [Models](MODELS.md) - 115-model registry with pricing data
     - [Usage](USAGE.md) - Automatic token counting and cost tracking
 
 ---

@@ -228,8 +228,8 @@ class OpenAI:
         type=ModelType.CHAT,
         prompt_cost=0.05,
         completion_cost=0.40,
-        max_tokens=8192,
-        context_window=128000,
+        max_tokens=128000,
+        context_window=400000,
     )
     # DEPRECATED: gpt-5.1-chat-latest shuts down 2026-07-23 (replacement: gpt-5.5).
     GPT_5_1_CHAT_LATEST = ModelInfo(

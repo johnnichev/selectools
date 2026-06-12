@@ -35,7 +35,7 @@ print(agent.get_usage_summary())
 ```
 
 !!! tip "See Also"
-    - [Models](MODELS.md) - 152-model registry with pricing data
+    - [Models](MODELS.md) - 115-model registry with pricing data
     - [Budget](BUDGET.md) - Token and cost budget limits
 
 ---
