@@ -220,8 +220,12 @@ class AnthropicProvider(Provider):
 
         content_text = _strip_reasoning_tags(content_text)
 
-        # Extract usage stats
+        # Extract usage stats. Cache tokens are billed separately from
+        # input_tokens (reads at 0.1x, 5-min-TTL writes at 1.25x the prompt
+        # rate), so they feed into calculate_cost as well.
         usage = response.usage
+        cache_creation_tokens = self._cache_usage_token(usage, "cache_creation_input_tokens")
+        cache_read_tokens = self._cache_usage_token(usage, "cache_read_input_tokens")
         usage_stats = UsageStats(
             prompt_tokens=usage.input_tokens if usage else 0,
             completion_tokens=usage.output_tokens if usage else 0,
@@ -230,13 +234,13 @@ class AnthropicProvider(Provider):
                 model_name,
                 usage.input_tokens if usage else 0,
                 usage.output_tokens if usage else 0,
+                cache_read_input_tokens=cache_read_tokens or 0,
+                cache_creation_input_tokens=cache_creation_tokens or 0,
             ),
             model=model_name,
             provider="anthropic",
-            cache_creation_input_tokens=self._cache_usage_token(
-                usage, "cache_creation_input_tokens"
-            ),
-            cache_read_input_tokens=self._cache_usage_token(usage, "cache_read_input_tokens"),
+            cache_creation_input_tokens=cache_creation_tokens,
+            cache_read_input_tokens=cache_read_tokens,
         )
 
         return (
@@ -592,8 +596,12 @@ class AnthropicProvider(Provider):
 
         content_text = _strip_reasoning_tags(content_text)
 
-        # Extract usage stats
+        # Extract usage stats. Cache tokens are billed separately from
+        # input_tokens (reads at 0.1x, 5-min-TTL writes at 1.25x the prompt
+        # rate), so they feed into calculate_cost as well.
         usage = response.usage
+        cache_creation_tokens = self._cache_usage_token(usage, "cache_creation_input_tokens")
+        cache_read_tokens = self._cache_usage_token(usage, "cache_read_input_tokens")
         usage_stats = UsageStats(
             prompt_tokens=usage.input_tokens if usage else 0,
             completion_tokens=usage.output_tokens if usage else 0,
@@ -602,13 +610,13 @@ class AnthropicProvider(Provider):
                 model_name,
                 usage.input_tokens if usage else 0,
                 usage.output_tokens if usage else 0,
+                cache_read_input_tokens=cache_read_tokens or 0,
+                cache_creation_input_tokens=cache_creation_tokens or 0,
             ),
             model=model_name,
             provider="anthropic",
-            cache_creation_input_tokens=self._cache_usage_token(
-                usage, "cache_creation_input_tokens"
-            ),
-            cache_read_input_tokens=self._cache_usage_token(usage, "cache_read_input_tokens"),
+            cache_creation_input_tokens=cache_creation_tokens,
+            cache_read_input_tokens=cache_read_tokens,
         )
 
         return (

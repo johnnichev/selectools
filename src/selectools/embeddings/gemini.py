@@ -18,6 +18,11 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
 
     Supports models: gemini-embedding-001, gemini-embedding-2
 
+    Requests do not set ``output_dimensionality``, so vectors come back at
+    each model's default dimensionality (3072 for gemini-embedding-001 and
+    gemini-embedding-2, which support MRL truncation but are not truncated
+    here). See ``_get_model_dimension`` for the full dimension/MRL story.
+
     Example:
         >>> from selectools.embeddings import GeminiEmbeddingProvider
         >>> from selectools.models import Gemini
@@ -66,12 +71,31 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
         self._dimension = self._get_model_dimension()
 
     def _get_model_dimension(self) -> int:
-        """Get the embedding dimension for the model."""
-        if "embedding-004" in self.model or "embedding-001" in self.model:
+        """Get the embedding dimension for the model.
+
+        The declared dimension must match what the API actually returns. This
+        provider never passes ``output_dimensionality`` in its requests (see
+        ``embed_text``/``embed_texts``/``embed_query``), so the API returns
+        each model's default, full-size vector:
+
+        - ``gemini-embedding-001`` and ``gemini-embedding-2``: 3072 by
+          default. Both are trained with Matryoshka Representation Learning
+          (MRL), so vectors *can* be truncated server-side (Google recommends
+          768, 1536, or 3072) by passing ``output_dimensionality`` — but this
+          provider does not request truncation, and existing vector store
+          indexes built with it hold 3072-dim vectors. Note that
+          ``gemini-embedding-001`` only normalizes the full 3072-dim output;
+          truncated outputs would need manual re-normalization.
+        - ``text-embedding-004`` (retired by Google): natively 768.
+
+        Source: https://ai.google.dev/gemini-api/docs/embeddings
+        """
+        if "embedding-004" in self.model:
             return 768
-        else:
-            logger.warning(f"Unknown Gemini embedding model '{self.model}', assuming dimension 768")
-            return 768
+        if "embedding-001" in self.model or "embedding-2" in self.model:
+            return 3072
+        logger.warning(f"Unknown Gemini embedding model '{self.model}', assuming dimension 3072")
+        return 3072
 
     def embed_text(self, text: str) -> List[float]:
         """

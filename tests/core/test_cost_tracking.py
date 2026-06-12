@@ -275,6 +275,103 @@ class TestPricing:
 
 
 # =============================================================================
+# Cache-Aware Cost Tests
+# =============================================================================
+
+
+class TestCacheAwareCost:
+    """Cache-aware calculate_cost (Anthropic prompt caching rates).
+
+    Anthropic's published rates relative to the base input price:
+    cache reads bill at 0.1x; cache writes (5-minute TTL, what selectools'
+    cache_system/cache_tools produce) bill at 1.25x.
+    Source: https://platform.claude.com/docs/en/build-with-claude/prompt-caching
+    """
+
+    def test_zero_cache_tokens_matches_legacy_two_term_formula(self) -> None:
+        """Defaults of 0 must reproduce the exact pre-cache-aware numbers."""
+        legacy = (2000 / 1_000_000) * 3.00 + (1000 / 1_000_000) * 15.00
+        assert calculate_cost(
+            Anthropic.SONNET_4_6.id, prompt_tokens=2000, completion_tokens=1000
+        ) == pytest.approx(legacy)
+        # Explicit zeros are identical to omitting the params
+        assert calculate_cost(
+            Anthropic.SONNET_4_6.id,
+            prompt_tokens=2000,
+            completion_tokens=1000,
+            cache_read_input_tokens=0,
+            cache_creation_input_tokens=0,
+        ) == pytest.approx(legacy)
+
+    def test_cache_read_discount(self) -> None:
+        """Cache reads bill at 0.1x the model's prompt rate."""
+        # Claude Sonnet 4.6: $3/1M prompt
+        cost = calculate_cost(
+            Anthropic.SONNET_4_6.id,
+            prompt_tokens=1000,
+            completion_tokens=0,
+            cache_read_input_tokens=100_000,
+        )
+        expected = (1000 / 1_000_000) * 3.00 + (100_000 / 1_000_000) * 3.00 * 0.1
+        assert cost == pytest.approx(expected)
+
+    def test_cache_write_premium(self) -> None:
+        """Cache writes (5-min TTL) bill at 1.25x the model's prompt rate."""
+        cost = calculate_cost(
+            Anthropic.SONNET_4_6.id,
+            prompt_tokens=1000,
+            completion_tokens=0,
+            cache_creation_input_tokens=100_000,
+        )
+        expected = (1000 / 1_000_000) * 3.00 + (100_000 / 1_000_000) * 3.00 * 1.25
+        assert cost == pytest.approx(expected)
+
+    def test_combined_read_write_and_output(self) -> None:
+        """All four token classes sum independently."""
+        cost = calculate_cost(
+            Anthropic.SONNET_4_6.id,
+            prompt_tokens=2000,
+            completion_tokens=1000,
+            cache_read_input_tokens=50_000,
+            cache_creation_input_tokens=10_000,
+        )
+        expected = (
+            (2000 / 1_000_000) * 3.00
+            + (1000 / 1_000_000) * 15.00
+            + (50_000 / 1_000_000) * 3.00 * 0.1
+            + (10_000 / 1_000_000) * 3.00 * 1.25
+        )
+        assert cost == pytest.approx(expected)
+
+    def test_unknown_model_still_returns_zero_with_cache_tokens(self) -> None:
+        """Unknown-model behavior is unchanged by the new params."""
+        cost = calculate_cost(
+            "unknown-model-xyz",
+            prompt_tokens=1000,
+            completion_tokens=500,
+            cache_read_input_tokens=10_000,
+            cache_creation_input_tokens=10_000,
+        )
+        assert cost == 0.0
+
+    def test_multiplier_constants_match_published_rates(self) -> None:
+        """Pin the published Anthropic multipliers (0.1x read, 1.25x 5-min write)."""
+        from selectools.pricing import (
+            CACHE_READ_COST_MULTIPLIER,
+            CACHE_WRITE_COST_MULTIPLIER,
+        )
+
+        assert CACHE_READ_COST_MULTIPLIER == 0.1
+        assert CACHE_WRITE_COST_MULTIPLIER == 1.25
+
+    def test_positional_signature_unchanged(self) -> None:
+        """@stable contract: the original 3-arg positional call still works."""
+        cost = calculate_cost(Anthropic.SONNET_4_6.id, 2000, 1000)
+        expected = (2000 / 1_000_000) * 3.00 + (1000 / 1_000_000) * 15.00
+        assert cost == pytest.approx(expected)
+
+
+# =============================================================================
 # Agent Integration Tests
 # =============================================================================
 

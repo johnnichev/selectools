@@ -321,6 +321,83 @@ class TestCacheUsageStats:
 
 
 # ---------------------------------------------------------------------------
+# Cache-aware cost wiring (cache tokens -> calculate_cost -> cost_usd)
+# ---------------------------------------------------------------------------
+
+
+class TestCacheAwareCostWiring:
+    """Cache token counts from the response usage must flow into cost_usd.
+
+    Rates: cache reads at 0.1x and 5-min-TTL cache writes at 1.25x the
+    model's prompt rate (Anthropic prompt-caching pricing).
+    """
+
+    MODEL = "claude-sonnet-4-5"  # $3/1M prompt, $15/1M completion
+
+    @staticmethod
+    def _expected_cost(prompt: int, completion: int, cache_read: int, cache_creation: int) -> float:
+        return (
+            (prompt / 1_000_000) * 3.00
+            + (completion / 1_000_000) * 15.00
+            + (cache_read / 1_000_000) * 3.00 * 0.1
+            + (cache_creation / 1_000_000) * 3.00 * 1.25
+        )
+
+    def test_complete_passes_cache_tokens_to_calculate_cost(self) -> None:
+        provider = _get_provider(cache_system=True)
+        provider._client.messages.create.return_value = _make_response(
+            cache_creation_input_tokens=1234,
+            cache_read_input_tokens=5678,
+        )
+        with patch(
+            "selectools.providers.anthropic_provider.calculate_cost", return_value=0.0
+        ) as mock_cost:
+            provider.complete(model=self.MODEL, system_prompt="sys", messages=_messages())
+        mock_cost.assert_called_once_with(
+            self.MODEL,
+            10,
+            5,
+            cache_read_input_tokens=5678,
+            cache_creation_input_tokens=1234,
+        )
+
+    def test_complete_cost_usd_is_cache_accurate(self) -> None:
+        """End-to-end: mocked response with cache tokens -> expected cost."""
+        provider = _get_provider(cache_system=True)
+        provider._client.messages.create.return_value = _make_response(
+            cache_creation_input_tokens=100_000,
+            cache_read_input_tokens=400_000,
+        )
+        _, usage = provider.complete(model=self.MODEL, system_prompt="sys", messages=_messages())
+        assert usage.cost_usd == pytest.approx(
+            self._expected_cost(10, 5, cache_read=400_000, cache_creation=100_000)
+        )
+
+    @pytest.mark.asyncio
+    async def test_acomplete_cost_usd_is_cache_accurate(self) -> None:
+        provider = _get_provider(cache_system=True)
+        provider._async_client.messages.create = AsyncMock(
+            return_value=_make_response(
+                cache_creation_input_tokens=100_000,
+                cache_read_input_tokens=400_000,
+            )
+        )
+        _, usage = await provider.acomplete(
+            model=self.MODEL, system_prompt="sys", messages=_messages()
+        )
+        assert usage.cost_usd == pytest.approx(
+            self._expected_cost(10, 5, cache_read=400_000, cache_creation=100_000)
+        )
+
+    def test_complete_no_cache_tokens_cost_unchanged(self) -> None:
+        """Responses without cache usage keep the legacy two-term cost."""
+        provider = _get_provider()
+        provider._client.messages.create.return_value = _make_response()
+        _, usage = provider.complete(model=self.MODEL, system_prompt="sys", messages=_messages())
+        assert usage.cost_usd == pytest.approx(self._expected_cost(10, 5, 0, 0))
+
+
+# ---------------------------------------------------------------------------
 # Combined flags
 # ---------------------------------------------------------------------------
 
