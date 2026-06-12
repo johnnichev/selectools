@@ -37,13 +37,17 @@ def bench(name, fn, iterations=200):
 def print_comparison(task, selectools_result, langgraph_result):
     s = selectools_result
     lg = langgraph_result
-    speedup = lg["mean"] / s["mean"] if s["mean"] > 0 else float("inf")
     print(f"\n  {task}")
     print(f"    selectools:  mean={s['mean']:6.2f}ms  p50={s['p50']:6.2f}ms  p95={s['p95']:6.2f}ms")
     print(
         f"    LangGraph:   mean={lg['mean']:6.2f}ms  p50={lg['p50']:6.2f}ms  p95={lg['p95']:6.2f}ms"
     )
-    print(f"    selectools is {speedup:.1f}x faster")
+    delta = s["mean"] - lg["mean"]
+    if delta <= 0:
+        print(f"    selectools is {abs(delta):.2f}ms faster per run (mean)")
+    else:
+        print(f"    selectools is {delta:.2f}ms slower per run (mean)")
+    return delta
 
 
 def main():
@@ -51,6 +55,8 @@ def main():
     print("Comparative Benchmarks: selectools vs LangGraph")
     print("=" * 70)
     print("(200 iterations each, mock providers, zero LLM latency)\n")
+
+    deltas = []
 
     # Check if langgraph is available
     try:
@@ -112,7 +118,7 @@ def main():
         lg_app = g.compile()
 
         lg_result = bench("langgraph 3-node", lambda: lg_app.invoke({"text": "test"}))
-        print_comparison("3-node linear pipeline", st_result, lg_result)
+        deltas.append(print_comparison("3-node linear pipeline", st_result, lg_result))
     else:
         print(f"\n  3-node linear pipeline")
         print(f"    selectools:  mean={st_result['mean']:6.2f}ms  p50={st_result['p50']:6.2f}ms")
@@ -175,7 +181,7 @@ def main():
         lg_cond_result = bench(
             "langgraph conditional", lambda: lg_cond_app.invoke({"text": "test"})
         )
-        print_comparison("Conditional routing", st_cond_result, lg_cond_result)
+        deltas.append(print_comparison("Conditional routing", st_cond_result, lg_cond_result))
     else:
         print(f"\n  Conditional routing")
         print(
@@ -215,10 +221,15 @@ def main():
     print("Summary")
     print(f"{'=' * 70}")
     print(f"  selectools framework overhead is negligible (<1ms for most operations).")
-    if has_langgraph:
-        print(
-            f"  LangGraph overhead is higher due to compile(), state validation, and Pregel runtime."
-        )
+    if has_langgraph and deltas:
+        worst = max(deltas)
+        if worst <= 0:
+            print(f"  selectools matched or beat LangGraph on every compared task.")
+        else:
+            print(
+                f"  LangGraph's graph runtime is up to {worst:.2f}ms/run faster on these"
+                f" micro-tasks; both are sub-millisecond."
+            )
     print(f"  Both are fast enough that LLM latency (100-2000ms) dominates real workloads.")
 
 
