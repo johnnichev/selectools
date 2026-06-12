@@ -114,6 +114,14 @@ __all__ reconciled (+11 exports), AgentConfig.hooks REMOVED (BREAKING)
 guide → Compatibility matrix refresh
 → 111 runnable examples, 7268 tests total
 
+v0.26.0 ✅ Safety Patch & Verified Registry
+Confirm-parser negation veto (non-leading negation no longer fired
+destructive CONFIRM) → Model registry refresh: 152 → 115, every entry
+source-verified, opus-4-1 pricing corrected, retired-model constants
+REMOVED (BREAKING) → Cache-aware calculate_cost → A2A -32602 on
+malformed parts → Gemini embedding dimension constant 3072
+→ 111 runnable examples, 7420 tests total
+
 v1.0.0 🟡 Stable Release (bake window — code-complete)
 API freeze ✅ (warts removed in v0.25) → Stability markers on all modules ✅
 → Security audit published ✅ → Compatibility matrix ✅

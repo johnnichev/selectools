@@ -1,56 +1,65 @@
 # Session Handoff
 
-## What I Was Doing (2026-06-11)
+## What I Was Doing (2026-06-12)
 
-Prepared the **v0.25.0 — Hardening & v1.0 Prep** release
-(branch `release/v0.25.0`). This closes the v1.0 engineering arc:
-everything v1.0 needs from the codebase is now merged. What remains
-for the 1.0 tag is mechanical and happens at tag time, after a bake
-window.
+Prepared the **v0.26.0 — Safety Patch & Verified Registry** release
+(branch `release/v0.26.0`). This is the planned mid-bake release:
+the bake-window bug hunt (#103/#104) found a destructive-CONFIRM
+safety bug in the `@beta` pending surface, and the registry refresh
+(#105/#106) was ready — shipping them together gets the safety fix
+to `selectools.pending` consumers immediately without disturbing the
+v1.0 bake (the fixes ARE the bake working as intended).
 
 ## Current State
 
-- **Version:** `0.25.0` in both `src/selectools/__init__.py` and
+- **Version:** `0.26.0` in both `src/selectools/__init__.py` and
   `pyproject.toml`.
-- **CHANGELOG:** `## [0.25.0] - 2026-06-11 — Hardening & v1.0 Prep`
-  finalized and synced to `docs/CHANGELOG.md`.
-- **Suite:** 7,268 tests collected (7,016 passed / 27 skipped / 231
-  e2e-deselected locally), 111 examples.
-- **Public surface:** 433 unique public symbols, 100% stability-marked
-  (205 stable / 228 beta), module-level `__stability__` on all 123
-  public modules, architecture-test CI gate enforcing markers on every
-  future public symbol (#95).
-- **Quality gate:** ruff format + check clean on src/tests (the only
-  ruff findings are pre-existing in `notebooks/getting_started.ipynb`,
-  which CI does not lint), bandit clean at -ll, mkdocs build clean.
-  mypy baseline: 5 accepted pre-existing errors (2 in
-  `agent/_tool_executor.py`, 3 in `agent/core.py`).
-- **Docs swept:** README (What's New v0.25, stats), ROADMAP (v0.25.0 ✅
-  block + backlog items #86/#87/#88 marked shipped + v1.0 progress),
-  CONTRIBUTING (both copies), landing/index.html counters, docs/llms.txt,
+- **CHANGELOG:** `## [0.26.0] - 2026-06-12 — Safety Patch & Verified
+  Registry` finalized and synced to `docs/CHANGELOG.md`.
+- **Suite:** 7,420 tests collected (7,168 non-e2e passed / 27 skipped /
+  231 e2e-deselected locally), 111 examples, 115 source-verified
+  models.
+- **Public surface:** 437 unique public symbols across 123 public
+  modules, 100% stability-marked, architecture-test CI gate intact.
+- **Quality gate:** ruff format + check clean, bandit clean at -ll
+  with pyproject config, full non-e2e suite green. mypy baseline:
+  5 accepted pre-existing errors (2 in `agent/_tool_executor.py`,
+  3 in `agent/core.py`).
+- **Docs swept:** README (What's New v0.26, stats), ROADMAP (v0.26.0 ✅
+  block), CHANGELOG synced, landing/index.html version strings
+  (status bar, footer, JSON-LD softwareVersion) + og-image.svg,
   this file.
 
-## What Shipped in v0.25.0 (PRs #84-#88, #90-#95)
+## What Shipped in v0.26.0 (PRs #103-#106)
 
-- **Features (`@beta`):** pending intent hooks (#85), knowledge
-  pre-save sanitizers (#84), planning-as-config (#86), tool result
-  compression (#87), agent-level HITL (#88).
-- **v1.0 groundwork:** wart removal (#94 — public
-  `clone_for_isolation()`, `__all__` reconciliation, **BREAKING**
-  removal of `AgentConfig.hooks`), stability marking sweep + CI gate
-  (#95), security audit + migration guide + compatibility refresh
-  (#91), real-Redis Lua smoke tests (#93), docs count corrections
-  (#92), CHANGELOG for the feature wave (#90).
-- **Fix:** runtime-checkable Protocol isinstance regression on
-  py3.9-3.11 (#95).
+- **Safety fix:** `RegexConfirmParser` non-leading negation fired
+  destructive CONFIRM ("se você não pode apagar, tudo bem" parsed as
+  confirm). Negation token anywhere now vetoes the restated-verb
+  branch (#103). All `selectools.pending` consumers should upgrade.
+- **Registry refresh (#105):** 152 → 115 models, every entry
+  source-verified; claude-fable-5/opus-4-8/opus-4-7, gpt-5.5 family,
+  gemini-3.5 line added; retired-model constants REMOVED (BREAKING
+  for direct registry references); opus-4-1 pricing fixed
+  ($5/$25 → $15/$75); gpt-5 context specs corrected.
+- **Cache-aware cost (#106):** `calculate_cost(...,
+  cache_read_input_tokens=, cache_creation_input_tokens=)`;
+  AnthropicProvider `UsageStats.cost_usd` now cache-accurate.
+- **Fixes:** A2A -32602 instead of HTTP 500 on malformed
+  `message.parts` (#103); bake-hunt tests gated on starlette (#104);
+  Gemini embedding dimension constant 3072 (#106).
 
-## The v1.0 Arc Is Code-Complete — Bake Window Starts Now
+## Next Up
 
-All v1.0 code work is merged: API freeze (warts removed), 100% stability
-marking with a CI gate, published security audit, 0.x→1.0 migration
-guide, compatibility matrix. v0.25.0 now bakes in the wild so the new
-`@beta` surface and the 19 fresh `@stable` promotions get real-world
-mileage before the 1.0 promise is stamped on them.
+- **Sheriff #303** — bump Sheriff's selectools pin to 0.26.0 so its
+  pending-confirmation flow picks up the negation-veto safety fix.
+  This is the first post-release action.
+
+## The v1.0 Bake Window Continues — July Tag Unchanged
+
+All v1.0 code work remains merged and baking. v0.26.0 is a mid-bake
+patch, not a new feature wave: the `@beta` surface got real-world
+mileage, the bake hunt caught a real safety bug, and the fix shipped.
+The July 1.0 tag plan is unchanged.
 
 ### July 1.0 Tag Checklist (in order)
 
