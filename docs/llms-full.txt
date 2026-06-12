@@ -579,7 +579,7 @@ You now know the core API. Here is where to go from here:
 | Use hybrid search (keyword + semantic) | [Hybrid Search Guide](modules/HYBRID_SEARCH.md) |
 | Load tools from plugin files | [Dynamic Tools Guide](modules/DYNAMIC_TOOLS.md) |
 | Cache LLM responses to save money | [Agent Guide — Caching](modules/AGENT.md#response-caching) |
-| Browse 152 models with pricing | [Models Guide](modules/MODELS.md) |
+| Browse 115 models with pricing | [Models Guide](modules/MODELS.md) |
 | Track costs and token usage | [Usage Guide](modules/USAGE.md) |
 | Understand the full architecture | [Architecture](ARCHITECTURE.md) |
 | Add input/output guardrails | [Guardrails Guide](modules/GUARDRAILS.md) |
@@ -7311,7 +7311,7 @@ from selectools.models import Gemini
 
 provider = GeminiProvider(
     api_key="...",  # Or set GEMINI_API_KEY or GOOGLE_API_KEY
-    default_model=Gemini.FLASH_2_0.id
+    default_model=Gemini.FLASH_2_5.id
 )
 
 # Features:
@@ -7965,7 +7965,7 @@ The provider falls through to the next on:
 
 The **Models** module provides a **single source of truth** for all supported LLM and embedding models. It includes:
 
-- 152 models across 5 providers
+- 115 models across 5 providers
 - Pricing per 1M tokens
 - Context windows
 - Max output tokens
@@ -8019,11 +8019,11 @@ class ModelInfo:
 ```python
 # Typed model constants
 OpenAI.GPT_4O              # ModelInfo instance
-Anthropic.SONNET_3_5       # ModelInfo instance
-Gemini.FLASH_2_0           # ModelInfo instance
+Anthropic.SONNET_4_6       # ModelInfo instance
+Gemini.FLASH_2_5           # ModelInfo instance
 
 # Complete list
-ALL_MODELS                 # List[ModelInfo] - all 152 models
+ALL_MODELS                 # List[ModelInfo] - all 115 models
 
 # Quick lookup
 MODELS_BY_ID               # Dict[str, ModelInfo] - O(1) lookup
@@ -8033,7 +8033,7 @@ MODELS_BY_ID               # Dict[str, ModelInfo] - O(1) lookup
 
 ## Model Classes
 
-### OpenAI Models (77 models)
+### OpenAI Models (65 models)
 
 ```python
 from selectools.models import OpenAI
@@ -8069,7 +8069,7 @@ OpenAI.Embeddings.TEXT_EMBEDDING_3_LARGE  # $0.13 per 1M tokens
 OpenAI.Embeddings.ADA_002                 # $0.10 per 1M tokens
 ```
 
-### Anthropic Models (22 models)
+### Anthropic Models (13 models)
 
 ```python
 from selectools.models import Anthropic
@@ -8092,7 +8092,7 @@ Anthropic.Embeddings.VOYAGE_3       # $0.06 per 1M tokens
 Anthropic.Embeddings.VOYAGE_3_LITE  # $0.02 per 1M tokens
 ```
 
-### Gemini Models (30 models)
+### Gemini Models (21 models)
 
 ```python
 from selectools.models import Gemini
@@ -8156,10 +8156,10 @@ from selectools.models import OpenAI, Anthropic, Gemini
 provider = OpenAIProvider(default_model=OpenAI.GPT_4O_MINI.id)
 
 # Anthropic
-provider = AnthropicProvider(default_model=Anthropic.SONNET_3_5_20241022.id)
+provider = AnthropicProvider(default_model=Anthropic.SONNET_4_6.id)
 
 # Gemini
-provider = GeminiProvider(default_model=Gemini.FLASH_2_0.id)
+provider = GeminiProvider(default_model=Gemini.FLASH_2_5.id)
 ```
 
 ### With Agent Config
@@ -8240,7 +8240,7 @@ else:
 ```python
 from selectools.models import ALL_MODELS
 
-# All 152 models
+# All 115 models
 print(f"Total models: {len(ALL_MODELS)}")
 
 # Filter by provider
@@ -8457,8 +8457,8 @@ from selectools.models import OpenAI, Anthropic, Gemini
 # Budget options
 print("Budget chat models:")
 print(f"  OpenAI GPT-4o-mini: ${OpenAI.GPT_4O_MINI.prompt_cost}/${OpenAI.GPT_4O_MINI.completion_cost}")
-print(f"  Gemini Flash 2.0: ${Gemini.FLASH_2_0.prompt_cost}/${Gemini.FLASH_2_0.completion_cost}")
-print(f"  Anthropic Haiku 3.5: ${Anthropic.HAIKU_3_5_20241022.prompt_cost}/${Anthropic.HAIKU_3_5_20241022.completion_cost}")
+print(f"  Gemini Flash 2.5: ${Gemini.FLASH_2_5.prompt_cost}/${Gemini.FLASH_2_5.completion_cost}")
+print(f"  Anthropic Haiku 4.5: ${Anthropic.HAIKU_4_5.prompt_cost}/${Anthropic.HAIKU_4_5.completion_cost}")
 
 # Output:
 # Budget chat models:
@@ -8473,7 +8473,7 @@ print(f"  Anthropic Haiku 3.5: ${Anthropic.HAIKU_3_5_20241022.prompt_cost}/${Ant
 from selectools.models import OpenAI, Anthropic, Gemini, Cohere
 
 print("Embedding costs:")
-print(f"  Gemini: ${Gemini.Embeddings.EMBEDDING_004.prompt_cost} (FREE)")
+print(f"  Gemini: ${Gemini.Embeddings.EMBEDDING_001.prompt_cost} per 1M tokens")
 print(f"  OpenAI small: ${OpenAI.Embeddings.TEXT_EMBEDDING_3_SMALL.prompt_cost}")
 print(f"  Voyage lite: ${Anthropic.Embeddings.VOYAGE_3_LITE.prompt_cost}")
 print(f"  Cohere: ${Cohere.Embeddings.EMBED_V3.prompt_cost}")
@@ -8503,7 +8503,7 @@ def test_model_registry():
     assert model.context_window > 0
 
     # Test registry
-    assert len(ALL_MODELS) >= 152
+    assert len(ALL_MODELS) >= 115
     assert "gpt-4o-mini" in MODELS_BY_ID
 
     # Test lookup
@@ -8588,7 +8588,7 @@ print(f"${cost:.6f}")  # $0.000200
 ```python
 from selectools import ALL_MODELS, MODELS_BY_ID
 
-# All 152 ModelInfo objects
+# All 115 ModelInfo objects
 for model in ALL_MODELS:
     print(f"{model.id:40s} ${model.prompt_cost:>8.2f} / ${model.completion_cost:>8.2f}")
 
@@ -17088,7 +17088,7 @@ Class-based lifecycle observability:
 
 ### 15. Model Registry (`models.py`)
 
-Single source of truth for 152 models:
+Single source of truth for 115 models:
 
 - Pricing per 1M tokens
 - Context windows
@@ -17874,7 +17874,7 @@ print(f"Cost: ${result.usage.total_cost_usd:.4f}")
 print(f"Tokens: {result.usage.total_tokens}")
 ```
 
-Automatic per-call cost tracking across 152 models with built-in pricing data.
+Automatic per-call cost tracking across 115 models with built-in pricing data.
 
 ---
 

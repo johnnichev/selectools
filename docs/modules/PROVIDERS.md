@@ -239,7 +239,7 @@ from selectools.models import Gemini
 
 provider = GeminiProvider(
     api_key="...",  # Or set GEMINI_API_KEY or GOOGLE_API_KEY
-    default_model=Gemini.FLASH_2_0.id
+    default_model=Gemini.FLASH_2_5.id
 )
 
 # Features:

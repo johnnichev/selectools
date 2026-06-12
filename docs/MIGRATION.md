@@ -238,7 +238,7 @@ print(f"Cost: ${result.usage.total_cost_usd:.4f}")
 print(f"Tokens: {result.usage.total_tokens}")
 ```
 
-Automatic per-call cost tracking across 152 models with built-in pricing data.
+Automatic per-call cost tracking across 115 models with built-in pricing data.
 
 ---
 

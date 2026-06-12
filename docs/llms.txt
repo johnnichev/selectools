@@ -47,7 +47,7 @@ result = agent.run("Find our refund policy")
 ## Providers
 
 - [Providers](https://selectools.dev/modules/PROVIDERS/): OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama, LiteLLM (100+ models) + FallbackProvider + RouterProvider (cost-optimized routing)
-- [Models](https://selectools.dev/modules/MODELS/): 152 models with built-in pricing data
+- [Models](https://selectools.dev/modules/MODELS/): 115 models with built-in pricing data
 
 ## Multi-Agent
 

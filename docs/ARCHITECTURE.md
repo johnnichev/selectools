@@ -311,7 +311,7 @@ Class-based lifecycle observability:
 
 ### 15. Model Registry (`models.py`)
 
-Single source of truth for 152 models:
+Single source of truth for 115 models:
 
 - Pricing per 1M tokens
 - Context windows

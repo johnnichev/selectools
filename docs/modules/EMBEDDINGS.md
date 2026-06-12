@@ -173,7 +173,7 @@ from selectools.models import Gemini
 
 embedder = GeminiEmbeddingProvider(
     api_key="...",  # Or set GEMINI_API_KEY / GOOGLE_API_KEY
-    model=Gemini.Embeddings.EMBEDDING_004.id
+    model=Gemini.Embeddings.EMBEDDING_001.id
 )
 
 embedding = embedder.embed_text("Hello world")
@@ -182,10 +182,10 @@ print(f"Dimension: {embedder.dimension}")  # 768
 
 **Available Models:**
 
-- `text-embedding-004` (768d, **FREE**) - **Recommended for cost**
-- `text-embedding-001` (768d, **FREE**) - Legacy
+- `gemini-embedding-001` ($0.15/1M tokens) - **Recommended**
+- `gemini-embedding-2` ($0.20/1M tokens) - Multimodal
 
-**Best Feature:** Completely free (with rate limits)
+**Note:** text-embedding-004 / text-embedding-001 were retired by Google.
 
 ### Cohere Embeddings
 
@@ -288,7 +288,7 @@ Most providers (OpenAI, Gemini) use the same method internally, but Cohere diffe
 
 | Provider             | Model                  | Dimension | Cost      | Notes              |
 | -------------------- | ---------------------- | --------- | --------- | ------------------ |
-| **Gemini**           | text-embedding-004     | 768       | **$0.00** | FREE (with limits) |
+| **Gemini**           | gemini-embedding-001   | 768       | $0.15     | Default            |
 | **OpenAI**           | text-embedding-3-small | 1536      | $0.02     | Best value         |
 | **Anthropic/Voyage** | voyage-3-lite          | 512       | $0.02     | Compact            |
 | **Anthropic/Voyage** | voyage-3               | 1024      | $0.06     | High quality       |
@@ -369,7 +369,7 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
 
 ```python
 class GeminiEmbeddingProvider(EmbeddingProvider):
-    def __init__(self, api_key: str | None = None, model: str = "text-embedding-004"):
+    def __init__(self, api_key: str | None = None, model: str = "gemini-embedding-001"):
         import google.generativeai as genai
 
         self.api_key = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
