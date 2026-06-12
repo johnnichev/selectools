@@ -42,7 +42,7 @@ class TestModelRegistry:
 
     def test_all_models_count(self) -> None:
         """Test that we have all registered models."""
-        assert len(ALL_MODELS) == 152
+        assert len(ALL_MODELS) == 115
 
     def test_models_by_id_count(self) -> None:
         """Test that MODELS_BY_ID has same count as ALL_MODELS."""
@@ -51,8 +51,8 @@ class TestModelRegistry:
     def test_models_by_id_lookup(self) -> None:
         """Test looking up models by ID."""
         assert MODELS_BY_ID["gpt-4o"].provider == "openai"
-        assert MODELS_BY_ID["claude-3-5-sonnet-20241022"].provider == "anthropic"
-        assert MODELS_BY_ID["gemini-2.0-flash"].provider == "gemini"
+        assert MODELS_BY_ID["claude-sonnet-4-6"].provider == "anthropic"
+        assert MODELS_BY_ID["gemini-2.5-flash"].provider == "gemini"
         assert MODELS_BY_ID["llama3.2"].provider == "ollama"
 
     def test_all_models_unique_ids(self) -> None:
@@ -74,7 +74,7 @@ class TestOpenAIModels:
     def test_openai_model_count(self) -> None:
         """Test OpenAI model count."""
         openai_models = [m for m in ALL_MODELS if m.provider == "openai"]
-        assert len(openai_models) == 79
+        assert len(openai_models) == 65
 
     def test_openai_gpt4o(self) -> None:
         """Test GPT-4o model definition."""
@@ -108,7 +108,7 @@ class TestAnthropicModels:
     def test_anthropic_model_count(self) -> None:
         """Test Anthropic model count."""
         anthropic_models = [m for m in ALL_MODELS if m.provider == "anthropic"]
-        assert len(anthropic_models) == 25
+        assert len(anthropic_models) == 13
 
     def test_anthropic_sonnet_4_5(self) -> None:
         """Test Claude Sonnet 4.5 model definition."""
@@ -118,7 +118,7 @@ class TestAnthropicModels:
         assert model.type == "chat"
         assert model.prompt_cost == 3.00
         assert model.completion_cost == 15.00
-        assert model.max_tokens == 8192
+        assert model.max_tokens == 64000
         assert model.context_window == 200000
 
     def test_anthropic_opus_4_5(self) -> None:
@@ -128,46 +128,46 @@ class TestAnthropicModels:
         assert model.prompt_cost == 5.00
         assert model.completion_cost == 25.00
 
-    def test_anthropic_haiku_3(self) -> None:
-        """Test Claude Haiku 3 (cheapest Claude model)."""
-        model = Anthropic.HAIKU_3
-        assert model.id == "claude-3-haiku"
-        assert model.prompt_cost == 0.25
-        assert model.completion_cost == 1.25
+    def test_anthropic_haiku_4_5(self) -> None:
+        """Test Claude Haiku 4.5 (cheapest Claude model)."""
+        model = Anthropic.HAIKU_4_5
+        assert model.id == "claude-haiku-4-5"
+        assert model.prompt_cost == 1.00
+        assert model.completion_cost == 5.00
 
 
 class TestGeminiModels:
     """Tests for Google Gemini model definitions."""
 
     def test_gemini_model_count(self) -> None:
-        """Test Gemini has 31 models (28 chat + 3 embedding)."""
+        """Test Gemini has 21 models (19 chat/audio/image + 2 embedding)."""
         gemini_models = [m for m in ALL_MODELS if m.provider == "gemini"]
-        assert len(gemini_models) == 32
+        assert len(gemini_models) == 21
 
-    def test_gemini_flash_2_0(self) -> None:
-        """Test Gemini 2.0 Flash model definition."""
-        model = Gemini.FLASH_2_0
-        assert model.id == "gemini-2.0-flash"
+    def test_gemini_flash_2_5(self) -> None:
+        """Test Gemini 2.5 Flash model definition."""
+        model = Gemini.FLASH_2_5
+        assert model.id == "gemini-2.5-flash"
         assert model.provider == "gemini"
         assert model.type == "chat"
-        assert model.prompt_cost == 0.10
-        assert model.completion_cost == 0.40
-        assert model.max_tokens == 8192
-        assert model.context_window == 1000000
+        assert model.prompt_cost == 0.30
+        assert model.completion_cost == 2.50
+        assert model.max_tokens == 65536
+        assert model.context_window == 1048576
 
-    def test_gemini_pro_3(self) -> None:
-        """Test Gemini 3 Pro Preview model definition."""
-        model = Gemini.PRO_3
-        assert model.id == "gemini-3-pro-preview"
+    def test_gemini_pro_3_1(self) -> None:
+        """Test Gemini 3.1 Pro Preview model definition."""
+        model = Gemini.PRO_3_1
+        assert model.id == "gemini-3.1-pro-preview"
         assert model.prompt_cost == 2.00
         assert model.completion_cost == 12.00
-        assert model.context_window == 2000000  # 2M tokens
+        assert model.context_window == 1048576
 
-    def test_gemini_gemma_free(self) -> None:
-        """Test Gemma (free open model)."""
-        model = Gemini.GEMMA_3
-        assert model.id == "gemma-3"
-        assert model.prompt_cost == 0.00
+    def test_gemini_embedding(self) -> None:
+        """Test Gemini embedding model definition."""
+        model = Gemini.Embeddings.EMBEDDING_001
+        assert model.id == "gemini-embedding-001"
+        assert model.prompt_cost == 0.15
         assert model.completion_cost == 0.00
 
 
@@ -229,13 +229,16 @@ class TestModelMetadataCompleteness:
         """Test that all models have max_tokens > 0."""
         for model in ALL_MODELS:
             assert model.max_tokens > 0
-            assert model.max_tokens <= 65536  # Reasonable upper bound
+            assert model.max_tokens <= 200000  # Reasonable upper bound
 
     def test_all_models_have_context_window(self) -> None:
         """Test that all models have context_window > 0."""
         for model in ALL_MODELS:
             assert model.context_window > 0
-            assert model.context_window >= model.max_tokens
+            # Audio (TTS) models can have a larger output limit than input
+            # context (e.g. Gemini TTS: 8k in / 16k out), so exempt them.
+            if model.type != "audio":
+                assert model.context_window >= model.max_tokens
 
 
 class TestModelTypes:
@@ -244,7 +247,7 @@ class TestModelTypes:
     def test_chat_models_majority(self) -> None:
         """Test that most models are chat type."""
         chat_models = [m for m in ALL_MODELS if m.type == "chat"]
-        assert len(chat_models) >= 100  # Most should be chat
+        assert len(chat_models) >= 80  # Most should be chat
 
     def test_audio_models_exist(self) -> None:
         """Test that audio models exist."""
@@ -272,7 +275,7 @@ class TestModelPricing:
         assert cheapest.prompt_cost + cheapest.completion_cost < 1.0  # Under $1 per 1M tokens
 
     def test_free_models_exist(self) -> None:
-        """Test that free models exist (Ollama + Gemma)."""
+        """Test that free models exist (Ollama local models)."""
         free_models = [m for m in ALL_MODELS if m.prompt_cost == 0 and m.completion_cost == 0]
         assert len(free_models) >= 13  # At least Ollama models
 
@@ -281,16 +284,16 @@ class TestProviderDefaults:
     """Tests for provider default models."""
 
     def test_openai_default_exists(self) -> None:
-        """Test that OpenAI default model (GPT-4O) exists."""
-        assert OpenAI.GPT_4O.id in MODELS_BY_ID
+        """Test that OpenAI provider default model (gpt-5-mini) exists."""
+        assert OpenAI.GPT_5_MINI.id in MODELS_BY_ID
 
     def test_anthropic_default_exists(self) -> None:
-        """Test that Anthropic default model exists."""
-        assert Anthropic.SONNET_3_5_20241022.id in MODELS_BY_ID
+        """Test that Anthropic provider default model (claude-sonnet-4-6) exists."""
+        assert Anthropic.SONNET_4_6.id in MODELS_BY_ID
 
     def test_gemini_default_exists(self) -> None:
-        """Test that Gemini default model (2.0 Flash) exists."""
-        assert Gemini.FLASH_2_0.id in MODELS_BY_ID
+        """Test that Gemini provider default model (gemini-3-flash-preview) exists."""
+        assert Gemini.FLASH_3_PREVIEW.id in MODELS_BY_ID
 
     def test_ollama_default_exists(self) -> None:
         """Test that Ollama default model (Llama 3.2) exists."""

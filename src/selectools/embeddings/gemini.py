@@ -16,14 +16,14 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
     """
     Google Gemini embedding provider.
 
-    Supports models: text-embedding-001, text-embedding-004
+    Supports models: gemini-embedding-001, gemini-embedding-2
 
     Example:
         >>> from selectools.embeddings import GeminiEmbeddingProvider
         >>> from selectools.models import Gemini
         >>>
         >>> embedder = GeminiEmbeddingProvider(
-        ...     model=Gemini.Embeddings.EMBEDDING_004.id
+        ...     model=Gemini.Embeddings.EMBEDDING_001.id
         ... )
         >>> embedding = embedder.embed_text("Hello, world!")
         >>> print(f"Dimension: {len(embedding)}")
@@ -31,7 +31,9 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
 
     def __init__(
         self,
-        model: str = "text-embedding-004",
+        # Default changed from text-embedding-004 (retired by Google) to its
+        # documented replacement gemini-embedding-001.
+        model: str = "gemini-embedding-001",
         api_key: Optional[str] = None,
         task_type: str = "retrieval_document",
     ):
@@ -39,7 +41,7 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
         Initialize Gemini embedding provider.
 
         Args:
-            model: Model name (default: text-embedding-004)
+            model: Model name (default: gemini-embedding-001)
             api_key: Google API key (defaults to GEMINI_API_KEY or GOOGLE_API_KEY env var)
             task_type: Task type for embeddings (retrieval_document, retrieval_query,
                       semantic_similarity, classification, clustering)
