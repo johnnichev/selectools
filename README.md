@@ -30,6 +30,19 @@ result = AgentGraph.chain(planner, writer, reviewer).run("Write a blog post")
 # selectools serve agent.yaml
 ```
 
+## What's New in v0.26
+
+### v0.26.0 — Safety Patch & Verified Registry
+
+A mid-bake safety patch plus a fully source-verified model registry.
+
+- **Confirm parser safety fix** — `RegexConfirmParser` treated replies like "se você não pode apagar, tudo bem" / "tú no puedes borrar" as confirmations: the restated-verb branch matched the action verb without checking for negation elsewhere in the reply. A negation token anywhere now vetoes that branch; bare confirms are unaffected. **All `selectools.pending` consumers should upgrade immediately.**
+- **Model registry refresh** — 152 → 115 models, every entry source-verified: claude-fable-5 / opus-4-8 / opus-4-7, the gpt-5.5 family, and the gemini-3.5 line added; retired and shut-down models removed (**BREAKING** if you referenced their registry constants — e.g. `AnthropicModels.CLAUDE_3_5_SONNET` — but those IDs 404 at their providers regardless); `claude-opus-4-1` mispricing corrected ($5/$25 → $15/$75); gpt-5 family context specs fixed (400k/128k); `GeminiEmbeddingProvider` default moved off the retired `text-embedding-004` to `gemini-embedding-001`.
+- **Cache-aware cost calculation** — `calculate_cost(..., cache_read_input_tokens=..., cache_creation_input_tokens=...)` prices prompt-cache traffic at Anthropic's published rates (reads 0.1×, 5-min writes 1.25×); `AnthropicProvider`'s `UsageStats.cost_usd` is now cache-accurate.
+- **Fixes** — A2A returns JSON-RPC -32602 (not HTTP 500) for non-dict `message.parts` elements; Gemini embedding dimension constant corrected to the actual 3072 for `gemini-embedding-001`/`-2` (vectors themselves unchanged); bake-hunt test module no longer requires optional extras in CI.
+
+See `CHANGELOG.md` for the full entry (7,420 tests, 111 examples, 115 models).
+
 ## What's New in v0.25
 
 ### v0.25.0 — Hardening & v1.0 Prep

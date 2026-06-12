@@ -5,6 +5,75 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.26.0] - 2026-06-12 — Safety Patch & Verified Registry
+
+### Fixed
+
+- **Confirm parser: non-leading negation fired destructive CONFIRM**
+  (#103) — `RegexConfirmParser` treated replies like
+  "se você não pode apagar, tudo bem" or "tú no puedes borrar" as
+  confirmations (verified against released v0.25.1). The restated-verb
+  branch matched the action verb without checking for negation tokens
+  elsewhere in the reply. A negation token anywhere in the reply now
+  vetoes the restated-verb branch; bare confirms ("sim", "yes",
+  "apague") are unaffected. **All `selectools.pending` consumers
+  should upgrade immediately.**
+- **A2A: malformed `message.parts` returned HTTP 500** (#103) — a
+  non-dict element in `message.parts` crashed the handler instead of
+  returning JSON-RPC -32602 (Invalid params). Now validated and
+  rejected cleanly.
+- Bake-hunt test module no longer requires optional extras in CI —
+  a2a repro tests are gated on starlette being importable (#104).
+- **Gemini embeddings: wrong dimension constant** (#106) —
+  `_get_model_dimension()` claimed 768 for `gemini-embedding-001` /
+  `gemini-embedding-2`, whose actual (and always-delivered) default
+  is 3072. Constant corrected; actual vector dimensionality is
+  unchanged — anything embedding with these models was already
+  getting 3072-dim vectors. MRL truncation semantics
+  (`output_dimensionality`) documented.
+- **Model registry mispricing** (#105) — `claude-opus-4-1` was listed
+  at $5/$25 per Mtok; actual is $15/$75. Cost tracking for that model
+  under-reported by 3×.
+
+### Changed
+
+- **Model registry refresh — 152 → 115 models, every entry
+  source-verified** (#105):
+  - Added: `claude-fable-5`, `claude-opus-4-8`, `claude-opus-4-7`,
+    the `gpt-5.5` family, and the `gemini-3.5` line.
+  - Retired and shut-down models removed (see Removed below).
+  - `gpt-5` family context specs corrected (400k context / 128k max
+    output).
+  - `GeminiEmbeddingProvider` default moved off the retired
+    `text-embedding-004` to `gemini-embedding-001`.
+  - Deprecation comments with provider retirement dates throughout
+    the registry.
+
+### Removed (BREAKING for direct registry references)
+
+- Registry class attributes for provider-retired models (#105): the
+  Claude 3.x/2.x family, `o1-mini`, `gpt-4-32k`, the gemini-1.5 and
+  gemini-2.0 families, and others — full list in #105 — plus three
+  never-real IDs (`claude-opus-4-11`, `claude-opus-4-01`,
+  `claude-sonnet-4-01`). Code referencing removed constants (e.g.
+  `AnthropicModels.CLAUDE_3_5_SONNET`) must migrate to current
+  models — these IDs 404 at their providers regardless, so the
+  constants only masked runtime failures.
+
+### Added
+
+- **Cache-aware cost calculation** (#106) — `calculate_cost(...,
+  cache_read_input_tokens=..., cache_creation_input_tokens=...)`
+  prices prompt-cache traffic at Anthropic's published rates (cache
+  reads 0.1× input, 5-minute cache writes 1.25× input).
+  `AnthropicProvider`'s `UsageStats.cost_usd` is now cache-accurate
+  instead of billing cached reads at full input price.
+
+### Stats
+
+- 7,420 tests (7,189 non-e2e), 111 examples, 115 source-verified
+  models, 437 public symbols across 123 public modules.
+
 ## [0.25.1] - 2026-06-12 — Idempotent Sanitizers & Picklable Exceptions
 
 ### Fixed
