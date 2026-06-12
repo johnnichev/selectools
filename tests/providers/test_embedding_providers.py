@@ -54,12 +54,16 @@ def mock_voyage_response() -> Mock:
 
 @pytest.fixture
 def mock_gemini_response() -> Mock:
-    """Mock Gemini embedding API response."""
+    """Mock Gemini embedding API response.
+
+    gemini-embedding-001 / gemini-embedding-2 return 3072-dim vectors by
+    default — the provider never requests ``output_dimensionality``.
+    """
     mock_response = Mock()
     mock_embedding1 = Mock()
-    mock_embedding1.values = [0.1] * 768
+    mock_embedding1.values = [0.1] * 3072
     mock_embedding2 = Mock()
-    mock_embedding2.values = [0.2] * 768
+    mock_embedding2.values = [0.2] * 3072
     mock_response.embeddings = [mock_embedding1, mock_embedding2]
     return mock_response
 
@@ -267,7 +271,10 @@ class TestGeminiEmbeddingProvider:
                 model=Gemini.Embeddings.EMBEDDING_001.id, api_key="test_key"
             )
             assert provider.model == Gemini.Embeddings.EMBEDDING_001.id
-            assert provider.dimension == 768
+            # Default (untruncated) output dimensionality for
+            # gemini-embedding-001 — the provider never requests
+            # output_dimensionality, so actual vectors are 3072-dim.
+            assert provider.dimension == 3072
 
     def test_embed_text_document_task(self, mock_gemini_response: Mock) -> None:
         """Test embedding text with RETRIEVAL_DOCUMENT task."""
@@ -290,7 +297,7 @@ class TestGeminiEmbeddingProvider:
             embedding = provider.embed_text("Document content")
 
             assert isinstance(embedding, list)
-            assert len(embedding) == 768
+            assert len(embedding) == 3072
             mock_models.embed_content.assert_called_once()
 
     def test_embed_query_query_task(self, mock_gemini_response: Mock) -> None:
@@ -314,7 +321,7 @@ class TestGeminiEmbeddingProvider:
             embedding = provider.embed_query("What is AI?")
 
             assert isinstance(embedding, list)
-            assert len(embedding) == 768
+            assert len(embedding) == 3072
             mock_models.embed_content.assert_called()
 
     def test_embed_texts_batch(self, mock_gemini_response: Mock) -> None:
@@ -380,6 +387,79 @@ class TestGeminiEmbeddingProvider:
 
             cost = calculate_embedding_cost(provider.model, 100)
             assert cost == pytest.approx(100 / 1_000_000 * 0.15)
+
+
+# ============================================================================
+# Gemini Dimension Semantics Regression Tests
+# ============================================================================
+
+
+class TestGeminiDimensionSemantics:
+    """Regression tests: declared dimension == actual request/response semantics.
+
+    The provider never passes ``output_dimensionality`` (no MRL truncation
+    requested), so the API returns each model's default dimensionality:
+    3072 for gemini-embedding-001 and gemini-embedding-2 per
+    https://ai.google.dev/gemini-api/docs/embeddings. The declared
+    ``dimension`` property must match those actual vectors — it previously
+    claimed 768 while real responses were 3072-dim.
+    """
+
+    @staticmethod
+    def _patched_provider(model: str, response: Mock | None = None) -> Any:
+        mock_google = Mock()
+        mock_genai = Mock()
+        mock_types = Mock()
+        mock_client = Mock()
+        mock_models = Mock()
+        if response is not None:
+            mock_models.embed_content.return_value = response
+        mock_client.models = mock_models
+        mock_genai.Client = Mock(return_value=mock_client)
+        mock_genai.types = mock_types
+        mock_google.genai = mock_genai
+        modules = {
+            "google": mock_google,
+            "google.genai": mock_genai,
+            "google.genai.types": mock_types,
+        }
+        return modules, mock_types, mock_models
+
+    def test_request_does_not_truncate_dimensions(self, mock_gemini_response: Mock) -> None:
+        """The embed request must not pass output_dimensionality (MRL truncation)."""
+        modules, mock_types, _ = self._patched_provider(
+            "gemini-embedding-001", mock_gemini_response
+        )
+        with patch.dict("sys.modules", modules):
+            provider = GeminiEmbeddingProvider(api_key="test_key")
+            provider.embed_text("Test")
+            # Only task_type is sent — no output_dimensionality, so the API
+            # returns the model default (3072 for gemini-embedding-001).
+            mock_types.EmbedContentConfig.assert_called_once_with(task_type="retrieval_document")
+
+    def test_declared_dimension_matches_actual_response(self, mock_gemini_response: Mock) -> None:
+        """provider.dimension must equal the length of vectors the API returns."""
+        modules, _, _ = self._patched_provider("gemini-embedding-001", mock_gemini_response)
+        with patch.dict("sys.modules", modules):
+            provider = GeminiEmbeddingProvider(api_key="test_key")
+            embedding = provider.embed_text("Test")
+            assert provider.dimension == len(embedding) == 3072
+
+    def test_gemini_embedding_2_default_dimension(self) -> None:
+        """gemini-embedding-2 also defaults to 3072 (was falling to the 768 fallback)."""
+        modules, _, _ = self._patched_provider(Gemini.Embeddings.EMBEDDING_2.id)
+        with patch.dict("sys.modules", modules):
+            provider = GeminiEmbeddingProvider(
+                model=Gemini.Embeddings.EMBEDDING_2.id, api_key="test_key"
+            )
+            assert provider.dimension == 3072
+
+    def test_legacy_embedding_004_dimension_unchanged(self) -> None:
+        """Retired text-embedding-004 was natively 768-dim — keep that mapping."""
+        modules, _, _ = self._patched_provider("text-embedding-004")
+        with patch.dict("sys.modules", modules):
+            provider = GeminiEmbeddingProvider(model="text-embedding-004", api_key="test_key")
+            assert provider.dimension == 768
 
 
 # ============================================================================
