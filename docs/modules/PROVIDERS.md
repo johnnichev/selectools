@@ -37,7 +37,7 @@ print(result.content)
 ```
 
 !!! tip "See Also"
-    - [Models](MODELS.md) - 152-model registry with pricing data
+    - [Models](MODELS.md) - 115-model registry with pricing data
     - [Usage](USAGE.md) - Automatic token counting and cost tracking
 
 ---
@@ -239,7 +239,7 @@ from selectools.models import Gemini
 
 provider = GeminiProvider(
     api_key="...",  # Or set GEMINI_API_KEY or GOOGLE_API_KEY
-    default_model=Gemini.FLASH_2_0.id
+    default_model=Gemini.FLASH_2_5.id
 )
 
 # Features:

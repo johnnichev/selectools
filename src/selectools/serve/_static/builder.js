@@ -18,22 +18,22 @@ function portsCompat(srcPtype, dstPtype) {
 // ─── Model registry (grouped by provider) ────────────────────────────────
 const MODELS = {
   openai: [
+    'gpt-5.5','gpt-5.5-pro','gpt-5.4','gpt-5.4-mini','gpt-5.4-nano',
     'gpt-4o','gpt-4o-mini','gpt-4.1','gpt-4.1-mini','gpt-4.1-nano',
-    'gpt-5','gpt-5-mini','gpt-5-nano','gpt-5-pro','chatgpt-4o-latest',
-    'o1','o1-mini','o1-pro','o3','o3-mini','o3-pro','o4-mini',
+    'gpt-5','gpt-5-mini','gpt-5-nano','gpt-5-pro',
+    'o1','o1-pro','o3','o3-mini','o3-pro','o4-mini',
     'gpt-4-turbo','gpt-4','gpt-3.5-turbo',
     'gpt-4o-2024-11-20','gpt-4o-2024-08-06','gpt-4o-mini-2024-07-18',
   ],
   anthropic: [
-    'claude-sonnet-4-6','claude-opus-4-6','claude-haiku-4-5',
-    'claude-3-7-sonnet-latest','claude-3-5-sonnet-latest','claude-3-5-haiku-latest',
-    'claude-opus-4','claude-sonnet-4','claude-3-opus','claude-3-haiku',
+    'claude-fable-5','claude-opus-4-8','claude-opus-4-7','claude-opus-4-6',
+    'claude-sonnet-4-6','claude-haiku-4-5',
+    'claude-opus-4-5','claude-sonnet-4-5',
   ],
   gemini: [
+    'gemini-3.5-flash','gemini-3.1-pro-preview','gemini-3.1-flash-lite',
+    'gemini-3-flash-preview',
     'gemini-2.5-pro','gemini-2.5-flash','gemini-2.5-flash-lite',
-    'gemini-2.0-flash','gemini-2.0-flash-lite',
-    'gemini-1.5-pro','gemini-1.5-flash',
-    'gemma-3','gemma-3n',
   ],
   ollama: [
     'llama3.2','llama3.1','llama3','llama2',
@@ -44,16 +44,19 @@ const MODELS = {
 
 // ─── Cost registry ────────────────────────────────────────────────────────
 const MODEL_COSTS = {
+  'gpt-5.5':{in:5,out:30},'gpt-5.5-pro':{in:30,out:180},
+  'gpt-5.4':{in:2.5,out:15},'gpt-5.4-mini':{in:0.75,out:4.5},'gpt-5.4-nano':{in:0.2,out:1.25},
   'gpt-4o':{in:2.5,out:10},'gpt-4o-mini':{in:0.15,out:0.6},
   'gpt-4.1':{in:2.0,out:8},'gpt-4.1-mini':{in:0.4,out:1.6},'gpt-4.1-nano':{in:0.1,out:0.4},
-  'gpt-5':{in:1.25,out:10},'gpt-5-mini':{in:0.25,out:2},'chatgpt-4o-latest':{in:5,out:15},
+  'gpt-5':{in:1.25,out:10},'gpt-5-mini':{in:0.25,out:2},
   'o1':{in:15,out:60},'o3':{in:2,out:8},'o3-mini':{in:1.1,out:4.4},'o4-mini':{in:1.1,out:4.4},
+  'claude-fable-5':{in:10,out:50},'claude-opus-4-8':{in:5,out:25},'claude-opus-4-7':{in:5,out:25},
   'claude-sonnet-4-6':{in:3,out:15},'claude-opus-4-6':{in:5,out:25},'claude-haiku-4-5':{in:1,out:5},
-  'claude-3-7-sonnet-latest':{in:3,out:15},'claude-3-5-sonnet-latest':{in:3,out:15},
-  'claude-3-5-haiku-latest':{in:0.8,out:4},'claude-opus-4':{in:5,out:25},'claude-sonnet-4':{in:3,out:15},
+  'claude-opus-4-5':{in:5,out:25},'claude-sonnet-4-5':{in:3,out:15},
+  'gemini-3.5-flash':{in:1.5,out:9},'gemini-3.1-pro-preview':{in:2,out:12},
+  'gemini-3.1-flash-lite':{in:0.25,out:1.5},'gemini-3-flash-preview':{in:0.5,out:3},
   'gemini-2.5-pro':{in:1.25,out:10},'gemini-2.5-flash':{in:0.3,out:2.5},
-  'gemini-2.5-flash-lite':{in:0.1,out:0.4},'gemini-2.0-flash':{in:0.1,out:0.4},
-  'gemini-1.5-pro':{in:1.25,out:5},'gemini-1.5-flash':{in:0.075,out:0.3},
+  'gemini-2.5-flash-lite':{in:0.1,out:0.4},
 };
 
 function nodeCostLabel(n) {
@@ -1559,7 +1562,7 @@ function loadTemplate(name) {
     nodes.push(gpt);
     const claude = mkNode('agent', 280, 220);
     claude.name = 'Claude Agent';
-    claude.provider = 'anthropic'; claude.model = 'claude-3-5-haiku-latest';
+    claude.provider = 'anthropic'; claude.model = 'claude-haiku-4-5';
     claude.system_prompt = 'Answer the question concisely.';
     nodes.push(claude);
     const gemini = mkNode('agent', 280, 360);

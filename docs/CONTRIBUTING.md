@@ -242,7 +242,7 @@ selectools/
 │   ├── knowledge_backends.py   # Supabase/Redis blob persistence for KnowledgeMemory
 │   ├── pending.py              # Deferred confirmation flow for destructive tools
 │   ├── results.py              # ToolResult base + Artifact side-channel
-│   ├── models.py               # Model registry (152 models)
+│   ├── models.py               # Model registry (115 models)
 │   ├── parser.py               # ToolCallParser
 │   ├── pricing.py              # LLM pricing data and cost calculation
 │   ├── prompt.py               # PromptBuilder

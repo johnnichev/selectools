@@ -199,10 +199,10 @@ class TestPricing:
         assert "gpt-4o" in PRICING
         assert "gpt-4o-mini" in PRICING
         assert "gpt-3.5-turbo" in PRICING
-        assert "claude-3-5-sonnet-20241022" in PRICING
-        assert "claude-3-opus-20240229" in PRICING
-        assert "gemini-1.5-pro" in PRICING
-        assert "gemini-1.5-flash" in PRICING
+        assert "claude-sonnet-4-6" in PRICING
+        assert "claude-opus-4-6" in PRICING
+        assert "gemini-2.5-pro" in PRICING
+        assert "gemini-2.5-flash" in PRICING
 
     def test_pricing_structure(self) -> None:
         """Test pricing data structure."""
@@ -227,19 +227,17 @@ class TestPricing:
         assert cost == pytest.approx(expected)
 
     def test_calculate_cost_claude(self) -> None:
-        """Test cost calculation for Claude 3.5 Sonnet."""
-        # Claude 3.5 Sonnet: $3/1M prompt, $15/1M completion
-        cost = calculate_cost(
-            Anthropic.SONNET_3_5_20241022.id, prompt_tokens=2000, completion_tokens=1000
-        )
+        """Test cost calculation for Claude Sonnet 4.6."""
+        # Claude Sonnet 4.6: $3/1M prompt, $15/1M completion
+        cost = calculate_cost(Anthropic.SONNET_4_6.id, prompt_tokens=2000, completion_tokens=1000)
         expected = (2000 / 1_000_000) * 3.00 + (1000 / 1_000_000) * 15.00
         assert cost == pytest.approx(expected)
 
     def test_calculate_cost_gemini(self) -> None:
-        """Test cost calculation for Gemini 1.5 Flash."""
-        # Gemini 1.5 Flash: $0.075/1M prompt, $0.30/1M completion
-        cost = calculate_cost(Gemini.FLASH_1_5.id, prompt_tokens=5000, completion_tokens=2500)
-        expected = (5000 / 1_000_000) * 0.075 + (2500 / 1_000_000) * 0.30
+        """Test cost calculation for Gemini 2.5 Flash."""
+        # Gemini 2.5 Flash: $0.30/1M prompt, $2.50/1M completion
+        cost = calculate_cost(Gemini.FLASH_2_5.id, prompt_tokens=5000, completion_tokens=2500)
+        expected = (5000 / 1_000_000) * 0.30 + (2500 / 1_000_000) * 2.50
         assert cost == pytest.approx(expected)
 
     def test_calculate_cost_unknown_model(self) -> None:

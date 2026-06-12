@@ -2,12 +2,12 @@
 Pricing tables for major LLM providers.
 
 This module derives pricing from the canonical model registry (models.py).
-Prices in USD per 1M tokens (updated March 2026).
+Prices in USD per 1M tokens (updated June 2026).
 
 Prices are subject to change - check provider documentation for current rates:
-- OpenAI: https://openai.com/api/pricing/
-- Anthropic: https://www.anthropic.com/pricing
-- Google: https://ai.google.dev/pricing
+- OpenAI: https://developers.openai.com/api/docs/pricing
+- Anthropic: https://platform.claude.com/docs/en/about-claude/pricing
+- Google: https://ai.google.dev/gemini-api/docs/pricing
 """
 
 from __future__ import annotations

@@ -355,8 +355,8 @@ class TestGeminiEmbeddingProvider:
                 with pytest.raises(ValueError, match="API_KEY"):
                     GeminiEmbeddingProvider()
 
-    def test_free_tier(self, mock_gemini_response: Mock) -> None:
-        """Test that Gemini embeddings are free."""
+    def test_embedding_cost(self, mock_gemini_response: Mock) -> None:
+        """Test Gemini embedding cost (gemini-embedding-001: $0.15/1M tokens)."""
         mock_google = Mock()
         mock_genai = Mock()
         mock_types = Mock()
@@ -375,11 +375,11 @@ class TestGeminiEmbeddingProvider:
             provider = GeminiEmbeddingProvider(api_key="test_key")
             provider.embed_text("Test")
 
-            # Verify cost is $0.00
+            # gemini-embedding-001 is $0.15 per 1M tokens
             from selectools.pricing import calculate_embedding_cost
 
             cost = calculate_embedding_cost(provider.model, 100)
-            assert cost == 0.0
+            assert cost == pytest.approx(100 / 1_000_000 * 0.15)
 
 
 # ============================================================================

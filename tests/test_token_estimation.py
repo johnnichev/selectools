@@ -14,7 +14,7 @@ class TestEstimateTokens:
         assert estimate_tokens("") == 0
 
     def test_empty_string_returns_zero_with_model(self):
-        assert estimate_tokens("", model="claude-3-5-sonnet-20240620") == 0
+        assert estimate_tokens("", model="claude-sonnet-4-6") == 0
 
     def test_short_text_returns_positive(self):
         result = estimate_tokens("Hello, world!")
@@ -94,8 +94,8 @@ class TestEstimateRunTokens:
         assert result.method in ("tiktoken", "heuristic")
 
     def test_model_field_set(self):
-        result = estimate_run_tokens(messages=[], tools=[], model="claude-3-opus-20240229")
-        assert result.model == "claude-3-opus-20240229"
+        result = estimate_run_tokens(messages=[], tools=[], model="claude-opus-4-6")
+        assert result.model == "claude-opus-4-6"
 
     def test_multiple_tools(self):
         tools = [
