@@ -165,6 +165,7 @@ nav:
     - OpenTelemetry: modules/OTEL.md
     - Langfuse: modules/LANGFUSE.md
     - Stability Markers: modules/STABILITY.md
+    - Benchmarks: modules/BENCHMARKS.md
     - Changelog: CHANGELOG.md
     - Architecture Decisions:
       - Protocol over ABC: decisions/001-protocol-over-abc.md

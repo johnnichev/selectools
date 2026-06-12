@@ -8,6 +8,7 @@ Run: python tests/benchmarks/bench_overhead.py
 """
 
 import os
+import platform
 import statistics
 import sys
 import time
@@ -25,12 +26,20 @@ def fast_tool(x: str) -> str:
     return f"result:{x}"
 
 
-def bench(name, fn, iterations=100):
-    """Run fn N times and report stats."""
+def bench(name, fn, iterations=100, setup=None):
+    """Run fn N times and report stats.
+
+    When ``setup`` is given it runs before every iteration OUTSIDE the timed
+    window and its return value is passed to ``fn``. Use it to build fresh
+    agents/graphs per iteration: a reused Agent accumulates conversation
+    history across runs, so later iterations time ever-growing message lists
+    instead of steady-state overhead.
+    """
     times = []
     for _ in range(iterations):
+        arg = setup() if setup is not None else None
         start = time.perf_counter()
-        fn()
+        fn(arg) if setup is not None else fn()
         elapsed = (time.perf_counter() - start) * 1000
         times.append(elapsed)
     p50 = statistics.median(times)
@@ -47,16 +56,20 @@ def main():
     print("=" * 80)
     print("Selectools Performance Benchmarks")
     print("=" * 80)
-    print(f"(100 iterations each, LocalProvider with ~0ms LLM latency)\n")
+    print(f"(100 iterations each, LocalProvider with ~0ms LLM latency)")
+    print(f"(Python {platform.python_version()}, {platform.platform()}, {platform.machine()})\n")
+
+    def make_agent(max_iterations=1):
+        return Agent(
+            tools=[fast_tool], provider=provider, config=AgentConfig(max_iterations=max_iterations)
+        )
 
     # 1. Single agent run overhead
     print("--- Agent Core ---")
-    agent = Agent(tools=[fast_tool], provider=provider, config=AgentConfig(max_iterations=1))
-    bench("agent.run() single iteration", lambda: agent.run("test"))
+    bench("agent.run() single iteration", lambda a: a.run("test"), setup=make_agent)
 
     # 2. Agent with tool call
-    agent2 = Agent(tools=[fast_tool], provider=provider, config=AgentConfig(max_iterations=3))
-    bench("agent.run() with tool call", lambda: agent2.run("test"))
+    bench("agent.run() with tool call", lambda a: a.run("test"), setup=lambda: make_agent(3))
 
     # 3. AgentGraph overhead
     print("\n--- Orchestration ---")
@@ -71,11 +84,17 @@ def main():
     graph3 = AgentGraph.chain(fn_node, fn_node, fn_node)
     bench("graph.run() 3 callable nodes", lambda: graph3.run("test"))
 
-    graph_agent = AgentGraph.chain(agent)
-    bench("graph.run() 1 agent node", lambda: graph_agent.run("test"))
+    bench(
+        "graph.run() 1 agent node",
+        lambda g: g.run("test"),
+        setup=lambda: AgentGraph.chain(make_agent()),
+    )
 
-    graph3_agent = AgentGraph.chain(agent, agent, agent)
-    bench("graph.run() 3 agent nodes", lambda: graph3_agent.run("test"))
+    bench(
+        "graph.run() 3 agent nodes",
+        lambda g: g.run("test"),
+        setup=lambda: AgentGraph.chain(make_agent(), make_agent(), make_agent()),
+    )
 
     # 4. Parallel overhead
     graph_par = AgentGraph()
