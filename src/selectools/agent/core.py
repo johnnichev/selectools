@@ -187,14 +187,23 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             if loaded is not None:
                 self.memory = loaded
 
-        # Auto-add remember tool if knowledge_memory is configured
-        if self.config.knowledge_memory and "remember" not in self._tools_by_name:
-            from ..toolbox.memory_tools import make_remember_tool
+        # Auto-add remember/recall tools if knowledge_memory is configured
+        if self.config.knowledge_memory:
+            from ..toolbox.memory_tools import make_recall_tool, make_remember_tool
 
-            remember_tool = make_remember_tool(self.config.knowledge_memory)
-            self.tools.append(remember_tool)
-            self._tools_by_name[remember_tool.name] = remember_tool
-            self._system_prompt = self.prompt_builder.build(self.tools)
+            memory_tools_added = False
+            if "remember" not in self._tools_by_name:
+                remember_tool = make_remember_tool(self.config.knowledge_memory)
+                self.tools.append(remember_tool)
+                self._tools_by_name[remember_tool.name] = remember_tool
+                memory_tools_added = True
+            if "recall" not in self._tools_by_name:
+                recall_tool = make_recall_tool(self.config.knowledge_memory)
+                self.tools.append(recall_tool)
+                self._tools_by_name[recall_tool.name] = recall_tool
+                memory_tools_added = True
+            if memory_tools_added:
+                self._system_prompt = self.prompt_builder.build(self.tools)
 
     @property
     def name(self) -> str:

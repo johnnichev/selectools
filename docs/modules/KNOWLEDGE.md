@@ -60,7 +60,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
 4. [KnowledgeMemory Class](#knowledgememory-class)
 5. [The remember() Method](#the-remember-method)
 6. [Context Building](#context-building)
-7. [Auto-Registered Tool](#auto-registered-tool)
+7. [Auto-Registered Tools](#auto-registered-tools)
 8. [Agent Integration](#agent-integration)
 9. [Log Pruning](#log-pruning)
 10. [Backends for Ephemeral Infrastructure](#backends-for-ephemeral-infrastructure)
@@ -78,7 +78,7 @@ The **Knowledge** module provides cross-session, long-term memory for selectools
 - **Long-Term Memory**: Facts that survive across sessions, restarts, and deployments
 - **Daily Logs**: Time-stamped memory entries for recent context
 - **Persistent MEMORY.md**: A durable file of important facts flagged as persistent
-- **Auto-Registered Tool**: The agent can call `remember()` to save knowledge during conversations
+- **Auto-Registered Tools**: The agent can call `remember()` to save knowledge and `recall()` to search it during conversations
 - **Category Organization**: Memories are tagged with categories for structured recall
 
 ### When to Use Each Memory Type
@@ -334,9 +334,9 @@ If either section is empty, it is omitted from the output.
 
 ---
 
-## Auto-Registered Tool
+## Auto-Registered Tools
 
-When `knowledge_memory` is set in `AgentConfig`, a `remember` tool is automatically registered on the agent. This allows the LLM to save knowledge during conversations without any additional configuration.
+When `knowledge_memory` is set in `AgentConfig`, a `remember` tool and a `recall` tool are automatically registered on the agent. This allows the LLM to save and search knowledge during conversations without any additional configuration. If you supply your own tool named `remember` or `recall`, the auto-registered version is skipped for that name only.
 
 ### Tool Definition
 
@@ -378,6 +378,37 @@ and your timezone is PST."
 ```
 
 The agent decides when to call `remember()` based on the conversation context. Explicit requests like "remember that..." and "save this..." reliably trigger the tool.
+
+### The recall Tool
+
+The `recall` tool is the retrieval counterpart of `remember`. It keyword-searches stored entries (case-insensitive match against content and category) and returns the closest matches ranked by relevance, then importance:
+
+```python
+recall(query="dark mode", limit="3")
+# Found 1 memory:
+# 1. [preferences] User prefers dark mode
+```
+
+- `query` (required): keywords describing the information to look up. An empty query returns the most important entries.
+- `limit` (optional): maximum number of memories to return. Defaults to `'5'`; invalid or non-positive values fall back to the default.
+
+If nothing matches, the tool returns `No memories found matching '<query>'.` so the agent knows to ask the user instead of guessing.
+
+### remember + recall Together
+
+```
+User: "Remember that I prefer dark mode."
+Agent calls: remember(content="User prefers dark mode", category="preferences", persistent="true")
+
+--- new session, days later ---
+
+User: "Set up the editor the way I like it."
+Agent calls: recall(query="editor preferences dark mode")
+Tool returns: "Found 1 memory:\n1. [preferences] User prefers dark mode"
+Agent: "Done — dark mode enabled, as you prefer."
+```
+
+Both tools can also be created manually via `selectools.toolbox.memory_tools.make_remember_tool(km)` and `make_recall_tool(km)` for agents that need only one of them or a custom tool list.
 
 ---
 
