@@ -1285,6 +1285,187 @@ class SupabaseSessionStore:
         return results[:limit]
 
 
+# ======================================================================
+# MongoDB backend
+# ======================================================================
+
+
+@beta
+class MongoSessionStore:
+    """MongoDB-backed session store.
+
+    Each session is one document keyed by ``_id`` (the bare ``session_id``, or
+    ``namespace:session_id`` when a namespace is supplied). The full
+    ``ConversationMemory`` dict lives in the ``memory`` field, so a save is a
+    single ``replace_one(..., upsert=True)`` — repeated saves are idempotent.
+
+    ``pymongo`` is an optional dependency. Install it with::
+
+        pip install selectools[mongo]
+
+    Args:
+        url: MongoDB connection URL.
+        database: Database name. Defaults to ``"selectools"``.
+        collection: Collection name. Defaults to ``"sessions"``.
+        default_ttl: Optional TTL in seconds. When set, a TTL index is created
+            on the ``expires_at`` field and each save stamps it, so the server
+            expires stale sessions. ``None`` (default) means no expiry.
+
+    Note:
+        ``search`` fetches every (optionally namespace-filtered) document and
+        scores it in-process with term frequency — no ``$text`` index is
+        assumed. Fine for hundreds of sessions; for large fleets add a text
+        index and a server-side query.
+    """
+
+    def __init__(
+        self,
+        url: str = "mongodb://localhost:27017",
+        database: str = "selectools",
+        collection: str = "sessions",
+        default_ttl: Optional[int] = None,
+    ) -> None:
+        try:
+            import pymongo  # type: ignore[import-untyped]
+        except ImportError as exc:
+            raise ImportError(
+                "MongoSessionStore requires the 'pymongo' package. "
+                "Install it with: pip install selectools[mongo]"
+            ) from exc
+
+        self._client: Any = pymongo.MongoClient(url)
+        self._collection: Any = self._client[database][collection]
+        self._default_ttl = default_ttl
+        if default_ttl is not None:
+            # Server-side expiry: a TTL index on a Date field with
+            # expireAfterSeconds=0 deletes docs once `expires_at` is reached.
+            self._collection.create_index("expires_at", expireAfterSeconds=0)
+
+    # -- validation helpers ------------------------------------------------
+
+    @staticmethod
+    def _validate_session_id(session_id: str) -> None:
+        if not session_id:
+            raise ValueError("session_id must not be empty")
+        if "\x00" in session_id:
+            raise ValueError(f"session_id must not contain null bytes: {session_id!r}")
+        if len(session_id) > 512:
+            raise ValueError(
+                f"session_id too long ({len(session_id)} chars, max 512): {session_id!r}"
+            )
+
+    @staticmethod
+    def _validate_namespace(namespace: Optional[str]) -> None:
+        if namespace is None:
+            return
+        if not namespace:
+            raise ValueError("namespace must not be empty when provided")
+        if "\x00" in namespace:
+            raise ValueError(f"namespace must not contain null bytes: {namespace!r}")
+        if len(namespace) > 512:
+            raise ValueError(f"namespace too long ({len(namespace)} chars, max 512): {namespace!r}")
+
+    def _key(self, session_id: str, namespace: Optional[str] = None) -> str:
+        self._validate_session_id(session_id)
+        self._validate_namespace(namespace)
+        return _make_key(session_id, namespace)
+
+    # -- public API --------------------------------------------------------
+
+    def save(
+        self,
+        session_id: str,
+        memory: ConversationMemory,
+        namespace: Optional[str] = None,
+    ) -> None:
+        key = self._key(session_id, namespace)
+        now = time.time()
+
+        existing = self._collection.find_one({"_id": key}, {"created_at": 1})
+        created_at = existing.get("created_at", now) if existing else now
+
+        doc: Dict[str, Any] = {
+            "_id": key,
+            "session_id": session_id,
+            "namespace": namespace,
+            "memory": memory.to_dict(),
+            "message_count": len(memory),
+            "created_at": created_at,
+            "updated_at": now,
+        }
+        if self._default_ttl is not None:
+            from datetime import datetime, timedelta, timezone
+
+            doc["expires_at"] = datetime.now(timezone.utc) + timedelta(seconds=self._default_ttl)
+
+        self._collection.replace_one({"_id": key}, doc, upsert=True)
+
+    def load(
+        self, session_id: str, namespace: Optional[str] = None
+    ) -> Optional[ConversationMemory]:
+        doc = self._collection.find_one({"_id": self._key(session_id, namespace)})
+        if doc is None:
+            return None
+        return ConversationMemory.from_dict(doc["memory"])
+
+    def list(self) -> List[SessionMetadata]:
+        results: List[SessionMetadata] = []
+        for doc in self._collection.find({}):
+            results.append(
+                SessionMetadata(
+                    session_id=doc.get("session_id", doc.get("_id", "")),
+                    message_count=int(doc.get("message_count") or 0),
+                    created_at=float(doc.get("created_at") or 0),
+                    updated_at=float(doc.get("updated_at") or 0),
+                )
+            )
+        return results
+
+    def delete(self, session_id: str, namespace: Optional[str] = None) -> bool:
+        result = self._collection.delete_one({"_id": self._key(session_id, namespace)})
+        return int(getattr(result, "deleted_count", 0)) > 0
+
+    def exists(self, session_id: str, namespace: Optional[str] = None) -> bool:
+        key = self._key(session_id, namespace)
+        return int(self._collection.count_documents({"_id": key}, limit=1)) > 0
+
+    def branch(self, source_id: str, new_id: str) -> None:
+        memory = self.load(source_id)
+        if memory is None:
+            raise ValueError(f"Session {source_id!r} not found")
+        self.save(new_id, memory)
+
+    @beta
+    def search(
+        self,
+        query: str,
+        namespace: Optional[str] = None,
+        limit: int = 5,
+    ) -> List[SessionSearchResult]:
+        """Fetch every (optionally namespace-filtered) doc and score in-process."""
+        terms = _search_terms(query)
+        if not terms or limit <= 0:
+            return []
+        mongo_filter: Dict[str, Any] = {}
+        if namespace is not None:
+            self._validate_namespace(namespace)
+            mongo_filter["namespace"] = namespace
+        results: List[SessionSearchResult] = []
+        for doc in self._collection.find(mongo_filter):
+            memory_data = doc.get("memory") or {}
+            score, snippets = _score_memory_dict(memory_data, terms)
+            if score > 0:
+                results.append(
+                    SessionSearchResult(
+                        session_id=doc.get("session_id", doc.get("_id", "")),
+                        score=score,
+                        matched_messages=snippets,
+                    )
+                )
+        results.sort(key=lambda r: (-r.score, r.session_id))
+        return results[:limit]
+
+
 __stability__ = "stable"
 
 __all__ = [
@@ -1295,4 +1476,5 @@ __all__ = [
     "SQLiteSessionStore",
     "RedisSessionStore",
     "SupabaseSessionStore",
+    "MongoSessionStore",
 ]

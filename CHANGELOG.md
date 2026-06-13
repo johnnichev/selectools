@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **MongoSessionStore (beta)** — a fifth session backend (joining JSON, SQLite,
+  Redis, Supabase). One document per session keyed by `_id`
+  (`session_id` or `namespace:session_id`); the full `ConversationMemory` lives
+  in the `memory` field, so saves are a single idempotent `replace_one` upsert.
+  Full protocol (save/load/list/delete/exists/branch/search), namespace
+  isolation, the same id/namespace validation guards as the other backends, and
+  optional server-side TTL via an `expires_at` index. `pip install
+  selectools[mongo]`. Docs: `docs/modules/SESSIONS.md`.
 - **Reasoning tools (beta)** — `selectools.toolbox.reasoning_tools` turns
   reasoning into explicit, bounded, inspectable `think` / `analyze` tool calls
   (vs the passive `reasoning_strategy` prompt). `make_reasoning_tools(min_steps,

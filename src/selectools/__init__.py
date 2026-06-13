@@ -179,6 +179,7 @@ from .scheduler import (
 )
 from .sessions import (
     JsonFileSessionStore,
+    MongoSessionStore,
     RedisSessionStore,
     SessionMetadata,
     SessionSearchResult,
@@ -365,6 +366,7 @@ __all__ = [
     "SQLiteSessionStore",
     "RedisSessionStore",
     "SupabaseSessionStore",
+    "MongoSessionStore",
     # Entity Memory
     "Entity",
     "EntityMemory",
