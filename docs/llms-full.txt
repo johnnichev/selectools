@@ -2,7 +2,7 @@
 
 > This file concatenates all selectools documentation pages for AI agent consumption.
 
-> 39 pages included. Generated from docs/ source files.
+> 42 pages included. Generated from docs/ source files.
 
 
 
@@ -19050,3 +19050,318 @@ export LANGFUSE_HOST="https://langfuse.internal.example.com"
 | # | Script | Description |
 |---|--------|-------------|
 | 88 | [`88_langfuse_observer.py`](https://github.com/johnnichev/selectools/blob/main/examples/88_langfuse_observer.py) | Langfuse trace + generation + span hierarchy |
+
+
+============================================================
+
+## FILE: docs/modules/BENCHMARKS.md
+
+============================================================
+
+
+# Performance Benchmarks
+
+Measured framework overhead for selectools v0.26.0. These numbers answer one
+question: **how much time does selectools add on top of the LLM call?**
+
+All benchmarks use `LocalProvider` (a zero-latency mock), so the timings below
+are pure framework overhead. In production, LLM API latency (100–2000ms per
+call) dominates; everything on this page is noise by comparison.
+
+## Environment
+
+| | |
+|---|---|
+| selectools | v0.26.0 |
+| Python | 3.9 (CPython) |
+| Machine | Apple M4, 24 GB RAM, macOS 26.3 |
+| Method | 100 iterations per case, fresh agent/graph instances per iteration |
+| Date | 2026-06-12 |
+
+## Framework overhead
+
+| Operation | mean | p50 | p95 | p99 |
+|---|---|---|---|---|
+| `agent.run()` single iteration | 0.04ms | 0.03ms | 0.04ms | 0.25ms |
+| `agent.run()` with tool call | 0.03ms | 0.03ms | 0.04ms | 0.04ms |
+| `graph.run()` 1 callable node | 0.32ms | 0.31ms | 0.37ms | 0.72ms |
+| `graph.run()` 3 callable nodes | 0.43ms | 0.43ms | 0.48ms | 0.55ms |
+| `graph.run()` 1 agent node | 0.27ms | 0.26ms | 0.30ms | 0.34ms |
+| `graph.run()` 3 agent nodes | 0.48ms | 0.47ms | 0.52ms | 0.54ms |
+| `graph.run()` 3 parallel nodes | 0.51ms | 0.51ms | 0.54ms | 0.57ms |
+| `pipeline.run()` 1 step | <0.01ms | <0.01ms | <0.01ms | 0.01ms |
+| `pipeline.run()` 3 steps | <0.01ms | <0.01ms | <0.01ms | 0.01ms |
+| `pipeline.run()` 10 steps | 0.01ms | 0.01ms | 0.01ms | 0.01ms |
+| checkpoint save (InMemory) | 0.01ms | 0.01ms | 0.01ms | 0.37ms |
+| checkpoint load (InMemory) | <0.01ms | <0.01ms | <0.01ms | 0.01ms |
+| trace store save (InMemory) | <0.01ms | <0.01ms | <0.01ms | <0.01ms |
+| trace store load (InMemory) | <0.01ms | <0.01ms | <0.01ms | <0.01ms |
+
+Takeaways:
+
+- An agent turn costs **~0.04ms** of framework time. At a typical 500ms LLM
+  round trip, selectools overhead is below 0.01% of wall clock.
+- Graph orchestration adds **~0.3ms fixed cost** per run plus roughly
+  0.05–0.1ms per node.
+- Pipelines, checkpoints, and trace stores are effectively free.
+
+## Comparison: selectools vs LangGraph
+
+Same tasks, same zero-latency mock providers, 200 iterations each
+(LangGraph 1.x, `langchain-core` current as of 2026-06-12).
+
+| Task | selectools (mean) | LangGraph (mean) | delta |
+|---|---|---|---|
+| 3-node linear pipeline | 0.43ms | 0.33ms | LangGraph 0.10ms faster |
+| Conditional routing | 0.37ms | 0.28ms | LangGraph 0.09ms faster |
+| 3-step pipeline composition | <0.01ms | N/A (LCEL, not compared) | — |
+
+Honest reading: LangGraph's compiled Pregel runtime is about **0.1ms faster
+per run** on graph micro-tasks. Both frameworks are sub-millisecond, which is
+under 0.1% of a single real LLM call — neither framework's orchestration
+overhead will ever be the bottleneck in your application. selectools does not
+trade performance for its smaller API; it trades a compile step for a simpler
+execution model at a cost of ~0.1ms per graph run.
+
+## Reproduce
+
+```bash
+# Framework overhead (no extra deps)
+python tests/benchmarks/bench_overhead.py
+
+# Comparison (needs the competitor installed)
+pip install langgraph langchain-core
+python tests/benchmarks/bench_vs_langchain.py
+```
+
+The harness builds **fresh agent/graph instances per iteration** outside the
+timed window. Reusing one `Agent` across iterations accumulates conversation
+history and inflates later timings — an earlier revision of this harness had
+exactly that bug, reporting 6.5ms for the 3-agent-node graph that actually
+costs 0.48ms.
+
+
+
+============================================================
+
+## FILE: docs/modules/SCHEDULER.md
+
+============================================================
+
+
+# Scheduled Agents
+
+Run an [`Agent`](AGENT.md) on a recurring **cron** or **interval** schedule for
+periodic, unattended work — monitoring, reporting, digesting, cleanup.
+
+`AgentScheduler` is stdlib-only (`asyncio` + `datetime`): no APScheduler or cron
+daemon dependency. It is marked `@beta`.
+
+## Quick start
+
+```python
+from selectools import Agent, AgentScheduler, cron, every
+
+agent = Agent(tools=[...], provider=provider)
+
+scheduler = AgentScheduler()
+scheduler.add_job(agent, "Summarize today's open incidents.", cron("0 9 * * *"))
+scheduler.add_job(agent, "Poll the status page for changes.", every(minutes=5))
+
+# Run the loop (async). Exits on stop(), the `until` deadline, or when every
+# job has exhausted its max_runs.
+await scheduler.astart()
+```
+
+Prefer to drive the clock yourself (your own loop, a serverless tick, a test)?
+Fire whatever is due in one call:
+
+```python
+results = scheduler.run_pending()      # sync, uses agent.run
+results = await scheduler.arun_pending()  # async, uses agent.arun
+```
+
+## Schedules
+
+### Cron
+
+`cron("minute hour day-of-month month day-of-week")` — standard 5-field syntax,
+minute resolution.
+
+| Field | Range | Notes |
+|---|---|---|
+| minute | 0–59 | |
+| hour | 0–23 | |
+| day-of-month | 1–31 | |
+| month | 1–12 | |
+| day-of-week | 0–7 | 0 and 7 are both Sunday |
+
+Each field supports `*`, `*/step`, `a`, `a-b`, `a-b/step`, and comma lists
+(`a,b,c`). When **both** day-of-month and day-of-week are restricted, a day
+matches if **either** matches — standard Vixie-cron semantics.
+
+```python
+cron("*/15 9-17 * * 1-5")   # every 15 min, 9am–5pm, Mon–Fri
+cron("0 0 1 * *")           # midnight on the 1st of each month
+cron("0 0 1 * 0")           # midnight on the 1st OR any Sunday
+```
+
+### Interval
+
+`every(seconds=…, minutes=…, hours=…)` — a fixed interval, minimum one second.
+
+```python
+every(seconds=30)
+every(minutes=5)
+every(hours=1, minutes=30)   # 90 minutes
+```
+
+## Jobs
+
+`add_job` returns a `ScheduledJob` you can inspect or mutate:
+
+```python
+job = scheduler.add_job(
+    agent, "Daily digest", cron("0 8 * * *"),
+    name="digest",          # defaults to the agent's name, then job-N
+    max_runs=30,            # stop after N firings (None = unlimited)
+    on_result=handle,       # callback(JobResult) after each run
+    start_immediately=True, # fire on the next tick, then resume the cadence
+)
+job.enabled = False         # pause without removing
+scheduler.remove_job("digest")
+```
+
+By default the first fire is the next time the schedule comes due **strictly
+after now** (an `every(minutes=5)` job first fires in five minutes). Pass
+`start_immediately=True` for the common "run now, then on schedule" pattern.
+
+## Results and failure isolation
+
+Each firing produces a `JobResult`:
+
+```python
+@dataclass
+class JobResult:
+    job_name: str
+    fired_at: datetime
+    run_index: int
+    output: str | None     # the agent's answer, on success
+    error: str | None      # "ExcType: message", on failure
+    # .ok -> error is None
+```
+
+A job that raises is recorded on its `JobResult.error` (and `job.last_result`)
+and **never stops sibling jobs or the scheduler loop**. The cadence is anchored
+to the scheduled fire time, not wall-clock-after-run, so a slow agent does not
+drift the schedule.
+
+## Driving the loop
+
+| Method | Use |
+|---|---|
+| `await scheduler.astart(poll_interval=1.0, until=None)` | Run until `stop()`, the `until` deadline, or all jobs exhaust. Returns every `JobResult`. |
+| `scheduler.run_pending(now=None)` | Fire everything due now once (sync, `agent.run`). |
+| `await scheduler.arun_pending(now=None)` | Same, async (`agent.arun`). |
+| `scheduler.stop()` | Signal `astart` to exit after the current iteration. |
+| `scheduler.due_jobs(now=None)` | The jobs that would fire now. |
+
+For deterministic tests, inject a clock: `AgentScheduler(now=lambda: fixed_dt)`.
+
+## Pairing with Agent-as-API
+
+A scheduler and [Agent-as-API](SERVE.md) compose: serve your agent over HTTP for
+on-demand calls while a scheduler drives the same agent on a cadence in the
+background. Expose `scheduler.jobs` and each `job.last_result` from your own
+route to surface schedule health.
+
+
+
+============================================================
+
+## FILE: docs/modules/REASONING_TOOLS.md
+
+============================================================
+
+
+# Reasoning Tools
+
+Turn reasoning into explicit, bounded, **inspectable tool calls**.
+
+[Reasoning *strategies*](REASONING_STRATEGIES.md) (`PromptBuilder(reasoning_strategy="react")`)
+nudge the model to think a certain way, but the thinking stays hidden inside the
+model's output. **Reasoning tools** make each reasoning step a `think` / `analyze`
+tool call instead — so the chain shows up as structured steps in the trace and is
+bounded by explicit `min_steps` / `max_steps`. The two compose: a strategy shapes
+*how* the model reasons; the tools make that reasoning *visible and bounded*.
+
+Marked `@beta`. Lives in `selectools.toolbox.reasoning_tools`.
+
+## Quick start
+
+```python
+from selectools import Agent
+from selectools.toolbox.reasoning_tools import make_reasoning_tools
+
+agent = Agent(
+    tools=[*my_tools, *make_reasoning_tools(min_steps=1, max_steps=8)],
+    provider=provider,
+)
+agent.run("Plan and execute the migration.")
+```
+
+The agent now has a `think` tool (a scratchpad for one reasoning step) and an
+`analyze` tool (evaluate a result and decide the next step). Both are plain tools
+that return an acknowledgement — they call no external system; their value is that
+the reasoning becomes part of the conversation as discrete, inspectable steps.
+
+## Inspecting the chain
+
+Hold a `ReasoningTools` instance to read the recorded steps after a run:
+
+```python
+from selectools.toolbox.reasoning_tools import ReasoningTools
+
+reasoning = ReasoningTools(min_steps=2, max_steps=6)
+agent = Agent(tools=[*my_tools, *reasoning.tools], provider=provider)
+agent.run("...")
+
+for step in reasoning.steps:        # list[ReasoningStep]
+    print(step.index, step.kind, step.content)
+
+reasoning.reset()                   # reuse the instance for another run
+```
+
+Both `think` and `analyze` count against the **same** budget, so
+`reasoning.count` is the total number of reasoning steps taken.
+
+## Bounds
+
+| Bound | Behavior |
+|---|---|
+| `max_steps` (default 10) | **Enforced.** Once reached, further `think`/`analyze` calls are not recorded and return a message telling the agent to stop reasoning and answer — a real guard against reasoning loops. Pass `None` for unbounded. |
+| `min_steps` (default 1) | **Guidance.** Advertised in the tool descriptions; each call reports how many more steps are expected. A model cannot be forced to call a tool, so the floor is a nudge, not a hard gate. |
+
+```python
+make_reasoning_tools(min_steps=0, max_steps=None)  # optional, unbounded
+make_reasoning_tools(min_steps=3, max_steps=12)     # think hard, but cap it
+```
+
+Invalid bounds (`min_steps < 0`, `max_steps < 1`, `max_steps < min_steps`) raise
+`ValueError` at construction.
+
+## API
+
+| Symbol | Description |
+|---|---|
+| `make_reasoning_tools(min_steps=1, max_steps=10) -> list[Tool]` | Fresh `think` + `analyze` tools backed by a new bounded log. |
+| `ReasoningTools(min_steps=1, max_steps=10)` | Holds the log; `.tools`, `.think_tool()`, `.analyze_tool()`, `.steps`, `.count`, `.reset()`. |
+| `ReasoningStep` | `index` (1-based), `kind` (`"think"`/`"analyze"`), `content`. |
+
+## When to use which
+
+- **Reasoning strategy** (prompt) — lightweight, zero tool overhead; good default.
+- **Reasoning tools** — when you want the chain *recorded* (for evals, debugging,
+  audit), or want a hard cap on reasoning effort. Use both together for shaped,
+  visible, bounded reasoning.
+

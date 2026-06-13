@@ -696,7 +696,7 @@ saved before this feature.
 
 **Stability:** beta
 
-All four backends implement `search(query, namespace=None, limit=5)` —
+All six backends implement `search(query, namespace=None, limit=5)` —
 free-text search over the **content of user and assistant messages**
 across every stored session. This is how an agent "remembers what we
 discussed last Tuesday."

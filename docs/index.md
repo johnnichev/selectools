@@ -138,7 +138,7 @@ pip install selectools
 
     ---
 
-    Tiered `UnifiedMemory`, 4 session backends with cross-session search, Supabase/Redis knowledge persistence.
+    Tiered `UnifiedMemory`, 6 session backends with cross-session search, Supabase/Redis knowledge persistence.
 
     [:octicons-arrow-right-24: Unified Memory](modules/UNIFIED_MEMORY.md)
 
