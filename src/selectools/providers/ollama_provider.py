@@ -88,7 +88,13 @@ class OllamaProvider(_OpenAICompatibleBase):
     def _get_token_key(self, model: str) -> str:
         return "max_tokens"  # Ollama always uses max_tokens
 
-    def _calculate_cost(self, model: str, prompt_tokens: int, completion_tokens: int) -> float:
+    def _calculate_cost(
+        self,
+        model: str,
+        prompt_tokens: int,
+        completion_tokens: int,
+        cached_input_tokens: int = 0,
+    ) -> float:
         return 0.0  # Local models are free
 
     def _get_provider_name(self) -> str:

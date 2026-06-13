@@ -26,11 +26,15 @@ class UsageStats:
         embedding_tokens: Number of tokens used for embeddings (RAG only).
         embedding_cost_usd: Estimated cost in USD for embeddings (RAG only).
         cache_creation_input_tokens: Tokens written to the provider prompt
-            cache (Anthropic prompt caching). None when the provider does
-            not report cache usage.
+            cache (Anthropic prompt caching; OpenAI and Gemini do not report
+            cache writes). None when the provider does not report cache usage.
         cache_read_input_tokens: Tokens served from the provider prompt
-            cache (Anthropic prompt caching). None when the provider does
-            not report cache usage.
+            cache. None when the provider does not report cache usage.
+            Semantics differ by provider: Anthropic bills these IN ADDITION
+            to prompt_tokens (usage.input_tokens excludes them); for OpenAI
+            (prompt_tokens_details.cached_tokens) and Gemini
+            (cached_content_token_count) they are a SUBSET of prompt_tokens,
+            so do not sum prompt_tokens + cache_read_input_tokens there.
     """
 
     prompt_tokens: int = 0

@@ -514,7 +514,7 @@ The following memory features were shipped in v0.16.0 and integrate with `Conver
 - **[Sessions](SESSIONS.md)** — Persistent session storage with JSON file, SQLite, and Redis backends
 - **[Entity Memory](ENTITY_MEMORY.md)** — LLM-based named entity extraction and context injection
 - **[Knowledge Graph](KNOWLEDGE_GRAPH.md)** — Relationship triple extraction with in-memory and SQLite storage
-- **[Knowledge Memory](KNOWLEDGE.md)** — Cross-session durable memory with daily logs and `remember` tool
+- **[Knowledge Memory](KNOWLEDGE.md)** — Cross-session durable memory with daily logs and auto-registered `remember` + `recall` tools (recall searches stored entries by keyword; see [Auto-Registered Tools](KNOWLEDGE.md#auto-registered-tools))
 
 ---
 

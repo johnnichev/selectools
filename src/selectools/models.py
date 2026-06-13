@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from .stability import register_stability, stable
 
@@ -50,6 +50,12 @@ class ModelInfo:
         completion_cost: Cost in USD per 1M output tokens
         max_tokens: Maximum output tokens per request
         context_window: Maximum context length in tokens
+        cached_prompt_cost: Cost in USD per 1M CACHED input tokens (the
+            provider-published cache-hit / cached-input rate). None when the
+            provider does not publish a cached rate for this model — costing
+            then falls back to the full prompt rate. Same verification
+            discipline as the other prices: NO rates from memory, only values
+            readable on the provider's official pricing page.
     """
 
     id: str
@@ -59,6 +65,7 @@ class ModelInfo:
     completion_cost: float
     max_tokens: int
     context_window: int
+    cached_prompt_cost: Optional[float] = None
 
 
 # =============================================================================
@@ -73,6 +80,13 @@ class OpenAI:
     Verified against https://developers.openai.com/api/docs/pricing,
     https://developers.openai.com/api/docs/models, and
     https://developers.openai.com/api/docs/deprecations (2026-06-12).
+
+    cached_prompt_cost ("Cached input" column) verified against
+    https://developers.openai.com/api/docs/pricing (2026-06-12). The page
+    only lists current models; legacy/deprecated models no longer appear
+    there, so their cached rates are left absent (costing falls back to the
+    full prompt rate). gpt-5.5-pro and gpt-5.4-pro are listed WITHOUT a
+    cached-input price, so the field stays absent for them by design.
     """
 
     # ===== GPT-5.5 Series (Latest Flagship) =====
@@ -84,6 +98,7 @@ class OpenAI:
         completion_cost=30.00,
         max_tokens=128000,
         context_window=1050000,
+        cached_prompt_cost=0.50,
     )
     GPT_5_5_PRO = ModelInfo(
         id="gpt-5.5-pro",
@@ -104,6 +119,7 @@ class OpenAI:
         completion_cost=15.00,
         max_tokens=128000,
         context_window=1050000,
+        cached_prompt_cost=0.25,
     )
     GPT_5_4_PRO = ModelInfo(
         id="gpt-5.4-pro",
@@ -122,6 +138,7 @@ class OpenAI:
         completion_cost=4.50,
         max_tokens=128000,
         context_window=400000,
+        cached_prompt_cost=0.075,
     )
     GPT_5_4_NANO = ModelInfo(
         id="gpt-5.4-nano",
@@ -131,6 +148,7 @@ class OpenAI:
         completion_cost=1.25,
         max_tokens=128000,
         context_window=400000,
+        cached_prompt_cost=0.02,
     )
 
     # ===== GPT-5.3 Series =====
@@ -152,6 +170,7 @@ class OpenAI:
         completion_cost=14.00,
         max_tokens=16384,
         context_window=128000,
+        cached_prompt_cost=0.175,
     )
 
     # ===== GPT-5.2 Series =====
@@ -418,6 +437,7 @@ class OpenAI:
 
     # ===== GPT Realtime/Audio =====
     # Text-token pricing; audio tokens are billed separately ($32.00/$64.00 per 1M).
+    # cached_prompt_cost is the text cached-input rate.
     GPT_REALTIME_2 = ModelInfo(
         id="gpt-realtime-2",
         provider="openai",
@@ -426,6 +446,7 @@ class OpenAI:
         completion_cost=24.00,
         max_tokens=32000,
         context_window=128000,
+        cached_prompt_cost=0.40,
     )
     GPT_REALTIME = ModelInfo(
         id="gpt-realtime",
@@ -733,6 +754,12 @@ class Anthropic:
 
     Verified against https://platform.claude.com/docs/en/about-claude/models/overview.md
     and https://platform.claude.com/docs/en/about-claude/pricing.md (2026-06-12).
+
+    cached_prompt_cost is the "Cache Hits & Refreshes" column of the model
+    pricing table at https://platform.claude.com/docs/en/about-claude/pricing
+    (verified 2026-06-12; every listed model is exactly 0.1x its base input
+    price). Cache WRITE premiums (1.25x 5-min / 2x 1-hour) are handled by the
+    multipliers in pricing.py, not by this field.
     """
 
     # ===== Claude Fable 5 (Latest, most capable) =====
@@ -746,6 +773,7 @@ class Anthropic:
         completion_cost=50.00,
         max_tokens=128000,
         context_window=1000000,
+        cached_prompt_cost=1.00,
     )
 
     # ===== Claude Opus 4.x Series =====
@@ -757,6 +785,7 @@ class Anthropic:
         completion_cost=25.00,
         max_tokens=128000,
         context_window=1000000,
+        cached_prompt_cost=0.50,
     )
     OPUS_4_7 = ModelInfo(
         id="claude-opus-4-7",
@@ -766,6 +795,7 @@ class Anthropic:
         completion_cost=25.00,
         max_tokens=128000,
         context_window=1000000,
+        cached_prompt_cost=0.50,
     )
     OPUS_4_6 = ModelInfo(
         id="claude-opus-4-6",
@@ -775,6 +805,7 @@ class Anthropic:
         completion_cost=25.00,
         max_tokens=128000,
         context_window=1000000,
+        cached_prompt_cost=0.50,
     )
 
     # ===== Claude Sonnet 4.6 =====
@@ -786,6 +817,7 @@ class Anthropic:
         completion_cost=15.00,
         max_tokens=64000,
         context_window=1000000,
+        cached_prompt_cost=0.30,
     )
 
     # ===== Claude 4.5 Series =====
@@ -797,6 +829,7 @@ class Anthropic:
         completion_cost=25.00,
         max_tokens=64000,
         context_window=200000,
+        cached_prompt_cost=0.50,
     )
     SONNET_4_5 = ModelInfo(
         id="claude-sonnet-4-5",
@@ -806,6 +839,7 @@ class Anthropic:
         completion_cost=15.00,
         max_tokens=64000,
         context_window=200000,
+        cached_prompt_cost=0.30,
     )
     HAIKU_4_5 = ModelInfo(
         id="claude-haiku-4-5",
@@ -815,6 +849,7 @@ class Anthropic:
         completion_cost=5.00,
         max_tokens=64000,
         context_window=200000,
+        cached_prompt_cost=0.10,
     )
 
     # ===== Claude 4.1 Series =====
@@ -827,6 +862,7 @@ class Anthropic:
         completion_cost=75.00,
         max_tokens=32000,
         context_window=200000,
+        cached_prompt_cost=1.50,
     )
 
     # ===== Claude 4 Base Aliases =====
@@ -840,6 +876,7 @@ class Anthropic:
         completion_cost=75.00,
         max_tokens=32000,
         context_window=200000,
+        cached_prompt_cost=1.50,
     )
     SONNET_4_0 = ModelInfo(
         id="claude-sonnet-4-0",
@@ -849,6 +886,7 @@ class Anthropic:
         completion_cost=15.00,
         max_tokens=64000,
         context_window=200000,
+        cached_prompt_cost=0.30,
     )
 
     # ===== Embedding Models (Voyage AI partnership) =====
@@ -887,6 +925,15 @@ class Gemini:
     Verified against https://ai.google.dev/gemini-api/docs/models and
     https://ai.google.dev/gemini-api/docs/pricing (2026-06-12).
     Tiered models record the base (<=200k-token prompt) price; see comments.
+
+    cached_prompt_cost is the per-token "Context caching" price on
+    https://ai.google.dev/gemini-api/docs/pricing (verified 2026-06-12).
+    Models whose pricing row lists no context-caching price keep the field
+    absent. Tiered models record the base (<=200k) caching rate, matching
+    the tier recorded for prompt_cost. NOTE: Google also bills cache
+    STORAGE per 1M-token-hour (e.g. $1.00 or $4.50/1M/hr); storage is a
+    time-based charge that token-count costing cannot capture and is NOT
+    included in cost_usd.
     """
 
     # ===== Gemini 3.5 Series (Latest) =====
@@ -898,6 +945,7 @@ class Gemini:
         completion_cost=9.00,
         max_tokens=65536,
         context_window=1048576,
+        cached_prompt_cost=0.15,
     )
     LIVE_TRANSLATE_3_5_PREVIEW = ModelInfo(
         id="gemini-3.5-live-translate-preview",
@@ -911,7 +959,8 @@ class Gemini:
 
     # ===== Gemini 3.1 Series =====
     # Tiered pricing: $2.00/$12.00 for prompts <=200k tokens,
-    # $4.00/$18.00 for prompts >200k tokens. Base tier recorded here.
+    # $4.00/$18.00 for prompts >200k tokens. Base tier recorded here
+    # (caching: $0.20 <=200k / $0.40 >200k; base tier recorded).
     PRO_3_1 = ModelInfo(
         id="gemini-3.1-pro-preview",
         provider="gemini",
@@ -920,6 +969,7 @@ class Gemini:
         completion_cost=12.00,
         max_tokens=65536,
         context_window=1048576,
+        cached_prompt_cost=0.20,
     )
     FLASH_LITE_3_1 = ModelInfo(
         id="gemini-3.1-flash-lite",
@@ -929,6 +979,7 @@ class Gemini:
         completion_cost=1.50,
         max_tokens=65536,
         context_window=1048576,
+        cached_prompt_cost=0.025,
     )
     # Text output $3.00/1M; image output is billed at $60.00/1M image tokens.
     FLASH_IMAGE_3_1 = ModelInfo(
@@ -978,11 +1029,13 @@ class Gemini:
         completion_cost=3.00,
         max_tokens=65536,
         context_window=1048576,
+        cached_prompt_cost=0.05,
     )
 
     # ===== Gemini 2.5 Series =====
     # Tiered pricing: $1.25/$10.00 for prompts <=200k tokens,
-    # $2.50/$15.00 for prompts >200k tokens. Base tier recorded here.
+    # $2.50/$15.00 for prompts >200k tokens. Base tier recorded here
+    # (caching: $0.125 <=200k / $0.25 >200k; base tier recorded).
     PRO_2_5 = ModelInfo(
         id="gemini-2.5-pro",
         provider="gemini",
@@ -991,6 +1044,7 @@ class Gemini:
         completion_cost=10.00,
         max_tokens=65536,
         context_window=1048576,
+        cached_prompt_cost=0.125,
     )
     FLASH_2_5 = ModelInfo(
         id="gemini-2.5-flash",
@@ -1000,6 +1054,7 @@ class Gemini:
         completion_cost=2.50,
         max_tokens=65536,
         context_window=1048576,
+        cached_prompt_cost=0.03,
     )
     FLASH_LITE_2_5 = ModelInfo(
         id="gemini-2.5-flash-lite",
@@ -1009,6 +1064,7 @@ class Gemini:
         completion_cost=0.40,
         max_tokens=65536,
         context_window=1048576,
+        cached_prompt_cost=0.01,
     )
     FLASH_NATIVE_AUDIO_2_5_PREVIEW = ModelInfo(
         id="gemini-2.5-flash-native-audio-preview-12-2025",
@@ -1085,6 +1141,13 @@ class Gemini:
     class Embeddings:
         """Google Gemini embedding models."""
 
+        # Default embedding model. Kept as the GeminiEmbeddingProvider default
+        # deliberately: gemini-embedding-2 (below) is GA and newer, but its
+        # embedding space is INCOMPATIBLE with -001, so flipping the library
+        # default would silently break existing vector stores (queries embedded
+        # with v2 don't match documents embedded with -001). A default change is
+        # itself breaking and must ship with a migration note. (decision
+        # 2026-06-13; both rates verified against ai.google.dev/gemini-api/pricing)
         EMBEDDING_001 = ModelInfo(
             id="gemini-embedding-001",
             provider="gemini",
@@ -1094,6 +1157,8 @@ class Gemini:
             max_tokens=2048,
             context_window=2048,
         )
+        # GA April 2026, multimodal, 8k token limit, recommended for NEW
+        # projects. Not the default (see -001 note above re: incompatible space).
         EMBEDDING_2 = ModelInfo(
             id="gemini-embedding-2",
             provider="gemini",

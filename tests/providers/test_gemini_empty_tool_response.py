@@ -85,7 +85,10 @@ class TestCompleteEmptyToolResponseWarning:
         provider._client.models.generate_content.return_value = _empty_response()
 
         with caplog.at_level(logging.WARNING, logger="selectools.providers.gemini_provider"):
-            with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+            with patch(
+                "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+                return_value=0.0,
+            ):
                 msg, _ = provider.complete(
                     model="gemini-2.5-flash-lite",
                     system_prompt="sys",
@@ -106,7 +109,10 @@ class TestCompleteEmptyToolResponseWarning:
         provider._client.models.generate_content.return_value = _empty_response()
 
         with caplog.at_level(logging.WARNING, logger="selectools.providers.gemini_provider"):
-            with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+            with patch(
+                "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+                return_value=0.0,
+            ):
                 provider.complete(
                     model="gemini-2.5-flash-lite",
                     system_prompt="sys",
@@ -122,7 +128,10 @@ class TestCompleteEmptyToolResponseWarning:
         provider._client.models.generate_content.return_value = _text_response("the answer")
 
         with caplog.at_level(logging.WARNING, logger="selectools.providers.gemini_provider"):
-            with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+            with patch(
+                "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+                return_value=0.0,
+            ):
                 msg, _ = provider.complete(
                     model="gemini-2.5-flash-lite",
                     system_prompt="sys",
@@ -153,7 +162,10 @@ class TestCompleteEmptyToolResponseWarning:
         provider._client.models.generate_content.return_value = response
 
         with caplog.at_level(logging.WARNING, logger="selectools.providers.gemini_provider"):
-            with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+            with patch(
+                "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+                return_value=0.0,
+            ):
                 msg, _ = provider.complete(
                     model="gemini-2.5-flash-lite",
                     system_prompt="sys",
@@ -172,7 +184,10 @@ class TestCompleteEmptyToolResponseWarning:
         provider._client.aio.models.generate_content = AsyncMock(return_value=_empty_response())
 
         with caplog.at_level(logging.WARNING, logger="selectools.providers.gemini_provider"):
-            with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+            with patch(
+                "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+                return_value=0.0,
+            ):
                 msg, _ = asyncio.run(
                     provider.acomplete(
                         model="gemini-2.5-flash-lite",

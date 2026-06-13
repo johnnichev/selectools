@@ -33,7 +33,7 @@ result = agent.run("Find our refund policy")
 
 - [Agent](https://selectools.dev/modules/AGENT/): Agent class, AgentConfig, AgentResult — the central orchestrator
 - [Tools](https://selectools.dev/modules/TOOLS/): @tool decorator, Tool class, ToolLoader, ToolRegistry
-- [Toolbox](https://selectools.dev/modules/TOOLBOX/): 48 pre-built tools (file I/O, HTTP/web, data parsing, datetime, text, code execution, search, GitHub, database, calculator, email, PDF, Slack, Notion, Linear)
+- [Toolbox](https://selectools.dev/modules/TOOLBOX/): 56 pre-built tools (file I/O, HTTP/web, data parsing, datetime, text, code execution, search, GitHub, database, calculator, email, PDF, Slack, Notion, Linear, Discord, S3, browser, image generation)
 - [Memory](https://selectools.dev/modules/MEMORY/): ConversationMemory with sliding window and summarize-on-trim
 - [Streaming](https://selectools.dev/modules/STREAMING/): Token-level astream() with tool call support
 

@@ -74,7 +74,7 @@ pip install selectools
 
     ---
 
-    48 production-ready tools: web search, code execution, file ops, SQL, calculator, email, PDF, Slack, Notion, Linear, more.
+    56 production-ready tools: web search, code execution, file ops, SQL, calculator, email, PDF, Slack, Notion, Linear, Discord, S3, browser, image gen, more.
 
     [:octicons-arrow-right-24: Toolbox](modules/TOOLBOX.md)
 
