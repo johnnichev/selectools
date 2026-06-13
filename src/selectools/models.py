@@ -1141,6 +1141,13 @@ class Gemini:
     class Embeddings:
         """Google Gemini embedding models."""
 
+        # Default embedding model. Kept as the GeminiEmbeddingProvider default
+        # deliberately: gemini-embedding-2 (below) is GA and newer, but its
+        # embedding space is INCOMPATIBLE with -001, so flipping the library
+        # default would silently break existing vector stores (queries embedded
+        # with v2 don't match documents embedded with -001). A default change is
+        # itself breaking and must ship with a migration note. (decision
+        # 2026-06-13; both rates verified against ai.google.dev/gemini-api/pricing)
         EMBEDDING_001 = ModelInfo(
             id="gemini-embedding-001",
             provider="gemini",
@@ -1150,6 +1157,8 @@ class Gemini:
             max_tokens=2048,
             context_window=2048,
         )
+        # GA April 2026, multimodal, 8k token limit, recommended for NEW
+        # projects. Not the default (see -001 note above re: incompatible space).
         EMBEDDING_2 = ModelInfo(
             id="gemini-embedding-2",
             provider="gemini",
