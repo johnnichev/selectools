@@ -148,7 +148,15 @@ class LiteLLMProvider(_OpenAICompatibleBase):
         # provider-specific quirks (e.g. max_completion_tokens) itself.
         return "max_tokens"
 
-    def _calculate_cost(self, model: str, prompt_tokens: int, completion_tokens: int) -> float:
+    def _calculate_cost(
+        self,
+        model: str,
+        prompt_tokens: int,
+        completion_tokens: int,
+        cached_input_tokens: int = 0,
+    ) -> float:
+        # litellm's cost_per_token has no cached-token input; cache hits are
+        # billed at the full prompt rate here (conservative over-estimate).
         try:
             prompt_cost, completion_cost = self._litellm.cost_per_token(
                 model=model,

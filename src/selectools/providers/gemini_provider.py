@@ -11,7 +11,7 @@ import base64
 import logging
 import os
 import uuid
-from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, Iterable, List, Union
+from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, Iterable, List, Optional, Union
 
 if TYPE_CHECKING:
     from ..tools.base import Tool
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 from ..env import load_default_env
 from ..exceptions import ProviderConfigurationError
 from ..models import Gemini as GeminiModels
-from ..pricing import calculate_cost
+from ..pricing import calculate_cost_with_cached_input
 from ..stability import stable
 from ..types import Message, Role, ToolCall
 from ..usage import UsageStats
@@ -56,6 +56,16 @@ def _sanitize_schema_for_gemini(schema: Dict[str, Any]) -> Dict[str, Any]:
     if isinstance(items, dict):
         cleaned["items"] = _sanitize_schema_for_gemini(items)
     return cleaned
+
+
+def _cached_content_tokens(usage: Any) -> Optional[int]:
+    """Read ``usage_metadata.cached_content_token_count`` defensively.
+
+    Returns None when the API does not report cache usage, so None (unknown)
+    is never conflated with 0 (a real zero-hit count). Pitfall #22.
+    """
+    value = getattr(usage, "cached_content_token_count", None) if usage is not None else None
+    return value if isinstance(value, int) else None
 
 
 def _candidate_finish_reason(response: Any) -> str:
@@ -240,13 +250,19 @@ class GeminiProvider(Provider):
             if usage is not None and usage.candidates_token_count is not None
             else 0
         )
+        # Cached input tokens (context-caching hits) are INCLUDED in
+        # prompt_token_count but bill at the model's published caching rate.
+        cached_tokens = _cached_content_tokens(usage)
         usage_stats = UsageStats(
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             total_tokens=prompt_tokens + completion_tokens,
-            cost_usd=calculate_cost(model_name, prompt_tokens, completion_tokens),
+            cost_usd=calculate_cost_with_cached_input(
+                model_name, prompt_tokens, completion_tokens, cached_tokens or 0
+            ),
             model=model_name,
             provider="gemini",
+            cache_read_input_tokens=cached_tokens,
         )
 
         return (
@@ -626,13 +642,19 @@ class GeminiProvider(Provider):
             if usage is not None and usage.candidates_token_count is not None
             else 0
         )
+        # Cached input tokens (context-caching hits) are INCLUDED in
+        # prompt_token_count but bill at the model's published caching rate.
+        cached_tokens = _cached_content_tokens(usage)
         usage_stats = UsageStats(
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             total_tokens=prompt_tokens + completion_tokens,
-            cost_usd=calculate_cost(model_name, prompt_tokens, completion_tokens),
+            cost_usd=calculate_cost_with_cached_input(
+                model_name, prompt_tokens, completion_tokens, cached_tokens or 0
+            ),
             model=model_name,
             provider="gemini",
+            cache_read_input_tokens=cached_tokens,
         )
 
         return (
