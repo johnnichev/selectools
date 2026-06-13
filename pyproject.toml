@@ -86,6 +86,9 @@ aws = [
 browser = [
     "playwright>=1.40.0",
 ]
+mongo = [
+    "pymongo>=4.0.0",
+]
 evals = [
     "pyyaml>=6.0.0",
 ]

@@ -47,7 +47,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
 
 **Added in:** v0.16.0
 **File:** `src/selectools/sessions.py`
-**Classes:** `SessionStore`, `SessionSearchResult`, `JsonFileSessionStore`, `SQLiteSessionStore`, `RedisSessionStore`, `SupabaseSessionStore`
+**Classes:** `SessionStore`, `SessionSearchResult`, `JsonFileSessionStore`, `SQLiteSessionStore`, `RedisSessionStore`, `SupabaseSessionStore`, `MongoSessionStore`
 
 ## Table of Contents
 
@@ -305,6 +305,44 @@ pip install selectools[supabase]
 ```
 
 **Example:** [`examples/96_supabase_session_store.py`](https://github.com/johnnichev/selectools/blob/main/examples/96_supabase_session_store.py) — runs offline against an in-process fake client; swap in `supabase.create_client(...)` for production.
+
+### 5. MongoSessionStore
+
+**Best for:** document-database deployments already running MongoDB.
+
+**Since:** Unreleased (beta)
+
+```python
+from selectools.sessions import MongoSessionStore
+
+store = MongoSessionStore(
+    url="mongodb://localhost:27017",  # connection URL
+    database="selectools",            # default
+    collection="sessions",            # default
+    default_ttl=None,                 # seconds; None = no expiry
+)
+```
+
+Each session is one document keyed by `_id` (the bare `session_id`, or
+`namespace:session_id` with a namespace). The full `ConversationMemory` lives in
+the `memory` field, so a save is a single `replace_one(..., upsert=True)`.
+
+**Features:**
+
+- Single-document-per-session storage; idempotent upsert saves
+- Namespace isolation and the same `session_id` / `namespace` validation guards
+  as the other backends (null bytes, 512-char cap)
+- Optional server-side expiry: when `default_ttl` is set, a TTL index is created
+  on `expires_at` and each save stamps it
+- `search` fetches the (optionally namespace-filtered) documents and scores them
+  in-process with term frequency — no `$text` index assumed (add one + a
+  server-side query for large fleets)
+
+**Installation:**
+
+```bash
+pip install selectools[mongo]
+```
 
 ---
 
