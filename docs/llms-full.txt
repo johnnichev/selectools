@@ -586,7 +586,7 @@ You now know the core API. Here is where to go from here:
 | Add audit logging | [Audit Guide](modules/AUDIT.md) |
 | Screen tool outputs for injection | [Security Guide](modules/SECURITY.md) |
 | Enable coherence checking | [Security Guide — Coherence](modules/SECURITY.md#coherence-checking) |
-| Use 48 pre-built tools | [Toolbox Guide](modules/TOOLBOX.md) |
+| Use 56 pre-built tools | [Toolbox Guide](modules/TOOLBOX.md) |
 | Handle errors gracefully | [Exceptions Guide](modules/EXCEPTIONS.md) |
 | Look up model pricing at runtime | [Models Guide — Pricing API](modules/MODELS.md#programmatic-pricing-api) |
 | Use structured output helpers | [Agent Guide — Structured Helpers](modules/AGENT.md#standalone-helpers) |
@@ -2549,7 +2549,7 @@ print(result.content)
 !!! tip "See Also"
     - [Agent](AGENT.md) -- how agents use tools in the execution loop
     - [Dynamic Tools](DYNAMIC_TOOLS.md) -- ToolLoader, hot-reload, plugin systems
-    - [Toolbox](TOOLBOX.md) -- 48 pre-built tools (file, web, data, datetime, text)
+    - [Toolbox](TOOLBOX.md) -- 56 pre-built tools (file, web, data, datetime, text)
 
 ---
 
@@ -13527,7 +13527,7 @@ from selectools import Agent, AgentConfig, OpenAIProvider
 from selectools.toolbox import get_all_tools
 
 agent = Agent(
-    tools=get_all_tools(),           # all 48 tools
+    tools=get_all_tools(),           # all 56 tools
     provider=OpenAIProvider(),
     config=AgentConfig(max_iterations=5),
 )
@@ -13545,7 +13545,7 @@ print(result.content)
 ```python
 from selectools.toolbox import get_all_tools
 
-tools = get_all_tools()  # List[Tool], 48 tools
+tools = get_all_tools()  # List[Tool], 56 tools
 ```
 
 ### By Category
@@ -13728,7 +13728,7 @@ agent = Agent(
 
 | Function | Description |
 |---|---|
-| `get_all_tools()` | Returns all 48 tools as `List[Tool]` |
+| `get_all_tools()` | Returns all 56 tools as `List[Tool]` |
 | `get_tools_by_category(category)` | Returns tools for one category (`"file"`, `"web"`, `"data"`, `"datetime"`, `"text"`) |
 | `selectools.toolbox.file_tools` | Module with 5 file tools |
 | `selectools.toolbox.web_tools` | Module with 2 web tools |

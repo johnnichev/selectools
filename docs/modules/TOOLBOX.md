@@ -1,11 +1,11 @@
 ---
-description: "48 pre-built tools for file I/O, web requests, data processing, datetime, text, code, search, GitHub, databases, calculator, email, PDF, Slack, Notion, and Linear"
+description: "56 pre-built tools for file I/O, web requests, data processing, datetime, text, code, search, GitHub, databases, calculator, email, PDF, Slack, Notion, Linear, Discord, S3, browser automation, and image generation"
 tags:
   - tools
   - built-in
 ---
 
-# Toolbox: 48 Pre-Built Tools
+# Toolbox: 56 Pre-Built Tools
 
 **Import:** `from selectools.toolbox import get_all_tools`
 
@@ -16,12 +16,13 @@ from selectools import Agent, AgentConfig, Message, Role
 from selectools.providers.stubs import LocalProvider
 from selectools.toolbox import get_all_tools, get_tools_by_category
 
-# Load all 48 pre-built tools across 15 categories
+# Load all 56 pre-built tools across 19 categories
 all_tools = get_all_tools()
 print(f"Loaded {len(all_tools)} tools")
 
 # Or load by category: file, web, data, datetime, text, code, search, github,
-# database, calculator, email, pdf, slack, notion, linear
+# database, calculator, email, pdf, slack, notion, linear, discord, s3,
+# browser, image
 text_tools = get_tools_by_category("text")
 data_tools = get_tools_by_category("data")
 
@@ -44,9 +45,9 @@ print(result.content)
 
 ---
 
-**Added in:** v0.12.0 | **Expanded in:** v0.21.0, v0.23.0
+**Added in:** v0.12.0 | **Expanded in:** v0.21.0, v0.23.0, v1.1.0
 
-The toolbox provides **48 ready-to-use tools** across 15 categories that you can give to an agent immediately — no implementation needed.
+The toolbox provides **56 ready-to-use tools** across 19 categories that you can give to an agent immediately — no implementation needed.
 
 ---
 
@@ -57,7 +58,7 @@ from selectools import Agent, AgentConfig, OpenAIProvider
 from selectools.toolbox import get_all_tools
 
 agent = Agent(
-    tools=get_all_tools(),           # all 48 tools
+    tools=get_all_tools(),           # all 56 tools
     provider=OpenAIProvider(),
     config=AgentConfig(max_iterations=5),
 )
@@ -75,7 +76,7 @@ print(result.content)
 ```python
 from selectools.toolbox import get_all_tools
 
-tools = get_all_tools()  # List[Tool], 48 tools
+tools = get_all_tools()  # List[Tool], 56 tools
 ```
 
 ### By Category
@@ -98,6 +99,10 @@ pdf_tools    = get_tools_by_category("pdf")        # 2 tools  (v0.23.0)
 slack_tools  = get_tools_by_category("slack")      # 3 tools  (v0.23.0)
 notion_tools = get_tools_by_category("notion")     # 3 tools  (v0.23.0)
 linear_tools = get_tools_by_category("linear")     # 3 tools  (v0.23.0)
+discord_tools = get_tools_by_category("discord")   # 2 tools  (v1.1.0)
+s3_tools     = get_tools_by_category("s3")         # 3 tools  (v1.1.0)
+browser_tools = get_tools_by_category("browser")   # 2 tools  (v1.1.0)
+image_tools  = get_tools_by_category("image")      # 1 tool   (v1.1.0)
 ```
 
 ### Individual Tools
@@ -118,6 +123,10 @@ from selectools.toolbox.pdf_tools import extract_pdf_text, extract_pdf_tables  #
 from selectools.toolbox.slack_tools import slack_send_message, slack_read_channel  # v0.23.0
 from selectools.toolbox.notion_tools import notion_create_page, notion_search  # v0.23.0
 from selectools.toolbox.linear_tools import linear_create_issue, linear_list_issues  # v0.23.0
+from selectools.toolbox.discord_tools import discord_send_message, discord_read_channel  # v1.1.0
+from selectools.toolbox.s3_tools import s3_list_objects, s3_get_object, s3_put_object  # v1.1.0
+from selectools.toolbox.browser_tools import browser_scrape_page, browser_screenshot  # v1.1.0
+from selectools.toolbox.image_tools import generate_image                     # v1.1.0
 ```
 
 ---
@@ -508,6 +517,106 @@ agent.ask("List my open issues and create a follow-up issue for the flaky test")
 
 ---
 
+## Discord Tools (2) — v1.1.0
+
+| Tool | Description | Parameters |
+|---|---|---|
+| `discord_send_message` | Send a message to a channel | `channel_id`, `text`, `token=None` |
+| `discord_read_channel` | Read recent channel history | `channel_id`, `limit=10`, `token=None` |
+
+Uses the Discord REST API v10 via `requests` (`pip install selectools[toolbox]`) —
+no gateway connection or `discord.py` required. Token via the `DISCORD_BOT_TOKEN`
+env var or the `token` parameter. The bot needs the `Send Messages` /
+`Read Message History` permissions in the target channel.
+
+```python
+agent = Agent(
+    tools=get_tools_by_category("discord"),
+    provider=provider,
+    config=AgentConfig(max_iterations=3),
+)
+
+agent.ask("Post 'v1.1.0 released' to channel 123456789012345678")
+agent.ask("Summarize the last 20 messages in channel 123456789012345678")
+```
+
+---
+
+## S3 Tools (3) — v1.1.0
+
+| Tool | Description | Parameters |
+|---|---|---|
+| `s3_list_objects` | List objects in a bucket | `bucket`, `prefix=""`, `max_keys=100` |
+| `s3_get_object` | Read an object's contents as text | `bucket`, `key`, `max_bytes=65536` |
+| `s3_put_object` | Upload text content to a bucket | `bucket`, `key`, `content`, `content_type=None` |
+
+Requires `boto3` (`pip install selectools[aws]`). The import is lazy — the
+toolbox loads fine without it. Credentials come from the standard AWS chain:
+`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` env vars,
+shared config files, or an IAM role.
+
+```python
+agent = Agent(
+    tools=get_tools_by_category("s3"),
+    provider=provider,
+    config=AgentConfig(max_iterations=3),
+)
+
+agent.ask("List the objects under reports/ in the analytics bucket and summarize the latest CSV")
+```
+
+---
+
+## Browser Tools (2) — v1.1.0
+
+| Tool | Description | Parameters |
+|---|---|---|
+| `browser_scrape_page` | Scrape the visible text of a rendered page | `url`, `timeout=30` |
+| `browser_screenshot` | Save a PNG screenshot of a page | `url`, `path`, `full_page=False`, `timeout=30` |
+
+Requires Playwright (`pip install selectools[browser]` then
+`playwright install chromium`). Pages render in headless Chromium with
+JavaScript executed, so dynamic sites work where plain HTTP scraping
+(`search_tools.scrape_url`) does not. Scraped text is truncated to 5000
+characters.
+
+```python
+agent = Agent(
+    tools=get_tools_by_category("browser"),
+    provider=provider,
+    config=AgentConfig(max_iterations=3),
+)
+
+agent.ask("Scrape https://example.com and summarize the page")
+agent.ask("Take a full-page screenshot of https://example.com and save it to shots/home.png")
+```
+
+---
+
+## Image Tools (1) — v1.1.0
+
+| Tool | Description | Parameters |
+|---|---|---|
+| `generate_image` | Generate an image from a text prompt | `prompt`, `output_path=None`, `model="gpt-image-1"`, `size="1024x1024"`, `api_key=None` |
+
+Uses the OpenAI Images API (the `openai` package is a core selectools
+dependency). Key via the `OPENAI_API_KEY` env var or the `api_key` parameter.
+Models that return base64 data (`gpt-image-1`) save a PNG to `output_path`
+(or a temp file) and return the path; models that return a hosted URL
+(`dall-e-3`) return the URL.
+
+```python
+agent = Agent(
+    tools=get_tools_by_category("image"),
+    provider=provider,
+    config=AgentConfig(max_iterations=3),
+)
+
+agent.ask("Generate a watercolor fox illustration and save it to assets/fox.png")
+```
+
+---
+
 ## Combining with Custom Tools
 
 Toolbox tools are regular `Tool` objects — mix them freely with your own:
@@ -534,8 +643,8 @@ agent = Agent(
 
 | Function | Description |
 |---|---|
-| `get_all_tools()` | Returns all 48 tools as `List[Tool]` |
-| `get_tools_by_category(category)` | Returns tools for one category (`"file"`, `"web"`, `"data"`, `"datetime"`, `"text"`, `"code"`, `"search"`, `"github"`, `"database"`, `"calculator"`, `"email"`, `"pdf"`, `"slack"`, `"notion"`, `"linear"`) |
+| `get_all_tools()` | Returns all 56 tools as `List[Tool]` |
+| `get_tools_by_category(category)` | Returns tools for one category (`"file"`, `"web"`, `"data"`, `"datetime"`, `"text"`, `"code"`, `"search"`, `"github"`, `"database"`, `"calculator"`, `"email"`, `"pdf"`, `"slack"`, `"notion"`, `"linear"`, `"discord"`, `"s3"`, `"browser"`, `"image"`) |
 | `selectools.toolbox.file_tools` | Module with 5 file tools |
 | `selectools.toolbox.web_tools` | Module with 2 web tools |
 | `selectools.toolbox.data_tools` | Module with 6 data tools |
@@ -551,6 +660,10 @@ agent = Agent(
 | `selectools.toolbox.slack_tools` | Module with 3 Slack tools (v0.23.0) |
 | `selectools.toolbox.notion_tools` | Module with 3 Notion tools (v0.23.0) |
 | `selectools.toolbox.linear_tools` | Module with 3 Linear tools (v0.23.0) |
+| `selectools.toolbox.discord_tools` | Module with 2 Discord tools (v1.1.0) |
+| `selectools.toolbox.s3_tools` | Module with 3 Amazon S3 tools (v1.1.0) |
+| `selectools.toolbox.browser_tools` | Module with 2 headless-browser tools (v1.1.0) |
+| `selectools.toolbox.image_tools` | Module with 1 image generation tool (v1.1.0) |
 
 ---
 
@@ -566,6 +679,7 @@ agent = Agent(
 
 | # | Script | Description |
 |---|--------|-------------|
-| 03 | [`03_toolbox.py`](https://github.com/johnnichev/selectools/blob/main/examples/03_toolbox.py) | Working demo of all 48 pre-built tools across 15 categories |
+| 03 | [`03_toolbox.py`](https://github.com/johnnichev/selectools/blob/main/examples/03_toolbox.py) | Working demo of all 56 pre-built tools across 19 categories |
 | 13 | [`13_dynamic_tools.py`](https://github.com/johnnichev/selectools/blob/main/examples/13_dynamic_tools.py) | Loading tools dynamically from files and directories |
 | 104 | [`104_toolbox_expansion.py`](https://github.com/johnnichev/selectools/blob/main/examples/104_toolbox_expansion.py) | Calculator, email, PDF, Slack, Notion, and Linear tools (v0.23.0) |
+| 112 | [`112_toolbox_v1_1_expansion.py`](https://github.com/johnnichev/selectools/blob/main/examples/112_toolbox_v1_1_expansion.py) | Discord, S3, browser, and image generation tools (v1.1.0) |
