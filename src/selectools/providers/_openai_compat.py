@@ -95,8 +95,20 @@ class _OpenAICompatibleBase(ABC):
         ...
 
     @abstractmethod
-    def _calculate_cost(self, model: str, prompt_tokens: int, completion_tokens: int) -> float:
-        """Return the estimated USD cost for the request."""
+    def _calculate_cost(
+        self,
+        model: str,
+        prompt_tokens: int,
+        completion_tokens: int,
+        cached_input_tokens: int = 0,
+    ) -> float:
+        """Return the estimated USD cost for the request.
+
+        ``cached_input_tokens`` is the portion of ``prompt_tokens`` served
+        from the provider prompt cache (OpenAI
+        ``usage.prompt_tokens_details.cached_tokens``); implementations that
+        do not price cache hits may ignore it.
+        """
         ...
 
     @abstractmethod
@@ -528,6 +540,18 @@ class _OpenAICompatibleBase(ABC):
 
     # -- response parsing (shared) --------------------------------------------
 
+    @staticmethod
+    def _cached_prompt_tokens(usage: Any) -> int | None:
+        """Read ``usage.prompt_tokens_details.cached_tokens`` defensively.
+
+        Returns None when the provider (or an OpenAI-compatible server like
+        Ollama) does not report the field, so None (unknown) is never
+        conflated with 0 (a real zero-hit count).
+        """
+        details = getattr(usage, "prompt_tokens_details", None) if usage else None
+        value = getattr(details, "cached_tokens", None) if details is not None else None
+        return value if isinstance(value, int) else None
+
     def _parse_response(self, response: Any, model_name: str) -> tuple[Message, UsageStats]:
         """Parse an OpenAI-compatible chat completion response."""
         if not response.choices:
@@ -552,6 +576,9 @@ class _OpenAICompatibleBase(ABC):
                 )
 
         usage = response.usage
+        # Cached input tokens (prompt-caching hits) are INCLUDED in
+        # prompt_tokens but bill at the model's published cached rate.
+        cached_tokens = self._cached_prompt_tokens(usage)
         usage_stats = UsageStats(
             prompt_tokens=usage.prompt_tokens if usage else 0,
             completion_tokens=usage.completion_tokens if usage else 0,
@@ -560,9 +587,11 @@ class _OpenAICompatibleBase(ABC):
                 model_name,
                 usage.prompt_tokens if usage else 0,
                 usage.completion_tokens if usage else 0,
+                cached_input_tokens=cached_tokens or 0,
             ),
             model=model_name,
             provider=self._get_provider_name(),
+            cache_read_input_tokens=cached_tokens,
         )
 
         return (

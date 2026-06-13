@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Cache-rate cost support for OpenAI and Gemini** (follow-up to #106's
+  Anthropic-only cache-aware costing) — `ModelInfo` gains an optional
+  `cached_prompt_cost` field (USD per 1M cached input tokens), populated
+  only with rates readable on the providers' official pricing pages on
+  2026-06-12 (6 OpenAI, 7 Gemini, 11 Anthropic models; never from
+  memory). New `@beta` helper
+  `pricing.calculate_cost_with_cached_input(model, input_tokens,
+  output_tokens, cached_input_tokens=0)` prices the cached portion of the
+  input at the published cached rate, falling back to the full prompt
+  rate when no rate is published (exactly the legacy formula).
+  `OpenAIProvider` (and `AzureOpenAIProvider` via inheritance) now feeds
+  `usage.prompt_tokens_details.cached_tokens` and `GeminiProvider` feeds
+  `usage_metadata.cached_content_token_count` through it on the
+  complete/acomplete paths, and both surface the count in
+  `UsageStats.cache_read_input_tokens`. Anthropic's existing
+  `calculate_cost` cache-read/write multiplier path is unchanged (its
+  registry `cached_prompt_cost` values are informational and pinned by
+  test to the published 0.1x multiplier). Note: Gemini cache STORAGE
+  ($/1M-token-hour) is time-based and intentionally not part of
+  `cost_usd`. All 24 cached rates independently re-verified against the
+  live provider pricing pages on 2026-06-13.
+- **gemini-embedding-2 guidance**: documented as GA (April 2026) and
+  recommended for new projects; `GeminiEmbeddingProvider` default stays
+  `gemini-embedding-001` because the two embedding spaces are incompatible
+  (flipping the default would silently break existing vector stores).
 - **Toolbox: four new categories — Discord, S3, browser, image generation**
   (toolbox: 48 → 56 tools, 15 → 19 categories; held for v1.1):
   - `discord_tools`: `discord_send_message`, `discord_read_channel` —

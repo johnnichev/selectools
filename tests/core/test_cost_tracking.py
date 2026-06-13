@@ -19,7 +19,12 @@ import pytest
 
 from selectools import Agent, AgentConfig, AgentUsage, Message, Role, UsageStats, tool
 from selectools.models import Anthropic, Gemini, OpenAI
-from selectools.pricing import PRICING, calculate_cost, get_model_pricing
+from selectools.pricing import (
+    PRICING,
+    calculate_cost,
+    calculate_cost_with_cached_input,
+    get_model_pricing,
+)
 from selectools.providers.stubs import LocalProvider
 
 # =============================================================================
@@ -369,6 +374,114 @@ class TestCacheAwareCost:
         cost = calculate_cost(Anthropic.SONNET_4_6.id, 2000, 1000)
         expected = (2000 / 1_000_000) * 3.00 + (1000 / 1_000_000) * 15.00
         assert cost == pytest.approx(expected)
+
+
+class TestCachedInputCost:
+    """calculate_cost_with_cached_input (OpenAI/Gemini cached-input rates).
+
+    Semantics: input_tokens INCLUDES cached_input_tokens (OpenAI
+    prompt_tokens / Gemini prompt_token_count style). The cached portion
+    bills at the registry's cached_prompt_cost when published, otherwise at
+    the full prompt rate (exactly the legacy two-term formula).
+
+    Rates verified 2026-06-12 against
+    https://developers.openai.com/api/docs/pricing and
+    https://ai.google.dev/gemini-api/docs/pricing.
+    """
+
+    def test_cached_rate_applied_openai(self) -> None:
+        """gpt-5.5: $5.00 input / $0.50 cached input / $30.00 output."""
+        cost = calculate_cost_with_cached_input(
+            OpenAI.GPT_5_5.id,
+            input_tokens=1_000_000,
+            output_tokens=10_000,
+            cached_input_tokens=400_000,
+        )
+        expected = (
+            (600_000 / 1_000_000) * 5.00
+            + (400_000 / 1_000_000) * 0.50
+            + (10_000 / 1_000_000) * 30.00
+        )
+        assert cost == pytest.approx(expected)
+
+    def test_cached_rate_applied_gemini(self) -> None:
+        """gemini-2.5-flash: $0.30 input / $0.03 context caching / $2.50 output."""
+        cost = calculate_cost_with_cached_input(
+            Gemini.FLASH_2_5.id,
+            input_tokens=1000,
+            output_tokens=10,
+            cached_input_tokens=600,
+        )
+        expected = (400 / 1_000_000) * 0.30 + (600 / 1_000_000) * 0.03 + (10 / 1_000_000) * 2.50
+        assert cost == pytest.approx(expected)
+
+    def test_no_cached_rate_falls_back_to_full_input_price(self) -> None:
+        """Models without a published cached rate bill cached tokens at full price."""
+        assert OpenAI.GPT_4O.cached_prompt_cost is None
+        cost = calculate_cost_with_cached_input(
+            OpenAI.GPT_4O.id,
+            input_tokens=1000,
+            output_tokens=10,
+            cached_input_tokens=600,
+        )
+        assert cost == pytest.approx(calculate_cost(OpenAI.GPT_4O.id, 1000, 10))
+
+    def test_zero_cached_tokens_matches_legacy_formula(self) -> None:
+        """Default of 0 cached tokens reproduces calculate_cost exactly."""
+        for model_id in (OpenAI.GPT_5_5.id, Gemini.FLASH_2_5.id, OpenAI.GPT_4O.id):
+            assert calculate_cost_with_cached_input(
+                model_id, input_tokens=2000, output_tokens=1000
+            ) == pytest.approx(calculate_cost(model_id, 2000, 1000))
+
+    def test_cached_tokens_clamped_to_input_tokens(self) -> None:
+        """cached > input never produces a negative uncached term."""
+        cost = calculate_cost_with_cached_input(
+            OpenAI.GPT_5_5.id,
+            input_tokens=100,
+            output_tokens=0,
+            cached_input_tokens=1_000_000,
+        )
+        assert cost == pytest.approx((100 / 1_000_000) * 0.50)
+
+    def test_negative_cached_tokens_treated_as_zero(self) -> None:
+        cost = calculate_cost_with_cached_input(
+            OpenAI.GPT_5_5.id,
+            input_tokens=1000,
+            output_tokens=0,
+            cached_input_tokens=-5,
+        )
+        assert cost == pytest.approx((1000 / 1_000_000) * 5.00)
+
+    def test_unknown_model_returns_zero(self) -> None:
+        assert (
+            calculate_cost_with_cached_input(
+                "unknown-model-xyz", input_tokens=1000, output_tokens=500, cached_input_tokens=100
+            )
+            == 0.0
+        )
+
+    def test_anthropic_registry_rates_match_published_multiplier(self) -> None:
+        """Every Anthropic cached rate on the pricing page is exactly 0.1x input.
+
+        Guards against the registry drifting from the multiplier that
+        calculate_cost's Anthropic cache-read path still uses.
+        """
+        from selectools.models import ALL_MODELS
+
+        anthropic_cached = [
+            m for m in ALL_MODELS if m.provider == "anthropic" and m.cached_prompt_cost is not None
+        ]
+        assert anthropic_cached, "expected Anthropic models with verified cached rates"
+        for model in anthropic_cached:
+            assert model.cached_prompt_cost == pytest.approx(model.prompt_cost * 0.1)
+
+    def test_cached_rate_always_cheaper_than_prompt_rate(self) -> None:
+        """Sanity: a published cache-hit rate must discount the prompt rate."""
+        from selectools.models import ALL_MODELS
+
+        for model in ALL_MODELS:
+            if model.cached_prompt_cost is not None:
+                assert 0 < model.cached_prompt_cost < model.prompt_cost, model.id
 
 
 # =============================================================================

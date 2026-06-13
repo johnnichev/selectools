@@ -16,7 +16,7 @@ import logging
 from typing import Dict
 
 from .models import ALL_MODELS, MODELS_BY_ID
-from .stability import register_stability, stable
+from .stability import beta, register_stability, stable
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +94,66 @@ def calculate_cost(
     return prompt_cost + completion_cost + cache_read_cost + cache_write_cost
 
 
+@beta
+def calculate_cost_with_cached_input(
+    model: str,
+    input_tokens: int,
+    output_tokens: int,
+    cached_input_tokens: int = 0,
+) -> float:
+    """
+    Calculate cost in USD when part of the input was served from a prompt cache.
+
+    Generalizes cache-rate pricing for providers whose usage objects report a
+    cached-token count that is INCLUDED in the total input count (OpenAI
+    ``usage.prompt_tokens_details.cached_tokens``, Gemini
+    ``usage_metadata.cached_content_token_count``). The cached portion is
+    billed at the model's registry ``cached_prompt_cost`` when published,
+    falling back to the full prompt rate otherwise (which reproduces the
+    legacy two-term formula exactly).
+
+    Not for Anthropic responses: Anthropic's ``input_tokens`` EXCLUDES cache
+    tokens and cache writes carry a premium — use :func:`calculate_cost` with
+    its ``cache_read_input_tokens``/``cache_creation_input_tokens`` params.
+
+    Args:
+        model: Model name (e.g., "gpt-5.5", "gemini-2.5-flash").
+        input_tokens: Total prompt/input tokens, INCLUDING any cached tokens.
+        output_tokens: Number of completion/output tokens.
+        cached_input_tokens: Portion of ``input_tokens`` served from the
+            provider prompt cache. Clamped to ``[0, input_tokens]``.
+
+    Returns:
+        Estimated cost in USD. Returns 0.0 if model pricing is unknown or for local models.
+
+    Note:
+        Gemini additionally bills cache STORAGE per 1M-token-hour; that
+        time-based charge cannot be derived from token counts and is not
+        included here.
+    """
+    if model not in MODELS_BY_ID:
+        logger.warning(
+            f"⚠️  Unknown model '{model}' - cannot calculate cost. "
+            f"Returning $0.00. Add model to selectools/models.py if known."
+        )
+        return 0.0
+
+    model_info = MODELS_BY_ID[model]
+    cached = min(max(cached_input_tokens, 0), max(input_tokens, 0))
+    uncached = max(input_tokens - cached, 0)
+    cached_rate = (
+        model_info.cached_prompt_cost
+        if model_info.cached_prompt_cost is not None
+        else model_info.prompt_cost
+    )
+
+    return (
+        (uncached / 1_000_000) * model_info.prompt_cost
+        + (cached / 1_000_000) * cached_rate
+        + (output_tokens / 1_000_000) * model_info.completion_cost
+    )
+
+
 @stable
 def calculate_embedding_cost(model: str, tokens: int) -> float:
     """
@@ -147,4 +207,10 @@ def get_model_pricing(model: str) -> Dict[str, float] | None:
 
 __stability__ = "stable"
 
-__all__ = ["PRICING", "calculate_cost", "calculate_embedding_cost", "get_model_pricing"]
+__all__ = [
+    "PRICING",
+    "calculate_cost",
+    "calculate_cost_with_cached_input",
+    "calculate_embedding_cost",
+    "get_model_pricing",
+]
