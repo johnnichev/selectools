@@ -331,3 +331,54 @@ class TestAgentIntegration:
         assert unified is not None
         assert any("Alice Smith" in c for c in lt_contents(unified))
         assert len(unified.episodic) == 2
+
+
+# --------------------------------------------------------------------------- #
+# Bug hunt 2026-06-13 regressions
+# --------------------------------------------------------------------------- #
+
+
+def test_flat_knowledge_memory_with_unified_raises(tmp_path):
+    # Bug 3: a flat knowledge_memory passed alongside MemoryConfig(unified=True)
+    # used to be silently dropped; it must now raise instead.
+    km = KnowledgeMemory(directory=str(tmp_path / "km"), store=InMemoryKnowledgeStore())
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        AgentConfig(knowledge_memory=km, memory=MemoryConfig(unified=True))
+
+
+@pytest.mark.asyncio
+async def test_arun_unified_records_redacted_user_text():
+    # Bug 1: in async mode the unified turn was recorded with the PRE-guardrail
+    # (raw) user text. After the fix it must record the redacted text.
+    from selectools.guardrails import (
+        Guardrail,
+        GuardrailAction,
+        GuardrailResult,
+        GuardrailsPipeline,
+    )
+
+    class Redactor(Guardrail):
+        name = "redactor"
+        action = GuardrailAction.REWRITE
+
+        def check(self, content: str) -> GuardrailResult:
+            return GuardrailResult(passed=False, content="[REDACTED]", guardrail_name=self.name)
+
+    @tool(description="noop")
+    def noop() -> str:
+        return "ok"
+
+    agent = Agent(
+        tools=[noop],
+        provider=LocalProvider(),
+        config=AgentConfig(
+            memory=MemoryConfig(unified=True),
+            guardrails=GuardrailsPipeline(input=[Redactor()]),
+        ),
+    )
+    await agent.arun("my secret password is hunter2")
+    history = agent.unified_memory.short_term.get_history()
+    user_text = " ".join(m.content or "" for m in history if m.role == Role.USER)
+    assert user_text, "the user turn should be recorded in short-term memory"
+    assert "hunter2" not in user_text  # raw input must NOT be persisted
+    assert "[REDACTED]" in user_text

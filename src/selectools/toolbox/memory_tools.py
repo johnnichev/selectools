@@ -64,6 +64,12 @@ def make_remember_tool(knowledge: "KnowledgeMemory") -> Tool:
 
 
 _DEFAULT_RECALL_LIMIT = 5
+# Entries fetched (importance-ordered) before in-process keyword ranking.
+# KnowledgeMemory exposes no text search, so recall ranks a window of the
+# highest-importance entries. With the default max_entries (50) this covers the
+# whole store. NOTE: a custom store holding more than this many entries can hide
+# a low-importance keyword match below the window — raise this (or add a
+# store-level search) if you run recall against a large unbounded store.
 _RECALL_FETCH_WINDOW = 500
 
 

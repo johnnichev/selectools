@@ -425,7 +425,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             # Short-term tier IS the conversation history; the turn is written
             # back via UnifiedMemory.add_turn() at finalize, which also handles
             # episodic recording and STM -> LTM promotion of aged-out items.
-            self._history = self.unified_memory.short_term.get_history() + list(messages)
+            short_term_base = self.unified_memory.short_term.get_history()
+            self._history = short_term_base + list(messages)
+            # self._history was just rebuilt, so the checkpoint captured above is
+            # stale. On error the non-memory rollback slices to this checkpoint;
+            # set it to the short-term base so a failed run leaves no in-flight trace.
+            history_checkpoint = len(short_term_base)
         elif self.memory:
             if self.config.session_store and self.config.session_id:
                 self._notify_observers(
@@ -1422,6 +1427,14 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         self._history[i].content = await self._arun_input_guardrails(
                             msg.content, ctx.trace
                         )
+                # Unified memory records ctx.unified_user_text at finalize. It was
+                # captured pre-guardrail in _prepare_run (async skips sync guardrails),
+                # so re-capture the now-redacted text to avoid persisting raw input.
+                if self.unified_memory is not None:
+                    for i in range(len(self._history) - 1, new_msg_start - 1, -1):
+                        if self._history[i].role == Role.USER and self._history[i].content:
+                            ctx.unified_user_text = self._history[i].content
+                            break
 
             await self._anotify_observers("on_run_start", ctx.run_id, messages, self._system_prompt)
 
@@ -1845,6 +1858,14 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         self._history[i].content = await self._arun_input_guardrails(
                             msg.content, ctx.trace
                         )
+                # Unified memory records ctx.unified_user_text at finalize. It was
+                # captured pre-guardrail in _prepare_run (async skips sync guardrails),
+                # so re-capture the now-redacted text to avoid persisting raw input.
+                if self.unified_memory is not None:
+                    for i in range(len(self._history) - 1, new_msg_start - 1, -1):
+                        if self._history[i].role == Role.USER and self._history[i].content:
+                            ctx.unified_user_text = self._history[i].content
+                            break
 
             await self._anotify_observers("on_run_start", ctx.run_id, messages, self._system_prompt)
 

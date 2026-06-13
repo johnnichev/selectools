@@ -55,13 +55,20 @@ _DEFAULT_PATTERNS: Tuple[Tuple[str, str], ...] = (
     ),
     (
         "reveal-system-prompt",
-        r"(?:reveal|show|print|repeat|display|tell\s+me|give\s+me)\s+"
-        r"(?:me\s+)?(?:your\s+|the\s+)?(?:system\s+|initial\s+|original\s+)?"
+        # Require either the possessive "your" (targeting the assistant's own
+        # prompt) or an explicit system/initial/original qualifier — so benign
+        # "show the rules" / "display instructions" do NOT fire, while
+        # "reveal your prompt" / "show the system prompt" still do.
+        r"(?:reveal|show|print|repeat|display|tell\s+me|give\s+me)\s+(?:me\s+)?"
+        r"(?:your\s+(?:system\s+|initial\s+|original\s+)?|(?:the\s+)?(?:system|initial|original)\s+)"
         r"(?:prompt|instructions|rules|directives?)",
     ),
     (
         "override-safety",
-        r"(?:override|bypass|disable|turn\s+off|ignore)\s+(?:your\s+|the\s+|all\s+)?"
+        # Qualifier (your/the/all) is REQUIRED so benign "ignore programming
+        # jargon" / "ignore security in this sandbox" do not fire, while
+        # "override your programming" / "bypass the safety filters" still do.
+        r"(?:override|bypass|disable|turn\s+off|ignore)\s+(?:your\s+|the\s+|all\s+)"
         r"(?:safety|security|guidelines?|guardrails?|filters?|restrictions?|programming)",
     ),
     (
@@ -93,7 +100,9 @@ _DEFAULT_PATTERNS: Tuple[Tuple[str, str], ...] = (
     ),
     (
         "pretend-no-rules",
-        r"pretend\s+(?:that\s+)?you\s+(?:are\s+(?:not\s+)?|have\s+no\b)",
+        # Require the negation — so benign "pretend you are a pirate" does NOT
+        # fire, while "pretend you are not bound" / "pretend you have no rules" do.
+        r"pretend\s+(?:that\s+)?you\s+(?:are\s+not\b|aren'?t\b|have\s+no\b)",
     ),
     (
         "role-delimiter-system",

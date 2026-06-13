@@ -87,6 +87,9 @@ def generate_image(
         b64 = getattr(data, "b64_json", None)
 
         if b64:
+            # Decode BEFORE creating the temp file so a malformed payload
+            # (binascii.Error) does not leave an orphaned 0-byte file on disk.
+            data = base64.b64decode(b64)
             if output_path and output_path.strip():
                 destination = Path(output_path.strip())
                 destination.parent.mkdir(parents=True, exist_ok=True)
@@ -96,7 +99,7 @@ def generate_image(
                 )
                 handle.close()
                 destination = Path(handle.name)
-            destination.write_bytes(base64.b64decode(b64))
+            destination.write_bytes(data)
             return f"Image generated with {model} and saved to {destination}"
         if url:
             return f"Image generated with {model}: {url}"

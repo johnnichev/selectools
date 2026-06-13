@@ -53,6 +53,26 @@ def _api_error(response: Any) -> str:
     return f"Error: Discord API returned HTTP {response.status_code}{detail}"
 
 
+class _NonJSONResponse(Exception):
+    """A 2xx Discord response whose body was not valid JSON (e.g. a CDN/Cloudflare
+    interstitial). Carries a readable message for the tool to return."""
+
+
+def _json_or_raise(response: Any) -> Any:
+    """Parse a 2xx response body as JSON, or raise a clear _NonJSONResponse.
+
+    ``requests`` does not raise on a 2xx with a non-JSON body — ``response.json()``
+    raises ``ValueError``/``JSONDecodeError``, which would otherwise surface as an
+    opaque ``"... JSONDecodeError"``.
+    """
+    try:
+        return response.json()
+    except ValueError as exc:
+        raise _NonJSONResponse(
+            f"Error: Discord API returned HTTP {response.status_code} with a non-JSON body"
+        ) from exc
+
+
 @beta
 @tool(description="Send a message to a Discord channel")
 def discord_send_message(channel_id: str, text: str, token: Optional[str] = None) -> str:
@@ -93,8 +113,10 @@ def discord_send_message(channel_id: str, text: str, token: Optional[str] = None
         if response.status_code >= 400:
             return _api_error(response)
 
-        data = response.json()
+        data = _json_or_raise(response)
         return f"Message sent to channel {channel_id} (id: {data.get('id', '?')})"
+    except _NonJSONResponse as exc:
+        return str(exc)
     except requests.exceptions.RequestException as exc:
         return f"Error: Could not reach the Discord API: {type(exc).__name__}"
     except Exception as exc:
@@ -144,7 +166,7 @@ def discord_read_channel(channel_id: str, limit: int = 10, token: Optional[str] 
         if response.status_code >= 400:
             return _api_error(response)
 
-        messages = response.json()
+        messages = _json_or_raise(response)
         if not messages:
             return f"No messages found in channel {channel_id}."
 
@@ -156,6 +178,8 @@ def discord_read_channel(channel_id: str, limit: int = 10, token: Optional[str] 
             lines.append(f"[{timestamp}] {author}: {content}")
 
         return "\n".join(lines)
+    except _NonJSONResponse as exc:
+        return str(exc)
     except requests.exceptions.RequestException as exc:
         return f"Error: Could not reach the Discord API: {type(exc).__name__}"
     except Exception as exc:

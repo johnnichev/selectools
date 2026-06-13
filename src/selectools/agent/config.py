@@ -308,6 +308,19 @@ class AgentConfig:
             )
 
         if isinstance(self.memory, MemoryConfig):
+            # Unified memory manages its own tiers; a flat entity_memory/
+            # knowledge_graph/knowledge_memory passed alongside it would be
+            # silently dropped by the overwrite below. Fail loudly instead.
+            if self.memory._unified_enabled and (
+                self.entity_memory is not None
+                or self.knowledge_graph is not None
+                or self.knowledge_memory is not None
+            ):
+                raise ValueError(
+                    "AgentConfig: entity_memory / knowledge_graph / knowledge_memory are "
+                    "mutually exclusive with MemoryConfig(unified=True). Inject custom tiers "
+                    "via MemoryConfig(unified_memory=UnifiedMemory(entity_memory=...)) instead."
+                )
             self.entity_memory = self.memory.entity_memory
             self.knowledge_graph = self.memory.knowledge_graph
             self.knowledge_memory = self.memory.knowledge_memory
