@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Reasoning tools (beta)** — `selectools.toolbox.reasoning_tools` turns
+  reasoning into explicit, bounded, inspectable `think` / `analyze` tool calls
+  (vs the passive `reasoning_strategy` prompt). `make_reasoning_tools(min_steps,
+  max_steps)` or a `ReasoningTools` instance (with `.steps`/`.count`/`.reset()`
+  to read back the chain). `max_steps` is enforced (a real guard against
+  reasoning loops); `min_steps` is advertised guidance. Both tools share one
+  budget. Docs: `docs/modules/REASONING_TOOLS.md`; example:
+  `examples/114_reasoning_tools.py`.
 - **Scheduled agents (beta)** — new `selectools.scheduler` module runs an
   `Agent` on a **cron** or **interval** schedule for periodic unattended work.
   `AgentScheduler` owns `ScheduledJob`s; `cron("0 9 * * *")` parses standard
