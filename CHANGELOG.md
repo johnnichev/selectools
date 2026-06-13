@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`recall` tool — completes the agentic-memory pair** (held for v1.1):
+  `make_recall_tool(knowledge)` in `selectools.toolbox.memory_tools`
+  creates a `recall(query, limit='5')` tool that keyword-searches
+  `KnowledgeMemory` entries (content + category, case-insensitive) and
+  returns matches ranked by relevance then importance. Auto-injected
+  alongside `remember` when `AgentConfig.knowledge_memory` is set; a
+  user-supplied tool named `recall` suppresses the auto-injected one,
+  same as `remember`. Marked `@beta`.
 - **Cache-rate cost support for OpenAI and Gemini** (follow-up to #106's
   Anthropic-only cache-aware costing) — `ModelInfo` gains an optional
   `cached_prompt_cost` field (USD per 1M cached input tokens), populated

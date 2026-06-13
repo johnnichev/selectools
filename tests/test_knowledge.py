@@ -9,7 +9,8 @@ Tests cover:
 - prune_old_logs
 - Round-trip serialization
 - make_remember_tool binding
-- Agent integration (context injection, auto-add remember tool)
+- make_recall_tool binding (search, limit handling, empty results)
+- Agent integration (context injection, auto-add remember/recall tools)
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ from typing import Any, Dict, List, Optional
 import pytest
 
 from selectools.knowledge import KnowledgeMemory
-from selectools.toolbox.memory_tools import make_remember_tool
+from selectools.toolbox.memory_tools import make_recall_tool, make_remember_tool
 from selectools.types import Message, Role
 from selectools.usage import UsageStats
 
@@ -314,6 +315,118 @@ class TestMakeRememberTool:
 
 
 # ======================================================================
+# make_recall_tool
+# ======================================================================
+
+
+class TestMakeRecallTool:
+    def test_creates_tool(self, tmp_path) -> None:
+        km = KnowledgeMemory(directory=str(tmp_path))
+        tool = make_recall_tool(km)
+        assert tool.name == "recall"
+        assert "search" in tool.description.lower() or "retrieve" in tool.description.lower()
+
+    def test_recall_returns_stored_facts(self, tmp_path) -> None:
+        km = KnowledgeMemory(directory=str(tmp_path))
+        km.remember("User prefers dark mode", category="preference")
+        km.remember("Deploy target is Railway", category="infra")
+        tool = make_recall_tool(km)
+        result = tool.function(query="dark mode")
+        assert "User prefers dark mode" in result
+        assert "Deploy target is Railway" not in result
+
+    def test_recall_matches_category(self, tmp_path) -> None:
+        km = KnowledgeMemory(directory=str(tmp_path))
+        km.remember("Timezone is PST", category="preference")
+        tool = make_recall_tool(km)
+        result = tool.function(query="preference")
+        assert "Timezone is PST" in result
+
+    def test_recall_case_insensitive(self, tmp_path) -> None:
+        km = KnowledgeMemory(directory=str(tmp_path))
+        km.remember("User name is Alice")
+        tool = make_recall_tool(km)
+        result = tool.function(query="ALICE")
+        assert "User name is Alice" in result
+
+    def test_recall_limit_respected(self, tmp_path) -> None:
+        km = KnowledgeMemory(directory=str(tmp_path))
+        for i in range(4):
+            km.remember(f"Project alpha note {i}")
+        tool = make_recall_tool(km)
+        result = tool.function(query="alpha", limit="2")
+        assert "Found 2 memories" in result
+
+    def test_recall_default_limit_is_five(self, tmp_path) -> None:
+        km = KnowledgeMemory(directory=str(tmp_path))
+        for i in range(8):
+            km.remember(f"Project beta note {i}")
+        tool = make_recall_tool(km)
+        result = tool.function(query="beta")
+        assert "Found 5 memories" in result
+
+    def test_recall_invalid_limit_falls_back(self, tmp_path) -> None:
+        km = KnowledgeMemory(directory=str(tmp_path))
+        for i in range(8):
+            km.remember(f"Project gamma note {i}")
+        tool = make_recall_tool(km)
+        result = tool.function(query="gamma", limit="lots")
+        assert "Found 5 memories" in result
+
+    def test_recall_nonpositive_limit_falls_back(self, tmp_path) -> None:
+        km = KnowledgeMemory(directory=str(tmp_path))
+        for i in range(8):
+            km.remember(f"Project delta note {i}")
+        tool = make_recall_tool(km)
+        assert "Found 5 memories" in tool.function(query="delta", limit="0")
+        assert "Found 5 memories" in tool.function(query="delta", limit="-3")
+
+    def test_recall_no_matches(self, tmp_path) -> None:
+        km = KnowledgeMemory(directory=str(tmp_path))
+        km.remember("User prefers dark mode")
+        tool = make_recall_tool(km)
+        result = tool.function(query="quantum entanglement")
+        assert "No memories found" in result
+
+    def test_recall_empty_store(self, tmp_path) -> None:
+        km = KnowledgeMemory(directory=str(tmp_path))
+        tool = make_recall_tool(km)
+        result = tool.function(query="anything")
+        assert "No memories found" in result
+
+    def test_recall_empty_query_returns_top_entries(self, tmp_path) -> None:
+        km = KnowledgeMemory(directory=str(tmp_path))
+        km.remember("Critical fact", importance=0.9)
+        km.remember("Trivial fact", importance=0.1)
+        tool = make_recall_tool(km)
+        result = tool.function(query="")
+        assert "Critical fact" in result
+        assert "Trivial fact" in result
+
+    def test_recall_single_match_singular_label(self, tmp_path) -> None:
+        km = KnowledgeMemory(directory=str(tmp_path))
+        km.remember("Only one entry about kubernetes")
+        tool = make_recall_tool(km)
+        result = tool.function(query="kubernetes")
+        assert "Found 1 memory" in result
+
+    def test_recall_category_tag_in_output(self, tmp_path) -> None:
+        km = KnowledgeMemory(directory=str(tmp_path))
+        km.remember("Timezone is PST", category="preference")
+        tool = make_recall_tool(km)
+        result = tool.function(query="timezone")
+        assert "[preference]" in result
+
+    def test_remember_then_recall_roundtrip(self, tmp_path) -> None:
+        km = KnowledgeMemory(directory=str(tmp_path))
+        remember = make_remember_tool(km)
+        recall = make_recall_tool(km)
+        remember.function(content="API key lives in 1Password", category="fact")
+        result = recall.function(query="API key")
+        assert "API key lives in 1Password" in result
+
+
+# ======================================================================
 # Agent integration
 # ======================================================================
 
@@ -436,6 +549,107 @@ class TestKnowledgeAgentIntegration:
         remember_tools = [t for t in agent.tools if t.name == "remember"]
         assert len(remember_tools) == 1
         assert remember_tools[0].description == "Custom remember"
+        # recall is still auto-added even when remember is user-provided
+        assert "recall" in agent._tools_by_name
+
+    def test_recall_tool_auto_added(self, tmp_path) -> None:
+        from selectools.agent import Agent, AgentConfig
+        from selectools.memory import ConversationMemory
+
+        class SimpleProvider:
+            name = "simple"
+            supports_streaming = False
+            supports_async = False
+
+            def complete(self, **kw):
+                return Message(role=Role.ASSISTANT, content="ok"), _usage()
+
+        km = KnowledgeMemory(directory=str(tmp_path))
+        agent = Agent(
+            tools=[self._make_tool()],
+            provider=SimpleProvider(),
+            memory=ConversationMemory(),
+            config=AgentConfig(knowledge_memory=km),
+        )
+        assert "recall" in agent._tools_by_name
+        assert "remember" in agent._tools_by_name
+
+    def test_recall_tool_not_duplicated(self, tmp_path) -> None:
+        """If user already provides a recall tool, don't add another."""
+        from selectools.agent import Agent, AgentConfig
+        from selectools.memory import ConversationMemory
+        from selectools.tools import Tool
+
+        class SimpleProvider:
+            name = "simple"
+            supports_streaming = False
+            supports_async = False
+
+            def complete(self, **kw):
+                return Message(role=Role.ASSISTANT, content="ok"), _usage()
+
+        km = KnowledgeMemory(directory=str(tmp_path))
+        custom_recall = Tool(
+            name="recall",
+            description="Custom recall",
+            parameters=[],
+            function=lambda: "custom",
+        )
+        agent = Agent(
+            tools=[self._make_tool(), custom_recall],
+            provider=SimpleProvider(),
+            memory=ConversationMemory(),
+            config=AgentConfig(knowledge_memory=km),
+        )
+        recall_tools = [t for t in agent.tools if t.name == "recall"]
+        assert len(recall_tools) == 1
+        assert recall_tools[0].description == "Custom recall"
+        # remember is still auto-added even when recall is user-provided
+        assert "remember" in agent._tools_by_name
+
+    def test_no_knowledge_no_memory_tools(self, tmp_path) -> None:
+        from selectools.agent import Agent, AgentConfig
+        from selectools.memory import ConversationMemory
+
+        class SimpleProvider:
+            name = "simple"
+            supports_streaming = False
+            supports_async = False
+
+            def complete(self, **kw):
+                return Message(role=Role.ASSISTANT, content="ok"), _usage()
+
+        agent = Agent(
+            tools=[self._make_tool()],
+            provider=SimpleProvider(),
+            memory=ConversationMemory(),
+            config=AgentConfig(),
+        )
+        assert "remember" not in agent._tools_by_name
+        assert "recall" not in agent._tools_by_name
+
+    def test_injected_recall_searches_knowledge(self, tmp_path) -> None:
+        from selectools.agent import Agent, AgentConfig
+        from selectools.memory import ConversationMemory
+
+        class SimpleProvider:
+            name = "simple"
+            supports_streaming = False
+            supports_async = False
+
+            def complete(self, **kw):
+                return Message(role=Role.ASSISTANT, content="ok"), _usage()
+
+        km = KnowledgeMemory(directory=str(tmp_path))
+        km.remember("User prefers Python", category="preference")
+        agent = Agent(
+            tools=[self._make_tool()],
+            provider=SimpleProvider(),
+            memory=ConversationMemory(),
+            config=AgentConfig(knowledge_memory=km),
+        )
+        result = agent._tools_by_name["recall"].function(query="Python")
+        assert "User prefers Python" in result
 
     def test_empty_knowledge_no_context(self, tmp_path) -> None:
         """Empty knowledge memory produces no SYSTEM context message."""
