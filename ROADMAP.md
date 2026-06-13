@@ -497,29 +497,47 @@ Individual stores/loaders remain installable a la carte: `pip install selectools
 | UnifiedMemory AgentConfig wiring | Unreleased (#111) | `MemoryConfig(unified=True, ...)`, `agent/core.py` |
 | Toolbox: Discord, S3, browser, image-gen (48 → 56 tools) | Unreleased (#110) | `toolbox/{discord,s3,browser,image}_tools.py` |
 | Cache-rate cost support (OpenAI + Gemini) | Unreleased (#112) | `pricing.calculate_cost_with_cached_input`, `cached_prompt_cost` |
+| Cron / scheduled agents | Unreleased (#113) | `scheduler.py` (`AgentScheduler`, `cron`, `every`) |
+| Reasoning-as-tool | Unreleased (#114) | `toolbox/reasoning_tools.py` (`make_reasoning_tools`, `ReasoningTools`) |
+| Episodic memory retention config | Unreleased (#111) | Delivered with the UnifiedMemory wiring — `MemoryConfig.episodic_retention_days` flows through and `add_turn` auto-prunes (tested: `test_retention_pruning`) |
 
-All four "v1.1 candidate" items shipped 2026-06-13 (#109-#112), folded into
-the v1.0 train rather than held to a post-tag minor. `gemini-embedding-2`
-decision: documented as GA/recommended-for-new; default stays
-`gemini-embedding-001` (incompatible embedding space — flipping it is itself
-breaking). See `CHANGELOG.md [Unreleased]`.
+Shipped 2026-06-13: the four v1.1 candidates (#109-#112) plus the top two
+Future/Watch items (cron #113, reasoning tools #114), folded into the v1.0
+train. Episodic retention config (#111) needed no separate work — the
+UnifiedMemory wiring already exposed and auto-applied it. `gemini-embedding-2`
+decision: GA/recommended-for-new; default stays `gemini-embedding-001`
+(incompatible embedding space). See `CHANGELOG.md [Unreleased]`.
 
 ---
 
-### Active Queue — Future / Watch
+### Active Queue — needs a product decision before building
 
-Ordered by current conviction. Top of the list is the next build.
+The autonomously-buildable, high-conviction items are now shipped. Each
+remaining item carries a scoping/product call (flagged), so these wait on
+John's direction rather than getting built blind.
 
-| Item | Source | Notes | Effort |
+| Item | Source | Decision needed | Effort |
 |---|---|---|---|
-| **Cron / scheduled agents** (NEXT) | PraisonAI | Background scheduling for periodic agent tasks; pairs with Agent-as-API | Medium |
-| Reasoning-as-tool | Agno | Composable reasoning step with min/max bounds (today it is a prompt strategy) | Medium |
-| Episodic memory retention config | PraisonAI | UnifiedMemory now wired (#111); expose episodic retention knobs on `MemoryConfig` | Low |
-| More DB backends (MongoDB, DynamoDB, Firestore) | Agno | 4 backends today (SQLite, Postgres, Redis, Supabase); add on demand | Medium per backend |
-| ML-based guard models | Superagent | Local prompt-injection detection as a GuardrailProvider | High |
-| Multi-channel bot gateway | PraisonAI | Telegram/Discord/Slack/WhatsApp routing; better as a separate package | High |
-| Learning system | Agno | Decision logging + preference tracking | High |
-| Shadow git checkpoints | PraisonAI | Workspace snapshots; only relevant if we move toward coding agents | Medium |
+| More DB backends (MongoDB, DynamoDB, Firestore) | Agno | Which backend(s), and is there real demand? 4 already shipped (SQLite/Postgres/Redis/Supabase). Pick one to add or skip. | Medium each |
+| ML-based guard models | Superagent | Hosting model: bundle a 0.6-4B model, optional extra, or call an external endpoint? Drives the whole design. | High |
+| Multi-channel bot gateway | PraisonAI | Roadmap itself says "better as a separate package." In-repo module vs new package = a product/packaging call. | High |
+| Learning system | Agno | Scope is vague (decision logging + preference tracking). Needs a concrete spec before it's buildable. | High |
+| Shadow git checkpoints | PraisonAI | Only relevant if selectools moves toward coding-agent use cases — a direction call. | Medium |
+
+### Previously Planned (Retained)
+
+| Feature | Notes | Target |
+|---|---|---|
+| AWS Bedrock provider | Covered today via LiteLLM; native boto3 wrapper only if enterprise demand | Future |
+| Durable execution / webhooks | Task queue, resume from checkpoint | Future |
+| Code execution sandbox (Docker/E2B) | Sandboxed code execution for untrusted input | Future |
+| Prompt registry / versioning | Version, A/B test, rollback prompts | Future |
+| Time-travel debugging / state replay | Rewind, edit, replay from any checkpoint | v1.x |
+| Voice / real-time audio agents | WebRTC, STT/TTS, sub-500ms latency | v1.x |
+| Rate limiting & quotas | Per-tool and per-user quotas | Future |
+| CRM & business tools | HubSpot, Salesforce integrations | Future |
+| Niche loaders | Confluence, Jira, Discord, Docx | Future |
+| Niche vector stores | Weaviate, Redis Vector, Milvus, OpenSearch, Lance | Future |
 
 ### Previously Planned (Retained)
 
