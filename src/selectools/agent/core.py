@@ -40,6 +40,7 @@ from .config import AgentConfig
 
 if TYPE_CHECKING:
     from ..memory import ConversationMemory
+    from ..unified_memory import UnifiedMemory
 
 
 @dataclass
@@ -52,6 +53,9 @@ class _RunContext:
     history_checkpoint: int
     response_format: Optional[ResponseFormat]
     user_text_for_coherence: str = ""
+    # Unified memory (beta): post-guardrail user text for this run, recorded
+    # via UnifiedMemory.add_turn() at finalize together with the final answer.
+    unified_user_text: str = ""
     iteration: int = 0
     # BUG-34 / Pydantic AI #4956: structured-validation retries need their
     # own budget, decoupled from the tool-iteration budget. Previously, a
@@ -180,6 +184,36 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
 
         self._system_prompt = self.prompt_builder.build(self.tools)
         self._history: List[Message] = []
+
+        # Unified tiered memory (beta, v1.1): built from config and driven by
+        # the agent — context assembly in _prepare_run, add_turn at finalize.
+        self.unified_memory: Optional["UnifiedMemory"] = None
+        mem_group = self.config.memory
+        if mem_group is not None and getattr(mem_group, "_unified_enabled", False):
+            if memory is not None:
+                raise ValueError(
+                    "MemoryConfig(unified=True) manages its own short-term tier; "
+                    "do not also pass memory= to Agent. To inject a custom tier, use "
+                    "MemoryConfig(unified_memory=UnifiedMemory(short_term=...)) instead."
+                )
+            if self.config.session_store is not None:
+                raise ValueError(
+                    "MemoryConfig(unified=True) does not support session_store yet. "
+                    "Unified memory is in-process in v1.1; remove session_store/"
+                    "SessionConfig or use ConversationMemory-based sessions."
+                )
+            if mem_group.unified_memory is not None:
+                self.unified_memory = mem_group.unified_memory
+            else:
+                from ..unified_memory import UnifiedMemory
+
+                self.unified_memory = UnifiedMemory(
+                    importance_threshold=mem_group.importance_threshold,
+                    short_term_limit=mem_group.short_term_limit,
+                    long_term_limit=mem_group.long_term_limit,
+                    episodic_retention_days=mem_group.episodic_retention_days,
+                    auto_promote=mem_group.auto_promote,
+                )
 
         # Auto-load session from store if configured (only if no memory was provided)
         if self.config.session_store and self.config.session_id and self.memory is None:
@@ -311,13 +345,20 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         return old
 
     def reset(self) -> None:
-        """Reset agent state for reuse. Clears history, usage stats, and memory."""
+        """Reset agent state for reuse. Clears history, usage stats, and memory.
+
+        With unified memory configured, the short-term, episodic, and
+        promotion-dedup state are cleared; the long-term tier is preserved
+        (see :meth:`UnifiedMemory.clear`).
+        """
         self._history = []
         self.usage = AgentUsage()
         if self.analytics:
             self.analytics = AgentAnalytics()
         if self.memory:
             self.memory.clear()
+        if self.unified_memory:
+            self.unified_memory.clear()
 
     def _prepare_run(
         self,
@@ -362,8 +403,21 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 if msg.role == Role.USER and msg.content:
                     msg.content = self._run_input_guardrails(msg.content, trace)
 
+        # Unified memory (beta): post-guardrail user text recorded at finalize
+        unified_user_text = ""
+        if self.unified_memory is not None:
+            for msg in reversed(messages):
+                if msg.role == Role.USER and msg.content:
+                    unified_user_text = msg.content
+                    break
+
         # Memory / session loading
-        if self.memory:
+        if self.unified_memory is not None:
+            # Short-term tier IS the conversation history; the turn is written
+            # back via UnifiedMemory.add_turn() at finalize, which also handles
+            # episodic recording and STM -> LTM promotion of aged-out items.
+            self._history = self.unified_memory.short_term.get_history() + list(messages)
+        elif self.memory:
             if self.config.session_store and self.config.session_id:
                 self._notify_observers(
                     "on_session_load", run_id, self.config.session_id, len(self.memory)
@@ -416,6 +470,23 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     Message(role=Role.SYSTEM, content=kg_ctx),
                 )
 
+        # Unified memory context (beta): long-term + entity + episodic tiers.
+        # The conversation tier is excluded — it is already in self._history
+        # as structured messages.
+        if self.unified_memory is not None:
+            max_ctx = (
+                self.config.memory.context_max_tokens if self.config.memory is not None else 4000
+            )
+            um_ctx = self.unified_memory.assemble_context(
+                max_tokens=max_ctx,
+                include_conversation=False,
+            )
+            if um_ctx:
+                self._history.insert(
+                    0,
+                    Message(role=Role.SYSTEM, content=um_ctx),
+                )
+
         # Prompt compression (modifies self._history view only, not self.memory)
         self._maybe_compress_context(run_id, trace)
 
@@ -426,6 +497,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             history_checkpoint=history_checkpoint,
             response_format=response_format,
             user_text_for_coherence=user_text_for_coherence,
+            unified_user_text=unified_user_text,
             artifacts=_begin_artifact_collection(),
         )
 
@@ -442,6 +514,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         """
         self._history.append(final_response)
         self._memory_add(final_response, ctx.run_id)
+        self._unified_memory_record(ctx, final_response)
         self._extract_entities(ctx.run_id)
         self._extract_kg_triples(ctx.run_id)
         self._session_save(ctx.run_id)
@@ -544,6 +617,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         )
         self._history.append(final_response)
         self._memory_add(final_response, ctx.run_id)
+        self._unified_memory_record(ctx, final_response)
         self._extract_entities(ctx.run_id)
         self._extract_kg_triples(ctx.run_id)
         self._session_save(ctx.run_id)
@@ -599,6 +673,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         final_response = Message(role=Role.ASSISTANT, content=reason)
         self._history.append(final_response)
         self._memory_add(final_response, ctx.run_id)
+        self._unified_memory_record(ctx, final_response)
         self._extract_entities(ctx.run_id)
         self._extract_kg_triples(ctx.run_id)
         self._session_save(ctx.run_id)
@@ -626,6 +701,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         final_response = Message(role=Role.ASSISTANT, content=reason)
         self._history.append(final_response)
         self._memory_add(final_response, ctx.run_id)
+        self._unified_memory_record(ctx, final_response)
         self._extract_entities(ctx.run_id)
         self._extract_kg_triples(ctx.run_id)
         self._session_save(ctx.run_id)
@@ -1261,9 +1337,9 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
           sibling clones (BUG-19 / PraisonAI #1260).
         - **Fresh**: ``_history`` starts empty and ``usage`` is a new
           :class:`AgentUsage` — the clone accumulates its own tokens/cost.
-        - **Dropped**: ``memory`` and ``analytics`` are set to ``None``;
-          callers that need conversation state must pass full message lists
-          explicitly.
+        - **Dropped**: ``memory``, ``unified_memory``, and ``analytics`` are
+          set to ``None``; callers that need conversation state must pass
+          full message lists explicitly.
 
         Returns:
             A new ``Agent`` sharing tools/provider with this one but with
@@ -1276,6 +1352,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         clone._history = []
         clone.usage = AgentUsage()
         clone.memory = None
+        clone.unified_memory = None
         clone.analytics = None
         return clone
 

@@ -516,6 +516,85 @@ The following memory features were shipped in v0.16.0 and integrate with `Conver
 - **[Knowledge Graph](KNOWLEDGE_GRAPH.md)** — Relationship triple extraction with in-memory and SQLite storage
 - **[Knowledge Memory](KNOWLEDGE.md)** — Cross-session durable memory with daily logs and `remember` tool
 
+---
+
+## Unified Memory via Config
+
+**Stability:** beta (v1.1)
+
+`UnifiedMemory` (shipped standalone in v0.24.0) composes the memory tiers —
+short-term (`ConversationMemory`), long-term (`KnowledgeMemory` with
+importance-based auto-promotion), entity, and episodic — into one lifecycle.
+Since v1.1 it is reachable directly from `AgentConfig`:
+
+```python title="unified_memory_config.py"
+from selectools import Agent, AgentConfig, MemoryConfig
+
+agent = Agent(
+    tools=[lookup],
+    provider=provider,
+    config=AgentConfig(
+        memory=MemoryConfig(
+            unified=True,
+            importance_threshold=0.7,
+            short_term_limit=100,
+            long_term_limit=1000,
+            episodic_retention_days=30,
+            auto_promote=True,
+        ),
+    ),
+)
+
+agent.run([Message(role=Role.USER, content="My name is Alice")])
+# ... once that turn ages out of the short-term window it is scored
+# (identity rule -> 0.9) and auto-promoted to long-term memory, then
+# injected back as context on later runs.
+
+agent.unified_memory.recall("user's name")  # federated recall across tiers
+```
+
+### How the agent drives it
+
+- **Before each call** the agent injects one system message built by
+  `UnifiedMemory.assemble_context(max_tokens=context_max_tokens,
+  include_conversation=False)` — the long-term, entity, and episodic tiers.
+  The short-term tier is sent as structured messages (it *is* the
+  conversation history), so it is excluded from the context block.
+  Compaction triggers at 70% of `context_max_tokens`.
+- **After each run** (including max-iterations, budget-exceeded, and
+  cancelled exits) the completed turn is written back via
+  `UnifiedMemory.add_turn()` — the single write path that records the
+  episode, feeds the entity tier when present, and promotes aged-out
+  short-term items whose importance clears `importance_threshold`.
+- `agent.reset()` clears the short-term, episodic, and dedup state but
+  preserves long-term memory. `clone_for_isolation()` drops unified memory,
+  matching the existing `memory` semantics.
+
+### MemoryConfig fields (beta)
+
+| Field | Default | Meaning |
+|---|---|---|
+| `unified` | `False` | Master switch. Off = zero behavior change. |
+| `unified_memory` | `None` | Pre-built `UnifiedMemory` instance (implies `unified=True`); use for custom tiers, scorers, or summarizers. Scalar fields below are then ignored. |
+| `importance_threshold` | `0.7` | Minimum score for STM -> LTM promotion. |
+| `short_term_limit` | `100` | Rolling window size, in messages. |
+| `long_term_limit` | `1000` | Max long-term entries before importance-based eviction. |
+| `episodic_retention_days` | `30` | Episodes older than this are pruned. |
+| `auto_promote` | `True` | Promote aging-out items automatically. |
+| `context_max_tokens` | `4000` | Budget for the injected context block. |
+
+### Constraints
+
+- Mutually exclusive with `entity_memory`, `knowledge_graph`, and
+  `knowledge_memory` on `MemoryConfig` (inject custom tiers through a
+  `UnifiedMemory` instance instead), with the Agent `memory=` parameter
+  (unified memory manages its own short-term tier), and with
+  `session_store` (unified memory is in-process in v1.1; session
+  persistence is a planned follow-up). Each conflict raises `ValueError`
+  at construction time.
+- The tier parameters are validated only while unified memory is enabled;
+  they are inert otherwise.
+
 ## Future Enhancements
 
 Potential improvements (see [Roadmap](https://github.com/johnnichev/selectools/blob/main/ROADMAP.md)):
@@ -546,3 +625,5 @@ Potential improvements (see [Roadmap](https://github.com/johnnichev/selectools/b
 | 04 | [`04_conversation_memory.py`](https://github.com/johnnichev/selectools/blob/main/examples/04_conversation_memory.py) | Multi-turn conversation with sliding window memory |
 | 20 | [`20_customer_support_bot.py`](https://github.com/johnnichev/selectools/blob/main/examples/20_customer_support_bot.py) | Full customer support bot with memory, guardrails, and tools |
 | 34 | [`34_summarize_on_trim.py`](https://github.com/johnnichev/selectools/blob/main/examples/34_summarize_on_trim.py) | Summarize-on-trim to preserve context when memory overflows |
+| 106 | [`106_unified_memory.py`](https://github.com/johnnichev/selectools/blob/main/examples/106_unified_memory.py) | UnifiedMemory standalone: tiers, scoring, promotion, recall |
+| 112 | [`112_unified_memory_config.py`](https://github.com/johnnichev/selectools/blob/main/examples/112_unified_memory_config.py) | Unified memory wired into an Agent via `MemoryConfig(unified=True)` |

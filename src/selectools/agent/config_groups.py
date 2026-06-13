@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     from ..policy import ToolPolicy
     from ..providers.base import Provider
     from ..sessions import SessionStore
+    from ..unified_memory import UnifiedMemory
     from ..usage import AgentUsage
 
 
@@ -199,11 +200,95 @@ class SummarizeConfig:
 @stable
 @dataclass
 class MemoryConfig:
-    """Memory subsystem settings."""
+    """Memory subsystem settings.
+
+    The ``unified*`` fields below are **beta** (v1.1): they wire
+    :class:`~selectools.unified_memory.UnifiedMemory` into the agent so it
+    builds context from all tiers before each call and persists the completed
+    turn (with STM -> LTM auto-promotion) after each run.
+
+    Attributes:
+        entity_memory: Optional EntityMemory for per-turn entity extraction
+            and context injection.
+        knowledge_graph: Optional KnowledgeGraphMemory for relationship
+            triple extraction and query-scoped context.
+        knowledge_memory: Optional KnowledgeMemory for durable facts and the
+            auto-injected ``remember`` tool.
+        unified: Enable unified tiered memory (beta). The agent builds a
+            :class:`~selectools.unified_memory.UnifiedMemory` from the tier
+            parameters below and drives it for context assembly and post-turn
+            persistence. Mutually exclusive with ``entity_memory``,
+            ``knowledge_graph``, ``knowledge_memory``, the Agent ``memory=``
+            parameter, and ``session_store``. Default: False.
+        unified_memory: Optional pre-built UnifiedMemory instance (beta).
+            Implies ``unified=True``. Use this to inject custom tiers
+            (``UnifiedMemory(short_term=..., long_term=..., entity_memory=...)``,
+            custom scorers, summarizers). When set, the scalar tier
+            parameters below are ignored — the instance's own settings win.
+            Default: None.
+        importance_threshold: Minimum importance score (0.0-1.0) for STM ->
+            LTM promotion. Default: 0.7.
+        short_term_limit: Rolling short-term window size, in messages
+            (one turn = two messages). Default: 100.
+        long_term_limit: Maximum long-term entries before importance-based
+            eviction. Default: 1000.
+        episodic_retention_days: Episodes older than this are pruned.
+            Default: 30.
+        auto_promote: Score and promote short-term items as they age out of
+            the rolling window. Default: True.
+        context_max_tokens: Token budget passed to
+            ``UnifiedMemory.assemble_context()`` when the agent injects
+            unified context; compaction triggers at 70% of this budget.
+            Default: 4000.
+
+    Raises:
+        ValueError: If unified memory is enabled together with
+            ``entity_memory``, ``knowledge_graph``, or ``knowledge_memory``;
+            or if any unified tier parameter is out of range while unified
+            memory is enabled (the parameters are inert otherwise).
+    """
 
     entity_memory: Optional["EntityMemory"] = None
     knowledge_graph: Optional["KnowledgeGraphMemory"] = None
     knowledge_memory: Optional["KnowledgeMemory"] = None
+    # -- Unified tiered memory (beta, v1.1) --
+    unified: bool = False
+    unified_memory: Optional["UnifiedMemory"] = None
+    importance_threshold: float = 0.7
+    short_term_limit: int = 100
+    long_term_limit: int = 1000
+    episodic_retention_days: int = 30
+    auto_promote: bool = True
+    context_max_tokens: int = 4000
+
+    @property
+    def _unified_enabled(self) -> bool:
+        """Whether unified memory is requested (flag or injected instance)."""
+        return self.unified or self.unified_memory is not None
+
+    def __post_init__(self) -> None:
+        if not self._unified_enabled:
+            return
+        if (
+            self.entity_memory is not None
+            or self.knowledge_graph is not None
+            or self.knowledge_memory is not None
+        ):
+            raise ValueError(
+                "MemoryConfig: unified memory is mutually exclusive with "
+                "entity_memory/knowledge_graph/knowledge_memory. Inject custom "
+                "tiers via MemoryConfig(unified_memory=UnifiedMemory(...)) instead."
+            )
+        if not 0.0 <= self.importance_threshold <= 1.0:
+            raise ValueError("MemoryConfig.importance_threshold must be between 0.0 and 1.0")
+        if self.short_term_limit < 1:
+            raise ValueError("MemoryConfig.short_term_limit must be at least 1")
+        if self.long_term_limit < 1:
+            raise ValueError("MemoryConfig.long_term_limit must be at least 1")
+        if self.episodic_retention_days < 1:
+            raise ValueError("MemoryConfig.episodic_retention_days must be at least 1")
+        if self.context_max_tokens < 1:
+            raise ValueError("MemoryConfig.context_max_tokens must be at least 1")
 
 
 @stable

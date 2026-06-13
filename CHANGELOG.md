@@ -5,6 +5,31 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Unified memory via config (beta, v1.1)** — `UnifiedMemory` (shipped
+  standalone in v0.24.0, #78) is now reachable from `AgentConfig`:
+  `AgentConfig(memory=MemoryConfig(unified=True, importance_threshold=0.7,
+  short_term_limit=100, long_term_limit=1000, episodic_retention_days=30,
+  auto_promote=True))`. The agent injects context assembled from the
+  long-term, entity, and episodic tiers before each call
+  (`context_max_tokens` budget, compaction at 70%) and persists every
+  completed turn via `UnifiedMemory.add_turn()` on all exit paths —
+  including max-iterations, budget-exceeded, and cancelled — driving
+  episodic recording and STM -> LTM auto-promotion. A pre-built instance
+  with custom tiers/scorers can be injected via
+  `MemoryConfig(unified_memory=...)`; the built instance is exposed as
+  `agent.unified_memory`. Default off; zero behavior change when not
+  configured. Mutually exclusive with `entity_memory`/`knowledge_graph`/
+  `knowledge_memory`, the Agent `memory=` parameter, and `session_store`
+  (each conflict raises `ValueError`).
+- `UnifiedMemory.assemble_context(..., include_conversation=False)` —
+  exclude the short-term conversation section when the conversation is
+  delivered separately (used by the agent integration; default `True`
+  preserves existing behavior).
+
 ## [0.26.0] - 2026-06-12 — Safety Patch & Verified Registry
 
 ### Fixed
