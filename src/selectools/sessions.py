@@ -1,8 +1,8 @@
 """
 Persistent session storage for conversation memory.
 
-Provides a protocol and three backends for saving/loading
-``ConversationMemory`` across agent restarts.
+Provides a protocol and backends (JSON file, SQLite, Redis, Supabase, MongoDB,
+DynamoDB) for saving/loading ``ConversationMemory`` across agent restarts.
 """
 
 from __future__ import annotations
@@ -1466,6 +1466,207 @@ class MongoSessionStore:
         return results[:limit]
 
 
+# ======================================================================
+# DynamoDB backend
+# ======================================================================
+
+
+@beta
+class DynamoDBSessionStore:
+    """Amazon DynamoDB-backed session store.
+
+    Each session is one item keyed by the ``session_key`` partition key (the bare
+    ``session_id``, or ``namespace:session_id`` with a namespace). The full
+    ``ConversationMemory`` is stored as a JSON string in ``memory_json`` — this
+    sidesteps DynamoDB's number type (which is Decimal-only, no floats) for the
+    nested payload. A save is a single ``put_item`` (upsert by partition key).
+
+    ``boto3`` is an optional dependency. Install it with::
+
+        pip install selectools[aws]
+
+    Args:
+        table_name: DynamoDB table name. The table must already exist with a
+            string partition key named ``session_key`` (this class never creates
+            tables).
+        region_name: Optional AWS region; otherwise boto3's normal resolution
+            (env, shared config, instance role) applies.
+        default_ttl: Optional TTL in seconds. When set, each save stamps an
+            ``expires_at`` epoch-seconds attribute. Enable TTL on that attribute
+            in the table settings for the server to expire stale sessions.
+
+    Required table (create once)::
+
+        partition key: session_key  (String)
+
+    Note:
+        ``list`` and ``search`` ``scan`` the table and score in-process — no GSI
+        assumed. Fine for hundreds of sessions; for large tables add a GSI / a
+        server-side query.
+    """
+
+    def __init__(
+        self,
+        table_name: str = "selectools_sessions",
+        region_name: Optional[str] = None,
+        default_ttl: Optional[int] = None,
+    ) -> None:
+        try:
+            import boto3  # type: ignore[import-untyped]
+        except ImportError as exc:
+            raise ImportError(
+                "DynamoDBSessionStore requires the 'boto3' package. "
+                "Install it with: pip install selectools[aws]"
+            ) from exc
+
+        resource = boto3.resource("dynamodb", region_name=region_name)
+        self._table: Any = resource.Table(table_name)
+        self._default_ttl = default_ttl
+
+    # -- validation helpers ------------------------------------------------
+
+    @staticmethod
+    def _validate_session_id(session_id: str) -> None:
+        if not session_id:
+            raise ValueError("session_id must not be empty")
+        if "\x00" in session_id:
+            raise ValueError(f"session_id must not contain null bytes: {session_id!r}")
+        if len(session_id) > 512:
+            raise ValueError(
+                f"session_id too long ({len(session_id)} chars, max 512): {session_id!r}"
+            )
+
+    @staticmethod
+    def _validate_namespace(namespace: Optional[str]) -> None:
+        if namespace is None:
+            return
+        if not namespace:
+            raise ValueError("namespace must not be empty when provided")
+        if "\x00" in namespace:
+            raise ValueError(f"namespace must not contain null bytes: {namespace!r}")
+        if len(namespace) > 512:
+            raise ValueError(f"namespace too long ({len(namespace)} chars, max 512): {namespace!r}")
+
+    def _key(self, session_id: str, namespace: Optional[str] = None) -> str:
+        self._validate_session_id(session_id)
+        self._validate_namespace(namespace)
+        return _make_key(session_id, namespace)
+
+    # -- public API --------------------------------------------------------
+
+    def save(
+        self,
+        session_id: str,
+        memory: ConversationMemory,
+        namespace: Optional[str] = None,
+    ) -> None:
+        from decimal import Decimal
+
+        key = self._key(session_id, namespace)
+        now = time.time()
+
+        existing = self._table.get_item(Key={"session_key": key}, ProjectionExpression="created_at")
+        created_at = existing["Item"]["created_at"] if existing.get("Item") else Decimal(str(now))
+
+        item: Dict[str, Any] = {
+            "session_key": key,
+            "session_id": session_id,
+            "namespace": namespace if namespace is not None else "",
+            "memory_json": json.dumps(memory.to_dict(), ensure_ascii=False),
+            "message_count": len(memory),
+            "created_at": created_at,
+            "updated_at": Decimal(str(now)),
+        }
+        if self._default_ttl is not None:
+            item["expires_at"] = int(now) + self._default_ttl
+        self._table.put_item(Item=item)
+
+    def load(
+        self, session_id: str, namespace: Optional[str] = None
+    ) -> Optional[ConversationMemory]:
+        response = self._table.get_item(Key={"session_key": self._key(session_id, namespace)})
+        item = response.get("Item")
+        if not item:
+            return None
+        return ConversationMemory.from_dict(json.loads(item["memory_json"]))
+
+    def list(self) -> List[SessionMetadata]:
+        results: List[SessionMetadata] = []
+        for item in self._scan_all():
+            results.append(
+                SessionMetadata(
+                    session_id=item.get("session_id", item.get("session_key", "")),
+                    message_count=int(item.get("message_count") or 0),
+                    created_at=float(item.get("created_at") or 0),
+                    updated_at=float(item.get("updated_at") or 0),
+                )
+            )
+        return results
+
+    def delete(self, session_id: str, namespace: Optional[str] = None) -> bool:
+        response = self._table.delete_item(
+            Key={"session_key": self._key(session_id, namespace)},
+            ReturnValues="ALL_OLD",
+        )
+        return bool(response.get("Attributes"))
+
+    def exists(self, session_id: str, namespace: Optional[str] = None) -> bool:
+        response = self._table.get_item(
+            Key={"session_key": self._key(session_id, namespace)},
+            ProjectionExpression="session_key",
+        )
+        return "Item" in response and bool(response["Item"])
+
+    def branch(self, source_id: str, new_id: str) -> None:
+        memory = self.load(source_id)
+        if memory is None:
+            raise ValueError(f"Session {source_id!r} not found")
+        self.save(new_id, memory)
+
+    def _scan_all(self) -> List[Dict[str, Any]]:
+        """Page through a full table scan (no GSI assumed)."""
+        items: List[Dict[str, Any]] = []
+        kwargs: Dict[str, Any] = {}
+        while True:
+            response = self._table.scan(**kwargs)
+            items.extend(response.get("Items", []))
+            start_key = response.get("LastEvaluatedKey")
+            if not start_key:
+                break
+            kwargs["ExclusiveStartKey"] = start_key
+        return items
+
+    @beta
+    def search(
+        self,
+        query: str,
+        namespace: Optional[str] = None,
+        limit: int = 5,
+    ) -> List[SessionSearchResult]:
+        """Scan the table and score each item in-process (term frequency)."""
+        terms = _search_terms(query)
+        if not terms or limit <= 0:
+            return []
+        if namespace is not None:
+            self._validate_namespace(namespace)
+        results: List[SessionSearchResult] = []
+        for item in self._scan_all():
+            if namespace is not None and item.get("namespace") != namespace:
+                continue
+            memory_data = json.loads(item.get("memory_json") or "{}")
+            score, snippets = _score_memory_dict(memory_data, terms)
+            if score > 0:
+                results.append(
+                    SessionSearchResult(
+                        session_id=item.get("session_id", item.get("session_key", "")),
+                        score=score,
+                        matched_messages=snippets,
+                    )
+                )
+        results.sort(key=lambda r: (-r.score, r.session_id))
+        return results[:limit]
+
+
 __stability__ = "stable"
 
 __all__ = [
@@ -1477,4 +1678,5 @@ __all__ = [
     "RedisSessionStore",
     "SupabaseSessionStore",
     "MongoSessionStore",
+    "DynamoDBSessionStore",
 ]

@@ -47,7 +47,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
 
 **Added in:** v0.16.0
 **File:** `src/selectools/sessions.py`
-**Classes:** `SessionStore`, `SessionSearchResult`, `JsonFileSessionStore`, `SQLiteSessionStore`, `RedisSessionStore`, `SupabaseSessionStore`, `MongoSessionStore`
+**Classes:** `SessionStore`, `SessionSearchResult`, `JsonFileSessionStore`, `SQLiteSessionStore`, `RedisSessionStore`, `SupabaseSessionStore`, `MongoSessionStore`, `DynamoDBSessionStore`
 
 ## Table of Contents
 
@@ -342,6 +342,48 @@ the `memory` field, so a save is a single `replace_one(..., upsert=True)`.
 
 ```bash
 pip install selectools[mongo]
+```
+
+### 6. DynamoDBSessionStore
+
+**Best for:** AWS-native / serverless deployments already using DynamoDB.
+
+**Since:** Unreleased (beta)
+
+```python
+from selectools.sessions import DynamoDBSessionStore
+
+store = DynamoDBSessionStore(
+    table_name="selectools_sessions",  # must already exist
+    region_name=None,                  # else boto3's normal resolution
+    default_ttl=None,                  # seconds; None = no expiry
+)
+```
+
+Each session is one item keyed by a string partition key `session_key` (the bare
+`session_id`, or `namespace:session_id`). The full `ConversationMemory` is stored
+as a JSON string in `memory_json`, which sidesteps DynamoDB's Decimal-only number
+type for the nested payload. A save is a single `put_item` (upsert).
+
+**Required table** (create once, e.g. via console/CDK/Terraform):
+
+- Partition key: `session_key` (String)
+
+**Features:**
+
+- Single-item-per-session storage; idempotent `put_item` upsert saves
+- Namespace isolation and the same `session_id` / `namespace` validation guards
+  as the other backends
+- Optional server-side TTL: when `default_ttl` is set, each save stamps an
+  `expires_at` epoch-seconds attribute — enable TTL on that attribute in the
+  table settings for the server to expire stale sessions
+- `list` / `search` paginate a full table `scan` and score in-process — no GSI
+  assumed (add one + a server-side query for large tables)
+
+**Installation:**
+
+```bash
+pip install selectools[aws]
 ```
 
 ---
