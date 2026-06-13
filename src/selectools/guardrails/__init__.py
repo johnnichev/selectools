@@ -2,6 +2,7 @@
 
 from .base import Guardrail, GuardrailAction, GuardrailError, GuardrailResult
 from .format import FormatGuardrail
+from .injection import PromptInjectionGuardrail
 from .length import LengthGuardrail
 from .pii import PIIGuardrail, PIIMatch
 from .pipeline import GuardrailsPipeline
@@ -22,4 +23,5 @@ __all__ = [
     "PIIMatch",
     "TopicGuardrail",
     "ToxicityGuardrail",
+    "PromptInjectionGuardrail",
 ]

@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **PromptInjectionGuardrail (beta)** — heuristic prompt-injection / jailbreak
+  detection (`selectools.guardrails`). Matches high-signal attack phrasings
+  ("ignore previous instructions", "reveal your system prompt", role-delimiter
+  spoofing like `<system>`/`[INST]`, jailbreak markers like "developer mode" /
+  "DAN") with deliberately high-precision patterns, so the default (block on a
+  single match) has a low false-positive rate. Tunable `min_matches`,
+  extensible/replaceable `patterns`, `detected()` for inspection, standard
+  `action` (block/warn/rewrite). Stdlib-only (the heuristic tier — a model-based
+  classifier remains a future optional addition). Docs:
+  `docs/modules/GUARDRAILS.md`.
 - **DynamoDBSessionStore (beta)** — a sixth session backend, AWS-native. One item
   per session keyed by a `session_key` string partition key; the
   `ConversationMemory` is stored as a JSON string (sidestepping DynamoDB's
