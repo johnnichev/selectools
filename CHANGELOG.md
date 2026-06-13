@@ -5,6 +5,40 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.27.1] - 2026-06-13 — Bug-Hunt Patch
+
+Adversarial bug hunt of the v0.27.0 feature surface. 10 confirmed bugs fixed
+(all additive features from v0.27.0 — no API changes). No breaking changes.
+
+### Fixed
+
+- **Scheduled agents recorded the wrong output.** `JobResult.output` stored
+  `str(AgentResult)` (the dataclass repr) instead of the agent's answer, because
+  `Agent.run()` returns an `AgentResult`, not a string. The whole output-recording
+  path produced garbage for real agents. Now extracts `AgentResult.content`.
+- **`PromptInjectionGuardrail` blocked benign input.** Three patterns fired on
+  legitimate requests — "pretend you are a pirate", "show the rules", "ignore
+  programming jargon". Tightened `pretend-no-rules` / `reveal-system-prompt` /
+  `override-safety` to require the actual attack signal; all known attacks still
+  detected (0 false positives across the benign corpus, 0 missed attacks).
+- **`s3_get_object` leaked the HTTP connection.** The boto3 `StreamingBody` was
+  read but never closed, so the connection was held out of the pool on any object
+  larger than the read cap. Closed in a `finally`.
+- **Unified memory persisted un-redacted input in async mode.** `arun`/`astream`
+  captured the user text before the async input-guardrail pass, so raw input was
+  written to memory even with a redacting guardrail. The redacted text is now
+  recorded.
+- **`generate_image` orphaned a temp file** when the API returned malformed
+  base64 — the payload is decoded before the file is created.
+- **Discord tools surfaced an opaque error** on a 2xx response with a non-JSON
+  body — now returns a clear message.
+- **`AgentConfig(entity_memory=..., memory=MemoryConfig(unified=True))` silently
+  dropped the flat tier** — it now raises a clear `ValueError`.
+- **Unified memory** left a stale `self._history` slice on the error-rollback path
+  (cosmetic; rebuilt on the next run). Corrected.
+- Removed a dead `calculate_cost` import in `azure_openai_provider.py`.
+- Documented the `recall` importance-window limitation for large custom stores.
+
 ## [0.27.0] - 2026-06-13 — Scheduling, Reasoning & New Backends
 
 ### Added

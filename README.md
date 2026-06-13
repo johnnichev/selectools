@@ -32,6 +32,10 @@ result = AgentGraph.chain(planner, writer, reviewer).run("Write a blog post")
 
 ## What's New in v0.27
 
+### v0.27.1 — Bug-Hunt Patch
+
+An adversarial bug hunt of the v0.27.0 surface fixed 10 confirmed bugs (no API changes, no breaking changes). Highlights: scheduled agents recorded the `AgentResult` repr instead of the answer text; `PromptInjectionGuardrail` blocked benign requests ("pretend you are a pirate", "show the rules"); `s3_get_object` leaked its HTTP connection; and unified memory persisted un-redacted input in async mode. See `CHANGELOG.md` for the full list.
+
 ### v0.27.0 — Scheduling, Reasoning & New Backends
 
 A feature release landing the post-1.0 backlog: scheduled agents, composable reasoning, two new session backends, an injection guardrail, and the rest of the v1.1 candidate set. All additive (`@beta`); no breaking changes.
