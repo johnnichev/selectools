@@ -14,7 +14,7 @@ from typing import Any, Dict, Tuple
 from ..env import load_default_env
 from ..exceptions import ProviderConfigurationError
 from ..models import OpenAI as OpenAIModels
-from ..pricing import calculate_cost
+from ..pricing import calculate_cost_with_cached_input
 from ..stability import stable
 from ._openai_compat import _OpenAICompatibleBase
 from .base import ProviderError
@@ -68,8 +68,16 @@ class OpenAIProvider(_OpenAICompatibleBase):
     def _get_token_key(self, model: str) -> str:
         return "max_completion_tokens" if _uses_max_completion_tokens(model) else "max_tokens"
 
-    def _calculate_cost(self, model: str, prompt_tokens: int, completion_tokens: int) -> float:
-        return calculate_cost(model, prompt_tokens, completion_tokens)
+    def _calculate_cost(
+        self,
+        model: str,
+        prompt_tokens: int,
+        completion_tokens: int,
+        cached_input_tokens: int = 0,
+    ) -> float:
+        return calculate_cost_with_cached_input(
+            model, prompt_tokens, completion_tokens, cached_input_tokens
+        )
 
     def _get_provider_name(self) -> str:
         return "openai"

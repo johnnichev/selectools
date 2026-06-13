@@ -392,7 +392,10 @@ class TestGeminiTimeout:
         mock_client.models.generate_content.return_value = self._make_mock_response()
         provider._client = mock_client
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             provider.complete(
                 model="gemini-test",
                 system_prompt="sys",
@@ -421,7 +424,10 @@ class TestGeminiTimeout:
         mock_client.models.generate_content.return_value = self._make_mock_response()
         provider._client = mock_client
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             provider.complete(
                 model="gemini-test",
                 system_prompt="sys",
@@ -453,7 +459,10 @@ class TestGeminiTimeout:
         mock_client.models.generate_content_stream.return_value = iter([mock_chunk])
         provider._client = mock_client
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             list(
                 provider.stream(
                     model="gemini-test",
@@ -484,7 +493,10 @@ class TestGeminiTimeout:
         mock_client.models.generate_content.return_value = self._make_mock_response()
         provider._client = mock_client
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             provider.complete(
                 model="gemini-test",
                 system_prompt="sys",

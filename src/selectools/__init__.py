@@ -149,7 +149,13 @@ from .pending import (
 )
 from .pipeline import Pipeline, Step, StepResult, branch, cache_step, parallel, retry, step
 from .policy import ApprovalRequest, PolicyDecision, PolicyResult, ToolPolicy
-from .pricing import PRICING, calculate_cost, calculate_embedding_cost, get_model_pricing
+from .pricing import (
+    PRICING,
+    calculate_cost,
+    calculate_cost_with_cached_input,
+    calculate_embedding_cost,
+    get_model_pricing,
+)
 from .prompt import REASONING_STRATEGIES, PromptBuilder
 from .providers.anthropic_provider import AnthropicProvider
 from .providers.azure_openai_provider import AzureOpenAIProvider
@@ -246,6 +252,7 @@ __all__ = [
     # Pricing
     "PRICING",
     "calculate_cost",
+    "calculate_cost_with_cached_input",
     "calculate_embedding_cost",
     "get_model_pricing",
     # Model Registry

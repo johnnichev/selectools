@@ -95,6 +95,39 @@ class TestToolboxAPI:
         missing = expected - names
         assert not missing, f"Missing from get_all_tools(): {missing}"
 
+    def test_v1_1_categories_registered(self) -> None:
+        """v1.1 expansion: discord/s3/browser/image categories."""
+        expected = {
+            "discord": 2,
+            "s3": 3,
+            "browser": 2,
+            "image": 1,
+        }
+        for category, count in expected.items():
+            tools = get_tools_by_category(category)
+            assert len(tools) == count, f"category '{category}' expected {count} tools"
+            assert all(hasattr(t, "name") and hasattr(t, "function") for t in tools)
+
+    def test_v1_1_tools_in_get_all_tools(self) -> None:
+        """All 8 v1.1 expansion tools must be returned by get_all_tools()."""
+        names = {t.name for t in get_all_tools()}
+        expected = {
+            "discord_send_message",
+            "discord_read_channel",
+            "s3_list_objects",
+            "s3_get_object",
+            "s3_put_object",
+            "browser_scrape_page",
+            "browser_screenshot",
+            "generate_image",
+        }
+        missing = expected - names
+        assert not missing, f"Missing from get_all_tools(): {missing}"
+
+    def test_get_all_tools_count(self) -> None:
+        """The advertised toolbox size: 56 tools after the v1.1 expansion."""
+        assert len(get_all_tools()) == 56
+
 
 # =============================================================================
 # File Tools Tests

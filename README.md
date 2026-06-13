@@ -595,7 +595,7 @@ report.to_html("report.html")
 - **Dynamic Tool Loading**: Plugin system with hot-reload support
 - **Response Caching**: InMemoryCache and RedisCache with stats tracking
 - **115 Model Registry**: Type-safe constants with pricing and metadata
-- **Pre-built Toolbox**: 48 tools for files, data, text, datetime, web, code, search, GitHub, DB, calculator, email, PDF, Slack, Notion, Linear
+- **Pre-built Toolbox**: 56 tools for files, data, text, datetime, web, code, search, GitHub, DB, calculator, email, PDF, Slack, Notion, Linear, Discord, S3, browser, image gen
 - **Persistent Sessions**: 4 backends (JSON file, SQLite, Redis, Supabase) with TTL and cross-session search
 - **Entity Memory**: LLM-based named entity extraction and tracking
 - **Unified Memory**: tiered conversation/knowledge/entity/episodic memory with token-aware compaction
@@ -1118,7 +1118,7 @@ Examples are numbered by difficulty. Start from 01 and work your way up.
 |---|---|---|---|
 | 01 | `01_hello_world.py` | First agent, `@tool`, `ask()` | No |
 | 02 | `02_search_weather.py` | ToolRegistry, multiple tools | No |
-| 03 | `03_toolbox.py` | 48 pre-built tools (file, data, text, datetime, web, code, search, and more) | No |
+| 03 | `03_toolbox.py` | 56 pre-built tools (file, data, text, datetime, web, code, search, and more) | No |
 | 04 | `04_conversation_memory.py` | Multi-turn memory | Yes |
 | 05 | `05_cost_tracking.py` | Token counting, cost warnings | Yes |
 | 06 | `06_async_agent.py` | `arun()`, concurrent agents, FastAPI | Yes |

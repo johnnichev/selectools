@@ -1790,7 +1790,10 @@ class TestGeminiProviderComplete:
         provider = self._get_provider()
         provider._client.models.generate_content.return_value = self._make_gemini_response("hi")
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.001):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.001,
+        ):
             msg, usage = provider.complete(
                 model="gemini-2.0-flash",
                 system_prompt="sys",
@@ -1813,7 +1816,10 @@ class TestGeminiProviderComplete:
             "", function_calls=[fc]
         )
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             msg, _ = provider.complete(
                 model="gemini-2.0-flash",
                 system_prompt="sys",
@@ -1852,7 +1858,10 @@ class TestGeminiProviderComplete:
         response.usage_metadata.candidates_token_count = 3
         provider._client.models.generate_content.return_value = response
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             msg, _ = provider.complete(
                 model="gemini-2.0-flash",
                 system_prompt="sys",
@@ -1894,7 +1903,10 @@ class TestGeminiProviderComplete:
         response.usage_metadata.candidates_token_count = 3
         provider._client.models.generate_content.return_value = response
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             msg, _ = provider.complete(
                 model="gemini-2.0-flash",
                 system_prompt="sys",
@@ -1918,7 +1930,10 @@ class TestGeminiProviderComplete:
         response.usage_metadata.candidates_token_count = 3
         provider._client.models.generate_content.return_value = response
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             msg, _ = provider.complete(
                 model="gemini-2.0-flash",
                 system_prompt="sys",
@@ -1937,7 +1952,10 @@ class TestGeminiProviderComplete:
             "hi", has_usage=False
         )
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             _, usage = provider.complete(
                 model="gemini-2.0-flash",
                 system_prompt="sys",
@@ -1970,7 +1988,10 @@ class TestGeminiProviderComplete:
         provider = self._get_provider()
         provider._client.models.generate_content.return_value = self._make_gemini_response()
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             provider.complete(
                 model="gemini-2.0-flash",
                 system_prompt="sys",
@@ -1996,7 +2017,10 @@ class TestGeminiProviderComplete:
             "", function_calls=[fc]
         )
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             msg, _ = provider.complete(
                 model="gemini-2.0-flash",
                 system_prompt="sys",
@@ -2031,7 +2055,10 @@ class TestGeminiProviderStream:
         chunk2.candidates = []
         provider._client.models.generate_content_stream.return_value = iter([chunk1, chunk2])
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             result = list(
                 provider.stream(
                     model="gemini-2.0-flash",
@@ -2064,7 +2091,10 @@ class TestGeminiProviderStream:
         chunk.candidates = [candidate]
         provider._client.models.generate_content_stream.return_value = iter([chunk])
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             result = list(
                 provider.stream(
                     model="gemini-2.0-flash",
@@ -2100,7 +2130,10 @@ class TestGeminiProviderStream:
         chunk.candidates = [candidate]
         provider._client.models.generate_content_stream.return_value = iter([chunk])
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             result = list(
                 provider.stream(
                     model="gemini-2.0-flash",
@@ -2201,7 +2234,10 @@ class TestGeminiProviderStream:
         chunk.candidates = [candidate]
         provider._client.models.generate_content_stream.return_value = iter([chunk])
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             result = list(
                 provider.stream(
                     model="gemini-2.0-flash",
@@ -2244,7 +2280,10 @@ class TestGeminiProviderAcomplete:
             return_value=self._make_gemini_response("async hello")
         )
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             msg, usage = await provider.acomplete(
                 model="gemini-2.0-flash",
                 system_prompt="sys",
@@ -2278,7 +2317,10 @@ class TestGeminiProviderAcomplete:
         response.usage_metadata.candidates_token_count = 3
         provider._client.aio.models.generate_content = AsyncMock(return_value=response)
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             msg, _ = await provider.acomplete(
                 model="gemini-2.0-flash",
                 system_prompt="sys",
@@ -2304,7 +2346,10 @@ class TestGeminiProviderAcomplete:
         response.usage_metadata.candidates_token_count = 3
         provider._client.aio.models.generate_content = AsyncMock(return_value=response)
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             msg, _ = await provider.acomplete(
                 model="gemini-2.0-flash",
                 system_prompt="sys",
@@ -2344,7 +2389,10 @@ class TestGeminiProviderAcomplete:
         response.usage_metadata = None
         provider._client.aio.models.generate_content = AsyncMock(return_value=response)
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             _, usage = await provider.acomplete(
                 model="gemini-2.0-flash",
                 system_prompt="sys",
@@ -2378,7 +2426,10 @@ class TestGeminiProviderAcomplete:
         response.usage_metadata.candidates_token_count = 3
         provider._client.aio.models.generate_content = AsyncMock(return_value=response)
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             msg, _ = await provider.acomplete(
                 model="gemini-2.0-flash",
                 system_prompt="sys",
@@ -2419,7 +2470,10 @@ class TestGeminiProviderAstream:
 
         provider._client.aio.models.generate_content_stream = AsyncMock(return_value=mock_stream())
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             result = []
             async for item in provider.astream(
                 model="gemini-2.0-flash",
@@ -2456,7 +2510,10 @@ class TestGeminiProviderAstream:
 
         provider._client.aio.models.generate_content_stream = AsyncMock(return_value=mock_stream())
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             result = []
             async for item in provider.astream(
                 model="gemini-2.0-flash",
@@ -2496,7 +2553,10 @@ class TestGeminiProviderAstream:
 
         provider._client.aio.models.generate_content_stream = AsyncMock(return_value=mock_stream())
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             result = []
             async for item in provider.astream(
                 model="gemini-2.0-flash",
@@ -2605,7 +2665,10 @@ class TestGeminiProviderAstream:
 
         provider._client.aio.models.generate_content_stream = AsyncMock(return_value=mock_stream())
 
-        with patch("selectools.providers.gemini_provider.calculate_cost", return_value=0.0):
+        with patch(
+            "selectools.providers.gemini_provider.calculate_cost_with_cached_input",
+            return_value=0.0,
+        ):
             result = []
             async for item in provider.astream(
                 model="gemini-2.0-flash",

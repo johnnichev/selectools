@@ -109,7 +109,7 @@ nav:
   - Core:
     - Agent: modules/AGENT.md
     - Tools: modules/TOOLS.md
-    - Toolbox (48 Built-in): modules/TOOLBOX.md
+    - Toolbox (56 Built-in): modules/TOOLBOX.md
     - Dynamic Tools: modules/DYNAMIC_TOOLS.md
     - Streaming: modules/STREAMING.md
     - Multimodal Messages: modules/MULTIMODAL.md
