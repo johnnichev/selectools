@@ -3,16 +3,18 @@
 ## What I Was Doing (2026-06-13)
 
 Merged a large feature wave to `main` and continued the post-1.0 roadmap.
-v0.26.0 is the latest **released** version; everything below is on `main`
-under `## [Unreleased]`, folded into the v1.0 train (John's call to
+Cut the **v0.27.0 — Scheduling, Reasoning & New Backends** feature release,
+shipping the post-1.0 backlog work merged this session. All additive (`@beta`),
+no breaking changes (minor bump). Folded into the v1.0 train (John's call to
 integrate now rather than hold to a post-tag minor — v1.0 is now materially
 larger than the originally-baked v0.24-0.26 surface). Bake clock still ~mid-July.
 
 ## Current State
 
-- **Version:** `0.26.0` (released) in `src/selectools/__init__.py` and
-  `pyproject.toml`. New work is `[Unreleased]` — do NOT bump the version
-  until the next release is cut.
+- **Version:** `0.27.0` in `src/selectools/__init__.py` and `pyproject.toml`.
+  CHANGELOG `## [0.27.0] - 2026-06-13` finalized and synced to
+  `docs/CHANGELOG.md`. Release = push tag `v0.27.0` (CI `publish-pypi` job
+  fires on `refs/tags/v*`).
 - **Suite:** ~7,728 tests collected; full non-e2e run 7,492 passed / 0
   failed. 115 examples, 115 source-verified models.
 - **Quality gate:** ruff format + check clean, mypy clean (the 5 prior
