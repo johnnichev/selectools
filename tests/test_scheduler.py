@@ -297,6 +297,28 @@ async def test_astart_runs_until_deadline():
     assert isinstance(results, list)
 
 
+def test_real_agent_result_records_text_not_repr():
+    # Regression: Agent.run() returns an AgentResult (not a str). The scheduler
+    # must record AgentResult.content, NOT str(AgentResult) (the dataclass repr).
+    from selectools import Agent, AgentConfig, tool
+    from selectools.providers.stubs import LocalProvider
+
+    @tool(description="noop")
+    def noop() -> str:
+        return "ok"
+
+    agent = Agent(tools=[noop], provider=LocalProvider(), config=AgentConfig(name="reporter"))
+    clock = Clock(datetime(2026, 6, 13, 9, 0))
+    s = AgentScheduler(now=clock)
+    s.add_job(agent, "ping", cron("0 9 * * *"), start_immediately=True)
+    results = s.run_pending()
+    assert len(results) == 1
+    out = results[0].output
+    assert out is not None
+    assert "AgentResult(" not in out  # not the repr
+    assert "ping" in out  # LocalProvider echoes the prompt
+
+
 @pytest.mark.asyncio
 async def test_arun_pending_uses_arun():
     clock = Clock(datetime(2026, 6, 13, 9, 0))

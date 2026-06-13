@@ -136,7 +136,13 @@ def s3_get_object(bucket: str, key: str, max_bytes: int = _MAX_GET_BYTES) -> str
     try:
         client = boto3.client("s3")
         response = client.get_object(Bucket=bucket.strip(), Key=key.strip())
-        body = response["Body"].read(max_bytes + 1)
+        stream = response["Body"]
+        try:
+            body = stream.read(max_bytes + 1)
+        finally:
+            # Closing the StreamingBody returns the underlying HTTP connection
+            # to the pool; reading a partial body without closing leaks it.
+            stream.close()
         truncated = len(body) > max_bytes
         text = body[:max_bytes].decode("utf-8", errors="replace")
 

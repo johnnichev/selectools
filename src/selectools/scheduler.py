@@ -55,6 +55,22 @@ logger = logging.getLogger("selectools.scheduler")
 _MAX_CRON_LOOKAHEAD_MINUTES = 366 * 4 * 24 * 60
 
 
+def _result_text(output: Any) -> str:
+    """Extract the response text from an agent's run() result.
+
+    ``Agent.run()`` returns an ``AgentResult`` whose ``.content`` is the final
+    response text — NOT a string. Storing ``str(result)`` would record the
+    dataclass repr instead of the answer, so prefer ``.content`` and fall back
+    to ``str`` only for plain-string returns or unknown result types.
+    """
+    if isinstance(output, str):
+        return output
+    content = getattr(output, "content", None)
+    if isinstance(content, str):
+        return content
+    return str(output)
+
+
 # =============================================================================
 # Schedules
 # =============================================================================
@@ -373,8 +389,7 @@ class AgentScheduler:
                 continue
             result = JobResult(job_name=job.name, fired_at=moment, run_index=job.run_count)
             try:
-                output = job.agent.run(job.prompt)
-                result.output = output if isinstance(output, str) else str(output)
+                result.output = _result_text(job.agent.run(job.prompt))
             except Exception as exc:  # noqa: BLE001 - isolate job failures
                 result.error = f"{type(exc).__name__}: {exc}"
                 logger.exception("scheduled job %r raised", job.name)
@@ -392,8 +407,7 @@ class AgentScheduler:
                 continue
             result = JobResult(job_name=job.name, fired_at=moment, run_index=job.run_count)
             try:
-                output = await job.agent.arun(job.prompt)
-                result.output = output if isinstance(output, str) else str(output)
+                result.output = _result_text(await job.agent.arun(job.prompt))
             except Exception as exc:  # noqa: BLE001 - isolate job failures
                 result.error = f"{type(exc).__name__}: {exc}"
                 logger.exception("scheduled job %r raised", job.name)
