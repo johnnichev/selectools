@@ -147,6 +147,7 @@ nav:
     - Token Estimation: modules/TOKEN_ESTIMATION.md
     - Model Switching: modules/MODEL_SWITCHING.md
     - Reasoning Strategies: modules/REASONING_STRATEGIES.md
+    - Reasoning Tools: modules/REASONING_TOOLS.md
     - Tool Result Caching: modules/TOOL_CACHING.md
     - Semantic Cache: modules/SEMANTIC_CACHE.md
     - Prompt Compression: modules/PROMPT_COMPRESSION.md
