@@ -519,7 +519,7 @@ John's direction rather than getting built blind.
 | Item | Source | Decision needed | Effort |
 |---|---|---|---|
 | More DB backends — **MongoDB (#116) + DynamoDB shipped**; Firestore on demand | Agno | MongoDB + DynamoDB session stores shipped 2026-06-13. Firestore next only if there's demand (needs `google-cloud-firestore`). | Medium each |
-| ML-based guard models | Superagent | Hosting model: bundle a 0.6-4B model, optional extra, or call an external endpoint? Drives the whole design. | High |
+| ML-based guard models | Superagent | **Heuristic tier shipped**: `PromptInjectionGuardrail` (2026-06-13) covers templated attacks with no model hosting. The *model-based* tier still needs the hosting decision: bundle a 0.6-4B model, optional extra, or external endpoint? | High |
 | Multi-channel bot gateway | PraisonAI | Roadmap itself says "better as a separate package." In-repo module vs new package = a product/packaging call. | High |
 | Learning system | Agno | Scope is vague (decision logging + preference tracking). Needs a concrete spec before it's buildable. | High |
 | Shadow git checkpoints | PraisonAI | Only relevant if selectools moves toward coding-agent use cases — a direction call. | Medium |

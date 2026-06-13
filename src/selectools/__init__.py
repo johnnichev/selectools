@@ -45,6 +45,7 @@ from .guardrails import (
     GuardrailsPipeline,
     LengthGuardrail,
     PIIGuardrail,
+    PromptInjectionGuardrail,
     TopicGuardrail,
     ToxicityGuardrail,
 )
@@ -354,6 +355,7 @@ __all__ = [
     "PIIGuardrail",
     "TopicGuardrail",
     "ToxicityGuardrail",
+    "PromptInjectionGuardrail",
     # Audit
     "AuditLogger",
     "PrivacyLevel",
