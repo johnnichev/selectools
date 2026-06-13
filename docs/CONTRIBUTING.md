@@ -266,7 +266,7 @@ selectools/
 │   ├── serve/                  # Serve CLI, builder UI, AgentAPI (api.py)
 │   ├── embeddings/             # Embedding providers
 │   ├── rag/                    # RAG: vector stores, chunking, loaders
-│   └── toolbox/                # 48 pre-built tools
+│   └── toolbox/                # 56 pre-built tools
 ├── tests/                      # Test suite (7268 tests, 95% coverage)
 │   ├── agent/                  # Agent tests
 │   ├── rag/                    # RAG tests

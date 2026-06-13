@@ -80,6 +80,12 @@ toolbox = [
     "slack-sdk>=3.27.0",
     "pdfplumber>=0.11.0",
 ]
+aws = [
+    "boto3>=1.34.0",
+]
+browser = [
+    "playwright>=1.40.0",
+]
 evals = [
     "pyyaml>=6.0.0",
 ]
