@@ -10,6 +10,7 @@ from ..types import Message, Role
 
 if TYPE_CHECKING:
     from ..memory import ConversationMemory
+    from .core import _RunContext
 
 
 _MAX_SUMMARY_CHARS = 4000  # ~1000 tokens, well under any provider's context window
@@ -131,6 +132,21 @@ class _MemoryManagerMixin:
             self._notify_observers("on_session_save", run_id, sid, len(self.memory))
         except Exception:  # nosec B110
             pass  # never crash the agent for a persistence failure
+
+    def _unified_memory_record(self, ctx: "_RunContext", final_response: Message) -> None:
+        """Persist the completed turn into unified memory, if configured.
+
+        Drives ``UnifiedMemory.add_turn()`` — the single write path that
+        records the episode, feeds the entity tier (when present), and
+        promotes aged-out short-term items to long-term memory.
+        """
+        unified = getattr(self, "unified_memory", None)
+        if unified is None:
+            return
+        try:
+            unified.add_turn(ctx.unified_user_text, final_response)
+        except Exception:  # nosec B110
+            pass  # never crash the agent for a memory persistence failure
 
     def _extract_entities(self, run_id: str) -> None:
         """Extract entities from recent messages if entity_memory is configured."""

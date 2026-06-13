@@ -299,6 +299,23 @@ class TestContextAssembly:
         with pytest.raises(ValueError):
             memory.assemble_context(max_tokens=0)
 
+    def test_exclude_conversation_keeps_other_tiers(self, tmp_path: Any) -> None:
+        # The agent integration sends short-term history as structured
+        # messages and only needs the non-conversation tiers here.
+        memory = make_memory(tmp_path)
+        memory.long_term.remember("User's daughter is Alice", importance=0.9)
+        memory.add_turn("hello", "hi")
+        context = memory.assemble_context(max_tokens=100_000, include_conversation=False)
+        assert "User's daughter is Alice" in context
+        assert "[Recent Episodes]" in context
+        assert "[Conversation]" not in context
+        assert "USER: hello" not in context  # episodic "user: hello" line remains
+
+    def test_include_conversation_default_unchanged(self, tmp_path: Any) -> None:
+        memory = make_memory(tmp_path)
+        memory.add_turn("hello", "hi")
+        assert "[Conversation]" in memory.assemble_context(max_tokens=100_000)
+
 
 # ----------------------------------------------------------------------
 # Recall federation

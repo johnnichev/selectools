@@ -683,7 +683,12 @@ class UnifiedMemory:
     # Read path — context assembly with compaction
     # ------------------------------------------------------------------
 
-    def assemble_context(self, max_tokens: int = 4000) -> str:
+    def assemble_context(
+        self,
+        max_tokens: int = 4000,
+        *,
+        include_conversation: bool = True,
+    ) -> str:
         """Build a single context string from all tiers.
 
         Sections, in order: long-term knowledge, known entities, recent
@@ -701,6 +706,11 @@ class UnifiedMemory:
 
         Args:
             max_tokens: Token budget the caller plans to spend on context.
+            include_conversation: Include the short-term conversation section.
+                Pass ``False`` when the conversation is delivered separately
+                (e.g. the agent integration sends short-term history as
+                structured messages and only needs the other tiers here).
+                Default: True.
 
         Returns:
             The assembled (possibly compacted) context string.
@@ -715,7 +725,7 @@ class UnifiedMemory:
                 self._entity_memory.build_context() if self._entity_memory is not None else ""
             )
             episodic_section = self._episodic_section()
-            messages = self._short_term.get_history()
+            messages = self._short_term.get_history() if include_conversation else []
 
         def render(conversation: str, drop_level: int = 0) -> str:
             parts = [long_term_section]
