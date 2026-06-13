@@ -5,6 +5,33 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Toolbox: four new categories — Discord, S3, browser, image generation**
+  (toolbox: 48 → 56 tools, 15 → 19 categories; held for v1.1):
+  - `discord_tools`: `discord_send_message`, `discord_read_channel` —
+    Discord REST API v10 via `requests` (no gateway/`discord.py`
+    dependency), `DISCORD_BOT_TOKEN` env var.
+  - `s3_tools`: `s3_list_objects`, `s3_get_object`, `s3_put_object` —
+    boto3 with the standard AWS credential chain. New `selectools[aws]`
+    optional extra.
+  - `browser_tools`: `browser_scrape_page`, `browser_screenshot` —
+    Playwright sync API in headless Chromium; scrape returns visible
+    text (JS rendered), screenshot saves a PNG and returns the path.
+    New `selectools[browser]` optional extra (plus
+    `playwright install chromium`).
+  - `image_tools`: `generate_image` — OpenAI Images API; base64
+    payloads are saved to disk and the path returned, hosted results
+    return the URL. Uses the existing core `openai` dependency and
+    `OPENAI_API_KEY`.
+  - All tools follow the established toolbox conventions: lazy optional
+    imports with actionable install hints, env-var credentials never
+    echoed in output or errors, readable error strings instead of
+    raised exceptions, `@beta` stability markers, category registry +
+    `__all__` reconciliation, fully mocked unit tests.
+
 ## [0.26.0] - 2026-06-12 — Safety Patch & Verified Registry
 
 ### Fixed

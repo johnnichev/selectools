@@ -618,7 +618,7 @@ You now know the core API. Here is where to go from here:
 | Add audit logging | [Audit Guide](modules/AUDIT.md) |
 | Screen tool outputs for injection | [Security Guide](modules/SECURITY.md) |
 | Enable coherence checking | [Security Guide — Coherence](modules/SECURITY.md#coherence-checking) |
-| Use 48 pre-built tools | [Toolbox Guide](modules/TOOLBOX.md) |
+| Use 56 pre-built tools | [Toolbox Guide](modules/TOOLBOX.md) |
 | Use Azure OpenAI | [Providers Guide -- Azure](modules/PROVIDERS.md#azure-openai-provider-v0210) |
 | Send traces to OTel / Langfuse | [Providers Guide -- Observability](modules/PROVIDERS.md#observability-integrations-v0210) |
 | Load CSV, JSON, HTML, or URLs | [RAG Guide -- Loaders](modules/RAG.md#loading-from-csv-v0210) |

@@ -17,6 +17,10 @@ This module provides a collection of ready-to-use tools for:
 - Slack (send, read channel, search)
 - Notion (create, search, update pages)
 - Linear (create, list, update issues)
+- Discord (send, read channel)
+- Amazon S3 (list, get, put objects)
+- Browser (scrape rendered pages, screenshots)
+- Image generation (OpenAI Images API)
 
 Usage:
     from selectools.toolbox import get_all_tools, file_tools, web_tools
@@ -38,17 +42,21 @@ from ..tools import Tool
 
 # Import all tool modules
 from . import (
+    browser_tools,
     calculator_tools,
     code_tools,
     data_tools,
     datetime_tools,
     db_tools,
+    discord_tools,
     email_tools,
     file_tools,
     github_tools,
+    image_tools,
     linear_tools,
     notion_tools,
     pdf_tools,
+    s3_tools,
     search_tools,
     slack_tools,
     text_tools,
@@ -73,6 +81,10 @@ __all__ = [
     "slack_tools",
     "notion_tools",
     "linear_tools",
+    "discord_tools",
+    "s3_tools",
+    "browser_tools",
+    "image_tools",
     "get_all_tools",
     "get_tools_by_category",
 ]
@@ -191,6 +203,34 @@ def get_all_tools() -> List[Tool]:
         ]
     )
 
+    # Discord tools
+    tools.extend(
+        [
+            discord_tools.discord_send_message,
+            discord_tools.discord_read_channel,
+        ]
+    )
+
+    # S3 tools
+    tools.extend(
+        [
+            s3_tools.s3_list_objects,
+            s3_tools.s3_get_object,
+            s3_tools.s3_put_object,
+        ]
+    )
+
+    # Browser tools
+    tools.extend(
+        [
+            browser_tools.browser_scrape_page,
+            browser_tools.browser_screenshot,
+        ]
+    )
+
+    # Image tools
+    tools.extend([image_tools.generate_image])
+
     return tools
 
 
@@ -202,7 +242,8 @@ def get_tools_by_category(category: str) -> List[Tool]:
     Args:
         category: Tool category ('file', 'web', 'data', 'datetime', 'text',
             'code', 'search', 'github', 'database', 'calculator', 'email',
-            'pdf', 'slack', 'notion', 'linear')
+            'pdf', 'slack', 'notion', 'linear', 'discord', 's3', 'browser',
+            'image')
 
     Returns:
         List of Tool objects from the specified category
@@ -268,6 +309,20 @@ def get_tools_by_category(category: str) -> List[Tool]:
             linear_tools.linear_list_issues,
             linear_tools.linear_update_issue,
         ],
+        "discord": [
+            discord_tools.discord_send_message,
+            discord_tools.discord_read_channel,
+        ],
+        "s3": [
+            s3_tools.s3_list_objects,
+            s3_tools.s3_get_object,
+            s3_tools.s3_put_object,
+        ],
+        "browser": [
+            browser_tools.browser_scrape_page,
+            browser_tools.browser_screenshot,
+        ],
+        "image": [image_tools.generate_image],
     }
 
     if category not in categories:
