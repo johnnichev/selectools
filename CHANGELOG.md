@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **DynamoDBSessionStore (beta)** — a sixth session backend, AWS-native. One item
+  per session keyed by a `session_key` string partition key; the
+  `ConversationMemory` is stored as a JSON string (sidestepping DynamoDB's
+  Decimal-only numbers for the nested payload), so saves are a single `put_item`
+  upsert. Full protocol, namespace isolation, the standard validation guards, and
+  optional server-side TTL via an `expires_at` epoch attribute. Reuses the
+  existing `boto3` dependency — `pip install selectools[aws]`. Docs:
+  `docs/modules/SESSIONS.md`.
 - **MongoSessionStore (beta)** — a fifth session backend (joining JSON, SQLite,
   Redis, Supabase). One document per session keyed by `_id`
   (`session_id` or `namespace:session_id`); the full `ConversationMemory` lives

@@ -518,7 +518,7 @@ John's direction rather than getting built blind.
 
 | Item | Source | Decision needed | Effort |
 |---|---|---|---|
-| More DB backends (MongoDB, DynamoDB, Firestore) | Agno | Which backend(s), and is there real demand? 4 already shipped (SQLite/Postgres/Redis/Supabase). Pick one to add or skip. | Medium each |
+| More DB backends — **MongoDB (#116) + DynamoDB shipped**; Firestore on demand | Agno | MongoDB + DynamoDB session stores shipped 2026-06-13. Firestore next only if there's demand (needs `google-cloud-firestore`). | Medium each |
 | ML-based guard models | Superagent | Hosting model: bundle a 0.6-4B model, optional extra, or call an external endpoint? Drives the whole design. | High |
 | Multi-channel bot gateway | PraisonAI | Roadmap itself says "better as a separate package." In-repo module vs new package = a product/packaging call. | High |
 | Learning system | Agno | Scope is vague (decision logging + preference tracking). Needs a concrete spec before it's buildable. | High |

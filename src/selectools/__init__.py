@@ -178,6 +178,7 @@ from .scheduler import (
     every,
 )
 from .sessions import (
+    DynamoDBSessionStore,
     JsonFileSessionStore,
     MongoSessionStore,
     RedisSessionStore,
@@ -367,6 +368,7 @@ __all__ = [
     "RedisSessionStore",
     "SupabaseSessionStore",
     "MongoSessionStore",
+    "DynamoDBSessionStore",
     # Entity Memory
     "Entity",
     "EntityMemory",
