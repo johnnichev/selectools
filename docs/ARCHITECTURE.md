@@ -195,12 +195,14 @@ Each implements the `Provider` protocol with `complete()`, `stream()`, `acomplet
 
 ### 6a. Persistent Sessions (`sessions.py`)
 
-**SessionStore** protocol with four backends for saving/loading `ConversationMemory`:
+**SessionStore** protocol with six backends for saving/loading `ConversationMemory`:
 
 - `JsonFileSessionStore` — file-based, one JSON file per session
 - `SQLiteSessionStore` — single database, JSON column
 - `RedisSessionStore` — distributed, server-side TTL
 - `SupabaseSessionStore` — Postgres-backed via Supabase PostgREST, JSONB column
+- `MongoSessionStore` — one document per session, idempotent upsert, optional TTL index
+- `DynamoDBSessionStore` — AWS-native, one item per session, optional TTL attribute
 - Auto-save after each run, auto-load on init via `AgentConfig`
 
 ### 6b. Entity Memory (`entity_memory.py`)

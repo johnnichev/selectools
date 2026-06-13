@@ -553,11 +553,13 @@ report.to_html("report.html")
 | **Dynamic Tools** | Load tools from files/directories at runtime. Add, remove, replace tools without restarting. |
 | **Response Caching** | LRU + TTL in-memory cache and Redis backend. Avoid redundant LLM calls for identical requests. |
 | **Routing Mode** | Agent selects a tool without executing it. Use for intent classification and request routing. |
-| **Guardrails Engine** | Input/output validation pipeline with PII redaction, topic blocking, toxicity detection, and format enforcement. |
+| **Guardrails Engine** | Input/output validation pipeline with PII redaction, prompt-injection detection, topic blocking, toxicity detection, and format enforcement. |
 | **Audit Logging** | JSONL audit trail with privacy controls (redact, hash, omit) and daily rotation. |
 | **Tool Output Screening** | Prompt injection detection with 15 built-in patterns. Per-tool or global. |
 | **Coherence Checking** | LLM-based verification that tool calls match user intent — catches injection-driven tool misuse. |
-| **Persistent Sessions** | `SessionStore` with JSON file, SQLite, Redis, and Supabase backends. Auto-save/load with TTL expiry, cross-session `search()`. |
+| **Persistent Sessions** | `SessionStore` with JSON file, SQLite, Redis, Supabase, MongoDB, and DynamoDB backends. Auto-save/load with TTL expiry, cross-session `search()`. |
+| **Scheduled Agents** | `AgentScheduler` runs an agent on a `cron()` or `every()` schedule — async loop, per-job `max_runs`, failure isolation, injectable clock. |
+| **Reasoning Tools** | `make_reasoning_tools()` adds `think`/`analyze` tools that make reasoning explicit and inspectable, bounded by `min_steps`/`max_steps`. |
 | **Agent-as-API** | `AgentAPI` serves any agent as a Starlette REST API — chat, SSE streaming, session CRUD, bearer auth, per-user session isolation. |
 | **A2A Protocol** | `A2AServer` + `A2AClient`: Agent Card discovery and JSON-RPC 2.0 messaging between agents. |
 | **LiteLLM Bridge** | `LiteLLMProvider` unlocks 100+ models (DeepSeek, Groq, Bedrock, ...) through one provider class. |
@@ -568,7 +570,7 @@ report.to_html("report.html")
 | **Prompt Caching** | Anthropic `cache_system`/`cache_tools` markers with cache hit-rate fields on `UsageStats`. |
 | **Entity Memory** | LLM-based entity extraction with deduplication, LRU pruning, and system prompt injection. |
 | **Knowledge Graph** | Relationship triple extraction with in-memory and SQLite storage and keyword-based querying. |
-| **Cross-Session Knowledge** | Daily logs + persistent facts with auto-registered `remember` tool. |
+| **Cross-Session Knowledge** | Daily logs + persistent facts with auto-registered `remember` + `recall` tools. |
 | **MCP Integration** | Connect to any MCP tool server (stdio + HTTP). MCPClient, MultiMCPClient, MCPServer. Circuit breaker, retry, graceful degradation. |
 | **Eval Framework** | 50 built-in evaluators (30 deterministic + 21 LLM-as-judge). A/B testing, regression detection, snapshot testing, HTML reports, JUnit XML, CI integration. |
 | **Multi-Agent Orchestration** | `AgentGraph` for directed agent graphs, `SupervisorAgent` with 4 strategies, HITL via generator nodes, parallel execution, checkpointing, subgraph composition. |
@@ -596,7 +598,10 @@ report.to_html("report.html")
 - **Response Caching**: InMemoryCache and RedisCache with stats tracking
 - **115 Model Registry**: Type-safe constants with pricing and metadata
 - **Pre-built Toolbox**: 56 tools for files, data, text, datetime, web, code, search, GitHub, DB, calculator, email, PDF, Slack, Notion, Linear, Discord, S3, browser, image gen
-- **Persistent Sessions**: 4 backends (JSON file, SQLite, Redis, Supabase) with TTL and cross-session search
+- **Persistent Sessions**: 6 backends (JSON file, SQLite, Redis, Supabase, MongoDB, DynamoDB) with TTL and cross-session search
+- **Scheduled Agents**: `AgentScheduler` runs an agent on a cron or interval schedule with per-job max-runs, failure isolation, and an async loop
+- **Reasoning Tools**: `think`/`analyze` tools make reasoning explicit, inspectable, and bounded by min/max steps
+- **Prompt-Injection Guardrail**: `PromptInjectionGuardrail` — heuristic jailbreak/injection detection with high-precision patterns
 - **Entity Memory**: LLM-based named entity extraction and tracking
 - **Unified Memory**: tiered conversation/knowledge/entity/episodic memory with token-aware compaction
 - **Knowledge Backends**: Supabase/Redis blob persistence for KnowledgeMemory on ephemeral infra
@@ -604,7 +609,7 @@ report.to_html("report.html")
 - **Deferred Confirmation**: `selectools.pending` for chat-channel destructive-tool confirmation
 - **Anthropic Prompt Caching**: `cache_system`/`cache_tools` with hit-rate visibility on `UsageStats`
 - **Knowledge Graph**: Triple extraction with in-memory and SQLite storage
-- **Cross-Session Knowledge**: Daily logs + persistent memory with `remember` tool, pluggable stores (File, SQLite), importance scoring, TTL
+- **Cross-Session Knowledge**: Daily logs + persistent memory with auto-injected `remember` + `recall` tools, pluggable stores (File, SQLite), importance scoring, TTL
 - **Token Budget & Cancellation**: `max_total_tokens`, `max_cost_usd` hard limits; `CancellationToken` for cooperative stopping
 - **Token Estimation**: `estimate_run_tokens()` for pre-execution budget checks
 - **Model Switching**: `model_selector` callback for per-iteration model selection
@@ -613,10 +618,10 @@ report.to_html("report.html")
 - **Conversation Branching**: `ConversationMemory.branch()` and `SessionStore.branch()` for A/B exploration and checkpointing
 - **Multi-Agent Orchestration**: `AgentGraph` with routing, parallel execution, HITL, checkpointing; `SupervisorAgent` with 4 strategies (plan_and_execute, round_robin, dynamic, magentic)
 - **Composable Pipelines**: `Pipeline` + `@step` + `|` operator + `parallel()` + `branch()` — chain agents, tools, and transforms
-- **111 Examples**: Multi-agent graphs, RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions (incl. Supabase), entity memory, knowledge graph, eval framework, advanced agent patterns, stability markers, HTML trace viewer, agent-as-API, A2A, routing, unified memory, and more
+- **115 Examples**: Multi-agent graphs, RAG, hybrid search, streaming, structured output, traces, batch, policy, observer, guardrails, audit, sessions (incl. Supabase), entity memory, knowledge graph, eval framework, advanced agent patterns, stability markers, HTML trace viewer, agent-as-API, A2A, routing, unified memory, scheduled agents, reasoning tools, and more
 - **Built-in Eval Framework**: 50 evaluators (30 deterministic + 21 LLM-as-judge), A/B testing, regression detection, HTML reports, JUnit XML, snapshot testing
 - **AgentObserver Protocol**: 46 lifecycle events with `run_id` correlation, `LoggingObserver`, `SimpleStepObserver`, OTel export
-- **7268 Tests**: Unit, integration, regression, and E2E with real API calls
+- **7700+ Tests**: Unit, integration, regression, and E2E with real API calls
 
 ## Install
 

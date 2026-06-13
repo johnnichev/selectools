@@ -1,58 +1,56 @@
 # Session Handoff
 
-## What I Was Doing (2026-06-12)
+## What I Was Doing (2026-06-13)
 
-Prepared the **v0.26.0 — Safety Patch & Verified Registry** release
-(branch `release/v0.26.0`). This is the planned mid-bake release:
-the bake-window bug hunt (#103/#104) found a destructive-CONFIRM
-safety bug in the `@beta` pending surface, and the registry refresh
-(#105/#106) was ready — shipping them together gets the safety fix
-to `selectools.pending` consumers immediately without disturbing the
-v1.0 bake (the fixes ARE the bake working as intended).
+Merged a large feature wave to `main` and continued the post-1.0 roadmap.
+v0.26.0 is the latest **released** version; everything below is on `main`
+under `## [Unreleased]`, folded into the v1.0 train (John's call to
+integrate now rather than hold to a post-tag minor — v1.0 is now materially
+larger than the originally-baked v0.24-0.26 surface). Bake clock still ~mid-July.
 
 ## Current State
 
-- **Version:** `0.26.0` in both `src/selectools/__init__.py` and
-  `pyproject.toml`.
-- **CHANGELOG:** `## [0.26.0] - 2026-06-12 — Safety Patch & Verified
-  Registry` finalized and synced to `docs/CHANGELOG.md`.
-- **Suite:** 7,420 tests collected (7,168 non-e2e passed / 27 skipped /
-  231 e2e-deselected locally), 111 examples, 115 source-verified
-  models.
-- **Public surface:** 437 unique public symbols across 123 public
-  modules, 100% stability-marked, architecture-test CI gate intact.
-- **Quality gate:** ruff format + check clean, bandit clean at -ll
-  with pyproject config, full non-e2e suite green. mypy baseline:
-  5 accepted pre-existing errors (2 in `agent/_tool_executor.py`,
-  3 in `agent/core.py`).
-- **Docs swept:** README (What's New v0.26, stats), ROADMAP (v0.26.0 ✅
-  block), CHANGELOG synced, landing/index.html version strings
-  (status bar, footer, JSON-LD softwareVersion) + og-image.svg,
-  this file.
+- **Version:** `0.26.0` (released) in `src/selectools/__init__.py` and
+  `pyproject.toml`. New work is `[Unreleased]` — do NOT bump the version
+  until the next release is cut.
+- **Suite:** ~7,728 tests collected; full non-e2e run 7,492 passed / 0
+  failed. 115 examples, 115 source-verified models.
+- **Quality gate:** ruff format + check clean, mypy clean (the 5 prior
+  baseline errors were not reintroduced), bandit clean. Architecture
+  stability gate green (every new module registered).
+- **Docs:** README (What's Included + capability table), ARCHITECTURE,
+  QUICKSTART, SESSIONS, GUARDRAILS, BENCHMARKS/SCHEDULER/REASONING_TOOLS
+  pages, mkdocs nav, landing/index.html, llms.txt/llms-full.txt, ROADMAP,
+  and CHANGELOG all reconciled to the new surface (this sweep).
 
-## What Shipped in v0.26.0 (PRs #103-#106)
+## Merged to main since v0.26.0 (2026-06-13, all `[Unreleased]`)
 
-- **Safety fix:** `RegexConfirmParser` non-leading negation fired
-  destructive CONFIRM ("se você não pode apagar, tudo bem" parsed as
-  confirm). Negation token anywhere now vetoes the restated-verb
-  branch (#103). All `selectools.pending` consumers should upgrade.
-- **Registry refresh (#105):** 152 → 115 models, every entry
-  source-verified; claude-fable-5/opus-4-8/opus-4-7, gpt-5.5 family,
-  gemini-3.5 line added; retired-model constants REMOVED (BREAKING
-  for direct registry references); opus-4-1 pricing fixed
-  ($5/$25 → $15/$75); gpt-5 context specs corrected.
-- **Cache-aware cost (#106):** `calculate_cost(...,
-  cache_read_input_tokens=, cache_creation_input_tokens=)`;
-  AnthropicProvider `UsageStats.cost_usd` now cache-accurate.
-- **Fixes:** A2A -32602 instead of HTTP 500 on malformed
-  `message.parts` (#103); bake-hunt tests gated on starlette (#104);
-  Gemini embedding dimension constant 3072 (#106).
+- **#108** v0.26.0 performance benchmarks published (`docs/modules/BENCHMARKS.md`)
+  + post-1.0 backlog reconciled in ROADMAP.
+- **#109** `recall` tool — completes the agentic-memory pair (`toolbox/memory_tools.py`).
+- **#110** Toolbox +4 categories (Discord, S3, browser, image-gen): 48 → 56 tools.
+- **#111** UnifiedMemory AgentConfig wiring — `MemoryConfig(unified=True, ...)`;
+  also delivered episodic-retention config (`add_turn` auto-prunes).
+- **#112** Cache-rate cost for OpenAI + Gemini (`calculate_cost_with_cached_input`,
+  `cached_prompt_cost`); 24 rates re-verified live; gemini-embedding-2 documented
+  as GA/recommended-for-new, default stays -001 (incompatible space).
+- **#113** Cron/scheduled agents (`scheduler.py`: `AgentScheduler`, `cron`, `every`).
+- **#114** Reasoning tools (`toolbox/reasoning_tools.py`: `think`/`analyze`, bounded).
+- **#116** MongoSessionStore; **#117** DynamoDBSessionStore (sessions now 6 backends).
+- **#118** `PromptInjectionGuardrail` — heuristic injection/jailbreak detection.
 
-## Next Up
+## Next Up — roadmap is decision-gated
 
-- **Sheriff #303** — bump Sheriff's selectools pin to 0.26.0 so its
-  pending-confirmation flow picks up the negation-veto safety fix.
-  This is the first post-release action.
+All autonomously-buildable Future/Watch items are shipped. The rest need a
+product call (see ROADMAP "needs a product decision"):
+- Firestore session backend — only if there's real demand (adds a dep).
+- Model-based guard (beyond the heuristic #118) — hosting decision.
+- Multi-channel bot gateway — in-repo vs separate package.
+- Learning system — needs a concrete spec.
+- Shadow git checkpoints — only if steering toward coding agents.
+
+Sheriff #303 (the prior "next up") is DONE — merged + deployed 2026-06-12,
+prod logs clean on selectools 0.26.0.
 
 ## The v1.0 Bake Window Continues — July Tag Unchanged
 
@@ -78,21 +76,22 @@ The July 1.0 tag plan is unchanged.
 
 ## Next Arcs (post-1.0 or parallel)
 
-- **Sheriff adoption:** enable Anthropic prompt caching; replace its
-  SupabaseSessionStore copy, knowledge.py shim, and pending_actions.py
-  with upstream. Small PRs in ~/projects/sheriff.
-- **UnifiedMemory config wiring** (`MemoryConfig(unified=True)`) —
-  the one P2 deferred from the core.py trio.
+- **Sheriff adoption:** DONE — caching, parser, knowledge, and the pending
+  store/sanitizer deletion all merged + deployed (Sheriff #300-#303).
+- **UnifiedMemory config wiring:** DONE (#111).
 - **Remaining backlog:** prompt registry/versioning, durable execution,
   code sandbox, Bedrock-native provider (LiteLLM covers it meanwhile),
-  P3 items.
+  P3 items. Plus the decision-gated Future/Watch items above.
 
 ## Watch Out For
 
-- **Venv quirks**: `.venv` has NO ruff (use system) and NO mkdocs (use
-  ~/Library/Python/3.9/bin/mkdocs). The venv `bandit` shim has a broken
-  shebang — run `python -m bandit`. Stale 0.8.0 editable .pth: always
-  test with `PYTHONPATH=$PWD/src`.
+- **Venv**: `.venv` now has `ruff` and `mkdocs` installed (this session);
+  `pymongo` is NOT installed (the Mongo backend tests inject a fake via
+  `sys.modules`, the same pattern as the Redis/Mongo/Dynamo backend tests).
+  Run `bandit` via `python -m bandit` if the shim shebang is broken. The
+  editable `.pth` points at the main repo's `src`; pytest's
+  `pythonpath = ["src", "."]` makes worktree runs use the worktree's own
+  source.
 - **`AgentConfig(hooks=...)` now raises TypeError** (#94). Migration
   mapping lives in `docs/MIGRATION_1.0.md`. Don't resurrect it for a
   "quick fix" — observers cover every hook point.

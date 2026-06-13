@@ -346,7 +346,7 @@ except GuardrailError as e:
     print(f"Blocked: {e.reason}")
 ```
 
-Five built-in guardrails: `TopicGuardrail`, `PIIGuardrail`, `ToxicityGuardrail`, `FormatGuardrail`, `LengthGuardrail`. Or subclass `Guardrail` to write your own.
+Six built-in guardrails: `TopicGuardrail`, `PIIGuardrail`, `ToxicityGuardrail`, `FormatGuardrail`, `LengthGuardrail`, `PromptInjectionGuardrail`. Or subclass `Guardrail` to write your own.
 
 ## Step 11: Audit Logging & Security
 
@@ -411,7 +411,7 @@ result = agent2.ask("What is my favorite color?")
 # Agent remembers the previous conversation
 ```
 
-Four backends available: `JsonFileSessionStore`, `SQLiteSessionStore`, `RedisSessionStore`, `SupabaseSessionStore`. All support namespace isolation; the file/SQLite/Redis backends also support TTL-based expiry.
+Six backends available: `JsonFileSessionStore`, `SQLiteSessionStore`, `RedisSessionStore`, `SupabaseSessionStore`, `MongoSessionStore`, `DynamoDBSessionStore`. All support namespace isolation; the file/SQLite/Redis/Mongo/DynamoDB backends also support TTL-based expiry.
 
 ## Step 13: Entity Memory
 

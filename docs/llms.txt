@@ -1,6 +1,6 @@
 # Selectools
 
-> Selectools is a production-ready Python library for building AI agents with tool calling, RAG, and multi-agent orchestration. One pip install. No DSL. Supports OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama, and 100+ models via LiteLLM. v0.25.0, 7268 tests at 95% coverage, Apache-2.0.
+> Selectools is a production-ready Python library for building AI agents with tool calling, RAG, and multi-agent orchestration. One pip install. No DSL. Supports OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama, and 100+ models via LiteLLM. v0.26.0, 7700+ tests at 95% coverage, Apache-2.0.
 
 Selectools uses a single `Agent` class with native tool calling. No chains, no expression language, no complex abstractions. It includes built-in features that other frameworks charge for or split into separate packages: 50 evaluators, hybrid RAG search (BM25 + vector), guardrails, audit logging, multi-agent orchestration, and a visual drag-drop builder. Free, local, MIT-compatible.
 
@@ -58,7 +58,7 @@ result = agent.run("Find our refund policy")
 
 ## Security
 
-- [Guardrails](https://selectools.dev/modules/GUARDRAILS/): PII redaction, toxicity, topic blocking, format validation
+- [Guardrails](https://selectools.dev/modules/GUARDRAILS/): PII redaction, prompt-injection detection, toxicity, topic blocking, format validation
 - [Audit](https://selectools.dev/modules/AUDIT/): JSONL audit logging with 4 privacy levels
 - [Security](https://selectools.dev/modules/SECURITY/): Prompt injection screening (15 patterns)
 
@@ -68,7 +68,10 @@ result = agent.run("Find our refund policy")
 
 ## Optional
 
-- [Sessions](https://selectools.dev/modules/SESSIONS/): JSON, SQLite, Redis session backends
+- [Sessions](https://selectools.dev/modules/SESSIONS/): JSON, SQLite, Redis, Supabase, MongoDB, DynamoDB session backends
+- [Scheduled Agents](https://selectools.dev/modules/SCHEDULER/): Run an agent on a cron or interval schedule (AgentScheduler, cron, every)
+- [Reasoning Tools](https://selectools.dev/modules/REASONING_TOOLS/): think/analyze tools that make reasoning explicit and bounded
+- [Benchmarks](https://selectools.dev/modules/BENCHMARKS/): Framework overhead measurements and methodology
 - [Entity Memory](https://selectools.dev/modules/ENTITY_MEMORY/): LLM-based entity extraction
 - [Knowledge Graph](https://selectools.dev/modules/KNOWLEDGE_GRAPH/): Triple extraction and storage
 - [MCP](https://selectools.dev/modules/MCP/): Model Context Protocol client/server
