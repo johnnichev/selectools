@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Scheduled agents (beta)** — new `selectools.scheduler` module runs an
+  `Agent` on a **cron** or **interval** schedule for periodic unattended work.
+  `AgentScheduler` owns `ScheduledJob`s; `cron("0 9 * * *")` parses standard
+  5-field expressions (`*`, `*/step`, `a-b`, `a,b,c`, day-of-month/day-of-week
+  OR semantics, `7`==Sunday) and `every(minutes=5)` builds intervals. Drive it
+  with `await scheduler.astart()` (sleeps until the next due job) or tick it
+  yourself via `run_pending()` / `arun_pending()`. Per-job `max_runs`,
+  `enabled`, `on_result` callback, and `start_immediately`; a failing job is
+  recorded on its `JobResult` and never stops siblings or the loop. Stdlib-only
+  (`asyncio` + `datetime`), `@beta`. Exposed at the top level
+  (`from selectools import AgentScheduler, cron, every`). Docs:
+  `docs/modules/SCHEDULER.md`; example: `examples/113_scheduled_agents.py`.
 - **Unified memory via config (beta, v1.1)** — `UnifiedMemory` (shipped
   standalone in v0.24.0, #78) is now reachable from `AgentConfig`:
   `AgentConfig(memory=MemoryConfig(unified=True, importance_threshold=0.7,

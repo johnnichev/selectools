@@ -493,55 +493,28 @@ Individual stores/loaders remain installable a la carte: `pip install selectools
 | Memory tiering / auto-promotion (`UnifiedMemory`, standalone) | v0.24.0 (#78) | `unified_memory.py` |
 | Agent-level HITL / approval | v0.25.0 (#88) | `ToolConfig.require_approval` + `approval_handler` |
 | Planning-as-config | v0.25.0 (#86) | `AgentConfig.planning` (`PlanningConfig`) |
+| Agentic memory — `recall` tool | Unreleased (#109) | `toolbox/memory_tools.py` `make_recall_tool` (auto-injected with `remember`) |
+| UnifiedMemory AgentConfig wiring | Unreleased (#111) | `MemoryConfig(unified=True, ...)`, `agent/core.py` |
+| Toolbox: Discord, S3, browser, image-gen (48 → 56 tools) | Unreleased (#110) | `toolbox/{discord,s3,browser,image}_tools.py` |
+| Cache-rate cost support (OpenAI + Gemini) | Unreleased (#112) | `pricing.calculate_cost_with_cached_input`, `cached_prompt_cost` |
+
+All four "v1.1 candidate" items shipped 2026-06-13 (#109-#112), folded into
+the v1.0 train rather than held to a post-tag minor. `gemini-embedding-2`
+decision: documented as GA/recommended-for-new; default stays
+`gemini-embedding-001` (incompatible embedding space — flipping it is itself
+breaking). See `CHANGELOG.md [Unreleased]`.
 
 ---
 
-### v1.1 Candidates (first post-1.0 minor)
+### Active Queue — Future / Watch
 
-Finish the two partially-delivered backlog items, plus small follow-ups
-flagged during the v0.26.0 registry work. All additive; none touch the
-frozen v1.0 surface.
-
-#### Agentic memory — `recall` tool (completes the pair)
-`remember` shipped; recall is still implicit (KnowledgeMemory context
-injection). Add `make_recall_tool(knowledge)` -> `recall(query, limit=5)` so
-the agent can query its memory on demand instead of relying on what the
-context builder pre-selected. Wraps existing KnowledgeMemory search.
-**Effort:** Low (1-2 days).
-
-#### UnifiedMemory AgentConfig wiring
-The class is shipped, tested, and feature-complete; it just isn't reachable
-via config. Target: `AgentConfig(memory=MemoryConfig(unified=True,
-importance_threshold=0.7, auto_promote=True))`. Deferred from v0.24 on
-purpose — do it as the flagship v1.1 feature.
-**Effort:** Medium (3-4 days, mostly config plumbing + docs).
-
-#### Toolbox: the four missing categories
-From the original 40->80+ plan, still missing: **Discord** (`discord.py`),
-**AWS S3** (`boto3`), **Browser** (`playwright` — scrape_page, screenshot,
-click), **Image generation** (DALL-E via existing `openai` dep). All follow
-the established @tool + lazy-import pattern.
-**Effort:** ~1 day per category, parallelizable.
-
-#### Pricing follow-ups (from the v0.26.0 registry refresh)
-- Cache-rate cost support in `pricing.py` (cached-token discounts are
-  provider-published; cost_usd currently ignores cache hits for non-Anthropic
-  providers).
-- `gemini-embedding-2` default decision (current default
-  `gemini-embedding-001` is fine but the successor is GA).
-**Effort:** Low.
-
----
-
-### Future / Watch (unscheduled)
-
-Ordered by current conviction, not effort.
+Ordered by current conviction. Top of the list is the next build.
 
 | Item | Source | Notes | Effort |
 |---|---|---|---|
-| Cron / scheduled agents | PraisonAI | Background scheduling for periodic tasks; pairs well with Agent-as-API | Medium |
+| **Cron / scheduled agents** (NEXT) | PraisonAI | Background scheduling for periodic agent tasks; pairs with Agent-as-API | Medium |
 | Reasoning-as-tool | Agno | Composable reasoning step with min/max bounds (today it is a prompt strategy) | Medium |
-| Episodic memory wiring | PraisonAI | Exists inside UnifiedMemory; expose retention config once unified wiring lands | Low after v1.1 |
+| Episodic memory retention config | PraisonAI | UnifiedMemory now wired (#111); expose episodic retention knobs on `MemoryConfig` | Low |
 | More DB backends (MongoDB, DynamoDB, Firestore) | Agno | 4 backends today (SQLite, Postgres, Redis, Supabase); add on demand | Medium per backend |
 | ML-based guard models | Superagent | Local prompt-injection detection as a GuardrailProvider | High |
 | Multi-channel bot gateway | PraisonAI | Telegram/Discord/Slack/WhatsApp routing; better as a separate package | High |

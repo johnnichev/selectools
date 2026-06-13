@@ -167,6 +167,16 @@ from .providers.openai_provider import OpenAIProvider
 from .providers.router import RouterConfig, RouterProvider
 from .providers.stubs import LocalProvider
 from .results import Ambiguous, Artifact, NotFound, ToolResult, emit_artifact
+from .scheduler import (
+    AgentScheduler,
+    CronSchedule,
+    IntervalSchedule,
+    JobResult,
+    Schedule,
+    ScheduledJob,
+    cron,
+    every,
+)
 from .sessions import (
     JsonFileSessionStore,
     RedisSessionStore,
@@ -321,6 +331,15 @@ __all__ = [
     "RepeatDetector",
     "StallDetector",
     "PingPongDetector",
+    # Scheduled agents
+    "AgentScheduler",
+    "ScheduledJob",
+    "JobResult",
+    "Schedule",
+    "CronSchedule",
+    "IntervalSchedule",
+    "cron",
+    "every",
     # Guardrails
     "guardrails",
     "Guardrail",
