@@ -30,6 +30,24 @@ result = AgentGraph.chain(planner, writer, reviewer).run("Write a blog post")
 # selectools serve agent.yaml
 ```
 
+## What's New in v0.27
+
+### v0.27.0 — Scheduling, Reasoning & New Backends
+
+A feature release landing the post-1.0 backlog: scheduled agents, composable reasoning, two new session backends, an injection guardrail, and the rest of the v1.1 candidate set. All additive (`@beta`); no breaking changes.
+
+- **Scheduled agents** — `AgentScheduler` runs an agent on a `cron("0 9 * * *")` or `every(minutes=5)` schedule. Async loop that sleeps until the next due job, per-job `max_runs` / `on_result` / `start_immediately`, failure isolation, and an injectable clock for tests. Stdlib-only (`selectools.scheduler`).
+- **Reasoning tools** — `make_reasoning_tools(min_steps, max_steps)` adds `think` / `analyze` tools that make the agent's reasoning explicit, inspectable steps (vs the passive `reasoning_strategy` prompt). `max_steps` is enforced (a real guard against reasoning loops); `min_steps` is guidance.
+- **Two new session backends** — `MongoSessionStore` and `DynamoDBSessionStore` bring the `SessionStore` count to six. Full protocol (save/load/list/delete/exists/branch/search), namespace isolation, and optional server-side TTL. `pip install selectools[mongo]` / `selectools[aws]`.
+- **Prompt-injection guardrail** — `PromptInjectionGuardrail` catches templated jailbreak/injection attacks ("ignore previous instructions", "reveal your system prompt", `<system>`/`[INST]` spoofing, "developer mode"/"DAN") with high-precision patterns. Heuristic tier — no model hosting required.
+- **Agentic memory completed** — the auto-injected `recall` tool joins `remember`, so the agent can both store and query its `KnowledgeMemory` on demand.
+- **UnifiedMemory via config** — `AgentConfig(memory=MemoryConfig(unified=True, ...))` makes the tiered `UnifiedMemory` (STM→LTM auto-promotion, entity + episodic tiers, token-aware compaction) reachable from config; default off.
+- **Toolbox 48 → 56 tools** — added Discord, AWS S3, headless browser (Playwright), and image generation (OpenAI Images) categories.
+- **Cache-rate cost for OpenAI + Gemini** — `calculate_cost_with_cached_input()` prices cached prompt tokens at each provider's published rate (`cached_prompt_cost` on `ModelInfo`); 24 rates source-verified.
+- **Performance benchmarks published** — framework overhead measured and documented (`docs/modules/BENCHMARKS.md`).
+
+See `CHANGELOG.md` for the full entry (7,700+ tests, 115 examples, 115 models).
+
 ## What's New in v0.26
 
 ### v0.26.0 — Safety Patch & Verified Registry
