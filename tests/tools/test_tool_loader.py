@@ -217,10 +217,12 @@ class TestAgentDynamicTools:
         with pytest.raises(KeyError, match="not found"):
             agent.remove_tool("z")
 
-    def test_remove_last_tool_raises(self) -> None:
+    def test_remove_last_tool_leaves_chat_agent(self) -> None:
+        # Removing the last tool is allowed: the agent becomes a pure chat agent.
         agent = _make_agent([_make_tool("a")])
-        with pytest.raises(ValueError, match="at least one tool"):
-            agent.remove_tool("a")
+        agent.remove_tool("a")
+        assert agent.tools == []
+        assert "a" not in agent._tools_by_name
 
     def test_replace_tool_existing(self) -> None:
         agent = _make_agent([_make_tool("a", "v1")])
