@@ -5,6 +5,21 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **The agent ignored every provider's default model.** `AgentConfig.model`
+  defaulted to the hardcoded `"gpt-5-mini"`, which the agent sent to *every*
+  provider — so `AnthropicProvider` / `GeminiProvider` / `OllamaProvider` /
+  `LiteLLMProvider` received an OpenAI model id and **404'd on every request**
+  (the error was returned as the assistant's answer, so the agent appeared to
+  respond with gibberish). `AgentConfig.model` now defaults to `None`, and the
+  agent resolves the model as: `model_selector` override → explicit
+  `config.model` → the provider's own `default_model`. Any non-OpenAI provider
+  used without an explicit model is now functional. The `/health` and `/schema`
+  serve endpoints report the resolved model.
+
 ## [0.27.1] - 2026-06-13 — Bug-Hunt Patch
 
 Adversarial bug hunt of the v0.27.0 feature surface. 10 confirmed bugs fixed

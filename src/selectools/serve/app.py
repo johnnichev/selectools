@@ -172,7 +172,9 @@ class AgentRouter:
         response = HealthResponse(
             status="ok",
             version=__version__,
-            model=self.agent.config.model,
+            # Report the resolved model (config.model may be None = use the
+            # provider's default).
+            model=self.agent._effective_model,
             provider=getattr(self.agent.provider, "name", "unknown"),
             tools=[t.name for t in self.agent.tools],
         )
@@ -188,7 +190,7 @@ class AgentRouter:
         """Handle GET /schema."""
         return {
             "tools": [t.schema() for t in self.agent.tools],
-            "model": self.agent.config.model,
+            "model": self.agent._effective_model,
         }
 
 

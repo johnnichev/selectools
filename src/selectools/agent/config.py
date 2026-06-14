@@ -123,7 +123,10 @@ class AgentConfig:
     """
 
     name: str = "agent"
-    model: str = "gpt-5-mini"
+    # None means "use the provider's own default_model". A hardcoded default
+    # here would be sent to EVERY provider — e.g. an OpenAI model id reaching
+    # the Anthropic API and 404-ing on every call.
+    model: Optional[str] = None
     temperature: float = 0.0
     max_tokens: int = 1000
     max_iterations: int = 6
