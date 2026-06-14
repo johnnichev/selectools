@@ -157,3 +157,49 @@ class TestModelSwitching:
         # If it weren't reset, the second run would start with "switched"
         # instead of "default", and model_selector would see it's already
         # "switched" and not fire on_model_switch
+
+
+# --------------------------------------------------------------------------- #
+# Bug hunt 2026-06-14: agent must use the provider's default_model, not a
+# hardcoded "gpt-5-mini", when config.model is unset.
+# --------------------------------------------------------------------------- #
+
+
+class _ModelCapturingProvider:
+    """Records the `model` the agent passes to complete()."""
+
+    name = "capture"
+
+    def __init__(self, default_model: str) -> None:
+        self.default_model = default_model
+        self.seen_models: list = []
+
+    def complete(self, *, model=None, system_prompt="", messages, tools=None, **kw):
+        self.seen_models.append(model)
+        return _resp("done")
+
+    async def acomplete(self, *, model=None, system_prompt="", messages, tools=None, **kw):
+        self.seen_models.append(model)
+        return _resp("done")
+
+
+def test_uses_provider_default_model_when_config_model_unset():
+    prov = _ModelCapturingProvider(default_model="claude-sonnet-4-6")
+    agent = Agent(tools=[_DUMMY], provider=prov, config=AgentConfig())
+    assert agent._effective_model == "claude-sonnet-4-6"
+    agent.run("hi")
+    assert prov.seen_models == ["claude-sonnet-4-6"]  # NOT "gpt-5-mini"
+
+
+def test_explicit_config_model_overrides_provider_default():
+    prov = _ModelCapturingProvider(default_model="claude-sonnet-4-6")
+    agent = Agent(tools=[_DUMMY], provider=prov, config=AgentConfig(model="gpt-4o"))
+    assert agent._effective_model == "gpt-4o"
+    agent.run("hi")
+    assert prov.seen_models == ["gpt-4o"]
+
+
+def test_config_model_defaults_to_none():
+    # The default must be None (sentinel for "use the provider default"), not a
+    # hardcoded model id that would reach every provider.
+    assert AgentConfig().model is None

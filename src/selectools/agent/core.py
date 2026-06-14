@@ -248,10 +248,16 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
     def _effective_model(self) -> str:
         """The model to use for the current iteration.
 
-        Returns the model set by ``model_selector`` if active, otherwise
-        falls back to ``self.config.model``.
+        Resolution order: a ``model_selector`` override, then an explicit
+        ``config.model``, then the provider's own ``default_model``. Without the
+        provider fallback a non-OpenAI provider would receive the OpenAI default
+        and 404. The final ``"gpt-5-mini"`` only applies to providers that expose
+        no default (e.g. the LocalProvider stub, which ignores the model).
         """
-        return getattr(self, "_current_model", None) or self.config.model
+        override = getattr(self, "_current_model", None) or self.config.model
+        if override:
+            return override
+        return getattr(self.provider, "default_model", None) or "gpt-5-mini"
 
     def __call__(
         self,
