@@ -1123,6 +1123,14 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         Returns:
             AgentResult with the final response and tool call metadata.
 
+        Error handling:
+            If the provider keeps failing after ``config.max_retries`` attempts,
+            the agent does NOT raise — it returns an ``AgentResult`` whose
+            ``content`` is ``"Provider error: <detail>"`` (graceful degradation),
+            and the failure is recorded on ``result.trace`` with the error.
+            Check ``result.trace`` (or test for the ``"Provider error:"`` prefix)
+            if you need to distinguish a provider failure from a real answer.
+
         Examples:
             >>> result = agent.run("What is Python?")
             >>> result = agent.run([Message(role=Role.USER, content="Hello")])
@@ -1214,7 +1222,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                             # agent with a tight tool-iteration budget should
                             # still allow the full RetryConfig.max_retries
                             # worth of structured-validation retries.
-                            retry_budget = self.config.retry.max_retries
+                            retry_budget = self.config.max_retries
                             if ctx.structured_retries < retry_budget:
                                 ctx.structured_retries += 1
                                 ctx.trace.add(
@@ -1651,7 +1659,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                             # agent with a tight tool-iteration budget should
                             # still allow the full RetryConfig.max_retries
                             # worth of structured-validation retries.
-                            retry_budget = self.config.retry.max_retries
+                            retry_budget = self.config.max_retries
                             if ctx.structured_retries < retry_budget:
                                 ctx.structured_retries += 1
                                 ctx.trace.add(
@@ -1970,7 +1978,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                             # agent with a tight tool-iteration budget should
                             # still allow the full RetryConfig.max_retries
                             # worth of structured-validation retries.
-                            retry_budget = self.config.retry.max_retries
+                            retry_budget = self.config.max_retries
                             if ctx.structured_retries < retry_budget:
                                 ctx.structured_retries += 1
                                 ctx.trace.add(

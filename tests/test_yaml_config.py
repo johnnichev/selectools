@@ -44,9 +44,11 @@ class TestFromDict:
         assert agent.config.compress_context is True
         assert agent.config.compress_threshold == 0.8
 
-    def test_empty_tools_gets_noop(self):
+    def test_empty_tools_builds_chat_agent(self):
+        # No tools in the config -> a pure conversational agent (no phantom
+        # no-op tool; the Agent no longer requires at least one tool).
         agent = from_dict({"model": "test"}, provider=LocalProvider())
-        assert len(agent.tools) >= 1
+        assert agent.tools == []
 
     def test_invalid_config_type_raises(self):
         with pytest.raises(ValueError, match="must be a dict"):

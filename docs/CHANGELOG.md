@@ -5,6 +5,20 @@ All notable changes to selectools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **YAML templates with no tools build a true conversational agent.** Previously
+  a tool-less template config injected a phantom no-op tool (only needed because
+  the agent used to require one); it now produces an agent with no tools.
+
+### Internal
+
+- The full `src/` tree is mypy-clean (0 errors). Cleared the 5 long-standing
+  baseline `union-attr`/`no-any-return` errors and an `image_tools` SDK-overload
+  warning. No behavior change.
+
 ## [0.27.2] - 2026-06-14 — Provider Model Fix & Tool-less Agents
 
 ### Fixed

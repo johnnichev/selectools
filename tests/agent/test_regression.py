@@ -41,7 +41,7 @@ def dummy_tool(x: str) -> str:
 
 @tool()
 def noop_tool() -> str:
-    """A no-op tool for agents that need at least one tool."""
+    """A no-op tool for tests that need a tool but don't exercise it."""
     return "noop"
 
 

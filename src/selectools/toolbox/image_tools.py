@@ -78,7 +78,9 @@ def generate_image(
 
     try:
         client = OpenAI(api_key=key)
-        response = client.images.generate(model=model, prompt=prompt, size=size, n=1)
+        # size is a user-provided str; the SDK accepts the standard size strings
+        # at runtime but types the param as a Literal, so mypy can't verify it.
+        response = client.images.generate(model=model, prompt=prompt, size=size, n=1)  # type: ignore[call-overload]
         data = response.data[0] if getattr(response, "data", None) else None
         if data is None:
             return "Error: OpenAI returned no image data."
