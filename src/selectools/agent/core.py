@@ -160,11 +160,10 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             ...     memory=ConversationMemory(max_messages=20)
             ... )
         """
-        if not tools:
-            raise ValueError("Agent requires at least one tool.")
-
-        self.tools = tools
-        self._tools_by_name = {tool.name: tool for tool in tools}
+        # An empty tool list is valid: a pure conversational agent (no tools)
+        # is a normal use case — the provider is simply called with no tools.
+        self.tools = tools or []
+        self._tools_by_name = {tool.name: tool for tool in self.tools}
         self.provider = provider or OpenAIProvider()
         strategy = config.reasoning_strategy if config else None
         if prompt_builder:
@@ -322,14 +321,11 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
 
         Raises:
             KeyError: If no tool with that name exists.
-            ValueError: If removing would leave the agent with zero tools.
         """
         if tool_name not in self._tools_by_name:
             raise KeyError(
                 f"Tool '{tool_name}' not found. Available: {', '.join(self._tools_by_name.keys())}"
             )
-        if len(self.tools) <= 1:
-            raise ValueError("Agent requires at least one tool.")
 
         removed = self._tools_by_name.pop(tool_name)
         self.tools = [t for t in self.tools if t.name != tool_name]
@@ -1397,8 +1393,21 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             parent_run_id: Optional run-ID of a parent agent for trace linking.
 
         Yields:
-            StreamChunk: Intermediate content chunks.
-            AgentResult: The final result object (yielded at the very end).
+            StreamChunk: incremental content deltas (and tool-call chunks).
+            AgentResult: the final, complete result — yielded once at the very
+                end. Its ``.content`` is the WHOLE answer, not a delta.
+
+        Consuming the stream — accumulate the ``StreamChunk`` deltas and treat
+        the terminal ``AgentResult`` separately. Do NOT add the final
+        ``AgentResult.content`` to the accumulated deltas, or you will get the
+        answer twice::
+
+            text = ""
+            async for chunk in agent.astream("..."):
+                if isinstance(chunk, StreamChunk):
+                    text += chunk.content or ""   # deltas only
+                else:                              # AgentResult (terminal)
+                    result = chunk                 # full answer + metadata
         """
         messages = self._normalize_messages(messages)
 

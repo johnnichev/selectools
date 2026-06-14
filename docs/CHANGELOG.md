@@ -19,6 +19,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `config.model` → the provider's own `default_model`. Any non-OpenAI provider
   used without an explicit model is now functional. The `/health` and `/schema`
   serve endpoints report the resolved model.
+- **A tool-less (pure conversational) agent is now valid.** `Agent(tools=[])` no
+  longer raises, and `remove_tool` may remove the last tool — the agent runs as
+  a chat-only agent, calling the provider with no tools.
+
+### Changed
+
+- **Docs: structured output and streaming sharp edges clarified.** With
+  `response_format`, the validated object is on `result.parsed`; `result.content`
+  remains the raw JSON text (documented on `AgentResult`). `astream` yields
+  `StreamChunk` deltas followed by a terminal `AgentResult` whose `.content` is
+  the whole answer — accumulate the deltas and handle the terminal result
+  separately, or a naive `text += item.content` doubles the response
+  (`docs/modules/STREAMING.md`).
 
 ## [0.27.1] - 2026-06-13 — Bug-Hunt Patch
 

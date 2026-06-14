@@ -135,6 +135,20 @@ asyncio.run(main())
 - **StreamChunk** — Intermediate content chunks (text and/or tool calls)
 - **AgentResult** — Final result, yielded once when the agent completes
 
+> **Accumulate deltas, not the final result.** The terminal `AgentResult.content`
+> is the *whole* answer, not a delta. Always discriminate by type — a naive
+> `text += item.content` over every yielded item appends the full answer on top
+> of the deltas and gives you the response **twice**:
+>
+> ```python
+> text = ""
+> async for item in agent.astream("..."):
+>     if isinstance(item, StreamChunk):
+>         text += item.content or ""   # deltas only
+>     else:
+>         result = item                # AgentResult: full answer + metadata
+> ```
+
 ### StreamChunk
 
 ```python

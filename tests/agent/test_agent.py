@@ -571,3 +571,19 @@ class TestRunStringShorthand:
         result = await agent.arun([Message(role=Role.USER, content="List")])
 
         assert result.content == "Async list works"
+
+
+class TestPureChatAgent:
+    """Bug hunt 2026-06-14: an agent with no tools is valid (pure chat)."""
+
+    def test_construct_with_empty_tools(self) -> None:
+        agent = Agent(tools=[], provider=FakeProvider(responses=["hi there"]))
+        assert agent.tools == []
+        result = agent.run("hello")
+        assert result.content == "hi there"
+
+    def test_remove_last_tool_leaves_pure_chat_agent(self) -> None:
+        agent = Agent(tools=[_noop_tool()], provider=FakeProvider(responses=["ok"]))
+        agent.remove_tool("noop")  # removing the only tool is allowed now
+        assert agent.tools == []
+        assert agent.run("still works?").content == "ok"
