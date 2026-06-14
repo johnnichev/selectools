@@ -328,6 +328,15 @@ class AgentResult:
         {'query': 'Python'}
         >>> result.iterations
         2
+
+    Structured output: when ``response_format`` is set, the validated object is
+    on ``result.parsed`` — ``result.content`` stays the raw JSON *text*::
+
+        >>> result = agent.run("Extract: John is 30", response_format=Person)
+        >>> result.parsed           # the typed object you want
+        Person(name='John', age=30)
+        >>> result.content          # the JSON string, NOT the object
+        '{"name": "John", "age": 30}'
     """
 
     message: Message

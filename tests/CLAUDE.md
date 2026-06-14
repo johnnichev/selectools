@@ -17,8 +17,8 @@ pytest tests/providers/test_models.py   # Specific test file
 
 ## Agent Setup in Tests
 
-- `Agent()` requires at least one tool as the first argument
-- Use `_DUMMY` tool (a no-op `@tool()` function) when tools are irrelevant to the test
+- `Agent(tools=[...])` takes the tools list first; an empty list is valid (pure chat agent)
+- Use `_DUMMY` tool (a no-op `@tool()` function) when a tool is needed but irrelevant to the test
 - Provider responses use `(Message, UsageStats)` tuples for controlled usage tracking
 
 ## Mock Patterns

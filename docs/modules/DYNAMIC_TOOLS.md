@@ -320,7 +320,9 @@ Remove a tool by name.
 
 **Raises:**
 - `KeyError` if no tool with that name exists
-- `ValueError` if removing would leave the agent with zero tools (agent requires at least one tool)
+
+Removing the last tool is allowed — the agent becomes a pure conversational
+agent (no tools).
 
 ```python
 removed = agent.remove_tool("deprecated_search")
@@ -521,14 +523,15 @@ ToolLoader.from_file("syntax_error.py")         # ImportError (or SyntaxError)
 
 ---
 
-### Removing Last Tool
+### Removing the Last Tool
 
 ```python
 agent = Agent(tools=[only_tool], provider=provider)
-agent.remove_tool("only_tool")  # ValueError: Agent requires at least one tool.
+agent.remove_tool("only_tool")  # OK — agent becomes a pure chat agent (no tools)
 ```
 
-**Fix:** Add a replacement tool before removing, or use `replace_tool()`.
+Removing every tool is allowed; the agent then runs as a tool-less
+conversational agent.
 
 ---
 
