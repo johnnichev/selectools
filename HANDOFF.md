@@ -11,7 +11,7 @@ larger than the originally-baked v0.24-0.26 surface). Bake clock still ~mid-July
 
 ## Current State
 
-- **Version:** `0.27.1` in `src/selectools/__init__.py` and `pyproject.toml`
+- **Version:** `0.27.2` in `src/selectools/__init__.py` and `pyproject.toml`
   (bug-hunt patch over 0.27.0 — 10 fixes, no API changes). CHANGELOG
   `## [0.27.1] - 2026-06-13 — Bug-Hunt Patch` synced to
   `docs/CHANGELOG.md`. Release = push tag `v0.27.1` (CI `publish-pypi` job

@@ -32,6 +32,10 @@ result = AgentGraph.chain(planner, writer, reviewer).run("Write a blog post")
 
 ## What's New in v0.27
 
+### v0.27.2 — Provider Model Fix & Tool-less Agents
+
+Fixes a P0: the agent ignored every provider's default model and sent `gpt-5-mini` to all of them, so **any non-OpenAI provider (Anthropic, Gemini, Ollama, LiteLLM) 404'd on every request**. `AgentConfig.model` now defaults to `None` and resolves to the provider's own default. Also: `Agent(tools=[])` is now valid (pure conversational agents), and the structured-output (`result.parsed` vs `.content`) and streaming (accumulate `StreamChunk` deltas, not the terminal `AgentResult`) sharp edges are documented.
+
 ### v0.27.1 — Bug-Hunt Patch
 
 An adversarial bug hunt of the v0.27.0 surface fixed 10 confirmed bugs (no API changes, no breaking changes). Highlights: scheduled agents recorded the `AgentResult` repr instead of the answer text; `PromptInjectionGuardrail` blocked benign requests ("pretend you are a pirate", "show the rules"); `s3_get_object` leaked its HTTP connection; and unified memory persisted un-redacted input in async mode. See `CHANGELOG.md` for the full list.
