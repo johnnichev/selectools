@@ -25,7 +25,7 @@ Some public symbols cannot carry a ``__stability__`` attribute:
 
 - module-level constants (``str``/``float``/``list``/``dict``/``tuple`` instances)
 - typing aliases (``Union[...]``, ``Callable[...]``, and friends)
-- ``@runtime_checkable`` Protocol classes — on Python 3.9-3.11 a
+- ``@runtime_checkable`` Protocol classes — on Python 3.10-3.11 a
   ``__stability__`` class attribute becomes a structural member of the
   protocol and silently breaks ``isinstance()`` for conforming
   implementations that do not define it.
@@ -162,7 +162,7 @@ def register_stability(name: str, level: str) -> None:
 
     Use this for module-level constants, typing aliases, and
     ``@runtime_checkable`` Protocol classes (decorating those would change
-    ``isinstance()`` behavior on Python 3.9-3.11). Call it at the symbol's
+    ``isinstance()`` behavior on Python 3.10-3.11). Call it at the symbol's
     definition site, right after the assignment.
 
     Raises:

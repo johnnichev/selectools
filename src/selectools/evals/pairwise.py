@@ -167,7 +167,7 @@ class PairwiseEval:
         report_b = suite_b.run()
 
         pairwise_results: List[PairwiseCaseResult] = []
-        for cr_a, cr_b in zip(report_a.case_results, report_b.case_results):
+        for cr_a, cr_b in zip(report_a.case_results, report_b.case_results, strict=False):
             winner, reason = self._compare_case(cr_a, cr_b)
             pairwise_results.append(
                 PairwiseCaseResult(

@@ -4,7 +4,7 @@ Thank you for your interest in contributing to Selectools! We welcome contributi
 
 **Current Version:** v0.29.0
 **Test Status:** 7796 tests collected (95% coverage)
-**Python:** 3.9 – 3.13
+**Python:** 3.10 – 3.13
 
 ## Getting Started
 

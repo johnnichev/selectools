@@ -1215,7 +1215,7 @@ class _ToolExecutorMixin:
                     for i in candidate_indices
                 ]
             )
-            for i, text in zip(candidate_indices, compressed_texts):
+            for i, text in zip(candidate_indices, compressed_texts, strict=False):
                 compressed_by_index[i] = text
                 self._store_compressed_in_cache(
                     results[i].tool, results[i].tool_call.parameters, results[i].result, text

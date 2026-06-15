@@ -127,12 +127,11 @@ first time.
 
 ## Python 3.9 support dropped
 
-v1.0.0 raises the floor to **Python 3.10** (`requires-python = ">=3.10"`), planned to land
-with the 1.0 tag itself. Python 3.9 reached upstream end-of-life in October 2025.
+The floor is now **Python 3.10** (`requires-python = ">=3.10"`), dropped ahead of the 1.0
+tag (in the 0.30.x line). Python 3.9 reached upstream end-of-life in October 2025.
 
-- The last series supporting 3.9 is **0.24.x**, which moves to security-fixes-only when
-  1.0 ships (see [SECURITY.md](https://github.com/johnnichev/selectools/blob/main/SECURITY.md)).
-- If you are stuck on 3.9, pin `selectools<1.0`.
+- The last series supporting 3.9 is **0.29.x**.
+- If you are stuck on 3.9, pin `selectools<0.30`.
 
 ---
 

@@ -282,7 +282,7 @@ class PgVectorStore(VectorStore):
         try:
             cursor = conn.cursor()
 
-            for doc_id, doc, embedding in zip(ids, documents, embeddings):
+            for doc_id, doc, embedding in zip(ids, documents, embeddings, strict=False):
                 embedding_str = "[" + ",".join(str(v) for v in embedding) + "]"
                 metadata_json = json.dumps(doc.metadata or {})
 

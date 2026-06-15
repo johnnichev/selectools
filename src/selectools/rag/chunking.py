@@ -301,7 +301,7 @@ def _split_into_sentences(text: str) -> List[str]:
 
 def _cosine_similarity(a: List[float], b: List[float]) -> float:
     """Compute cosine similarity between two vectors without numpy."""
-    dot = sum(x * y for x, y in zip(a, b))
+    dot = sum(x * y for x, y in zip(a, b, strict=False))
     norm_a = math.sqrt(sum(x * x for x in a))
     norm_b = math.sqrt(sum(x * x for x in b))
     if norm_a == 0 or norm_b == 0:
@@ -531,7 +531,7 @@ class ContextualChunker:
             chunk_origins.extend([idx] * len(chunks))
 
         enriched: List[Document] = []
-        for chunk_doc, origin_idx in zip(all_base_chunks, chunk_origins):
+        for chunk_doc, origin_idx in zip(all_base_chunks, chunk_origins, strict=False):
             full_text = doc_text_map[origin_idx]
             truncated_doc = full_text[: self.max_document_chars]
 

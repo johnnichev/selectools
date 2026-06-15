@@ -258,7 +258,7 @@ class FAISSVectorStore(VectorStore):
 
         results: List[SearchResult] = []
         seen_texts: set = set()
-        for score, idx in zip(scores[0], indices[0]):
+        for score, idx in zip(scores[0], indices[0], strict=False):
             # FAISS returns -1 for empty slots
             if idx < 0:
                 continue

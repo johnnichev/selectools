@@ -12,17 +12,17 @@ dependencies. All combinations in the CI matrix are validated on every commit.
 
 | Python | Status | CI tested |
 | ------ | ------ | --------- |
-| 3.9    | ✅ Supported | Yes |
 | 3.10   | ✅ Supported | Yes |
 | 3.11   | ✅ Supported | Yes |
 | 3.12   | ✅ Supported | Yes |
 | 3.13   | ✅ Supported | Yes |
-| < 3.9  | ❌ Not supported | — |
+| < 3.10 | ❌ Not supported | — |
 
-!!! warning "Python 3.9 support ends at v1.0.0"
-    Python 3.9 reached upstream end-of-life in October 2025. selectools will drop
-    Python 3.9 support at the **v1.0.0** release; the minimum will become Python 3.10.
-    All 0.x releases (including the final 0.24.x series) continue to support 3.9.
+!!! note "Python 3.10+ required"
+    selectools requires Python 3.10 or newer (`requires-python = ">=3.10"`).
+    Python 3.9 reached upstream end-of-life in October 2025 and was dropped ahead
+    of the 1.0 release. The last series supporting 3.9 is **0.29.x**; if you are
+    stuck on 3.9, pin `selectools<0.30`.
     See [MIGRATION_1.0](MIGRATION_1.0.md) for details.
 
 ---
@@ -31,7 +31,7 @@ dependencies. All combinations in the CI matrix are validated on every commit.
 
 | OS | Status |
 |----|--------|
-| Linux (Ubuntu latest) | ✅ CI-tested (full 3.9–3.13 matrix) |
+| Linux (Ubuntu latest) | ✅ CI-tested (full 3.10–3.13 matrix) |
 | macOS | ✅ Tested (dev environment) |
 | Windows | ⚠️ Not CI-tested — likely works, not guaranteed |
 

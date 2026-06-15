@@ -218,7 +218,7 @@ class QdrantVectorStore(VectorStore):
         ids: List[str] = []
         points: List[Any] = []
 
-        for doc, embedding in zip(documents, embeddings):
+        for doc, embedding in zip(documents, embeddings, strict=False):
             doc_id = uuid.uuid4().hex
             ids.append(doc_id)
 

@@ -271,7 +271,7 @@ class AgentGraph:
         node_names = names or [f"step_{i}" for i in range(len(agents))]
         if len(node_names) != len(agents):
             raise ValueError(f"names length ({len(node_names)}) != agents length ({len(agents)})")
-        for i, (nname, agent) in enumerate(zip(node_names, agents)):
+        for i, (nname, agent) in enumerate(zip(node_names, agents, strict=False)):
             graph.add_node(nname, agent)
             if i > 0:
                 graph.add_edge(node_names[i - 1], nname)
@@ -1449,7 +1449,7 @@ class AgentGraph:
             child_outputs = await asyncio.gather(
                 *[
                     run_child(name, bstate)
-                    for name, bstate in zip(node.child_node_names, branch_states)
+                    for name, bstate in zip(node.child_node_names, branch_states, strict=False)
                 ],
                 return_exceptions=True,
             )

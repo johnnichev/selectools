@@ -16,7 +16,14 @@ import asyncio
 import contextvars
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import aclosing
 from typing import Any, Awaitable, Callable, Optional, TypeVar
+
+# ``aclosing`` is re-exported from this module so existing call sites
+# (agent._provider_caller, agent.core) and the regression test that imports it
+# from here are unchanged. It was a local backport while selectools supported
+# 3.9; the floor is now >=3.10, where ``contextlib.aclosing`` is stdlib.
+__all__ = ["aclosing", "run_sync", "run_in_executor_copyctx"]
 
 T = TypeVar("T")
 
@@ -61,36 +68,6 @@ def run_sync(coro: Awaitable[T]) -> T:
     executor = _get_run_sync_executor()
     future = executor.submit(_runner)
     return future.result()
-
-
-class aclosing:  # noqa: N801 — intentionally matches stdlib contextlib.aclosing
-    """Async context manager that calls ``aclose()`` on exit.
-
-    BUG-33 / Pydantic AI PRs #4476, #4205: ``async for item in gen:``
-    without a context manager leaks the async generator when the loop
-    body raises — ``gen.__aexit__`` runs under GC instead of
-    deterministically. ``contextlib.aclosing`` fixes this, but was only
-    added in Python 3.10 and selectools supports 3.9+. This class is a
-    drop-in backport that works on any Python version.
-
-    Usage::
-
-        async with aclosing(provider.astream(...)) as gen:
-            async for item in gen:
-                if stop_condition(item):
-                    break  # provider gen gets aclose()'d on exit
-    """
-
-    def __init__(self, thing: Any) -> None:
-        self._thing = thing
-
-    async def __aenter__(self) -> Any:
-        """Return the wrapped async iterable so callers can iterate it."""
-        return self._thing
-
-    async def __aexit__(self, *_exc: Any) -> None:
-        """Call ``aclose()`` on the wrapped async iterable on exit."""
-        await self._thing.aclose()
 
 
 async def run_in_executor_copyctx(

@@ -7,7 +7,7 @@ name = "selectools"
 version = "0.29.0"
 description = "Production-ready Python framework for AI agents with multi-agent graphs, hybrid RAG, guardrails, audit logging, 50 evaluators, and a visual builder. Supports OpenAI, Anthropic, Gemini, Ollama. By NichevLabs."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = "Apache-2.0"
 authors = [{name = "John Nichev", email = "johnnichev@gmail.com"}]
 maintainers = [{name = "NichevLabs", email = "support@nichevlabs.com"}]
@@ -28,7 +28,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -130,7 +129,7 @@ where = ["src"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py39"
+target-version = "py310"
 extend-exclude = [
     ".eggs",
     ".git",
