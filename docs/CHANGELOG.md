@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-06-15 — Stability Promotions (v1.0 Freeze Prep)
+
 ### Stability promotions (v1.0 freeze prep)
 
 First beta → stable promotion pass toward the 1.0 API freeze. Promotions only
@@ -30,6 +32,12 @@ nothing is removed or renamed.
   types — `EvalSuite`/`TestCase`/`EvalReport`/… — remain `@stable`).
 - New `scripts/stability_audit.py` reports symbols whose marker disagrees with
   their module promise, so future promotion passes are reproducible.
+
+### Stats
+
+- Public surface now ~439 stable / ~347 beta (was ~410 / ~376). 7,796 tests, 115
+  examples, 115 models. Full suite green on Python 3.9–3.13; mypy clean; ruff +
+  bandit clean.
 
 ## [0.28.0] - 2026-06-15 — Hardening Sweep: Shell Safety, Session Namespaces & Typed Public API
 

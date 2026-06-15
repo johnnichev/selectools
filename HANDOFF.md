@@ -2,17 +2,17 @@
 
 ## What I Was Doing (2026-06-15)
 
-Ran a full-codebase audit (6 parallel review agents, every P0 hand-verified),
-then executed a **zero-tech-debt sweep** — every P1/P2/P3 item fixed or verified
-as deliberate design — merged as PR #127. Then cut the **v0.28.0 — Hardening
-Sweep** release (this handoff). Folded into the v1.0 train; bake clock still
-~mid-July.
+Big session: zero-tech-debt sweep (PR #127), **v0.28.0 Hardening Sweep** release,
+residual closure (#129: llms-full generator, Supabase search verdict, skill
+toolchain), the **v1.0 beta→stable promotion pass** (#130), and now cutting
+**v0.29.0 — Stability Promotions** (this handoff). v1.0 still baking ~mid-July;
+the remaining 1.0 gate is the Python 3.9 drop (#99, scoping in progress).
 
 ## Current State
 
-- **Version:** `0.28.0` in `src/selectools/__init__.py` and `pyproject.toml`.
-  CHANGELOG `## [0.28.0] - 2026-06-15 — Hardening Sweep` synced to
-  `docs/CHANGELOG.md`. Release = push tag `v0.28.0` (CI `publish-pypi` job
+- **Version:** `0.29.0` in `src/selectools/__init__.py` and `pyproject.toml`.
+  CHANGELOG `## [0.29.0] - 2026-06-15 — Stability Promotions` synced to
+  `docs/CHANGELOG.md`. Release = push tag `v0.29.0` (CI `publish-pypi` job
   fires on `refs/tags/v*`).
 - **Suite:** 7,796 tests collected; full non-e2e run 7,637 passed / 0 failed.
   115 examples, 115 source-verified models.
