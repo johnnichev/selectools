@@ -1248,6 +1248,6 @@ DEFAULT_EVALUATORS: List[Any] = [
 
 
 # Evaluator is @runtime_checkable: a ``__stability__`` class attribute would become
-# a structural protocol member on Python 3.9-3.11 and break ``isinstance()``
+# a structural protocol member on Python 3.10-3.11 and break ``isinstance()``
 # for implementations that do not define it, so it is registered instead.
 register_stability("Evaluator", "beta")

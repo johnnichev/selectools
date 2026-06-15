@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-06-15 — Stable
+
+selectools is **1.0**. The public API is frozen: every public symbol carries a
+stability marker (`@stable` / `@beta`), and `@stable` symbols now hold a real
+compatibility promise — they will not be removed or have breaking signature
+changes without a deprecation cycle spanning at least two minor releases. The
+project is marked `Development Status :: 5 - Production/Stable`.
+
+What "stable" covers today: the agent loop and config, providers, tools and the
+mature toolbox, sessions, memory, guardrails, orchestration graphs, the pattern
+agents, the policy layer, and the core types. Subsystems still iterating —
+RAG/embeddings, MCP, A2A, the evaluator catalog, unified memory, the scheduler,
+and the newest backends — remain `@beta` and are free to evolve in 1.x minors;
+see `scripts/stability_audit.py` for the live marker map. The cumulative
+beta→stable promotion work landed across 0.25.0 and 0.29.0.
+
+### Removed (breaking)
+
+- **Python 3.9 support dropped** — the minimum is now Python 3.10
+  (`requires-python = ">=3.10"`); the CI matrix is 3.10–3.13. Python 3.9 reached
+  upstream end-of-life in October 2025. The last 3.9-supporting release is
+  **0.29.x**; pin `selectools<1.0` to stay on 3.9. Internally, the `aclosing`
+  backport was replaced with stdlib `contextlib.aclosing`. No other API removals.
+
+### Changed
+
+- `Development Status` classifier flipped from `4 - Beta` to
+  `5 - Production/Stable`.
+
+### Notes
+
+- Aside from the Python 3.9 drop, code that ran deprecation-warning-free on the
+  latest 0.x release runs unmodified on 1.0. See `docs/MIGRATION_1.0.md`.
+
 ## [0.29.0] - 2026-06-15 — Stability Promotions (v1.0 Freeze Prep)
 
 ### Stability promotions (v1.0 freeze prep)

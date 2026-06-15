@@ -30,6 +30,16 @@ result = AgentGraph.chain(planner, writer, reviewer).run("Write a blog post")
 # selectools serve agent.yaml
 ```
 
+## What's New in v1.0
+
+### v1.0.0 — Stable
+
+selectools is **1.0**. The public API is frozen and `@stable` symbols now carry a real compatibility promise — no removal or breaking signature change without a deprecation cycle spanning at least two minor releases. The package is `Development Status :: 5 - Production/Stable`.
+
+- **Frozen, marked surface** — every public symbol carries a `@stable`/`@beta` marker (CI-enforced). The stable set covers the agent loop and config, providers, tools and the mature toolbox, sessions, memory, guardrails, orchestration graphs, the pattern agents, the policy layer, and the core types. RAG/embeddings, MCP, A2A, the evaluator catalog, unified memory, the scheduler, and the newest backends stay `@beta` and keep evolving in 1.x.
+- **Python 3.10+** *(breaking)* — Python 3.9 reached end-of-life in October 2025 and is dropped; the minimum is now 3.10 (CI runs 3.10–3.13). Pin `selectools<1.0` to stay on 3.9.
+- Aside from the 3.9 drop, code that ran deprecation-warning-free on the latest 0.x release runs unmodified on 1.0. See `docs/MIGRATION_1.0.md`.
+
 ## What's New in v0.29
 
 ### v0.29.0 — Stability Promotions (v1.0 Freeze Prep)
@@ -261,19 +271,25 @@ selectools serve --builder
 
 ### v0.19.3 — Stability Markers Applied to All Public APIs
 
-Every public class and function exported from `selectools` now carries a stability marker:
+Every public class and function exported from `selectools` carries a stability
+marker. As of 1.0, `@stable` symbols carry a compatibility promise — no removal
+or breaking signature change without a deprecation cycle of at least two minors:
 
 ```python
-from selectools import Agent, AgentGraph, PlanAndExecuteAgent
+from selectools import Agent, AgentGraph, AgentScheduler
 
-print(Agent.__stability__)               # "stable"
-print(AgentGraph.__stability__)          # "beta"
-print(PlanAndExecuteAgent.__stability__) # "beta"
+print(Agent.__stability__)          # "stable"
+print(AgentGraph.__stability__)     # "stable"  (promoted for 1.0)
+print(AgentScheduler.__stability__) # "beta"    (still iterating)
 ```
 
-**`@stable`** — 60+ core symbols (Agent, AgentConfig, providers, memory, tools, evals, guardrails, sessions, knowledge, cache, cancellation)
+**`@stable`** — the frozen core: Agent, AgentConfig, providers, memory, tools and
+the mature toolbox, sessions, guardrails, orchestration graphs, the pattern
+agents, the policy layer, and the core types.
 
-**`@beta`** — 30+ newer symbols (AgentGraph, SupervisorAgent, Pipeline, @step, parallel, branch, all four patterns, compose)
+**`@beta`** — subsystems still evolving in 1.x: RAG/embeddings, MCP, A2A, the
+evaluator catalog, unified memory, the scheduler, and the newest backends. Run
+`python scripts/stability_audit.py` for the live marker map.
 
 ### v0.19.2 — Enterprise Hardening
 

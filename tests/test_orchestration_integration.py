@@ -80,9 +80,12 @@ class TestPublicExports:
         assert hasattr(selectools, "ErrorPolicy")
 
     def test_version_updated(self):
+        import re
+
         import selectools
 
-        assert selectools.__version__.startswith("0.")
+        # Version is a valid semver (MAJOR.MINOR.PATCH), not pinned to 0.x.
+        assert re.match(r"^\d+\.\d+\.\d+", selectools.__version__)
 
 
 class TestNewStepTypes:

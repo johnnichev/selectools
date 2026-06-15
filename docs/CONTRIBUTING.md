@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to Selectools! We welcome contributions from the community.
 
-**Current Version:** v0.29.0
+**Current Version:** v1.0.0
 **Test Status:** 7796 tests collected (95% coverage)
 **Python:** 3.10 – 3.13
 
