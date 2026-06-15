@@ -17,7 +17,7 @@ from __future__ import annotations
 import os
 from typing import Any, Optional
 
-from ..stability import beta
+from ..stability import stable
 from ..tools import tool
 
 _MISSING_DEP_ERROR = (
@@ -46,7 +46,7 @@ def _slack_error(exc: Any) -> str:
     return f"Error: Slack API call failed: {type(exc).__name__}"
 
 
-@beta
+@stable
 @tool(description="Send a message to a Slack channel")
 def slack_send_message(channel: str, text: str, token: Optional[str] = None) -> str:
     """
@@ -88,7 +88,7 @@ def slack_send_message(channel: str, text: str, token: Optional[str] = None) -> 
         return f"Error sending Slack message: {type(exc).__name__}"
 
 
-@beta
+@stable
 @tool(description="Read recent messages from a Slack channel")
 def slack_read_channel(channel: str, limit: int = 10, token: Optional[str] = None) -> str:
     """
@@ -144,7 +144,7 @@ def slack_read_channel(channel: str, limit: int = 10, token: Optional[str] = Non
         return f"Error reading Slack channel: {type(exc).__name__}"
 
 
-@beta
+@stable
 @tool(description="Search Slack messages across the workspace")
 def slack_search_messages(query: str, count: int = 10, token: Optional[str] = None) -> str:
     """

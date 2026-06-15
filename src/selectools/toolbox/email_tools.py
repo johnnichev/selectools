@@ -20,7 +20,7 @@ from email.message import EmailMessage
 from email.utils import parsedate_to_datetime
 from typing import Optional
 
-from ..stability import beta
+from ..stability import stable
 from ..tools import tool
 
 _DEFAULT_SMTP_PORT = 587
@@ -62,7 +62,7 @@ def _extract_snippet(message: "EmailMessage") -> str:
     return snippet
 
 
-@beta
+@stable
 @tool(description="Send an email via SMTP (TLS)")
 def send_email(
     to: str,
@@ -140,7 +140,7 @@ def send_email(
         return f"Error: Could not connect to SMTP server {host}:{port}: {exc}"
 
 
-@beta
+@stable
 @tool(description="Read the latest emails from an IMAP inbox")
 def read_inbox(
     limit: int = 5,

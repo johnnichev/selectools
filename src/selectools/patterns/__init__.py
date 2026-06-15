@@ -25,7 +25,7 @@ from .plan_and_execute import PlanAndExecuteAgent, PlanStep
 from .reflective import ReflectionRound, ReflectiveAgent, ReflectiveResult
 from .team_lead import Subtask, TeamLeadAgent, TeamLeadResult
 
-__stability__ = "beta"
+__stability__ = "stable"
 
 __all__ = [
     # PlanAndExecute

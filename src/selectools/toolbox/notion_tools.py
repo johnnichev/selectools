@@ -17,7 +17,7 @@ import json
 import os
 from typing import Any, Dict, Optional
 
-from ..stability import beta
+from ..stability import stable
 from ..tools import tool
 
 _API_BASE = "https://api.notion.com/v1"
@@ -53,7 +53,7 @@ def _api_error(response: Any) -> str:
     return f"Error: Notion API returned HTTP {response.status_code}{detail}"
 
 
-@beta
+@stable
 @tool(description="Create a page in Notion")
 def notion_create_page(
     parent_page_id: str,
@@ -123,7 +123,7 @@ def notion_create_page(
         return f"Error creating Notion page: {type(exc).__name__}: {exc}"
 
 
-@beta
+@stable
 @tool(description="Search pages and databases in a Notion workspace")
 def notion_search(query: str, max_results: int = 5, api_key: Optional[str] = None) -> str:
     """
@@ -195,7 +195,7 @@ def notion_search(query: str, max_results: int = 5, api_key: Optional[str] = Non
         return f"Error searching Notion: {type(exc).__name__}: {exc}"
 
 
-@beta
+@stable
 @tool(description="Update a Notion page's title or archive state")
 def notion_update_page(
     page_id: str,

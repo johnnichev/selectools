@@ -305,6 +305,6 @@ class TeamLeadAgent:
         return TeamLeadResult(content=synthesis.content or work_log, subtasks=all_subtasks)
 
 
-__stability__ = "beta"
+__stability__ = "stable"
 
 __all__ = ["TeamLeadAgent", "Subtask", "TeamLeadResult"]

@@ -17,7 +17,7 @@ import ast
 import math
 from typing import Callable, Dict, Union
 
-from ..stability import beta
+from ..stability import stable
 from ..tools import tool
 
 _MAX_EXPRESSION_LENGTH = 2000
@@ -144,7 +144,7 @@ def _eval_node(node: ast.AST) -> _Number:
     raise ValueError(f"expression element '{type(node).__name__}' is not allowed")
 
 
-@beta
+@stable
 @tool(description="Safely evaluate a math expression (arithmetic, sqrt, log, trig, pi/e)")
 def evaluate_expression(expression: str) -> str:
     """
@@ -279,7 +279,7 @@ def _format_quantity(value: float) -> str:
     return f"{value:.6f}".rstrip("0").rstrip(".")
 
 
-@beta
+@stable
 @tool(description="Convert between length, mass, temperature, and data units")
 def unit_convert(value: float, from_unit: str, to_unit: str) -> str:
     """
