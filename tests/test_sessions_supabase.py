@@ -641,3 +641,34 @@ class TestSupabaseSessionStoreSearch:
 
         results = store.search('"quartz"')
         assert [r.session_id for r in results] == ["s2"]
+
+
+def test_search_sends_validated_postgrest_json_filter() -> None:
+    """search() filters on the ``memory_json->>messages`` text projection.
+
+    ``col->>key`` is valid PostgREST syntax (extracts a JSON field as text) —
+    confirmed against the Supabase docs (e.g. ``metadata->>stuff`` in a filter).
+    A 2026-06-15 audit flagged this as "always returns empty"; that was a false
+    positive. This test locks the exact column expression so a refactor can't
+    silently send invalid syntax (which WOULD make server-side search empty),
+    and asserts the term is JSON-escaped to match the escaped jsonb projection.
+    """
+    recorded: list = []
+
+    class _RecordingBuilder(FakeQueryBuilder):
+        def ilike(self, col: str, pattern: str) -> "FakeQueryBuilder":
+            recorded.append((col, pattern))
+            return super().ilike(col, pattern)
+
+    class _RecordingClient(FakeSupabaseClient):
+        def table(self, name: str) -> "FakeQueryBuilder":
+            return _RecordingBuilder(self._data, name, "select")
+
+    store = _make_store(_RecordingClient())
+    store.save("s1", _search_memory("quartz crystal"))
+    store.search("quartz")
+
+    assert recorded, "search() issued no ilike filter"
+    assert {col for col, _ in recorded} == {"memory_json->>messages"}
+    # The pattern is wrapped in % and lower-cased per term.
+    assert all(p.startswith("%") and p.endswith("%") for _, p in recorded)
