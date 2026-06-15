@@ -30,6 +30,19 @@ result = AgentGraph.chain(planner, writer, reviewer).run("Write a blog post")
 # selectools serve agent.yaml
 ```
 
+## What's New in v0.29
+
+### v0.29.0 — Stability Promotions (v1.0 Freeze Prep)
+
+The first beta → stable promotion pass toward the 1.0 API freeze. Additive only — promotions strengthen guarantees, nothing is removed or renamed.
+
+- **24 mature toolbox tools promoted to `@stable`** — calculator, code (incl. `execute_shell`), db, email, GitHub, Linear, Notion, PDF, web search, and Slack tools. They're 4–15 releases old with frozen signatures.
+- **`orchestration`, `patterns`, and `policy` are now stable modules** — their public surfaces (AgentGraph, the checkpoint stores, all five pattern agents, ToolPolicy) were already frozen in v0.25; this aligns the module-level promise. Also promoted `SessionSearchResult` and `PlanningConfig`.
+- **Held `@beta` on purpose** — the v0.27.0 additions (recall tool, injection guardrail, cache-rate cost, Mongo/Dynamo session stores) get one more cycle, and `evals` stays a beta module while its 50 evaluator classes keep growing (its 7 core types are `@stable`).
+- **New `scripts/stability_audit.py`** reports any symbol whose marker disagrees with its module promise, so promotion passes are reproducible.
+
+See `CHANGELOG.md` for the full entry.
+
 ## What's New in v0.28
 
 ### v0.28.0 — Hardening Sweep: Shell Safety, Session Namespaces & Typed Public API
