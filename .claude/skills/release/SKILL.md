@@ -28,20 +28,32 @@ Preparing release version: $ARGUMENTS
 
 ---
 
-## Phase 1: Quality Gate — Lint & Tests
+## Phase 1: Quality Gate — Lint, Tests, E2E
 
-Run `/lint` (fix mode) to auto-format and check code quality. ALL four checks must pass:
-- black
-- isort
-- flake8
-- mypy
+Run `/lint` (fix mode) to auto-format and check code quality. ALL must pass
+(the repo uses ruff + mypy + bandit — NOT black/isort/flake8):
+- `ruff check src/ tests/` (lint; isort+flake8 replacement)
+- `ruff format src/ tests/ --check` (format; black replacement)
+- `mypy src/`
+- `bandit -c pyproject.toml -r src/`
 
-Then run the full test suite:
+Then run the full test suite (use the project venv, e.g. `.venv/bin/python -m pytest`):
 ```bash
-pytest tests/ -x -q
+pytest tests/ -q          # full suite — do NOT shortcut to a subset
 ```
 
-**STOP if any lint or test failure. Fix before proceeding.**
+**E2E hard gate (real API, before tagging).** Per `feedback_evals_before_release`,
+real-LLM e2e tests must run before every release — mock tests passed while a real
+SYSTEM-role bug shipped. Run the named gate files with whatever provider keys are
+set (each provider's tests skip if its key is absent):
+```bash
+python -u -m pytest tests/test_orchestration_evals.py tests/test_orchestration_e2e.py --run-e2e -v
+```
+Tip: do NOT pipe through `tail` (it block-buffers and hides progress); use `-u`
+and read the output file. If only one provider key is available, a scoped
+`-k <provider>` run validates that provider's real path quickly.
+
+**STOP if any lint, test, or e2e failure. Fix before proceeding.**
 
 ---
 
@@ -105,7 +117,17 @@ Update `.private/` tracking docs:
 - `.private/competitive-analysis.md` — update comparison matrix, test count, advantages list
 - `.private/growth-plan.md` — update product features list
 
-### 4d. Doc Build Verification
+### 4d. Regenerate the LLM aggregate + Doc Build Verification
+
+`docs/llms-full.txt` is generated, NOT hand-edited — regenerate it so it picks up
+new module docs and current counts/versions automatically:
+
+```bash
+python scripts/build_llms_full.py          # rebuild from mkdocs nav
+python scripts/build_llms_full.py --check   # CI-style staleness guard
+```
+
+Then sync the changelog mirror and build the docs:
 
 ```bash
 cp CHANGELOG.md docs/CHANGELOG.md && mkdocs build
