@@ -30,6 +30,21 @@ result = AgentGraph.chain(planner, writer, reviewer).run("Write a blog post")
 # selectools serve agent.yaml
 ```
 
+## What's New in v0.28
+
+### v0.28.0 — Hardening Sweep: Shell Safety, Session Namespaces & Typed Public API
+
+A full audit-driven tech-debt sweep — mostly additive and bugfix, with one called-out behavior change.
+
+- **`execute_shell` is now a real boundary, not a best-effort filter** — it parses with `shlex` and runs with `shell=False`, so pipes, chaining (`;`, `&&`), redirection, subshells, globbing, and backgrounding can never be interpreted (closes the previously-bypassable `\n` and bare-`&` holes). **Behavior change:** commands relying on shell features now fail fast instead of running through `/bin/sh`.
+- **SSRF guard extended to the headless-browser tools and the serve webhook** — `browser_scrape_page`/`browser_screenshot` and the eval-alert webhook now reject loopback/private/link-local targets; SSRF logic is consolidated into one shared validator.
+- **Session namespaces fixed across all backends** — `SessionStore.branch()` gained an optional `namespace` parameter, and `list()` now returns a round-trippable storage key consistently (JSON/Redis/Mongo/DynamoDB previously returned a bare id that couldn't be reloaded for namespaced sessions).
+- **Embedding providers accept `timeout` + `max_retries`** (OpenAI/Voyage/Cohere, default 60s/2) so a hung or rate-limited call can't block ingestion.
+- **Typed public API** — `AgentResult.trace`/`.usage` and the ten `AgentConfig` nested-group fields are now their concrete types instead of `Any` (full autocomplete + type-checking); tightening surfaced and fixed two real bugs the `Any` had masked.
+- **Packaging** — added the missing `[cache]` extra (`redis`), `pytz` to `[toolbox]`, and `jsonschema` to `[evals]`.
+
+See `CHANGELOG.md` for the full entry (7,796 tests, 115 examples, 115 models).
+
 ## What's New in v0.27
 
 ### v0.27.2 — Provider Model Fix & Tool-less Agents
@@ -214,7 +229,7 @@ The first AI agent framework to ship a visual graph builder in a single `pip ins
 
 **[Try the builder in your browser →](https://selectools.dev/builder/)** — no install required.
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb) [![Examples Gallery](https://img.shields.io/badge/examples-96_scripts-06b6d4)](https://selectools.dev/examples/)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/johnnichev/selectools/blob/main/notebooks/getting_started.ipynb) [![Examples Gallery](https://img.shields.io/badge/examples-115_scripts-06b6d4)](https://selectools.dev/examples/)
 
 ```bash
 pip install selectools
