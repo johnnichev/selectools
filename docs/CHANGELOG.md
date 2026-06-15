@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-06-15 — Cleanup & Z-Timestamp Fix
+
+First post-1.0 patch: a Python 3.10 crash fix plus an internal hygiene sweep.
+All changes are internal/private; no public symbol is affected and the frozen
+1.0 API is unchanged.
+
 ### Fixed
 
 - **Knowledge and checkpoint loaders no longer crash on `Z`-suffixed timestamps
