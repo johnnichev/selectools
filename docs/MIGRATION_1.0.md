@@ -137,13 +137,9 @@ tag (in the 0.30.x line). Python 3.9 reached upstream end-of-life in October 202
 
 ## No other breaking changes
 
-!!! note "Pending final confirmation"
-    The statement below is finalized by the pre-1.0 stability-marking sweep. Until the
-    1.0.0 tag is cut, treat this section as provisional.
-
 Aside from the `AgentConfig.hooks` removal, the `clone_for_isolation` rename, and the
-Python 3.9 drop, **no other breaking changes are planned for 1.0**. Code that runs
-deprecation-warning-free on the latest 0.24.x release should run unmodified on 1.0
+Python 3.9 drop, **there are no other breaking changes in 1.0**. Code that runs
+deprecation-warning-free on the latest 0.x release runs unmodified on 1.0
 (on Python 3.10+).
 
 ---
@@ -183,15 +179,22 @@ previously unmarked and are now `@stable` alongside their parent APIs.
 
 `CheckpointStore` is `@runtime_checkable` and therefore carries its marker in
 `selectools.stability.STABILITY_REGISTRY` instead of a class attribute (a class
-attribute would become a structural protocol member on Python 3.9-3.11 and break
+attribute would become a structural protocol member on Python 3.10-3.11 and break
 `isinstance()` for third-party stores).
 
+A second promotion pass (0.29.0) added to the stable surface: the 24 mature toolbox
+tools (calculator, code, db, email, GitHub, Linear, Notion, PDF, web search, Slack),
+the `orchestration` / `patterns` / `policy` module-level promises, `SessionSearchResult`,
+and `agent.PlanningConfig`. Run `python scripts/stability_audit.py` for the
+authoritative, live marker map.
+
 Deliberately **not** promoted (still `@beta` at 1.0): the loop-detection family,
-`LocalProvider` (test stub), the `Pipeline`/`compose` family, everything shipped in
-v0.24/v0.25-dev (`pending`, `results`, `a2a`, `AgentAPI`, knowledge backends,
-unified memory, `LiteLLMProvider`/`RouterProvider`, sanitizers, planning,
-compression/HITL types), and the `rag`/`mcp`/`embeddings`/`observe`/`evals`
-(evaluators) surfaces.
+`LocalProvider` (test stub), the `Pipeline`/`compose` family, `pending`, `results`,
+`a2a`, `AgentAPI`, knowledge backends, unified memory,
+`LiteLLMProvider`/`RouterProvider`, sanitizers, compression/HITL types, the
+v0.27 additions (`make_recall_tool`, `PromptInjectionGuardrail`, the Mongo/Dynamo
+session stores), and the `rag`/`mcp`/`embeddings`/`observe`/`evals` (evaluator)
+surfaces.
 
 Anything still `@beta` at 1.0 (for example, the `selectools serve` CLI surface) remains
 outside the semver guarantee until promoted in a later 1.x release.
