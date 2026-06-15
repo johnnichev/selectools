@@ -1593,7 +1593,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     # finally block and releases HTTP connections — instead
                     # of waiting for GC and emitting `async generator raised
                     # StopAsyncIteration` warnings.
-                    async with aclosing(
+                    async with aclosing(  # type: ignore[type-var]  # astream is an async generator (has aclose) but typed AsyncIterable
                         self.provider.astream(
                             model=self._effective_model,
                             system_prompt=self._system_prompt,

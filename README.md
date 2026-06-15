@@ -467,7 +467,7 @@ def web_search(query: str) -> str:
     return expensive_api_call(query)
 ```
 
-Also: Python 3.9–3.13 CI matrix (verified zero compatibility issues).
+Also: Python 3.10–3.13 CI matrix (verified zero compatibility issues).
 
 </details>
 

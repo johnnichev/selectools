@@ -49,7 +49,7 @@ class TopicGuardrail(Guardrail):
         normalized = re.sub(r"[\u200b\u200c\u200d\ufeff\u00ad]", "", normalized)
 
         matched: List[str] = []
-        for pattern, topic in zip(self._patterns, self.deny):
+        for pattern, topic in zip(self._patterns, self.deny, strict=False):
             if pattern.search(normalized):
                 matched.append(topic)
 

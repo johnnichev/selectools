@@ -159,7 +159,7 @@ class StallDetector(BaseDetector):
         result_window = tool_results[-self.threshold :]
         first_name = call_window[0].tool_name
         first_hash = _result_hash(result_window[0])
-        for call, result in zip(call_window[1:], result_window[1:]):
+        for call, result in zip(call_window[1:], result_window[1:], strict=False):
             if call.tool_name != first_name:
                 return None
             if _result_hash(result) != first_hash:

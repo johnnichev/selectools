@@ -116,7 +116,7 @@ class PineconeVectorStore(VectorStore):
         # Generate IDs and prepare vectors
         vectors = []
         ids = []
-        for i, (doc, embedding) in enumerate(zip(documents, embeddings)):
+        for i, (doc, embedding) in enumerate(zip(documents, embeddings, strict=False)):
             doc_id = f"doc_{hashlib.sha256(doc.text.encode()).hexdigest()[:16]}_{i}"
             ids.append(doc_id)
 

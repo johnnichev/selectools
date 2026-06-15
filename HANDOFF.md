@@ -6,7 +6,7 @@ Big session: zero-tech-debt sweep (PR #127), **v0.28.0 Hardening Sweep** release
 residual closure (#129: llms-full generator, Supabase search verdict, skill
 toolchain), the **v1.0 beta→stable promotion pass** (#130), and now cutting
 **v0.29.0 — Stability Promotions** (this handoff). v1.0 still baking ~mid-July;
-the remaining 1.0 gate is the Python 3.9 drop (#99, scoping in progress).
+the Python 3.9 drop (#99) is done; 1.0 freeze next.
 
 ## Current State
 
@@ -65,11 +65,12 @@ The July 1.0 tag plan is unchanged.
 
 ### July 1.0 Tag Checklist (in order)
 
-1. **Drop Python 3.9** — dedicated PR: `requires-python = ">=3.10"`,
-   remove 3.9 from the CI matrix, drop the py39 typing shims and the
-   3.9-only Protocol workaround notes, retarget ruff
-   (`target-version = "py310"`). This is the only remaining breaking
-   change and it lands BEFORE the tag, not in it.
+1. **Drop Python 3.9** — DONE (dedicated PR): `requires-python = ">=3.10"`,
+   3.9 removed from the CI matrix, `aclosing` backport replaced with
+   `contextlib.aclosing` (the only true 3.9-only shim), ruff retargeted
+   (`target-version = "py310"`). NOTE: the `stability.py` Protocol workaround
+   is for a **3.9–3.11** bug, NOT 3.9-only — it STAYS until the floor is ≥3.12.
+   This is the only remaining breaking change and it lands BEFORE the tag.
 2. **Promote-after-bake review** — sweep the `@beta` surface for
    anything that baked cleanly through the window (v0.24 + v0.25
    betas; check issue tracker for API-shape complaints). Promotions
@@ -104,7 +105,7 @@ The July 1.0 tag plan is unchanged.
   Any new public symbol without a marker fails CI by design; mark it,
   don't exempt it.
 - **Protocol classes + markers**: stability markers must not become
-  structural members of runtime-checkable Protocols (py3.9-3.11
+  structural members of runtime-checkable Protocols (py3.10-3.11
   regression fixed in #95) — keep markers in the registry for
   Protocols, not as attributes.
 - **`tests/rag/test_property_based_rag.py::test_full_metadata_filter_always_matches`**

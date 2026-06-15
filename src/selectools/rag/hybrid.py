@@ -257,14 +257,14 @@ class HybridSearcher:
         doc_scores: Dict[int, float] = {}
         doc_map: Dict[int, SearchResult] = {}
 
-        for result, norm_score in zip(vector_results, v_normalised):
+        for result, norm_score in zip(vector_results, v_normalised, strict=False):
             key = id(result.document)
             doc_scores[key] = self.vector_weight * norm_score
             doc_map[key] = result
 
         text_to_key = {doc_map[key].document.text: key for key in doc_map}
 
-        for result, norm_score in zip(keyword_results, k_normalised):
+        for result, norm_score in zip(keyword_results, k_normalised, strict=False):
             matched_key = text_to_key.get(result.document.text)
             if matched_key is not None:
                 key = matched_key

@@ -131,7 +131,7 @@ class SQLiteVectorStore(VectorStore):
             conn = sqlite3.connect(self.db_path)
             try:
                 cursor = conn.cursor()
-                for doc_id, doc, embedding in zip(ids, documents, embeddings):
+                for doc_id, doc, embedding in zip(ids, documents, embeddings, strict=False):
                     cursor.execute(
                         """
                         INSERT OR REPLACE INTO documents (id, text, metadata, embedding)
