@@ -1094,7 +1094,7 @@ class JsonSchemaEvaluator:
 def _validate_json_schema(data: Any, schema: Dict[str, Any]) -> List[str]:
     """Minimal JSON Schema validator. Uses jsonschema if available."""
     try:
-        import jsonschema  # type: ignore
+        import jsonschema  # type: ignore[import-untyped]
 
         validator = jsonschema.Draft7Validator(schema)
         return [e.message for e in validator.iter_errors(data)]

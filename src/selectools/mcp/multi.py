@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Optional, Set
 
 from ..stability import beta
 from ..tools.base import Tool
 from .client import MCPClient
 from .config import MCPServerConfig
+
+logger = logging.getLogger(__name__)
 
 
 @beta
@@ -62,8 +65,11 @@ class MultiMCPClient:
             try:
                 await client.connect()
                 self._clients[config.name] = client
-            except Exception:  # nosec B110
+            except Exception as exc:
                 self._failed_servers.append(config.name)
+                logger.warning(
+                    "MCP server %r failed to connect: %s", config.name, exc, exc_info=True
+                )
 
     async def disconnect_all(self) -> None:
         """Disconnect from all servers."""

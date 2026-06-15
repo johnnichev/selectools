@@ -35,6 +35,8 @@ class AnthropicEmbeddingProvider(EmbeddingProvider):
         model: str = "voyage-3-lite",
         api_key: Optional[str] = None,
         truncate: bool = True,
+        timeout: float = 60.0,
+        max_retries: int = 2,
     ):
         """
         Initialize Anthropic/Voyage embedding provider.
@@ -43,6 +45,10 @@ class AnthropicEmbeddingProvider(EmbeddingProvider):
             model: Model name (default: voyage-3-lite)
             api_key: Voyage API key (defaults to VOYAGE_API_KEY env var)
             truncate: Whether to truncate inputs longer than context window
+            timeout: Per-request timeout in seconds (default: 60). Prevents a
+                hung embeddings call from blocking ingestion indefinitely.
+            max_retries: Number of automatic retries on transient errors,
+                handled by the Voyage SDK (default: 2).
         """
         try:
             import voyageai
@@ -52,7 +58,12 @@ class AnthropicEmbeddingProvider(EmbeddingProvider):
                 "Install with: pip install voyageai"
             ) from e
 
-        self.client = voyageai.Client(api_key=api_key)
+        try:
+            self.client = voyageai.Client(api_key=api_key, max_retries=max_retries, timeout=timeout)
+        except TypeError:
+            # Older voyageai versions lack the timeout/max_retries kwargs.
+            logger.debug("voyageai.Client does not accept timeout/max_retries; using defaults")
+            self.client = voyageai.Client(api_key=api_key)
         self.model = model
         self.truncate = truncate
         self._dimension = self._get_model_dimension()

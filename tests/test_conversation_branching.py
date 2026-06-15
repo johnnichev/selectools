@@ -185,3 +185,43 @@ def test_sqlite_store_branch_independent(sqlite_store):
 def test_sqlite_store_branch_raises_when_source_missing(sqlite_store):
     with pytest.raises(ValueError, match="not found"):
         sqlite_store.branch("ghost", "dst")
+
+
+# ---------------------------------------------------------------------------
+# Namespaced branch() + list() round-trip (regression: namespaces were broken)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("store_fixture", ["json_store", "sqlite_store"])
+def test_branch_namespaced_session(store_fixture, request):
+    """branch() can copy a session that lives under a namespace."""
+    store = request.getfixturevalue(store_fixture)
+    mem = ConversationMemory(max_messages=20)
+    mem.add(Message(role=Role.USER, content="ns original"))
+    store.save("src", mem, namespace="team-a")
+
+    # Without the namespace, the source is invisible -> ValueError.
+    with pytest.raises(ValueError, match="not found"):
+        store.branch("src", "dst")
+
+    # With the namespace, the copy lands in the same namespace.
+    store.branch("src", "dst", namespace="team-a")
+    assert store.exists("dst", namespace="team-a")
+    assert not store.exists("dst")  # not leaked into the global namespace
+    loaded = store.load("dst", namespace="team-a")
+    assert loaded is not None
+    assert len(loaded) == 1
+
+
+@pytest.mark.parametrize("store_fixture", ["json_store", "sqlite_store"])
+def test_list_returns_roundtrippable_key_for_namespaced_session(store_fixture, request):
+    """list() returns a storage key that load() accepts with no namespace arg."""
+    store = request.getfixturevalue(store_fixture)
+    store.save("s1", ConversationMemory(max_messages=20), namespace="team-a")
+
+    metas = store.list()
+    assert len(metas) == 1
+    key = metas[0].session_id
+    assert key == "team-a:s1"  # composite storage key, consistent across backends
+    # The returned key round-trips directly through load() with no namespace.
+    assert store.load(key) is not None

@@ -142,15 +142,13 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         Initialize a new Agent instance.
 
         Args:
-            tools: List of Tool instances the agent can use (minimum 1 required).
+            tools: List of Tool instances the agent can use. May be empty for a
+                pure conversational agent (the provider is called with no tools).
             provider: LLM provider adapter. Defaults to OpenAIProvider().
             prompt_builder: Custom prompt builder. Defaults to PromptBuilder().
             parser: Custom tool call parser. Defaults to ToolCallParser().
             config: Agent configuration options. Defaults to AgentConfig().
             memory: Optional conversation memory for maintaining history across turns.
-
-        Raises:
-            ValueError: If tools list is empty.
 
         Example:
             >>> agent = Agent(
@@ -1078,6 +1076,10 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     result = AgentResult(
                         message=Message(role=Role.ASSISTANT, content=f"Batch error: {exc}"),
                     )
+            # No lock needed here (unlike sync batch(), which uses real OS
+            # threads): merge() and the increment are synchronous with no
+            # await, so under asyncio's single-threaded event loop they run
+            # atomically relative to the other gathered coroutines.
             self.usage.merge(clone.usage)
             completed += 1
             if on_progress:
@@ -1380,7 +1382,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         clone.analytics = None
         return clone
 
-    @deprecated(since="1.0.0", replacement="clone_for_isolation")
+    @deprecated(since="0.25.0", replacement="clone_for_isolation")
     def _clone_for_isolation(self) -> "Agent":
         """Deprecated alias for :meth:`clone_for_isolation`."""
         return self.clone_for_isolation()

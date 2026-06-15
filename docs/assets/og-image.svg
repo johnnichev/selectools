@@ -63,7 +63,7 @@
 
   <!-- Stats bar -->
   <text x="80" y="480" font-family="'JetBrains Mono', 'Fira Code', 'Consolas', monospace" font-size="16" letter-spacing="0.5">
-    <tspan fill="#22d3ee">115 Models</tspan><tspan fill="#334155" dx="6">&middot;</tspan><tspan fill="#22d3ee" dx="6">7268 Tests</tspan><tspan fill="#334155" dx="6">&middot;</tspan><tspan fill="#22d3ee" dx="6">50 Evaluators</tspan><tspan fill="#334155" dx="6">&middot;</tspan><tspan fill="#22d3ee" dx="6">9 Providers</tspan>
+    <tspan fill="#22d3ee">115 Models</tspan><tspan fill="#334155" dx="6">&middot;</tspan><tspan fill="#22d3ee" dx="6">7796 Tests</tspan><tspan fill="#334155" dx="6">&middot;</tspan><tspan fill="#22d3ee" dx="6">50 Evaluators</tspan><tspan fill="#334155" dx="6">&middot;</tspan><tspan fill="#22d3ee" dx="6">9 Providers</tspan>
   </text>
 
   <!-- Attribution -->

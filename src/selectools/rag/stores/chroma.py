@@ -172,7 +172,7 @@ class ChromaVectorStore(VectorStore):
 
         # Query Chroma
         results = self.collection.query(
-            query_embeddings=[query_embedding],  # type: ignore
+            query_embeddings=[query_embedding],  # type: ignore[arg-type]
             n_results=n_results,
             where=where,
             include=["documents", "metadatas", "distances"],
@@ -190,7 +190,7 @@ class ChromaVectorStore(VectorStore):
             for i in range(len(results["ids"][0])):
                 doc = Document(
                     text=results["documents"][0][i],
-                    metadata=results["metadatas"][0][i] or {},  # type: ignore
+                    metadata=results["metadatas"][0][i] or {},  # type: ignore[arg-type]
                 )
 
                 # Chroma returns distances, convert to similarity scores

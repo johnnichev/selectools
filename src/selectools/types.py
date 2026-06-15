@@ -11,10 +11,14 @@ import base64
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol
 
 from selectools.results import Artifact
 from selectools.stability import stable
+
+if TYPE_CHECKING:
+    from selectools.trace import AgentTrace
+    from selectools.usage import AgentUsage
 
 
 @stable
@@ -344,12 +348,12 @@ class AgentResult:
     tool_args: Dict[str, Any] = field(default_factory=dict)
     iterations: int = 0
     tool_calls: List["ToolCall"] = field(default_factory=list)
-    parsed: Optional[Any] = None
+    parsed: Optional[Any] = None  # validated object when response_format is set; user-parameterized
     reasoning: Optional[str] = None
     reasoning_history: List[str] = field(default_factory=list)
-    trace: Optional[Any] = None
+    trace: Optional["AgentTrace"] = None
     provider_used: Optional[str] = None
-    usage: Optional[Any] = None
+    usage: Optional["AgentUsage"] = None
     artifacts: List[Artifact] = field(default_factory=list)
 
     @property

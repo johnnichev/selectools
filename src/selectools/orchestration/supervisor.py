@@ -287,7 +287,9 @@ class SupervisorAgent:
         except Exception as exc:
             import logging
 
-            logging.getLogger("selectools.orchestration").warning("Planner call failed: %s", exc)
+            logging.getLogger("selectools.orchestration").warning(
+                "Planner call failed: %s", exc, exc_info=True
+            )
             return ""
 
         return result_msg.content or ""

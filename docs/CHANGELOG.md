@@ -7,17 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **`execute_shell` no longer uses a shell.** The tool now parses the command
+  with `shlex` and runs it with `shell=False`, so pipes, chaining (`;`, `&&`),
+  redirection, subshells, globbing, and backgrounding can never be interpreted —
+  a real boundary, not a best-effort filter. Metacharacters (now including the
+  previously-missed `\n` and bare `&`) are rejected up front. **Behavior change:**
+  commands relying on shell features (e.g. `echo $HOME`, `ls *.py | wc -l`) now
+  fail fast instead of running through `/bin/sh`.
+- **SSRF guard extended to the headless-browser tools and the serve webhook.**
+  `browser_scrape_page`, `browser_screenshot`, and the eval-alert webhook now
+  reject loopback/private/link-local targets via the shared validator (the SSRF
+  logic is consolidated into one module, `selectools._ssrf`).
+
 ### Changed
 
 - **YAML templates with no tools build a true conversational agent.** Previously
   a tool-less template config injected a phantom no-op tool (only needed because
   the agent used to require one); it now produces an agent with no tools.
+- **`SessionStore.list()` returns the full storage key consistently** on every
+  backend (the bare id, or `"{namespace}:{id}"` for namespaced sessions), so a
+  listed id round-trips straight back through `load(id)`. Previously JSON/Redis/
+  Mongo/DynamoDB returned a bare id that could not be reloaded for namespaced
+  sessions.
+- **`SessionStore.branch()` gained an optional `namespace` parameter** (all
+  backends + the Protocol) so namespaced sessions can be branched; previously it
+  always operated on the un-namespaced key and raised for namespaced sessions.
+- **Embedding providers (`OpenAI`/`Anthropic`-Voyage/`Cohere`) accept `timeout`
+  and `max_retries`** (default 60s / 2 retries), so a hung or rate-limited
+  embeddings call can no longer block ingestion indefinitely.
+
+### Added
+
+- **`[cache]` extra** (`redis>=4.0.0`) for `RedisCache`/`RedisSessionStore` and
+  the Redis knowledge/pending backends — previously advertised in the README but
+  not declared. Added `pytz` to `[toolbox]` and `jsonschema` to `[evals]` to
+  match the code's optional imports.
 
 ### Internal
 
-- The full `src/` tree is mypy-clean (0 errors). Cleared the 5 long-standing
-  baseline `union-attr`/`no-any-return` errors and an `image_tools` SDK-overload
-  warning. No behavior change.
+- The full `src/` tree is mypy-clean (0 errors). `AgentResult.trace`/`.usage`
+  and the ten `AgentConfig` nested-group fields are now typed with their concrete
+  classes (via `TYPE_CHECKING`) instead of `Any`; remaining bare `# type: ignore`
+  comments were given explicit error codes.
+- `InMemoryVectorStore.search(dedup=True)` now dedups on `(text, source)` via the
+  shared helper, consistent with every other vector store backend.
+- Silent-failure paths now log (MCP connect, supervisor planner, production eval
+  worker, compression fallback); the streaming sync-fallback closes its generator;
+  several `serve` file reads use `with` to avoid descriptor leaks.
 
 ## [0.27.2] - 2026-06-14 — Provider Model Fix & Tool-less Agents
 

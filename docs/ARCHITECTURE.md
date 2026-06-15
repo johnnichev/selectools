@@ -1,7 +1,7 @@
 # Selectools Architecture
 
-**Version:** 0.25.0
-**Last Updated:** April 2026
+**Version:** 0.27.2
+**Last Updated:** June 2026
 
 ## System Overview
 
@@ -45,7 +45,7 @@ Selectools is a production-ready Python framework for building AI agents with to
 
 - **Provider-Agnostic**: Switch between OpenAI, Anthropic, Gemini, and Ollama with one line
 - **Production-Ready**: Robust error handling, retry logic, timeouts, and validation
-- **RAG Support**: 4 embedding providers, 4 vector stores, document loaders
+- **RAG Support**: 4 embedding providers, 7 vector stores, document loaders
 - **Developer-Friendly**: Type hints, `@tool` decorator, automatic schema inference
 - **Observable**: `AgentObserver` + `AsyncAgentObserver` protocol (46 events with `run_id`), `LoggingObserver`, `SimpleStepObserver`, analytics, usage tracking, and cost monitoring (legacy hooks removed in v1.0)
 - **Native Tool Calling**: OpenAI, Anthropic, and Gemini native function calling APIs

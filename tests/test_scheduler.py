@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta
 
 import pytest
@@ -286,15 +287,39 @@ def test_max_runs_validation():
 
 @pytest.mark.asyncio
 async def test_astart_runs_until_deadline():
-    # Real (fast) interval; bounded by `until` so the test terminates.
+    # start_immediately makes the first fire deterministic (no wall-clock race):
+    # the job is due at loop entry, so it fires once before the deadline bounds
+    # the loop. Guarded by wait_for so a hang fails loudly instead of blocking.
     start = datetime.now()
     s = AgentScheduler()
     agent = FakeAgent()
-    s.add_job(agent, "tick", every(seconds=1))
-    results = await s.astart(poll_interval=0.05, until=start + timedelta(milliseconds=250))
-    # Fires immediately on the first tick (next_after is ~1s out, but the
-    # deadline bounds the loop); at minimum the loop exits cleanly.
-    assert isinstance(results, list)
+    s.add_job(agent, "tick", every(seconds=3600), start_immediately=True)
+    results = await asyncio.wait_for(
+        s.astart(poll_interval=0.02, until=start + timedelta(milliseconds=300)),
+        timeout=5.0,
+    )
+    # The immediately-due job fires exactly once; the next fire is an hour out,
+    # so the deadline ends the loop after that single fire.
+    assert len(results) == 1
+    assert results[0].job_name == "fake"  # job name defaults to agent.name
+    assert agent.calls == ["tick"]  # the prompt was dispatched exactly once
+
+
+@pytest.mark.asyncio
+async def test_astart_exits_on_stop():
+    # Regression: AgentScheduler.stop() must break the astart loop. Previously
+    # stop() and the _stopped path had zero coverage.
+    s = AgentScheduler()
+    agent = FakeAgent()
+    # Hourly job: fires once immediately, then nothing for an hour — so without
+    # stop() the loop would idle far past the test. stop() must end it promptly.
+    s.add_job(agent, "tick", every(seconds=3600), start_immediately=True)
+    task = asyncio.create_task(s.astart(poll_interval=0.02))
+    await asyncio.sleep(0.1)  # let it fire once and enter the poll/sleep loop
+    s.stop()
+    results = await asyncio.wait_for(task, timeout=5.0)
+    assert len(results) >= 1  # fired at least the immediate run before stop()
+    assert agent.calls == ["tick"]
 
 
 def test_real_agent_result_records_text_not_repr():

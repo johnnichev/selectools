@@ -102,4 +102,4 @@ class TestCloneForIsolationDeprecatedAlias:
 
     def test_alias_marked_deprecated(self) -> None:
         assert getattr(Agent._clone_for_isolation, "__stability__", None) == "deprecated"
-        assert getattr(Agent._clone_for_isolation, "__deprecated_since__", None) == "1.0.0"
+        assert getattr(Agent._clone_for_isolation, "__deprecated_since__", None) == "0.25.0"

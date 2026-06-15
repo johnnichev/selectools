@@ -4,71 +4,18 @@ from __future__ import annotations
 
 import csv
 import io
-import ipaddress
 import json
 import logging
 import re
-import socket
 import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
-from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
+from .._ssrf import check_url as _validate_url
 from ..stability import beta
 from .vector_store import Document
-
-# Private IP networks that must be blocked to prevent SSRF
-_BLOCKED_NETWORKS = [
-    ipaddress.ip_network("127.0.0.0/8"),
-    ipaddress.ip_network("10.0.0.0/8"),
-    ipaddress.ip_network("172.16.0.0/12"),
-    ipaddress.ip_network("192.168.0.0/16"),
-    ipaddress.ip_network("169.254.0.0/16"),
-    ipaddress.ip_network("::1/128"),
-    ipaddress.ip_network("fc00::/7"),
-    ipaddress.ip_network("fe80::/10"),
-]
-
-
-def _validate_url(url: str) -> None:
-    """Validate a URL to prevent SSRF attacks.
-
-    Raises ValueError if the URL uses a non-HTTP scheme, targets localhost,
-    or resolves to a private/reserved IP range.
-    """
-    parsed = urlparse(url)
-
-    # Only allow http and https schemes
-    if parsed.scheme not in ("http", "https"):
-        raise ValueError(
-            f"URL scheme {parsed.scheme!r} is not allowed. Only http:// and https:// are permitted."
-        )
-
-    hostname = parsed.hostname
-    if not hostname:
-        raise ValueError("URL has no hostname.")
-
-    # Block well-known loopback/internal hostnames
-    lower_host = hostname.lower()
-    if lower_host in ("localhost", "0.0.0.0"):
-        raise ValueError(f"Requests to {hostname!r} are blocked (loopback/internal address).")
-
-    # Resolve hostname and check against blocked networks
-    try:
-        addr_infos = socket.getaddrinfo(hostname, None)
-    except socket.gaierror as e:
-        raise ValueError(f"Could not resolve hostname {hostname!r}: {e}") from e
-
-    for _family, _type, _proto, _canonname, sockaddr in addr_infos:
-        ip = ipaddress.ip_address(sockaddr[0])
-        for network in _BLOCKED_NETWORKS:
-            if ip in network:
-                raise ValueError(
-                    f"URL resolves to private/reserved address {ip} "
-                    f"(network {network}). Requests to internal networks are blocked."
-                )
 
 
 @beta

@@ -143,7 +143,8 @@ class InMemoryVectorStore(VectorStore):
             query_embedding: Query embedding vector
             top_k: Number of results to return
             filter: Optional metadata filter
-            dedup: If True, drop duplicate-text results (keeps first).
+            dedup: If True, drop results with a duplicate ``(text, source)``
+                pair (keeps the first, highest-scoring occurrence).
 
         Returns:
             List of SearchResult objects, sorted by similarity
@@ -178,9 +179,8 @@ class InMemoryVectorStore(VectorStore):
             top_indices = np.argpartition(similarities, -fetch_k)[-fetch_k:]
             top_indices = top_indices[np.argsort(similarities[top_indices])][::-1]
 
-        # Build results with optional filtering and dedup.
+        # Build results with optional filtering.
         results: List[SearchResult] = []
-        seen_texts: set = set()
         for idx in top_indices:
             doc = documents_snapshot[idx]
 
@@ -188,18 +188,17 @@ class InMemoryVectorStore(VectorStore):
             if filter and not self._matches_filter(doc, filter):
                 continue
 
-            # Apply text dedup if requested (keeps highest-scoring occurrence).
-            if dedup:
-                if doc.text in seen_texts:
-                    continue
-                seen_texts.add(doc.text)
-
             results.append(SearchResult(document=doc, score=float(similarities[idx])))
 
-            # Stop if we have enough results after filtering/dedup
-            if len(results) >= top_k:
+            # Without dedup we can stop as soon as we have top_k. With dedup we
+            # keep all over-fetched candidates and dedup below before truncating.
+            if not dedup and len(results) >= top_k:
                 break
 
+        # Dedup on (text, source) via the shared helper, consistent with every
+        # other vector store backend (keeps the highest-scoring occurrence).
+        if dedup:
+            results = _dedup_search_results(results)
         return results[:top_k]
 
     def delete(self, ids: List[str]) -> None:
