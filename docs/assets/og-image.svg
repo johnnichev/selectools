@@ -43,6 +43,11 @@
   <text x="138" y="270" font-family="'Plus Jakarta Sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
         font-weight="800" font-size="60" fill="#ffffff" letter-spacing="-1.5">selectools</text>
 
+  <!-- v1.0 stable badge -->
+  <rect x="510" y="237" width="152" height="40" rx="20" fill="none" stroke="#22d3ee" stroke-width="2"/>
+  <text x="586" y="263" text-anchor="middle" font-family="'Plus Jakarta Sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+        font-weight="700" font-size="19" fill="#22d3ee">v1.0 &#183; STABLE</text>
+
   <!-- Tagline -->
   <text x="80" y="318" font-family="'Plus Jakarta Sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
         font-weight="400" font-size="28" fill="#94a3b8">AI agents that are just Python.</text>
@@ -63,7 +68,7 @@
 
   <!-- Stats bar -->
   <text x="80" y="480" font-family="'JetBrains Mono', 'Fira Code', 'Consolas', monospace" font-size="16" letter-spacing="0.5">
-    <tspan fill="#22d3ee">115 Models</tspan><tspan fill="#334155" dx="6">&middot;</tspan><tspan fill="#22d3ee" dx="6">7796 Tests</tspan><tspan fill="#334155" dx="6">&middot;</tspan><tspan fill="#22d3ee" dx="6">50 Evaluators</tspan><tspan fill="#334155" dx="6">&middot;</tspan><tspan fill="#22d3ee" dx="6">9 Providers</tspan>
+    <tspan fill="#22d3ee">115 Models</tspan><tspan fill="#334155" dx="6">&#183;</tspan><tspan fill="#22d3ee" dx="6">7796 Tests</tspan><tspan fill="#334155" dx="6">&#183;</tspan><tspan fill="#22d3ee" dx="6">50 Evaluators</tspan><tspan fill="#334155" dx="6">&#183;</tspan><tspan fill="#22d3ee" dx="6">9 Providers</tspan>
   </text>
 
   <!-- Attribution -->

@@ -16,6 +16,8 @@ An open-source project from **[NichevLabs](https://nichevlabs.com)**.
 
 **Multi-agent orchestration in plain Python.** Build agent graphs, compose pipelines with `|`, deploy with one command. No DSL, no compile step, no paid debugger. Works with OpenAI, Anthropic, Gemini, and Ollama.
 
+> 🎉 **selectools is 1.0 — stable.** The public API is frozen; `@stable` symbols carry a 2-minor compatibility promise. Python 3.10+. See [What's New in v1.0](#whats-new-in-v10).
+
 ### 3 Ways to Build
 
 ```python
