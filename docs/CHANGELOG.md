@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-06-15 — Hardening Sweep: Shell Safety, Session Namespaces & Typed Public API
+
+A full audit-driven tech-debt sweep. Hardens the shell tool and SSRF surface,
+fixes session-namespace correctness across all backends, tightens the public
+API types, and reconciles packaging/docs. Mostly additive and bugfix; one
+behavior change (`execute_shell`) is called out below.
+
 ### Security
 
 - **`execute_shell` no longer uses a shell.** The tool now parses the command
@@ -56,6 +63,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Silent-failure paths now log (MCP connect, supervisor planner, production eval
   worker, compression fallback); the streaming sync-fallback closes its generator;
   several `serve` file reads use `with` to avoid descriptor leaks.
+
+### Stats
+
+- 7,796 tests, 115 examples, 115 models, 56 toolbox tools, 6 session backends,
+  7 vector stores, 50 evaluators. Full suite green on Python 3.9–3.13; mypy clean
+  (180 files); ruff + bandit clean.
 
 ## [0.27.2] - 2026-06-14 — Provider Model Fix & Tool-less Agents
 

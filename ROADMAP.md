@@ -493,13 +493,13 @@ Individual stores/loaders remain installable a la carte: `pip install selectools
 | Memory tiering / auto-promotion (`UnifiedMemory`, standalone) | v0.24.0 (#78) | `unified_memory.py` |
 | Agent-level HITL / approval | v0.25.0 (#88) | `ToolConfig.require_approval` + `approval_handler` |
 | Planning-as-config | v0.25.0 (#86) | `AgentConfig.planning` (`PlanningConfig`) |
-| Agentic memory — `recall` tool | Unreleased (#109) | `toolbox/memory_tools.py` `make_recall_tool` (auto-injected with `remember`) |
-| UnifiedMemory AgentConfig wiring | Unreleased (#111) | `MemoryConfig(unified=True, ...)`, `agent/core.py` |
-| Toolbox: Discord, S3, browser, image-gen (48 → 56 tools) | Unreleased (#110) | `toolbox/{discord,s3,browser,image}_tools.py` |
-| Cache-rate cost support (OpenAI + Gemini) | Unreleased (#112) | `pricing.calculate_cost_with_cached_input`, `cached_prompt_cost` |
-| Cron / scheduled agents | Unreleased (#113) | `scheduler.py` (`AgentScheduler`, `cron`, `every`) |
-| Reasoning-as-tool | Unreleased (#114) | `toolbox/reasoning_tools.py` (`make_reasoning_tools`, `ReasoningTools`) |
-| Episodic memory retention config | Unreleased (#111) | Delivered with the UnifiedMemory wiring — `MemoryConfig.episodic_retention_days` flows through and `add_turn` auto-prunes (tested: `test_retention_pruning`) |
+| Agentic memory — `recall` tool | v0.27.0 (#109) | `toolbox/memory_tools.py` `make_recall_tool` (auto-injected with `remember`) |
+| UnifiedMemory AgentConfig wiring | v0.27.0 (#111) | `MemoryConfig(unified=True, ...)`, `agent/core.py` |
+| Toolbox: Discord, S3, browser, image-gen (48 → 56 tools) | v0.27.0 (#110) | `toolbox/{discord,s3,browser,image}_tools.py` |
+| Cache-rate cost support (OpenAI + Gemini) | v0.27.0 (#112) | `pricing.calculate_cost_with_cached_input`, `cached_prompt_cost` |
+| Cron / scheduled agents | v0.27.0 (#113) | `scheduler.py` (`AgentScheduler`, `cron`, `every`) |
+| Reasoning-as-tool | v0.27.0 (#114) | `toolbox/reasoning_tools.py` (`make_reasoning_tools`, `ReasoningTools`) |
+| Episodic memory retention config | v0.27.0 (#111) | Delivered with the UnifiedMemory wiring — `MemoryConfig.episodic_retention_days` flows through and `add_turn` auto-prunes (tested: `test_retention_pruning`) |
 
 Shipped 2026-06-13: the four v1.1 candidates (#109-#112) plus the top two
 Future/Watch items (cron #113, reasoning tools #114), folded into the v1.0

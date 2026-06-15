@@ -1,31 +1,31 @@
 # Session Handoff
 
-## What I Was Doing (2026-06-13)
+## What I Was Doing (2026-06-15)
 
-Merged a large feature wave to `main` and continued the post-1.0 roadmap.
-Cut the **v0.27.0 — Scheduling, Reasoning & New Backends** feature release,
-shipping the post-1.0 backlog work merged this session. All additive (`@beta`),
-no breaking changes (minor bump). Folded into the v1.0 train (John's call to
-integrate now rather than hold to a post-tag minor — v1.0 is now materially
-larger than the originally-baked v0.24-0.26 surface). Bake clock still ~mid-July.
+Ran a full-codebase audit (6 parallel review agents, every P0 hand-verified),
+then executed a **zero-tech-debt sweep** — every P1/P2/P3 item fixed or verified
+as deliberate design — merged as PR #127. Then cut the **v0.28.0 — Hardening
+Sweep** release (this handoff). Folded into the v1.0 train; bake clock still
+~mid-July.
 
 ## Current State
 
-- **Version:** `0.27.2` in `src/selectools/__init__.py` and `pyproject.toml`
-  (bug-hunt patch over 0.27.0 — 10 fixes, no API changes). CHANGELOG
-  `## [0.27.1] - 2026-06-13 — Bug-Hunt Patch` synced to
-  `docs/CHANGELOG.md`. Release = push tag `v0.27.1` (CI `publish-pypi` job
+- **Version:** `0.28.0` in `src/selectools/__init__.py` and `pyproject.toml`.
+  CHANGELOG `## [0.28.0] - 2026-06-15 — Hardening Sweep` synced to
+  `docs/CHANGELOG.md`. Release = push tag `v0.28.0` (CI `publish-pypi` job
   fires on `refs/tags/v*`).
-- **Suite:** ~7,728 tests collected; full non-e2e run 7,492 passed / 0
-  failed. 115 examples, 115 source-verified models.
-- **Quality gate:** ruff format + check clean, **mypy fully clean (0 errors —
-  the 5 long-standing baseline errors were fixed in the tech-debt sweep)**,
-  bandit clean. Architecture
-  stability gate green (every new module registered).
-- **Docs:** README (What's Included + capability table), ARCHITECTURE,
-  QUICKSTART, SESSIONS, GUARDRAILS, BENCHMARKS/SCHEDULER/REASONING_TOOLS
-  pages, mkdocs nav, landing/index.html, llms.txt/llms-full.txt, ROADMAP,
-  and CHANGELOG all reconciled to the new surface (this sweep).
+- **Suite:** 7,796 tests collected; full non-e2e run 7,637 passed / 0 failed.
+  115 examples, 115 source-verified models.
+- **Quality gate:** ruff format + check clean, **mypy fully clean (0 errors,
+  180 files)**, bandit clean. Architecture stability gate green.
+- **0.28.0 themes:** `execute_shell` shell=False (behavior change), SSRF guard
+  on browser/webhook (consolidated `_ssrf.py`), session `branch()` namespace +
+  consistent round-trippable `list()` keys across all backends, public-API type
+  tightening (`AgentResult`/`AgentConfig` off `Any`), embedding timeout/retry,
+  new `[cache]` extra, doc/count reconciliation.
+- **Docs:** README (What's New v0.28 + badges/counts), ARCHITECTURE, COMPATIBILITY,
+  QUICKSTART, EVALS, index, CONTRIBUTING, landing/index.html, og assets,
+  llms.txt, and CHANGELOG all reconciled this release.
 
 ## Merged to main since v0.26.0 (2026-06-13, all `[Unreleased]`)
 
