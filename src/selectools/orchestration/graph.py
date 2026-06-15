@@ -41,7 +41,7 @@ from ..exceptions import GraphExecutionError
 from ..stability import beta, stable
 from ..trace import AgentTrace, StepType, TraceStep
 from ..types import AgentResult, Message, Role
-from ..usage import UsageStats
+from ..usage import AgentUsage, UsageStats
 from .node import (
     GraphNode,
     ParallelGroupNode,
@@ -126,7 +126,7 @@ def _make_synthetic_result(state: GraphState) -> AgentResult:
     return AgentResult(
         message=Message(role=Role.ASSISTANT, content=content),
         iterations=1,
-        usage=UsageStats(),
+        usage=AgentUsage(),
     )
 
 
@@ -145,8 +145,6 @@ def _state_hash(state: GraphState) -> str:
 
 def _to_usage_stats(obj: Any) -> UsageStats:
     """Normalise UsageStats or AgentUsage to a UsageStats value."""
-    from ..usage import AgentUsage
-
     if isinstance(obj, AgentUsage):
         return UsageStats(
             prompt_tokens=obj.total_prompt_tokens,

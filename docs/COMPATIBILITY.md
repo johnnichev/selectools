@@ -1,7 +1,7 @@
 # Compatibility Matrix
 
 **Added in:** v0.19.2
-**Updated:** v0.25.0
+**Updated:** v0.27.2
 
 This page documents the tested combinations of Python versions, provider SDKs, and optional
 dependencies. All combinations in the CI matrix are validated on every commit.
@@ -52,7 +52,7 @@ These are always installed with `pip install selectools`.
 
 ## Optional Dependencies
 
-Install extras as needed: `pip install "selectools[rag,evals,mcp,litellm,postgres,supabase,toolbox,observe,serve]"`
+Install extras as needed: `pip install "selectools[rag,evals,mcp,litellm,postgres,supabase,toolbox,observe,serve,aws,browser,mongo,cache]"`
 
 ### `[rag]` — Vector stores, embeddings, and loaders
 
@@ -72,6 +72,13 @@ Install extras as needed: `pip install "selectools[rag,evals,mcp,litellm,postgre
 | Package | Required version | What it enables |
 |---------|-----------------|-----------------|
 | `pyyaml` | `>=6.0.0` | YAML dataset loading in EvalSuite |
+| `jsonschema` | `>=4.0.0` | Full JSON Schema validation (graceful fallback to a minimal validator if absent) |
+
+### `[cache]` — Redis cache and session/knowledge backends
+
+| Package | Required version | What it enables |
+|---------|-----------------|-----------------|
+| `redis` | `>=4.0.0` | RedisCache, RedisSessionStore, Redis knowledge/pending backends |
 
 ### `[mcp]` — Model Context Protocol
 
@@ -104,6 +111,7 @@ Install extras as needed: `pip install "selectools[rag,evals,mcp,litellm,postgre
 | `requests` | `>=2.28.0` | HTTP tools (web requests) |
 | `slack-sdk` | `>=3.27.0` | Slack tools (send/read/search messages) |
 | `pdfplumber` | `>=0.11.0` | PDF extraction tools |
+| `pytz` | `>=2023.3` | Timezone support in datetime tools |
 
 ### `[observe]` — Observability integrations
 
@@ -117,9 +125,27 @@ Install extras as needed: `pip install "selectools[rag,evals,mcp,litellm,postgre
 | Package | Required version | What it enables |
 |---------|-----------------|-----------------|
 | `pyyaml` | `>=6.0.0` | YAML agent config (`selectools serve agent.yaml`) |
-| `starlette` | `>=0.27.0` | AgentAPI / A2AServer ASGI apps |
+| `starlette` | `>=0.27.0, <1.0` | AgentAPI / A2AServer ASGI apps |
 | `uvicorn[standard]` | `>=0.24.0` | Built-in ASGI server for `selectools serve` |
 | `httpx` | `>=0.24.0` | A2AClient and HTTP transport |
+
+### `[aws]` — Amazon DynamoDB / S3
+
+| Package | Required version | What it enables |
+|---------|-----------------|-----------------|
+| `boto3` | `>=1.34.0` | DynamoDBSessionStore, S3 tools |
+
+### `[browser]` — Headless-browser tools
+
+| Package | Required version | What it enables |
+|---------|-----------------|-----------------|
+| `playwright` | `>=1.40.0` | browser_scrape_page, browser_screenshot (run `playwright install chromium`) |
+
+### `[mongo]` — MongoDB sessions
+
+| Package | Required version | What it enables |
+|---------|-----------------|-----------------|
+| `pymongo` | `>=4.0.0` | MongoSessionStore |
 
 ---
 
@@ -159,8 +185,10 @@ Seven vector store backends:
 |---------|------|----------|
 | `JsonFileSessionStore` | sessions | core (stdlib) |
 | `SQLiteSessionStore` | sessions | core (stdlib) |
-| `RedisSessionStore` | sessions | `redis>=4.0.0` (not a declared extra — install manually) |
+| `RedisSessionStore` | sessions | `[cache]` (`redis>=4.0.0`) |
 | `SupabaseSessionStore` | sessions | `[supabase]` |
+| `MongoSessionStore` | sessions | `[mongo]` (`pymongo>=4.0.0`) |
+| `DynamoDBSessionStore` | sessions | `[aws]` (`boto3>=1.34.0`) |
 | `InMemoryCheckpointStore` | checkpoints | core |
 | `FileCheckpointStore` | checkpoints | core (stdlib) |
 | `SQLiteCheckpointStore` | checkpoints | core (stdlib) |
@@ -231,7 +259,7 @@ support matrix.
 
 | Backend | Package | Min version | Notes |
 |---------|---------|------------|-------|
-| Redis (cache/sessions/knowledge) | `redis` | `>=4.0.0` | Not a declared extra — install manually |
+| Redis (cache/sessions/knowledge) | `redis` | `>=4.0.0` | Declared extra: `selectools[cache]` |
 | Supabase (sessions/knowledge) | `supabase` | `>=2.0.0` | Declared extra: `selectools[supabase]` |
 | PostgreSQL (checkpoints/pgvector) | `psycopg2-binary` | `>=2.9.0` | Declared extra: `selectools[postgres]` |
 | SQLite (sessions/checkpoints/vectors) | stdlib | — | Always available |

@@ -153,9 +153,10 @@ class VectorStore(ABC):
             query_embedding: Query embedding vector
             top_k: Number of results to return
             filter: Optional metadata filter (e.g., {"source": "manual.pdf"})
-            dedup: If True, post-filter results so each unique document text
-                appears at most once (keeps the first — highest-scoring —
-                occurrence). Default False for backward compatibility.
+            dedup: If True, post-filter results so each unique
+                ``(text, source)`` pair appears at most once (keeps the first —
+                highest-scoring — occurrence). Default False for backward
+                compatibility.
 
         Returns:
             List of SearchResult objects, sorted by similarity (highest first)
@@ -237,10 +238,11 @@ class VectorStore(ABC):
 
 __stability__ = "beta"
 
+# NOTE: ``_dedup_search_results`` and ``_validate_filter`` are intentionally
+# omitted — they are private helpers shared across the rag package via explicit
+# imports, not part of the public ``import *`` surface.
 __all__ = [
     "Document",
     "SearchResult",
     "VectorStore",
-    "_dedup_search_results",
-    "_validate_filter",
 ]

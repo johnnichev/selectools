@@ -158,23 +158,25 @@ class TestOpenAIEmbeddingProvider:
             with pytest.raises(Exception, match="Invalid API key"):
                 provider.embed_text("Test")
 
-    @pytest.mark.skip(reason="Retry logic not yet implemented in OpenAI provider")
-    def test_retry_on_rate_limit(self) -> None:
-        """Test retry logic on rate limit errors."""
+    def test_timeout_and_retries_wired_to_client(self) -> None:
+        """timeout + max_retries are passed to the OpenAI SDK client.
+
+        Retry/backoff on 429/5xx is delegated to the SDK's built-in
+        ``max_retries`` mechanism rather than reimplemented here.
+        """
         with patch("openai.OpenAI") as MockClient:
-            mock_client = MockClient.return_value
-            # First call fails, second succeeds
-            mock_response = Mock()
-            mock_response.data = [Mock(embedding=[0.1] * 1536)]
-            mock_response.usage = Mock(prompt_tokens=10)
+            OpenAIEmbeddingProvider(timeout=12.5, max_retries=5)
+            _, kwargs = MockClient.call_args
+            assert kwargs["timeout"] == 12.5
+            assert kwargs["max_retries"] == 5
 
-            mock_client.embeddings.create.side_effect = [Exception("Rate limit"), mock_response]
-
-            provider = OpenAIEmbeddingProvider()
-
-            # Should retry and succeed
-            embedding = provider.embed_text("Test")
-            assert len(embedding) == 1536
+    def test_default_timeout_and_retries(self) -> None:
+        """Sane defaults are applied so a hung call cannot block forever."""
+        with patch("openai.OpenAI") as MockClient:
+            OpenAIEmbeddingProvider()
+            _, kwargs = MockClient.call_args
+            assert kwargs["timeout"] == 60.0
+            assert kwargs["max_retries"] == 2
 
 
 # ============================================================================

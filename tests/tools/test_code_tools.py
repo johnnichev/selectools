@@ -180,9 +180,48 @@ class TestExecuteShell:
         assert "300" in result
 
     @patch("selectools.toolbox.code_tools.subprocess.run")
-    def test_shell_true_is_used(self, mock_run: MagicMock) -> None:
-        """Command is executed with shell=True."""
+    def test_runs_without_a_shell(self, mock_run: MagicMock) -> None:
+        """Command is executed with shell=False and a parsed argv list."""
         mock_run.return_value = MagicMock(stdout="ok", stderr="", returncode=0)
         code_tools.execute_shell.function("echo ok")
-        _, kwargs = mock_run.call_args
-        assert kwargs.get("shell") is True
+        args, kwargs = mock_run.call_args
+        assert kwargs.get("shell") is False
+        # First positional arg is the shlex-parsed argv list, not a raw string.
+        assert args[0] == ["echo", "ok"]
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            "echo hi; rm -rf x",  # chaining
+            "echo hi | cat",  # pipe
+            "echo hi && echo bye",  # AND-chaining
+            "echo hi & echo bye",  # backgrounding (bare &)
+            "echo $(whoami)",  # subshell
+            "echo `whoami`",  # backtick subshell
+            "echo hi > /tmp/x",  # redirect
+            "echo hi\nrm -rf x",  # newline injection
+            "echo hi\rrm -rf x",  # carriage-return injection
+        ],
+    )
+    @patch("selectools.toolbox.code_tools.subprocess.run")
+    def test_metacharacters_rejected_before_execution(
+        self, mock_run: MagicMock, payload: str
+    ) -> None:
+        """Every shell metacharacter is rejected without invoking subprocess."""
+        result = code_tools.execute_shell.function(payload)
+        assert result.lower().startswith("error")
+        assert "blocked shell metacharacter" in result
+        mock_run.assert_not_called()
+
+    def test_unbalanced_quotes_reported(self) -> None:
+        """A command that shlex cannot parse returns a clear error."""
+        result = code_tools.execute_shell.function('echo "unterminated')
+        assert "could not parse" in result.lower()
+
+    @patch("selectools.toolbox.code_tools.subprocess.run")
+    def test_arguments_are_not_glob_expanded(self, mock_run: MagicMock) -> None:
+        """Globs pass through literally (no shell), proving shell=False semantics."""
+        mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
+        code_tools.execute_shell.function("ls *.py")
+        args, _ = mock_run.call_args
+        assert args[0] == ["ls", "*.py"]

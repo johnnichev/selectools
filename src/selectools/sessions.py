@@ -38,7 +38,10 @@ class SessionMetadata:
     """Lightweight summary of a stored session.
 
     Attributes:
-        session_id: Unique identifier for the session.
+        session_id: The session's full storage key — the bare session_id for
+            un-namespaced sessions, or ``"{namespace}:{session_id}"`` for
+            namespaced ones. Pass it straight back to ``load(session_id)`` (no
+            ``namespace`` argument) to reload the session.
         message_count: Number of messages in the session.
         created_at: Unix timestamp when the session was first saved.
         updated_at: Unix timestamp of the most recent save.
@@ -155,7 +158,14 @@ class SessionStore(Protocol):
         ...
 
     def list(self) -> List[SessionMetadata]:
-        """Return metadata for every stored session."""
+        """Return metadata for every stored session, across all namespaces.
+
+        Each :class:`SessionMetadata` ``session_id`` is the full storage key:
+        the bare session_id for un-namespaced sessions, or
+        ``"{namespace}:{session_id}"`` for namespaced ones. Pass it straight
+        back to ``load(session_id)`` (with no ``namespace`` argument) to reload
+        the session — the returned id round-trips on every backend.
+        """
         ...
 
     def delete(self, session_id: str, namespace: Optional[str] = None) -> bool:
@@ -166,11 +176,19 @@ class SessionStore(Protocol):
         """Check whether a session exists."""
         ...
 
-    def branch(self, source_id: str, new_id: str) -> None:
+    def branch(self, source_id: str, new_id: str, namespace: Optional[str] = None) -> None:
         """Copy session *source_id* to *new_id*.
 
         The two sessions are completely independent after branching — modifying
         one does not affect the other.
+
+        Args:
+            source_id: Session to copy from.
+            new_id: Session to copy to.
+            namespace: Namespace that both *source_id* and *new_id* live under.
+                ``None`` (the default) branches un-namespaced sessions. To
+                branch a namespaced session, pass its namespace (the bare ids,
+                not the ``"{namespace}:{id}"`` storage key).
 
         Raises:
             ValueError: If *source_id* does not exist.
@@ -334,7 +352,7 @@ class JsonFileSessionStore:
                     continue
                 results.append(
                     SessionMetadata(
-                        session_id=data["session_id"],
+                        session_id=_make_key(data["session_id"], data.get("namespace")),
                         message_count=data["memory"].get("message_count", 0),
                         created_at=data["created_at"],
                         updated_at=data["updated_at"],
@@ -362,12 +380,12 @@ class JsonFileSessionStore:
                 return False
         return not self._is_expired(data)
 
-    def branch(self, source_id: str, new_id: str) -> None:
-        """Copy session *source_id* to a new session *new_id*."""
-        memory = self.load(source_id)
+    def branch(self, source_id: str, new_id: str, namespace: Optional[str] = None) -> None:
+        """Copy session *source_id* to a new session *new_id* (within *namespace*)."""
+        memory = self.load(source_id, namespace=namespace)
         if memory is None:
             raise ValueError(f"Session {source_id!r} not found")
-        self.save(new_id, memory)
+        self.save(new_id, memory, namespace=namespace)
 
     @beta
     def search(
@@ -629,12 +647,12 @@ class SQLiteSessionStore:
             return False
         return not self._is_expired_ts(row[0])
 
-    def branch(self, source_id: str, new_id: str) -> None:
-        """Copy session *source_id* to a new session *new_id*."""
-        memory = self.load(source_id)
+    def branch(self, source_id: str, new_id: str, namespace: Optional[str] = None) -> None:
+        """Copy session *source_id* to a new session *new_id* (within *namespace*)."""
+        memory = self.load(source_id, namespace=namespace)
         if memory is None:
             raise ValueError(f"Session {source_id!r} not found")
-        self.save(new_id, memory)
+        self.save(new_id, memory, namespace=namespace)
 
     @beta
     def search(
@@ -926,22 +944,25 @@ class RedisSessionStore:
         while True:
             cursor, keys = self._client.scan(cursor=cursor, match=pattern, count=100)
             for meta_key in keys:
+                # Dedup on the (unique) meta_key to absorb SCAN duplicates. Do
+                # NOT dedup on the bare session_id: two sessions can share a
+                # bare id across different namespaces.
+                if meta_key in seen_ids:
+                    continue
+                seen_ids.add(meta_key)
                 raw = self._client.get(meta_key)
                 if raw is None:
                     continue
                 try:
                     meta = json.loads(raw)
                     # Guard against non-metadata JSON (e.g. data key accidentally
-                    # matched when session_id ends with ":meta") and SCAN duplicates.
-                    session_id = meta["session_id"]
+                    # matched when session_id ends with ":meta").
+                    bare_id = meta["session_id"]
                 except (json.JSONDecodeError, TypeError, KeyError):
                     continue
-                if session_id in seen_ids:
-                    continue
-                seen_ids.add(session_id)
                 results.append(
                     SessionMetadata(
-                        session_id=session_id,
+                        session_id=_make_key(bare_id, meta.get("namespace")),
                         message_count=meta.get("message_count", 0),
                         created_at=meta.get("created_at", 0),
                         updated_at=meta.get("updated_at", 0),
@@ -960,12 +981,12 @@ class RedisSessionStore:
     def exists(self, session_id: str, namespace: Optional[str] = None) -> bool:
         return bool(self._client.exists(self._key(session_id, namespace)))
 
-    def branch(self, source_id: str, new_id: str) -> None:
-        """Copy session *source_id* to a new session *new_id*."""
-        memory = self.load(source_id)
+    def branch(self, source_id: str, new_id: str, namespace: Optional[str] = None) -> None:
+        """Copy session *source_id* to a new session *new_id* (within *namespace*)."""
+        memory = self.load(source_id, namespace=namespace)
         if memory is None:
             raise ValueError(f"Session {source_id!r} not found")
-        self.save(new_id, memory)
+        self.save(new_id, memory, namespace=namespace)
 
     @beta
     def search(
@@ -1212,12 +1233,12 @@ class SupabaseSessionStore:
         )
         return bool(response.data)
 
-    def branch(self, source_id: str, new_id: str) -> None:
-        """Copy session *source_id* to a new session *new_id*."""
-        memory = self.load(source_id)
+    def branch(self, source_id: str, new_id: str, namespace: Optional[str] = None) -> None:
+        """Copy session *source_id* to a new session *new_id* (within *namespace*)."""
+        memory = self.load(source_id, namespace=namespace)
         if memory is None:
             raise ValueError(f"Session {source_id!r} not found")
-        self.save(new_id, memory)
+        self.save(new_id, memory, namespace=namespace)
 
     @beta
     def search(
@@ -1413,7 +1434,9 @@ class MongoSessionStore:
         for doc in self._collection.find({}):
             results.append(
                 SessionMetadata(
-                    session_id=doc.get("session_id", doc.get("_id", "")),
+                    # ``_id`` is the full storage key (composite when namespaced).
+                    session_id=doc.get("_id")
+                    or _make_key(doc.get("session_id", ""), doc.get("namespace")),
                     message_count=int(doc.get("message_count") or 0),
                     created_at=float(doc.get("created_at") or 0),
                     updated_at=float(doc.get("updated_at") or 0),
@@ -1429,11 +1452,12 @@ class MongoSessionStore:
         key = self._key(session_id, namespace)
         return int(self._collection.count_documents({"_id": key}, limit=1)) > 0
 
-    def branch(self, source_id: str, new_id: str) -> None:
-        memory = self.load(source_id)
+    def branch(self, source_id: str, new_id: str, namespace: Optional[str] = None) -> None:
+        """Copy session *source_id* to a new session *new_id* (within *namespace*)."""
+        memory = self.load(source_id, namespace=namespace)
         if memory is None:
             raise ValueError(f"Session {source_id!r} not found")
-        self.save(new_id, memory)
+        self.save(new_id, memory, namespace=namespace)
 
     @beta
     def search(
@@ -1595,7 +1619,8 @@ class DynamoDBSessionStore:
         for item in self._scan_all():
             results.append(
                 SessionMetadata(
-                    session_id=item.get("session_id", item.get("session_key", "")),
+                    # ``session_key`` is the full storage key (composite when namespaced).
+                    session_id=item.get("session_key", ""),
                     message_count=int(item.get("message_count") or 0),
                     created_at=float(item.get("created_at") or 0),
                     updated_at=float(item.get("updated_at") or 0),
@@ -1617,11 +1642,12 @@ class DynamoDBSessionStore:
         )
         return "Item" in response and bool(response["Item"])
 
-    def branch(self, source_id: str, new_id: str) -> None:
-        memory = self.load(source_id)
+    def branch(self, source_id: str, new_id: str, namespace: Optional[str] = None) -> None:
+        """Copy session *source_id* to a new session *new_id* (within *namespace*)."""
+        memory = self.load(source_id, namespace=namespace)
         if memory is None:
             raise ValueError(f"Session {source_id!r} not found")
-        self.save(new_id, memory)
+        self.save(new_id, memory, namespace=namespace)
 
     def _scan_all(self) -> List[Dict[str, Any]]:
         """Page through a full table scan (no GSI assumed)."""

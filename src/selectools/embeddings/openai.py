@@ -36,6 +36,8 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         model: str = "text-embedding-3-small",
         api_key: Optional[str] = None,
         dimensions: Optional[int] = None,
+        timeout: float = 60.0,
+        max_retries: int = 2,
     ):
         """
         Initialize OpenAI embedding provider.
@@ -44,6 +46,11 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
             model: Model name (default: text-embedding-3-small)
             api_key: OpenAI API key (defaults to OPENAI_API_KEY env var)
             dimensions: Optional dimensions for truncation (only for v3 models)
+            timeout: Per-request timeout in seconds (default: 60). Prevents a
+                hung embeddings call from blocking ingestion indefinitely.
+            max_retries: Number of automatic retries on transient errors
+                (429/5xx) with exponential backoff, handled by the OpenAI SDK
+                (default: 2).
         """
         try:
             from openai import OpenAI
@@ -52,7 +59,7 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
                 "OpenAI package required for OpenAI embeddings. Install with: pip install openai"
             ) from e
 
-        self.client = OpenAI(api_key=api_key)
+        self.client = OpenAI(api_key=api_key, timeout=timeout, max_retries=max_retries)
         self.model = model
         self.dimensions = dimensions
         self._dimension = self._get_model_dimension()

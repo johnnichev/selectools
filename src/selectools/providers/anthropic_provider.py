@@ -199,7 +199,7 @@ class AnthropicProvider(Provider):
         if timeout is not None:
             request_args["timeout"] = timeout
         try:
-            response = self._client.messages.create(**request_args)  # type: ignore
+            response = self._client.messages.create(**request_args)  # type: ignore[call-overload]
         except Exception as exc:
             raise ProviderError(f"Anthropic completion failed: {exc}") from exc
 
@@ -285,7 +285,7 @@ class AnthropicProvider(Provider):
         if timeout is not None:
             request_args["timeout"] = timeout
         try:
-            stream = self._client.messages.create(**request_args)  # type: ignore
+            stream = self._client.messages.create(**request_args)  # type: ignore[call-overload]
         except Exception as exc:
             raise ProviderError(f"Anthropic streaming failed: {exc}") from exc
 
@@ -575,7 +575,7 @@ class AnthropicProvider(Provider):
         if timeout is not None:
             request_args["timeout"] = timeout
         try:
-            response = await self._async_client.messages.create(**request_args)  # type: ignore
+            response = await self._async_client.messages.create(**request_args)  # type: ignore[call-overload]
         except Exception as exc:
             raise ProviderError(f"Anthropic async completion failed: {exc}") from exc
 
@@ -661,7 +661,7 @@ class AnthropicProvider(Provider):
         if timeout is not None:
             request_args["timeout"] = timeout
         try:
-            stream = await self._async_client.messages.create(**request_args)  # type: ignore
+            stream = await self._async_client.messages.create(**request_args)  # type: ignore[call-overload]
         except Exception as exc:
             raise ProviderError(f"Anthropic async streaming failed: {exc}") from exc
 

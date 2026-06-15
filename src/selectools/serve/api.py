@@ -115,14 +115,16 @@ class _InMemorySessionStore:
 
     def list(self) -> List[SessionMetadata]:
         with self._lock:
+            # The dict key is the full storage key (composite when namespaced),
+            # so it round-trips straight back through load() with no namespace.
             return [
                 SessionMetadata(
-                    session_id=entry["session_id"],
+                    session_id=key,
                     message_count=entry["memory"].get("message_count", 0),
                     created_at=entry["created_at"],
                     updated_at=entry["updated_at"],
                 )
-                for entry in self._data.values()
+                for key, entry in self._data.items()
             ]
 
     def delete(self, session_id: str, namespace: Optional[str] = None) -> bool:
@@ -152,11 +154,11 @@ class _InMemorySessionStore:
             "use a persistent SessionStore backend (e.g. SQLiteSessionStore)."
         )
 
-    def branch(self, source_id: str, new_id: str) -> None:
-        memory = self.load(source_id)
+    def branch(self, source_id: str, new_id: str, namespace: Optional[str] = None) -> None:
+        memory = self.load(source_id, namespace=namespace)
         if memory is None:
             raise ValueError(f"Session {source_id!r} not found")
-        self.save(new_id, memory)
+        self.save(new_id, memory, namespace=namespace)
 
 
 # ─── Response helpers ─────────────────────────────────────────────────────────

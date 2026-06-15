@@ -6,7 +6,7 @@ import asyncio
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 # Module-level singleton for running sync provider calls in an async context.
 # Creating a new ThreadPoolExecutor per call (inside a retry loop) wastes
@@ -65,8 +65,15 @@ class _ProviderCallerMixin:
                 temperature=self.config.temperature,
             )
             cached = self.config.cache.get(cache_key)
-            if cached is not None:
-                cached_msg = cast(Message, cached[0])
+            # Only treat a well-formed (Message, usage) pair as a cache hit;
+            # anything else (key collision, schema drift) falls through to a
+            # real provider call instead of crashing on a bad cast.
+            if (
+                isinstance(cached, (tuple, list))
+                and len(cached) >= 2
+                and isinstance(cached[0], Message)
+            ):
+                cached_msg = cached[0]
                 cached_usage = cached[1]
                 self.usage.add_usage(cached_usage, tool_name=None)
                 if run_id:
@@ -273,8 +280,15 @@ class _ProviderCallerMixin:
                 temperature=self.config.temperature,
             )
             cached = self.config.cache.get(cache_key)
-            if cached is not None:
-                cached_msg = cast(Message, cached[0])
+            # Only treat a well-formed (Message, usage) pair as a cache hit;
+            # anything else (key collision, schema drift) falls through to a
+            # real provider call instead of crashing on a bad cast.
+            if (
+                isinstance(cached, (tuple, list))
+                and len(cached) >= 2
+                and isinstance(cached[0], Message)
+            ):
+                cached_msg = cached[0]
                 cached_usage = cached[1]
                 self.usage.add_usage(cached_usage, tool_name=None)
                 if run_id:
@@ -524,21 +538,29 @@ class _ProviderCallerMixin:
                     elif isinstance(chunk, ToolCall):
                         tool_calls.append(chunk)
         else:
-            for chunk in self.provider.stream(
-                model=self._effective_model,
-                system_prompt=self._system_prompt,
-                messages=self._history,
-                tools=self.tools,
-                temperature=self.config.temperature,
-                max_tokens=self.config.max_tokens,
-                timeout=self.config.request_timeout,
-            ):
-                if isinstance(chunk, str):
-                    if chunk:
-                        aggregated.append(chunk)
-                        if stream_handler:
-                            stream_handler(chunk)
-                elif isinstance(chunk, ToolCall):
-                    tool_calls.append(chunk)
+            # Sync-generator fallback: wrap in closing() so a stream_handler
+            # exception or caller disconnect deterministically closes the
+            # provider generator (the sync analog of the aclosing path above).
+            from contextlib import closing
+
+            with closing(
+                self.provider.stream(
+                    model=self._effective_model,
+                    system_prompt=self._system_prompt,
+                    messages=self._history,
+                    tools=self.tools,
+                    temperature=self.config.temperature,
+                    max_tokens=self.config.max_tokens,
+                    timeout=self.config.request_timeout,
+                )
+            ) as stream:
+                for chunk in stream:
+                    if isinstance(chunk, str):
+                        if chunk:
+                            aggregated.append(chunk)
+                            if stream_handler:
+                                stream_handler(chunk)
+                    elif isinstance(chunk, ToolCall):
+                        tool_calls.append(chunk)
 
         return "".join(aggregated), tool_calls

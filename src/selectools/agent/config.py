@@ -22,6 +22,18 @@ if TYPE_CHECKING:
     from ..providers.base import Provider
     from ..sessions import SessionStore
     from ..usage import AgentUsage
+    from .config_groups import (
+        BudgetConfig,
+        CoherenceConfig,
+        CompressConfig,
+        GuardrailsConfig,
+        MemoryConfig,
+        RetryConfig,
+        SessionConfig,
+        SummarizeConfig,
+        ToolConfig,
+        TraceConfig,
+    )
 
 ConfirmAction = Union[
     Callable[[str, Dict[str, Any], str], bool],
@@ -179,16 +191,17 @@ class AgentConfig:
 
     # -- Nested config groups (optional, for YAML / clean APIs) --
     # When provided, nested values take precedence over flat fields.
-    retry: Optional[Any] = None  # RetryConfig
-    tool: Optional[Any] = None  # ToolConfig
-    coherence: Optional[Any] = None  # CoherenceConfig (name collision with coherence_check)
-    guardrail: Optional[Any] = None  # GuardrailsConfig
-    session: Optional[Any] = None  # SessionConfig
-    summarize: Optional[Any] = None  # SummarizeConfig
-    memory: Optional[Any] = None  # MemoryConfig
-    budget: Optional[Any] = None  # BudgetConfig
-    trace: Optional[Any] = None  # TraceConfig
-    compress: Optional[Any] = None  # CompressConfig
+    # (CoherenceConfig's attribute name collides with the flat coherence_check.)
+    retry: Optional["RetryConfig"] = None
+    tool: Optional["ToolConfig"] = None
+    coherence: Optional["CoherenceConfig"] = None
+    guardrail: Optional["GuardrailsConfig"] = None
+    session: Optional["SessionConfig"] = None
+    summarize: Optional["SummarizeConfig"] = None
+    memory: Optional["MemoryConfig"] = None
+    budget: Optional["BudgetConfig"] = None
+    trace: Optional["TraceConfig"] = None
+    compress: Optional["CompressConfig"] = None
 
     # -- Planning-as-config (ROADMAP P2). See PlanningConfig below and
     # agent/_planning.py for the adapter. Self-contained: default None means

@@ -3455,7 +3455,12 @@ def _bug21_make_mock_embedder() -> MagicMock:
 
 
 def test_bug21_memory_store_search_dedup_opt_in() -> None:
-    """InMemoryVectorStore.search(dedup=True) should remove duplicate texts."""
+    """InMemoryVectorStore.search(dedup=True) dedups on (text, source).
+
+    Consistent with _dedup_search_results and every other backend (BUG-24):
+    identical text from *different* sources is preserved as distinct
+    citations; only a true duplicate (same text AND same source) collapses.
+    """
     from selectools.rag.stores.memory import InMemoryVectorStore
     from selectools.rag.vector_store import Document
 
@@ -3465,28 +3470,30 @@ def test_bug21_memory_store_search_dedup_opt_in() -> None:
     store.add_documents(
         [
             Document(text=same_text, metadata={"source": "a"}),
-            Document(text=same_text, metadata={"source": "b"}),
+            Document(text=same_text, metadata={"source": "a"}),  # true duplicate
+            Document(text=same_text, metadata={"source": "b"}),  # distinct source
             Document(text="different doc", metadata={"source": "c"}),
         ]
     )
 
     query_vec = embedder.embed_query(same_text)
 
-    # Without dedup: duplicates preserved (default behavior).
+    # Without dedup: every copy preserved (default behavior).
     results_no_dedup = store.search(query_vec, top_k=10)
     texts_no_dedup = [r.document.text for r in results_no_dedup]
-    assert texts_no_dedup.count(same_text) >= 2, (
-        f"Without dedup, expected 2+ copies of {same_text!r}; got: {texts_no_dedup}"
+    assert texts_no_dedup.count(same_text) >= 3, (
+        f"Without dedup, expected 3+ copies of {same_text!r}; got: {texts_no_dedup}"
     )
 
-    # With dedup=True: only the first occurrence of each text survives.
+    # With dedup=True: the (text, "a") true-duplicate collapses to one, but the
+    # distinct (text, "b") citation survives -> 2 copies of same_text remain.
     results_dedup = store.search(query_vec, top_k=10, dedup=True)
-    texts_dedup = [r.document.text for r in results_dedup]
-    assert texts_dedup.count(same_text) == 1, (
-        f"With dedup=True, expected 1 copy of {same_text!r}; got: {texts_dedup}"
-    )
+    pairs = [(r.document.text, r.document.metadata.get("source")) for r in results_dedup]
+    assert pairs.count((same_text, "a")) == 1
+    assert pairs.count((same_text, "b")) == 1
+    assert [p for p in pairs].count((same_text, "a")) + pairs.count((same_text, "b")) == 2
     # The "different doc" should still be present.
-    assert "different doc" in texts_dedup
+    assert "different doc" in [r.document.text for r in results_dedup]
 
 
 def test_bug21_dedup_default_is_false_backward_compat() -> None:

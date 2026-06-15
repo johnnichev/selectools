@@ -20,8 +20,15 @@ class _FakePlaywrightError(Exception):
     pass
 
 
-def _install_fake_playwright(monkeypatch: pytest.MonkeyPatch, page: MagicMock) -> MagicMock:
-    """Install a fake playwright.sync_api whose chromium page is *page*."""
+def _install_fake_playwright(
+    monkeypatch: pytest.MonkeyPatch, page: MagicMock, patch_ssrf: bool = True
+) -> MagicMock:
+    """Install a fake playwright.sync_api whose chromium page is *page*.
+
+    By default the SSRF ``validate_url`` guard is stubbed to a no-op so these
+    tests stay network-free (no real DNS resolution). SSRF-specific tests pass
+    ``patch_ssrf=False`` to exercise the real guard.
+    """
     browser = MagicMock()
     browser.new_page.return_value = page
     handle = MagicMock()
@@ -38,7 +45,43 @@ def _install_fake_playwright(monkeypatch: pytest.MonkeyPatch, page: MagicMock) -
     playwright.sync_api = sync_api  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "playwright", playwright)
     monkeypatch.setitem(sys.modules, "playwright.sync_api", sync_api)
+    if patch_ssrf:
+        monkeypatch.setattr("selectools.toolbox.browser_tools.validate_url", lambda _url: None)
     return browser
+
+
+class TestBrowserSSRF:
+    """The SSRF guard blocks internal targets in both browser tools."""
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "http://localhost/admin",
+            "http://127.0.0.1:8080/",
+            "http://169.254.169.254/latest/meta-data/",  # cloud metadata
+            "http://[::1]/",
+        ],
+    )
+    def test_scrape_blocks_internal_targets(
+        self, monkeypatch: pytest.MonkeyPatch, url: str
+    ) -> None:
+        page = MagicMock()
+        browser = _install_fake_playwright(monkeypatch, page, patch_ssrf=False)
+        result = browser_scrape_page.function(url)
+        assert "Error" in result
+        # Browser is never launched for a blocked URL.
+        browser.new_page.assert_not_called()
+        page.goto.assert_not_called()
+
+    def test_screenshot_blocks_internal_targets(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        page = MagicMock()
+        browser = _install_fake_playwright(monkeypatch, page, patch_ssrf=False)
+        result = browser_screenshot.function("http://127.0.0.1/", str(tmp_path / "p.png"))
+        assert "Error" in result
+        page.goto.assert_not_called()
+        page.screenshot.assert_not_called()
 
 
 class TestBrowserScrapePage:

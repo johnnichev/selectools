@@ -46,7 +46,7 @@ print(f"Pass: {report.pass_count}, Fail: {report.fail_count}")
 
 **Added in:** v0.17.0
 
-Built-in agent evaluation with 39 evaluators, regression detection, and CI integration. No separate install, no SaaS account, no external dependencies.
+Built-in agent evaluation with 50 evaluators, regression detection, and CI integration. No separate install, no SaaS account, no external dependencies.
 
 ---
 

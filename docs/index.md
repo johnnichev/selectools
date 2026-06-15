@@ -106,7 +106,7 @@ pip install selectools
 
     ---
 
-    50 built-in evaluators (30 deterministic + 20 LLM-as-judge) with HTML reports and JUnit XML.
+    50 built-in evaluators (29 deterministic + 21 LLM-as-judge) with HTML reports and JUnit XML.
 
     [:octicons-arrow-right-24: Eval framework](modules/EVALS.md)
 

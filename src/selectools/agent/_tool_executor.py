@@ -138,6 +138,7 @@ class _ToolExecutorMixin:
             tool_name,
             type(exc).__name__,
             exc,
+            exc_info=exc,
         )
 
     def _build_compression_request(self, tool_name: str, result: str) -> Message:

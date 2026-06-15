@@ -34,6 +34,8 @@ class CohereEmbeddingProvider(EmbeddingProvider):
         model: str = "embed-english-v3.0",
         api_key: Optional[str] = None,
         truncate: str = "END",
+        timeout: float = 60.0,
+        max_retries: int = 2,
     ):
         """
         Initialize Cohere embedding provider.
@@ -42,6 +44,10 @@ class CohereEmbeddingProvider(EmbeddingProvider):
             model: Model name (default: embed-english-v3.0)
             api_key: Cohere API key (defaults to COHERE_API_KEY env var)
             truncate: Truncation strategy: "NONE", "START", or "END" (default: "END")
+            timeout: Per-request timeout in seconds (default: 60). Prevents a
+                hung embeddings call from blocking ingestion indefinitely.
+            max_retries: Number of automatic retries on transient errors,
+                handled by the Cohere SDK (default: 2).
         """
         try:
             import cohere
@@ -50,7 +56,12 @@ class CohereEmbeddingProvider(EmbeddingProvider):
                 "cohere package required for Cohere embeddings. Install with: pip install cohere"
             ) from e
 
-        self.client = cohere.Client(api_key=api_key)
+        try:
+            self.client = cohere.Client(api_key=api_key, timeout=timeout, max_retries=max_retries)
+        except TypeError:
+            # Older cohere versions lack the timeout/max_retries kwargs.
+            logger.debug("cohere.Client does not accept timeout/max_retries; using defaults")
+            self.client = cohere.Client(api_key=api_key)
         self.model = model
         self.truncate = truncate
         self._dimension = self._get_model_dimension()

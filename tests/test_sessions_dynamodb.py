@@ -52,6 +52,27 @@ class FakeTable:
         return {"Items": [dict(v) for v in self.items.values()]}
 
 
+class PaginatedFakeTable(FakeTable):
+    """FakeTable whose scan() returns one item per page, exercising _scan_all.
+
+    Each scan returns a single item plus a ``LastEvaluatedKey`` pointing at the
+    next one, until the items are exhausted — so the store's pagination loop
+    (``ExclusiveStartKey`` follow-up scans) is actually driven.
+    """
+
+    def scan(self, **kwargs: Any) -> Dict[str, Any]:  # noqa: N803
+        keys = list(self.items.keys())
+        start = kwargs.get("ExclusiveStartKey")
+        idx = keys.index(start) + 1 if start is not None else 0
+        if idx >= len(keys):
+            return {"Items": []}
+        key = keys[idx]
+        page: Dict[str, Any] = {"Items": [dict(self.items[key])]}
+        if idx + 1 < len(keys):
+            page["LastEvaluatedKey"] = key
+        return page
+
+
 def _make_store(table: FakeTable, default_ttl: Optional[int] = None):
     fake_resource = MagicMock()
     fake_resource.Table.return_value = table
@@ -146,6 +167,17 @@ def test_list_returns_metadata():
     assert isinstance(meta["s1"], SessionMetadata)
     assert meta["s1"].message_count == 2
     assert isinstance(meta["s1"].created_at, float)
+
+
+def test_list_paginates_across_scan_pages():
+    # Exercise the _scan_all ExclusiveStartKey loop: 3 sessions returned one per
+    # page must all appear in list() (previously the single-page fake never hit
+    # the pagination follow-up).
+    store = _make_store(PaginatedFakeTable())
+    store.save("s1", _memory("a"))
+    store.save("s2", _memory("b"))
+    store.save("s3", _memory("c"))
+    assert {m.session_id for m in store.list()} == {"s1", "s2", "s3"}
 
 
 def test_delete():

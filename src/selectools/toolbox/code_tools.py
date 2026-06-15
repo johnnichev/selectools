@@ -8,6 +8,7 @@ and output truncation for safety.
 from __future__ import annotations
 
 import os
+import shlex
 import subprocess  # nosec B404 — code execution tool
 import tempfile
 
@@ -16,9 +17,25 @@ from ..tools import tool
 
 _MAX_OUTPUT_BYTES = 10 * 1024  # 10 KB
 
-# Shell metacharacters that enable command chaining, subshells, or redirection.
-# Commands containing any of these are rejected to prevent shell injection.
-_SHELL_BLOCKLIST = [";", "|", "&&", "||", "`", "$(", "{", ">", ">>", "<", "<<", "2>"]
+# Shell metacharacters that enable command chaining, subshells, redirection, or
+# backgrounding. The command is executed WITHOUT a shell (``shell=False``), so
+# these can never be interpreted as operators -- this list exists so the tool
+# returns a clear "not supported" error instead of silently passing the
+# character through as a literal argv token. Newline and bare ``&`` are
+# included because they are the classic blocklist-bypass vectors.
+_SHELL_BLOCKLIST = [
+    ";",
+    "|",
+    "&",
+    "`",
+    "$(",
+    "{",
+    "}",
+    ">",
+    "<",
+    "\n",
+    "\r",
+]
 
 
 def _truncate(text: str, max_bytes: int = _MAX_OUTPUT_BYTES) -> str:
@@ -101,17 +118,24 @@ def execute_python(code: str, timeout: int = 30) -> str:
 @tool(description="Execute a shell command and return output")
 def execute_shell(command: str, timeout: int = 30) -> str:
     """
-    Execute a shell command and return combined stdout + stderr.
+    Execute a single command and return combined stdout + stderr.
 
-    **WARNING**: This tool executes arbitrary shell commands. It should be
-    restricted via ``ToolPolicy`` to prevent misuse in untrusted contexts.
-    Commands containing shell metacharacters (pipes, redirects, chaining)
-    are rejected to mitigate injection attacks.
+    **WARNING**: This tool runs a program of the caller's choosing. It should
+    be restricted via ``ToolPolicy`` to prevent misuse in untrusted contexts.
+
+    The command is parsed with ``shlex`` and executed **without a shell**
+    (``shell=False``), so it runs exactly one program with arguments -- shell
+    features such as pipes (``|``), chaining (``;``, ``&&``), redirection
+    (``>``), subshells (``$(...)``), and globbing are NOT interpreted.
+    Commands containing those metacharacters are rejected up front rather than
+    being silently passed through as literal arguments. This is a real
+    boundary, not a best-effort filter: there is no shell to inject into.
 
     Output is truncated to 10 KB to avoid overwhelming the context window.
 
     Args:
-        command: Shell command to execute (no shell metacharacters allowed).
+        command: Command to execute, e.g. ``"ls -la /tmp"``. Parsed into
+            program + arguments; no shell metacharacters are permitted.
         timeout: Maximum execution time in seconds (default: 30).
 
     Returns:
@@ -125,18 +149,29 @@ def execute_shell(command: str, timeout: int = 30) -> str:
     if timeout > 300:
         return "Error: Timeout must not exceed 300 seconds."
 
-    # Reject commands containing dangerous shell metacharacters
+    # Reject shell metacharacters. With shell=False they cannot be interpreted
+    # as operators, but rejecting them gives a clear error instead of running
+    # the program with a confusing literal argument.
     for meta in _SHELL_BLOCKLIST:
         if meta in command:
+            display = meta.encode("unicode_escape").decode("ascii")
             return (
-                f"Error: Command contains blocked shell metacharacter {meta!r}. "
-                "Shell chaining, pipes, redirects, and subshells are not allowed."
+                f"Error: Command contains blocked shell metacharacter {display!r}. "
+                "This tool runs a single program without a shell; chaining, pipes, "
+                "redirects, subshells, and backgrounding are not supported."
             )
 
     try:
-        result = subprocess.run(  # nosec B602 B603 B607 — intentional shell tool
-            command,
-            shell=True,  # nosec B602
+        argv = shlex.split(command)
+    except ValueError as exc:
+        return f"Error: Could not parse command: {exc}"
+    if not argv:
+        return "Error: No command provided."
+
+    try:
+        result = subprocess.run(  # nosec B603 B607 — single program, shell=False, intentional
+            argv,
+            shell=False,
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -159,8 +194,10 @@ def execute_shell(command: str, timeout: int = 30) -> str:
 
     except subprocess.TimeoutExpired:
         return f"Error: Command timed out after {timeout} seconds."
+    except FileNotFoundError:
+        return f"Error: Command not found: {argv[0]!r}"
     except Exception as e:
-        return f"Error executing command: {e}"
+        return f"Error executing command: {type(e).__name__}"
 
 
 __stability__ = "stable"

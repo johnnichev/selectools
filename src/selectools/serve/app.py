@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import hmac
 import json
+import logging
 import os
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -24,6 +25,8 @@ from ..stability import beta
 from .builder import BUILDER_HTML
 from .models import HealthResponse, InvokeResponse
 from .playground import PLAYGROUND_HTML
+
+logger = logging.getLogger(__name__)
 
 LOGIN_HTML = """<!DOCTYPE html>
 <html lang="en">
@@ -70,7 +73,8 @@ def _resolve_auth_token(cli_token: Optional[str] = None) -> Optional[str]:
     dotfile = os.path.expanduser("~/.selectools/auth_token")
     if os.path.isfile(dotfile):
         try:
-            token = open(dotfile).read().strip()  # noqa: WPS515
+            with open(dotfile) as f:
+                token = f.read().strip()
             if token:
                 return token
         except OSError:
@@ -942,7 +946,8 @@ def _resolve_users() -> Dict[str, Any]:
         dotfile = os.path.expanduser("~/.selectools/users.json")
         if os.path.isfile(dotfile):
             try:
-                raw = open(dotfile).read()  # noqa: WPS515
+                with open(dotfile) as f:
+                    raw = f.read()
             except OSError:
                 raw = None
     if raw:
@@ -975,7 +980,8 @@ def _check_graph_permission(
     if not os.path.isfile(path):
         return False
     try:
-        g = json.loads(open(path).read())  # noqa: WPS515
+        with open(path) as f:
+            g = json.loads(f.read())
     except Exception:
         return False
     if g.get("owner") == username:
@@ -1028,24 +1034,35 @@ def _run_evals_on_run(job: Dict[str, Any]) -> None:
                     case = TestCase(input=job.get("input", ""))
                     r = ev_cls().evaluate(case)
                     results.append({"name": name, "pass": r.pass_, "score": r.score})
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Production evaluator %r failed: %s", name, exc, exc_info=True)
         scores = [r["score"] for r in results if r.get("score") is not None]
         if scores:
             avg = sum(scores) / len(scores)
             threshold = config.get("alert_threshold", 0.0)
             if avg < threshold:
                 _fire_eval_alert(job, avg, threshold)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug(
+            "Production eval worker failed for run %s: %s",
+            job.get("run_id"),
+            exc,
+            exc_info=True,
+        )
 
 
 def _fire_eval_alert(job: Dict[str, Any], score: float, threshold: float) -> None:
     """Fire webhook alert if eval score drops below threshold."""
     import urllib.request as _ureq
 
+    from .._ssrf import validate_url
+
     webhook = job.get("eval_config", {}).get("webhook_url")
     if not webhook:
+        return
+    # Block SSRF: a webhook URL from eval_config must not target internal hosts.
+    if validate_url(webhook) is not None:
+        logger.warning("Eval webhook URL rejected by SSRF guard: %r", webhook)
         return
     payload = {
         "graph_id": job.get("graph_id", ""),
@@ -1075,7 +1092,8 @@ def _route_experiment(graph_id: str, run_id: str, experiments_dir: Optional[str]
     experiments: List[Dict[str, Any]] = []
     if os.path.isfile(base):
         try:
-            experiments = json.loads(open(base).read())  # noqa: WPS515
+            with open(base) as f:
+                experiments = json.loads(f.read())
         except Exception:
             pass
     exp = next(
@@ -1581,7 +1599,8 @@ class BuilderServer:
                     last_hash = ""
                     for _ in range(600):
                         try:
-                            content = open(watch_path).read()  # noqa: WPS515
+                            with open(watch_path) as f:
+                                content = f.read()
                             h = _hl.md5(content.encode()).hexdigest()
                             if h != last_hash:
                                 last_hash = h
@@ -1602,7 +1621,8 @@ class BuilderServer:
                         self._json({"error": "File not found"}, 404)
                         return
                     try:
-                        source = open(sync_path).read()  # noqa: WPS515
+                        with open(sync_path) as f:
+                            source = f.read()
                         # Simple regex-based patch for update_node
                         if patch.get("type") == "update_node":
                             node_id = patch.get("node_id", "")

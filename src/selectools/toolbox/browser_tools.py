@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .._ssrf import validate_url
 from ..stability import beta
 from ..tools import tool
 
@@ -53,6 +54,9 @@ def browser_scrape_page(url: str, timeout: int = _DEFAULT_TIMEOUT_S) -> str:
     url = url.strip()
     if not url.startswith(("http://", "https://")):
         return "Error: URL must start with http:// or https://"
+    ssrf_error = validate_url(url)
+    if ssrf_error:
+        return ssrf_error
 
     timeout_ms = max(1, min(timeout, 120)) * 1000
 
@@ -110,6 +114,9 @@ def browser_screenshot(
     url = url.strip()
     if not url.startswith(("http://", "https://")):
         return "Error: URL must start with http:// or https://"
+    ssrf_error = validate_url(url)
+    if ssrf_error:
+        return ssrf_error
     if not path or not path.strip():
         return "Error: No output path provided."
 
