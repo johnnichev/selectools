@@ -11,7 +11,7 @@ import os
 import re
 import sqlite3
 
-from ..stability import beta
+from ..stability import stable
 from ..tools import tool
 
 
@@ -64,7 +64,7 @@ def _format_table(columns: list[str], rows: list[tuple]) -> str:
     return "\n".join(lines)
 
 
-@beta
+@stable
 @tool(description="Execute a read-only SQL query against a SQLite database")
 def query_sqlite(db_path: str, sql: str, max_rows: int = 100) -> str:
     """
@@ -130,7 +130,7 @@ def query_sqlite(db_path: str, sql: str, max_rows: int = 100) -> str:
             conn.close()
 
 
-@beta
+@stable
 @tool(description="Execute a read-only SQL query against PostgreSQL")
 def query_postgres(connection_string: str, sql: str, max_rows: int = 100) -> str:
     """

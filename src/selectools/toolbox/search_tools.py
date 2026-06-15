@@ -14,7 +14,7 @@ import urllib.request
 from typing import Optional
 
 from .._ssrf import validate_url as _validate_url
-from ..stability import beta
+from ..stability import stable
 from ..tools import tool
 
 _MAX_OUTPUT_BYTES = 10 * 1024  # 10 KB
@@ -43,7 +43,7 @@ def _strip_html_tags(text: str) -> str:
     return text.strip()
 
 
-@beta
+@stable
 @tool(description="Search the web using DuckDuckGo (no API key needed)")
 def web_search(query: str, num_results: int = 5) -> str:
     """
@@ -121,7 +121,7 @@ def web_search(query: str, num_results: int = 5) -> str:
         return f"Error performing web search: {e}"
 
 
-@beta
+@stable
 @tool(description="Fetch a URL and extract text content")
 def scrape_url(url: str, selector: Optional[str] = None) -> str:
     """

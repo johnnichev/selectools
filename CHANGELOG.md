@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Stability promotions (v1.0 freeze prep)
+
+First beta → stable promotion pass toward the 1.0 API freeze. Promotions only
+strengthen guarantees (a `@stable` symbol carries a 2-minor removal promise);
+nothing is removed or renamed.
+
+- **24 mature toolbox tools → `@stable`**: `evaluate_expression`, `unit_convert`,
+  `execute_python`, `execute_shell`, `query_postgres`, `query_sqlite`,
+  `send_email`, `read_inbox`, the GitHub/Linear/Notion/Slack tool sets,
+  `extract_pdf_text`, `extract_pdf_tables`, `web_search`, `scrape_url`. These are
+  4–15 releases old with frozen signatures, in already-stable category modules.
+- **`SessionSearchResult` and `agent.PlanningConfig` → `@stable`.**
+- **Module promises upgraded to `stable`**: `orchestration` (+ checkpoint, graph,
+  node, state, supervisor) and `patterns` (+ debate, plan_and_execute, reflective,
+  team_lead) and `policy` — their public surfaces were already fully `@stable`
+  (the v0.25 promotion sweep); this aligns the module-level promise.
+- Held `@beta` deliberately: the v0.27.0 additions (`make_recall_tool`,
+  `PromptInjectionGuardrail`, `calculate_cost_with_cached_input`,
+  `MongoSessionStore`, `DynamoDBSessionStore`) need another cycle, and `evals`
+  stays a beta module (its 50 evaluator classes are still growing; the 7 core
+  types — `EvalSuite`/`TestCase`/`EvalReport`/… — remain `@stable`).
+- New `scripts/stability_audit.py` reports symbols whose marker disagrees with
+  their module promise, so future promotion passes are reproducible.
+
 ## [0.28.0] - 2026-06-15 — Hardening Sweep: Shell Safety, Session Namespaces & Typed Public API
 
 A full audit-driven tech-debt sweep. Hardens the shell tool and SSRF surface,

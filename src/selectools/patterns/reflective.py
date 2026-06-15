@@ -135,6 +135,6 @@ class ReflectiveAgent:
         return ReflectiveResult(final_draft=draft, rounds=rounds, approved=approved)
 
 
-__stability__ = "beta"
+__stability__ = "stable"
 
 __all__ = ["ReflectiveAgent", "ReflectionRound", "ReflectiveResult"]

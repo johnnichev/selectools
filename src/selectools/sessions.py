@@ -53,7 +53,7 @@ class SessionMetadata:
     updated_at: float
 
 
-@beta
+@stable
 @dataclass(frozen=True)
 class SessionSearchResult:
     """One session matched by :meth:`SessionStore.search`.

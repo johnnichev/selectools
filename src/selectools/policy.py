@@ -233,6 +233,6 @@ class ToolPolicy:
         return cls.from_dict(data)
 
 
-__stability__ = "beta"
+__stability__ = "stable"
 
 __all__ = ["ApprovalRequest", "ToolPolicy", "PolicyDecision", "PolicyResult"]

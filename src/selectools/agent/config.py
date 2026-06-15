@@ -404,7 +404,7 @@ step executes and must return one of:
 """
 
 
-@beta
+@stable
 @dataclass
 class PlanningConfig:
     """Opt-in planning for any Agent: plan -> (approve) -> execute -> synthesize.

@@ -12,7 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional
 
-from ..stability import beta
+from ..stability import stable
 from ..tools import tool
 
 _MAX_OUTPUT_CHARS = 20_000
@@ -49,7 +49,7 @@ def _parse_page_spec(pages: Optional[str], page_count: int) -> List[int]:
     return sorted(set(selected))
 
 
-@beta
+@stable
 @tool(description="Extract text content from a PDF file")
 def extract_pdf_text(path: str, pages: Optional[str] = None) -> str:
     """
@@ -97,7 +97,7 @@ def extract_pdf_text(path: str, pages: Optional[str] = None) -> str:
         return f"Error reading PDF: {type(exc).__name__}: {exc}"
 
 
-@beta
+@stable
 @tool(description="Extract tables from a PDF file")
 def extract_pdf_tables(path: str, pages: Optional[str] = None) -> str:
     """

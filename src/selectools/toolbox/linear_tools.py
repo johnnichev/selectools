@@ -16,7 +16,7 @@ import json
 import os
 from typing import Any, Dict, Optional
 
-from ..stability import beta
+from ..stability import stable
 from ..tools import tool
 
 _API_URL = "https://api.linear.app/graphql"
@@ -57,7 +57,7 @@ def _format_graphql_errors(body: Dict[str, Any]) -> str:
     return f"Error: Linear API error: {messages}"
 
 
-@beta
+@stable
 @tool(description="Create an issue in Linear")
 def linear_create_issue(
     team_id: str,
@@ -127,7 +127,7 @@ def linear_create_issue(
         return f"Error creating Linear issue: {type(exc).__name__}: {exc}"
 
 
-@beta
+@stable
 @tool(description="List recent issues in Linear")
 def linear_list_issues(
     team_id: Optional[str] = None,
@@ -206,7 +206,7 @@ def linear_list_issues(
         return f"Error listing Linear issues: {type(exc).__name__}: {exc}"
 
 
-@beta
+@stable
 @tool(description="Update a Linear issue's title, description, or state")
 def linear_update_issue(
     issue_id: str,

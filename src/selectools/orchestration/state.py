@@ -342,7 +342,7 @@ def merge_states(states: List[GraphState], policy: MergePolicy) -> GraphState:
     )
 
 
-__stability__ = "beta"
+__stability__ = "stable"
 
 __all__ = [
     "STATE_KEY_LAST_OUTPUT",
