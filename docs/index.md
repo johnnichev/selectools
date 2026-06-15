@@ -16,6 +16,9 @@ description: Selectools is a production-ready Python library for building AI age
 
 **Production-ready AI agents in plain Python.** Multi-agent graphs, tool calling, RAG, 50 evaluators, and a drag-drop visual builder. All in one `pip install`. No DSL. No SaaS. No vendor lock-in.
 
+!!! success "selectools is 1.0 — stable"
+    The public API is frozen. `@stable` symbols carry a compatibility promise — no removal or breaking signature change without a deprecation cycle of at least two minor releases. Python 3.10+.
+
 ```bash
 pip install selectools
 ```

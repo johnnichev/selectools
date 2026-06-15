@@ -44,7 +44,7 @@
     "url": "https://selectools.dev/",
     "downloadUrl": "https://pypi.org/project/selectools/",
     "installUrl": "https://pypi.org/project/selectools/",
-    "softwareVersion": "0.27.2",
+    "softwareVersion": "1.0.0",
     "datePublished": "2026-04-01",
     "dateModified": "2026-06-12",
     "inLanguage": "en",
@@ -90,7 +90,7 @@
       "Visual drag-and-drop agent builder with 8 node types and 7 templates",
       "Composable pipelines with @step decorator and @pipeline operator",
       "Token-level streaming with native tool call support",
-      "433-symbol public API, 100% stability-marked and CI-enforced",
+      "485-symbol public API, 100% stability-marked and CI-enforced",
       "Compatibility matrix across Python 3.10 to 3.13 (90%+ coverage, 7796 tests)"
     ],
     "keywords": "python, ai agent, llm, tool calling, rag, hybrid search, multi-agent, langchain alternative, openai, anthropic, gemini, ollama, agent framework, mcp, model context protocol"
@@ -234,7 +234,7 @@
         "name": "Is Selectools production-ready?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Yes. 7,796 tests at 90%+ coverage, published security audit, SBOM (CycloneDX), formal deprecation policy, @stable/@beta markers on all 433 public symbols (100% stability-marked, CI-enforced), compatibility matrix for Python 3.10-3.13. Migration guides for 4 frameworks. Apache-2.0 licensed."
+          "text": "Yes — selectools is 1.0: the public API is frozen and @stable symbols carry a 2-minor compatibility promise. 7,796 tests at 90%+ coverage, published security audit, SBOM (CycloneDX), @stable/@beta markers on all 485 public symbols (100% stability-marked, CI-enforced), CI matrix for Python 3.10-3.13. Migration guides for 4 frameworks. Apache-2.0 licensed."
         }
       },
       {
@@ -4396,10 +4396,11 @@
   <div class="wrap">
     <div class="hero-grid">
       <div class="hero-content">
-        <span class="section-label" style="margin-bottom:16px">Open Source from NichevLabs</span>
+        <a href="https://pypi.org/project/selectools/" class="hero-badge" style="display:inline-block;margin-bottom:14px;padding:5px 13px;border:1px solid var(--cyan);border-radius:999px;color:var(--cyan);font-size:12.5px;font-weight:600;letter-spacing:.02em;text-decoration:none">selectools 1.0 — Production Stable</a>
+        <span class="section-label" style="display:block;margin-bottom:16px">Open Source from NichevLabs</span>
         <h1>AI agents that are <span class="grad">just Python.</span></h1>
         <p class="hero-sub">
-          Multi-agent graphs, tool calling, RAG, 50 evaluators, one-line REST serving, and a drag-drop visual builder. All in one <code>pip install</code>. No DSL to learn. No SaaS to pay for. No vendor to depend on.
+          Multi-agent graphs, tool calling, RAG, 50 evaluators, one-line REST serving, and a drag-drop visual builder. All in one <code>pip install</code>. No DSL to learn. No SaaS to pay for. No vendor to depend on. <strong>1.0: the public API is frozen and stable.</strong>
         </p>
         <div class="terminal-install" id="pipTerminal" role="button" tabindex="0" aria-label="Click to copy: pip install selectools">
           <div class="terminal-chrome">
@@ -4457,10 +4458,10 @@
     <div class="status-item"><span class="status-val">115</span> models</div>
     <div class="status-item"><span class="status-val">7796</span> tests</div>
     <div class="status-item"><span class="status-val">90%+</span> coverage</div>
-    <div class="status-item"><span class="status-val">111</span> examples</div>
+    <div class="status-item"><span class="status-val">115</span> examples</div>
     <div class="status-item"><span class="status-val">50</span> evaluators</div>
     <div class="status-item"><span class="status-val">9</span> providers</div>
-    <div class="status-item"><span class="status-val">v0.27.2</span></div>
+    <div class="status-item"><span class="status-val">v1.0.0</span></div>
   </div>
 </div>
 
@@ -5106,9 +5107,8 @@ result = agent.<span class="fn">run</span>(<span class="str">"Find our refund po
           <span class="ent-version"><span class="ent-version__check">✓</span> 3.12</span>
           <span class="ent-version"><span class="ent-version__check">✓</span> 3.11</span>
           <span class="ent-version"><span class="ent-version__check">✓</span> 3.10</span>
-          <span class="ent-version"><span class="ent-version__check">✓</span> 3.9</span>
         </div>
-        <p class="ent-exhibit__caption">Five major versions, one wheel.</p>
+        <p class="ent-exhibit__caption">Python 3.10–3.13, one wheel.</p>
       </div>
 
       <!-- Exhibit 4: CycloneDX SBOM -->
@@ -5135,12 +5135,12 @@ result = agent.<span class="fn">run</span>(<span class="str">"Find our refund po
           <span class="ent-marker ent-marker--stable">
             <span class="ent-marker__dot"></span>
             <span class="ent-marker__name">@stable</span>
-            <span class="ent-marker__count">205</span>
+            <span class="ent-marker__count">250</span>
           </span>
           <span class="ent-marker ent-marker--beta">
             <span class="ent-marker__dot"></span>
             <span class="ent-marker__name">@beta</span>
-            <span class="ent-marker__count">228</span>
+            <span class="ent-marker__count">233</span>
           </span>
           <span class="ent-marker ent-marker--dep">
             <span class="ent-marker__dot"></span>
@@ -5148,7 +5148,7 @@ result = agent.<span class="fn">run</span>(<span class="str">"Find our refund po
             <span class="ent-marker__count">2 minors</span>
           </span>
         </div>
-        <p class="ent-exhibit__caption">433-symbol public API, 100% stability-marked, CI-enforced. v1.0 on the horizon.</p>
+        <p class="ent-exhibit__caption">485-symbol public API, 100% stability-marked, CI-enforced. <strong>Stable at 1.0</strong> — `@stable` carries a 2-minor compatibility promise.</p>
       </div>
     </div>
   </div>
@@ -5364,7 +5364,7 @@ report.<span class="fn">to_html</span>(<span class="str">"report.html"</span>)
     <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap;justify-content:center">
       <a href="builder/" class="btn btn-cyan">Open Full Builder &rarr;</a>
       <a href="#simulations" class="btn btn-ghost">Live Simulations</a>
-      <a href="examples/" class="btn btn-ghost">111 Examples</a>
+      <a href="examples/" class="btn btn-ghost">115 Examples</a>
     </div>
     <div class="code-frame reveal" style="margin-top:32px;padding:0">
       <div class="cmp-scroll">
@@ -5814,7 +5814,7 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
               <span class="repl__q-cat">concepts</span>
             </summary>
             <div class="repl__q-answer">
-              Yes. 7,796 tests at 90%+ coverage (including 40 real API evaluations), published security audit, SBOM (CycloneDX 1.6), formal deprecation policy, <code>@stable</code>/<code>@beta</code> markers on all 433 public symbols (100% stability-marked, CI-enforced), and a compatibility matrix covering Python 3.10 to 3.13. Migration guides for LangChain, CrewAI, AutoGen, and LlamaIndex. Apache-2.0 licensed.
+              Yes — selectools is <strong>1.0</strong>: the public API is frozen, and <code>@stable</code> symbols carry a compatibility promise (no breaking change without a 2-minor deprecation cycle). 7,796 tests at 90%+ coverage (including 40 real API evaluations), published security audit, SBOM (CycloneDX 1.6), <code>@stable</code>/<code>@beta</code> markers on all 485 public symbols (100% stability-marked, CI-enforced), and a CI matrix covering Python 3.10 to 3.13. Migration guides for LangChain, CrewAI, AutoGen, and LlamaIndex. Apache-2.0 licensed.
             </div>
           </details>
 
@@ -5834,13 +5834,13 @@ result = <span class="fn">AgentGraph</span>.<span class="fn">chain</span>(planne
 │   ├── <a href="docs/configuration/">configuration.md</a>
 │   ├── <a href="docs/providers/">providers.md</a>
 │   └── <a href="docs/api-reference/">api-reference/</a>
-├── <a href="examples/">examples/</a>      <span class="footer-term__cmt"># 111 numbered scripts</span>
+├── <a href="examples/">examples/</a>      <span class="footer-term__cmt"># 115 numbered scripts</span>
 ├── <a href="builder/">builder/</a>       <span class="footer-term__cmt"># visual flow editor</span>
 ├── <a href="https://github.com/johnnichev/selectools">github/</a>        <span class="footer-term__cmt"># source &middot; issues &middot; discussions</span>
 ├── <a href="https://pypi.org/project/selectools/">pypi/</a>          <span class="footer-term__cmt"># pip install selectools</span>
 └── <a href="CHANGELOG/">changelog/</a>     <span class="footer-term__cmt"># what shipped, what changed</span>
 
-<span class="footer-term__cmt"># selectools v0.27.2 &middot; Apache-2.0 &middot; <span class="footer-term__nichev">made by <a href="https://nichevlabs.com">NichevLabs</a></span></span>
+<span class="footer-term__cmt"># selectools v1.0.0 &middot; Apache-2.0 &middot; <span class="footer-term__nichev">made by <a href="https://nichevlabs.com">NichevLabs</a></span></span>
 <span class="footer-term__cmt"># for developers who ship</span></div>
   <div class="footer-term__final">
     <span class="pr">$</span>
