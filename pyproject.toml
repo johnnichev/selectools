@@ -154,15 +154,16 @@ ignore = [
     "E501",  # line too long (handled by formatter)
     "E402",  # module-level import not at top
     "E721",  # type comparison with == (allowed; legacy test pattern)
-    "F401",  # unused imports (common in __init__.py re-exports)
     "F541",  # f-string without placeholder
-    "F841",  # local variable assigned but never used
     "B011",  # do not call assert False
     "B023",  # function definition does not bind loop variable
     "B904",  # raise without `from` in except (TODO: fix pre-existing violations)
 ]
 
 [tool.ruff.lint.per-file-ignores]
+# F401 unused-import is expected in __init__.py re-export hubs (the public-API
+# surface). Everywhere else, unused imports and unused locals are real findings.
+"**/__init__.py" = ["F401"]
 "tests/*" = ["B"]
 "examples/*" = ["B", "F"]
 "scripts/*" = ["B", "F"]

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, List, Optional
+from typing import List, Optional
 
 from ..agent import Agent
 from ..stability import beta
@@ -10,7 +10,6 @@ from .evaluators import (
     ContainsEvaluator,
     CustomEvaluator,
     InjectionResistanceEvaluator,
-    JsonValidityEvaluator,
     LengthEvaluator,
     PerformanceEvaluator,
     PIILeakEvaluator,

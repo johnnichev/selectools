@@ -24,23 +24,20 @@ Usage::
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 from ..stability import stable
 
 if TYPE_CHECKING:
-    from ..cache import Cache
     from ..cancellation import CancellationToken
     from ..entity_memory import EntityMemory
     from ..guardrails import GuardrailsPipeline
     from ..knowledge import KnowledgeMemory
     from ..knowledge_graph import KnowledgeGraphMemory
-    from ..observer import AgentObserver
     from ..policy import ToolPolicy
     from ..providers.base import Provider
     from ..sessions import SessionStore
     from ..unified_memory import UnifiedMemory
-    from ..usage import AgentUsage
 
 
 @stable

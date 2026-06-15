@@ -154,7 +154,6 @@ class InMemoryVectorStore(VectorStore):
         with self._lock:
             embeddings_snapshot = self.embeddings
             documents_snapshot = list(self.documents)
-            ids_snapshot = list(self.ids)
 
         if embeddings_snapshot is None or len(embeddings_snapshot) == 0:
             return []

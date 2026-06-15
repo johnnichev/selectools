@@ -20,9 +20,9 @@ import json
 import re
 import threading
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Tuple
 
+from ._time import parse_iso
 from .orchestration.checkpoint import (
     CheckpointMetadata,
     _deserialize_checkpoint,
@@ -137,9 +137,7 @@ class PostgresCheckpointStore:
                 step=r[2],
                 node_name=r[3],
                 interrupted=r[4],
-                created_at=(
-                    r[5] if isinstance(r[5], datetime) else datetime.fromisoformat(str(r[5]))
-                ),
+                created_at=parse_iso(r[5]),
             )
             for r in rows
         ]

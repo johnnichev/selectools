@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 
-import html
 import json
 import threading
-import time
 from http.server import HTTPServer, SimpleHTTPRequestHandler
-from io import BytesIO
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict
 
 from ..stability import beta
-from .types import CaseVerdict
 
 
 class _DashboardHandler(SimpleHTTPRequestHandler):

@@ -2,7 +2,6 @@
 Date and time utility tools.
 """
 
-import datetime as _dt
 from datetime import datetime, timedelta
 from datetime import timezone as _timezone
 from typing import Optional

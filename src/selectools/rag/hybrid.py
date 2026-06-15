@@ -295,22 +295,6 @@ class HybridSearcher:
 
         return [(s - min_s) / span for s in scores]
 
-    @staticmethod
-    def _find_matching_key(
-        document: Document,
-        doc_map: Dict[int, SearchResult],
-    ) -> Optional[int]:
-        """
-        Find an existing key in doc_map whose document matches by text content.
-
-        This handles the case where vector and BM25 results reference
-        different Document instances that represent the same underlying document.
-        """
-        for key, result in doc_map.items():
-            if result.document.text == document.text:
-                return key
-        return None
-
 
 __stability__ = "beta"
 

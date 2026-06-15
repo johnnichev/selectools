@@ -268,7 +268,6 @@ class Tool:
             return
 
         func_params = sig.parameters
-        param_names_set = {p.name for p in self.parameters}
         injected_names = set(self.injected_kwargs.keys())
 
         # If the function accepts **kwargs it will accept any named parameter —

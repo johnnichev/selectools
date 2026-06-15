@@ -6,7 +6,7 @@ import asyncio
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Callable, List, Optional, Tuple
 
 # Module-level singleton for running sync provider calls in an async context.
 # Creating a new ThreadPoolExecutor per call (inside a retry loop) wastes

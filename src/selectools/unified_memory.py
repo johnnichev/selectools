@@ -48,6 +48,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
+from ._time import ensure_aware, parse_iso
 from .entity_memory import EntityMemory
 from .knowledge import KnowledgeEntry, KnowledgeMemory
 from .memory import ConversationMemory
@@ -194,9 +195,7 @@ class Episode:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Episode":
-        ts = datetime.fromisoformat(data["timestamp"])
-        if ts.tzinfo is None:
-            ts = ts.replace(tzinfo=timezone.utc)
+        ts = ensure_aware(parse_iso(data["timestamp"]))
         return cls(user=data.get("user", ""), assistant=data.get("assistant", ""), timestamp=ts)
 
 

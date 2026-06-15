@@ -17,7 +17,7 @@ from .._async_utils import aclosing, run_in_executor_copyctx
 from ..analytics import AgentAnalytics
 from ..parser import ToolCallParser
 from ..prompt import PromptBuilder
-from ..providers.base import Provider, ProviderError
+from ..providers.base import Provider
 from ..providers.openai_provider import OpenAIProvider
 from ..results import Artifact, _begin_artifact_collection
 from ..stability import beta, deprecated, stable

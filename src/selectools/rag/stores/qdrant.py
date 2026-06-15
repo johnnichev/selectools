@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import threading
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
     from ...embeddings.provider import EmbeddingProvider
@@ -274,8 +274,6 @@ class QdrantVectorStore(VectorStore):
             List of :class:`SearchResult` objects sorted by descending
             similarity score.
         """
-        models = _import_qdrant_models()
-
         # Build Qdrant filter from simple dict or pass-through native filter
         qdrant_filter = self._build_filter(filter)
 

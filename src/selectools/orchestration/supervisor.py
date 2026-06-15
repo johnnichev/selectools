@@ -30,9 +30,7 @@ Usage::
 
 from __future__ import annotations
 
-import asyncio
-import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Any, AsyncGenerator, Dict, List, Optional
 
@@ -41,15 +39,13 @@ if TYPE_CHECKING:
     from ..cancellation import CancellationToken
     from ..observer import AgentObserver
     from ..providers.base import Provider
-    from ..types import AgentResult
-    from .checkpoint import CheckpointStore
 
 from .._async_utils import run_sync
 from .._json_utils import safe_json_parse
-from ..stability import beta, stable
+from ..stability import stable
 from ..types import Message, Role
 from ..usage import UsageStats
-from .graph import AgentGraph, ErrorPolicy, GraphResult, _merge_usage
+from .graph import AgentGraph, GraphResult, _merge_usage
 from .state import STATE_KEY_LAST_OUTPUT, ContextMode, GraphState
 
 

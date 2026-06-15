@@ -15,7 +15,7 @@ import os
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, Iterator, List, Optional
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
 if TYPE_CHECKING:
     from ..agent.core import Agent
@@ -149,8 +149,6 @@ class AgentRouter:
         async def _stream() -> AsyncIterator[str]:
             chunks = []
             async for item in self.agent.astream(prompt):
-                from ..types import AgentResult, StreamChunk
-
                 if isinstance(item, str):
                     chunks.append(item)
                     yield f"data: {json.dumps({'type': 'chunk', 'content': item})}\n\n"

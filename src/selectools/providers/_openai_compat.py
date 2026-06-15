@@ -29,7 +29,7 @@ from typing import (
 
 from ..types import Message, Role, ToolCall
 from ..usage import UsageStats
-from .base import Provider, ProviderError
+from .base import ProviderError
 
 
 def _parse_tool_args(raw: Optional[str]) -> Tuple[Dict[str, Any], Optional[str]]:

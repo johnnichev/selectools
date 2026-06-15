@@ -4,9 +4,8 @@ Ollama provider adapter for local LLM inference.
 
 from __future__ import annotations
 
-import json
 import uuid
-from typing import Any, Dict
+from typing import Any
 
 from ..models import Ollama as OllamaModels
 from ..stability import stable

@@ -12,8 +12,7 @@ progress and optionally reassign work.
 
 from __future__ import annotations
 
-import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, List, Optional
 
 if TYPE_CHECKING:
@@ -25,7 +24,7 @@ from .._async_utils import run_sync
 from .._json_utils import safe_json_parse as _safe_json_parse
 from ..orchestration.graph import AgentGraph
 from ..orchestration.state import ContextMode, GraphState
-from ..stability import beta, stable
+from ..stability import stable
 from ..types import Message, Role
 
 

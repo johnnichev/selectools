@@ -8,7 +8,7 @@ import threading
 from typing import TYPE_CHECKING, Any, Optional, cast
 
 if TYPE_CHECKING:
-    from ..memory import ConversationMemory
+    pass
 
 logger = logging.getLogger(__name__)
 
