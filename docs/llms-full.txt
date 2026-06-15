@@ -12412,7 +12412,7 @@ File paths are resolved relative to the YAML config file's directory. Path trave
 
 ### No Tools
 
-If no tools are specified, a no-op placeholder tool is registered so the agent can still function (some providers require at least one tool).
+If no tools are specified, the template builds a pure conversational agent (no tools).
 
 ---
 
@@ -19061,7 +19061,7 @@ export LANGFUSE_HOST="https://langfuse.internal.example.com"
 
 # Performance Benchmarks
 
-Measured framework overhead for selectools v0.26.0. These numbers answer one
+Measured framework overhead for selectools v0.27.2. These numbers answer one
 question: **how much time does selectools add on top of the LLM call?**
 
 All benchmarks use `LocalProvider` (a zero-latency mock), so the timings below
@@ -19072,7 +19072,7 @@ call) dominates; everything on this page is noise by comparison.
 
 | | |
 |---|---|
-| selectools | v0.26.0 |
+| selectools | v0.27.2 |
 | Python | 3.9 (CPython) |
 | Machine | Apple M4, 24 GB RAM, macOS 26.3 |
 | Method | 100 iterations per case, fresh agent/graph instances per iteration |
@@ -19364,4 +19364,3 @@ Invalid bounds (`min_steps < 0`, `max_steps < 1`, `max_steps < min_steps`) raise
 - **Reasoning tools** — when you want the chain *recorded* (for evals, debugging,
   audit), or want a hard cap on reasoning effort. Use both together for shaped,
   visible, bounded reasoning.
-

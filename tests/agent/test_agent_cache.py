@@ -122,7 +122,7 @@ def _noop_tool() -> Tool:
 
 
 def _dummy_tool() -> Tool:
-    """Minimal tool to satisfy Agent's requirement for at least one tool."""
+    """Minimal no-op tool for tests that need a tool but don't exercise it."""
     return Tool(
         name="noop",
         description="A no-op tool for testing cache behaviour",

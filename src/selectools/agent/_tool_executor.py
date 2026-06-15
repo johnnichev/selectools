@@ -107,7 +107,7 @@ class _ToolExecutorMixin:
             return False
         if tool is None or getattr(tool, "terminal", False):
             return False
-        return len(result) > tcfg.compress_threshold
+        return bool(len(result) > tcfg.compress_threshold)
 
     def _stop_condition_hit(self, tool_name: str, result: str) -> bool:
         """True if config.stop_condition fires for this result (terminal path)."""
@@ -203,7 +203,7 @@ class _ToolExecutorMixin:
     def _compression_max_tokens(self) -> int:
         """Token budget for the summary: comfortably under the char threshold."""
         threshold = self.config.tool.compress_threshold
-        return max(128, min(1000, threshold // 4))
+        return int(max(128, min(1000, threshold // 4)))
 
     def _compress_tool_result(
         self,

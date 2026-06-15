@@ -18,8 +18,9 @@ larger than the originally-baked v0.24-0.26 surface). Bake clock still ~mid-July
   fires on `refs/tags/v*`).
 - **Suite:** ~7,728 tests collected; full non-e2e run 7,492 passed / 0
   failed. 115 examples, 115 source-verified models.
-- **Quality gate:** ruff format + check clean, mypy clean (the 5 prior
-  baseline errors were not reintroduced), bandit clean. Architecture
+- **Quality gate:** ruff format + check clean, **mypy fully clean (0 errors —
+  the 5 long-standing baseline errors were fixed in the tech-debt sweep)**,
+  bandit clean. Architecture
   stability gate green (every new module registered).
 - **Docs:** README (What's Included + capability table), ARCHITECTURE,
   QUICKSTART, SESSIONS, GUARDRAILS, BENCHMARKS/SCHEDULER/REASONING_TOOLS

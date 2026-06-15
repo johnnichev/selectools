@@ -153,16 +153,9 @@ def _build_agent_from_dict(
     if provider is None:
         provider = _resolve_provider(raw.get("provider", "openai"))
 
-    # Resolve tools
+    # Resolve tools. An empty list is fine — the template builds a pure
+    # conversational agent (the Agent no longer requires at least one tool).
     tools = _resolve_tools(raw.get("tools", []), base_dir=base_dir)
-    if not tools:
-        from ..tools.decorators import tool
-
-        @tool(description="No-op placeholder tool")
-        def noop() -> str:
-            return "ok"
-
-        tools = [noop]
 
     # Build nested configs from YAML sections
     config_kwargs: Dict[str, Any] = {}

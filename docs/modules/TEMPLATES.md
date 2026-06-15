@@ -437,7 +437,8 @@ File paths are resolved relative to the YAML config file's directory. Path trave
 
 ### No Tools
 
-If no tools are specified, a no-op placeholder tool is registered so the agent can still function (some providers require at least one tool).
+If no tools are specified, the template builds a pure conversational agent (no
+tools) — a normal use case. The provider is simply called with no tools.
 
 ---
 
