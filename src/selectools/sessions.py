@@ -15,6 +15,7 @@ import warnings
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Protocol, Tuple
 
+from ._time import ensure_aware, parse_iso
 from .memory import ConversationMemory
 from .stability import beta, stable
 
@@ -1061,17 +1062,12 @@ def _iso_to_ts(value: Any) -> float:
     Handles the ``Z`` suffix and naive datetimes (treated as UTC).
     Returns ``0.0`` on any parse failure rather than raising.
     """
-    from datetime import datetime, timezone
-
     if value is None:
         return 0.0
     if isinstance(value, (int, float)):
         return float(value)
     try:
-        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt.timestamp()
+        return ensure_aware(parse_iso(value)).timestamp()
     except ValueError:
         return 0.0
 

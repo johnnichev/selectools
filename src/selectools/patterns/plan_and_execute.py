@@ -10,8 +10,7 @@ is re-called with the failure context to revise the remaining steps.
 
 from __future__ import annotations
 
-import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
@@ -23,7 +22,7 @@ from .._async_utils import run_sync
 from .._json_utils import safe_json_parse as _safe_json_parse
 from ..orchestration.graph import GraphResult
 from ..orchestration.state import GraphState
-from ..stability import beta, stable
+from ..stability import stable
 from ..trace import AgentTrace
 from ..types import Message, Role
 from ..usage import UsageStats

@@ -7,13 +7,13 @@ import json
 import os
 import threading
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
     from ...embeddings.provider import EmbeddingProvider
 
 from ...stability import beta
-from ..vector_store import Document, SearchResult, VectorStore, _dedup_search_results
+from ..vector_store import Document, SearchResult, VectorStore
 
 
 def _import_faiss() -> Any:

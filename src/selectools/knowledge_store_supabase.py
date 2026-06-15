@@ -13,6 +13,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
+from ._time import parse_iso
 from .knowledge import KnowledgeEntry
 from .stability import beta
 
@@ -69,10 +70,10 @@ class SupabaseKnowledgeStore:
         metadata = row.get("metadata", {})
         if isinstance(metadata, str):
             metadata = json.loads(metadata)
-        created_at = datetime.fromisoformat(row["created_at"])
+        created_at = parse_iso(row["created_at"])
         if created_at.tzinfo is None:
             created_at = created_at.replace(tzinfo=timezone.utc)
-        updated_at = datetime.fromisoformat(row["updated_at"])
+        updated_at = parse_iso(row["updated_at"])
         if updated_at.tzinfo is None:
             updated_at = updated_at.replace(tzinfo=timezone.utc)
         return KnowledgeEntry(

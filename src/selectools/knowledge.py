@@ -29,7 +29,6 @@ import logging
 import os
 import sqlite3
 import threading
-import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -45,6 +44,7 @@ from typing import (
     runtime_checkable,
 )
 
+from ._time import parse_iso
 from .knowledge_sanitizers import dedupe_against
 from .stability import beta, register_stability, stable
 
@@ -291,10 +291,10 @@ class FileKnowledgeStore:
                     continue
                 try:
                     d = json.loads(line)
-                    created_at = datetime.fromisoformat(d["created_at"])
+                    created_at = parse_iso(d["created_at"])
                     if created_at.tzinfo is None:
                         created_at = created_at.replace(tzinfo=timezone.utc)
-                    updated_at = datetime.fromisoformat(d["updated_at"])
+                    updated_at = parse_iso(d["updated_at"])
                     if updated_at.tzinfo is None:
                         updated_at = updated_at.replace(tzinfo=timezone.utc)
                     entries.append(
@@ -467,10 +467,10 @@ class SQLiteKnowledgeStore:
             )
 
     def _row_to_entry(self, row: tuple) -> KnowledgeEntry:
-        created_at = datetime.fromisoformat(row[6])
+        created_at = parse_iso(row[6])
         if created_at.tzinfo is None:
             created_at = created_at.replace(tzinfo=timezone.utc)
-        updated_at = datetime.fromisoformat(row[7])
+        updated_at = parse_iso(row[7])
         if updated_at.tzinfo is None:
             updated_at = updated_at.replace(tzinfo=timezone.utc)
         return KnowledgeEntry(
@@ -564,7 +564,7 @@ class SQLiteKnowledgeStore:
                 if persistent:
                     continue
                 if ttl is not None:
-                    created_dt = datetime.fromisoformat(created)
+                    created_dt = parse_iso(created)
                     if created_dt.tzinfo is None:
                         created_dt = created_dt.replace(tzinfo=timezone.utc)
                     if now > created_dt + timedelta(days=ttl):
@@ -572,7 +572,7 @@ class SQLiteKnowledgeStore:
                         removed += 1
                         continue
                 if max_age_days is not None:
-                    created_dt = datetime.fromisoformat(created)
+                    created_dt = parse_iso(created)
                     if created_dt.tzinfo is None:
                         created_dt = created_dt.replace(tzinfo=timezone.utc)
                     if now > created_dt + timedelta(days=max_age_days):

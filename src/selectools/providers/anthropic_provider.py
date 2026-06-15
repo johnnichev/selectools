@@ -4,7 +4,6 @@ Anthropic provider adapter for the tool-calling library.
 
 from __future__ import annotations
 
-import json
 import os
 import re
 from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, Iterable, List, cast

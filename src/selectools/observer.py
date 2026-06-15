@@ -35,7 +35,7 @@ import logging
 import time
 from typing import Any, Callable, Dict, List, Optional
 
-from .stability import beta, stable
+from .stability import stable
 from .types import AgentResult, Message
 from .usage import UsageStats
 

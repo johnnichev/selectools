@@ -19,14 +19,12 @@ from typing import (
     Iterable,
     List,
     Optional,
-    Tuple,
     Union,
-    cast,
 )
 
 from ..stability import stable
 from ..types import Message, ToolCall
-from .base import Provider, ProviderError
+from .base import ProviderError
 
 if TYPE_CHECKING:
     from ..tools.base import Tool

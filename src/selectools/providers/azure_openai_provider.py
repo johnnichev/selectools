@@ -13,7 +13,7 @@ from typing import Any, Dict
 
 from ..env import load_default_env
 from ..exceptions import ProviderConfigurationError
-from ..stability import beta, stable
+from ..stability import stable
 from .base import ProviderError
 from .openai_provider import OpenAIProvider, _uses_max_completion_tokens
 

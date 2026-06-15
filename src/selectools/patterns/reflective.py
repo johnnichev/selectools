@@ -8,8 +8,7 @@ or max_reflections is reached.
 
 from __future__ import annotations
 
-import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, List, Optional
 
 if TYPE_CHECKING:
@@ -18,7 +17,7 @@ if TYPE_CHECKING:
     from ..observer import AgentObserver
 
 from .._async_utils import run_sync
-from ..stability import beta, stable
+from ..stability import stable
 from ..types import Message, Role
 
 

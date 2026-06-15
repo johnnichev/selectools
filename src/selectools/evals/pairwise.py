@@ -2,18 +2,14 @@
 
 from __future__ import annotations
 
-import time
-import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from .. import __version__
 from ..agent import Agent
 from ..stability import beta
-from .evaluators import DEFAULT_EVALUATORS
 from .report import EvalReport
 from .suite import EvalSuite
-from .types import CaseResult, CaseVerdict, EvalMetadata, TestCase
+from .types import CaseResult, CaseVerdict, TestCase
 
 
 @beta

@@ -7,16 +7,14 @@ Three backends: InMemory (dev), SQLite (production), JSONL (export/archive).
 from __future__ import annotations
 
 import json
-import os
 import sqlite3
 import threading
-import time
-import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Protocol, runtime_checkable
 
+from .._time import parse_iso
 from ..stability import beta, register_stability
 from ..trace import AgentTrace
 
@@ -285,7 +283,7 @@ class SQLiteTraceStore:
             run_id=run_id,
             steps=steps,
             total_ms=total_ms,
-            created_at=datetime.fromisoformat(created_at),
+            created_at=parse_iso(created_at),
             metadata=meta,
         )
 
@@ -369,7 +367,7 @@ class JSONLTraceStore:
             run_id=entry.get("run_id", ""),
             steps=entry.get("steps", 0),
             total_ms=entry.get("total_ms", 0.0),
-            created_at=datetime.fromisoformat(entry.get("created_at", "2000-01-01T00:00:00+00:00")),
+            created_at=parse_iso(entry.get("created_at", "2000-01-01T00:00:00+00:00")),
             metadata=entry.get("metadata", {}),
         )
 

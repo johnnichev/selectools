@@ -359,12 +359,6 @@ class BM25:
             self._avg_doc_len = 0.0
             self._df = {}
 
-    def _score_document(self, idx_doc: _IndexedDoc, query_terms: List[str]) -> float:
-        """Compute BM25 score using current instance state (not thread-safe — use snapshot variant)."""
-        return self._score_document_snapshot(
-            idx_doc, query_terms, self._doc_count, self._avg_doc_len, self._df
-        )
-
     def _score_document_snapshot(
         self,
         idx_doc: _IndexedDoc,

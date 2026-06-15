@@ -15,9 +15,7 @@ from ..stability import stable
 from .state import STATE_KEY_LAST_OUTPUT, ContextMode, GraphState
 
 if TYPE_CHECKING:
-    from ..agent.core import Agent
-    from ..types import AgentResult, Message
-    from .graph import ErrorPolicy
+    pass
 
 
 @stable

@@ -57,8 +57,8 @@ def _get_parallel_dispatch_executor() -> ThreadPoolExecutor:
 
 
 from .._async_utils import run_in_executor_copyctx
-from ..coherence import CoherenceResult, acheck_coherence, check_coherence
-from ..policy import ApprovalRequest, PolicyDecision, PolicyResult, ToolPolicy
+from ..coherence import acheck_coherence, check_coherence
+from ..policy import ApprovalRequest, PolicyDecision, PolicyResult
 from ..security import screen_output as screen_tool_output
 from ..trace import StepType, TraceStep
 from ..types import Message, Role

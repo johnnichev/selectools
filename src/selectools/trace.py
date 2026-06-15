@@ -15,7 +15,7 @@ from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any, Dict, Iterator, List, Optional
 
-from selectools.stability import beta, stable
+from selectools.stability import stable
 
 
 @stable

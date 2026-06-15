@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, List, Optional, Union
 
-from ..stability import beta, stable
+from ..stability import stable
 
 if TYPE_CHECKING:
     from ..cache import Cache

@@ -9,7 +9,6 @@ from ..trace import AgentTrace, StepType, TraceStep
 from ..types import Message, Role
 
 if TYPE_CHECKING:
-    from ..memory import ConversationMemory
     from .core import _RunContext
 
 

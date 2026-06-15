@@ -224,7 +224,7 @@ def _cmd_doctor() -> None:
     for name, val in keys.items():
         status = "set" if val else "not set"
         icon = "OK" if val else "MISSING"
-        print(f"  {name}: {icon}")
+        print(f"  {name}: {icon} ({status})")
 
     # Optional deps
     print("\nOptional Dependencies:")

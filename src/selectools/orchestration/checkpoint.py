@@ -30,8 +30,9 @@ import threading
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Protocol, Tuple, runtime_checkable
+from typing import Dict, List, Protocol, Tuple, runtime_checkable
 
+from .._time import parse_iso
 from ..stability import register_stability, stable
 from .state import GraphState
 
@@ -257,7 +258,7 @@ class FileCheckpointStore:
                             step=m["step"],
                             node_name=m.get("node_name", ""),
                             interrupted=m.get("interrupted", False),
-                            created_at=datetime.fromisoformat(m["created_at"]),
+                            created_at=parse_iso(m["created_at"]),
                         )
                     )
                 except Exception:  # nosec B110
@@ -375,7 +376,7 @@ class SQLiteCheckpointStore:
                 step=row["step"],
                 node_name=row["node_name"],
                 interrupted=bool(row["interrupted"]),
-                created_at=datetime.fromisoformat(row["created_at"]),
+                created_at=parse_iso(row["created_at"]),
             )
             for row in rows
         ]

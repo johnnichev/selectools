@@ -67,7 +67,10 @@ class PineconeVectorStore(VectorStore):
             index_name: Name of the Pinecone index
             namespace: Namespace within the index (default: "" for default namespace)
             api_key: Pinecone API key (defaults to PINECONE_API_KEY env var)
-            environment: Pinecone environment (defaults to PINECONE_ENVIRONMENT env var)
+            environment: Deprecated and ignored. Pinecone v3+ infers the host
+                from the index, so this parameter has no effect; it is kept only
+                for backward-compatible call sites and will be removed in a
+                future minor release.
             **pinecone_kwargs: Additional arguments to pass to Pinecone client
         """
         try:

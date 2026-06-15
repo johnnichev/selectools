@@ -21,7 +21,7 @@ import inspect
 import json
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
@@ -38,7 +38,7 @@ from typing import (
 
 from .._async_utils import run_in_executor_copyctx, run_sync
 from ..exceptions import GraphExecutionError
-from ..stability import beta, stable
+from ..stability import stable
 from ..trace import AgentTrace, StepType, TraceStep
 from ..types import AgentResult, Message, Role
 from ..usage import AgentUsage, UsageStats
@@ -47,7 +47,6 @@ from .node import (
     ParallelGroupNode,
     SubgraphNode,
     build_context_messages,
-    default_input_transform,
     default_output_transform,
 )
 from .state import (
@@ -64,7 +63,6 @@ from .state import (
 )
 
 if TYPE_CHECKING:
-    from ..agent.core import Agent
     from ..cancellation import CancellationToken
     from ..guardrails.pipeline import GuardrailsPipeline
     from ..observer import AgentObserver
@@ -835,7 +833,6 @@ class AgentGraph:
                 self._trace_step(trace, StepType.GRAPH_CHECKPOINT, checkpoint_id=ckpt_id)
 
             # Resolve next node
-            prev_node = current
             current = self._resolve_next_node(current, state, trace, run_id)
 
         # Output guardrails

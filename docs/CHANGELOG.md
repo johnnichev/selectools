@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Knowledge and checkpoint loaders no longer crash on `Z`-suffixed timestamps
+  on Python 3.10.** `datetime.fromisoformat` did not accept a trailing `Z` (UTC
+  designator) until Python 3.11, so a timestamp such as `"2026-06-15T12:00:00Z"`
+  — the form Postgres/Supabase/Redis routinely return — raised `ValueError` on
+  the project's minimum interpreter. All 17 ISO-parse sites now route through a
+  single `selectools._time.parse_iso` helper that normalizes the suffix first.
+  (#136)
+- **`selectools doctor` now prints the API-key status text it computes.** The
+  per-key line built a `"set" / "not set"` string and then dropped it, printing
+  only the `OK` / `MISSING` icon; it now shows both (e.g. `OPENAI_API_KEY: OK
+  (set)`). (#135)
+
+### Internal
+
+- **Removed confirmed dead code** (#137): three unused `serve` request/response
+  dataclasses (`InvokeRequest`, `BatchRequest`, `BatchResponse`), two unreachable
+  private helpers (`bm25._score_document`, `hybrid._find_matching_key`), four
+  dead local variables, and 104 unused imports across the `src/` tree. No public
+  symbols affected.
+- **Tightened ruff config** (#138): `F401` (unused imports) and `F841` (unused
+  locals) are now enforced everywhere; the `F401` ignore is scoped to
+  `**/__init__.py` re-export hubs, so dead imports and locals can no longer
+  accumulate silently.
+- The vestigial `PineconeVectorStore(environment=...)` parameter is now
+  documented as deprecated/ignored (Pinecone v3+ infers the host); removal is
+  tracked for a future minor (#149).
+
 ## [1.0.0] - 2026-06-15 — Stable
 
 selectools is **1.0**. The public API is frozen: every public symbol carries a

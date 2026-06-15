@@ -13,10 +13,10 @@ import copy
 import json
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 if TYPE_CHECKING:
-    from ..types import AgentResult, Message
+    pass
 
 from ..stability import register_stability, stable
 
@@ -141,7 +141,7 @@ class GraphState:
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "GraphState":
         """Reconstruct a GraphState from a dictionary produced by to_dict()."""
-        from ..types import Message, Role  # noqa: F811
+        from ..types import Message  # noqa: F811
 
         messages: List[Any] = []
         for m in d.get("messages", []):
