@@ -172,15 +172,7 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
             raise ValueError("No embedding returned")
         return response.embeddings[0].values
 
-    @property
-    def dimension(self) -> int:
-        """
-        Get the embedding vector dimension.
 
-        Returns:
-            Dimension of embedding vectors
-        """
-        return self._dimension
 
 
 __stability__ = "beta"

@@ -63,7 +63,6 @@ class EmbeddingProvider(ABC):
         pass
 
     @property
-    @abstractmethod
     def dimension(self) -> int:
         """
         Get the embedding vector dimension for this model.
@@ -71,8 +70,7 @@ class EmbeddingProvider(ABC):
         Returns:
             Integer dimension of embedding vectors
         """
-        pass
-
+        return self._dimension
 
 __stability__ = "beta"
 

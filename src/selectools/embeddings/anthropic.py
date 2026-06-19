@@ -139,15 +139,6 @@ class AnthropicEmbeddingProvider(EmbeddingProvider):
         )
         return cast(List[float], response.embeddings[0])
 
-    @property
-    def dimension(self) -> int:
-        """
-        Get the embedding vector dimension.
-
-        Returns:
-            Dimension of embedding vectors
-        """
-        return self._dimension
 
 
 __stability__ = "beta"
