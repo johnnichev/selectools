@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, Iterable, List, Opti
 if TYPE_CHECKING:
     from ..tools.base import Tool
 
+from google.genai import types
+
 from ..env import load_default_env
 from ..exceptions import ProviderConfigurationError
 from ..models import Gemini as GeminiModels
@@ -141,6 +143,61 @@ class GeminiProvider(Provider):
         self._genai = genai
         self.default_model = default_model
 
+    def _build_config(
+        self,
+        *,
+        system_prompt: str,
+        tools: List[Tool] | None,
+        temperature: float,
+        max_tokens: int,
+        timeout: float | None,
+    ) -> types.GenerateContentConfig:
+
+        http_options = (
+            types.HttpOptions(timeout=int(timeout * 1000)) if timeout is not None else None
+        )
+
+        config = types.GenerateContentConfig(
+            temperature=temperature,
+            max_output_tokens=max_tokens,
+            system_instruction=system_prompt if system_prompt else None,
+            http_options=http_options,
+        )
+
+        if tools:
+            config.tools = [self._map_tool_to_gemini(t) for t in tools]
+
+        return config
+
+    def _toolcall_from_part(
+        self,
+        part: types.Part,
+    ) -> ToolCall:
+        tc_id = f"call_{uuid.uuid4().hex}"
+
+        raw_sig = getattr(part, "thought_signature", None)
+
+        sig_str = (
+            (
+                base64.b64encode(raw_sig).decode("ascii")
+                if isinstance(raw_sig, bytes)
+                else str(raw_sig)
+            )
+            if raw_sig
+            else None
+        )
+
+        function_call = part.function_call
+        if function_call is None:  # pragma: no cover - callers guard on part.function_call
+            raise ProviderError("Gemini part has no function_call to convert")
+
+        return ToolCall(
+            tool_name=str(function_call.name or ""),
+            parameters=function_call.args if function_call.args else {},
+            id=tc_id,
+            thought_signature=sig_str,
+        )
+
     def complete(
         self,
         *,
@@ -169,23 +226,17 @@ class GeminiProvider(Provider):
         Raises:
             ProviderError: If the API call fails
         """
-        from google.genai import types
 
         model_name = model or self.default_model
         contents = self._format_contents(system_prompt, messages)
 
-        http_options = (
-            types.HttpOptions(timeout=int(timeout * 1000)) if timeout is not None else None
-        )
-        config = types.GenerateContentConfig(
+        config = self._build_config(
+            system_prompt=system_prompt,
+            tools=tools,
             temperature=temperature,
-            max_output_tokens=max_tokens,
-            system_instruction=system_prompt if system_prompt else None,
-            http_options=http_options,
+            max_tokens=max_tokens,
+            timeout=timeout,
         )
-
-        if tools:
-            config.tools = [self._map_tool_to_gemini(t) for t in tools]
 
         try:
             response = self._client.models.generate_content(
@@ -210,25 +261,7 @@ class GeminiProvider(Provider):
         if candidate_content and candidate_content.parts:
             for part in candidate_content.parts:
                 if part.function_call:
-                    tc_id = f"call_{uuid.uuid4().hex}"
-                    raw_sig = getattr(part, "thought_signature", None)
-                    sig_str = (
-                        (
-                            base64.b64encode(raw_sig).decode("ascii")
-                            if isinstance(raw_sig, bytes)
-                            else str(raw_sig)
-                        )
-                        if raw_sig
-                        else None
-                    )
-                    tool_calls.append(
-                        ToolCall(
-                            tool_name=str(part.function_call.name or ""),
-                            parameters=part.function_call.args if part.function_call.args else {},
-                            id=tc_id,
-                            thought_signature=sig_str,
-                        )
-                    )
+                    tool_calls.append(self._toolcall_from_part(part))
 
         # Issue #66: a tool-equipped response with neither text nor tool calls
         # would silently no-op the agent loop. Surface it loudly.
@@ -292,23 +325,17 @@ class GeminiProvider(Provider):
             str: Text content deltas.
             ToolCall: Complete tool call objects when a function_call part arrives.
         """
-        from google.genai import types
 
         model_name = model or self.default_model
         contents = self._format_contents(system_prompt, messages)
 
-        http_options = (
-            types.HttpOptions(timeout=int(timeout * 1000)) if timeout is not None else None
-        )
-        config = types.GenerateContentConfig(
+        config = self._build_config(
+            system_prompt=system_prompt,
+            tools=tools,
             temperature=temperature,
-            max_output_tokens=max_tokens,
-            system_instruction=system_prompt if system_prompt else None,
-            http_options=http_options,
+            max_tokens=max_tokens,
+            timeout=timeout,
         )
-
-        if tools:
-            config.tools = [self._map_tool_to_gemini(t) for t in tools]
 
         try:
             stream = self._client.models.generate_content_stream(
@@ -358,28 +385,9 @@ class GeminiProvider(Provider):
                                         continue
                                     _seen_tool_calls.add(dedup_key)
 
-                                    tc_id = f"call_{uuid.uuid4().hex}"
-                                    raw_sig = getattr(part, "thought_signature", None)
-                                    sig_str = (
-                                        (
-                                            base64.b64encode(raw_sig).decode("ascii")
-                                            if isinstance(raw_sig, bytes)
-                                            else str(raw_sig)
-                                        )
-                                        if raw_sig
-                                        else None
-                                    )
-                                    _yielded_any = True
-                                    yield ToolCall(
-                                        tool_name=call_name,
-                                        parameters=(
-                                            part.function_call.args
-                                            if part.function_call.args
-                                            else {}
-                                        ),
-                                        id=tc_id,
-                                        thought_signature=sig_str,
-                                    )
+                                    if part.function_call:
+                                        _yielded_any = True
+                                        yield self._toolcall_from_part(part)
         except ProviderError:
             raise
         except Exception as exc:
@@ -565,23 +573,17 @@ class GeminiProvider(Provider):
         Returns:
             Tuple of (response_text, usage_stats)
         """
-        from google.genai import types
 
         model_name = model or self.default_model
         contents = self._format_contents(system_prompt, messages)
 
-        http_options = (
-            types.HttpOptions(timeout=int(timeout * 1000)) if timeout is not None else None
-        )
-        config = types.GenerateContentConfig(
+        config = self._build_config(
+            system_prompt=system_prompt,
+            tools=tools,
             temperature=temperature,
-            max_output_tokens=max_tokens,
-            system_instruction=system_prompt if system_prompt else None,
-            http_options=http_options,
+            max_tokens=max_tokens,
+            timeout=timeout,
         )
-
-        if tools:
-            config.tools = [self._map_tool_to_gemini(t) for t in tools]
 
         try:
             response = await self._client.aio.models.generate_content(
@@ -606,25 +608,7 @@ class GeminiProvider(Provider):
         if candidate_content and candidate_content.parts:
             for part in candidate_content.parts:
                 if part.function_call:
-                    tc_id = f"call_{uuid.uuid4().hex}"
-                    raw_sig = getattr(part, "thought_signature", None)
-                    sig_str = (
-                        (
-                            base64.b64encode(raw_sig).decode("ascii")
-                            if isinstance(raw_sig, bytes)
-                            else str(raw_sig)
-                        )
-                        if raw_sig
-                        else None
-                    )
-                    tool_calls.append(
-                        ToolCall(
-                            tool_name=str(part.function_call.name or ""),
-                            parameters=part.function_call.args if part.function_call.args else {},
-                            id=tc_id,
-                            thought_signature=sig_str,
-                        )
-                    )
+                    tool_calls.append(self._toolcall_from_part(part))
 
         # Issue #66: see complete() — surface empty tool-equipped responses.
         if tools and not content_text and not tool_calls:
@@ -684,23 +668,17 @@ class GeminiProvider(Provider):
             str: Text content deltas
             ToolCall: Complete tool call objects when a function_call part arrives
         """
-        from google.genai import types
 
         model_name = model or self.default_model
         contents = self._format_contents(system_prompt, messages)
 
-        http_options = (
-            types.HttpOptions(timeout=int(timeout * 1000)) if timeout is not None else None
-        )
-        config = types.GenerateContentConfig(
+        config = self._build_config(
+            system_prompt=system_prompt,
+            tools=tools,
             temperature=temperature,
-            max_output_tokens=max_tokens,
-            system_instruction=system_prompt if system_prompt else None,
-            http_options=http_options,
+            max_tokens=max_tokens,
+            timeout=timeout,
         )
-
-        if tools:
-            config.tools = [self._map_tool_to_gemini(t) for t in tools]
 
         try:
             stream = await self._client.aio.models.generate_content_stream(
@@ -744,29 +722,9 @@ class GeminiProvider(Provider):
                                     if dedup_key in _seen_tool_calls:
                                         continue
                                     _seen_tool_calls.add(dedup_key)
-
-                                    tc_id = f"call_{uuid.uuid4().hex}"
-                                    raw_sig = getattr(part, "thought_signature", None)
-                                    sig_str = (
-                                        (
-                                            base64.b64encode(raw_sig).decode("ascii")
-                                            if isinstance(raw_sig, bytes)
-                                            else str(raw_sig)
-                                        )
-                                        if raw_sig
-                                        else None
-                                    )
-                                    _yielded_any = True
-                                    yield ToolCall(
-                                        tool_name=call_name,
-                                        parameters=(
-                                            part.function_call.args
-                                            if part.function_call.args
-                                            else {}
-                                        ),
-                                        id=tc_id,
-                                        thought_signature=sig_str,
-                                    )
+                                    if part.function_call:
+                                        _yielded_any = True
+                                        yield self._toolcall_from_part(part)
         except ProviderError:
             raise
         except Exception as exc:

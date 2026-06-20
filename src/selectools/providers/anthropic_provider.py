@@ -155,6 +155,92 @@ class AnthropicProvider(Provider):
         self.cache_system = cache_system
         self.cache_tools = cache_tools
 
+    def _build_request_args(
+        self,
+        *,
+        model_name: str,
+        system_prompt: str,
+        payload: List[dict],
+        temperature: float,
+        max_tokens: int,
+        tools: List[Tool] | None,
+        timeout: float | None,
+        stream: bool = False,
+    ) -> Dict[str, Any]:
+        request_args: Dict[str, Any] = {
+            "model": model_name,
+            "system": self._system_param(system_prompt),
+            "messages": payload,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+
+        if stream:
+            request_args["stream"] = True
+
+        if tools:
+            request_args["tools"] = self._tools_param(tools)
+
+        if timeout is not None:
+            request_args["timeout"] = timeout
+
+        return request_args
+
+    def _message_from_content_blocks(
+        self,
+        blocks: Any,
+    ) -> tuple[str, List[ToolCall]]:
+        content_text = ""
+        tool_calls: List[ToolCall] = []
+
+        for block in blocks:
+            if block.type == "text":
+                content_text += block.text
+            elif block.type == "tool_use":
+                tool_calls.append(
+                    ToolCall(
+                        tool_name=block.name,
+                        parameters=cast(Dict[str, Any], block.input),
+                        id=block.id,
+                    )
+                )
+
+        return _strip_reasoning_tags(content_text), tool_calls
+
+    def _usage_from_response(
+        self,
+        response: Any,
+        model_name: str,
+    ) -> UsageStats:
+        usage = response.usage
+
+        cache_creation_tokens = self._cache_usage_token(
+            usage,
+            "cache_creation_input_tokens",
+        )
+
+        cache_read_tokens = self._cache_usage_token(
+            usage,
+            "cache_read_input_tokens",
+        )
+
+        return UsageStats(
+            prompt_tokens=usage.input_tokens if usage else 0,
+            completion_tokens=usage.output_tokens if usage else 0,
+            total_tokens=(usage.input_tokens + usage.output_tokens) if usage else 0,
+            cost_usd=calculate_cost(
+                model_name,
+                usage.input_tokens if usage else 0,
+                usage.output_tokens if usage else 0,
+                cache_read_input_tokens=cache_read_tokens or 0,
+                cache_creation_input_tokens=cache_creation_tokens or 0,
+            ),
+            model=model_name,
+            provider="anthropic",
+            cache_creation_input_tokens=cache_creation_tokens,
+            cache_read_input_tokens=cache_read_tokens,
+        )
+
     def complete(
         self,
         *,
@@ -185,61 +271,31 @@ class AnthropicProvider(Provider):
         """
         payload = self._format_messages(messages)
         model_name = model or self.default_model
-        request_args = {
-            "model": model_name,
-            "system": self._system_param(system_prompt),
-            "messages": payload,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        }
-        if tools:
-            request_args["tools"] = self._tools_param(tools)
+        request_args = self._build_request_args(
+            model_name=model_name,
+            system_prompt=system_prompt,
+            payload=payload,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            tools=tools,
+            timeout=timeout,
+        )
 
-        if timeout is not None:
-            request_args["timeout"] = timeout
         try:
             response = self._client.messages.create(**request_args)  # type: ignore[call-overload]
         except Exception as exc:
             raise ProviderError(f"Anthropic completion failed: {exc}") from exc
 
-        content_text = ""
-        tool_calls: List[ToolCall] = []
-
-        for block in response.content:
-            if block.type == "text":
-                content_text += block.text
-            elif block.type == "tool_use":
-                tool_calls.append(
-                    ToolCall(
-                        tool_name=block.name,
-                        parameters=cast(Dict[str, Any], block.input),
-                        id=block.id,
-                    )
-                )
+        content_text, tool_calls = self._message_from_content_blocks(response.content)
 
         content_text = _strip_reasoning_tags(content_text)
 
         # Extract usage stats. Cache tokens are billed separately from
         # input_tokens (reads at 0.1x, 5-min-TTL writes at 1.25x the prompt
         # rate), so they feed into calculate_cost as well.
-        usage = response.usage
-        cache_creation_tokens = self._cache_usage_token(usage, "cache_creation_input_tokens")
-        cache_read_tokens = self._cache_usage_token(usage, "cache_read_input_tokens")
-        usage_stats = UsageStats(
-            prompt_tokens=usage.input_tokens if usage else 0,
-            completion_tokens=usage.output_tokens if usage else 0,
-            total_tokens=(usage.input_tokens + usage.output_tokens) if usage else 0,
-            cost_usd=calculate_cost(
-                model_name,
-                usage.input_tokens if usage else 0,
-                usage.output_tokens if usage else 0,
-                cache_read_input_tokens=cache_read_tokens or 0,
-                cache_creation_input_tokens=cache_creation_tokens or 0,
-            ),
-            model=model_name,
-            provider="anthropic",
-            cache_creation_input_tokens=cache_creation_tokens,
-            cache_read_input_tokens=cache_read_tokens,
+        usage_stats = self._usage_from_response(
+            response,
+            model_name,
         )
 
         return (
@@ -271,18 +327,17 @@ class AnthropicProvider(Provider):
         """
         payload = self._format_messages(messages)
         model_name = model or self.default_model
-        request_args = {
-            "model": model_name,
-            "system": self._system_param(system_prompt),
-            "messages": payload,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "stream": True,
-        }
-        if tools:
-            request_args["tools"] = self._tools_param(tools)
-        if timeout is not None:
-            request_args["timeout"] = timeout
+        request_args = self._build_request_args(
+            model_name=model_name,
+            system_prompt=system_prompt,
+            payload=payload,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            tools=tools,
+            timeout=timeout,
+            stream=True,
+        )
+
         try:
             stream = self._client.messages.create(**request_args)  # type: ignore[call-overload]
         except Exception as exc:
@@ -561,63 +616,32 @@ class AnthropicProvider(Provider):
         """
         payload = self._format_messages(messages)
         model_name = model or self.default_model
-        request_args = {
-            "model": model_name,
-            "system": self._system_param(system_prompt),
-            "messages": payload,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        }
-        if tools:
-            request_args["tools"] = self._tools_param(tools)
+        request_args = self._build_request_args(
+            model_name=model_name,
+            system_prompt=system_prompt,
+            payload=payload,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            tools=tools,
+            timeout=timeout,
+        )
 
-        if timeout is not None:
-            request_args["timeout"] = timeout
         try:
             response = await self._async_client.messages.create(**request_args)  # type: ignore[call-overload]
         except Exception as exc:
             raise ProviderError(f"Anthropic async completion failed: {exc}") from exc
 
-        content_text = ""
-        tool_calls: List[ToolCall] = []
-
-        for block in response.content:
-            if block.type == "text":
-                content_text += block.text
-            elif block.type == "tool_use":
-                tool_calls.append(
-                    ToolCall(
-                        tool_name=block.name,
-                        parameters=cast(Dict[str, Any], block.input),
-                        id=block.id,
-                    )
-                )
+        content_text, tool_calls = self._message_from_content_blocks(response.content)
 
         content_text = _strip_reasoning_tags(content_text)
 
         # Extract usage stats. Cache tokens are billed separately from
         # input_tokens (reads at 0.1x, 5-min-TTL writes at 1.25x the prompt
         # rate), so they feed into calculate_cost as well.
-        usage = response.usage
-        cache_creation_tokens = self._cache_usage_token(usage, "cache_creation_input_tokens")
-        cache_read_tokens = self._cache_usage_token(usage, "cache_read_input_tokens")
-        usage_stats = UsageStats(
-            prompt_tokens=usage.input_tokens if usage else 0,
-            completion_tokens=usage.output_tokens if usage else 0,
-            total_tokens=(usage.input_tokens + usage.output_tokens) if usage else 0,
-            cost_usd=calculate_cost(
-                model_name,
-                usage.input_tokens if usage else 0,
-                usage.output_tokens if usage else 0,
-                cache_read_input_tokens=cache_read_tokens or 0,
-                cache_creation_input_tokens=cache_creation_tokens or 0,
-            ),
-            model=model_name,
-            provider="anthropic",
-            cache_creation_input_tokens=cache_creation_tokens,
-            cache_read_input_tokens=cache_read_tokens,
+        usage_stats = self._usage_from_response(
+            response,
+            model_name,
         )
-
         return (
             Message(
                 role=Role.ASSISTANT,
@@ -647,18 +671,17 @@ class AnthropicProvider(Provider):
         """
         payload = self._format_messages(messages)
         model_name = model or self.default_model
-        request_args = {
-            "model": model_name,
-            "system": self._system_param(system_prompt),
-            "messages": payload,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "stream": True,
-        }
-        if tools:
-            request_args["tools"] = self._tools_param(tools)
-        if timeout is not None:
-            request_args["timeout"] = timeout
+        request_args = self._build_request_args(
+            model_name=model_name,
+            system_prompt=system_prompt,
+            payload=payload,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            tools=tools,
+            timeout=timeout,
+            stream=True,
+        )
+
         try:
             stream = await self._async_client.messages.create(**request_args)  # type: ignore[call-overload]
         except Exception as exc:
