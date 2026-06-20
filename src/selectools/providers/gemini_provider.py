@@ -187,9 +187,13 @@ class GeminiProvider(Provider):
             else None
         )
 
+        function_call = part.function_call
+        if function_call is None:  # pragma: no cover - callers guard on part.function_call
+            raise ProviderError("Gemini part has no function_call to convert")
+
         return ToolCall(
-            tool_name=str(part.function_call.name or ""),
-            parameters=part.function_call.args if part.function_call.args else {},
+            tool_name=str(function_call.name or ""),
+            parameters=function_call.args if function_call.args else {},
             id=tc_id,
             thought_signature=sig_str,
         )

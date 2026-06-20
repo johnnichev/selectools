@@ -147,7 +147,6 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         return self.embed_text(query)
 
 
-
 __stability__ = "beta"
 
 __all__ = ["OpenAIEmbeddingProvider"]

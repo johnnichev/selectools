@@ -19,6 +19,11 @@ class EmbeddingProvider(ABC):
     across different backend implementations (OpenAI, Anthropic/Voyage, Gemini, Cohere).
     """
 
+    # Each concrete provider sets this in __init__ (typically via
+    # _get_model_dimension()). Declared here so the shared `dimension`
+    # property below is type-checked against the base class.
+    _dimension: int
+
     @abstractmethod
     def embed_text(self, text: str) -> List[float]:
         """
@@ -71,6 +76,7 @@ class EmbeddingProvider(ABC):
             Integer dimension of embedding vectors
         """
         return self._dimension
+
 
 __stability__ = "beta"
 

@@ -173,8 +173,6 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
         return response.embeddings[0].values
 
 
-
-
 __stability__ = "beta"
 
 __all__ = ["GeminiEmbeddingProvider"]

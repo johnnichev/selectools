@@ -140,7 +140,6 @@ class AnthropicEmbeddingProvider(EmbeddingProvider):
         return cast(List[float], response.embeddings[0])
 
 
-
 __stability__ = "beta"
 
 __all__ = ["AnthropicEmbeddingProvider"]
