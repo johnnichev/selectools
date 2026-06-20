@@ -113,8 +113,6 @@ class AnthropicProvider(Provider):
     cache_system: bool = False
     cache_tools: bool = False
 
-
-
     def __init__(
         self,
         api_key: str | None = None,
@@ -156,8 +154,6 @@ class AnthropicProvider(Provider):
         self.default_model = default_model
         self.cache_system = cache_system
         self.cache_tools = cache_tools
-
-
 
     def _build_request_args(
         self,
@@ -209,8 +205,7 @@ class AnthropicProvider(Provider):
                     )
                 )
 
-        return _strip_reasoning_tags(content_text), tool_calls    
-
+        return _strip_reasoning_tags(content_text), tool_calls
 
     def _usage_from_response(
         self,
@@ -245,7 +240,6 @@ class AnthropicProvider(Provider):
             cache_creation_input_tokens=cache_creation_tokens,
             cache_read_input_tokens=cache_read_tokens,
         )
-
 
     def complete(
         self,
@@ -286,19 +280,13 @@ class AnthropicProvider(Provider):
             tools=tools,
             timeout=timeout,
         )
-        if tools:
-            request_args["tools"] = self._tools_param(tools)
 
-        if timeout is not None:
-            request_args["timeout"] = timeout
         try:
             response = self._client.messages.create(**request_args)  # type: ignore[call-overload]
         except Exception as exc:
             raise ProviderError(f"Anthropic completion failed: {exc}") from exc
 
-        content_text, tool_calls = self._message_from_content_blocks(
-            response.content
-        )
+        content_text, tool_calls = self._message_from_content_blocks(response.content)
 
         content_text = _strip_reasoning_tags(content_text)
 
@@ -349,10 +337,7 @@ class AnthropicProvider(Provider):
             timeout=timeout,
             stream=True,
         )
-        if tools:
-            request_args["tools"] = self._tools_param(tools)
-        if timeout is not None:
-            request_args["timeout"] = timeout
+
         try:
             stream = self._client.messages.create(**request_args)  # type: ignore[call-overload]
         except Exception as exc:
@@ -640,19 +625,13 @@ class AnthropicProvider(Provider):
             tools=tools,
             timeout=timeout,
         )
-        if tools:
-            request_args["tools"] = self._tools_param(tools)
 
-        if timeout is not None:
-            request_args["timeout"] = timeout
         try:
             response = await self._async_client.messages.create(**request_args)  # type: ignore[call-overload]
         except Exception as exc:
             raise ProviderError(f"Anthropic async completion failed: {exc}") from exc
 
-        content_text, tool_calls = self._message_from_content_blocks(
-            response.content
-        )
+        content_text, tool_calls = self._message_from_content_blocks(response.content)
 
         content_text = _strip_reasoning_tags(content_text)
 
@@ -702,10 +681,7 @@ class AnthropicProvider(Provider):
             timeout=timeout,
             stream=True,
         )
-        if tools:
-            request_args["tools"] = self._tools_param(tools)
-        if timeout is not None:
-            request_args["timeout"] = timeout
+
         try:
             stream = await self._async_client.messages.create(**request_args)  # type: ignore[call-overload]
         except Exception as exc:

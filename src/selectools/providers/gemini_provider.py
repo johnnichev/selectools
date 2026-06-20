@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, Iterable, List, Opti
 if TYPE_CHECKING:
     from ..tools.base import Tool
 
+from google.genai import types
+
 from ..env import load_default_env
 from ..exceptions import ProviderConfigurationError
 from ..models import Gemini as GeminiModels
@@ -141,21 +143,18 @@ class GeminiProvider(Provider):
         self._genai = genai
         self.default_model = default_model
 
-
     def _build_config(
         self,
         *,
         system_prompt: str,
-        tools,
+        tools: List[Tool] | None,
         temperature: float,
         max_tokens: int,
-        timeout: float | None,):
-        from google.genai import types
+        timeout: float | None,
+    ) -> types.GenerateContentConfig:
 
         http_options = (
-            types.HttpOptions(timeout=int(timeout * 1000))
-            if timeout is not None
-            else None
+            types.HttpOptions(timeout=int(timeout * 1000)) if timeout is not None else None
         )
 
         config = types.GenerateContentConfig(
@@ -168,11 +167,12 @@ class GeminiProvider(Provider):
         if tools:
             config.tools = [self._map_tool_to_gemini(t) for t in tools]
 
-        return config    
+        return config
 
-
-
-    def _toolcall_from_part(self, part) -> ToolCall:
+    def _toolcall_from_part(
+        self,
+        part: types.Part,
+    ) -> ToolCall:
         tc_id = f"call_{uuid.uuid4().hex}"
 
         raw_sig = getattr(part, "thought_signature", None)
@@ -193,7 +193,6 @@ class GeminiProvider(Provider):
             id=tc_id,
             thought_signature=sig_str,
         )
-
 
     def complete(
         self,
@@ -223,7 +222,6 @@ class GeminiProvider(Provider):
         Raises:
             ProviderError: If the API call fails
         """
-        from google.genai import types
 
         model_name = model or self.default_model
         contents = self._format_contents(system_prompt, messages)
@@ -259,9 +257,7 @@ class GeminiProvider(Provider):
         if candidate_content and candidate_content.parts:
             for part in candidate_content.parts:
                 if part.function_call:
-                    tool_calls.append(
-                        self._toolcall_from_part(part)
-                    )
+                    tool_calls.append(self._toolcall_from_part(part))
 
         # Issue #66: a tool-equipped response with neither text nor tool calls
         # would silently no-op the agent loop. Surface it loudly.
@@ -325,7 +321,6 @@ class GeminiProvider(Provider):
             str: Text content deltas.
             ToolCall: Complete tool call objects when a function_call part arrives.
         """
-        from google.genai import types
 
         model_name = model or self.default_model
         contents = self._format_contents(system_prompt, messages)
@@ -386,7 +381,9 @@ class GeminiProvider(Provider):
                                         continue
                                     _seen_tool_calls.add(dedup_key)
 
-                                    yield self._toolcall_from_part(part)
+                                    if part.function_call:
+                                        _yielded_any = True
+                                        yield self._toolcall_from_part(part)
         except ProviderError:
             raise
         except Exception as exc:
@@ -572,7 +569,6 @@ class GeminiProvider(Provider):
         Returns:
             Tuple of (response_text, usage_stats)
         """
-        from google.genai import types
 
         model_name = model or self.default_model
         contents = self._format_contents(system_prompt, messages)
@@ -608,9 +604,7 @@ class GeminiProvider(Provider):
         if candidate_content and candidate_content.parts:
             for part in candidate_content.parts:
                 if part.function_call:
-                    tool_calls.append(
-                        self._toolcall_from_part(part)
-                    )
+                    tool_calls.append(self._toolcall_from_part(part))
 
         # Issue #66: see complete() — surface empty tool-equipped responses.
         if tools and not content_text and not tool_calls:
@@ -670,7 +664,6 @@ class GeminiProvider(Provider):
             str: Text content deltas
             ToolCall: Complete tool call objects when a function_call part arrives
         """
-        from google.genai import types
 
         model_name = model or self.default_model
         contents = self._format_contents(system_prompt, messages)
@@ -725,7 +718,9 @@ class GeminiProvider(Provider):
                                     if dedup_key in _seen_tool_calls:
                                         continue
                                     _seen_tool_calls.add(dedup_key)
-                                    yield self._toolcall_from_part(part)
+                                    if part.function_call:
+                                        _yielded_any = True
+                                        yield self._toolcall_from_part(part)
         except ProviderError:
             raise
         except Exception as exc:
