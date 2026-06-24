@@ -33,6 +33,31 @@ def _make_key(session_id: str, namespace: Optional[str]) -> str:
     return session_id
 
 
+def _validate_session_id(session_id: str) -> None:
+    """Validate session ID."""
+    if not session_id:
+        raise ValueError("session_id must not be empty")
+    if "\x00" in session_id:
+        raise ValueError(f"session_id must not contain null bytes: {session_id!r}")
+    if len(session_id) > 512:
+        raise ValueError(f"session_id too long ({len(session_id)} chars, max 512): {session_id!r}")
+
+
+def _validate_namespace(namespace: Optional[str]) -> None:
+    """Validate namespace."""
+    if namespace is None:
+        return
+
+    if not namespace:
+        raise ValueError("namespace must not be empty when provided")
+
+    if "\x00" in namespace:
+        raise ValueError(f"namespace must not contain null bytes: {namespace!r}")
+
+    if len(namespace) > 512:
+        raise ValueError(f"namespace too long ({len(namespace)} chars, max 512): {namespace!r}")
+
+
 @stable
 @dataclass
 class SessionMetadata:
@@ -856,37 +881,14 @@ class RedisSessionStore:
         self._prefix = prefix
         self._default_ttl = default_ttl
 
-    @staticmethod
-    def _validate_session_id(session_id: str) -> None:
-        """Reject session IDs that could cause key collisions or other problems."""
-        if not session_id:
-            raise ValueError("session_id must not be empty")
-        if "\x00" in session_id:
-            raise ValueError(f"session_id must not contain null bytes: {session_id!r}")
-        if len(session_id) > 512:
-            raise ValueError(
-                f"session_id too long ({len(session_id)} chars, max 512): {session_id!r}"
-            )
-
-    @staticmethod
-    def _validate_namespace(namespace: Optional[str]) -> None:
-        if namespace is None:
-            return
-        if not namespace:
-            raise ValueError("namespace must not be empty when provided")
-        if "\x00" in namespace:
-            raise ValueError(f"namespace must not contain null bytes: {namespace!r}")
-        if len(namespace) > 512:
-            raise ValueError(f"namespace too long ({len(namespace)} chars, max 512): {namespace!r}")
-
     def _key(self, session_id: str, namespace: Optional[str] = None) -> str:
-        self._validate_session_id(session_id)
-        self._validate_namespace(namespace)
+        _validate_session_id(session_id)
+        _validate_namespace(namespace)
         return f"{self._prefix}{_make_key(session_id, namespace)}"
 
     def _meta_key(self, session_id: str, namespace: Optional[str] = None) -> str:
-        self._validate_session_id(session_id)
-        self._validate_namespace(namespace)
+        _validate_session_id(session_id)
+        _validate_namespace(namespace)
         return f"{self._prefix}__meta__{_make_key(session_id, namespace)}"
 
     # -- public API --------------------------------------------------------
@@ -1129,32 +1131,9 @@ class SupabaseSessionStore:
 
     # -- validation helpers ------------------------------------------------
 
-    @staticmethod
-    def _validate_session_id(session_id: str) -> None:
-        """Reject session IDs that could cause key collisions or other problems."""
-        if not session_id:
-            raise ValueError("session_id must not be empty")
-        if "\x00" in session_id:
-            raise ValueError(f"session_id must not contain null bytes: {session_id!r}")
-        if len(session_id) > 512:
-            raise ValueError(
-                f"session_id too long ({len(session_id)} chars, max 512): {session_id!r}"
-            )
-
-    @staticmethod
-    def _validate_namespace(namespace: Optional[str]) -> None:
-        if namespace is None:
-            return
-        if not namespace:
-            raise ValueError("namespace must not be empty when provided")
-        if "\x00" in namespace:
-            raise ValueError(f"namespace must not contain null bytes: {namespace!r}")
-        if len(namespace) > 512:
-            raise ValueError(f"namespace too long ({len(namespace)} chars, max 512): {namespace!r}")
-
     def _key(self, session_id: str, namespace: Optional[str] = None) -> str:
-        self._validate_session_id(session_id)
-        self._validate_namespace(namespace)
+        _validate_session_id(session_id)
+        _validate_namespace(namespace)
         return _make_key(session_id, namespace)
 
     # -- public API --------------------------------------------------------
@@ -1358,33 +1337,9 @@ class MongoSessionStore:
             # expireAfterSeconds=0 deletes docs once `expires_at` is reached.
             self._collection.create_index("expires_at", expireAfterSeconds=0)
 
-    # -- validation helpers ------------------------------------------------
-
-    @staticmethod
-    def _validate_session_id(session_id: str) -> None:
-        if not session_id:
-            raise ValueError("session_id must not be empty")
-        if "\x00" in session_id:
-            raise ValueError(f"session_id must not contain null bytes: {session_id!r}")
-        if len(session_id) > 512:
-            raise ValueError(
-                f"session_id too long ({len(session_id)} chars, max 512): {session_id!r}"
-            )
-
-    @staticmethod
-    def _validate_namespace(namespace: Optional[str]) -> None:
-        if namespace is None:
-            return
-        if not namespace:
-            raise ValueError("namespace must not be empty when provided")
-        if "\x00" in namespace:
-            raise ValueError(f"namespace must not contain null bytes: {namespace!r}")
-        if len(namespace) > 512:
-            raise ValueError(f"namespace too long ({len(namespace)} chars, max 512): {namespace!r}")
-
     def _key(self, session_id: str, namespace: Optional[str] = None) -> str:
-        self._validate_session_id(session_id)
-        self._validate_namespace(namespace)
+        _validate_session_id(session_id)
+        _validate_namespace(namespace)
         return _make_key(session_id, namespace)
 
     # -- public API --------------------------------------------------------
@@ -1468,7 +1423,7 @@ class MongoSessionStore:
             return []
         mongo_filter: Dict[str, Any] = {}
         if namespace is not None:
-            self._validate_namespace(namespace)
+            _validate_namespace(namespace)
             mongo_filter["namespace"] = namespace
         results: List[SessionSearchResult] = []
         for doc in self._collection.find(mongo_filter):
@@ -1545,31 +1500,9 @@ class DynamoDBSessionStore:
 
     # -- validation helpers ------------------------------------------------
 
-    @staticmethod
-    def _validate_session_id(session_id: str) -> None:
-        if not session_id:
-            raise ValueError("session_id must not be empty")
-        if "\x00" in session_id:
-            raise ValueError(f"session_id must not contain null bytes: {session_id!r}")
-        if len(session_id) > 512:
-            raise ValueError(
-                f"session_id too long ({len(session_id)} chars, max 512): {session_id!r}"
-            )
-
-    @staticmethod
-    def _validate_namespace(namespace: Optional[str]) -> None:
-        if namespace is None:
-            return
-        if not namespace:
-            raise ValueError("namespace must not be empty when provided")
-        if "\x00" in namespace:
-            raise ValueError(f"namespace must not contain null bytes: {namespace!r}")
-        if len(namespace) > 512:
-            raise ValueError(f"namespace too long ({len(namespace)} chars, max 512): {namespace!r}")
-
     def _key(self, session_id: str, namespace: Optional[str] = None) -> str:
-        self._validate_session_id(session_id)
-        self._validate_namespace(namespace)
+        _validate_session_id(session_id)
+        _validate_namespace(namespace)
         return _make_key(session_id, namespace)
 
     # -- public API --------------------------------------------------------
@@ -1670,7 +1603,7 @@ class DynamoDBSessionStore:
         if not terms or limit <= 0:
             return []
         if namespace is not None:
-            self._validate_namespace(namespace)
+            _validate_namespace(namespace)
         results: List[SessionSearchResult] = []
         for item in self._scan_all():
             if namespace is not None and item.get("namespace") != namespace:
