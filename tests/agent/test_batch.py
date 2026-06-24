@@ -7,15 +7,14 @@ Previously only covered by E2E tests that were always skipped in CI.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
-from unittest.mock import MagicMock
+from typing import Any, List, Tuple
 
 import pytest
 
 from selectools.agent.core import Agent, AgentConfig
 from selectools.providers.base import Provider, ProviderError
 from selectools.tools import tool
-from selectools.types import AgentResult, Message, Role, ToolCall
+from selectools.types import AgentResult, Message, Role
 from selectools.usage import UsageStats
 
 _DUMMY_USAGE = UsageStats(0, 0, 0, 0.0, "mock", "mock")
@@ -183,6 +182,6 @@ class TestBatchErrorHandling:
         assert len(results) == 3
 
         contents = [r.content for r in results]
-        error_results = [c for c in contents if "error" in c.lower() or "Error" in c]
+        [c for c in contents if "error" in c.lower() or "Error" in c]
         success_results = [c for c in contents if "ok" in c.lower()]
         assert len(success_results) >= 1

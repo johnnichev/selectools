@@ -7,21 +7,19 @@ feature gap that was previously missing from astream().
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple, Union
+from typing import Any, AsyncGenerator, Dict, List, Tuple, Union
 from unittest.mock import MagicMock
 
 import pytest
 
-from selectools.agent.core import Agent, AgentConfig, _RunContext
+from selectools.agent.core import Agent, AgentConfig
 from selectools.exceptions import GraphExecutionError
-from selectools.guardrails import Guardrail, GuardrailAction, GuardrailResult, GuardrailsPipeline
+from selectools.guardrails import Guardrail, GuardrailResult, GuardrailsPipeline
 from selectools.observer import AgentObserver
 from selectools.policy import PolicyDecision, PolicyResult, ToolPolicy
 from selectools.providers.base import Provider
-from selectools.structured import ResponseFormat
-from selectools.tools import Tool, tool
-from selectools.trace import AgentTrace
-from selectools.types import AgentResult, Message, Role, StreamChunk, ToolCall
+from selectools.tools import tool
+from selectools.types import AgentResult, Message, Role, ToolCall
 from selectools.usage import UsageStats
 
 _DUMMY_USAGE = UsageStats(0, 0, 0, 0.0, "mock", "mock")
@@ -242,7 +240,7 @@ class TestAstreamInputGuardrails:
             provider=provider,
             config=AgentConfig(max_iterations=1, guardrails=pipeline),
         )
-        result = await _collect_astream(agent, "This is bad")
+        await _collect_astream(agent, "This is bad")
         # The guardrail should have rewritten "bad" to "good" in the history
         user_msgs = [m for m in agent._history if m.role == Role.USER]
         assert any("good" in (m.content or "") for m in user_msgs)
@@ -288,7 +286,7 @@ class TestAstreamKnowledgeMemory:
             provider=provider,
             config=AgentConfig(max_iterations=1, knowledge_memory=km),
         )
-        result = await _collect_astream(agent, "Hello")
+        await _collect_astream(agent, "Hello")
         system_msgs = [m for m in agent._history if m.role == Role.SYSTEM]
         assert any("User prefers Python" in (m.content or "") for m in system_msgs)
 
@@ -308,7 +306,7 @@ class TestAstreamEntityMemory:
             provider=provider,
             config=AgentConfig(max_iterations=1, entity_memory=em),
         )
-        result = await _collect_astream(agent, "Hi")
+        await _collect_astream(agent, "Hi")
         system_msgs = [m for m in agent._history if m.role == Role.SYSTEM]
         assert any("Alice: engineer" in (m.content or "") for m in system_msgs)
 
@@ -328,7 +326,7 @@ class TestAstreamKnowledgeGraph:
             provider=provider,
             config=AgentConfig(max_iterations=1, knowledge_graph=kg),
         )
-        result = await _collect_astream(agent, "Tell me about Alice")
+        await _collect_astream(agent, "Tell me about Alice")
         system_msgs = [m for m in agent._history if m.role == Role.SYSTEM]
         assert any("Alice -> works_at -> Acme" in (m.content or "") for m in system_msgs)
 
@@ -501,7 +499,7 @@ class TestAstreamAnalytics:
             provider=provider,
             config=AgentConfig(max_iterations=2, enable_analytics=True),
         )
-        result = await _collect_astream(agent, "Greet Bob")
+        await _collect_astream(agent, "Greet Bob")
         assert agent.analytics is not None
         metrics = agent.analytics.get_metrics("greet_tool")
         assert metrics is not None
@@ -895,7 +893,7 @@ class TestAstreamPerToolUsageTracking:
             provider=provider,
             config=AgentConfig(max_iterations=2),
         )
-        result = await _collect_astream(agent, "Greet Alice")
+        await _collect_astream(agent, "Greet Alice")
         assert "greet_tool" in agent.usage.tool_usage
         assert agent.usage.tool_usage["greet_tool"] >= 1
 
@@ -1184,7 +1182,7 @@ class TestParallelOutputScreening:
             provider=provider,
             config=AgentConfig(max_iterations=2, screen_tool_output=True),
         )
-        result = agent.run("Use both tools")
+        agent.run("Use both tools")
         # Screening should have caught the injection pattern in the tool result
         # The tool result in history should be modified by screening
         tool_msgs = [
@@ -1209,7 +1207,7 @@ class TestParallelOutputScreening:
             provider=provider,
             config=AgentConfig(max_iterations=2, screen_tool_output=True),
         )
-        result = await agent.arun("Use both tools")
+        await agent.arun("Use both tools")
         tool_msgs = [
             m
             for m in agent._history

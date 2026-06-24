@@ -9,8 +9,6 @@ from __future__ import annotations
 import os
 import time
 
-import pytest
-
 from selectools.entity_memory import Entity, EntityMemory
 from selectools.knowledge import KnowledgeMemory
 from selectools.memory import ConversationMemory

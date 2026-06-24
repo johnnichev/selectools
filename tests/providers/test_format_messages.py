@@ -11,7 +11,7 @@ sent to the provider API.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -175,7 +175,7 @@ class TestGeminiFormatContents:
 
     def test_tool_role_as_function_response(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -199,7 +199,7 @@ class TestGeminiFormatContents:
 
     def test_assistant_with_function_call(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -227,7 +227,7 @@ class TestGeminiFormatContents:
 
     def test_user_with_image(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -240,7 +240,7 @@ class TestGeminiFormatContents:
 
     def test_tool_without_name_fallback(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -381,7 +381,7 @@ class TestGeminiTimeout:
     def test_complete_passes_timeout_to_config(self) -> None:
         """complete() must set http_options with timeout_ms when timeout is given."""
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -413,7 +413,7 @@ class TestGeminiTimeout:
     def test_complete_no_timeout_does_not_set_http_options(self) -> None:
         """complete() must not set http_options when timeout=None."""
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -444,7 +444,7 @@ class TestGeminiTimeout:
     def test_stream_passes_timeout_to_config(self) -> None:
         """stream() must set http_options with timeout_ms when timeout is given."""
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -482,7 +482,7 @@ class TestGeminiTimeout:
     def test_timeout_seconds_converted_to_milliseconds(self) -> None:
         """Timeout in seconds must be converted to milliseconds (SDK uses ms)."""
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 from unittest.mock import MagicMock, patch
 
 import pytest

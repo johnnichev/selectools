@@ -11,13 +11,9 @@ Covers:
 
 from __future__ import annotations
 
-import csv
 import json
-import tempfile
-from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Generator
 from unittest import mock
 
 import pytest

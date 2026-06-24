@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from selectools.knowledge import KnowledgeBackend, KnowledgeMemory
+from selectools.knowledge import KnowledgeMemory
 from selectools.knowledge_backends import SupabaseKnowledgeBackend
 
 # ======================================================================

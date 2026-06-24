@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import time
 from typing import Any, List, Optional, Tuple
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -246,7 +245,6 @@ class _StreamingOkProvider:
     supports_async = True
 
     def __init__(self, chunks: Optional[List[Any]] = None):
-        from selectools.types import ToolCall
 
         self._chunks: List[Any] = chunks if chunks is not None else ["hello ", "world"]
 

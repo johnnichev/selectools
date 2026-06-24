@@ -108,7 +108,7 @@ async def test_context_propagation_to_tools() -> None:
         )
 
         # 3. Execute agent
-        result = await agent.arun([Message(role=Role.USER, content="start")])
+        await agent.arun([Message(role=Role.USER, content="start")])
 
         # 4. Verify results in history
         # Check agent history directly

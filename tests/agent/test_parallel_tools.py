@@ -309,7 +309,7 @@ class TestParallelErrorHandling:
             provider=provider,
             config=AgentConfig(max_iterations=3, parallel_tool_execution=True),
         )
-        result = await agent.arun([Message(role=Role.USER, content="go")])
+        await agent.arun([Message(role=Role.USER, content="go")])
 
         tool_results = [m for m in agent._history if m.role == Role.TOOL]
         assert len(tool_results) == 3
@@ -334,7 +334,7 @@ class TestParallelUnknownTool:
             provider=provider,
             config=AgentConfig(max_iterations=3, parallel_tool_execution=True),
         )
-        result = agent.run([Message(role=Role.USER, content="go")])
+        agent.run([Message(role=Role.USER, content="go")])
 
         tool_results = [m for m in agent._history if m.role == Role.TOOL]
         assert len(tool_results) == 2

@@ -9,7 +9,7 @@ is exercised without real AWS access.
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from unittest.mock import MagicMock, patch
 
 import pytest

@@ -11,7 +11,7 @@ import os
 import sys
 import types
 from pathlib import Path
-from typing import Any, Callable, Coroutine, Dict, Generator, List, Optional
+from typing import Any, Callable, Coroutine, Generator, List, Optional
 
 import pytest
 
@@ -229,7 +229,7 @@ def test_conversation_memory_with_agent() -> None:
     assert memory.get_history()[1].role == Role.ASSISTANT
 
     # Second turn - memory should persist
-    response2 = agent.run([Message(role=Role.USER, content="Hi again")])
+    agent.run([Message(role=Role.USER, content="Hi again")])
     assert len(memory) == 4  # 2 previous + 2 new
     history = memory.get_history()
     assert history[0].content == "Hello"
@@ -698,11 +698,11 @@ async def test_async_with_memory() -> None:
     agent = Agent(tools=[tool], provider=LocalProvider(), memory=memory)
 
     # First turn
-    response1 = await agent.arun([Message(role=Role.USER, content="Hello 1")])
+    await agent.arun([Message(role=Role.USER, content="Hello 1")])
     assert len(memory) >= 1
 
     # Second turn
-    response2 = await agent.arun([Message(role=Role.USER, content="Hello 2")])
+    await agent.arun([Message(role=Role.USER, content="Hello 2")])
     assert len(memory) >= 2
 
 

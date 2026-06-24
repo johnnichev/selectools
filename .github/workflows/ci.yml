@@ -8,6 +8,22 @@ on:
     branches: [main]
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install ruff
+        # Pinned to match the ruff-pre-commit rev in .pre-commit-config.yaml
+        run: pip install ruff==0.15.8
+      - name: Ruff lint
+        run: ruff check src/ tests/
+      - name: Ruff format check
+        run: ruff format --check src/ tests/
+
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -45,7 +61,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    needs: [test, security]
+    needs: [lint, test, security]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6

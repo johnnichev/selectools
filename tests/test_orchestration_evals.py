@@ -15,7 +15,6 @@ Validates that agents in graphs actually:
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, List
 
 import pytest
 

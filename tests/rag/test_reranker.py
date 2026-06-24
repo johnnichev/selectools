@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 try:
-    import numpy
+    import numpy  # noqa: F401
 
     NUMPY_AVAILABLE = True
 except ImportError:
@@ -419,7 +419,7 @@ class TestHybridSearcherWithReranker:
 
         searcher_no_rerank = HybridSearcher(vector_store=store)
         searcher_no_rerank.add_documents(documents)
-        results_original = searcher_no_rerank.search("Python programming", top_k=5)
+        searcher_no_rerank.search("Python programming", top_k=5)
 
         store2 = InMemoryVectorStore(MockEmbedder())
         reranker = MockReranker(reverse=True)

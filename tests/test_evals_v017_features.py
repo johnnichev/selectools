@@ -24,12 +24,11 @@ from unittest.mock import patch
 
 import pytest
 
-from selectools import Agent, AgentConfig, AgentResult, Message, Role, tool
+from selectools import Agent, AgentConfig, Message, Role, tool
 from selectools.cache_semantic import SemanticCache, _cosine_similarity
 from selectools.evals import EvalSuite, TestCase
 from selectools.evals.evaluators import ContainsEvaluator, CustomEvaluator
 from selectools.evals.report import EvalReport
-from selectools.evals.types import CaseResult, CaseVerdict, EvalMetadata
 from selectools.memory import ConversationMemory
 from selectools.sessions import JsonFileSessionStore, SQLiteSessionStore
 from selectools.token_estimation import TokenEstimate

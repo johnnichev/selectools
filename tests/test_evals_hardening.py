@@ -10,7 +10,6 @@ and chained evaluator interactions.
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -21,18 +20,13 @@ from selectools import Agent, AgentConfig, tool
 from selectools.evals import (
     BaselineStore,
     CaseVerdict,
-    DatasetLoader,
     EvalSuite,
     HistoryStore,
     PairwiseEval,
     SnapshotStore,
     TestCase,
     generate_badge,
-    generate_detailed_badge,
 )
-from selectools.evals.evaluators import DEFAULT_EVALUATORS
-from selectools.evals.history import HistoryEntry, HistoryTrend
-from selectools.evals.html import _donut_svg, _histogram_svg, _trend_svg
 from selectools.evals.llm_evaluators import (
     CorrectnessEvaluator,
     InstructionFollowingEvaluator,
@@ -335,7 +329,6 @@ class TestFeatureChains:
 
     def test_html_report_with_all_verdicts(self, tmp_path: Path) -> None:
         """HTML report handles pass, fail, and error in the same report."""
-        from tests.conftest import SharedErrorProvider
 
         agent_good = _fake_agent(["good"])
         r1 = EvalSuite(
@@ -756,7 +749,6 @@ class TestBaselineStorePathTraversal:
 
     def test_save_strips_directory_traversal(self, tmp_path: Path) -> None:
         """A suite name with '../' components must not escape the baseline dir."""
-        import json
 
         from selectools.evals import EvalReport
         from selectools.evals.regression import BaselineStore

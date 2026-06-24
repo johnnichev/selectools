@@ -12,8 +12,6 @@ import urllib.error
 from io import BytesIO
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from selectools.toolbox import github_tools
 
 

@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
-from unittest.mock import MagicMock
+from typing import Any, Tuple
 
 import pytest
 

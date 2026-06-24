@@ -1,7 +1,6 @@
 """Tests for knowledge memory enhancement (R3) — stores, entries, eviction."""
 
 import os
-import tempfile
 from datetime import datetime, timedelta, timezone
 
 import pytest

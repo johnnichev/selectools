@@ -218,7 +218,6 @@ class TestVectorStoreFilterProperties:
     @settings(max_examples=150, deadline=None)
     def test_full_metadata_filter_always_matches(self, metadata) -> None:
         """A filter equal to the full metadata must match the document."""
-        from selectools.rag.stores.memory import InMemoryVectorStore
 
         doc = Document(text="test", metadata=metadata)
         # Check filter inline (same logic as _matches_filter)

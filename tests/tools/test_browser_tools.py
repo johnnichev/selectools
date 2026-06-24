@@ -77,7 +77,7 @@ class TestBrowserSSRF:
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         page = MagicMock()
-        browser = _install_fake_playwright(monkeypatch, page, patch_ssrf=False)
+        _install_fake_playwright(monkeypatch, page, patch_ssrf=False)
         result = browser_screenshot.function("http://127.0.0.1/", str(tmp_path / "p.png"))
         assert "Error" in result
         page.goto.assert_not_called()

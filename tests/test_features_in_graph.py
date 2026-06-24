@@ -7,11 +7,7 @@ are composed into graphs, pipelines, and parallel execution.
 
 from __future__ import annotations
 
-import asyncio
-import threading
-import time
 from typing import Any, Dict, List
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -24,14 +20,13 @@ from selectools.orchestration.state import (
     STATE_KEY_LAST_OUTPUT,
     GraphState,
     InterruptRequest,
-    MergePolicy,
 )
-from selectools.pipeline import Pipeline, Step, parallel, step
-from selectools.policy import PolicyDecision, ToolPolicy
+from selectools.pipeline import Pipeline, parallel, step
+from selectools.policy import ToolPolicy
 from selectools.providers.base import Provider
 from selectools.tools.base import Tool
 from selectools.trace import StepType
-from selectools.types import AgentResult, Message, Role, ToolCall
+from selectools.types import Message, Role, ToolCall
 from selectools.usage import UsageStats
 
 # ---------------------------------------------------------------------------
@@ -448,7 +443,7 @@ class TestReasoningInGraph:
         agent = _make_agent(provider, reasoning_strategy="react")
 
         graph = AgentGraph.chain(agent)
-        result = graph.run("Think step by step")
+        graph.run("Think step by step")
 
         # Verify the system prompt was modified to include ReAct instructions
         assert len(provider.calls) > 0
@@ -461,7 +456,7 @@ class TestReasoningInGraph:
         agent = _make_agent(provider, reasoning_strategy="cot")
 
         graph = AgentGraph.chain(agent)
-        result = graph.run("Explain")
+        graph.run("Explain")
 
         system = provider.calls[0]["system_prompt"]
         assert "step" in system.lower() or "chain" in system.lower() or "think" in system.lower()
@@ -482,8 +477,8 @@ class TestCachingInGraph:
         agent = _make_agent(provider, cache=cache)
 
         graph = AgentGraph.chain(agent)
-        r1 = graph.run("same question")
-        r2 = graph.run("same question")
+        graph.run("same question")
+        graph.run("same question")
 
         # Second run should hit cache — fewer provider calls
         assert cache.stats.hits >= 1 or len(provider.calls) <= 2

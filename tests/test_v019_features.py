@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import os
 import tempfile
 import warnings
@@ -258,7 +257,7 @@ class TestTypeSafeContracts:
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            pipeline = produce_str | consume_str
+            produce_str | consume_str
             type_warnings = [x for x in w if "type mismatch" in str(x.message)]
             assert len(type_warnings) == 0
 
@@ -273,6 +272,6 @@ class TestTypeSafeContracts:
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            pipeline = produce_int | consume_str
+            produce_int | consume_str
             type_warnings = [x for x in w if "type mismatch" in str(x.message)]
             assert len(type_warnings) == 1

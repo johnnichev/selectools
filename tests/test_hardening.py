@@ -7,22 +7,16 @@ boundary conditions that normal usage would never hit.
 
 from __future__ import annotations
 
-import asyncio
-import time
-
 import pytest
 
-from selectools.exceptions import GraphExecutionError
 from selectools.orchestration.checkpoint import InMemoryCheckpointStore
 from selectools.orchestration.graph import AgentGraph, ErrorPolicy, GraphResult
 from selectools.orchestration.state import (
     STATE_KEY_LAST_OUTPUT,
     GraphState,
     InterruptRequest,
-    MergePolicy,
-    Scatter,
 )
-from selectools.pipeline import Pipeline, Step, StepResult, branch, parallel, step
+from selectools.pipeline import Pipeline, Step, branch, parallel, step
 
 # ---------------------------------------------------------------------------
 # Helpers

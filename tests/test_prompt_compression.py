@@ -5,8 +5,6 @@ from __future__ import annotations
 from typing import List, Optional, Tuple
 from unittest.mock import patch
 
-import pytest
-
 from selectools import Agent, AgentConfig, Message, Role, Tool, UsageStats
 from selectools.memory import ConversationMemory
 from selectools.observer import AgentObserver

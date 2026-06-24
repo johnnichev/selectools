@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import os
-import tempfile
 from datetime import datetime, timedelta, timezone
-from typing import List
 
 import pytest
 
@@ -15,7 +12,6 @@ from selectools.observe.trace_store import (
     SQLiteTraceStore,
     TraceFilter,
     TraceStore,
-    TraceSummary,
 )
 from selectools.trace import AgentTrace, StepType, TraceStep
 
@@ -433,7 +429,7 @@ class TestJSONLTraceStore:
 
     def test_parent_dir_created(self, tmp_path):
         nested = tmp_path / "deep" / "nested" / "dir"
-        store = JSONLTraceStore(str(nested / "traces.jsonl"))
+        JSONLTraceStore(str(nested / "traces.jsonl"))
         assert nested.exists()
 
     def test_round_trip_preserves_step_data(self, tmp_path):

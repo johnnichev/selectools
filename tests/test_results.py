@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import FrozenInstanceError, asdict, dataclass
-from typing import Any, ClassVar, List, Optional, Tuple
+from typing import Any, ClassVar, List, Tuple
 
 import pytest
 

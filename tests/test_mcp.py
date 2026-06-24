@@ -7,10 +7,8 @@ are skipped if it's not installed.
 
 from __future__ import annotations
 
-import json
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Dict
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -367,7 +365,6 @@ class TestMCPImports:
 
 class TestBackgroundLoop:
     def test_loop_runs_coroutine(self) -> None:
-        import asyncio
 
         from selectools.mcp._loop import _BackgroundLoop
 

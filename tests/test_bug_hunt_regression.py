@@ -6,11 +6,7 @@ and verifies the fix is in place. Grouped by subsystem and severity.
 
 from __future__ import annotations
 
-import json
 import os
-import re
-import tempfile
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
@@ -18,15 +14,10 @@ import pytest
 
 from selectools.agent.config import AgentConfig
 from selectools.agent.core import Agent
-from selectools.cancellation import CancellationToken
-from selectools.knowledge import FileKnowledgeStore, KnowledgeEntry, KnowledgeMemory
+from selectools.knowledge import FileKnowledgeStore, KnowledgeEntry
 from selectools.memory import ConversationMemory
-from selectools.observer import AgentObserver
-from selectools.policy import ToolPolicy
 from selectools.sessions import JsonFileSessionStore
 from selectools.tools.base import Tool, ToolParameter
-from selectools.tools.decorators import tool
-from selectools.trace import StepType
 from selectools.types import Message, Role, ToolCall
 from selectools.usage import UsageStats
 

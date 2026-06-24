@@ -1,8 +1,5 @@
 """Regression tests for bug hunt batch 1 — security and memory fixes."""
 
-import os
-import tempfile
-
 import pytest
 
 from selectools.knowledge import FileKnowledgeStore, KnowledgeEntry

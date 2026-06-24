@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from selectools.knowledge import KnowledgeEntry
 from selectools.knowledge_store_redis import RedisKnowledgeStore
 from selectools.knowledge_store_supabase import SupabaseKnowledgeStore

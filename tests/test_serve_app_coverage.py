@@ -9,7 +9,6 @@ Tests are organized into:
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import tempfile
@@ -17,7 +16,6 @@ import threading
 import time
 import urllib.error
 import urllib.request
-from typing import Any, Dict, List
 from unittest import mock
 
 import pytest
@@ -34,7 +32,6 @@ from selectools.serve.app import (
     BuilderServer,
     _ai_build_fallback,
     _apply_pinned_ports,
-    _builder_run_mock,
     _check_graph_permission,
     _estimate_run_cost,
     _estimate_task_tier,
@@ -49,7 +46,6 @@ from selectools.serve.app import (
     _resolve_auth_token,
     _resolve_users,
     _route_experiment,
-    _run_builder_evals,
     _run_evals_on_run,
     _smart_route,
     create_app,
@@ -550,25 +546,25 @@ class TestMakeProvider:
     def test_claude_model(self):
         with mock.patch("selectools.providers.anthropic_provider.AnthropicProvider") as mock_cls:
             mock_cls.return_value = mock.MagicMock()
-            result = _make_provider("claude-sonnet-4-6", "sk-ant-fake")
+            _make_provider("claude-sonnet-4-6", "sk-ant-fake")
             mock_cls.assert_called_once_with(api_key="sk-ant-fake")
 
     def test_gemini_model(self):
         with mock.patch("selectools.providers.gemini_provider.GeminiProvider") as mock_cls:
             mock_cls.return_value = mock.MagicMock()
-            result = _make_provider("gemini-2.0-flash", "fake-key")
+            _make_provider("gemini-2.0-flash", "fake-key")
             mock_cls.assert_called_once_with(api_key="fake-key")
 
     def test_llama_model(self):
         with mock.patch("selectools.providers.ollama_provider.OllamaProvider") as mock_cls:
             mock_cls.return_value = mock.MagicMock()
-            result = _make_provider("llama-3.1", "fake-key")
+            _make_provider("llama-3.1", "fake-key")
             mock_cls.assert_called_once()
 
     def test_openai_default(self):
         with mock.patch("selectools.providers.openai_provider.OpenAIProvider") as mock_cls:
             mock_cls.return_value = mock.MagicMock()
-            result = _make_provider("gpt-4o-mini", "sk-fake")
+            _make_provider("gpt-4o-mini", "sk-fake")
             mock_cls.assert_called_once_with(api_key="sk-fake")
 
 
@@ -842,7 +838,7 @@ class TestAgentServerAuth:
     def test_builder_redirects_without_auth(self, server):
         req = urllib.request.Request(f"{server}/builder")
         try:
-            resp = _open_no_redirect(req)
+            _open_no_redirect(req)
             # If no redirect, check it returned login redirect or 302
             assert False, "Expected 302 redirect"
         except urllib.error.HTTPError as e:
@@ -856,7 +852,7 @@ class TestAgentServerAuth:
             headers={"Content-Type": "application/json"},
         )
         try:
-            resp = _open_no_redirect(req)
+            _open_no_redirect(req)
             assert False, "Expected 302 redirect"
         except urllib.error.HTTPError as e:
             assert e.code == 302
@@ -869,7 +865,7 @@ class TestAgentServerAuth:
             headers={"Content-Type": "application/json"},
         )
         try:
-            resp = _open_no_redirect(req)
+            _open_no_redirect(req)
             assert False, "Expected 302 redirect"
         except urllib.error.HTTPError as e:
             assert e.code == 302

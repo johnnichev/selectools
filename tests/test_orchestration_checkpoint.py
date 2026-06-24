@@ -9,7 +9,6 @@ import threading
 import pytest
 
 from selectools.orchestration.checkpoint import (
-    CheckpointMetadata,
     FileCheckpointStore,
     InMemoryCheckpointStore,
     SQLiteCheckpointStore,
@@ -81,7 +80,7 @@ class TestInMemoryCheckpointStore:
         store = InMemoryCheckpointStore()
         state = _make_state()
         state.metadata["__pending_interrupt_key__"] = "node_a_0"
-        cid = store.save("g1", state, 1)
+        store.save("g1", state, 1)
         metas = store.list("g1")
         assert metas[0].interrupted is True
 
@@ -166,7 +165,7 @@ class TestFileCheckpointStore:
         with tempfile.TemporaryDirectory() as tmpdir:
             store = FileCheckpointStore(tmpdir)
             state = _make_state()
-            cid = store.save("my_graph", state, 1)
+            store.save("my_graph", state, 1)
             graph_dir = os.path.join(tmpdir, "my_graph")
             assert os.path.isdir(graph_dir)
             files = os.listdir(graph_dir)
@@ -197,7 +196,7 @@ class TestFileCheckpointStore:
             store = FileCheckpointStore(tmpdir)
             state = _make_state()
             state.metadata["__pending_interrupt_key__"] = "node_0"
-            cid = store.save("g1", state, 1)
+            store.save("g1", state, 1)
             metas = store.list("g1")
             assert metas[0].interrupted is True
 
@@ -257,7 +256,7 @@ class TestSQLiteCheckpointStore:
             store = SQLiteCheckpointStore(db)
             state = _make_state()
             state.metadata["__pending_interrupt_key__"] = "node_0"
-            cid = store.save("g1", state, 1)
+            store.save("g1", state, 1)
             metas = store.list("g1")
             assert metas[0].interrupted is True
 

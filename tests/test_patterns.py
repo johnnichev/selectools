@@ -2,26 +2,20 @@
 
 from __future__ import annotations
 
-import asyncio
 from dataclasses import is_dataclass
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from selectools.patterns import (
     DebateAgent,
-    DebateResult,
-    DebateRound,
     PlanAndExecuteAgent,
     PlanStep,
-    ReflectionRound,
     ReflectiveAgent,
-    ReflectiveResult,
     Subtask,
     TeamLeadAgent,
     TeamLeadResult,
 )
-from selectools.types import Message, Role
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -93,7 +87,7 @@ class TestPlanAndExecuteAgent:
         writer = _make_agent("fallback content")
 
         agent = PlanAndExecuteAgent(planner=planner, executors={"writer": writer})
-        result = agent.run("Write something")
+        agent.run("Write something")
 
         # Fallback: writer should still be called
         writer.arun.assert_called_once()
@@ -255,7 +249,7 @@ class TestDebateAgent:
             judge=judge,
             max_rounds=3,
         )
-        result = da.run("Should we adopt microservices?")
+        da.run("Should we adopt microservices?")
 
         assert optimist.arun.call_count == 3
         assert skeptic.arun.call_count == 3
@@ -270,7 +264,7 @@ class TestDebateAgent:
             judge=judge,
             max_rounds=2,
         )
-        result = da.run("topic")
+        da.run("topic")
 
         judge.arun.assert_called_once()
 
@@ -413,7 +407,7 @@ class TestTeamLeadAgent:
             team={"analyst": analyst, "writer": writer},
             delegation_strategy="sequential",
         )
-        result = agent.run("Investigate and report")
+        agent.run("Investigate and report")
 
         analyst.arun.assert_called_once()
         writer.arun.assert_called_once()

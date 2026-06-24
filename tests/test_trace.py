@@ -10,9 +10,6 @@ from __future__ import annotations
 import json
 import os
 import tempfile
-from typing import Any, Dict, List
-
-import pytest
 
 from selectools.trace import AgentTrace, TraceStep
 

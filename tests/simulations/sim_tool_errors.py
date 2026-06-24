@@ -12,14 +12,11 @@ Run: pytest tests/simulations/sim_tool_errors.py -v
 
 from __future__ import annotations
 
-import random
 from typing import List
 
 import pytest
 
-from selectools.providers.stubs import LocalProvider
 from selectools.tools import tool
-from selectools.trace import StepType
 
 # ---------------------------------------------------------------------------
 # Tool definitions

@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
-
-from selectools.security import ScreeningResult, screen_output
+from selectools.security import screen_output
 
 
 class TestScreenOutput:

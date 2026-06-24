@@ -11,8 +11,7 @@ Targets uncovered lines identified by coverage analysis:
 
 from __future__ import annotations
 
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -21,30 +20,24 @@ from selectools.orchestration.checkpoint import InMemoryCheckpointStore
 from selectools.orchestration.graph import (
     AgentGraph,
     ErrorPolicy,
-    GraphResult,
     _make_synthetic_result,
     _merge_usage,
     _state_hash,
 )
-from selectools.orchestration.node import GraphNode, ParallelGroupNode
 from selectools.orchestration.state import (
     STATE_KEY_LAST_OUTPUT,
     ContextMode,
-    GraphEvent,
     GraphEventType,
     GraphState,
     InterruptRequest,
-    MergePolicy,
     Scatter,
-    _Goto,
-    _Update,
     goto,
     update,
 )
 from selectools.patterns.plan_and_execute import PlanAndExecuteAgent, PlanStep
 from selectools.patterns.team_lead import Subtask, TeamLeadAgent, TeamLeadResult
 from selectools.trace import AgentTrace
-from selectools.types import AgentResult, Message, Role
+from selectools.types import Message, Role
 from selectools.usage import UsageStats
 
 # ---------------------------------------------------------------------------
@@ -1317,7 +1310,7 @@ class TestTeamLeadSequentialContext:
             team={"first": first, "second": second},
             delegation_strategy="sequential",
         )
-        result = await agent.arun("multi-step task")
+        await agent.arun("multi-step task")
 
         # Second agent should receive context from first
         second_call = second.arun.call_args[0][0]
@@ -1350,7 +1343,7 @@ class TestTeamLeadSequentialContext:
             delegation_strategy="sequential",
             cancellation_token=token,
         )
-        result = await agent.arun("task")
+        await agent.arun("task")
         # Worker should not have been called due to cancellation
         worker.arun.assert_not_called()
 
@@ -1534,7 +1527,7 @@ class TestPlanAndExecuteCancellation:
             executors={"writer": writer},
             cancellation_token=token,
         )
-        result = await agent.arun("task")
+        await agent.arun("task")
 
         # Writer should not have been called
         writer.arun.assert_not_called()
@@ -1561,7 +1554,7 @@ class TestPlanAndExecuteContextChaining:
             planner=planner,
             executors={"step1": step1, "step2": step2},
         )
-        result = await agent.arun("multi-step task")
+        await agent.arun("multi-step task")
 
         # step2 should receive context including step1's output
         step2_call = step2.arun.call_args[0][0]
@@ -1585,7 +1578,7 @@ class TestPlanAndExecuteContextChaining:
             planner=planner,
             executors={"real": real},
         )
-        result = await agent.arun("task")
+        await agent.arun("task")
 
         # real should be called twice (first and third steps)
         assert real.arun.call_count == 2

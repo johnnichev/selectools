@@ -256,7 +256,7 @@ async def test_error_handling_under_load() -> None:
         try:
             response = await agent.arun([Message(role=Role.USER, content=f"Request {request_id}")])
             return "success", response.role == Role.ASSISTANT
-        except Exception as e:
+        except Exception:
             return "error", False
 
     start_time = time.time()

@@ -1,6 +1,5 @@
 """Tests for the visual agent builder (v0.20.0)."""
 
-import io
 import json
 import threading
 import time
@@ -12,7 +11,6 @@ from selectools import Agent, AgentConfig
 from selectools.providers.stubs import LocalProvider
 from selectools.serve.app import (
     AgentRouter,
-    AgentServer,
     BuilderServer,
     _builder_run_mock,
     _run_builder_evals,
@@ -230,7 +228,7 @@ class TestBuilderHtml:
     def test_not_empty_eval_in_client_evals(self):
         """_clientRunEvals must include not_empty check."""
         ci = BUILDER_HTML.find("function _clientRunEvals(")
-        ce = BUILDER_HTML.find("}", ci + 10)
+        BUILDER_HTML.find("}", ci + 10)
         # Find closing brace of function (nested, so find a reasonable range)
         assert "not_empty" in BUILDER_HTML[ci : ci + 800]
 
@@ -1116,8 +1114,6 @@ class TestAiBuildEndpoint:
         server = BuilderServer(port=0)
         # Use a real port for testing
         import socket
-        from http.server import HTTPServer
-        from socketserver import TCPServer
 
         sock = socket.socket()
         sock.bind(("", 0))
@@ -1815,10 +1811,9 @@ class TestBuilderAuth:
     def _request(self, server, path="/builder", method="GET", body=None, cookie=None):
         """Fire a single request against a BuilderServer running in a thread."""
         from http.server import HTTPServer
-        from urllib.parse import urlparse
 
         results = {}
-        httpd = HTTPServer(("127.0.0.1", 0), type("H", (), {})())  # dummy — replaced below
+        HTTPServer(("127.0.0.1", 0), type("H", (), {})())  # dummy — replaced below
 
         # Spin up the real server on a random port
         actual_port = [0]
@@ -1826,9 +1821,6 @@ class TestBuilderAuth:
         def run():
             s = server
             # patch port
-            import types
-
-            from selectools.serve.app import BuilderServer
 
             _auth = s.auth_token
 
@@ -1848,7 +1840,6 @@ class TestBuilderAuth:
             results["port"] = actual_port[0]
 
         # Simpler: use urllib directly against a real running instance
-        import time
 
         _port = [None]
         _stop = threading.Event()
@@ -1869,11 +1860,9 @@ class TestBuilderAuth:
             from urllib.parse import urlparse as _up
 
             from selectools.serve.app import (
-                BUILDER_HTML,
                 LOGIN_HTML,
                 LOGIN_HTML_ERROR,
                 _make_session_cookie,
-                _resolve_auth_token,
             )
 
             class H(BaseHTTPRequestHandler):
@@ -1997,7 +1986,7 @@ class TestBuilderAuth:
 
     def test_no_auth_builder_accessible(self):
         """Without auth token, /builder returns 200."""
-        from selectools.serve.app import BUILDER_HTML, BuilderServer
+        from selectools.serve.app import BuilderServer
 
         srv = BuilderServer(port=0, auth_token=None)
         r = self._request(srv, "/builder")
@@ -2036,7 +2025,6 @@ class TestBuilderAuth:
 
     def test_login_correct_token_sets_cookie(self):
         """POST /login with correct token returns 302 + Set-Cookie header."""
-        import json
 
         from selectools.serve.app import BuilderServer
 
@@ -2047,7 +2035,6 @@ class TestBuilderAuth:
 
     def test_login_wrong_token_stays(self):
         """POST /login with wrong token returns 200 (error page, not redirect)."""
-        import json
 
         from selectools.serve.app import BuilderServer
 
@@ -2603,7 +2590,6 @@ class TestBuilderAuthSSO:
 
     def test_resolve_users_from_env(self):
         """_resolve_users() reads BUILDER_USERS env var."""
-        import json as _json
         import os
 
         from selectools.serve.app import _resolve_users

@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 from unittest.mock import MagicMock
-
-import pytest
 
 from selectools.evals import (
     ConcisenessEvaluator,
@@ -26,7 +24,7 @@ from selectools.evals import (
     URLValidityEvaluator,
     WordCountEvaluator,
 )
-from selectools.evals.types import CaseResult, CaseVerdict, EvalFailure
+from selectools.evals.types import CaseResult, CaseVerdict
 
 # ---------------------------------------------------------------------------
 # Helpers

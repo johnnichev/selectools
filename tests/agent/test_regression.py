@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import copy
 import json
 import threading
 import time
@@ -22,7 +21,7 @@ import pytest
 
 from selectools.agent.core import Agent, AgentConfig
 from selectools.observer import AgentObserver
-from selectools.policy import PolicyDecision, ToolPolicy
+from selectools.policy import ToolPolicy
 from selectools.providers.base import Provider, ProviderError
 from selectools.providers.fallback import FallbackProvider
 from selectools.providers.stubs import LocalProvider
@@ -291,7 +290,7 @@ class TestRoutingOnlyIterationEvents:
                 observers=[observer],
             ),
         )
-        result = await agent.arun("route me")
+        await agent.arun("route me")
         assert len(observer.events.get("on_iteration_end", [])) == 1
 
 
@@ -1130,7 +1129,6 @@ class TestParallelToolsExecutorSingleton:
 
         # Second call returns no tool calls, ending the loop
         call_no = {"n": 0}
-        original_complete = provider.complete
 
         def complete_once(**kw):
             call_no["n"] += 1
@@ -1230,9 +1228,6 @@ class TestCoherenceCheckTraceStepType:
 
     def _make_coherence_provider(self, incoherent: bool):
         """Return a provider that fails coherence checks when incoherent=True."""
-        from unittest.mock import patch
-
-        from selectools.coherence import CoherenceResult
 
         class _CoherenceProvider(Provider):
             name = "coherence"
@@ -1661,7 +1656,7 @@ class TestCompressKeepRecentZero:
             "selectools.agent._memory_manager.estimate_run_tokens",
             return_value=high_fill,
         ):
-            result = agent.run("current user message")
+            agent.run("current user message")
 
         # The current user message must have been seen by the provider.
         assert any("current user message" in msg for msg in call_log), (
@@ -1755,7 +1750,7 @@ class TestParallelDispatchExecutorSingleton:
         )
 
         # Must complete within a reasonable timeout — not deadlock.
-        result = agent.run("run all tools")
+        agent.run("run all tools")
         assert call_count["n"] == 10, f"All 10 tool calls must execute, got {call_count['n']}"
 
 
@@ -1887,7 +1882,6 @@ class _FailingGuardrail:
     """Guardrail that always raises so _prepare_run fails after prompt mutation."""
 
     def check(self, text: str) -> Any:
-        from selectools.guardrails.base import GuardrailResult
 
         raise RuntimeError("guardrail boom")
 
@@ -2968,7 +2962,7 @@ def test_bug15_summary_helper_caps_at_max_chars():
 
 
 def test_bug15_summary_helper_empty_existing():
-    from selectools.agent._memory_manager import _MAX_SUMMARY_CHARS, _append_summary
+    from selectools.agent._memory_manager import _append_summary
 
     assert _append_summary(None, "first summary") == "first summary"
     assert _append_summary("", "first summary") == "first summary"
@@ -3175,7 +3169,6 @@ def test_bug17_agent_trace_concurrent_add():
 
 def test_bug17_agent_trace_has_lock():
     """Verify the lock attribute exists and is a threading.Lock."""
-    import threading
 
     from selectools.trace import AgentTrace
 
@@ -3383,7 +3376,6 @@ def test_bug16_build_cancelled_result_calls_extraction():
 
 
 def test_bug22_optional_without_default_is_not_required():
-    from typing import Optional
 
     from selectools.tools import tool as _bug22_tool
 
@@ -3400,7 +3392,6 @@ def test_bug22_optional_without_default_is_not_required():
 
 def test_bug22_optional_with_default_still_not_required():
     """Regression guard: Optional[T] with a default value remains optional."""
-    from typing import Optional
 
     from selectools.tools import tool as _bug22_tool
 
@@ -3968,7 +3959,6 @@ def test_bug29_bare_list_still_works_without_items():
 
 def test_bug29_optional_list_str_still_preserves_items():
     """`Optional[list[str]]` must still emit `items: {type: string}`."""
-    from typing import Optional
 
     from selectools.tools import tool
 

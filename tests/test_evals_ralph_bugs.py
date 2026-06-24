@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-import json
-import tempfile
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 from unittest.mock import MagicMock
-
-import pytest
 
 from selectools.evals.badge import generate_badge, generate_detailed_badge
 from selectools.evals.dataset import DatasetLoader
@@ -232,7 +227,7 @@ class TestEvaluatorCrashIsolation:
         case = TestCase(input="test")
         agent_result = _make_agent_result(content="response")
 
-        case_result = CaseResult(
+        CaseResult(
             case=case,
             verdict=CaseVerdict.PASS,
             agent_result=agent_result,

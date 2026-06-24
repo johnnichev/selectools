@@ -441,9 +441,6 @@ class TestDatetimeTimezoneParamShadowing:
         The parameter name 'timezone' was shadowing the imported datetime.timezone
         class, causing 'UTC'.utc AttributeError instead of returning the current time.
         """
-        import sys
-        import types
-        import unittest.mock as mock
 
         # Test UTC timezone works (pytz not needed for UTC)
         from selectools.toolbox.datetime_tools import get_current_time

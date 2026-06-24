@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any, Dict, List
 
 import pytest
@@ -10,7 +9,6 @@ import pytest
 from selectools.pipeline import (
     Pipeline,
     Step,
-    StepResult,
     _ensure_step,
     _filter_kwargs,
     _get_type_hints,
@@ -526,7 +524,7 @@ class TestPipelineCall:
         assert result == "HELLO"
 
     def test_call_with_graph_state_no_last_output(self):
-        from selectools.orchestration.state import STATE_KEY_LAST_OUTPUT, GraphState
+        from selectools.orchestration.state import GraphState
 
         pipeline = Pipeline(steps=[Step(lambda x: x.upper(), name="up")])
         state = GraphState.from_prompt("hello world")

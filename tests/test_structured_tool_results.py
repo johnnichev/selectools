@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from selectools.tools.base import Tool, ToolParameter
+from selectools.tools.base import Tool
 
 
 def _make_tool(func):

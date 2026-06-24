@@ -14,11 +14,9 @@ import json
 import os
 import time
 
-import pytest
-
 from selectools.memory import ConversationMemory
 from selectools.sessions import JsonFileSessionStore, SQLiteSessionStore
-from selectools.types import Message, Role, ToolCall
+from selectools.types import Message, Role
 
 
 def _memory_with_messages(*contents: str) -> ConversationMemory:

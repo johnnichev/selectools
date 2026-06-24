@@ -9,15 +9,13 @@ Bug #3: DocumentLoader.from_json turns None text_field values into "None" string
 from __future__ import annotations
 
 import json
-import os
 import sys
-import tempfile
 from typing import Any, List
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from selectools.rag.vector_store import Document, SearchResult, VectorStore
+from selectools.rag.vector_store import VectorStore
 
 # ============================================================================
 # Fixtures

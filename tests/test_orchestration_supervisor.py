@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from selectools.orchestration.graph import GraphResult, _merge_usage
-from selectools.orchestration.state import STATE_KEY_LAST_OUTPUT, GraphState
 from selectools.orchestration.supervisor import (
     ModelSplit,
     SupervisorAgent,
@@ -257,7 +256,7 @@ class TestRoundRobin:
             max_rounds=3,
         )
 
-        result = await supervisor.arun("task")
+        await supervisor.arun("task")
         # With 1 agent, 3 rounds → called exactly 3 times
         assert a.arun.call_count == 3
 
@@ -295,7 +294,7 @@ class TestDynamic:
             max_rounds=2,
         )
 
-        result = await supervisor.arun("research topic")
+        await supervisor.arun("research topic")
         assert researcher.arun.call_count >= 1
 
     @pytest.mark.asyncio
@@ -328,7 +327,7 @@ class TestDynamic:
             max_rounds=1,
         )
 
-        result = await supervisor.arun("task")
+        await supervisor.arun("task")
         # Should fall back to "a" and call it
         assert a.arun.call_count >= 1
 
@@ -404,7 +403,7 @@ class TestMagentic:
             observers=[ReplanObserver()],
         )
 
-        result = await supervisor.arun("stuck task")
+        await supervisor.arun("stuck task")
         assert len(replan_fired) >= 1
 
     @pytest.mark.asyncio

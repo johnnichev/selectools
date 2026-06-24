@@ -7,7 +7,7 @@ All tests mock the qdrant_client module completely — no Qdrant server needed.
 from __future__ import annotations
 
 import sys
-from typing import Any, Dict, List
+from typing import Any, List
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -237,7 +237,7 @@ class TestQdrantAddDocuments:
 
         # Collection should have been created
         qdrant_store.client.create_collection.assert_called_once()
-        call_kwargs = (
+        (
             qdrant_store.client.create_collection.call_kwargs
             if hasattr(qdrant_store.client.create_collection, "call_kwargs")
             else qdrant_store.client.create_collection.call_args
