@@ -1131,29 +1131,6 @@ class SupabaseSessionStore:
 
     # -- validation helpers ------------------------------------------------
 
-    @staticmethod
-    def _validate_session_id(session_id: str) -> None:
-        """Reject session IDs that could cause key collisions or other problems."""
-        if not session_id:
-            raise ValueError("session_id must not be empty")
-        if "\x00" in session_id:
-            raise ValueError(f"session_id must not contain null bytes: {session_id!r}")
-        if len(session_id) > 512:
-            raise ValueError(
-                f"session_id too long ({len(session_id)} chars, max 512): {session_id!r}"
-            )
-
-    @staticmethod
-    def _validate_namespace(namespace: Optional[str]) -> None:
-        if namespace is None:
-            return
-        if not namespace:
-            raise ValueError("namespace must not be empty when provided")
-        if "\x00" in namespace:
-            raise ValueError(f"namespace must not contain null bytes: {namespace!r}")
-        if len(namespace) > 512:
-            raise ValueError(f"namespace too long ({len(namespace)} chars, max 512): {namespace!r}")
-
     def _key(self, session_id: str, namespace: Optional[str] = None) -> str:
         _validate_session_id(session_id)
         _validate_namespace(namespace)
@@ -1522,28 +1499,6 @@ class DynamoDBSessionStore:
         self._default_ttl = default_ttl
 
     # -- validation helpers ------------------------------------------------
-
-    @staticmethod
-    def _validate_session_id(session_id: str) -> None:
-        if not session_id:
-            raise ValueError("session_id must not be empty")
-        if "\x00" in session_id:
-            raise ValueError(f"session_id must not contain null bytes: {session_id!r}")
-        if len(session_id) > 512:
-            raise ValueError(
-                f"session_id too long ({len(session_id)} chars, max 512): {session_id!r}"
-            )
-
-    @staticmethod
-    def _validate_namespace(namespace: Optional[str]) -> None:
-        if namespace is None:
-            return
-        if not namespace:
-            raise ValueError("namespace must not be empty when provided")
-        if "\x00" in namespace:
-            raise ValueError(f"namespace must not contain null bytes: {namespace!r}")
-        if len(namespace) > 512:
-            raise ValueError(f"namespace too long ({len(namespace)} chars, max 512): {namespace!r}")
 
     def _key(self, session_id: str, namespace: Optional[str] = None) -> str:
         _validate_session_id(session_id)
