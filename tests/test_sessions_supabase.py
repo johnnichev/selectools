@@ -8,7 +8,6 @@ to be installed.
 
 from __future__ import annotations
 
-import sys
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock, patch
@@ -18,7 +17,7 @@ import pytest
 from selectools.memory import ConversationMemory
 from selectools.sessions import SessionMetadata, SupabaseSessionStore
 from selectools.types import Message, Role, ToolCall
-from selectools.sessions import _validate_namespace
+
 # ======================================================================
 # Fake Supabase client
 # ======================================================================
@@ -494,21 +493,21 @@ class TestSupabaseSessionStoreValidation:
     def test_empty_namespace_raises(self) -> None:
         store = self._store_without_supabase()
         with pytest.raises(ValueError, match="must not be empty"):
-            _validate_namespace("")
+            store._key("sid", namespace="")
 
     def test_null_byte_in_namespace_raises(self) -> None:
         store = self._store_without_supabase()
         with pytest.raises(ValueError, match="null bytes"):
-            _validate_namespace("bad\x00ns")
+            store._key("sid", namespace="bad\x00ns")
 
     def test_namespace_too_long_raises(self) -> None:
         store = self._store_without_supabase()
         with pytest.raises(ValueError, match="too long"):
-            _validate_namespace("n" * 513)
+            store._key("sid", namespace="n" * 513)
 
     def test_none_namespace_passes(self) -> None:
         store = self._store_without_supabase()
-        _validate_namespace(None) # must not raise
+        store._key("sid", namespace=None)  # must not raise
 
     def test_save_empty_session_id_raises(self) -> None:
         client = FakeSupabaseClient()

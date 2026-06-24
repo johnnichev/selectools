@@ -16,11 +16,8 @@ Usage:
 from __future__ import annotations
 
 import threading
-import time
-from typing import Any, List
+from typing import List
 from unittest.mock import Mock
-
-import pytest
 
 from selectools.rag.vector_store import Document
 

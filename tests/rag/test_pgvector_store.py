@@ -6,7 +6,7 @@ import json
 import sys
 import types
 from typing import Any, List
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -261,7 +261,6 @@ class TestAddDocuments:
         store, conn = _make_store(dim=3, pre_initialized=True)
 
         # Make execute raise on the insert
-        original_execute = conn._cursor.execute
         call_count = [0]
 
         def failing_execute(sql: str, params: Any = None) -> None:
@@ -308,7 +307,7 @@ class TestSearch:
             ("doc_1", "matched", {"source": "pdf"}, 0.9),
         ]
 
-        results = store.search(
+        store.search(
             [0.1, 0.2, 0.3],
             top_k=5,
             filter={"source": "pdf"},

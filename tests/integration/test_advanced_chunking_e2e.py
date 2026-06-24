@@ -8,9 +8,7 @@ They are skipped when OPENAI_API_KEY is not set.
 from __future__ import annotations
 
 import os
-import tempfile
 from pathlib import Path
-from typing import List
 
 import pytest
 
@@ -19,7 +17,6 @@ from selectools.providers.openai_provider import OpenAIProvider
 from selectools.rag import Document, RecursiveTextSplitter, VectorStore
 from selectools.rag.chunking import ContextualChunker, SemanticChunker
 from selectools.tools import ToolLoader, tool
-from selectools.tools.base import Tool
 from selectools.types import Message, Role
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")

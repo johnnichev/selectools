@@ -8,10 +8,6 @@ and knowledge memory all work together without interference.
 from __future__ import annotations
 
 import os
-import tempfile
-from unittest.mock import MagicMock, patch
-
-import pytest
 
 from selectools.agent import Agent, AgentConfig
 from selectools.entity_memory import EntityMemory

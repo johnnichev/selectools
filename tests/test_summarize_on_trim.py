@@ -13,16 +13,14 @@ Tests cover:
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, List, Optional, Tuple
-
-import pytest
+from typing import Any, Dict, List, Optional
 
 from selectools.agent import Agent, AgentConfig
 from selectools.memory import ConversationMemory
 from selectools.observer import AgentObserver
 from selectools.sessions import JsonFileSessionStore
 from selectools.tools import Tool
-from selectools.types import Message, Role, ToolCall
+from selectools.types import Message, Role
 from selectools.usage import UsageStats
 
 

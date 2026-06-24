@@ -8,8 +8,6 @@ after sliding-window trimming.
 
 from __future__ import annotations
 
-import pytest
-
 from selectools.memory import ConversationMemory
 from selectools.types import Message, Role, ToolCall
 

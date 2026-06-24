@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import os
-import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, List
 from unittest.mock import MagicMock
 
 import pytest
 
-from selectools.tools import Tool, ToolLoader, tool
+from selectools.tools import Tool, ToolLoader
 from selectools.tools.base import ToolParameter
 
 if TYPE_CHECKING:
@@ -388,7 +386,6 @@ class TestToolLoaderSameStemCollision:
 
     def test_reload_file_targets_correct_module(self, tmp_path: Path) -> None:
         """reload_file must only remove the specific file's module, not a same-stem sibling."""
-        import sys
 
         dir_a = tmp_path / "dir_a"
         dir_b = tmp_path / "dir_b"
@@ -408,7 +405,7 @@ class TestToolLoaderSameStemCollision:
             "    return 'B:' + x\n"
         )
 
-        tools_a = ToolLoader.from_file(str(dir_a / "plugin.py"))
+        ToolLoader.from_file(str(dir_a / "plugin.py"))
         tools_b = ToolLoader.from_file(str(dir_b / "plugin.py"))
 
         # Reload A — B's module must remain in sys.modules

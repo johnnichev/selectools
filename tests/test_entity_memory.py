@@ -12,9 +12,7 @@ Tests cover:
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional
-
-import pytest
+from typing import Any, Dict, List
 
 from selectools.entity_memory import Entity, EntityMemory
 from selectools.types import Message, Role

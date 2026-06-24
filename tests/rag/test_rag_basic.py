@@ -11,7 +11,7 @@ from typing import List
 import pytest
 
 try:
-    import numpy
+    import numpy  # noqa: F401
 
     NUMPY_AVAILABLE = True
 except ImportError:

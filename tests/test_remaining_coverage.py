@@ -5,17 +5,13 @@ Each test class focuses on one module, hitting branches that existing tests miss
 
 from __future__ import annotations
 
-import asyncio
-import copy
 import json
 import os
 import tempfile
 import time
-import uuid
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 from unittest import mock
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -35,7 +31,6 @@ from selectools.exceptions import (
     ToolValidationError,
 )
 from selectools.providers.stubs import LocalProvider
-from selectools.tools.base import Tool
 from selectools.tools.decorators import tool
 from selectools.trace import AgentTrace, StepType, TraceStep, trace_to_html, trace_to_json
 from selectools.types import Message, Role, ToolCall
@@ -811,7 +806,7 @@ class TestAgentCoreArun:
             provider=provider,
             config=AgentConfig(model="test", max_iterations=5),
         )
-        result = await agent.arun("Return a person", response_format=Person)
+        await agent.arun("Return a person", response_format=Person)
         assert call_count >= 2
 
     @pytest.mark.asyncio
@@ -1002,7 +997,7 @@ class TestSnapshotStore:
 
     def test_snapshot_save_and_compare(self):
         from selectools.evals.snapshot import SnapshotStore
-        from selectools.evals.types import CaseResult, CaseVerdict, TestCase
+        from selectools.evals.types import CaseVerdict, TestCase
 
         with tempfile.TemporaryDirectory() as tmpdir:
             store = SnapshotStore(tmpdir)

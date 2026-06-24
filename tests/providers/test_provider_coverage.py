@@ -10,9 +10,7 @@ Mocks the SDK client directly — never calls real APIs.
 
 from __future__ import annotations
 
-import asyncio
-import json
-from typing import Any, Dict, List
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -20,7 +18,6 @@ import pytest
 from selectools.providers.base import ProviderError
 from selectools.tools.base import Tool, ToolParameter
 from selectools.types import Message, Role, ToolCall
-from selectools.usage import UsageStats
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -1783,7 +1780,7 @@ class TestGeminiProviderComplete:
 
     def test_complete_basic(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -1804,7 +1801,7 @@ class TestGeminiProviderComplete:
 
     def test_complete_with_tool_calls(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -1833,7 +1830,7 @@ class TestGeminiProviderComplete:
     def test_complete_with_thought_signature_bytes(self) -> None:
         """thought_signature as bytes is base64-encoded."""
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -1878,7 +1875,7 @@ class TestGeminiProviderComplete:
     def test_complete_with_thought_signature_string(self) -> None:
         """thought_signature as string is converted with str()."""
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -1917,7 +1914,7 @@ class TestGeminiProviderComplete:
     def test_complete_text_value_error(self) -> None:
         """When response.text raises ValueError, content falls back to empty string."""
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -1943,7 +1940,7 @@ class TestGeminiProviderComplete:
 
     def test_complete_no_usage(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -1966,7 +1963,7 @@ class TestGeminiProviderComplete:
 
     def test_complete_error(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -1981,7 +1978,7 @@ class TestGeminiProviderComplete:
 
     def test_complete_with_tools_in_config(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2005,7 +2002,7 @@ class TestGeminiProviderComplete:
     def test_complete_function_call_no_args(self) -> None:
         """function_call with args=None gets empty dict."""
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2042,7 +2039,7 @@ class TestGeminiProviderStream:
 
     def test_stream_text(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2070,7 +2067,7 @@ class TestGeminiProviderStream:
 
     def test_stream_with_tool_call(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2110,7 +2107,7 @@ class TestGeminiProviderStream:
 
     def test_stream_with_thought_signature(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2148,7 +2145,7 @@ class TestGeminiProviderStream:
 
     def test_stream_error_during_creation(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2165,7 +2162,7 @@ class TestGeminiProviderStream:
 
     def test_stream_error_mid_stream(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2191,7 +2188,7 @@ class TestGeminiProviderStream:
 
     def test_stream_provider_error_passthrough(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2214,7 +2211,7 @@ class TestGeminiProviderStream:
 
     def test_stream_function_call_no_args(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2271,7 +2268,7 @@ class TestGeminiProviderAcomplete:
     @pytest.mark.asyncio
     async def test_acomplete_basic(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2294,7 +2291,7 @@ class TestGeminiProviderAcomplete:
     @pytest.mark.asyncio
     async def test_acomplete_with_tool_calls(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2333,7 +2330,7 @@ class TestGeminiProviderAcomplete:
     @pytest.mark.asyncio
     async def test_acomplete_text_value_error(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2360,7 +2357,7 @@ class TestGeminiProviderAcomplete:
     @pytest.mark.asyncio
     async def test_acomplete_error(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2378,7 +2375,7 @@ class TestGeminiProviderAcomplete:
     @pytest.mark.asyncio
     async def test_acomplete_no_usage(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2403,7 +2400,7 @@ class TestGeminiProviderAcomplete:
     @pytest.mark.asyncio
     async def test_acomplete_with_thought_signature_bytes(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2452,7 +2449,7 @@ class TestGeminiProviderAstream:
     @pytest.mark.asyncio
     async def test_astream_text(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2486,7 +2483,7 @@ class TestGeminiProviderAstream:
     @pytest.mark.asyncio
     async def test_astream_with_tool_call(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2529,7 +2526,7 @@ class TestGeminiProviderAstream:
     @pytest.mark.asyncio
     async def test_astream_with_thought_signature(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2571,7 +2568,7 @@ class TestGeminiProviderAstream:
     @pytest.mark.asyncio
     async def test_astream_error_during_creation(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2590,7 +2587,7 @@ class TestGeminiProviderAstream:
     @pytest.mark.asyncio
     async def test_astream_error_mid_stream(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2617,7 +2614,7 @@ class TestGeminiProviderAstream:
     @pytest.mark.asyncio
     async def test_astream_provider_error_passthrough(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2641,7 +2638,7 @@ class TestGeminiProviderAstream:
     @pytest.mark.asyncio
     async def test_astream_function_call_no_args(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2682,7 +2679,7 @@ class TestGeminiProviderAstream:
     async def test_astream_text_value_error(self) -> None:
         """When chunk.text raises ValueError during streaming, it's skipped."""
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2719,7 +2716,7 @@ class TestGeminiFormatContentsAdvanced:
 
     def test_system_role_converted_to_user(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2732,7 +2729,7 @@ class TestGeminiFormatContentsAdvanced:
     def test_tool_with_thought_signature_echo(self) -> None:
         """TOOL messages echo thought_signature from preceding ASSISTANT tool_calls."""
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2761,7 +2758,7 @@ class TestGeminiFormatContentsAdvanced:
     def test_unknown_role_falls_back_to_user(self) -> None:
         """Messages with an unrecognized role fall back to user."""
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2775,7 +2772,7 @@ class TestGeminiFormatContentsAdvanced:
     def test_empty_parts_skipped(self) -> None:
         """Messages with no content produce no parts and are skipped."""
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 
@@ -2786,7 +2783,7 @@ class TestGeminiFormatContentsAdvanced:
 
     def test_map_tool_to_gemini(self) -> None:
         try:
-            from google.genai import types
+            from google.genai import types  # noqa: F401
         except ImportError:
             pytest.skip("google-genai not installed")
 

@@ -17,21 +17,19 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from selectools import Agent, AgentConfig
 from selectools.coherence import CoherenceResult
-from selectools.policy import PolicyDecision, PolicyResult, ToolPolicy
+from selectools.policy import ToolPolicy
 from selectools.providers.stubs import LocalProvider
-from selectools.tools.base import Tool
 from selectools.tools.decorators import tool
-from selectools.trace import AgentTrace, StepType, TraceStep
+from selectools.trace import AgentTrace, StepType
 from selectools.types import Message, Role, ToolCall
-from selectools.usage import AgentUsage, UsageStats
+from selectools.usage import UsageStats
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -93,7 +91,7 @@ class TestToolExecutorTimeout:
         """Tool times out and agent reports TimeoutError."""
         agent = _make_agent(tools=[slow_tool], tool_timeout_seconds=0.01)
         # Force the agent to call slow_tool directly via _execute_tool_with_timeout
-        result = agent.run("call slow_tool")
+        agent.run("call slow_tool")
         # The agent loop will just echo, but we can test the direct path
         # by calling the mixin method:
         with pytest.raises(TimeoutError, match="timed out"):
@@ -625,8 +623,6 @@ class TestSupervisorMagentic:
         mock_result.usage = UsageStats(prompt_tokens=5, completion_tokens=3, total_tokens=8)
         mock_agent.arun = AsyncMock(return_value=mock_result)
 
-        call_count = {"n": 0}
-
         # First call: not progressing, second: not progressing (triggers replan),
         # third: complete
         responses = [
@@ -721,7 +717,7 @@ class TestSupervisorMagentic:
             strategy=SupervisorStrategy.MAGENTIC,
             max_rounds=5,
         )
-        result = supervisor.run("task")
+        supervisor.run("task")
         # Agent should still execute using fallback to first agent
         assert mock_agent.arun.called
 
@@ -813,7 +809,7 @@ class TestSupervisorDynamic:
             strategy=SupervisorStrategy.DYNAMIC,
             max_rounds=5,
         )
-        result = supervisor.run("task")
+        supervisor.run("task")
         # Falls back to "worker" then completes on _looks_complete("All done.")
         assert mock_agent.arun.called
 
@@ -830,7 +826,7 @@ class TestSupervisorDynamic:
             strategy=SupervisorStrategy.DYNAMIC,
             max_rounds=5,
         )
-        result = supervisor.run("query")
+        supervisor.run("query")
         assert not mock_agent.arun.called
 
 
@@ -1634,7 +1630,7 @@ class TestProviderCallerCacheKey:
             return await agent._acall_provider(run_id="r1")
 
         asyncio.run(_run())
-        captured = capsys.readouterr()
+        capsys.readouterr()
         # LocalProvider doesn't print verbose, but no crash
 
     def test_acall_provider_with_cache_hit(self):
@@ -1726,7 +1722,7 @@ class TestProviderCallerCacheKey:
             return original_complete(**kwargs)
 
         agent.provider.complete = flaky_complete
-        msg = agent._call_provider(run_id="r1")
+        agent._call_provider(run_id="r1")
         assert call_count["n"] == 2
 
 

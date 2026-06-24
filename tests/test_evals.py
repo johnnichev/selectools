@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
-import tempfile
-from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock
 
@@ -29,7 +26,6 @@ from selectools.evals import (
     OutputEvaluator,
     PerformanceEvaluator,
     PIILeakEvaluator,
-    RegressionResult,
     StartsWithEvaluator,
     StructuredOutputEvaluator,
     TestCase,

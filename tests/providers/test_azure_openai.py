@@ -7,7 +7,6 @@ calls real Azure APIs.
 
 from __future__ import annotations
 
-import json
 import os
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -18,7 +17,6 @@ from selectools.exceptions import ProviderConfigurationError
 from selectools.providers.base import ProviderError
 from selectools.tools.base import Tool, ToolParameter
 from selectools.types import Message, Role, ToolCall
-from selectools.usage import UsageStats
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -146,7 +144,7 @@ class TestAzureOpenAIProviderInit:
         ):
             from selectools.providers.azure_openai_provider import AzureOpenAIProvider
 
-            provider = AzureOpenAIProvider(
+            AzureOpenAIProvider(
                 azure_endpoint=_ENDPOINT,
                 azure_ad_token="my-aad-token",
                 azure_deployment="gpt-4o",

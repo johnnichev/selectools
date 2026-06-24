@@ -8,7 +8,6 @@ cancellation+subgraph, pipeline+graph, observer ordering, etc.
 from __future__ import annotations
 
 import json
-from typing import Any
 
 import pytest
 
@@ -20,10 +19,10 @@ from selectools.observer import AgentObserver
 from selectools.orchestration.checkpoint import InMemoryCheckpointStore
 from selectools.orchestration.graph import ErrorPolicy
 from selectools.orchestration.state import STATE_KEY_LAST_OUTPUT, GraphState, InterruptRequest
-from selectools.pipeline import Pipeline, Step, branch, parallel, step
+from selectools.pipeline import Pipeline, Step, branch
 from selectools.providers.base import Provider
 from selectools.trace import StepType
-from selectools.types import AgentResult, Message, Role, ToolCall
+from selectools.types import Message, Role, ToolCall
 from selectools.usage import UsageStats
 
 # ---------------------------------------------------------------------------

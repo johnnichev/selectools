@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from selectools import (
     AgentConfig,
     BudgetConfig,
@@ -124,15 +122,7 @@ class TestImports:
     def test_all_config_groups_importable_from_selectools(self):
         from selectools import (
             BudgetConfig,
-            CoherenceConfig,
-            CompressConfig,
-            GuardrailsConfig,
-            MemoryConfig,
             RetryConfig,
-            SessionConfig,
-            SummarizeConfig,
-            ToolConfig,
-            TraceConfig,
         )
 
         assert RetryConfig is not None

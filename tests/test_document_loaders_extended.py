@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import json
-import textwrap
 import urllib.error
-from io import BytesIO
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -13,7 +11,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from selectools.rag.loaders import DocumentLoader
-from selectools.rag.vector_store import Document
 
 # ---------------------------------------------------------------------------
 # from_csv

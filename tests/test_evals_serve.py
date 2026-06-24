@@ -4,12 +4,7 @@ from __future__ import annotations
 
 import io
 import json
-import threading
-import time
-from http.server import HTTPServer
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from selectools.evals.serve import _DASHBOARD_HTML, _DashboardHandler, serve_eval
 

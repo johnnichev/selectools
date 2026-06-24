@@ -17,7 +17,6 @@ from typing import List
 import pytest
 
 from selectools.memory import ConversationMemory
-from selectools.providers.stubs import LocalProvider
 from selectools.types import Message, Role
 
 

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-
 import pytest
 
 from selectools.pipeline import Pipeline, Step, StepResult, branch, parallel, step

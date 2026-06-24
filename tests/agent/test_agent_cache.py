@@ -295,11 +295,11 @@ class TestCacheWithRoutingMode:
         config = AgentConfig(max_iterations=1, routing_only=True, cache=cache)
         agent = Agent(tools=[_dummy_tool()], provider=provider, config=config)
 
-        result1 = agent.run([Message(role=Role.USER, content="Route me")])
+        agent.run([Message(role=Role.USER, content="Route me")])
         assert provider.call_count == 1
 
         agent.reset()
-        result2 = agent.run([Message(role=Role.USER, content="Route me")])
+        agent.run([Message(role=Role.USER, content="Route me")])
         assert provider.call_count == 1  # cache hit
         assert cache.stats.hits == 1
 

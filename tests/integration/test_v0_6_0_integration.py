@@ -12,8 +12,6 @@ Tests that Ollama provider and Analytics work well with:
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
 
 from selectools import Agent, AgentConfig, Message, Role, Tool, ToolParameter
@@ -385,7 +383,7 @@ class TestCombinedFeatures:
 
         # Verify analytics has data (may or may not depending on execution)
         analytics = agent.get_analytics()
-        initial_metrics_count = len(analytics.get_all_metrics())
+        len(analytics.get_all_metrics())
 
         # Reset analytics
         analytics.reset()

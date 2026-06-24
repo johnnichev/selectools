@@ -2,24 +2,18 @@
 
 from __future__ import annotations
 
-import asyncio
-
 import pytest
 
 from selectools.exceptions import GraphExecutionError
-from selectools.orchestration.graph import AgentGraph, ErrorPolicy, GraphResult
-from selectools.orchestration.node import GraphNode
+from selectools.orchestration.graph import AgentGraph, ErrorPolicy
 from selectools.orchestration.state import (
     STATE_KEY_LAST_OUTPUT,
-    ContextMode,
-    GraphEvent,
     GraphEventType,
     GraphState,
     InterruptRequest,
     MergePolicy,
     Scatter,
 )
-from selectools.types import Message, Role
 
 # ------------------------------------------------------------------
 # Test helpers
@@ -1050,7 +1044,7 @@ class TestRoutingFramework:
 
     def test_update_routing_applies_patch_and_follows_edge(self):
         """update() from router applies state patch then follows static edge."""
-        from selectools.orchestration.state import _Update, update
+        from selectools.orchestration.state import update
 
         def update_router(state: GraphState):
             return update({"injected": "by_router"})
@@ -1103,7 +1097,7 @@ class TestRoutingFramework:
         result = graph.run("go", checkpoint_store=store)
         assert result.interrupted
 
-        final = graph.resume(result.interrupt_id, "yes", checkpoint_store=store)
+        graph.resume(result.interrupt_id, "yes", checkpoint_store=store)
         assert len(resume_events) == 1, f"on_graph_resume should fire once. Got: {resume_events}"
 
     def test_file_checkpoint_rejects_path_traversal(self):

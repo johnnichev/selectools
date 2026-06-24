@@ -1,9 +1,5 @@
 """Tests for trace_to_html."""
 
-import time
-
-import pytest
-
 from selectools import trace_to_html
 from selectools.trace import AgentTrace, StepType, TraceStep
 

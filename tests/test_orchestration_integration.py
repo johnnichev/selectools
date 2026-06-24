@@ -2,18 +2,13 @@
 
 from __future__ import annotations
 
-import pytest
-
 from selectools.observer import AgentObserver, LoggingObserver, SimpleStepObserver
 from selectools.orchestration import (
     STATE_KEY_LAST_OUTPUT,
     AgentGraph,
-    CheckpointStore,
     ContextMode,
     ErrorPolicy,
     FileCheckpointStore,
-    GraphEvent,
-    GraphEventType,
     GraphNode,
     GraphResult,
     GraphState,
@@ -27,9 +22,6 @@ from selectools.orchestration import (
     SubgraphNode,
     SupervisorAgent,
     SupervisorStrategy,
-    goto,
-    merge_states,
-    update,
 )
 from selectools.trace import StepType
 
@@ -159,7 +151,6 @@ class TestNewObserverMethods:
 
     def test_logging_observer_graph_methods_callable(self):
         """LoggingObserver graph methods call _emit without raising."""
-        import logging
 
         obs = LoggingObserver()
         # Should not raise

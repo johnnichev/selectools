@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Any, AsyncGenerator, Generator
+from typing import AsyncGenerator, Generator
 
 import pytest
 
@@ -184,7 +184,7 @@ class TestStreamingWithMemory:
         config = AgentConfig(max_iterations=2)
         agent = Agent(tools=[stream_numbers], provider=provider, config=config, memory=memory)
 
-        response = agent.run([Message(role=Role.USER, content="Stream some numbers")])
+        agent.run([Message(role=Role.USER, content="Stream some numbers")])
 
         # Memory should contain the interaction
         history = memory.get_history()
@@ -263,7 +263,7 @@ class TestStreamingCombinedFeatures:
             tools=[stream_numbers, get_info], provider=provider, config=config, memory=memory
         )
 
-        response = agent.run([Message(role=Role.USER, content="Run both tools")])
+        agent.run([Message(role=Role.USER, content="Run both tools")])
 
         # Verify observer events
         assert "agent_start" in hook_events

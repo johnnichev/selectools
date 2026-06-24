@@ -14,8 +14,7 @@ Run: pytest tests/simulations/sim_provider_failover.py -v
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
-from unittest.mock import Mock
+from typing import List
 
 import pytest
 

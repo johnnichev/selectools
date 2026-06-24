@@ -7,14 +7,13 @@ provides a dynamic alternative.
 
 from __future__ import annotations
 
-import asyncio
 from typing import List
 
 import pytest
 
 from selectools import Agent, AgentConfig
 from selectools.tools import Tool, ToolParameter, tool
-from selectools.types import Message, Role, ToolCall
+from selectools.types import ToolCall
 
 # ---------------------------------------------------------------------------
 # Helpers

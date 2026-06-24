@@ -11,7 +11,6 @@ Run with: pytest tests/test_property_based.py -x -q
 from __future__ import annotations
 
 from typing import Any, Dict, List
-from unittest.mock import Mock
 
 import pytest
 from hypothesis import given, settings

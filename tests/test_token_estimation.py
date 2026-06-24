@@ -1,7 +1,5 @@
 """Tests for pre-execution token estimation (R6)."""
 
-import json
-
 from selectools.token_estimation import TokenEstimate, estimate_run_tokens, estimate_tokens
 from selectools.tools.base import Tool
 from selectools.types import Message, Role

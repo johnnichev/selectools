@@ -15,11 +15,8 @@ Tests cover:
 
 from __future__ import annotations
 
-import os
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
-
-import pytest
+from typing import List
 
 from selectools.knowledge import KnowledgeMemory
 from selectools.toolbox.memory_tools import make_recall_tool, make_remember_tool

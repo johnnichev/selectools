@@ -10,8 +10,7 @@ import json
 import sys
 import tempfile
 import time
-import types
-from dataclasses import dataclass
+import types  # noqa: F401
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock, patch
@@ -340,7 +339,6 @@ class TestUnwrapType:
         from selectools.tools.decorators import _unwrap_type
 
         # Construct str | None without eval
-        union_type = types.UnionType  # type: ignore[attr-defined]
         # The standard way to get str | None at runtime on 3.10+
         str_or_none = str | None  # type: ignore[operator]
         result = _unwrap_type(str_or_none)

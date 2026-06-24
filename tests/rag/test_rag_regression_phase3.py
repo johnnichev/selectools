@@ -9,7 +9,6 @@ concurrent execution, adversarial inputs, or unusual argument combinations.
 from __future__ import annotations
 
 import threading
-import time
 from typing import List
 from unittest.mock import MagicMock, Mock, patch
 
@@ -382,7 +381,6 @@ class TestContextualChunkerProviderErrorFallback:
     def test_partial_provider_failure_continues(self):
         """Provider failure on chunk 1 must not prevent chunk 2 from being processed."""
         from selectools.rag.chunking import ContextualChunker, TextSplitter
-        from selectools.types import Message, Role
 
         base = TextSplitter(chunk_size=50, chunk_overlap=0)
         call_count = [0]

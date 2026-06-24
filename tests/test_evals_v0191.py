@@ -24,7 +24,7 @@ from selectools.evals.llm_evaluators import (
     FactConsistencyEvaluator,
     StepReasoningEvaluator,
 )
-from selectools.evals.types import CaseResult, CaseVerdict, EvalFailure, TestCase
+from selectools.evals.types import CaseResult, CaseVerdict, TestCase
 
 # ---------------------------------------------------------------------------
 # Test helpers
@@ -583,7 +583,6 @@ class TestStepReasoningEvaluator:
         case = _make_case(rubric=None)
         result = _make_result("Step-by-step analysis here.")
         ev.check(case, result)
-        call_args = provider.complete.call_args
         # The system prompt is in the call — verify it was called
         provider.complete.assert_called_once()
 

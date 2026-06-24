@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import json
 import sys
-import threading
 from datetime import datetime, timezone
 from types import ModuleType
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -80,7 +79,7 @@ class TestPostgresCheckpointStoreInit:
 
     def test_creates_table_on_init(self):
         fake_pg, mock_conn, mock_cursor = _make_fake_psycopg2()
-        store = _make_store(fake_pg)
+        _make_store(fake_pg)
         # _init_table should have been called, executing CREATE TABLE and CREATE INDEX
         assert mock_cursor.execute.call_count >= 2
         sql_calls = [str(c) for c in mock_cursor.execute.call_args_list]
@@ -110,7 +109,7 @@ class TestPostgresCheckpointStoreInit:
         fake_pg, mock_conn, mock_cursor = _make_fake_psycopg2()
         cls = _import_store(fake_pg)
         with patch.dict(sys.modules, {"psycopg2": fake_pg}):
-            store = cls(dsn="postgresql://x@y/z", table="custom_cp")
+            cls(dsn="postgresql://x@y/z", table="custom_cp")
         sql_calls = [str(c) for c in mock_cursor.execute.call_args_list]
         assert any("custom_cp" in s for s in sql_calls)
 

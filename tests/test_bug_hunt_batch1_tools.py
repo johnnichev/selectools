@@ -1,14 +1,10 @@
 """Regression tests for bug hunt batch 1 — tools, RAG, evals fixes."""
 
-import asyncio
-import json
-import re
-
 import pytest
 
 from selectools.evals.evaluators import JsonValidityEvaluator, OutputEvaluator
 from selectools.evals.types import CaseResult, TestCase
-from selectools.tools.base import Tool, ToolParameter
+from selectools.tools.base import Tool
 
 
 class TestAsyncToolSync:

@@ -107,7 +107,7 @@ class TestSQLitePersistence:
         """Test basic persistence after reconnection."""
         # Add documents and close
         store1 = SQLiteVectorStore(embedder=mock_embedder, db_path=temp_db_path)
-        doc_ids = store1.add_documents(sample_documents)
+        store1.add_documents(sample_documents)
         del store1
 
         # Reopen and verify
@@ -209,7 +209,7 @@ class TestSQLiteDatabaseOperations:
         """Test that database file is created."""
         assert not os.path.exists(temp_db_path)
 
-        store = SQLiteVectorStore(embedder=mock_embedder, db_path=temp_db_path)
+        SQLiteVectorStore(embedder=mock_embedder, db_path=temp_db_path)
 
         assert os.path.exists(temp_db_path)
         assert os.path.isfile(temp_db_path)
@@ -259,7 +259,7 @@ class TestSQLiteDatabaseOperations:
         # Delete and re-add with new content
         store.delete(doc_ids)
         doc2 = Document(text="updated text", metadata={"version": 2})
-        new_ids = store.add_documents([doc2])
+        store.add_documents([doc2])
 
         # Search and verify the new document is there
         query_embedding = mock_embedder.embed_query("updated")

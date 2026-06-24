@@ -192,7 +192,7 @@ def main():
     # Task 3: Pipeline composition (selectools only — no LCEL comparison)
     # =========================================================
 
-    from selectools.pipeline import Pipeline, Step, step
+    from selectools.pipeline import step
 
     @step
     def upper(x: str) -> str:

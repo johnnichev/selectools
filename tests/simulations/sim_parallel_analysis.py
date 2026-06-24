@@ -21,7 +21,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
 from selectools import Agent, AgentConfig, AgentGraph, tool
-from selectools.orchestration.state import STATE_KEY_LAST_OUTPUT, GraphState, MergePolicy
+from selectools.orchestration.state import MergePolicy
 from selectools.providers.openai_provider import OpenAIProvider
 
 # --- Tools ---

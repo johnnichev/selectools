@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
 from selectools import Agent, AgentConfig, AgentGraph, tool
 from selectools.orchestration.state import STATE_KEY_LAST_OUTPUT, GraphState
-from selectools.pipeline import Pipeline, Step, parallel, step
+from selectools.pipeline import Pipeline, Step, step
 from selectools.providers.stubs import LocalProvider
 
 

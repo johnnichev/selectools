@@ -16,7 +16,6 @@ from __future__ import annotations
 import json
 from typing import (
     Any,
-    AsyncGenerator,
     AsyncIterable,
     Dict,
     Generator,
@@ -845,12 +844,10 @@ class TestGeminiStreamSafetyFilter:
         provider._client.models.generate_content_stream.return_value = mock_stream
         provider.default_model = "gemini-test"
 
-        from google.genai import types  # type: ignore[import]
-
         provider._genai = MagicMock()
 
         # Build minimal config mock
-        config_mock = MagicMock()
+        MagicMock()
         with (
             MagicMock() as _mock_types,
         ):

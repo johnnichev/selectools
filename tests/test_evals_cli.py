@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import sys
-from io import StringIO
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -118,7 +116,7 @@ class TestCreateAgent:
     @patch("selectools.Agent")
     def test_local_provider_with_model(self, mock_agent_cls):
         mock_agent_cls.return_value = MagicMock()
-        agent = _create_agent("local", "custom-local")
+        _create_agent("local", "custom-local")
         call_kwargs = mock_agent_cls.call_args
         assert call_kwargs.kwargs["config"].model == "custom-local"
 
@@ -132,7 +130,7 @@ class TestCreateAgent:
         mock_agent_cls.return_value = MagicMock()
         with patch("selectools.providers.OpenAIProvider") as mock_prov:
             mock_prov.return_value = MagicMock()
-            agent = _create_agent("openai", None)
+            _create_agent("openai", None)
             mock_prov.assert_called_once()
 
     @patch("selectools.Agent")
@@ -140,7 +138,7 @@ class TestCreateAgent:
         mock_agent_cls.return_value = MagicMock()
         with patch("selectools.providers.AnthropicProvider") as mock_prov:
             mock_prov.return_value = MagicMock()
-            agent = _create_agent("anthropic", None)
+            _create_agent("anthropic", None)
             mock_prov.assert_called_once()
 
     @patch("selectools.Agent")
@@ -148,7 +146,7 @@ class TestCreateAgent:
         mock_agent_cls.return_value = MagicMock()
         with patch("selectools.providers.GeminiProvider") as mock_prov:
             mock_prov.return_value = MagicMock()
-            agent = _create_agent("gemini", None)
+            _create_agent("gemini", None)
             mock_prov.assert_called_once()
 
     @patch("selectools.Agent")
@@ -156,7 +154,7 @@ class TestCreateAgent:
         mock_agent_cls.return_value = MagicMock()
         with patch("selectools.providers.OllamaProvider") as mock_prov:
             mock_prov.return_value = MagicMock()
-            agent = _create_agent("ollama", None)
+            _create_agent("ollama", None)
             mock_prov.assert_called_once()
 
     @patch("selectools.Agent")

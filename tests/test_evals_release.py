@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, List
+from typing import Any
 from unittest.mock import MagicMock
-
-import pytest
 
 from selectools import Agent, AgentConfig, tool
 from selectools.evals import (
@@ -14,7 +12,6 @@ from selectools.evals import (
     EvalMetadata,
     EvalReport,
     EvalSuite,
-    HistoryStore,
     HistoryTrend,
     TestCase,
 )

@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 from unittest.mock import MagicMock
 
-import pytest
-
-from selectools.evals import CaseResult, CaseVerdict, EvalMetadata, EvalReport, EvalSuite, TestCase
+from selectools.evals import CaseResult, CaseVerdict, EvalMetadata, EvalReport, TestCase
 from selectools.evals.badge import generate_badge, generate_detailed_badge
 from selectools.evals.generator import _parse_generated_cases, generate_cases
 from selectools.evals.pairwise import PairwiseCaseResult, PairwiseEval, PairwiseReport

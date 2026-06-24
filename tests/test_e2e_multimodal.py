@@ -29,7 +29,6 @@ from __future__ import annotations
 import os
 import struct
 import zlib
-from pathlib import Path
 
 import pytest
 

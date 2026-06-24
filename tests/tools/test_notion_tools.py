@@ -73,7 +73,7 @@ class TestNotionCreatePage:
                 200, {"id": "page-123", "url": "https://notion.so/page-123"}
             )
         )
-        fake = _install_fake_requests(monkeypatch, post=post)
+        _install_fake_requests(monkeypatch, post=post)
         result = notion_create_page.function(
             "parent-id", "My Page", content="line one\nline two", api_key=_KEY
         )

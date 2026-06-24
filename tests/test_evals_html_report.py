@@ -2,12 +2,6 @@
 
 from __future__ import annotations
 
-import os
-import tempfile
-from pathlib import Path
-
-import pytest
-
 from selectools.evals.html import _donut_svg, _histogram_svg, _trend_svg, render_html_report
 from selectools.evals.report import EvalReport
 from selectools.evals.types import CaseResult, CaseVerdict, EvalFailure, EvalMetadata, TestCase

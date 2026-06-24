@@ -22,8 +22,6 @@ Covers:
 
 from __future__ import annotations
 
-import asyncio
-import copy
 import json
 import logging
 from dataclasses import dataclass, field
@@ -723,7 +721,7 @@ class TestStructuredValidateEvents:
                 return msg, stats
 
         agent, obs = _agent(provider=JSONProvider())
-        result = agent.run("what is the answer?", response_format=Response)
+        agent.run("what is the answer?", response_format=Response)
         validates = obs.get("structured_validate")
         assert len(validates) >= 1
         assert validates[0].args["success"] is True

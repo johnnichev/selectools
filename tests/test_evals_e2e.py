@@ -6,19 +6,16 @@ and SharedToolCallProvider — no mocks. Covers all gaps identified in the cover
 
 from __future__ import annotations
 
-import asyncio
 import json
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any, List
+from typing import Any
 
 import pytest
 
 from selectools import Agent, AgentConfig, tool
 from selectools.evals import (
     BaselineStore,
-    CaseResult,
-    CaseVerdict,
     DatasetLoader,
     EvalReport,
     EvalSuite,
@@ -28,10 +25,8 @@ from selectools.evals import (
     generate_badge,
     generate_cases,
     generate_detailed_badge,
-    serve_eval,
 )
-from selectools.evals.html import _donut_svg, _histogram_svg, render_html_report
-from selectools.evals.junit import render_junit_xml
+from selectools.evals.html import _donut_svg, _histogram_svg
 from selectools.evals.llm_evaluators import (
     BiasEvaluator,
     CoherenceEvaluator,
@@ -44,10 +39,7 @@ from selectools.evals.llm_evaluators import (
     SummaryEvaluator,
     ToxicityEvaluator,
 )
-from selectools.evals.pairwise import PairwiseReport
-from selectools.evals.snapshot import SnapshotDiff, SnapshotResult
-from selectools.types import Message, Role, ToolCall
-from selectools.usage import UsageStats
+from selectools.types import ToolCall
 
 # Import shared test providers from conftest
 from tests.conftest import SharedFakeProvider, SharedToolCallProvider

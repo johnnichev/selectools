@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-import base64
-import os
-import tempfile
-
 import pytest
 
 from selectools.types import ContentPart, Message, Role, image_message, text_content

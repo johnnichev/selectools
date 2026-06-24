@@ -304,7 +304,7 @@ class TestSQLiteVectorStore:
         try:
             # Add documents and close
             store1 = SQLiteVectorStore(embedder=mock_embedder, db_path=db_path)
-            doc_ids = store1.add_documents(sample_documents)
+            store1.add_documents(sample_documents)
             del store1
 
             # Reopen and verify documents exist

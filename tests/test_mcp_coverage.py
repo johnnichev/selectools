@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-import copy
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest

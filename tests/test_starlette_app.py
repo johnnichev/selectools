@@ -1,7 +1,5 @@
 """Tests for the Starlette ASGI builder app."""
 
-import json
-
 import pytest
 
 starlette = pytest.importorskip("starlette", reason="starlette not installed")

@@ -1,12 +1,9 @@
 """Regression tests for bug hunt batch 1 — agent core and provider fixes."""
 
-import inspect
-
 import pytest
 
 from selectools.agent.config import AgentConfig
 from selectools.agent.core import Agent
-from selectools.observer import AgentObserver
 from selectools.tools.base import Tool
 from selectools.trace import StepType
 from selectools.types import Message, Role, ToolCall

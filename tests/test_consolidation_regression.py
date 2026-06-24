@@ -93,7 +93,7 @@ class TestArunToolUsageStats:
             memory=ConversationMemory(max_messages=50),
             config=AgentConfig(max_iterations=3),
         )
-        result = await agent.arun("Test tool usage")
+        await agent.arun("Test tool usage")
         assert "echo" in agent.usage.tool_usage
         assert agent.usage.tool_usage["echo"] >= 1
 
@@ -312,7 +312,7 @@ class TestSQLiteTripleStoreWAL:
     def test_wal_mode_enabled(self, tmp_path: "os.PathLike[str]") -> None:
         """SQLiteTripleStore should use WAL journal mode."""
         db = os.path.join(str(tmp_path), "triples.db")
-        store = SQLiteTripleStore(db_path=db)
+        SQLiteTripleStore(db_path=db)
 
         conn = sqlite3.connect(db)
         mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
