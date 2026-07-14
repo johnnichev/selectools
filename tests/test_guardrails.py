@@ -561,3 +561,62 @@ class TestToolArgsGuardrails:
         checked, triggered = await pipeline.acheck_tool_args(params)
         assert checked is params
         assert triggered is None
+
+
+# ── Tool-results guardrails (issue #165) ────────────────────────────────
+
+
+class TestToolResultsGuardrails:
+    def test_pipeline_default_has_empty_tool_results(self) -> None:
+        pipeline = GuardrailsPipeline()
+        assert pipeline.tool_results == []
+
+    def test_no_tool_results_guardrails_returns_result_unchanged(self) -> None:
+        pipeline = GuardrailsPipeline()
+        result, triggered = pipeline.check_tool_result("raw output")
+        assert result == "raw output"
+        assert triggered is None
+
+    def test_passing_chain_keeps_result(self) -> None:
+        pipeline = GuardrailsPipeline(tool_results=[_RedactSecretGuardrail()])
+        result, triggered = pipeline.check_tool_result("clean output")
+        assert result == "clean output"
+        assert triggered is None
+
+    def test_rewrite_sanitizes_result(self) -> None:
+        pipeline = GuardrailsPipeline(tool_results=[_RedactSecretGuardrail()])
+        result, triggered = pipeline.check_tool_result("found secret-token here")
+        assert result == "found [REDACTED] here"
+        assert triggered == "redact-secret"
+
+    def test_block_action_raises(self) -> None:
+        class _Blocker(Guardrail):
+            name = "result-blocker"
+            action = GuardrailAction.BLOCK
+
+            def check(self, content: str) -> GuardrailResult:
+                return GuardrailResult(passed=False, content=content, reason="oversized")
+
+        pipeline = GuardrailsPipeline(tool_results=[_Blocker()])
+        with pytest.raises(GuardrailError, match="oversized"):
+            pipeline.check_tool_result("anything")
+
+    def test_pii_guardrail_redacts_result(self) -> None:
+        pipeline = GuardrailsPipeline(tool_results=[PIIGuardrail(action=GuardrailAction.REWRITE)])
+        result, triggered = pipeline.check_tool_result("customer email: jane@example.com")
+        assert "jane@example.com" not in result
+        assert triggered is not None
+
+    @pytest.mark.asyncio
+    async def test_acheck_tool_result_rewrites(self) -> None:
+        pipeline = GuardrailsPipeline(tool_results=[_RedactSecretGuardrail()])
+        result, triggered = await pipeline.acheck_tool_result("has secret-token")
+        assert result == "has [REDACTED]"
+        assert triggered == "redact-secret"
+
+    @pytest.mark.asyncio
+    async def test_acheck_tool_result_empty_fast_path(self) -> None:
+        pipeline = GuardrailsPipeline()
+        result, triggered = await pipeline.acheck_tool_result("x")
+        assert result == "x"
+        assert triggered is None

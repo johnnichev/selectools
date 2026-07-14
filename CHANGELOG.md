@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Tool-results guardrails (opt-in).** `GuardrailsPipeline` gained a
+  `tool_results` stage that runs guardrails over every tool's **return value**
+  after execution, before the result re-enters the model context — the other
+  half of the tool-boundary surface started by `tool_args` in v1.1.0. Results
+  are plain strings (no JSON round-trip); rewrites are what the model sees and
+  what the tool-result cache stores; `block` propagates as `GuardrailError`
+  instead of degrading into an error-result message. Covers single and
+  parallel execution across `run()`, `arun()`, and `astream()`. Empty by
+  default. (#165)
+
 ## [1.1.0] - 2026-07-14 — Tool-Args Guardrails & Native Structured Output
 
 First 1.x minor: two additive features closing the guardrail and

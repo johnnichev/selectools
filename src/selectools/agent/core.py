@@ -978,6 +978,52 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             )
         return checked
 
+    def _run_tool_result_guardrails(
+        self,
+        tool_name: str,
+        result: str,
+        trace: Optional[AgentTrace] = None,
+    ) -> str:
+        """Run tool-results guardrails on a tool's return value.
+
+        Returns the (possibly rewritten) result. No-op unless the configured
+        pipeline carries ``tool_results`` guardrails (opt-in).
+        """
+        pipeline = self.config.guardrails
+        if not pipeline or not getattr(pipeline, "tool_results", None):
+            return result
+        checked, triggered = pipeline.check_tool_result(result)
+        if trace is not None and triggered:
+            trace.add(
+                TraceStep(
+                    type=StepType.GUARDRAIL,
+                    tool_name=tool_name,
+                    summary=f"Tool-result guardrail ({tool_name}): {triggered}",
+                )
+            )
+        return checked
+
+    async def _arun_tool_result_guardrails(
+        self,
+        tool_name: str,
+        result: str,
+        trace: Optional[AgentTrace] = None,
+    ) -> str:
+        """Async tool-results guardrails — calls ``acheck()`` to avoid blocking the event loop."""
+        pipeline = self.config.guardrails
+        if not pipeline or not getattr(pipeline, "tool_results", None):
+            return result
+        checked, triggered = await pipeline.acheck_tool_result(result)
+        if trace is not None and triggered:
+            trace.add(
+                TraceStep(
+                    type=StepType.GUARDRAIL,
+                    tool_name=tool_name,
+                    summary=f"Tool-result guardrail ({tool_name}): {triggered}",
+                )
+            )
+        return checked
+
     async def _arun_input_guardrails(self, content: str, trace: Optional[AgentTrace] = None) -> str:
         """Async input guardrails — calls ``acheck()`` to avoid blocking the event loop."""
         if not self.config.guardrails or not self.config.guardrails.input:

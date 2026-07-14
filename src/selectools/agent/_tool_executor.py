@@ -58,6 +58,7 @@ def _get_parallel_dispatch_executor() -> ThreadPoolExecutor:
 
 from .._async_utils import run_in_executor_copyctx
 from ..coherence import acheck_coherence, check_coherence
+from ..guardrails import GuardrailError
 from ..policy import ApprovalRequest, PolicyDecision, PolicyResult
 from ..security import screen_output as screen_tool_output
 from ..trace import StepType, TraceStep
@@ -886,6 +887,7 @@ class _ToolExecutorMixin:
             try:
                 result = self._execute_tool_with_timeout(tool, parameters, chunk_cb)
                 result = self._screen_tool_result(tool_name, result)
+                result = self._run_tool_result_guardrails(tool_name, result, trace)
                 self._store_tool_cache(tool, parameters, result)
                 dur = time.time() - start
                 if run_id:
@@ -898,6 +900,10 @@ class _ToolExecutorMixin:
                         dur * 1000,
                     )
                 return _Result(tc, result, False, dur, tool, chunk_counter["count"])
+            except GuardrailError:
+                # block action is a policy decision, not a tool failure —
+                # propagate like the other guardrail stages do.
+                raise
             except Exception as exc:
                 dur = time.time() - start
                 if run_id:
@@ -1130,6 +1136,7 @@ class _ToolExecutorMixin:
             try:
                 result = await self._aexecute_tool_with_timeout(tool, parameters, chunk_cb)
                 result = self._screen_tool_result(tool_name, result)
+                result = await self._arun_tool_result_guardrails(tool_name, result, trace)
                 self._store_tool_cache(tool, parameters, result)
                 dur = time.time() - start
                 if run_id:
@@ -1150,6 +1157,10 @@ class _ToolExecutorMixin:
                         dur * 1000,
                     )
                 return _Result(tc, result, False, dur, tool, chunk_counter["count"])
+            except GuardrailError:
+                # block action is a policy decision, not a tool failure —
+                # propagate like the other guardrail stages do.
+                raise
             except Exception as exc:
                 dur = time.time() - start
                 if run_id:
@@ -1475,6 +1486,7 @@ class _ToolExecutorMixin:
 
             result = self._execute_tool_with_timeout(tool, parameters, chunk_callback)
             result = self._screen_tool_result(tool_name, result)
+            result = self._run_tool_result_guardrails(tool_name, result, ctx.trace)
             duration = time.time() - start_time
 
             self._notify_observers(
@@ -1516,6 +1528,10 @@ class _ToolExecutorMixin:
                     self.usage.tool_tokens.get(tool.name, 0) + parent_usage.total_tokens
                 )
 
+        except GuardrailError:
+            # block action is a policy decision, not a tool failure —
+            # propagate like the other guardrail stages do.
+            raise
         except Exception as exc:
             duration = time.time() - start_time
             self._notify_observers(
@@ -1714,6 +1730,7 @@ class _ToolExecutorMixin:
 
             result = await self._aexecute_tool_with_timeout(tool, parameters, chunk_callback)
             result = self._screen_tool_result(tool_name, result)
+            result = await self._arun_tool_result_guardrails(tool_name, result, ctx.trace)
             duration = time.time() - start_time
 
             self._notify_observers(
@@ -1758,6 +1775,10 @@ class _ToolExecutorMixin:
                     self.usage.tool_tokens.get(tool.name, 0) + parent_usage.total_tokens
                 )
 
+        except GuardrailError:
+            # block action is a policy decision, not a tool failure —
+            # propagate like the other guardrail stages do.
+            raise
         except Exception as exc:
             duration = time.time() - start_time
             self._notify_observers(

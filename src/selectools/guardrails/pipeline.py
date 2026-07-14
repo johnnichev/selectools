@@ -35,11 +35,20 @@ class GuardrailsPipeline:
             list receives the JSON-serialized arguments dict as its content;
             ``rewrite`` results are parsed back into the arguments, ``block``
             raises :class:`GuardrailError` before the tool runs.
+        tool_results: Guardrails evaluated on a tool's **return value** after
+            execution, before the result re-enters the model context (added
+            in v1.2, opt-in). The other half of the tool-boundary surface:
+            ``tool_args`` gates what goes INTO a tool, this gates what comes
+            OUT (external API responses, retrieved chunks, oversized blobs).
+            Tool results are plain strings, so guardrails receive them as-is;
+            ``rewrite`` replaces the result, ``block`` raises
+            :class:`GuardrailError` before the result reaches history.
     """
 
     input: List[Guardrail] = field(default_factory=list)
     output: List[Guardrail] = field(default_factory=list)
     tool_args: List[Guardrail] = field(default_factory=list)
+    tool_results: List[Guardrail] = field(default_factory=list)
 
     def check_input(self, content: str) -> GuardrailResult:
         """Run all *input* guardrails against *content*.
@@ -106,6 +115,29 @@ class GuardrailsPipeline:
         if result.content == serialized:
             return parameters, result.guardrail_name
         return self._parse_rewritten_args(result), result.guardrail_name
+
+    def check_tool_result(self, result: str) -> Tuple[str, Optional[str]]:
+        """Run all *tool_results* guardrails against a tool's return value.
+
+        Returns:
+            ``(result, triggered_names)`` — the (possibly rewritten) result
+            string, and a comma-joined string of triggered guardrail names
+            (``None`` if nothing triggered).
+
+        Raises:
+            GuardrailError: If any guardrail with ``action=block`` fails.
+        """
+        if not self.tool_results:
+            return result, None
+        chain_result = self._run_chain(self.tool_results, result)
+        return chain_result.content, chain_result.guardrail_name
+
+    async def acheck_tool_result(self, result: str) -> Tuple[str, Optional[str]]:
+        """Async version of :meth:`check_tool_result`."""
+        if not self.tool_results:
+            return result, None
+        chain_result = await self._arun_chain(self.tool_results, result)
+        return chain_result.content, chain_result.guardrail_name
 
     @staticmethod
     def _parse_rewritten_args(result: GuardrailResult) -> Dict[str, Any]:

@@ -103,8 +103,9 @@ User Message → Input Guardrails → LLM Call → Output Guardrails → Respons
 1. **Input guardrails** run on every user message before it reaches the LLM
 2. **Output guardrails** run on the LLM response's free-text content before it's returned to you
 3. **Tool-args guardrails** (opt-in) run on the arguments of every tool call before the tool executes
-4. Guardrails execute **in order** — if one rewrites content, the next sees the rewritten version
-5. If a guardrail **blocks**, processing stops immediately with a `GuardrailError`
+4. **Tool-results guardrails** (opt-in) run on every tool's return value before it re-enters the model context
+5. Guardrails execute **in order** — if one rewrites content, the next sees the rewritten version
+6. If a guardrail **blocks**, processing stops immediately with a `GuardrailError`
 
 ---
 
@@ -141,6 +142,43 @@ Semantics mirror the content path:
 This covers `run()`, `arun()`, and `astream()`, including tool calls extracted
 by the text `ToolCallParser` fallback. It is fully opt-in: an empty
 `tool_args` list (the default) changes nothing.
+
+---
+
+## Tool-Results Guardrails
+
+`tool_args` gates what goes INTO a tool; `tool_results` gates what comes OUT.
+A tool that fetches web content, calls an external API, or retrieves RAG
+chunks returns text that flows straight back into the model's context — PII,
+injection payloads, or oversized blobs included. The `tool_results` stage
+runs the chain over every tool's return value after execution, before the
+result is appended to history:
+
+```python
+config = AgentConfig(
+    guardrails=GuardrailsPipeline(
+        tool_results=[
+            PIIGuardrail(),                     # redact PII from fetched content
+            LengthGuardrail(max_chars=50_000),  # bound retrieved blobs
+        ],
+    ),
+)
+```
+
+- Tool results are plain strings, so guardrails receive them as-is (no JSON
+  round-trip).
+- `rewrite` replaces the result the model sees; the sanitized value is also
+  what gets stored in the tool-result cache.
+- `block` raises `GuardrailError` and aborts the run — it is a policy
+  decision, not a tool failure, so it propagates instead of degrading into an
+  `Error executing tool` message the model keeps iterating on.
+- Runs after prompt-injection screening (`screen_tool_output`) and before
+  caching/compression, across single and parallel execution in `run()`,
+  `arun()`, and `astream()`.
+
+Together the four stages close the loop: `input` and `output` gate the
+conversation surface, `tool_args` and `tool_results` gate both directions of
+the tool boundary.
 
 ---
 
