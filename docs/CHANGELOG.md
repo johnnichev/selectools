@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Tool-args guardrails (opt-in).** `GuardrailsPipeline` gained a `tool_args`
+  stage that runs guardrails over tool-call **arguments** before the tool
+  executes, symmetric with the existing content path (block / rewrite / warn).
+  Output guardrails only ever saw the model's free-text content, so structured
+  or sensitive data carried via native tool calls bypassed the guardrail
+  surface entirely. Covers `run()`, `arun()`, and `astream()`, including
+  parser-extracted tool calls. Empty by default — no behavior change unless
+  configured. (#158)
+
 ## [1.0.1] - 2026-06-15 — Cleanup & Z-Timestamp Fix
 
 First post-1.0 patch: a Python 3.10 crash fix plus an internal hygiene sweep.

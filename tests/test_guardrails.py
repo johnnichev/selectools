@@ -461,3 +461,103 @@ class TestToxicityGuardrailEmptyBlocklist:
         """ToxicityGuardrail(blocklist=None) must still load the default blocklist."""
         g = ToxicityGuardrail(blocklist=None)
         assert len(g._blocklist) > 0
+
+
+# ── Tool-args guardrails (issue #158) ───────────────────────────────────
+
+
+class _RedactSecretGuardrail(Guardrail):
+    """Rewrites the literal 'secret-token' out of content."""
+
+    name = "redact-secret"
+    action = GuardrailAction.REWRITE
+
+    def check(self, content: str) -> GuardrailResult:
+        if "secret-token" in content:
+            return GuardrailResult(
+                passed=False,
+                content=content.replace("secret-token", "[REDACTED]"),
+                reason="secret found",
+                guardrail_name=self.name,
+            )
+        return GuardrailResult(passed=True, content=content, guardrail_name=self.name)
+
+
+class _BreakJsonGuardrail(Guardrail):
+    """Rewrites content into something that is no longer valid JSON."""
+
+    name = "break-json"
+    action = GuardrailAction.REWRITE
+
+    def check(self, content: str) -> GuardrailResult:
+        return GuardrailResult(
+            passed=False,
+            content="not json at all",
+            reason="mangled",
+            guardrail_name=self.name,
+        )
+
+
+class TestToolArgsGuardrails:
+    def test_pipeline_default_has_empty_tool_args(self) -> None:
+        pipeline = GuardrailsPipeline()
+        assert pipeline.tool_args == []
+
+    def test_no_tool_args_guardrails_returns_params_unchanged(self) -> None:
+        pipeline = GuardrailsPipeline()
+        params = {"query": "hello", "n": 3}
+        checked, triggered = pipeline.check_tool_args(params)
+        assert checked is params
+        assert triggered is None
+
+    def test_passing_chain_keeps_params(self) -> None:
+        pipeline = GuardrailsPipeline(tool_args=[_RedactSecretGuardrail()])
+        params = {"query": "hello world", "n": 3}
+        checked, triggered = pipeline.check_tool_args(params)
+        assert checked == params
+        assert triggered is None
+
+    def test_rewrite_sanitizes_string_values(self) -> None:
+        pipeline = GuardrailsPipeline(tool_args=[_RedactSecretGuardrail()])
+        params = {"query": "use secret-token now", "n": 3}
+        checked, triggered = pipeline.check_tool_args(params)
+        assert checked == {"query": "use [REDACTED] now", "n": 3}
+        assert triggered == "redact-secret"
+
+    def test_block_action_raises(self) -> None:
+        class _Blocker(Guardrail):
+            name = "blocker"
+            action = GuardrailAction.BLOCK
+
+            def check(self, content: str) -> GuardrailResult:
+                return GuardrailResult(passed=False, content=content, reason="nope")
+
+        pipeline = GuardrailsPipeline(tool_args=[_Blocker()])
+        with pytest.raises(GuardrailError, match="nope"):
+            pipeline.check_tool_args({"query": "anything"})
+
+    def test_rewrite_to_invalid_json_raises(self) -> None:
+        pipeline = GuardrailsPipeline(tool_args=[_BreakJsonGuardrail()])
+        with pytest.raises(GuardrailError, match="valid JSON"):
+            pipeline.check_tool_args({"query": "x"})
+
+    def test_pii_guardrail_redacts_args(self) -> None:
+        pipeline = GuardrailsPipeline(tool_args=[PIIGuardrail(action=GuardrailAction.REWRITE)])
+        checked, triggered = pipeline.check_tool_args({"message": "email me at john@example.com"})
+        assert "john@example.com" not in checked["message"]
+        assert triggered is not None
+
+    @pytest.mark.asyncio
+    async def test_acheck_tool_args_rewrites(self) -> None:
+        pipeline = GuardrailsPipeline(tool_args=[_RedactSecretGuardrail()])
+        checked, triggered = await pipeline.acheck_tool_args({"q": "secret-token"})
+        assert checked == {"q": "[REDACTED]"}
+        assert triggered == "redact-secret"
+
+    @pytest.mark.asyncio
+    async def test_acheck_tool_args_empty_fast_path(self) -> None:
+        pipeline = GuardrailsPipeline()
+        params = {"q": "x"}
+        checked, triggered = await pipeline.acheck_tool_args(params)
+        assert checked is params
+        assert triggered is None

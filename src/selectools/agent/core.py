@@ -759,6 +759,9 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             if parse_result.tool_call:
                 tool_calls_to_execute.append(parse_result.tool_call)
 
+        for tc in tool_calls_to_execute:
+            tc.parameters = self._run_tool_args_guardrails(tc.tool_name, tc.parameters, ctx.trace)
+
         reasoning_text = self._extract_reasoning(response_msg, tool_calls_to_execute)
         if reasoning_text:
             ctx.reasoning_history.append(reasoning_text)
@@ -794,6 +797,11 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             parse_result = self.parser.parse(response_text)
             if parse_result.tool_call:
                 tool_calls_to_execute.append(parse_result.tool_call)
+
+        for tc in tool_calls_to_execute:
+            tc.parameters = await self._arun_tool_args_guardrails(
+                tc.tool_name, tc.parameters, ctx.trace
+            )
 
         reasoning_text = self._extract_reasoning(response_msg, tool_calls_to_execute)
         if reasoning_text:
@@ -840,6 +848,52 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 )
             )
         return result.content
+
+    def _run_tool_args_guardrails(
+        self,
+        tool_name: str,
+        parameters: Dict[str, Any],
+        trace: Optional[AgentTrace] = None,
+    ) -> Dict[str, Any]:
+        """Run tool-args guardrails on a tool call's arguments.
+
+        Returns the (possibly rewritten) arguments dict. No-op unless the
+        configured pipeline carries ``tool_args`` guardrails (opt-in).
+        """
+        pipeline = self.config.guardrails
+        if not pipeline or not getattr(pipeline, "tool_args", None):
+            return parameters
+        checked, triggered = pipeline.check_tool_args(parameters)
+        if trace is not None and triggered:
+            trace.add(
+                TraceStep(
+                    type=StepType.GUARDRAIL,
+                    tool_name=tool_name,
+                    summary=f"Tool-args guardrail ({tool_name}): {triggered}",
+                )
+            )
+        return checked
+
+    async def _arun_tool_args_guardrails(
+        self,
+        tool_name: str,
+        parameters: Dict[str, Any],
+        trace: Optional[AgentTrace] = None,
+    ) -> Dict[str, Any]:
+        """Async tool-args guardrails — calls ``acheck()`` to avoid blocking the event loop."""
+        pipeline = self.config.guardrails
+        if not pipeline or not getattr(pipeline, "tool_args", None):
+            return parameters
+        checked, triggered = await pipeline.acheck_tool_args(parameters)
+        if trace is not None and triggered:
+            trace.add(
+                TraceStep(
+                    type=StepType.GUARDRAIL,
+                    tool_name=tool_name,
+                    summary=f"Tool-args guardrail ({tool_name}): {triggered}",
+                )
+            )
+        return checked
 
     async def _arun_input_guardrails(self, content: str, trace: Optional[AgentTrace] = None) -> str:
         """Async input guardrails — calls ``acheck()`` to avoid blocking the event loop."""
