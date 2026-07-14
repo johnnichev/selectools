@@ -199,6 +199,35 @@ the tool boundary.
 
 ---
 
+## Observability
+
+Every guardrail trip emits an `on_guardrail_triggered` observer event (v1.2)
+in addition to the existing `GUARDRAIL` trace steps, so hit-rates are
+measurable through the same infrastructure as the rest of the agent
+(Langfuse/OTel observers, `AuditLogger`):
+
+```python
+class GuardrailMetrics(AgentObserver):
+    def on_guardrail_triggered(self, run_id, stage, guardrail_name, action, detail=None):
+        statsd.increment(f"guardrails.{stage}.{guardrail_name}.{action}")
+```
+
+- `stage`: `"input"`, `"output"`, `"tool_args"`, or `"tool_results"`.
+- `action`: the guardrail's configured action (`"block"`, `"rewrite"`,
+  `"warn"`). For `block`, `detail` carries the rejection reason and the
+  event fires immediately before the `GuardrailError` propagates; blocks
+  also gain a `GUARDRAIL` trace step (previously the raise left no trace).
+- Content is never included in the event — wire your own redacted context
+  if needed.
+- `AuditLogger` writes each trip as a `guardrail_triggered` JSONL record.
+- Async observers receive `a_on_guardrail_triggered` (respects `blocking`).
+
+Structured-output observability: per-attempt validation already flows
+through `on_structured_validate`; the terminal outcome is available on
+`AgentResult.structured_status` via `on_run_end`.
+
+---
+
 ## Failure Actions
 
 Every guardrail has an `action` that controls what happens when content fails the check:

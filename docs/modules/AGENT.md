@@ -690,6 +690,7 @@ agent = Agent(
 | `on_batch_start` | Batch | `batch_id`*, `prompts_count` | Before `batch()`/`abatch()` |
 | `on_batch_end` | Batch | `batch_id`*, `results_count`, `errors_count`, `total_duration_ms` | After all batch items complete |
 | `on_policy_decision` | Policy | `tool_name`, `decision`, `reason`, `tool_args` | After tool policy evaluation |
+| `on_guardrail_triggered` | Guardrail | `stage`, `guardrail_name`, `action`, `detail` | A guardrail tripped on any stage (v1.2) |
 | `on_structured_validate` | Structured | `success`, `attempt`, `error` | After structured output validation |
 | `on_provider_fallback` | Fallback | `failed_provider`, `next_provider`, `error` | FallbackProvider switches provider |
 | `on_memory_trim` | Memory | `messages_removed`, `messages_remaining`, `reason` | Memory enforces limits |
