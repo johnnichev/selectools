@@ -101,11 +101,21 @@ class GuardrailsPipeline:
         """
         if not self.tool_args:
             return parameters, None
+        checked, result = self._check_tool_args_detailed(parameters)
+        return checked, result.guardrail_name
+
+    def _check_tool_args_detailed(
+        self, parameters: Dict[str, Any]
+    ) -> Tuple[Dict[str, Any], GuardrailResult]:
+        """Like :meth:`check_tool_args` but returns the full chain result
+        (``.trips`` carries per-guardrail (name, action) pairs)."""
+        if not self.tool_args:
+            return parameters, GuardrailResult(passed=True, content="")
         serialized = json.dumps(parameters, ensure_ascii=False, default=str)
         result = self._run_chain(self.tool_args, serialized)
         if result.content == serialized:
-            return parameters, result.guardrail_name
-        return self._parse_rewritten_args(result), result.guardrail_name
+            return parameters, result
+        return self._parse_rewritten_args(result), result
 
     async def acheck_tool_args(
         self, parameters: Dict[str, Any]
@@ -113,11 +123,20 @@ class GuardrailsPipeline:
         """Async version of :meth:`check_tool_args`."""
         if not self.tool_args:
             return parameters, None
+        checked, result = await self._acheck_tool_args_detailed(parameters)
+        return checked, result.guardrail_name
+
+    async def _acheck_tool_args_detailed(
+        self, parameters: Dict[str, Any]
+    ) -> Tuple[Dict[str, Any], GuardrailResult]:
+        """Async variant of :meth:`_check_tool_args_detailed`."""
+        if not self.tool_args:
+            return parameters, GuardrailResult(passed=True, content="")
         serialized = json.dumps(parameters, ensure_ascii=False, default=str)
         result = await self._arun_chain(self.tool_args, serialized)
         if result.content == serialized:
-            return parameters, result.guardrail_name
-        return self._parse_rewritten_args(result), result.guardrail_name
+            return parameters, result
+        return self._parse_rewritten_args(result), result
 
     def check_tool_result(self, result: str) -> Tuple[str, Optional[str]]:
         """Run all *tool_results* guardrails against a tool's return value.
@@ -130,13 +149,21 @@ class GuardrailsPipeline:
         Raises:
             GuardrailError: If any guardrail with ``action=block`` fails.
         """
-        chain_result = self._run_chain(self.tool_results, result)
+        chain_result = self._check_tool_result_detailed(result)
         return chain_result.content, chain_result.guardrail_name
+
+    def _check_tool_result_detailed(self, result: str) -> GuardrailResult:
+        """Like :meth:`check_tool_result` but returns the full chain result."""
+        return self._run_chain(self.tool_results, result)
 
     async def acheck_tool_result(self, result: str) -> Tuple[str, Optional[str]]:
         """Async version of :meth:`check_tool_result`."""
-        chain_result = await self._arun_chain(self.tool_results, result)
+        chain_result = await self._acheck_tool_result_detailed(result)
         return chain_result.content, chain_result.guardrail_name
+
+    async def _acheck_tool_result_detailed(self, result: str) -> GuardrailResult:
+        """Async variant of :meth:`_check_tool_result_detailed`."""
+        return await self._arun_chain(self.tool_results, result)
 
     @staticmethod
     def _parse_rewritten_args(result: GuardrailResult) -> Dict[str, Any]:
@@ -162,15 +189,19 @@ class GuardrailsPipeline:
     def _run_chain(guardrails: List[Guardrail], content: str) -> GuardrailResult:
         current = content
         triggered_names: List[str] = []
+        trips: List[Tuple[str, str]] = []
         for g in guardrails:
             result = g.check(current)
             if not result.passed:
                 triggered_names.append(g.name)
+                action_value = getattr(g.action, "value", str(g.action))
                 if g.action == GuardrailAction.BLOCK:
                     raise GuardrailError(
                         guardrail_name=g.name,
                         reason=result.reason or "Check failed",
+                        prior_trips=trips,
                     )
+                trips.append((g.name, action_value))
                 if g.action == GuardrailAction.WARN:
                     logger.warning(
                         "Guardrail '%s' warning: %s",
@@ -184,22 +215,28 @@ class GuardrailsPipeline:
             else:
                 current = result.content
         guardrail_name = ", ".join(triggered_names) if triggered_names else None
-        return GuardrailResult(passed=True, content=current, guardrail_name=guardrail_name)
+        return GuardrailResult(
+            passed=True, content=current, guardrail_name=guardrail_name, trips=trips
+        )
 
     @staticmethod
     async def _arun_chain(guardrails: List[Guardrail], content: str) -> GuardrailResult:
         """Async version of ``_run_chain`` — calls ``acheck()`` on each guardrail."""
         current = content
         triggered_names: List[str] = []
+        trips: List[Tuple[str, str]] = []
         for g in guardrails:
             result = await g.acheck(current)
             if not result.passed:
                 triggered_names.append(g.name)
+                action_value = getattr(g.action, "value", str(g.action))
                 if g.action == GuardrailAction.BLOCK:
                     raise GuardrailError(
                         guardrail_name=g.name,
                         reason=result.reason or "Check failed",
+                        prior_trips=trips,
                     )
+                trips.append((g.name, action_value))
                 if g.action == GuardrailAction.WARN:
                     logger.warning(
                         "Guardrail '%s' warning: %s",
@@ -213,7 +250,9 @@ class GuardrailsPipeline:
             else:
                 current = result.content
         guardrail_name = ", ".join(triggered_names) if triggered_names else None
-        return GuardrailResult(passed=True, content=current, guardrail_name=guardrail_name)
+        return GuardrailResult(
+            passed=True, content=current, guardrail_name=guardrail_name, trips=trips
+        )
 
 
 __stability__ = "stable"

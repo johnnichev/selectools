@@ -214,6 +214,25 @@ class AuditLogger(AgentObserver):
             }
         )
 
+    def on_guardrail_triggered(
+        self,
+        run_id: str,
+        stage: str,
+        guardrail_name: str,
+        action: str,
+        detail: Optional[str] = None,
+    ) -> None:
+        self._write(
+            {
+                "event": "guardrail_triggered",
+                "run_id": run_id,
+                "stage": stage,
+                "guardrail_name": guardrail_name,
+                "action": action,
+                "detail": detail,
+            }
+        )
+
     def on_error(self, run_id: str, error: Exception, context: Dict[str, Any]) -> None:
         self._write(
             {

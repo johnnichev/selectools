@@ -194,6 +194,25 @@ class AgentObserver:
         via ``confirm_action``.
         """
 
+    def on_guardrail_triggered(
+        self,
+        run_id: str,
+        stage: str,
+        guardrail_name: str,
+        action: str,
+        detail: Optional[str] = None,
+    ) -> None:
+        """Called when a guardrail trips on any stage (v1.2, issue #167).
+
+        ``stage`` is one of ``"input"``, ``"output"``, ``"tool_args"``, or
+        ``"tool_results"``. ``action`` is the guardrail's configured action
+        (``"block"``, ``"rewrite"``, or ``"warn"``). For ``"block"``,
+        ``detail`` carries the rejection reason and a ``GuardrailError`` is
+        raised immediately after the event fires; for other actions
+        ``detail`` is ``None`` (content is never included — wire your own
+        redacted context if needed).
+        """
+
     # ------------------------------------------------------------------
     # Structured output events
     # ------------------------------------------------------------------
@@ -1181,6 +1200,16 @@ class AsyncAgentObserver(AgentObserver):
         tool_args: Dict[str, Any],
     ) -> None:
         """Async counterpart of :meth:`on_policy_decision`."""
+
+    async def a_on_guardrail_triggered(
+        self,
+        run_id: str,
+        stage: str,
+        guardrail_name: str,
+        action: str,
+        detail: Optional[str] = None,
+    ) -> None:
+        """Async counterpart of :meth:`on_guardrail_triggered`."""
 
     # ------------------------------------------------------------------
     # Structured output events

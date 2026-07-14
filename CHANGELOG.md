@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Guardrail observability (`on_guardrail_triggered`).** Every guardrail trip
+  now fires an observer event with the stage (input/output/tool_args/
+  tool_results), guardrail name, configured action, and (for blocks) the
+  rejection reason — measurable through the same observer infra as the rest
+  of the agent (Langfuse/OTel wiring, async observers via
+  `a_on_guardrail_triggered`). `AuditLogger` writes each trip as a
+  `guardrail_triggered` JSONL record. Blocks attach the run trace to the
+  exception (`GuardrailError.agent_trace`) and emit the rewrite/warn trips
+  that preceded the block in the same chain (`GuardrailError.prior_trips`),
+  so audit trails never lose a redaction that ran before a block. Content
+  is never included in events. (#167)
+
 - **Conditional and single-pass structured synthesis.** `final_turn_only` no
   longer unconditionally pays an extra full-context call per turn (#164/#166):
   - `reuse_loop_answer` (default True): when the loop's converged answer

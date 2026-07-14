@@ -475,7 +475,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             messages = [copy.copy(msg) for msg in messages]
             for msg in messages:
                 if msg.role == Role.USER and msg.content:
-                    msg.content = self._run_input_guardrails(msg.content, trace)
+                    msg.content = self._run_input_guardrails(msg.content, trace, run_id=run_id)
 
         # Unified memory (beta): post-guardrail user text recorded at finalize
         unified_user_text = ""
@@ -850,7 +850,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         Returns (response_text, tool_calls_to_execute, reasoning_text).
         """
         response_text = response_msg.content or ""
-        response_text = self._run_output_guardrails(response_text, ctx.trace)
+        response_text = self._run_output_guardrails(response_text, ctx.trace, run_id=ctx.run_id)
         response_msg.content = response_text
 
         tool_calls_to_execute: List[ToolCall] = []
@@ -869,7 +869,9 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 tool_calls_to_execute.append(parse_result.tool_call)
 
         for tc in tool_calls_to_execute:
-            tc.parameters = self._run_tool_args_guardrails(tc.tool_name, tc.parameters, ctx.trace)
+            tc.parameters = self._run_tool_args_guardrails(
+                tc.tool_name, tc.parameters, ctx.trace, run_id=ctx.run_id
+            )
 
         reasoning_text = self._extract_reasoning(response_msg, tool_calls_to_execute)
         if reasoning_text:
@@ -896,7 +898,9 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
     ) -> tuple:
         """Async version of _process_response — uses async output guardrails."""
         response_text = response_msg.content or ""
-        response_text = await self._arun_output_guardrails(response_text, ctx.trace)
+        response_text = await self._arun_output_guardrails(
+            response_text, ctx.trace, run_id=ctx.run_id
+        )
         response_msg.content = response_text
 
         tool_calls_to_execute: List[ToolCall] = []
@@ -916,7 +920,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
 
         for tc in tool_calls_to_execute:
             tc.parameters = await self._arun_tool_args_guardrails(
-                tc.tool_name, tc.parameters, ctx.trace
+                tc.tool_name, tc.parameters, ctx.trace, run_id=ctx.run_id
             )
 
         reasoning_text = self._extract_reasoning(response_msg, tool_calls_to_execute)
@@ -937,11 +941,97 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
 
         return response_text, tool_calls_to_execute, reasoning_text
 
-    def _run_input_guardrails(self, content: str, trace: Optional[AgentTrace] = None) -> str:
+    def _emit_guardrail_trips(
+        self,
+        run_id: Optional[str],
+        stage: str,
+        trips: List[tuple],
+    ) -> None:
+        """Fire on_guardrail_triggered for each (name, action) trip (issue #167)."""
+        if not run_id:
+            return
+        for name, action in trips:
+            self._notify_observers("on_guardrail_triggered", run_id, stage, name, action, None)
+
+    async def _aemit_guardrail_trips(
+        self,
+        run_id: Optional[str],
+        stage: str,
+        trips: List[tuple],
+    ) -> None:
+        """Async variant of _emit_guardrail_trips (also fires async observers)."""
+        if not run_id:
+            return
+        self._emit_guardrail_trips(run_id, stage, trips)
+        for name, action in trips:
+            await self._anotify_observers(
+                "on_guardrail_triggered", run_id, stage, name, action, None
+            )
+
+    def _handle_guardrail_block(
+        self,
+        run_id: Optional[str],
+        stage: str,
+        exc: GuardrailError,
+        trace: Optional[AgentTrace] = None,
+    ) -> None:
+        """Record a block trip (trace step + observer events) before the caller
+        re-raises (input/output/tool_args) or contains it (tool_results).
+
+        Rewrite/warn trips that preceded the block in the same chain are
+        emitted first (``exc.prior_trips``), then the block event itself.
+        The run trace is attached to the exception (``exc.agent_trace``) —
+        a blocked run never returns an ``AgentResult``, so this is the only
+        way the recorded GUARDRAIL step stays observable.
+        """
+        if trace is not None:
+            trace.add(
+                TraceStep(
+                    type=StepType.GUARDRAIL,
+                    summary=f"{stage} guardrail blocked: {exc.guardrail_name}",
+                    error=exc.reason,
+                )
+            )
+            exc.agent_trace = trace
+        if run_id:
+            self._emit_guardrail_trips(run_id, stage, list(exc.prior_trips))
+            self._notify_observers(
+                "on_guardrail_triggered", run_id, stage, exc.guardrail_name, "block", exc.reason
+            )
+
+    async def _ahandle_guardrail_block(
+        self,
+        run_id: Optional[str],
+        stage: str,
+        exc: GuardrailError,
+        trace: Optional[AgentTrace] = None,
+    ) -> None:
+        """Async variant of _handle_guardrail_block (also fires async observers)."""
+        self._handle_guardrail_block(run_id, stage, exc, trace)
+        if run_id:
+            for name, action in exc.prior_trips:
+                await self._anotify_observers(
+                    "on_guardrail_triggered", run_id, stage, name, action, None
+                )
+            await self._anotify_observers(
+                "on_guardrail_triggered", run_id, stage, exc.guardrail_name, "block", exc.reason
+            )
+
+    def _run_input_guardrails(
+        self,
+        content: str,
+        trace: Optional[AgentTrace] = None,
+        run_id: Optional[str] = None,
+    ) -> str:
         """Run input guardrails on user content.  Returns (possibly rewritten) content."""
         if not self.config.guardrails or not self.config.guardrails.input:
             return content
-        result = self.config.guardrails.check_input(content)
+        try:
+            result = self.config.guardrails.check_input(content)
+        except GuardrailError as exc:
+            self._handle_guardrail_block(run_id, "input", exc, trace)
+            raise
+        self._emit_guardrail_trips(run_id, "input", result.trips)
         if trace is not None and (not result.passed or result.guardrail_name):
             trace.add(
                 TraceStep(
@@ -951,11 +1041,21 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             )
         return result.content
 
-    def _run_output_guardrails(self, content: str, trace: Optional[AgentTrace] = None) -> str:
+    def _run_output_guardrails(
+        self,
+        content: str,
+        trace: Optional[AgentTrace] = None,
+        run_id: Optional[str] = None,
+    ) -> str:
         """Run output guardrails on LLM response.  Returns (possibly rewritten) content."""
         if not self.config.guardrails or not self.config.guardrails.output:
             return content
-        result = self.config.guardrails.check_output(content)
+        try:
+            result = self.config.guardrails.check_output(content)
+        except GuardrailError as exc:
+            self._handle_guardrail_block(run_id, "output", exc, trace)
+            raise
+        self._emit_guardrail_trips(run_id, "output", result.trips)
         if trace is not None and (not result.passed or result.guardrail_name):
             trace.add(
                 TraceStep(
@@ -1067,6 +1167,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         tool_name: str,
         parameters: Dict[str, Any],
         trace: Optional[AgentTrace] = None,
+        run_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Run tool-args guardrails on a tool call's arguments.
 
@@ -1076,7 +1177,13 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         pipeline = self.config.guardrails
         if not pipeline or not getattr(pipeline, "tool_args", None):
             return parameters
-        checked, triggered = pipeline.check_tool_args(parameters)
+        try:
+            checked, chain_result = pipeline._check_tool_args_detailed(parameters)
+        except GuardrailError as exc:
+            self._handle_guardrail_block(run_id, "tool_args", exc, trace)
+            raise
+        triggered = chain_result.guardrail_name
+        self._emit_guardrail_trips(run_id, "tool_args", chain_result.trips)
         if trace is not None and triggered:
             trace.add(
                 TraceStep(
@@ -1092,12 +1199,19 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         tool_name: str,
         parameters: Dict[str, Any],
         trace: Optional[AgentTrace] = None,
+        run_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Async tool-args guardrails — calls ``acheck()`` to avoid blocking the event loop."""
         pipeline = self.config.guardrails
         if not pipeline or not getattr(pipeline, "tool_args", None):
             return parameters
-        checked, triggered = await pipeline.acheck_tool_args(parameters)
+        try:
+            checked, chain_result = await pipeline._acheck_tool_args_detailed(parameters)
+        except GuardrailError as exc:
+            await self._ahandle_guardrail_block(run_id, "tool_args", exc, trace)
+            raise
+        triggered = chain_result.guardrail_name
+        await self._aemit_guardrail_trips(run_id, "tool_args", chain_result.trips)
         if trace is not None and triggered:
             trace.add(
                 TraceStep(
@@ -1136,21 +1250,16 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         pipeline = self.config.guardrails
         if not pipeline or not getattr(pipeline, "tool_results", None):
             return result
+        run_id = run_ctx.run_id if run_ctx is not None else None
         try:
-            checked, triggered = pipeline.check_tool_result(result)
+            chain_result = pipeline._check_tool_result_detailed(result)
         except GuardrailError as exc:
-            if trace is not None:
-                trace.add(
-                    TraceStep(
-                        type=StepType.GUARDRAIL,
-                        tool_name=tool_name,
-                        summary=f"Tool-result guardrail blocked ({tool_name}): {exc.guardrail_name}",
-                        error=exc.reason,
-                    )
-                )
+            self._handle_guardrail_block(run_id, "tool_results", exc, trace)
             if run_ctx is not None and run_ctx.guardrail_block is None:
                 run_ctx.guardrail_block = exc
             return self._blocked_result_marker(exc)
+        checked, triggered = chain_result.content, chain_result.guardrail_name
+        self._emit_guardrail_trips(run_id, "tool_results", chain_result.trips)
         if trace is not None and triggered:
             trace.add(
                 TraceStep(
@@ -1175,21 +1284,16 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         pipeline = self.config.guardrails
         if not pipeline or not getattr(pipeline, "tool_results", None):
             return result
+        run_id = run_ctx.run_id if run_ctx is not None else None
         try:
-            checked, triggered = await pipeline.acheck_tool_result(result)
+            chain_result = await pipeline._acheck_tool_result_detailed(result)
         except GuardrailError as exc:
-            if trace is not None:
-                trace.add(
-                    TraceStep(
-                        type=StepType.GUARDRAIL,
-                        tool_name=tool_name,
-                        summary=f"Tool-result guardrail blocked ({tool_name}): {exc.guardrail_name}",
-                        error=exc.reason,
-                    )
-                )
+            await self._ahandle_guardrail_block(run_id, "tool_results", exc, trace)
             if run_ctx is not None and run_ctx.guardrail_block is None:
                 run_ctx.guardrail_block = exc
             return self._blocked_result_marker(exc)
+        checked, triggered = chain_result.content, chain_result.guardrail_name
+        await self._aemit_guardrail_trips(run_id, "tool_results", chain_result.trips)
         if trace is not None and triggered:
             trace.add(
                 TraceStep(
@@ -1200,11 +1304,21 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             )
         return checked
 
-    async def _arun_input_guardrails(self, content: str, trace: Optional[AgentTrace] = None) -> str:
+    async def _arun_input_guardrails(
+        self,
+        content: str,
+        trace: Optional[AgentTrace] = None,
+        run_id: Optional[str] = None,
+    ) -> str:
         """Async input guardrails — calls ``acheck()`` to avoid blocking the event loop."""
         if not self.config.guardrails or not self.config.guardrails.input:
             return content
-        result = await self.config.guardrails.acheck_input(content)
+        try:
+            result = await self.config.guardrails.acheck_input(content)
+        except GuardrailError as exc:
+            await self._ahandle_guardrail_block(run_id, "input", exc, trace)
+            raise
+        await self._aemit_guardrail_trips(run_id, "input", result.trips)
         if trace is not None and (not result.passed or result.guardrail_name):
             trace.add(
                 TraceStep(
@@ -1215,12 +1329,20 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         return result.content
 
     async def _arun_output_guardrails(
-        self, content: str, trace: Optional[AgentTrace] = None
+        self,
+        content: str,
+        trace: Optional[AgentTrace] = None,
+        run_id: Optional[str] = None,
     ) -> str:
         """Async output guardrails — calls ``acheck()`` to avoid blocking the event loop."""
         if not self.config.guardrails or not self.config.guardrails.output:
             return content
-        result = await self.config.guardrails.acheck_output(content)
+        try:
+            result = await self.config.guardrails.acheck_output(content)
+        except GuardrailError as exc:
+            await self._ahandle_guardrail_block(run_id, "output", exc, trace)
+            raise
+        await self._aemit_guardrail_trips(run_id, "output", result.trips)
         if trace is not None and (not result.passed or result.guardrail_name):
             trace.add(
                 TraceStep(
@@ -1843,7 +1965,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     if msg.role == Role.USER and msg.content:
                         self._history[i] = copy.copy(msg)
                         self._history[i].content = await self._arun_input_guardrails(
-                            msg.content, ctx.trace
+                            msg.content, ctx.trace, run_id=ctx.run_id
                         )
                 # Unified memory records ctx.unified_user_text at finalize. It was
                 # captured pre-guardrail in _prepare_run (async skips sync guardrails),
@@ -2333,7 +2455,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     if msg.role == Role.USER and msg.content:
                         self._history[i] = copy.copy(msg)
                         self._history[i].content = await self._arun_input_guardrails(
-                            msg.content, ctx.trace
+                            msg.content, ctx.trace, run_id=ctx.run_id
                         )
                 # Unified memory records ctx.unified_user_text at finalize. It was
                 # captured pre-guardrail in _prepare_run (async skips sync guardrails),
