@@ -216,3 +216,94 @@ class TestObserverBase:
         assert guardrail_entries[0]["stage"] == "output"
         assert guardrail_entries[0]["guardrail_name"] == "redact-secret"
         assert guardrail_entries[0]["action"] == "rewrite"
+
+
+# ── Review follow-ups (PR #170 self-review) ─────────────────────────────
+
+
+class TestAsyncBlockEvents:
+    """Block events must reach async observers in arun/astream too — blocks
+    are the most security-relevant guardrail outcome."""
+
+    @pytest.mark.asyncio
+    async def test_arun_input_block_fires_async_event(self) -> None:
+        obs = _AsyncRecorder()
+        agent = _agent(GuardrailsPipeline(input=[_BlockSecret()]), obs)
+        with pytest.raises(GuardrailError):
+            await agent.arun("please use secret-token")
+        assert ("input", "block-secret", "block") in obs.events
+
+    @pytest.mark.asyncio
+    async def test_arun_output_block_fires_async_event(self) -> None:
+        obs = _AsyncRecorder()
+        agent = _agent(GuardrailsPipeline(output=[_BlockSecret()]), obs)
+        with pytest.raises(GuardrailError):
+            await agent.arun("go")
+        assert ("output", "block-secret", "block") in obs.events
+
+    @pytest.mark.asyncio
+    async def test_astream_tool_results_block_fires_async_event(self) -> None:
+        obs = _AsyncRecorder()
+        agent = _agent(
+            GuardrailsPipeline(tool_results=[_BlockSecret()]),
+            obs,
+            provider=_tool_call_provider(),
+        )
+        with pytest.raises(GuardrailError):
+            async for _chunk in agent.astream("go"):
+                pass
+        assert ("tool_results", "block-secret", "block") in obs.events
+
+
+class TestTripFidelity:
+    def test_rewrite_before_block_emits_both_events(self) -> None:
+        """A rewrite that mutated content before a later guardrail blocked
+        must still be recorded — compliance audits rely on it."""
+        obs = _Recorder()
+        agent = _agent(
+            GuardrailsPipeline(output=[_RedactSecret(), _BlockAll()]),
+            obs,
+        )
+        with pytest.raises(GuardrailError):
+            agent.run("go")
+        stages_names_actions = [(s, n, a) for s, n, a, _d in obs.events]
+        assert ("output", "redact-secret", "rewrite") in stages_names_actions
+        assert ("output", "block-all", "block") in stages_names_actions
+
+    def test_comma_in_guardrail_name_stays_one_event(self) -> None:
+        class _CommaName(Guardrail):
+            name = "pii, strict"
+            action = GuardrailAction.REWRITE
+
+            def check(self, content: str) -> GuardrailResult:
+                return GuardrailResult(
+                    passed=False,
+                    content=content + " [checked]",
+                    reason="always",
+                    guardrail_name=self.name,
+                )
+
+        obs = _Recorder()
+        agent = _agent(GuardrailsPipeline(output=[_CommaName()]), obs)
+        agent.run("go")
+        matching = [e for e in obs.events if e[1] == "pii, strict"]
+        assert matching, f"expected a single event for the comma name, got {obs.events}"
+        assert matching[0][2] == "rewrite"
+
+    def test_block_exception_carries_agent_trace(self) -> None:
+        agent = _agent(GuardrailsPipeline(output=[_BlockSecret()]), _Recorder())
+        with pytest.raises(GuardrailError) as excinfo:
+            agent.run("go")
+        trace = getattr(excinfo.value, "agent_trace", None)
+        assert trace is not None, "blocks must surface the run trace on the exception"
+        from selectools.trace import StepType
+
+        assert any(s.type == StepType.GUARDRAIL for s in trace.steps)
+
+
+class _BlockAll(Guardrail):
+    name = "block-all"
+    action = GuardrailAction.BLOCK
+
+    def check(self, content: str) -> GuardrailResult:
+        return GuardrailResult(passed=False, content=content, reason="blocked all")

@@ -176,4 +176,16 @@ result = agent.ask("Search for john@example.com")
 print("  Tool args were PII-redacted and tool results length-bounded.")
 
 
+# ── 8. Guardrail observability (v1.2) ──────────────────────────────────
+# Every trip fires on_guardrail_triggered(run_id, stage, name, action,
+# detail) through the standard observer infra:
+#
+#   class GuardrailMetrics(AgentObserver):
+#       def on_guardrail_triggered(self, run_id, stage, name, action, detail=None):
+#           print(f"guardrail hit: {stage}/{name} -> {action}")
+#
+#   AgentConfig(observers=[GuardrailMetrics()], guardrails=pipeline)
+#
+# AuditLogger records each trip as a guardrail_triggered JSONL entry.
+
 print("\n✅ All guardrail examples complete!")

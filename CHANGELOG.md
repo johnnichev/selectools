@@ -15,9 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rejection reason — measurable through the same observer infra as the rest
   of the agent (Langfuse/OTel wiring, async observers via
   `a_on_guardrail_triggered`). `AuditLogger` writes each trip as a
-  `guardrail_triggered` JSONL record, and blocking guardrails now leave a
-  `GUARDRAIL` trace step before the `GuardrailError` propagates (previously
-  the raise left no trace). Content is never included in events. (#167)
+  `guardrail_triggered` JSONL record. Blocks attach the run trace to the
+  exception (`GuardrailError.agent_trace`) and emit the rewrite/warn trips
+  that preceded the block in the same chain (`GuardrailError.prior_trips`),
+  so audit trails never lose a redaction that ran before a block. Content
+  is never included in events. (#167)
 
 - **Tool-results guardrails (opt-in).** `GuardrailsPipeline` gained a
   `tool_results` stage that runs guardrails over every tool's **return value**
