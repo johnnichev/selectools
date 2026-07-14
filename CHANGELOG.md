@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-07-14 — Streaming Contracts
+
+Makes `final_turn_only` structured output safe to rely on across upgrades
+(#174): the streaming behavior and the `should_finalize` message view are
+now documented, tested public contracts enforced on every consumption
+surface — `astream()` chunks, the `stream_handler` callback, and the
+`selectools.serve` SSE stream.
+
 ### Added
 
 - **Public streaming + `should_finalize` contracts for `final_turn_only`
@@ -44,7 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `AgentResult.parsed` / `.content` instead of accumulating streamed
   content. (#174)
 
-## [1.2.0] - 2026-07-14 — Tool-Boundary Guardrails Complete & Structured Synthesis Follow-ups
+## [1.2.0]## [1.2.0] - 2026-07-14 — Tool-Boundary Guardrails Complete & Structured Synthesis Follow-ups
 
 Second 1.x minor, closing the loop on the v1.1.0 features from real
 tool-heavy agentic chat usage (#164-#167): tool RESULTS join tool args
