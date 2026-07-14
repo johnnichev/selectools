@@ -16,7 +16,7 @@ An open-source project from **[NichevLabs](https://nichevlabs.com)**.
 
 **Multi-agent orchestration in plain Python.** Build agent graphs, compose pipelines with `|`, deploy with one command. No DSL, no compile step, no paid debugger. Works with OpenAI, Anthropic, Gemini, and Ollama.
 
-> 🎉 **selectools is 1.0 — stable.** The public API is frozen; `@stable` symbols carry a 2-minor compatibility promise. Python 3.10+. See [What's New in v1.0](#whats-new-in-v10).
+> 🎉 **selectools is 1.0 — stable.** The public API is frozen; `@stable` symbols carry a 2-minor compatibility promise. Python 3.10+. Latest: [v1.2](#whats-new-in-v12) — four-stage guardrails, native structured output, and observability events.
 
 ### 3 Ways to Build
 
@@ -31,6 +31,25 @@ result = AgentGraph.chain(planner, writer, reviewer).run("Write a blog post")
 # 3. Deploy — 1 command
 # selectools serve agent.yaml
 ```
+
+## What's New in v1.2
+
+### v1.2.0 — Tool-Boundary Guardrails Complete & Structured Synthesis Follow-ups
+
+Closes the loop on the v1.1 features from real tool-heavy agentic chat usage. All additive.
+
+- **`tool_results` guardrails** — the fourth stage: gate what comes OUT of tools (external API responses, RAG chunks, oversized blobs) before it re-enters the model context. Blocks contain the content with a marker (history/memory stay coherent, observers get terminal events, parallel siblings persist) and then abort the run; guardrails apply to fresh results AND cache hits.
+- **Structured synthesis is now conditional** — `reuse_loop_answer` (default) skips the synthesis call when the converged loop answer already validates; a `should_finalize` predicate skips it for plain conversational turns; `single_pass` gets the structured object straight from the final tool-loop turn on providers supporting tools+json_schema (OpenAI/Azure).
+- **`AgentResult.structured_status` / `structured_error`** — explicit outcome (`ok` / `validation_failed` / `skipped` / `not_attempted`) instead of guessing from a bare `parsed=None`; `astream()` signals `structured_synthesis_start` for pending-state UI.
+- **`on_guardrail_triggered`** — observer event on every guardrail trip (stage, name, action, detail) with faithful per-guardrail trips, pre-block rewrite/warn preservation (`GuardrailError.prior_trips`), the run trace on the exception (`GuardrailError.agent_trace`), async delivery, and `AuditLogger` JSONL records.
+
+## What's New in v1.1
+
+### v1.1.0 — Tool-Args Guardrails & Native Structured Output
+
+- **`tool_args` guardrails** — run the guardrail chain over tool-call **arguments** before the tool executes (block / rewrite / warn), closing the blind spot where structured or sensitive data flowed via native tool calls.
+- **Native structured output** — `response_format` is sent to the provider as a native JSON-schema constraint where supported (OpenAI/Azure `json_schema` with graceful retry-without, Gemini `response_json_schema`); everyone else keeps the prompt-injection fallback. Local validation always still runs.
+- **`StructuredOutputConfig(final_turn_only=True)`** — keep the schema out of tool-loop turns; one tool-less synthesis call produces the validated answer, and in `astream()` the JSON never leaks as content chunks.
 
 ## What's New in v1.0
 
@@ -613,7 +632,7 @@ report.to_html("report.html")
 | Capability | What You Get |
 |---|---|
 | **Provider Agnostic** | Switch between OpenAI, Anthropic, Gemini, Ollama with one line. Your tools stay identical. |
-| **Structured Output** | Pydantic or JSON Schema `response_format` with auto-retry on validation failure. |
+| **Structured Output** | Pydantic or JSON Schema `response_format` — provider-native json_schema where supported, auto-retry on validation failure, conditional final-turn synthesis, and an explicit `structured_status` outcome. |
 | **Execution Traces** | Every `run()` returns `result.trace` — structured timeline of LLM calls, tool picks, and executions. |
 | **Reasoning Visibility** | `result.reasoning` surfaces *why* the agent chose a tool, extracted from LLM responses. |
 | **Provider Fallback** | `FallbackProvider` tries providers in priority order with circuit breaker on failure. |
@@ -625,7 +644,7 @@ report.to_html("report.html")
 | **Dynamic Tools** | Load tools from files/directories at runtime. Add, remove, replace tools without restarting. |
 | **Response Caching** | LRU + TTL in-memory cache and Redis backend. Avoid redundant LLM calls for identical requests. |
 | **Routing Mode** | Agent selects a tool without executing it. Use for intent classification and request routing. |
-| **Guardrails Engine** | Input/output validation pipeline with PII redaction, prompt-injection detection, topic blocking, toxicity detection, and format enforcement. |
+| **Guardrails Engine** | Four-stage validation pipeline (input, output, tool args, tool results) with PII redaction, prompt-injection detection, topic blocking, toxicity detection, format enforcement, and per-trip observer events. |
 | **Audit Logging** | JSONL audit trail with privacy controls (redact, hash, omit) and daily rotation. |
 | **Tool Output Screening** | Prompt injection detection with 15 built-in patterns. Per-tool or global. |
 | **Coherence Checking** | LLM-based verification that tool calls match user intent — catches injection-driven tool misuse. |
@@ -657,7 +676,7 @@ report.to_html("report.html")
 - **6 LLM Providers**: OpenAI, Azure OpenAI, Anthropic, Gemini, Ollama, LiteLLM (100+ models) + FallbackProvider (auto-failover) + RouterProvider (cost-based routing)
 - **Agent-as-API**: `AgentAPI` — production REST endpoints (chat, SSE streaming, sessions) from any agent
 - **A2A Protocol**: Agent Card discovery + JSON-RPC 2.0 agent-to-agent messaging
-- **Structured Output**: Pydantic / JSON Schema `response_format` with auto-retry
+- **Structured Output**: Pydantic / JSON Schema `response_format` — native json_schema on supporting providers, auto-retry, explicit `structured_status`
 - **Execution Traces**: `result.trace` with typed timeline of every agent step
 - **Reasoning Visibility**: `result.reasoning` explains *why* the agent chose a tool
 - **Batch Processing**: `agent.batch()` / `agent.abatch()` for concurrent classification
@@ -934,7 +953,7 @@ result = agent.ask("I want to cancel my account", response_format=Classification
 print(result.parsed)  # Classification(intent="cancel", confidence=0.95, priority="high")
 ```
 
-Auto-retries with error feedback when validation fails.
+Auto-retries with error feedback when validation fails. On supporting providers (OpenAI/Azure/Gemini) the schema is enforced natively via json_schema; `result.structured_status` tells you exactly what happened (`ok`, `validation_failed`, `skipped`, `not_attempted`), and `StructuredOutputConfig` controls final-turn synthesis for tool-calling agents.
 
 ### Execution Traces & Reasoning
 
@@ -1215,13 +1234,13 @@ Examples are numbered by difficulty. Start from 01 and work your way up.
 | 20 | `20_customer_support_bot.py` | Multi-tool customer support workflow | Yes |
 | 21 | `21_data_analysis_agent.py` | Data exploration and analysis | Yes |
 | 22 | `22_ollama_local.py` | Fully local LLM via Ollama | No (Ollama) |
-| 23 | `23_structured_output.py` | Pydantic response_format, auto-retry, JSON extraction | No |
+| 23 | `23_structured_output.py` | Pydantic response_format, auto-retry, JSON extraction, structured modes | No |
 | 24 | `24_traces_and_reasoning.py` | AgentTrace timeline, reasoning visibility, JSON export | No |
 | 25 | `25_provider_fallback.py` | FallbackProvider, circuit breaker, failover chain | No |
 | 26 | `26_batch_processing.py` | batch(), abatch(), structured batch, error isolation | No |
 | 27 | `27_tool_policy.py` | ToolPolicy, deny_when, HITL approval, memory trimming | No |
 | 28 | `28_agent_observer.py` | AgentObserver, LoggingObserver, multiple observers, OTel export | No |
-| 29 | `29_guardrails.py` | Input/output guardrails, PII redaction, topic blocking | No |
+| 29 | `29_guardrails.py` | Four-stage guardrails (incl. tool args/results), PII redaction, observability | No |
 | 30 | `30_audit_logging.py` | JSONL audit logging, privacy controls, daily rotation | No |
 | 31 | `31_tool_output_screening.py` | Prompt injection detection in tool outputs | No |
 | 32 | `32_coherence_checking.py` | LLM-based intent verification for injection defense | Yes |
@@ -1319,7 +1338,7 @@ pytest tests/ -x -q          # All tests
 pytest tests/ -k "not e2e"   # Skip E2E (no API keys needed)
 ```
 
-7,796 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, guardrails, sessions, memory, eval framework, budget/cancellation, knowledge stores, orchestration, pipelines, agent patterns, stability markers, trace viewer, serve API, A2A, routing, and E2E integration with real API calls.
+7,788 tests covering parsing, agent loop, providers, RAG pipeline, hybrid search, advanced chunking, dynamic tools, caching, streaming, four-stage guardrails, structured-output modes, sessions, memory, eval framework, budget/cancellation, knowledge stores, orchestration, pipelines, agent patterns, stability markers, trace viewer, serve API, A2A, routing, and E2E integration with real API calls.
 
 ## License
 

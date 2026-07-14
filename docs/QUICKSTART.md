@@ -316,7 +316,7 @@ otel_spans = result.trace.to_otel_spans()
 
 ## Step 10: Add Guardrails
 
-Validate inputs and outputs with a pluggable guardrail pipeline:
+Validate inputs and outputs with a pluggable guardrail pipeline (four stages are available — `input`, `output`, `tool_args`, `tool_results` — see the [Guardrails guide](modules/GUARDRAILS.md)):
 
 ```python
 from selectools import Agent, AgentConfig

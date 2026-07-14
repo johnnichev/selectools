@@ -52,7 +52,7 @@ Selectools is a production-ready Python framework for building AI agents with to
 - **Streaming**: E2E token-level streaming with native tool call support via `Agent.astream`
 - **Parallel Execution**: Concurrent tool execution via `asyncio.gather` / `ThreadPoolExecutor`
 - **Response Caching**: Built-in LRU+TTL cache (`InMemoryCache`) and distributed `RedisCache`
-- **Structured Output**: Pydantic / JSON Schema `response_format` with auto-retry on validation failure
+- **Structured Output**: Pydantic / JSON Schema `response_format` — provider-native json_schema where supported, auto-retry on validation failure, explicit `structured_status` outcome
 - **Execution Traces**: `AgentTrace` with typed `TraceStep` timeline on every `run()` / `arun()`
 - **Reasoning Visibility**: `result.reasoning` surfaces *why* the agent chose a tool
 - **Provider Fallback**: `FallbackProvider` with priority ordering and circuit breaker
@@ -101,7 +101,7 @@ graph TD
     style Orchestration fill:#22c55e,color:#fff
 ```
 
-**Agent responsibilities:** Iterative tool-calling loop, structured output parsing, execution traces, reasoning extraction, error handling with retries, observer notifications, parallel tool execution, batch processing, response caching, input/output guardrails, tool output screening, coherence checking, audit logging, session persistence, and memory context injection (entity, KG, knowledge).
+**Agent responsibilities:** Iterative tool-calling loop, structured output parsing, execution traces, reasoning extraction, error handling with retries, observer notifications, parallel tool execution, batch processing, response caching, four-stage guardrails (input/output/tool args/tool results), tool output screening, coherence checking, audit logging, session persistence, and memory context injection (entity, KG, knowledge).
 
 ---
 
@@ -267,10 +267,14 @@ Tool usage analytics with:
 Enforces typed responses from LLMs:
 
 - Pydantic `BaseModel` or dict JSON Schema support
-- Schema instruction injection into system prompt
+- Provider-native json_schema mode where supported (OpenAI/Azure/Gemini);
+  schema-instruction prompt injection as the universal fallback
 - JSON extraction from LLM response text
 - Validation with auto-retry on failure
-- `result.parsed` returns the typed object
+- `StructuredOutputConfig`: `final_turn_only` synthesis scoping,
+  `reuse_loop_answer`, `should_finalize`, `single_pass`
+- `result.parsed` returns the typed object; `result.structured_status`
+  reports the outcome (`ok` / `validation_failed` / `skipped` / `not_attempted`)
 
 ### 11. Execution Traces (`trace.py`)
 

@@ -744,24 +744,30 @@ from selectools.guardrails import (
 )
 from selectools.agent.config_groups import GuardrailsConfig
 
-pipeline = GuardrailsPipeline(guardrails=[
-    PIIGuardrail(action=GuardrailAction.REDACT),      # Redact SSNs, emails, phones
-    ToxicityGuardrail(threshold=0.7, action=GuardrailAction.BLOCK),
-    LengthGuardrail(max_length=5000),
-    TopicGuardrail(blocked_topics=["violence", "illegal"], action=GuardrailAction.BLOCK),
-])
+pipeline = GuardrailsPipeline(
+    input=[
+        PIIGuardrail(action=GuardrailAction.REWRITE),  # Redact SSNs, emails, phones
+        ToxicityGuardrail(threshold=0.7, action=GuardrailAction.BLOCK),
+        TopicGuardrail(deny=["violence", "illegal"], action=GuardrailAction.BLOCK),
+    ],
+    output=[LengthGuardrail(max_chars=5000, action=GuardrailAction.REWRITE)],
+    # v1.1/v1.2: gate both directions of the tool boundary too
+    tool_args=[PIIGuardrail()],
+    tool_results=[LengthGuardrail(max_chars=50_000, action=GuardrailAction.REWRITE)],
+)
 
 agent = Agent(
-    provider=OpenAIProvider(),
     tools=[...],
+    provider=OpenAIProvider(),
     config=AgentConfig(
-        guardrails=GuardrailsConfig(pipeline=pipeline, screen_tool_output=True),
+        guardrail=GuardrailsConfig(pipeline=pipeline, screen_tool_output=True),
     ),
 )
 
 result = agent.run("My SSN is 123-45-6789, can you help?")
-# Input PII is redacted before reaching the LLM
-# Tool outputs are screened for prompt injection
+# Input PII is redacted before reaching the LLM; tool args and results are
+# guarded at the tool boundary; tool outputs are screened for injection.
+# Every trip fires on_guardrail_triggered for observers/audit.
 ```
 
 ---
