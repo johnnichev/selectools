@@ -265,9 +265,15 @@ class TestAgentRouterBuilder:
 class TestBuilderRunMock:
     """Unit tests for the _builder_run_mock function."""
 
-    def _run(self, nodes_data, input_msg="hello"):
+    def _run(self, nodes_data, input_msg="hello", edges_data=None, pinned_ports=None):
         events = []
-        _builder_run_mock(nodes_data, input_msg, events.append)
+        _builder_run_mock(
+            nodes_data,
+            input_msg,
+            events.append,
+            pinned_ports,
+            edges_data=edges_data,
+        )
         return events
 
     def _agent_node(self, **kw):
@@ -303,6 +309,44 @@ class TestBuilderRunMock:
         events = self._run([self._agent_node()])
         types = [e["type"] for e in events]
         assert "run_end" in types
+
+    def test_pinned_port_overrides_downstream_mock_input(self):
+        nodes = [
+            self._agent_node(id="source", name="Source"),
+            self._agent_node(id="target", name="Target"),
+        ]
+        edges = [{"from": "source", "to": "target", "port": "output", "varPort": "topic"}]
+
+        events = self._run(
+            nodes,
+            input_msg="original input",
+            edges_data=edges,
+            pinned_ports={"source::output": "pinned value"},
+        )
+
+        target_chunks = "".join(
+            event["content"]
+            for event in events
+            if event["type"] == "chunk" and event["node_id"] == "target"
+        )
+        assert "pinned value" in target_chunks
+
+    def test_start_edge_uses_original_input(self):
+        nodes = [
+            {"id": "__start__", "type": "start", "name": "START"},
+            self._agent_node(id="target", name="Target"),
+        ]
+        edges = [{"from": "__start__", "to": "target"}]
+
+        events = self._run(nodes, input_msg="original input", edges_data=edges)
+
+        target_chunks = "".join(
+            event["content"]
+            for event in events
+            if event["type"] == "chunk" and event["node_id"] == "target"
+        )
+        assert "original input" in target_chunks
+        assert "Input: None" not in target_chunks
 
     def test_empty_nodes_emits_no_node_events(self):
         events = self._run([])
@@ -2316,13 +2360,8 @@ class TestBuilderDataPinning:
         assert "Pin last output" in BUILDER_HTML
 
     def test_mock_run_accepts_pinned_ports(self):
-        """/run handler reads pinned_ports from body."""
-        import inspect
-
-        from selectools.serve.app import _builder_run_mock
-
-        src = inspect.getsource(_builder_run_mock)
-        assert "pinned_ports" in src
+        """Server-backed /run requests send pinned_ports."""
+        assert "pinned_ports: pinnedPorts" in BUILDER_HTML
 
     def test_pinned_ports_in_yaml_export(self):
         """pinned_ports key is in YAML export."""

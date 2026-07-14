@@ -236,6 +236,16 @@ class TestApplyPinnedPorts:
         result = _apply_pinned_ports([], edges, pinned, last_outputs)
         assert result["input"] == "real_data"
 
+    def test_target_node_filter_uses_builder_edge_shape(self):
+        edges = [
+            {"from": "a", "to": "target", "port": "output", "varPort": "topic"},
+            {"from": "b", "to": "other", "port": "output", "varPort": "topic"},
+        ]
+        pinned = {"a::output": "pinned_data", "b::output": "other_data"}
+        last_outputs = {"a": "real_data", "b": "other_real_data"}
+        result = _apply_pinned_ports([], edges, pinned, last_outputs, target_node_id="target")
+        assert result == {"topic": "pinned_data"}
+
 
 class TestParsePythonToGraph:
     def test_empty_source(self):

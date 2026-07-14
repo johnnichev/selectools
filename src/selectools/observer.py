@@ -229,6 +229,10 @@ class AgentObserver:
         ``attempt`` is 1-based (first attempt = 1).  On failure, ``error``
         contains the validation error message and the agent will retry if
         iterations remain.
+
+        Not called when a ``should_finalize`` predicate skips the synthesis
+        turn (nothing was validated) — the terminal outcome is always
+        available on ``AgentResult.structured_status`` via ``on_run_end``.
         """
 
     # ------------------------------------------------------------------
