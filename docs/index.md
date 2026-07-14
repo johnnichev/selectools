@@ -101,7 +101,7 @@ pip install selectools
 
     ---
 
-    PII redaction, injection defense, toxicity screening, and audit logging built in.
+    Four stages — input, output, tool args, tool results — with PII redaction, injection defense, observer events, and audit logging built in.
 
     [:octicons-arrow-right-24: Guardrails](modules/GUARDRAILS.md)
 
