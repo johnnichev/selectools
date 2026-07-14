@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-14 — Tool-Args Guardrails & Native Structured Output
+
+First 1.x minor: two additive features closing the guardrail and
+structured-output gaps found building tool-heavy agentic chat surfaces
+(#158, #159). The frozen 1.0 API is untouched; both features are opt-in or
+fall back to byte-identical 1.0 behavior.
+
 ### Added
 
 - **Native provider structured output.** `response_format` is now sent to the
