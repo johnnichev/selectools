@@ -344,7 +344,13 @@ def _make_routes(auth_token: Optional[str]) -> list:  # type: ignore[type-arg]
             events.append(event)
 
         if mock_mode:
-            _builder_run_mock(nodes_data, input_msg, collect, pinned_ports_data)
+            _builder_run_mock(
+                nodes_data,
+                input_msg,
+                collect,
+                pinned_ports_data,
+                edges_data=edges_data,
+            )
         else:
             _builder_run_live(nodes_data, edges_data, input_msg, api_key, collect)
 

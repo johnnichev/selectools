@@ -411,6 +411,8 @@ def _builder_run_mock(
     input_msg: str,
     emit: Any,
     pinned_ports: Optional[Dict[str, Any]] = None,
+    *,
+    edges_data: Optional[List[Dict[str, Any]]] = None,
 ) -> None:
     """Execute a mock graph run (no API keys required)."""
     _t0 = time.time()
@@ -427,6 +429,13 @@ def _builder_run_mock(
         return
 
     total_tokens = 0
+    last_outputs: Dict[str, Any] = {}
+    pinned_ports = pinned_ports or {}
+    edges_data = edges_data or []
+    for n in nodes_data:
+        if n.get("type") == "start":
+            last_outputs[str(n.get("id", "START"))] = input_msg
+    last_outputs["START"] = input_msg
     for n in nodes_data:
         if n.get("type") not in ("agent", "hitl"):
             continue
@@ -458,7 +467,19 @@ def _builder_run_mock(
             time.sleep(0.5)
             emit({"type": "hitl_auto", "node_id": node_id, "choice": auto_choice})
             emit({"type": "node_end", "node_id": node_id, "tokens": 0, "cost": 0.0})
+            last_outputs[node_id] = auto_choice
             continue
+
+        node_inputs = _apply_pinned_ports(
+            nodes_data,
+            edges_data,
+            pinned_ports,
+            last_outputs,
+            target_node_id=node_id,
+        )
+        effective_input = input_msg
+        if node_inputs:
+            effective_input = "\n".join(str(value) for value in node_inputs.values())
 
         model = n.get("model", "gpt-4o-mini")
         provider = n.get("provider", "openai")
@@ -470,7 +491,7 @@ def _builder_run_mock(
                         "type": "tool_call",
                         "node_id": node_id,
                         "tool": tool_name,
-                        "args": {"query": input_msg[:40]},
+                        "args": {"query": effective_input[:40]},
                     }
                 )
                 emit(
@@ -484,7 +505,7 @@ def _builder_run_mock(
 
         mock_text = (
             f"[MOCK] {node_name} processed your request using {provider}/{model}. "
-            f"In live mode this calls the real API. Input: {input_msg[:60]}"
+            f"In live mode this calls the real API. Input: {effective_input[:60]}"
         )
         for word in mock_text.split():
             emit({"type": "chunk", "node_id": node_id, "content": word + " "})
@@ -503,6 +524,7 @@ def _builder_run_mock(
         node_tokens = 45
         total_tokens += node_tokens
         emit({"type": "node_end", "node_id": node_id, "tokens": node_tokens, "cost": 0.0})
+        last_outputs[node_id] = mock_text
 
     emit({"type": "run_end", "total_tokens": total_tokens, "total_cost": 0.0})
 
@@ -731,13 +753,21 @@ def _apply_pinned_ports(
     edges_data: List[Dict[str, Any]],
     pinned_ports: Dict[str, Any],
     last_outputs: Dict[str, Any],
+    target_node_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Return node_inputs dict respecting pinned port overrides."""
     inputs: Dict[str, Any] = {}
     for edge in edges_data:
         src = edge.get("source") or edge.get("from", "")
-        src_handle = edge.get("sourceHandle", "output")
-        tgt_handle = edge.get("targetHandle", "input")
+        target = edge.get("target") or edge.get("to")
+        if target_node_id is not None and target != target_node_id:
+            continue
+        src_handle = (
+            edge.get("sourceHandle") or edge.get("port") or edge.get("fromPort") or "output"
+        )
+        tgt_handle = (
+            edge.get("targetHandle") or edge.get("varPort") or edge.get("toPort") or "input"
+        )
         key = f"{src}::{src_handle}"
         if key in pinned_ports:
             inputs[tgt_handle] = pinned_ports[key]
@@ -1691,7 +1721,13 @@ class BuilderServer:
 
                     emit({"type": "run_start", "mock": mock_mode})
                     if mock_mode:
-                        _builder_run_mock(nodes_data, input_msg, emit, pinned_ports_data)
+                        _builder_run_mock(
+                            nodes_data,
+                            input_msg,
+                            emit,
+                            pinned_ports_data,
+                            edges_data=edges_data,
+                        )
                     else:
                         _builder_run_live(nodes_data, edges_data, input_msg, api_key, emit)
                 except Exception as exc:
