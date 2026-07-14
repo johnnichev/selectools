@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-14 — Tool-Args Guardrails & Native Structured Output
+
+First 1.x minor: two additive features closing the guardrail and
+structured-output gaps found building tool-heavy agentic chat surfaces
+(#158, #159). The frozen 1.0 API is untouched; both features are opt-in or
+fall back to byte-identical 1.0 behavior.
+
+### Added
+
+- **Native provider structured output.** `response_format` is now sent to the
+  provider as a native JSON-schema constraint when the provider supports it —
+  OpenAI/Azure (`response_format: json_schema`, with automatic retry-without on
+  models that reject it) and Gemini (`response_json_schema`; not combinable
+  with function calling, so tool-equipped Gemini agents keep the fallback).
+  Providers without native support keep the v1.0 prompt-injection behavior
+  unchanged, and `parse_and_validate` still runs in both modes so
+  `result.parsed` is always locally validated. Opt out with
+  `StructuredOutputConfig(native=False)`. (#159)
+- **`StructuredOutputConfig(final_turn_only=True)` (beta).** Scopes the schema
+  to a final synthesis turn instead of injecting it on every loop iteration:
+  the tool loop runs schema-free (tool calling and the text `ToolCallParser`
+  work normally), then one extra tool-less synthesis call produces the
+  validated structured answer. Reachable from `run()`, `arun()`, AND
+  `astream()` — in streaming the loop's prose streams as chunks while the
+  synthesis JSON is delivered only via the terminal `AgentResult`, fixing the
+  raw-JSON-fragments-in-chat-surface leak. (#159)
+- **Tool-args guardrails (opt-in).** `GuardrailsPipeline` gained a `tool_args`
+  stage that runs guardrails over tool-call **arguments** before the tool
+  executes, symmetric with the existing content path (block / rewrite / warn).
+  Output guardrails only ever saw the model's free-text content, so structured
+  or sensitive data carried via native tool calls bypassed the guardrail
+  surface entirely. Covers `run()`, `arun()`, and `astream()`, including
+  parser-extracted tool calls. Empty by default — no behavior change unless
+  configured. (#158)
+
 ## [1.0.1] - 2026-06-15 — Cleanup & Z-Timestamp Fix
 
 First post-1.0 patch: a Python 3.10 crash fix plus an internal hygiene sweep.
