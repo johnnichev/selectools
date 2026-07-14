@@ -23,6 +23,7 @@ from ..results import Artifact, _begin_artifact_collection
 from ..stability import beta, deprecated, stable
 from ..structured import (
     ResponseFormat,
+    build_final_turn_request,
     build_schema_instruction,
     parse_and_validate,
     schema_from_response_format,
@@ -81,6 +82,20 @@ class _RunContext:
     # within this run so a human is not re-paged when the model retries an
     # identical denied call on a later iteration. Approvals are NOT memoized.
     denied_approvals: Dict[str, str] = field(default_factory=dict)
+    # Structured-output modes (issue #159). response_schema is the resolved
+    # JSON Schema dict for response_format. native_structured means the loop
+    # calls carry the schema natively (no prompt injection). In
+    # final-turn-only mode the loop runs schema-free; once it converges,
+    # structured_final_pending marks the extra synthesis turn (tools
+    # withheld, schema applied — natively when native_final).
+    response_schema: Optional[Dict[str, Any]] = None
+    native_structured: bool = False
+    structured_final_only: bool = False
+    structured_final_pending: bool = False
+    native_final: bool = False
+    # Budget allowance for the synthesis turn: set to 1 when the transition
+    # into structured_final_pending consumes an iteration.
+    structured_extra_turns: int = 0
 
 
 @stable
@@ -384,9 +399,32 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         """
         self._current_model: Optional[str] = None
         original_system_prompt = self._system_prompt
+        response_schema: Optional[Dict[str, Any]] = None
+        native_structured = False
+        structured_final_only = False
+        native_final = False
         if response_format is not None:
-            schema = schema_from_response_format(response_format)
-            self._system_prompt = self._system_prompt + build_schema_instruction(schema)
+            response_schema = schema_from_response_format(response_format)
+            structured_cfg = self.config.structured_output
+            native_wanted = structured_cfg is None or structured_cfg.native
+            native_supported = native_wanted and getattr(
+                self.provider, "supports_native_structured_output", False
+            )
+            if structured_cfg is not None and structured_cfg.final_turn_only:
+                # Final-turn-only: the loop runs with no schema pressure at
+                # all; the synthesis call applies it — natively if supported,
+                # since that call carries no tools.
+                structured_final_only = True
+                native_final = native_supported
+            elif native_supported and (
+                not self.tools
+                or getattr(self.provider, "supports_native_structured_output_with_tools", False)
+            ):
+                native_structured = True
+            else:
+                self._system_prompt = self._system_prompt + build_schema_instruction(
+                    response_schema
+                )
 
         trace = self._new_trace()
         if parent_run_id is not None:
@@ -513,6 +551,10 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             user_text_for_coherence=user_text_for_coherence,
             unified_user_text=unified_user_text,
             artifacts=_begin_artifact_collection(),
+            response_schema=response_schema,
+            native_structured=native_structured,
+            structured_final_only=structured_final_only,
+            native_final=native_final,
         )
 
     def _finalize_run(
@@ -754,7 +796,9 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         tool_calls_to_execute: List[ToolCall] = []
         if response_msg.tool_calls:
             tool_calls_to_execute = response_msg.tool_calls
-        elif ctx.response_format is None:
+        elif ctx.response_format is None or (
+            ctx.structured_final_only and not ctx.structured_final_pending
+        ):
             parse_result = self.parser.parse(response_text)
             if parse_result.tool_call:
                 tool_calls_to_execute.append(parse_result.tool_call)
@@ -793,7 +837,9 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         tool_calls_to_execute: List[ToolCall] = []
         if response_msg.tool_calls:
             tool_calls_to_execute = response_msg.tool_calls
-        elif ctx.response_format is None:
+        elif ctx.response_format is None or (
+            ctx.structured_final_only and not ctx.structured_final_pending
+        ):
             parse_result = self.parser.parse(response_text)
             if parse_result.tool_call:
                 tool_calls_to_execute.append(parse_result.tool_call)
@@ -848,6 +894,43 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 )
             )
         return result.content
+
+    def _structured_call_kwargs(self, ctx: _RunContext) -> Dict[str, Any]:
+        """Provider-call overrides for the current iteration's structured mode.
+
+        - Synthesis turn (final-turn-only, pending): withhold tools and apply
+          the schema — natively when the provider supports it, otherwise via a
+          schema-instructed system prompt for this call only.
+        - Native mode: pass the JSON Schema straight to the provider.
+        - Otherwise: no overrides (prompt-injection behavior unchanged).
+        """
+        if ctx.structured_final_pending:
+            kwargs: Dict[str, Any] = {"tools_override": []}
+            if ctx.native_final:
+                kwargs["response_format"] = ctx.response_schema
+            else:
+                kwargs["system_prompt_override"] = self._system_prompt + build_schema_instruction(
+                    ctx.response_schema or {}
+                )
+            return kwargs
+        if ctx.native_structured:
+            return {"response_format": ctx.response_schema}
+        return {}
+
+    def _begin_structured_final_turn(self, ctx: _RunContext, response_text: str) -> None:
+        """Transition into the synthesis turn of final-turn-only mode.
+
+        The model's free-text answer joins the history, followed by a user
+        message requesting the schema-conforming restatement. The next loop
+        iteration (allowed by ``structured_extra_turns``) makes the synthesis
+        call with tools withheld.
+        """
+        ctx.structured_final_pending = True
+        ctx.structured_extra_turns = 1
+        self._history.append(Message(role=Role.ASSISTANT, content=response_text))
+        self._history.append(
+            Message(role=Role.USER, content=build_final_turn_request(ctx.response_schema or {}))
+        )
 
     def _run_tool_args_guardrails(
         self,
@@ -1219,7 +1302,10 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             # structured-validation retries. Without this, an agent with
             # max_iterations=3 and 3 validation failures would terminate
             # before reaching RetryConfig.max_retries.
-            while ctx.iteration < self.config.max_iterations + ctx.structured_retries:
+            while (
+                ctx.iteration
+                < self.config.max_iterations + ctx.structured_retries + ctx.structured_extra_turns
+            ):
                 ctx.iteration += 1
 
                 # Cancellation check (R2)
@@ -1248,11 +1334,25 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 )
 
                 response_msg = self._call_provider(
-                    stream_handler=stream_handler, trace=ctx.trace, run_id=ctx.run_id
+                    stream_handler=stream_handler,
+                    trace=ctx.trace,
+                    run_id=ctx.run_id,
+                    **self._structured_call_kwargs(ctx),
                 )
                 response_text, tool_calls_to_execute, reasoning_text = self._process_response(
                     ctx, response_msg
                 )
+
+                if (
+                    not tool_calls_to_execute
+                    and ctx.structured_final_only
+                    and not ctx.structured_final_pending
+                ):
+                    self._begin_structured_final_turn(ctx, response_text)
+                    self._notify_observers(
+                        "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                    )
+                    continue
 
                 if not tool_calls_to_execute:
                     parsed = None
@@ -1522,7 +1622,10 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             # structured-validation retries. Without this, an agent with
             # max_iterations=3 and 3 validation failures would terminate
             # before reaching RetryConfig.max_retries.
-            while ctx.iteration < self.config.max_iterations + ctx.structured_retries:
+            while (
+                ctx.iteration
+                < self.config.max_iterations + ctx.structured_retries + ctx.structured_extra_turns
+            ):
                 ctx.iteration += 1
 
                 # Cancellation check (R2)
@@ -1572,51 +1675,53 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     "on_iteration_start", ctx.run_id, ctx.iteration, self._history
                 )
 
-                full_content = ""
-                current_tool_calls: List[ToolCall] = []
+                if ctx.structured_final_pending:
+                    # Synthesis turn (final-turn-only): never stream the
+                    # structured JSON as content chunks — it is delivered via
+                    # the terminal AgentResult (.content / .parsed) only.
+                    response_msg = await self._acall_provider(
+                        trace=ctx.trace,
+                        run_id=ctx.run_id,
+                        **self._structured_call_kwargs(ctx),
+                    )
+                    full_content = response_msg.content or ""
+                else:
+                    # Native structured output: pass the schema straight to
+                    # providers that advertise support (never to others —
+                    # their signatures may not accept the kwarg).
+                    provider_extra: Dict[str, Any] = (
+                        {"response_format": ctx.response_schema} if ctx.native_structured else {}
+                    )
+                    full_content = ""
+                    current_tool_calls: List[ToolCall] = []
 
-                has_astream = (
-                    hasattr(self.provider, "astream")
-                    and self.provider.astream is not None
-                    and self.provider.supports_streaming
-                )
+                    has_astream = (
+                        hasattr(self.provider, "astream")
+                        and self.provider.astream is not None
+                        and self.provider.supports_streaming
+                    )
 
-                self._notify_observers(
-                    "on_llm_start",
-                    ctx.run_id,
-                    self._history,
-                    self._effective_model,
-                    self._system_prompt,
-                )
-                await self._anotify_observers(
-                    "on_llm_start",
-                    ctx.run_id,
-                    self._history,
-                    self._effective_model,
-                    self._system_prompt,
-                )
-                llm_start = time.time()
+                    self._notify_observers(
+                        "on_llm_start",
+                        ctx.run_id,
+                        self._history,
+                        self._effective_model,
+                        self._system_prompt,
+                    )
+                    await self._anotify_observers(
+                        "on_llm_start",
+                        ctx.run_id,
+                        self._history,
+                        self._effective_model,
+                        self._system_prompt,
+                    )
+                    llm_start = time.time()
 
-                if not has_astream:
-                    if hasattr(self.provider, "acomplete") and getattr(
-                        self.provider, "supports_async", False
-                    ):
-                        response_msg, _usage = await self.provider.acomplete(
-                            model=self._effective_model,
-                            system_prompt=self._system_prompt,
-                            messages=self._history,
-                            tools=self.tools,
-                            temperature=self.config.temperature,
-                            max_tokens=self.config.max_tokens,
-                            timeout=self.config.request_timeout,
-                        )
-                    else:
-                        # BUG-32: propagate caller contextvars into the worker.
-                        loop = asyncio.get_running_loop()
-                        response_msg, _usage = await run_in_executor_copyctx(
-                            loop,
-                            None,
-                            lambda: self.provider.complete(
+                    if not has_astream:
+                        if hasattr(self.provider, "acomplete") and getattr(
+                            self.provider, "supports_async", False
+                        ):
+                            response_msg, _usage = await self.provider.acomplete(
                                 model=self._effective_model,
                                 system_prompt=self._system_prompt,
                                 messages=self._history,
@@ -1624,65 +1729,83 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                                 temperature=self.config.temperature,
                                 max_tokens=self.config.max_tokens,
                                 timeout=self.config.request_timeout,
-                            ),
+                                **provider_extra,
+                            )
+                        else:
+                            # BUG-32: propagate caller contextvars into the worker.
+                            loop = asyncio.get_running_loop()
+                            response_msg, _usage = await run_in_executor_copyctx(
+                                loop,
+                                None,
+                                lambda: self.provider.complete(
+                                    model=self._effective_model,
+                                    system_prompt=self._system_prompt,
+                                    messages=self._history,
+                                    tools=self.tools,
+                                    temperature=self.config.temperature,
+                                    max_tokens=self.config.max_tokens,
+                                    timeout=self.config.request_timeout,
+                                    **provider_extra,
+                                ),
+                            )
+                        if _usage:
+                            self.usage.add_usage(_usage, tool_name=None)
+                        _response_content = response_msg.content or ""
+                        self._notify_observers("on_llm_end", ctx.run_id, _response_content, _usage)
+                        await self._anotify_observers(
+                            "on_llm_end", ctx.run_id, _response_content, _usage
                         )
-                    if _usage:
-                        self.usage.add_usage(_usage, tool_name=None)
-                    _response_content = response_msg.content or ""
-                    self._notify_observers("on_llm_end", ctx.run_id, _response_content, _usage)
-                    await self._anotify_observers(
-                        "on_llm_end", ctx.run_id, _response_content, _usage
-                    )
-                    if _usage:
-                        self._notify_observers("on_usage", ctx.run_id, _usage)
-                        await self._anotify_observers("on_usage", ctx.run_id, _usage)
-                    yield StreamChunk(content=_response_content)
-                    full_content = _response_content
-                    if response_msg.tool_calls:
-                        current_tool_calls = response_msg.tool_calls
-                else:
-                    # BUG-33: wrap provider.astream() generator in aclosing so
-                    # that a guardrail raise, validation failure, or caller
-                    # disconnect deterministically runs the generator's
-                    # finally block and releases HTTP connections — instead
-                    # of waiting for GC and emitting `async generator raised
-                    # StopAsyncIteration` warnings.
-                    async with aclosing(  # type: ignore[type-var]  # astream is an async generator (has aclose) but typed AsyncIterable
-                        self.provider.astream(
+                        if _usage:
+                            self._notify_observers("on_usage", ctx.run_id, _usage)
+                            await self._anotify_observers("on_usage", ctx.run_id, _usage)
+                        yield StreamChunk(content=_response_content)
+                        full_content = _response_content
+                        if response_msg.tool_calls:
+                            current_tool_calls = response_msg.tool_calls
+                    else:
+                        # BUG-33: wrap provider.astream() generator in aclosing so
+                        # that a guardrail raise, validation failure, or caller
+                        # disconnect deterministically runs the generator's
+                        # finally block and releases HTTP connections — instead
+                        # of waiting for GC and emitting `async generator raised
+                        # StopAsyncIteration` warnings.
+                        async with aclosing(  # type: ignore[type-var]  # astream is an async generator (has aclose) but typed AsyncIterable
+                            self.provider.astream(
+                                model=self._effective_model,
+                                system_prompt=self._system_prompt,
+                                messages=self._history,
+                                tools=self.tools,
+                                temperature=self.config.temperature,
+                                max_tokens=self.config.max_tokens,
+                                timeout=self.config.request_timeout,
+                                **provider_extra,
+                            )
+                        ) as gen:
+                            async for item in gen:
+                                if isinstance(item, str):
+                                    yield StreamChunk(content=item)
+                                    full_content += item
+                                elif isinstance(item, ToolCall):
+                                    current_tool_calls.append(item)
+                                    yield StreamChunk(tool_calls=[item])
+
+                        self._notify_observers("on_llm_end", ctx.run_id, full_content, None)
+                        await self._anotify_observers("on_llm_end", ctx.run_id, full_content, None)
+
+                    ctx.trace.add(
+                        TraceStep(
+                            type=StepType.LLM_CALL,
+                            duration_ms=(time.time() - llm_start) * 1000,
                             model=self._effective_model,
-                            system_prompt=self._system_prompt,
-                            messages=self._history,
-                            tools=self.tools,
-                            temperature=self.config.temperature,
-                            max_tokens=self.config.max_tokens,
-                            timeout=self.config.request_timeout,
+                            summary=f"{self._effective_model} → {len(full_content)} chars (stream)",
                         )
-                    ) as gen:
-                        async for item in gen:
-                            if isinstance(item, str):
-                                yield StreamChunk(content=item)
-                                full_content += item
-                            elif isinstance(item, ToolCall):
-                                current_tool_calls.append(item)
-                                yield StreamChunk(tool_calls=[item])
-
-                    self._notify_observers("on_llm_end", ctx.run_id, full_content, None)
-                    await self._anotify_observers("on_llm_end", ctx.run_id, full_content, None)
-
-                ctx.trace.add(
-                    TraceStep(
-                        type=StepType.LLM_CALL,
-                        duration_ms=(time.time() - llm_start) * 1000,
-                        model=self._effective_model,
-                        summary=f"{self._effective_model} → {len(full_content)} chars (stream)",
                     )
-                )
 
-                response_msg = Message(
-                    role=Role.ASSISTANT,
-                    content=full_content,
-                    tool_calls=current_tool_calls or None,
-                )
+                    response_msg = Message(
+                        role=Role.ASSISTANT,
+                        content=full_content,
+                        tool_calls=current_tool_calls or None,
+                    )
 
                 # Use async _process_response for non-blocking output guardrails
                 (
@@ -1690,6 +1813,20 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     tool_calls_to_execute,
                     reasoning_text,
                 ) = await self._aprocess_response(ctx, response_msg)
+
+                if (
+                    not tool_calls_to_execute
+                    and ctx.structured_final_only
+                    and not ctx.structured_final_pending
+                ):
+                    self._begin_structured_final_turn(ctx, response_text)
+                    self._notify_observers(
+                        "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                    )
+                    await self._anotify_observers(
+                        "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                    )
+                    continue
 
                 if not tool_calls_to_execute:
                     parsed = None
@@ -1953,7 +2090,10 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             # structured-validation retries. Without this, an agent with
             # max_iterations=3 and 3 validation failures would terminate
             # before reaching RetryConfig.max_retries.
-            while ctx.iteration < self.config.max_iterations + ctx.structured_retries:
+            while (
+                ctx.iteration
+                < self.config.max_iterations + ctx.structured_retries + ctx.structured_extra_turns
+            ):
                 ctx.iteration += 1
 
                 # Cancellation check (R2)
@@ -2002,13 +2142,30 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 )
 
                 response_msg = await self._acall_provider(
-                    stream_handler=stream_handler, trace=ctx.trace, run_id=ctx.run_id
+                    stream_handler=stream_handler,
+                    trace=ctx.trace,
+                    run_id=ctx.run_id,
+                    **self._structured_call_kwargs(ctx),
                 )
                 (
                     response_text,
                     tool_calls_to_execute,
                     reasoning_text,
                 ) = await self._aprocess_response(ctx, response_msg)
+
+                if (
+                    not tool_calls_to_execute
+                    and ctx.structured_final_only
+                    and not ctx.structured_final_pending
+                ):
+                    self._begin_structured_final_turn(ctx, response_text)
+                    self._notify_observers(
+                        "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                    )
+                    await self._anotify_observers(
+                        "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                    )
+                    continue
 
                 if not tool_calls_to_execute:
                     parsed = None

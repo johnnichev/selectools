@@ -236,6 +236,7 @@ class CacheKeyBuilder:
         messages: List["Message"],
         tools: Optional[List["Tool"]] = None,
         temperature: float = 0.0,
+        response_format: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Return a deterministic hex-digest key for the given request params."""
         messages_data: List[Dict[str, Any]] = []
@@ -280,6 +281,9 @@ class CacheKeyBuilder:
             "tools": tools_data,
             "temperature": temperature,
         }
+        # Only keyed when set, so pre-existing cache entries stay valid.
+        if response_format is not None:
+            payload["response_format"] = response_format
 
         canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()

@@ -26,7 +26,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
-from ..stability import stable
+from ..stability import beta, stable
 
 if TYPE_CHECKING:
     from ..cancellation import CancellationToken
@@ -172,6 +172,32 @@ class GuardrailsConfig:
     pipeline: Optional["GuardrailsPipeline"] = None
     screen_tool_output: bool = False
     output_screening_patterns: Optional[List[str]] = None
+
+
+@beta
+@dataclass
+class StructuredOutputConfig:
+    """Structured-output (``response_format``) behavior settings (beta, v1.1).
+
+    Attributes:
+        native: Use the provider's native structured-output mode (OpenAI
+            ``json_schema``, Gemini ``response_json_schema``) when the provider
+            advertises support, instead of injecting a schema instruction into
+            the system prompt. Providers without native support keep the
+            prompt-injection + parse behavior unchanged. Default: True.
+        final_turn_only: Keep the schema out of tool-loop turns entirely.
+            The loop runs to convergence with no schema pressure (so tool
+            calling and the text ``ToolCallParser`` work normally), then one
+            extra synthesis call — with the schema applied and no tools —
+            produces the validated structured final answer. In ``astream()``
+            the synthesis JSON is delivered only via the terminal
+            ``AgentResult`` (``.content`` / ``.parsed``), never leaked as
+            content chunks. Costs one extra provider call per run.
+            Default: False.
+    """
+
+    native: bool = True
+    final_turn_only: bool = False
 
 
 @stable
@@ -323,6 +349,7 @@ __stability__ = "stable"
 
 __all__ = [
     "RetryConfig",
+    "StructuredOutputConfig",
     "ToolConfig",
     "CoherenceConfig",
     "GuardrailsConfig",

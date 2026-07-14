@@ -1256,12 +1256,55 @@ print(result.content)  # Raw JSON string
 
 ### How It Works
 
-1. `build_schema_instruction(schema)` generates a prompt fragment describing the expected JSON shape
-2. Schema instruction is appended to the system prompt for the duration of the run
+1. **Native structured output (v1.1, default when supported).** When the
+   provider advertises native support (`OpenAIProvider` / `AzureOpenAIProvider`
+   via `response_format: json_schema`, `GeminiProvider` via
+   `response_json_schema`), the JSON Schema is sent with the request instead of
+   being injected into the system prompt — the provider constrains the output
+   mechanically, and no schema-instruction tokens are spent per call. Gemini
+   cannot combine native mode with function calling, so tool-equipped Gemini
+   agents fall back to prompt injection (or use `final_turn_only`, below).
+2. **Prompt-injection fallback.** For every other provider,
+   `build_schema_instruction(schema)` is appended to the system prompt for the
+   duration of the run — the pre-1.1 behavior, unchanged.
 3. LLM response is passed through `extract_json()` to isolate the JSON block
-4. `parse_and_validate()` validates against the Pydantic model or JSON Schema
+4. `parse_and_validate()` validates against the Pydantic model or JSON Schema —
+   this runs in **both** modes, so `result.parsed` is always validated locally,
+   never taken on provider trust
 5. On validation failure, the error is fed back to the LLM for a retry
 6. `result.parsed` contains the typed object; `result.content` has the raw string
+
+### StructuredOutputConfig (beta, v1.1)
+
+```python
+from selectools import AgentConfig, StructuredOutputConfig
+
+config = AgentConfig(
+    structured_output=StructuredOutputConfig(
+        native=True,            # provider-native JSON schema when supported (default)
+        final_turn_only=False,  # scope the schema to a final synthesis turn
+    ),
+)
+```
+
+- `native=False` forces the prompt-injection path everywhere.
+- `final_turn_only=True` keeps the schema out of tool-loop turns entirely: the
+  loop runs to convergence with no schema pressure (tool calling and the text
+  `ToolCallParser` work normally — previously the parser was disabled whenever
+  `response_format` was set), then **one extra synthesis call** with the schema
+  applied and no tools produces the validated structured final answer. This is
+  the streaming-friendly equivalent of the `PlanningConfig` structured
+  synthesis call.
+
+### Streaming and response_format
+
+- **Default mode**: `astream()` streams the model's answer token-by-token, and
+  with `response_format` set the answer IS the JSON — clients rendering chunks
+  as chat text will see raw JSON fragments. Accumulate chunks and parse, or use
+  `final_turn_only`.
+- **`final_turn_only=True`**: the tool loop streams normally (prose chunks),
+  and the synthesis JSON is delivered ONLY via the terminal `AgentResult`
+  (`.content` / `.parsed`) — never leaked as content chunks.
 
 ### Structured Retry Budget (v0.22.0 — BUG-34)
 
