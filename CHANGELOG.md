@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Conditional and single-pass structured synthesis.** `final_turn_only` no
+  longer unconditionally pays an extra full-context call per turn (#164/#166):
+  - `reuse_loop_answer` (default True): when the loop's converged answer
+    already parses and validates against the schema, it is used directly and
+    the synthesis call is skipped.
+  - `should_finalize` predicate `(messages, last_response_text) -> bool`:
+    when the converged answer does not validate, the caller can decline the
+    synthesis turn for plain-conversational replies (result finishes with
+    `structured_status="skipped"`). A validating answer wins before the
+    predicate runs.
+  - `single_pass` (opt-in): providers advertising tools+json_schema support
+    (OpenAI/Azure) carry the schema natively on loop calls, so the converged
+    answer IS the structured object — one pass, no synthesis call; others
+    fall back to the separate synthesis call. In `astream()` the final answer
+    then streams as JSON chunks (documented).
+- **`AgentResult.structured_status` / `structured_error`.** Explicit
+  structured-output outcome instead of a bare `parsed=None`: `"ok"`,
+  `"validation_failed"` (with the last validation error),
+  `"skipped"`, or `"not_attempted"`; `None` when `response_format` was not
+  set. (#164)
+- **`StreamChunk.event`.** Lifecycle signal field; `astream()` emits
+  `structured_synthesis_start` when the tool loop converges and a
+  (non-streamed) synthesis call begins, so clients can render a pending
+  state. (#164)
 - **Tool-results guardrails (opt-in).** `GuardrailsPipeline` gained a
   `tool_results` stage that runs guardrails over every tool's **return value**
   after execution, before the result re-enters the model context — the other

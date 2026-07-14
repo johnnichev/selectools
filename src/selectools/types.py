@@ -355,6 +355,14 @@ class AgentResult:
     provider_used: Optional[str] = None
     usage: Optional["AgentUsage"] = None
     artifacts: List[Artifact] = field(default_factory=list)
+    # Structured-output outcome (v1.2, issue #164). None when response_format
+    # was not set. "ok" = parsed carries a validated object;
+    # "validation_failed" = retries exhausted (structured_error has the last
+    # error); "skipped" = a should_finalize predicate declined the synthesis
+    # turn; "not_attempted" = the run ended before validation could happen
+    # (e.g. a terminal tool result became the final answer).
+    structured_status: Optional[str] = None
+    structured_error: Optional[str] = None
 
     @property
     def content(self) -> str:
@@ -377,11 +385,16 @@ class StreamChunk:
         content: The text content of this chunk (delta).
         role: The role emitting this chunk (usually ASSISTANT).
         tool_calls: Optional list of tool calls (if this chunk contains tool invocations).
+        event: Optional lifecycle signal (v1.2). Currently emitted:
+            ``"structured_synthesis_start"`` — the tool loop converged and a
+            structured synthesis call is starting; clients can render a
+            pending state. Event chunks carry no content.
     """
 
     content: str = ""
     role: Role = Role.ASSISTANT
     tool_calls: Optional[List[ToolCall]] = None
+    event: Optional[str] = None
 
 
 # StreamHandler is intentionally NOT @runtime_checkable, so the class-level

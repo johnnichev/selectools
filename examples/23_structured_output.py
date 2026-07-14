@@ -233,6 +233,23 @@ def main() -> None:
     assert "broken" in result_4.parsed.keywords
     print("\n  PASS: JSON extracted from fenced code block\n")
 
+    # ── 5. v1.2: structured-output modes ─────────────────────────────
+    # StructuredOutputConfig controls HOW the schema is enforced:
+    #
+    #   AgentConfig(structured_output=StructuredOutputConfig(
+    #       native=True,            # provider-native json_schema when supported
+    #       final_turn_only=True,   # keep the schema out of tool-loop turns
+    #       reuse_loop_answer=True, # skip synthesis when the answer validates
+    #       should_finalize=lambda messages, text: needs_structured(text),
+    #       single_pass=True,       # tools + json_schema in one pass (OpenAI)
+    #   ))
+    #
+    # and AgentResult.structured_status tells you what actually happened:
+    # "ok" | "validation_failed" (see .structured_error) | "skipped" |
+    # "not_attempted" | None (no response_format).
+    print("  See StructuredOutputConfig for native/final-turn/single-pass modes")
+    print("  and AgentResult.structured_status for the validation outcome.\n")
+
     print("=" * 70)
     print("  All structured output tests passed!")
     print("=" * 70 + "\n")
