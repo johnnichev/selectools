@@ -82,6 +82,12 @@ class _OpenAICompatibleBase(ABC):
     name: str
     supports_streaming: bool = True
     supports_async: bool = True
+    # Native structured output (issue #159): subclasses whose backing API
+    # accepts the Chat Completions ``response_format`` json_schema mode set
+    # these to True (OpenAI/Azure). The agent only passes ``response_format``
+    # to providers that advertise support.
+    supports_native_structured_output: bool = False
+    supports_native_structured_output_with_tools: bool = False
 
     # -- template methods that subclasses override ---------------------------
 
@@ -149,6 +155,29 @@ class _OpenAICompatibleBase(ABC):
         """
         return args
 
+    def _map_response_format(self, schema: Dict[str, Any]) -> Dict[str, Any]:
+        """Wrap a raw JSON Schema in the Chat Completions json_schema envelope."""
+        return {
+            "type": "json_schema",
+            "json_schema": {"name": "structured_response", "schema": schema},
+        }
+
+    @staticmethod
+    def _drop_unsupported_arg(exc: Exception, args: Dict[str, Any]) -> bool:
+        """Drop a request arg the API rejected, signalling one retry.
+
+        Some models reject ``temperature`` (o-series) or ``response_format``
+        (pre-json_schema models). When the error message names such an arg
+        that is present in the request, remove it and return True so the
+        caller retries once without it.
+        """
+        msg = str(exc).lower()
+        for key in ("response_format", "temperature"):
+            if key in args and key in msg:
+                args.pop(key)
+                return True
+        return False
+
     # -- shared implementation ------------------------------------------------
 
     def complete(
@@ -161,6 +190,7 @@ class _OpenAICompatibleBase(ABC):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
+        response_format: Dict[str, Any] | None = None,
     ) -> tuple[Message, UsageStats]:
         formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
         model_name = model or self.default_model
@@ -177,12 +207,13 @@ class _OpenAICompatibleBase(ABC):
 
         if tools:
             args["tools"] = [self._map_tool_to_openai(t) for t in tools]
+        if response_format is not None:
+            args["response_format"] = self._map_response_format(response_format)
 
         try:
             response = cast(Any, self._client.chat.completions.create(**args))
         except Exception as exc:  # noqa: BLE001
-            if "temperature" in str(exc).lower() and "temperature" in args:
-                args.pop("temperature")
+            if self._drop_unsupported_arg(exc, args):
                 try:
                     response = cast(Any, self._client.chat.completions.create(**args))
                 except Exception as exc2:  # noqa: BLE001
@@ -202,6 +233,7 @@ class _OpenAICompatibleBase(ABC):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
+        response_format: Dict[str, Any] | None = None,
     ) -> tuple[Message, UsageStats]:
         formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
         model_name = model or self.default_model
@@ -218,12 +250,13 @@ class _OpenAICompatibleBase(ABC):
 
         if tools:
             args["tools"] = [self._map_tool_to_openai(t) for t in tools]
+        if response_format is not None:
+            args["response_format"] = self._map_response_format(response_format)
 
         try:
             response = cast(Any, await self._async_client.chat.completions.create(**args))
         except Exception as exc:  # noqa: BLE001
-            if "temperature" in str(exc).lower() and "temperature" in args:
-                args.pop("temperature")
+            if self._drop_unsupported_arg(exc, args):
                 try:
                     response = cast(Any, await self._async_client.chat.completions.create(**args))
                 except Exception as exc2:  # noqa: BLE001
@@ -243,6 +276,7 @@ class _OpenAICompatibleBase(ABC):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
+        response_format: Dict[str, Any] | None = None,
     ) -> Iterable[Union[str, ToolCall]]:
         """Stream response chunks with tool call support.
 
@@ -265,12 +299,13 @@ class _OpenAICompatibleBase(ABC):
             args["timeout"] = timeout
         if tools:
             args["tools"] = [self._map_tool_to_openai(t) for t in tools]
+        if response_format is not None:
+            args["response_format"] = self._map_response_format(response_format)
 
         try:
             response = cast(Any, self._client.chat.completions.create(**args))
         except Exception as exc:  # noqa: BLE001
-            if "temperature" in str(exc).lower() and "temperature" in args:
-                args.pop("temperature")
+            if self._drop_unsupported_arg(exc, args):
                 try:
                     response = cast(Any, self._client.chat.completions.create(**args))
                 except Exception as exc2:  # noqa: BLE001
@@ -357,6 +392,7 @@ class _OpenAICompatibleBase(ABC):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
+        response_format: Dict[str, Any] | None = None,
     ) -> AsyncIterable[Union[str, ToolCall]]:
         """Async streaming with native tool call support."""
         formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
@@ -374,14 +410,15 @@ class _OpenAICompatibleBase(ABC):
             args["timeout"] = timeout
         if tools:
             args["tools"] = [self._map_tool_to_openai(t) for t in tools]
+        if response_format is not None:
+            args["response_format"] = self._map_response_format(response_format)
 
         args = self._build_astream_args(args)
 
         try:
             response = cast(Any, await self._async_client.chat.completions.create(**args))
         except Exception as exc:  # noqa: BLE001
-            if "temperature" in str(exc).lower() and "temperature" in args:
-                args.pop("temperature")
+            if self._drop_unsupported_arg(exc, args):
                 try:
                     response = cast(Any, await self._async_client.chat.completions.create(**args))
                 except Exception as exc2:  # noqa: BLE001

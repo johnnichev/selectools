@@ -30,6 +30,7 @@ if TYPE_CHECKING:
         MemoryConfig,
         RetryConfig,
         SessionConfig,
+        StructuredOutputConfig,
         SummarizeConfig,
         ToolConfig,
         TraceConfig,
@@ -202,6 +203,8 @@ class AgentConfig:
     budget: Optional["BudgetConfig"] = None
     trace: Optional["TraceConfig"] = None
     compress: Optional["CompressConfig"] = None
+    # Structured-output behavior (beta, v1.1). Group-only — no flat mirrors.
+    structured_output: Optional["StructuredOutputConfig"] = None
 
     # -- Planning-as-config (ROADMAP P2). See PlanningConfig below and
     # agent/_planning.py for the adapter. Self-contained: default None means
@@ -217,6 +220,7 @@ class AgentConfig:
             MemoryConfig,
             RetryConfig,
             SessionConfig,
+            StructuredOutputConfig,
             SummarizeConfig,
             ToolConfig,
             TraceConfig,
@@ -381,6 +385,10 @@ class AgentConfig:
                 threshold=self.compress_threshold,
                 keep_recent=self.compress_keep_recent,
             )
+
+        self.structured_output = _unpack(self.structured_output, StructuredOutputConfig)
+        if self.structured_output is None:
+            self.structured_output = StructuredOutputConfig()
 
         # -- Planning-as-config: auto-unpack dicts (for YAML / dict configs) --
         if isinstance(self.planning, dict):

@@ -13,6 +13,7 @@ from .agent.config_groups import (
     MemoryConfig,
     RetryConfig,
     SessionConfig,
+    StructuredOutputConfig,
     SummarizeConfig,
     ToolConfig,
     TraceConfig,
