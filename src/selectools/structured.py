@@ -11,7 +11,7 @@ import json
 import re
 from typing import Any, Dict, Optional, Type, Union
 
-from .stability import register_stability, stable
+from .stability import beta, register_stability, stable
 
 ResponseFormat = Union[Type[Any], Dict[str, Any]]
 register_stability("ResponseFormat", "stable")
@@ -37,6 +37,23 @@ def build_schema_instruction(schema: Dict[str, Any]) -> str:
     compact = json.dumps(schema, indent=2)
     return (
         "\n\nYou MUST respond with valid JSON that conforms to this schema:\n"
+        f"```json\n{compact}\n```\n"
+        "Return ONLY the JSON object, no extra text."
+    )
+
+
+@beta
+def build_final_turn_request(schema: Dict[str, Any]) -> str:
+    """Build the user message that requests the structured final answer.
+
+    Used by ``StructuredOutputConfig(final_turn_only=True)``: after the tool
+    loop converges on a free-text answer, this message asks the model to
+    restate that answer as a single schema-conforming JSON object.
+    """
+    compact = json.dumps(schema, indent=2)
+    return (
+        "The task is complete. Now restate your final answer as valid JSON "
+        "conforming to this schema:\n"
         f"```json\n{compact}\n```\n"
         "Return ONLY the JSON object, no extra text."
     )
@@ -139,6 +156,7 @@ __all__ = [
     "ResponseFormat",
     "schema_from_response_format",
     "build_schema_instruction",
+    "build_final_turn_request",
     "extract_json",
     "parse_and_validate",
     "validation_retry_message",

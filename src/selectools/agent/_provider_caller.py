@@ -6,7 +6,7 @@ import asyncio
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING, Callable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 # Module-level singleton for running sync provider calls in an async context.
 # Creating a new ThreadPoolExecutor per call (inside a retry loop) wastes
@@ -50,8 +50,18 @@ class _ProviderCallerMixin:
         stream_handler: Optional[Callable[[str], None]] = None,
         trace: Optional[AgentTrace] = None,
         run_id: Optional[str] = None,
+        response_format: Optional[Dict[str, Any]] = None,
+        tools_override: Optional[List[Any]] = None,
+        system_prompt_override: Optional[str] = None,
     ) -> Message:
         call_start = time.time()
+        effective_tools = self.tools if tools_override is None else tools_override
+        effective_system_prompt = (
+            system_prompt_override if system_prompt_override is not None else self._system_prompt
+        )
+        provider_extra: Dict[str, Any] = {}
+        if response_format is not None:
+            provider_extra["response_format"] = response_format
 
         cache_key: Optional[str] = None
         if self.config.cache and not (
@@ -59,10 +69,11 @@ class _ProviderCallerMixin:
         ):
             cache_key = CacheKeyBuilder.build(
                 model=self._effective_model,
-                system_prompt=self._system_prompt,
+                system_prompt=effective_system_prompt,
                 messages=self._history,
-                tools=self.tools,
+                tools=effective_tools,
                 temperature=self.config.temperature,
+                response_format=response_format,
             )
             cached = self.config.cache.get(cache_key)
             # Only treat a well-formed (Message, usage) pair as a cache hit;
@@ -82,7 +93,7 @@ class _ProviderCallerMixin:
                         run_id,
                         self._history,
                         self._effective_model,
-                        self._system_prompt,
+                        effective_system_prompt,
                     )
                     self._notify_observers(
                         "on_llm_end",
@@ -122,12 +133,15 @@ class _ProviderCallerMixin:
                         run_id,
                         self._history,
                         self._effective_model,
-                        self._system_prompt,
+                        effective_system_prompt,
                     )
 
                 if self.config.stream and getattr(self.provider, "supports_streaming", False):
                     response_text, streamed_tool_calls = self._streaming_call(
-                        stream_handler=stream_handler
+                        stream_handler=stream_handler,
+                        response_format=response_format,
+                        tools=effective_tools,
+                        system_prompt=effective_system_prompt,
                     )
                     if run_id:
                         self._notify_observers("on_llm_end", run_id, response_text, None)
@@ -139,12 +153,13 @@ class _ProviderCallerMixin:
 
                 response_msg, usage_stats = self.provider.complete(
                     model=self._effective_model,
-                    system_prompt=self._system_prompt,
+                    system_prompt=effective_system_prompt,
                     messages=self._history,
-                    tools=self.tools,
+                    tools=effective_tools,
                     temperature=self.config.temperature,
                     max_tokens=self.config.max_tokens,
                     timeout=self.config.request_timeout,
+                    **provider_extra,
                 )
                 response_text = response_msg.content or ""
 
@@ -229,21 +244,29 @@ class _ProviderCallerMixin:
         )
 
     def _streaming_call(
-        self, stream_handler: Optional[Callable[[str], None]] = None
+        self,
+        stream_handler: Optional[Callable[[str], None]] = None,
+        response_format: Optional[Dict[str, Any]] = None,
+        tools: Optional[List[Any]] = None,
+        system_prompt: Optional[str] = None,
     ) -> Tuple[str, List[ToolCall]]:
         if not getattr(self.provider, "supports_streaming", False):
             raise ProviderError(f"Provider {self.provider.name} does not support streaming.")
 
+        provider_extra: Dict[str, Any] = {}
+        if response_format is not None:
+            provider_extra["response_format"] = response_format
         aggregated: List[str] = []
         tool_calls: List[ToolCall] = []
         for chunk in self.provider.stream(
             model=self._effective_model,
-            system_prompt=self._system_prompt,
+            system_prompt=self._system_prompt if system_prompt is None else system_prompt,
             messages=self._history,
-            tools=self.tools,
+            tools=self.tools if tools is None else tools,
             temperature=self.config.temperature,
             max_tokens=self.config.max_tokens,
             timeout=self.config.request_timeout,
+            **provider_extra,
         ):
             if isinstance(chunk, str):
                 if chunk:
@@ -264,9 +287,19 @@ class _ProviderCallerMixin:
         stream_handler: Optional[Callable[[str], None]] = None,
         trace: Optional[AgentTrace] = None,
         run_id: Optional[str] = None,
+        response_format: Optional[Dict[str, Any]] = None,
+        tools_override: Optional[List[Any]] = None,
+        system_prompt_override: Optional[str] = None,
     ) -> Message:
         """Async version of _call_provider with retry logic."""
         call_start = time.time()
+        effective_tools = self.tools if tools_override is None else tools_override
+        effective_system_prompt = (
+            system_prompt_override if system_prompt_override is not None else self._system_prompt
+        )
+        provider_extra: Dict[str, Any] = {}
+        if response_format is not None:
+            provider_extra["response_format"] = response_format
 
         cache_key: Optional[str] = None
         if self.config.cache and not (
@@ -274,10 +307,11 @@ class _ProviderCallerMixin:
         ):
             cache_key = CacheKeyBuilder.build(
                 model=self._effective_model,
-                system_prompt=self._system_prompt,
+                system_prompt=effective_system_prompt,
                 messages=self._history,
-                tools=self.tools,
+                tools=effective_tools,
                 temperature=self.config.temperature,
+                response_format=response_format,
             )
             cached = self.config.cache.get(cache_key)
             # Only treat a well-formed (Message, usage) pair as a cache hit;
@@ -297,14 +331,14 @@ class _ProviderCallerMixin:
                         run_id,
                         self._history,
                         self._effective_model,
-                        self._system_prompt,
+                        effective_system_prompt,
                     )
                     await self._anotify_observers(
                         "on_llm_start",
                         run_id,
                         self._history,
                         self._effective_model,
-                        self._system_prompt,
+                        effective_system_prompt,
                     )
                     self._notify_observers(
                         "on_llm_end",
@@ -357,19 +391,22 @@ class _ProviderCallerMixin:
                         run_id,
                         self._history,
                         self._effective_model,
-                        self._system_prompt,
+                        effective_system_prompt,
                     )
                     await self._anotify_observers(
                         "on_llm_start",
                         run_id,
                         self._history,
                         self._effective_model,
-                        self._system_prompt,
+                        effective_system_prompt,
                     )
 
                 if self.config.stream and getattr(self.provider, "supports_streaming", False):
                     response_text, streamed_tool_calls = await self._astreaming_call(
-                        stream_handler=stream_handler
+                        stream_handler=stream_handler,
+                        response_format=response_format,
+                        tools=effective_tools,
+                        system_prompt=effective_system_prompt,
                     )
                     if run_id:
                         self._notify_observers("on_llm_end", run_id, response_text, None)
@@ -386,12 +423,13 @@ class _ProviderCallerMixin:
                 ):
                     response_msg, usage_stats = await self.provider.acomplete(
                         model=self._effective_model,
-                        system_prompt=self._system_prompt,
+                        system_prompt=effective_system_prompt,
                         messages=self._history,
-                        tools=self.tools,
+                        tools=effective_tools,
                         temperature=self.config.temperature,
                         max_tokens=self.config.max_tokens,
                         timeout=self.config.request_timeout,
+                        **provider_extra,
                     )
                     response_text = response_msg.content or ""
                 else:
@@ -405,12 +443,13 @@ class _ProviderCallerMixin:
                         _get_async_provider_executor(),
                         lambda: self.provider.complete(
                             model=self._effective_model,
-                            system_prompt=self._system_prompt,
+                            system_prompt=effective_system_prompt,
                             messages=self._history,
-                            tools=self.tools,
+                            tools=effective_tools,
                             temperature=self.config.temperature,
                             max_tokens=self.config.max_tokens,
                             timeout=self.config.request_timeout,
+                            **provider_extra,
                         ),
                     )
                     response_text = response_msg.content or ""
@@ -506,12 +545,21 @@ class _ProviderCallerMixin:
         )
 
     async def _astreaming_call(
-        self, stream_handler: Optional[Callable[[str], None]] = None
+        self,
+        stream_handler: Optional[Callable[[str], None]] = None,
+        response_format: Optional[Dict[str, Any]] = None,
+        tools: Optional[List[Any]] = None,
+        system_prompt: Optional[str] = None,
     ) -> Tuple[str, List[ToolCall]]:
         """Async version of _streaming_call."""
         if not getattr(self.provider, "supports_streaming", False):
             raise ProviderError(f"Provider {self.provider.name} does not support streaming.")
 
+        provider_extra: Dict[str, Any] = {}
+        if response_format is not None:
+            provider_extra["response_format"] = response_format
+        effective_tools = self.tools if tools is None else tools
+        effective_system_prompt = self._system_prompt if system_prompt is None else system_prompt
         aggregated: List[str] = []
         tool_calls: List[ToolCall] = []
 
@@ -521,12 +569,13 @@ class _ProviderCallerMixin:
             async with aclosing(
                 self.provider.astream(  # type: ignore[attr-defined]
                     model=self._effective_model,
-                    system_prompt=self._system_prompt,
+                    system_prompt=effective_system_prompt,
                     messages=self._history,
-                    tools=self.tools,
+                    tools=effective_tools,
                     temperature=self.config.temperature,
                     max_tokens=self.config.max_tokens,
                     timeout=self.config.request_timeout,
+                    **provider_extra,
                 )
             ) as stream:
                 async for chunk in stream:
@@ -546,12 +595,13 @@ class _ProviderCallerMixin:
             with closing(
                 self.provider.stream(
                     model=self._effective_model,
-                    system_prompt=self._system_prompt,
+                    system_prompt=effective_system_prompt,
                     messages=self._history,
-                    tools=self.tools,
+                    tools=effective_tools,
                     temperature=self.config.temperature,
                     max_tokens=self.config.max_tokens,
                     timeout=self.config.request_timeout,
+                    **provider_extra,
                 )
             ) as stream:
                 for chunk in stream:

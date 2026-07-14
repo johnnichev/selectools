@@ -41,6 +41,8 @@ class OpenAIProvider(_OpenAICompatibleBase):
     name = "openai"
     supports_streaming = True
     supports_async = True
+    supports_native_structured_output = True
+    supports_native_structured_output_with_tools = True
 
     def __init__(self, api_key: str | None = None, default_model: str = OpenAIModels.GPT_5_MINI.id):
         load_default_env()

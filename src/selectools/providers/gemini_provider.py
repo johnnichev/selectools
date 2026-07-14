@@ -118,6 +118,11 @@ class GeminiProvider(Provider):
     name = "gemini"
     supports_streaming = True
     supports_async = True
+    # Native structured output via response_json_schema (issue #159). Gemini
+    # does NOT support combining it with function calling, so the with-tools
+    # flag stays False — the agent only sends the schema on tool-free calls.
+    supports_native_structured_output = True
+    supports_native_structured_output_with_tools = False
 
     def __init__(
         self, api_key: str | None = None, default_model: str = GeminiModels.FLASH_3_PREVIEW.id
@@ -151,6 +156,7 @@ class GeminiProvider(Provider):
         temperature: float,
         max_tokens: int,
         timeout: float | None,
+        response_format: Dict[str, Any] | None = None,
     ) -> types.GenerateContentConfig:
 
         http_options = (
@@ -166,6 +172,10 @@ class GeminiProvider(Provider):
 
         if tools:
             config.tools = [self._map_tool_to_gemini(t) for t in tools]
+
+        if response_format is not None:
+            config.response_mime_type = "application/json"
+            config.response_json_schema = response_format
 
         return config
 
@@ -208,6 +218,7 @@ class GeminiProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
+        response_format: Dict[str, Any] | None = None,
     ) -> tuple[Message, UsageStats]:
         """
         Call Gemini's generate_content API for a non-streaming completion.
@@ -236,6 +247,7 @@ class GeminiProvider(Provider):
             temperature=temperature,
             max_tokens=max_tokens,
             timeout=timeout,
+            response_format=response_format,
         )
 
         try:
@@ -317,6 +329,7 @@ class GeminiProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
+        response_format: Dict[str, Any] | None = None,
     ) -> Iterable[Union[str, ToolCall]]:
         """
         Stream responses from Gemini's generate_content_stream API.
@@ -335,6 +348,7 @@ class GeminiProvider(Provider):
             temperature=temperature,
             max_tokens=max_tokens,
             timeout=timeout,
+            response_format=response_format,
         )
 
         try:
@@ -566,6 +580,7 @@ class GeminiProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
+        response_format: Dict[str, Any] | None = None,
     ) -> tuple[Message, UsageStats]:
         """
         Async version of complete() using client.aio.
@@ -583,6 +598,7 @@ class GeminiProvider(Provider):
             temperature=temperature,
             max_tokens=max_tokens,
             timeout=timeout,
+            response_format=response_format,
         )
 
         try:
@@ -660,6 +676,7 @@ class GeminiProvider(Provider):
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
+        response_format: Dict[str, Any] | None = None,
     ) -> AsyncIterable[Union[str, ToolCall]]:
         """
         Async streaming with native tool call support.
@@ -678,6 +695,7 @@ class GeminiProvider(Provider):
             temperature=temperature,
             max_tokens=max_tokens,
             timeout=timeout,
+            response_format=response_format,
         )
 
         try:
