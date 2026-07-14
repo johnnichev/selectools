@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-07-14 — Tool-Boundary Guardrails Complete & Structured Synthesis Follow-ups
+
+Second 1.x minor, closing the loop on the v1.1.0 features from real
+tool-heavy agentic chat usage (#164-#167): tool RESULTS join tool args
+under the guardrail surface, the structured-output synthesis call becomes
+conditional (often free), the validation outcome is explicit, and both
+subsystems emit observability events. All additive; the frozen 1.0 API is
+unchanged.
+
 ### Added
 
 - **Guardrail observability (`on_guardrail_triggered`).** Every guardrail trip
@@ -58,7 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   execution across `run()`, `arun()`, and `astream()`. Empty by default.
   (#165)
 
-## [1.1.0] - 2026-07-14 — Tool-Args Guardrails & Native Structured Output
+## [1.1.0]## [1.1.0] - 2026-07-14 — Tool-Args Guardrails & Native Structured Output
 
 First 1.x minor: two additive features closing the guardrail and
 structured-output gaps found building tool-heavy agentic chat surfaces
