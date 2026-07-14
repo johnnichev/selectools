@@ -92,14 +92,55 @@ result = agent.ask("What do you think about politics?")
 
 ```
 User Message → Input Guardrails → LLM Call → Output Guardrails → Response
-                    ↓                              ↓
-              block / rewrite / warn          block / rewrite / warn
+                    ↓                  ↓               ↓
+              block / rewrite / warn   ↓         block / rewrite / warn
+                                       ↓
+                            Tool-Args Guardrails → Tool Execution
+                                       ↓
+                              block / rewrite / warn
 ```
 
 1. **Input guardrails** run on every user message before it reaches the LLM
-2. **Output guardrails** run on the LLM response before it's returned to you
-3. Guardrails execute **in order** — if one rewrites content, the next sees the rewritten version
-4. If a guardrail **blocks**, processing stops immediately with a `GuardrailError`
+2. **Output guardrails** run on the LLM response's free-text content before it's returned to you
+3. **Tool-args guardrails** (opt-in) run on the arguments of every tool call before the tool executes
+4. Guardrails execute **in order** — if one rewrites content, the next sees the rewritten version
+5. If a guardrail **blocks**, processing stops immediately with a `GuardrailError`
+
+---
+
+## Tool-Args Guardrails
+
+Output guardrails only inspect the model's free-text content. Anything the
+model carries via a **native tool call** — structured payloads, user-facing
+data inside arguments — never flows through them. The `tool_args` stage closes
+that gap: before any tool executes, its arguments are JSON-serialized and run
+through the chain, so the same text-oriented guardrails (PII, injection,
+length, topic) apply to tool-call arguments.
+
+```python
+from selectools.guardrails import GuardrailsPipeline, PIIGuardrail, LengthGuardrail
+
+config = AgentConfig(
+    guardrails=GuardrailsPipeline(
+        tool_args=[
+            PIIGuardrail(),                    # redact PII inside arguments
+            LengthGuardrail(max_chars=10_000), # bound the payload size
+        ],
+    ),
+)
+```
+
+Semantics mirror the content path:
+
+- `rewrite` — the sanitised JSON is parsed back into the arguments dict; the
+  tool receives the rewritten values. A rewrite that breaks the JSON raises
+  `GuardrailError` instead of silently passing mangled arguments through.
+- `block` — raises `GuardrailError` before the tool runs.
+- `warn` — logs and continues.
+
+This covers `run()`, `arun()`, and `astream()`, including tool calls extracted
+by the text `ToolCallParser` fallback. It is fully opt-in: an empty
+`tool_args` list (the default) changes nothing.
 
 ---
 
