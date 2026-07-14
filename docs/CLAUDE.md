@@ -47,6 +47,6 @@ Every feature MUST update all of these:
 ## Gotchas
 
 - CHANGELOG.md lives at repo root — must be copied into `docs/` before build
-- Gallery JSON (`landing/examples.json`) must be regenerated when examples are added
+- Examples gallery (`landing/examples/index.html`) must be regenerated when examples are added or edited: `python scripts/build_examples_gallery.py > landing/examples/index.html`
 - Hardcoded counts (model count, test count, example count) appear across many files — audit all
 - `docs/ARCHITECTURE.md` must be updated when adding new components
