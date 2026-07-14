@@ -1274,15 +1274,18 @@ print(result.content)  # Raw JSON string
 5. On validation failure, the error is fed back to the LLM for a retry
 6. `result.parsed` contains the typed object; `result.content` has the raw string
 
-### StructuredOutputConfig (beta, v1.1)
+### StructuredOutputConfig (beta, v1.1; extended v1.2)
 
 ```python
 from selectools import AgentConfig, StructuredOutputConfig
 
 config = AgentConfig(
     structured_output=StructuredOutputConfig(
-        native=True,            # provider-native JSON schema when supported (default)
-        final_turn_only=False,  # scope the schema to a final synthesis turn
+        native=True,             # provider-native JSON schema when supported (default)
+        final_turn_only=False,   # scope the schema to a final synthesis turn
+        reuse_loop_answer=True,  # skip synthesis when the loop answer validates (default)
+        should_finalize=None,    # predicate to skip synthesis on plain turns
+        single_pass=False,       # tools+json_schema in one pass (OpenAI/Azure)
     ),
 )
 ```
@@ -1291,10 +1294,42 @@ config = AgentConfig(
 - `final_turn_only=True` keeps the schema out of tool-loop turns entirely: the
   loop runs to convergence with no schema pressure (tool calling and the text
   `ToolCallParser` work normally — previously the parser was disabled whenever
-  `response_format` was set), then **one extra synthesis call** with the schema
-  applied and no tools produces the validated structured final answer. This is
-  the streaming-friendly equivalent of the `PlanningConfig` structured
-  synthesis call.
+  `response_format` was set), then a synthesis call with the schema applied
+  and no tools produces the validated structured final answer. This is the
+  streaming-friendly equivalent of the `PlanningConfig` structured synthesis
+  call.
+
+The synthesis call is **conditional** (v1.2, #164/#166) — three paths avoid it:
+
+1. `reuse_loop_answer=True` (default): if the converged loop answer already
+   parses and validates against the schema, it becomes the structured answer
+   directly. No synthesis call.
+2. `should_finalize=(messages, last_response_text) -> bool`: consulted when
+   the converged answer does NOT validate. Return `False` for turns that need
+   no structured output (plain conversational replies) — the run finishes with
+   `parsed=None` and `structured_status="skipped"`. A validating answer wins
+   before the predicate runs.
+3. `single_pass=True`: on providers advertising
+   `supports_native_structured_output_with_tools` (OpenAI/Azure), the schema
+   rides natively on the loop calls, so the converged answer IS the structured
+   object and (via `reuse_loop_answer`) the synthesis call never happens.
+   Providers without combined support fall back to the separate synthesis
+   call automatically.
+
+### Structured outcome: `structured_status` / `structured_error` (v1.2)
+
+`AgentResult.parsed is None` is no longer ambiguous:
+
+| `structured_status` | Meaning |
+|---|---|
+| `None` | `response_format` was not set |
+| `"ok"` | `parsed` carries a validated object |
+| `"validation_failed"` | retries exhausted; `structured_error` has the last validation error |
+| `"skipped"` | a `should_finalize` predicate declined the synthesis turn |
+| `"not_attempted"` | the run ended before validation could happen (e.g. terminal tool result) |
+
+Branch to a fallback deliberately on `"validation_failed"` instead of
+guessing from a bare `None`.
 
 ### Streaming and response_format
 
@@ -1304,7 +1339,12 @@ config = AgentConfig(
   `final_turn_only`.
 - **`final_turn_only=True`**: the tool loop streams normally (prose chunks),
   and the synthesis JSON is delivered ONLY via the terminal `AgentResult`
-  (`.content` / `.parsed`) — never leaked as content chunks.
+  (`.content` / `.parsed`) — never leaked as content chunks. When a synthesis
+  call starts, `astream()` emits `StreamChunk(event="structured_synthesis_start")`
+  (no content) so clients can render a pending state.
+- **`single_pass=True` caveat**: the final loop answer is the JSON itself, so
+  in `astream()` it streams as content chunks (like default mode) — the
+  trade-off for eliminating the synthesis round-trip.
 
 ### Structured Retry Budget (v0.22.0 — BUG-34)
 
