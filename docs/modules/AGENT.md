@@ -1336,20 +1336,32 @@ The synthesis call is **conditional** (v1.2, #164/#166) — three paths avoid it
 Branch to a fallback deliberately on `"validation_failed"` instead of
 guessing from a bare `None`.
 
-### Streaming and response_format
+### Streaming and response_format — the public contract (v1.2.1, #174)
+
+These behaviors are load-bearing for chat surfaces, documented here as a
+**tested public contract** (`tests/agent/test_structured_streaming_contract.py`
+pins every clause):
 
 - **Default mode**: `astream()` streams the model's answer token-by-token, and
   with `response_format` set the answer IS the JSON — clients rendering chunks
   as chat text will see raw JSON fragments. Accumulate chunks and parse, or use
   `final_turn_only`.
-- **`final_turn_only=True`**: the tool loop streams normally (prose chunks),
-  and the synthesis JSON is delivered ONLY via the terminal `AgentResult`
-  (`.content` / `.parsed`) — never leaked as content chunks. When a synthesis
-  call starts, `astream()` emits `StreamChunk(event="structured_synthesis_start")`
-  (no content) so clients can render a pending state.
-- **`single_pass=True` caveat**: the final loop answer is the JSON itself, so
-  in `astream()` it streams as content chunks (like default mode) — the
-  trade-off for eliminating the synthesis round-trip.
+- **`final_turn_only=True` guarantee**: the structured answer is NEVER emitted
+  as content chunks — on any path. It arrives only on the terminal
+  `AgentResult` (`.content` / `.parsed`).
+  - Without `single_pass`: the tool loop streams prose chunks normally; the
+    synthesis call is non-streaming; `StreamChunk(event="structured_synthesis_start")`
+    (content-free) fires **iff** a synthesis call is made — the reuse path and
+    `should_finalize` skips emit no event.
+  - With `single_pass`: content chunks are **suppressed** (the schema rides on
+    every loop call, so content is the JSON envelope by construction);
+    tool-call chunks still stream for activity display.
+- **`should_finalize(messages, text)` contract**: `messages` is the run's
+  conversation view at convergence — prior history (with memory), this turn's
+  USER message(s), the ASSISTANT tool-call messages, and one
+  `Message(role=TOOL)` per executed tool with `tool_name`, `tool_call_id`, and
+  `tool_result` always populated (`tool_result` equals the result text the
+  model saw, including error/denial messages). Treat messages as read-only.
 
 ### Structured Retry Budget (v0.22.0 — BUG-34)
 

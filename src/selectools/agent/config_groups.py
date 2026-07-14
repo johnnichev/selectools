@@ -213,16 +213,29 @@ class StructuredOutputConfig:
             answer wins before the predicate runs (even with
             ``reuse_loop_answer=False``). Like ``stop_condition``, an
             exception raised by the predicate propagates and aborts the run.
-            Default: None (always finalize, the v1.1 behavior).
+
+            ``messages`` contract (public, tested — issue #174): the run's
+            conversation view at convergence, in chronological order —
+            prior history (when memory is configured), this turn's USER
+            message(s), each ASSISTANT message that requested tools
+            (``.tool_calls`` populated), and one ``Message(role=TOOL)`` per
+            executed tool with ``tool_name``, ``tool_call_id``, and
+            ``tool_result`` ALWAYS populated (``tool_result`` equals the
+            result text the model saw — success, error, or policy denial).
+            Treat the messages as read-only; mutating the list itself is
+            harmless. Default: None (always finalize, the v1.1 behavior).
         single_pass: In ``final_turn_only`` mode with a provider that
             advertises ``supports_native_structured_output_with_tools``
             (OpenAI/Azure), carry the schema natively on the loop calls so
             the converged answer IS the structured object — combined with
             ``reuse_loop_answer`` this eliminates the synthesis call (v1.2,
             issue #166). Providers without combined support fall back to the
-            separate synthesis call. NOTE: in ``astream()`` the final answer
-            is then JSON and streams as content chunks (like plain native
-            mode). Default: False.
+            separate synthesis call. Streaming contract (public, tested —
+            issue #174): in ``astream()`` content chunks are SUPPRESSED in
+            this mode (with the schema riding on every loop call, content is
+            the JSON envelope by construction); tool-call chunks still
+            stream, and the structured answer arrives only on the terminal
+            ``AgentResult``. Default: False.
     """
 
     native: bool = True

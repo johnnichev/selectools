@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Public streaming + `should_finalize` contracts for `final_turn_only`
+  (#174).** Two previously source-only behaviors are now documented, typed
+  into docstrings, and pinned by dedicated contract tests
+  (`tests/agent/test_structured_streaming_contract.py`):
+  - `final_turn_only` + `astream()` NEVER emits the structured answer as
+    content chunks — on any path. New in this change: `single_pass` mode now
+    **suppresses** content chunks (they are the JSON envelope by construction
+    when the schema rides on every loop call), closing the leak that was
+    previously a documented caveat; tool-call chunks still stream.
+    `structured_synthesis_start` fires iff a separate synthesis call is made.
+  - `should_finalize(messages, text)` receives a documented conversation
+    view: this turn's TOOL messages are guaranteed to carry `tool_name`,
+    `tool_call_id`, and `tool_result`. To back that guarantee,
+    `tool_result` now defaults to the message content at every append site —
+    error results and policy denials populate it too (previously only
+    success-path messages did).
+
 ## [1.2.0] - 2026-07-14 — Tool-Boundary Guardrails Complete & Structured Synthesis Follow-ups
 
 Second 1.x minor, closing the loop on the v1.1.0 features from real

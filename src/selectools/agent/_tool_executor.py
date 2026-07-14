@@ -784,12 +784,19 @@ class _ToolExecutorMixin:
         tool_result: Optional[str] = None,
         run_id: Optional[str] = None,
     ) -> None:
-        """Update history with tool output."""
+        """Update history with tool output.
+
+        ``tool_result`` defaults to ``tool_content`` so EVERY TOOL message —
+        success, error, or policy denial — carries a populated ``tool_result``.
+        This is a public contract for ``should_finalize`` consumers (#174);
+        callers pass an explicit ``tool_result`` only when the raw result
+        differs from the message content (e.g. compression).
+        """
         tool_msg = Message(
             role=Role.TOOL,
             content=tool_content,
             tool_name=tool_name,
-            tool_result=tool_result,
+            tool_result=tool_result if tool_result is not None else tool_content,
             tool_call_id=tool_call_id,
         )
         self._history.append(tool_msg)

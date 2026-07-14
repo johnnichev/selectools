@@ -2053,6 +2053,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     provider_extra: Dict[str, Any] = (
                         {"response_format": ctx.response_schema} if ctx.native_structured else {}
                     )
+                    # single_pass streaming contract (#174): with the schema
+                    # riding natively on loop calls, any content the model
+                    # emits IS the structured JSON envelope — suppress it from
+                    # the chunk stream; the answer arrives only on the
+                    # terminal AgentResult. Tool-call chunks still stream.
+                    suppress_content = ctx.native_structured and ctx.structured_final_only
                     full_content = ""
                     current_tool_calls: List[ToolCall] = []
 
@@ -2119,7 +2125,8 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         if _usage:
                             self._notify_observers("on_usage", ctx.run_id, _usage)
                             await self._anotify_observers("on_usage", ctx.run_id, _usage)
-                        yield StreamChunk(content=_response_content)
+                        if not suppress_content:
+                            yield StreamChunk(content=_response_content)
                         full_content = _response_content
                         if response_msg.tool_calls:
                             current_tool_calls = response_msg.tool_calls
@@ -2144,7 +2151,8 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         ) as gen:
                             async for item in gen:
                                 if isinstance(item, str):
-                                    yield StreamChunk(content=item)
+                                    if not suppress_content:
+                                        yield StreamChunk(content=item)
                                     full_content += item
                                 elif isinstance(item, ToolCall):
                                     current_tool_calls.append(item)
