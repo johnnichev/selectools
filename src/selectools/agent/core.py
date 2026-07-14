@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import json
 import threading
 import time
 import uuid
@@ -99,9 +100,11 @@ class _RunContext:
     # Structured-output follow-ups (issues #164/#166): structured_skipped is
     # set when a should_finalize predicate declined the synthesis turn;
     # structured_error records the last validation error for
-    # AgentResult.structured_status/structured_error.
+    # AgentResult.structured_status/structured_error; structured_parsed
+    # caches the reuse-path validation so finalize does not re-parse.
     structured_skipped: bool = False
     structured_error: Optional[str] = None
+    structured_parsed: Optional[Any] = None
 
 
 @stable
@@ -575,6 +578,27 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             native_final=native_final,
         )
 
+    @staticmethod
+    def _structured_outcome(
+        ctx: _RunContext, parsed: Any = None
+    ) -> tuple[Optional[str], Optional[str]]:
+        """Compute (structured_status, structured_error) for an AgentResult.
+
+        None/None when response_format was not set; otherwise "skipped",
+        "ok", "validation_failed" (with the last error), or "not_attempted"
+        for runs that ended before validation could conclude (max
+        iterations, budget, cancellation, terminal tool result).
+        """
+        if ctx.response_format is None:
+            return None, None
+        if ctx.structured_skipped:
+            return "skipped", None
+        if parsed is not None:
+            return "ok", None
+        if ctx.structured_error is not None:
+            return "validation_failed", ctx.structured_error
+        return "not_attempted", None
+
     def _finalize_run(
         self,
         ctx: _RunContext,
@@ -592,18 +616,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         self._extract_entities(ctx.run_id)
         self._extract_kg_triples(ctx.run_id)
         self._session_save(ctx.run_id)
-        structured_status: Optional[str] = None
-        structured_error: Optional[str] = None
-        if ctx.response_format is not None:
-            if ctx.structured_skipped:
-                structured_status = "skipped"
-            elif parsed is not None:
-                structured_status = "ok"
-            elif ctx.structured_error is not None:
-                structured_status = "validation_failed"
-                structured_error = ctx.structured_error
-            else:
-                structured_status = "not_attempted"
+        structured_status, structured_error = self._structured_outcome(ctx, parsed)
         result = AgentResult(
             message=final_response,
             tool_name=ctx.last_tool_name,
@@ -709,6 +722,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         self._extract_entities(ctx.run_id)
         self._extract_kg_triples(ctx.run_id)
         self._session_save(ctx.run_id)
+        structured_status, structured_error = self._structured_outcome(ctx)
         result = AgentResult(
             message=final_response,
             tool_name=ctx.last_tool_name,
@@ -721,6 +735,8 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             provider_used=getattr(self.provider, "provider_used", None),
             usage=copy.deepcopy(self.usage),
             artifacts=list(ctx.artifacts),
+            structured_status=structured_status,
+            structured_error=structured_error,
         )
         self._notify_observers("on_run_end", ctx.run_id, result)
         return result
@@ -765,6 +781,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         self._extract_entities(ctx.run_id)
         self._extract_kg_triples(ctx.run_id)
         self._session_save(ctx.run_id)
+        structured_status, structured_error = self._structured_outcome(ctx)
         result = AgentResult(
             message=final_response,
             tool_name=ctx.last_tool_name,
@@ -777,6 +794,8 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             provider_used=getattr(self.provider, "provider_used", None),
             usage=copy.deepcopy(self.usage),
             artifacts=list(ctx.artifacts),
+            structured_status=structured_status,
+            structured_error=structured_error,
         )
         self._notify_observers("on_run_end", ctx.run_id, result)
         return result
@@ -793,6 +812,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         self._extract_entities(ctx.run_id)
         self._extract_kg_triples(ctx.run_id)
         self._session_save(ctx.run_id)
+        structured_status, structured_error = self._structured_outcome(ctx)
         result = AgentResult(
             message=final_response,
             tool_name=ctx.last_tool_name,
@@ -805,6 +825,8 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             provider_used=getattr(self.provider, "provider_used", None),
             usage=copy.deepcopy(self.usage),
             artifacts=list(ctx.artifacts),
+            structured_status=structured_status,
+            structured_error=structured_error,
         )
         self._notify_observers("on_run_end", ctx.run_id, result)
         return result
@@ -829,7 +851,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         if response_msg.tool_calls:
             tool_calls_to_execute = response_msg.tool_calls
         elif ctx.response_format is None or (
-            ctx.structured_final_only and not ctx.structured_final_pending
+            ctx.structured_final_only
+            and not ctx.structured_final_pending
+            # single_pass converged answers are native JSON — the text
+            # parser's whole-text fallback would hijack schemas whose keys
+            # look like a tool call (name/parameters).
+            and not ctx.native_structured
         ):
             parse_result = self.parser.parse(response_text)
             if parse_result.tool_call:
@@ -870,7 +897,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         if response_msg.tool_calls:
             tool_calls_to_execute = response_msg.tool_calls
         elif ctx.response_format is None or (
-            ctx.structured_final_only and not ctx.structured_final_pending
+            ctx.structured_final_only
+            and not ctx.structured_final_pending
+            # single_pass converged answers are native JSON — the text
+            # parser's whole-text fallback would hijack schemas whose keys
+            # look like a tool call (name/parameters).
+            and not ctx.native_structured
         ):
             parse_result = self.parser.parse(response_text)
             if parse_result.tool_call:
@@ -964,24 +996,61 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             Message(role=Role.USER, content=build_final_turn_request(ctx.response_schema or {}))
         )
 
+    def _validate_loop_answer(self, ctx: _RunContext, response_text: str) -> Optional[Any]:
+        """Conservative reuse gate for the loop's converged answer.
+
+        Only accepts an answer that IS one JSON object in its entirety —
+        never a fragment embedded in prose (``extract_json`` would happily
+        grab an echoed tool result mid-sentence). Pydantic schemas validate
+        fully; dict schemas (which ``parse_and_validate`` cannot deep-check)
+        must at least carry every top-level ``required`` key.
+
+        Returns the parsed object on success, ``None`` otherwise.
+        """
+        if ctx.response_format is None:
+            return None
+        stripped = response_text.strip()
+        if not (stripped.startswith("{") and stripped.endswith("}")):
+            return None
+        try:
+            data = json.loads(stripped)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(data, dict):
+            return None
+        if isinstance(ctx.response_format, dict):
+            required = ctx.response_format.get("required")
+            if isinstance(required, list) and not all(key in data for key in required):
+                return None
+            return data
+        try:
+            return parse_and_validate(stripped, ctx.response_format)
+        except (ValueError, TypeError):
+            return None
+
     def _resolve_structured_final(self, ctx: _RunContext, response_text: str) -> str:
         """Decide what to do when the tool loop converges in final-turn-only mode.
 
         Returns one of:
 
-        - ``"reuse"`` — the converged answer already validates against the
-          schema; use it directly, no synthesis call (#164/#166).
-        - ``"skip"`` — a ``should_finalize`` predicate declined the synthesis
-          turn; finish with ``parsed=None`` and status ``"skipped"``.
+        - ``"reuse"`` — the whole converged answer already validates against
+          the schema; use it directly, no synthesis call (#164/#166).
+        - ``"skip"`` — the answer does not validate and a ``should_finalize``
+          predicate declined the synthesis turn; finish with ``parsed=None``
+          and status ``"skipped"``.
         - ``"synthesize"`` — pay the extra synthesis call (v1.1 behavior).
+
+        A validating answer always wins before the predicate runs — even
+        with ``reuse_loop_answer=False``, a valid answer synthesizes rather
+        than skips.
         """
         cfg = self.config.structured_output
-        if (cfg is None or cfg.reuse_loop_answer) and ctx.response_format is not None:
-            try:
-                parse_and_validate(response_text, ctx.response_format)
+        parsed = self._validate_loop_answer(ctx, response_text)
+        if parsed is not None:
+            if cfg is None or cfg.reuse_loop_answer:
+                ctx.structured_parsed = parsed
                 return "reuse"
-            except (ValueError, TypeError):
-                pass
+            return "synthesize"
         predicate = cfg.should_finalize if cfg is not None else None
         if predicate is not None and not predicate(list(self._history), response_text):
             return "skip"
@@ -1419,7 +1488,11 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     parsed = None
                     if ctx.response_format is not None and not ctx.structured_skipped:
                         try:
-                            parsed = parse_and_validate(response_text, ctx.response_format)
+                            parsed = (
+                                ctx.structured_parsed
+                                if ctx.structured_parsed is not None
+                                else parse_and_validate(response_text, ctx.response_format)
+                            )
                             self._notify_observers(
                                 "on_structured_validate",
                                 ctx.run_id,
@@ -1885,9 +1958,6 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     if decision == "skip":
                         ctx.structured_skipped = True
                     elif decision == "synthesize":
-                        # Signal clients that a (non-streamed) synthesis call
-                        # is starting so they can render a pending state.
-                        yield StreamChunk(event="structured_synthesis_start")
                         self._begin_structured_final_turn(ctx, response_text)
                         self._notify_observers(
                             "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
@@ -1895,6 +1965,11 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         await self._anotify_observers(
                             "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
                         )
+                        # Signal clients that a (non-streamed) synthesis call
+                        # is starting so they can render a pending state.
+                        # Yielded after the transition so a consumer breaking
+                        # at this chunk leaves the run in a consistent state.
+                        yield StreamChunk(event="structured_synthesis_start")
                         continue
                     # "reuse": the converged answer already validates — fall
                     # through to the normal finalize path, which re-validates.
@@ -1903,7 +1978,11 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     parsed = None
                     if ctx.response_format is not None and not ctx.structured_skipped:
                         try:
-                            parsed = parse_and_validate(response_text, ctx.response_format)
+                            parsed = (
+                                ctx.structured_parsed
+                                if ctx.structured_parsed is not None
+                                else parse_and_validate(response_text, ctx.response_format)
+                            )
                             self._notify_observers(
                                 "on_structured_validate",
                                 ctx.run_id,
@@ -2249,7 +2328,11 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     parsed = None
                     if ctx.response_format is not None and not ctx.structured_skipped:
                         try:
-                            parsed = parse_and_validate(response_text, ctx.response_format)
+                            parsed = (
+                                ctx.structured_parsed
+                                if ctx.structured_parsed is not None
+                                else parse_and_validate(response_text, ctx.response_format)
+                            )
                             self._notify_observers(
                                 "on_structured_validate",
                                 ctx.run_id,

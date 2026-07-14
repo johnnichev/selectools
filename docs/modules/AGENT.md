@@ -1301,9 +1301,13 @@ config = AgentConfig(
 
 The synthesis call is **conditional** (v1.2, #164/#166) — three paths avoid it:
 
-1. `reuse_loop_answer=True` (default): if the converged loop answer already
-   parses and validates against the schema, it becomes the structured answer
-   directly. No synthesis call.
+1. `reuse_loop_answer=True` (default): if the converged loop answer validates
+   against the schema, it becomes the structured answer directly — no
+   synthesis call. The gate is conservative: the WHOLE answer must be a
+   single JSON object (a fragment embedded in prose never qualifies),
+   Pydantic schemas validate fully, and dict schemas must carry every
+   top-level `required` key. Anything else falls back to synthesis, so prose
+   answers behave exactly like v1.1.
 2. `should_finalize=(messages, last_response_text) -> bool`: consulted when
    the converged answer does NOT validate. Return `False` for turns that need
    no structured output (plain conversational replies) — the run finishes with

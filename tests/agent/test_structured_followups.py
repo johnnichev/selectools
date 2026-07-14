@@ -283,3 +283,96 @@ class TestSynthesisStreamSignal:
             if isinstance(chunk, StreamChunk) and chunk.event:
                 events.append(chunk.event)
         assert events == []
+
+
+# ── Review follow-ups (PR #169 self-review) ─────────────────────────────
+
+
+class TestReuseGateConservative:
+    """reuse must only fire when the WHOLE converged answer is a validating
+    JSON object — never on a fragment embedded in prose, and never on a
+    dict-schema answer missing required keys."""
+
+    def test_embedded_json_fragment_does_not_trigger_reuse(self) -> None:
+        prose = 'The lookup returned {"answer": "x"} so I am done here.'
+        provider = SharedFakeProvider([_tool_call_message(), prose, JSON_ANSWER])
+        agent = _final_turn_agent(provider)
+        result = agent.run("go", response_format=SCHEMA)
+        assert provider.calls == 3, "embedded fragments must go through synthesis"
+        assert result.parsed == {"answer": "42"}
+
+    def test_dict_schema_missing_required_keys_does_not_reuse(self) -> None:
+        provider = SharedFakeProvider([_tool_call_message(), '{"other": 1}', JSON_ANSWER])
+        agent = _final_turn_agent(provider)
+        result = agent.run("go", response_format=SCHEMA)
+        assert provider.calls == 3, "answer missing required keys must synthesize"
+        assert result.parsed == {"answer": "42"}
+
+    def test_validating_answer_wins_even_with_reuse_disabled(self) -> None:
+        """A schema-valid converged answer must never be 'skipped' by the
+        predicate, regardless of reuse_loop_answer."""
+        provider = SharedFakeProvider([_tool_call_message(), JSON_ANSWER, JSON_ANSWER])
+        agent = _final_turn_agent(
+            provider,
+            reuse_loop_answer=False,
+            should_finalize=lambda m, t: False,
+        )
+        result = agent.run("go", response_format=SCHEMA)
+        assert provider.calls == 3, "reuse off: valid answer synthesizes, never skips"
+        assert result.structured_status == "ok"
+        assert result.parsed == {"answer": "42"}
+
+
+class TestSinglePassParserGuard:
+    def test_native_json_answer_is_not_hijacked_by_text_parser(self) -> None:
+        """single_pass converged answers are native JSON; a schema whose keys
+        look like a tool call (name/parameters) must not be intercepted by
+        the ToolCallParser fallback."""
+        schema = {
+            "type": "object",
+            "properties": {"name": {"type": "string"}, "parameters": {"type": "object"}},
+            "required": ["name", "parameters"],
+        }
+        answer = '{"name": "recommendation", "parameters": {"answer": "42"}}'
+        provider = NativeWithToolsProvider([_tool_call_message(), answer])
+        agent = _final_turn_agent(provider, single_pass=True)
+        result = agent.run("go", response_format=schema)
+        assert provider.calls == 2
+        assert result.parsed == {"name": "recommendation", "parameters": {"answer": "42"}}
+        assert not any(tc.tool_name == "recommendation" for tc in result.tool_calls), (
+            "the JSON answer must not be executed as a tool call"
+        )
+
+
+class TestEarlyExitStatus:
+    def test_max_iterations_reports_not_attempted(self) -> None:
+        provider = SharedFakeProvider([_tool_call_message()])  # tools forever
+        agent = Agent(
+            [lookup],
+            provider=provider,
+            config=AgentConfig(model="fake-model", max_iterations=2),
+        )
+        result = agent.run("go", response_format=SCHEMA)
+        assert "Maximum iterations" in result.content
+        assert result.structured_status == "not_attempted"
+
+    def test_budget_exceeded_reports_not_attempted(self) -> None:
+        provider = SharedFakeProvider([_tool_call_message()])
+        agent = Agent(
+            [lookup],
+            provider=provider,
+            config=AgentConfig(model="fake-model", max_total_tokens=1),
+        )
+        result = agent.run("go", response_format=SCHEMA)
+        assert "budget" in result.content.lower()
+        assert result.structured_status == "not_attempted"
+
+    def test_early_exit_without_response_format_stays_none(self) -> None:
+        provider = SharedFakeProvider([_tool_call_message()])
+        agent = Agent(
+            [lookup],
+            provider=provider,
+            config=AgentConfig(model="fake-model", max_iterations=2),
+        )
+        result = agent.run("go")
+        assert result.structured_status is None

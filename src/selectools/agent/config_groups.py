@@ -24,7 +24,7 @@ Usage::
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
 
 from ..stability import beta, stable
 
@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from ..policy import ToolPolicy
     from ..providers.base import Provider
     from ..sessions import SessionStore
+    from ..types import Message
     from ..unified_memory import UnifiedMemory
 
 
@@ -196,17 +197,23 @@ class StructuredOutputConfig:
             (see ``reuse_loop_answer`` / ``should_finalize`` /
             ``single_pass`` for the paths that avoid it). Default: False.
         reuse_loop_answer: In ``final_turn_only`` mode, when the loop's
-            converged answer already parses and validates against the schema,
-            use it directly and skip the synthesis call entirely (v1.2,
-            issue #164). Default: True.
+            converged answer validates against the schema, use it directly
+            and skip the synthesis call entirely (v1.2, issue #164). The
+            gate is conservative: the WHOLE answer must be a single JSON
+            object (fragments embedded in prose never qualify), Pydantic
+            schemas validate fully, and dict schemas must carry every
+            top-level ``required`` key. Anything else falls back to the
+            synthesis call. Default: True.
         should_finalize: Optional predicate ``(messages, last_response_text)
             -> bool`` consulted in ``final_turn_only`` mode when the
             converged answer did NOT validate. Return ``False`` to skip the
             synthesis call for turns that need no structured output — the
             run finishes with ``parsed=None`` and
             ``AgentResult.structured_status == "skipped"``. A validating
-            answer wins before the predicate runs. Default: None (always
-            finalize, the v1.1 behavior).
+            answer wins before the predicate runs (even with
+            ``reuse_loop_answer=False``). Like ``stop_condition``, an
+            exception raised by the predicate propagates and aborts the run.
+            Default: None (always finalize, the v1.1 behavior).
         single_pass: In ``final_turn_only`` mode with a provider that
             advertises ``supports_native_structured_output_with_tools``
             (OpenAI/Azure), carry the schema natively on the loop calls so
@@ -221,7 +228,7 @@ class StructuredOutputConfig:
     native: bool = True
     final_turn_only: bool = False
     reuse_loop_answer: bool = True
-    should_finalize: Optional[Any] = None  # Callable[[List[Message], str], bool]
+    should_finalize: Optional[Callable[[List["Message"], str], bool]] = None
     single_pass: bool = False
 
 
