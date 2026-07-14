@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, AsyncGenerator, Callable, Dict, List, Opt
 
 from .._async_utils import aclosing, run_in_executor_copyctx
 from ..analytics import AgentAnalytics
+from ..guardrails import GuardrailError
 from ..parser import ToolCallParser
 from ..prompt import PromptBuilder
 from ..providers.base import Provider
@@ -83,6 +84,11 @@ class _RunContext:
     # within this run so a human is not re-paged when the model retries an
     # identical denied call on a later iteration. Approvals are NOT memoized.
     denied_approvals: Dict[str, str] = field(default_factory=dict)
+    # tool_results block (issue #165): recorded when a block-action guardrail
+    # rejects a tool's return value. The result is replaced with a blocked
+    # marker so history/memory stay coherent and observers get terminal
+    # events; the loop raises this exception once the tool batch completes.
+    guardrail_block: Optional[GuardrailError] = None
     # Structured-output modes (issue #159). response_schema is the resolved
     # JSON Schema dict for response_format. native_structured means the loop
     # calls carry the schema natively (no prompt injection). In
@@ -1102,6 +1108,98 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             )
         return checked
 
+    @staticmethod
+    def _blocked_result_marker(exc: GuardrailError) -> str:
+        """Standardized replacement for a tool result rejected by a block guardrail."""
+        return f"[Tool result blocked by guardrail '{exc.guardrail_name}': {exc.reason}]"
+
+    def _run_tool_result_guardrails(
+        self,
+        tool_name: str,
+        result: str,
+        trace: Optional[AgentTrace] = None,
+        run_ctx: Optional[_RunContext] = None,
+    ) -> str:
+        """Run tool-results guardrails on a tool's return value.
+
+        Returns the (possibly rewritten) result. No-op unless the configured
+        pipeline carries ``tool_results`` guardrails (opt-in).
+
+        A ``block`` guardrail does NOT raise from inside the tool executor —
+        that would strand an assistant tool_call in history/memory (provider
+        400 on the next turn), skip terminal observer events, and abandon
+        parallel siblings. Instead the blocked content is contained: the
+        result is replaced with a marker, the exception is recorded on
+        ``run_ctx.guardrail_block``, and the agent loop raises it once the
+        whole tool batch has been processed and persisted.
+        """
+        pipeline = self.config.guardrails
+        if not pipeline or not getattr(pipeline, "tool_results", None):
+            return result
+        try:
+            checked, triggered = pipeline.check_tool_result(result)
+        except GuardrailError as exc:
+            if trace is not None:
+                trace.add(
+                    TraceStep(
+                        type=StepType.GUARDRAIL,
+                        tool_name=tool_name,
+                        summary=f"Tool-result guardrail blocked ({tool_name}): {exc.guardrail_name}",
+                        error=exc.reason,
+                    )
+                )
+            if run_ctx is not None and run_ctx.guardrail_block is None:
+                run_ctx.guardrail_block = exc
+            return self._blocked_result_marker(exc)
+        if trace is not None and triggered:
+            trace.add(
+                TraceStep(
+                    type=StepType.GUARDRAIL,
+                    tool_name=tool_name,
+                    summary=f"Tool-result guardrail ({tool_name}): {triggered}",
+                )
+            )
+        return checked
+
+    async def _arun_tool_result_guardrails(
+        self,
+        tool_name: str,
+        result: str,
+        trace: Optional[AgentTrace] = None,
+        run_ctx: Optional[_RunContext] = None,
+    ) -> str:
+        """Async tool-results guardrails — calls ``acheck()`` to avoid blocking the event loop.
+
+        Block containment semantics match :meth:`_run_tool_result_guardrails`.
+        """
+        pipeline = self.config.guardrails
+        if not pipeline or not getattr(pipeline, "tool_results", None):
+            return result
+        try:
+            checked, triggered = await pipeline.acheck_tool_result(result)
+        except GuardrailError as exc:
+            if trace is not None:
+                trace.add(
+                    TraceStep(
+                        type=StepType.GUARDRAIL,
+                        tool_name=tool_name,
+                        summary=f"Tool-result guardrail blocked ({tool_name}): {exc.guardrail_name}",
+                        error=exc.reason,
+                    )
+                )
+            if run_ctx is not None and run_ctx.guardrail_block is None:
+                run_ctx.guardrail_block = exc
+            return self._blocked_result_marker(exc)
+        if trace is not None and triggered:
+            trace.add(
+                TraceStep(
+                    type=StepType.GUARDRAIL,
+                    tool_name=tool_name,
+                    summary=f"Tool-result guardrail ({tool_name}): {triggered}",
+                )
+            )
+        return checked
+
     async def _arun_input_guardrails(self, content: str, trace: Optional[AgentTrace] = None) -> str:
         """Async input guardrails — calls ``acheck()`` to avoid blocking the event loop."""
         if not self.config.guardrails or not self.config.guardrails.input:
@@ -1600,6 +1698,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                             break
 
                 self._check_loop_detection(ctx)
+
+                if ctx.guardrail_block is not None:
+                    # Raised only now — after every result in the batch was
+                    # appended to history/memory — so the conversation stays
+                    # coherent for the next turn.
+                    raise ctx.guardrail_block
 
                 if ctx.terminal_tool_result is not None:
                     final_response = Message(role=Role.ASSISTANT, content=ctx.terminal_tool_result)
@@ -2108,6 +2212,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
 
                 await self._acheck_loop_detection(ctx)
 
+                if ctx.guardrail_block is not None:
+                    # Raised only now — after every result in the batch was
+                    # appended to history/memory — so the conversation stays
+                    # coherent for the next turn.
+                    raise ctx.guardrail_block
+
                 if ctx.terminal_tool_result is not None:
                     final_response = Message(role=Role.ASSISTANT, content=ctx.terminal_tool_result)
                     self._notify_observers(
@@ -2455,6 +2565,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                             break
 
                 await self._acheck_loop_detection(ctx)
+
+                if ctx.guardrail_block is not None:
+                    # Raised only now — after every result in the batch was
+                    # appended to history/memory — so the conversation stays
+                    # coherent for the next turn.
+                    raise ctx.guardrail_block
 
                 if ctx.terminal_tool_result is not None:
                     final_response = Message(role=Role.ASSISTANT, content=ctx.terminal_tool_result)

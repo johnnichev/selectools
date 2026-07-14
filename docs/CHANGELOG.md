@@ -33,6 +33,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `structured_synthesis_start` when the tool loop converges and a
   (non-streamed) synthesis call begins, so clients can render a pending
   state. (#164)
+- **Tool-results guardrails (opt-in).** `GuardrailsPipeline` gained a
+  `tool_results` stage that runs guardrails over every tool's **return value**
+  after execution, before the result re-enters the model context — the other
+  half of the tool-boundary surface started by `tool_args` in v1.1.0. Results
+  are plain strings (no JSON round-trip); rewrites are what the model sees.
+  `block` contains the content (a blocked marker keeps history/memory
+  coherent and terminal observer events firing) and the loop raises
+  `GuardrailError` once the tool batch is processed. Guardrails run at use
+  time — on fresh results AND on tool-result cache hits, so new guardrails
+  apply retroactively to old cache entries. Covers single and parallel
+  execution across `run()`, `arun()`, and `astream()`. Empty by default.
+  (#165)
 
 ## [1.1.0] - 2026-07-14 — Tool-Args Guardrails & Native Structured Output
 

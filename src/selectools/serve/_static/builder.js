@@ -2911,7 +2911,7 @@ async function runLive(input, apiKey) {
     const resp = await fetch('/run', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({input, nodes, edges, api_key: apiKey}),
+      body: JSON.stringify({input, nodes, edges, api_key: apiKey, pinned_ports: pinnedPorts}),
     });
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({message: 'Request failed'}));
