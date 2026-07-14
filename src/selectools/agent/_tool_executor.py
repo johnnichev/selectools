@@ -784,7 +784,15 @@ class _ToolExecutorMixin:
         tool_result: Optional[str] = None,
         run_id: Optional[str] = None,
     ) -> None:
-        """Update history with tool output."""
+        """Update history with tool output.
+
+        Public contract for ``should_finalize`` consumers (#174): on
+        executor-appended TOOL messages, ``tool_result`` carries the result
+        text for SUCCESSFUL executions and stays ``None`` for errors and
+        policy/coherence denials (whose ``content`` carries the error text).
+        The ``None`` marker is the structural discriminator between "the
+        tool produced a result" and "the tool failed".
+        """
         tool_msg = Message(
             role=Role.TOOL,
             content=tool_content,

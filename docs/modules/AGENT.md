@@ -1336,20 +1336,53 @@ The synthesis call is **conditional** (v1.2, #164/#166) — three paths avoid it
 Branch to a fallback deliberately on `"validation_failed"` instead of
 guessing from a bare `None`.
 
-### Streaming and response_format
+### Streaming and response_format — the public contract (#174)
+
+**Since: v1.3.0** (the `structured_synthesis_start` event since v1.2.0)
+
+These behaviors are load-bearing for chat surfaces, documented here as a
+**tested public contract** (`tests/agent/test_structured_streaming_contract.py`
+pins every clause). The contract covers `astream()` chunks, the
+`stream_handler` callback in `run()`/`arun()`, and the `selectools.serve`
+SSE stream (which forwards event chunks as `{"type": "event", ...}`):
 
 - **Default mode**: `astream()` streams the model's answer token-by-token, and
   with `response_format` set the answer IS the JSON — clients rendering chunks
   as chat text will see raw JSON fragments. Accumulate chunks and parse, or use
   `final_turn_only`.
-- **`final_turn_only=True`**: the tool loop streams normally (prose chunks),
-  and the synthesis JSON is delivered ONLY via the terminal `AgentResult`
-  (`.content` / `.parsed`) — never leaked as content chunks. When a synthesis
-  call starts, `astream()` emits `StreamChunk(event="structured_synthesis_start")`
-  (no content) so clients can render a pending state.
-- **`single_pass=True` caveat**: the final loop answer is the JSON itself, so
-  in `astream()` it streams as content chunks (like default mode) — the
-  trade-off for eliminating the synthesis round-trip.
+- **`final_turn_only=True` guarantees**:
+  - The **synthesis turn never streams** — not as `astream()` chunks and not
+    through `stream_handler`. Its JSON arrives only on the terminal
+    `AgentResult` (`.content` / `.parsed`).
+    `StreamChunk(event="structured_synthesis_start")` (content-free) fires
+    once per run when the synthesis turn begins; validation retries within
+    the turn make additional (equally non-streamed) calls without re-emitting
+    the event.
+  - With `single_pass`: content is suppressed on **both** channels (chunks
+    and `stream_handler`) — the schema rides on every loop call, so content
+    is the JSON envelope by construction. Tool-call chunks still stream for
+    activity display (including on providers without native async
+    streaming).
+  - **Reuse caveat, signaled**: without `single_pass`, the loop streams model
+    output as it always has — so when the converged loop answer itself
+    validates and is reused (`reuse_loop_answer=True`), that answer has
+    already streamed as ordinary loop chunks.
+    `StreamChunk(event="structured_reuse")` fires at that moment so a chat
+    surface can convert or retract the just-streamed bubble (not emitted in
+    `single_pass` mode, where nothing streamed needs converting). Clients
+    that must never display raw JSON should handle this event, or use
+    `single_pass` on supporting providers.
+- **`should_finalize(messages, text)` contract**: `messages` is the run's
+  conversation view at convergence — prior history (with memory), possible
+  `Role.SYSTEM` context injections (summaries, entity/knowledge memory),
+  this turn's USER message(s), the ASSISTANT tool-call messages, and one
+  `Message(role=TOOL)` per executed tool. On executor-appended TOOL
+  messages, `tool_name` is always populated; `tool_result` carries the
+  result text for **successful** executions and stays `None` for errors and
+  policy/coherence denials — `tool_result is not None` is the supported
+  test for "this tool produced a real result". `tool_call_id` is populated
+  for native tool-calling providers, `None` for text-parsed tool calls.
+  Treat messages as read-only.
 
 ### Structured Retry Budget (v0.22.0 — BUG-34)
 

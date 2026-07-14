@@ -446,6 +446,13 @@ class AgentAPI:
                     async for item in runner.astream(messages):
                         if isinstance(item, AgentResult):
                             final = item
+                        elif isinstance(item, StreamChunk) and getattr(item, "event", None):
+                            # Content-free lifecycle signals (#174) — e.g.
+                            # structured_synthesis_start / structured_reuse —
+                            # must reach SSE clients so chat surfaces can
+                            # render pending states or convert bubbles.
+                            payload = {"type": "event", "event": item.event}
+                            yield f"data: {json.dumps(payload)}\n\n".encode()
                         elif isinstance(item, StreamChunk) and item.content:
                             chunks.append(item.content)
                             payload = {"type": "chunk", "content": item.content}

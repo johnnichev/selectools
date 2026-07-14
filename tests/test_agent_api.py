@@ -17,6 +17,7 @@ from starlette.testclient import TestClient  # noqa: E402
 from selectools.agent import Agent, AgentConfig  # noqa: E402
 from selectools.serve import AgentAPI  # noqa: E402
 from selectools.tools import Tool, ToolParameter  # noqa: E402
+from selectools.types import Message, Role  # noqa: E402
 from tests.conftest import SharedFakeProvider  # noqa: E402
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -313,6 +314,30 @@ class TestUserIsolation:
 
 
 class TestChatStream:
+    def test_stream_forwards_event_chunks(self):
+        """Content-free StreamChunk lifecycle events (#174) — e.g.
+        structured_synthesis_start / structured_reuse — must reach SSE
+        clients as {"type": "event", ...} records, not be dropped."""
+        from selectools.types import AgentResult, StreamChunk
+
+        agent = make_agent(responses=["final answer"])
+
+        class _EventStreamAgent(type(agent)):
+            async def astream(self, messages, **kwargs):
+                yield StreamChunk(event="structured_synthesis_start")
+                yield StreamChunk(content="final answer")
+                yield AgentResult(message=Message(role=Role.ASSISTANT, content="final answer"))
+
+        agent.__class__ = _EventStreamAgent
+        client = make_client(AgentAPI(agents=[agent]))
+        r = client.post("/v1/chat/stream", json={"input": "go"})
+        assert r.status_code == 200
+        events = sse_events(r.text)
+        event_records = [e for e in events if e.get("type") == "event"]
+        assert event_records == [{"type": "event", "event": "structured_synthesis_start"}]
+        chunk_text = "".join(e["content"] for e in events if e["type"] == "chunk")
+        assert chunk_text == "final answer"
+
     def test_stream_yields_chunks_and_result(self):
         client = make_client(AgentAPI(agents=[make_agent(responses=["streamed answer"])]))
         r = client.post("/v1/chat/stream", json={"input": "stream it"})

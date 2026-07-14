@@ -100,6 +100,9 @@ class _RunContext:
     structured_final_only: bool = False
     structured_final_pending: bool = False
     native_final: bool = False
+    # single_pass mode resolved once at run setup: the schema rides natively
+    # on loop calls AND final-turn-only semantics apply (issue #166/#174).
+    single_pass_active: bool = False
     # Budget allowance for the synthesis turn: set to 1 when the transition
     # into structured_final_pending consumes an iteration.
     structured_extra_turns: int = 0
@@ -582,6 +585,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             native_structured=native_structured,
             structured_final_only=structured_final_only,
             native_final=native_final,
+            single_pass_active=native_structured and structured_final_only,
         )
 
     @staticmethod
@@ -862,7 +866,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             # single_pass converged answers are native JSON — the text
             # parser's whole-text fallback would hijack schemas whose keys
             # look like a tool call (name/parameters).
-            and not ctx.native_structured
+            and not ctx.single_pass_active
         ):
             parse_result = self.parser.parse(response_text)
             if parse_result.tool_call:
@@ -912,7 +916,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             # single_pass converged answers are native JSON — the text
             # parser's whole-text fallback would hijack schemas whose keys
             # look like a tool call (name/parameters).
-            and not ctx.native_structured
+            and not ctx.single_pass_active
         ):
             parse_result = self.parser.parse(response_text)
             if parse_result.tool_call:
@@ -1677,8 +1681,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     "on_iteration_start", ctx.run_id, ctx.iteration, self._history
                 )
 
+                # The synthesis turn and single_pass loop turns carry the
+                # structured JSON — never feed it to the token callback
+                # (same contract as astream chunk suppression, #174).
+                _suppress_handler = ctx.structured_final_pending or ctx.single_pass_active
                 response_msg = self._call_provider(
-                    stream_handler=stream_handler,
+                    stream_handler=None if _suppress_handler else stream_handler,
                     trace=ctx.trace,
                     run_id=ctx.run_id,
                     **self._structured_call_kwargs(ctx),
@@ -2053,6 +2061,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     provider_extra: Dict[str, Any] = (
                         {"response_format": ctx.response_schema} if ctx.native_structured else {}
                     )
+                    # single_pass streaming contract (#174): with the schema
+                    # riding natively on loop calls, any content the model
+                    # emits IS the structured JSON envelope — suppress it from
+                    # the chunk stream; the answer arrives only on the
+                    # terminal AgentResult. Tool-call chunks still stream.
+                    suppress_content = ctx.single_pass_active
                     full_content = ""
                     current_tool_calls: List[ToolCall] = []
 
@@ -2119,10 +2133,15 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         if _usage:
                             self._notify_observers("on_usage", ctx.run_id, _usage)
                             await self._anotify_observers("on_usage", ctx.run_id, _usage)
-                        yield StreamChunk(content=_response_content)
+                        if not suppress_content:
+                            yield StreamChunk(content=_response_content)
                         full_content = _response_content
                         if response_msg.tool_calls:
                             current_tool_calls = response_msg.tool_calls
+                            # Mirror the native-astream path: tool-call
+                            # activity always streams, even when content is
+                            # suppressed (single_pass contract, #174).
+                            yield StreamChunk(tool_calls=current_tool_calls)
                     else:
                         # BUG-33: wrap provider.astream() generator in aclosing so
                         # that a guardrail raise, validation failure, or caller
@@ -2144,7 +2163,8 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         ) as gen:
                             async for item in gen:
                                 if isinstance(item, str):
-                                    yield StreamChunk(content=item)
+                                    if not suppress_content:
+                                        yield StreamChunk(content=item)
                                     full_content += item
                                 elif isinstance(item, ToolCall):
                                     current_tool_calls.append(item)
@@ -2183,6 +2203,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     decision = self._resolve_structured_final(ctx, response_text)
                     if decision == "skip":
                         ctx.structured_skipped = True
+                    elif decision == "reuse" and not ctx.single_pass_active:
+                        # The converged loop answer validated and just streamed
+                        # as ordinary loop content — signal clients that those
+                        # chunks WERE the structured answer so a chat surface
+                        # can convert/retract the bubble (#174).
+                        yield StreamChunk(event="structured_reuse")
                     elif decision == "synthesize":
                         self._begin_structured_final_turn(ctx, response_text)
                         self._notify_observers(
@@ -2524,8 +2550,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     "on_iteration_start", ctx.run_id, ctx.iteration, self._history
                 )
 
+                # The synthesis turn and single_pass loop turns carry the
+                # structured JSON — never feed it to the token callback
+                # (same contract as astream chunk suppression, #174).
+                _suppress_handler = ctx.structured_final_pending or ctx.single_pass_active
                 response_msg = await self._acall_provider(
-                    stream_handler=stream_handler,
+                    stream_handler=None if _suppress_handler else stream_handler,
                     trace=ctx.trace,
                     run_id=ctx.run_id,
                     **self._structured_call_kwargs(ctx),

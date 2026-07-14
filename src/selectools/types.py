@@ -139,6 +139,12 @@ class Message:
                     The image will be automatically base64-encoded on initialization.
         tool_name: Optional name of the tool that generated this message (for TOOL role).
         tool_result: Optional result from tool execution (for TOOL role).
+                     On TOOL messages appended by the agent's tool executor
+                     this carries the result text for successful executions
+                     and stays None for errors/policy denials — the None
+                     marker distinguishes failures (see the should_finalize
+                     contract in StructuredOutputConfig, #174). Caller-built
+                     TOOL messages may leave it unset.
         image_base64: Auto-populated base64-encoded image data (not set via __init__).
 
     Example:
@@ -385,10 +391,18 @@ class StreamChunk:
         content: The text content of this chunk (delta).
         role: The role emitting this chunk (usually ASSISTANT).
         tool_calls: Optional list of tool calls (if this chunk contains tool invocations).
-        event: Optional lifecycle signal (v1.2). Currently emitted:
-            ``"structured_synthesis_start"`` — the tool loop converged and a
-            structured synthesis call is starting; clients can render a
-            pending state. Event chunks carry no content.
+        event: Optional lifecycle signal. Event chunks carry no content.
+            Currently emitted:
+            ``"structured_synthesis_start"`` (since v1.2.0) — the structured
+            synthesis turn is starting; clients can render a pending state.
+            Fires once per run when the turn begins; validation retries
+            within the synthesis turn do not re-emit it.
+            ``"structured_reuse"`` (since v1.3.0) — the converged loop answer
+            validated and was reused as the structured answer; the chunks
+            already streamed for this turn WERE that answer, so chat surfaces
+            can convert or retract the bubble. Not emitted in ``single_pass``
+            mode (content is suppressed there, so nothing streamed needs
+            converting). (#174)
     """
 
     content: str = ""
