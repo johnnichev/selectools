@@ -781,22 +781,20 @@ class _ToolExecutorMixin:
         tool_content: str,
         tool_name: str,
         tool_call_id: Optional[str] = None,
-        tool_result: Optional[str] = None,
         run_id: Optional[str] = None,
     ) -> None:
         """Update history with tool output.
 
-        ``tool_result`` defaults to ``tool_content`` so EVERY TOOL message —
-        success, error, or policy denial — carries a populated ``tool_result``.
-        This is a public contract for ``should_finalize`` consumers (#174);
-        callers pass an explicit ``tool_result`` only when the raw result
-        differs from the message content (e.g. compression).
+        ``tool_result`` is always set to ``tool_content`` so EVERY TOOL
+        message — success, error, or policy denial — carries a populated
+        ``tool_result`` equal to the text the model saw. This is a public
+        contract for ``should_finalize`` consumers (#174).
         """
         tool_msg = Message(
             role=Role.TOOL,
             content=tool_content,
             tool_name=tool_name,
-            tool_result=tool_result if tool_result is not None else tool_content,
+            tool_result=tool_content,
             tool_call_id=tool_call_id,
         )
         self._history.append(tool_msg)
@@ -1040,7 +1038,6 @@ class _ToolExecutorMixin:
                     message_content,
                     r.tool_call.tool_name,
                     r.tool_call.id,
-                    tool_result=message_content,
                     run_id=run_id,
                 )
 
@@ -1318,7 +1315,6 @@ class _ToolExecutorMixin:
                     message_content,
                     r.tool_call.tool_name,
                     r.tool_call.id,
-                    tool_result=message_content,
                     run_id=run_id,
                 )
 
@@ -1488,7 +1484,6 @@ class _ToolExecutorMixin:
                 cached_content,
                 tool_name,
                 tool_call.id,
-                tool_result=cached_content,
                 run_id=ctx.run_id,
             )
             if getattr(tool, "terminal", False) or self._stop_condition_hit(tool_name, cached_raw):
@@ -1604,7 +1599,6 @@ class _ToolExecutorMixin:
             message_content,
             tool_name,
             tool_call.id,
-            tool_result=message_content,
             run_id=ctx.run_id,
         )
 
@@ -1732,7 +1726,6 @@ class _ToolExecutorMixin:
                 cached_content,
                 tool_name,
                 tool_call.id,
-                tool_result=cached_content,
                 run_id=ctx.run_id,
             )
             if getattr(tool, "terminal", False) or self._stop_condition_hit(tool_name, cached_raw):
@@ -1865,7 +1858,6 @@ class _ToolExecutorMixin:
             message_content,
             tool_name,
             tool_call.id,
-            tool_result=message_content,
             run_id=ctx.run_id,
         )
 

@@ -275,14 +275,17 @@ class TestSynthesisStreamSignal:
         assert "structured_synthesis_start" in events
 
     @pytest.mark.asyncio
-    async def test_no_event_when_synthesis_skipped(self) -> None:
+    async def test_no_synthesis_event_when_synthesis_skipped(self) -> None:
         provider = SharedFakeProvider([_tool_call_message(), JSON_ANSWER])
         agent = _final_turn_agent(provider)
         events: List[str] = []
         async for chunk in agent.astream("go", response_format=SCHEMA):
             if isinstance(chunk, StreamChunk) and chunk.event:
                 events.append(chunk.event)
-        assert events == []
+        assert "structured_synthesis_start" not in events
+        # the reuse path signals that the streamed loop answer WAS the
+        # structured answer (#174)
+        assert events == ["structured_reuse"]
 
 
 # ── Review follow-ups (PR #169 self-review) ─────────────────────────────

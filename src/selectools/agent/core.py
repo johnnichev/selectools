@@ -100,6 +100,9 @@ class _RunContext:
     structured_final_only: bool = False
     structured_final_pending: bool = False
     native_final: bool = False
+    # single_pass mode resolved once at run setup: the schema rides natively
+    # on loop calls AND final-turn-only semantics apply (issue #166/#174).
+    single_pass_active: bool = False
     # Budget allowance for the synthesis turn: set to 1 when the transition
     # into structured_final_pending consumes an iteration.
     structured_extra_turns: int = 0
@@ -582,6 +585,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             native_structured=native_structured,
             structured_final_only=structured_final_only,
             native_final=native_final,
+            single_pass_active=native_structured and structured_final_only,
         )
 
     @staticmethod
@@ -862,7 +866,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             # single_pass converged answers are native JSON — the text
             # parser's whole-text fallback would hijack schemas whose keys
             # look like a tool call (name/parameters).
-            and not ctx.native_structured
+            and not ctx.single_pass_active
         ):
             parse_result = self.parser.parse(response_text)
             if parse_result.tool_call:
@@ -912,7 +916,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
             # single_pass converged answers are native JSON — the text
             # parser's whole-text fallback would hijack schemas whose keys
             # look like a tool call (name/parameters).
-            and not ctx.native_structured
+            and not ctx.single_pass_active
         ):
             parse_result = self.parser.parse(response_text)
             if parse_result.tool_call:
@@ -2058,7 +2062,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     # emits IS the structured JSON envelope — suppress it from
                     # the chunk stream; the answer arrives only on the
                     # terminal AgentResult. Tool-call chunks still stream.
-                    suppress_content = ctx.native_structured and ctx.structured_final_only
+                    suppress_content = ctx.single_pass_active
                     full_content = ""
                     current_tool_calls: List[ToolCall] = []
 
@@ -2191,6 +2195,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     decision = self._resolve_structured_final(ctx, response_text)
                     if decision == "skip":
                         ctx.structured_skipped = True
+                    elif decision == "reuse" and not ctx.single_pass_active:
+                        # The converged loop answer validated and just streamed
+                        # as ordinary loop content — signal clients that those
+                        # chunks WERE the structured answer so a chat surface
+                        # can convert/retract the bubble (#174).
+                        yield StreamChunk(event="structured_reuse")
                     elif decision == "synthesize":
                         self._begin_structured_final_turn(ctx, response_text)
                         self._notify_observers(

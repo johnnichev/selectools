@@ -233,6 +233,12 @@ class Message:
         msg.image_base64 = data.get("image_base64")
         msg.tool_name = data.get("tool_name")
         msg.tool_result = data.get("tool_result")
+        # Sessions persisted before v1.2.x stored tool_result=None on
+        # error/denial TOOL messages; normalize so the should_finalize
+        # contract (tool_result always populated on TOOL messages, #174)
+        # holds for restored histories too.
+        if msg.role == Role.TOOL and msg.tool_result is None:
+            msg.tool_result = msg.content
         msg.tool_call_id = data.get("tool_call_id")
         raw_calls = data.get("tool_calls")
         if raw_calls:
@@ -385,10 +391,15 @@ class StreamChunk:
         content: The text content of this chunk (delta).
         role: The role emitting this chunk (usually ASSISTANT).
         tool_calls: Optional list of tool calls (if this chunk contains tool invocations).
-        event: Optional lifecycle signal (v1.2). Currently emitted:
+        event: Optional lifecycle signal (v1.2). Event chunks carry no
+            content. Currently emitted:
             ``"structured_synthesis_start"`` — the tool loop converged and a
             structured synthesis call is starting; clients can render a
-            pending state. Event chunks carry no content.
+            pending state.
+            ``"structured_reuse"`` — the converged loop answer validated and
+            was reused as the structured answer; the chunks already streamed
+            for this turn WERE that answer, so chat surfaces can convert or
+            retract the bubble (#174).
     """
 
     content: str = ""

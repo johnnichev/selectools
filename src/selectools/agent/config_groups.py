@@ -216,14 +216,18 @@ class StructuredOutputConfig:
 
             ``messages`` contract (public, tested — issue #174): the run's
             conversation view at convergence, in chronological order —
-            prior history (when memory is configured), this turn's USER
-            message(s), each ASSISTANT message that requested tools
-            (``.tool_calls`` populated), and one ``Message(role=TOOL)`` per
-            executed tool with ``tool_name``, ``tool_call_id``, and
-            ``tool_result`` ALWAYS populated (``tool_result`` equals the
-            result text the model saw — success, error, or policy denial).
-            Treat the messages as read-only; mutating the list itself is
-            harmless. Default: None (always finalize, the v1.1 behavior).
+            prior history (when memory is configured, including restored
+            sessions), this turn's USER message(s), the ASSISTANT messages
+            that requested tools, and one ``Message(role=TOOL)`` per
+            executed tool. On every TOOL message, ``tool_name`` and
+            ``tool_result`` are ALWAYS populated (``tool_result`` equals
+            the result text the model saw — success, error, or policy
+            denial; legacy persisted messages are normalized on load).
+            ``tool_call_id`` is populated for native tool-calling providers
+            but is ``None`` for text-parsed tool calls — key by it only if
+            you know your provider supplies ids. Treat the messages as
+            read-only; mutating the list itself is harmless. Default: None
+            (always finalize, the v1.1 behavior).
         single_pass: In ``final_turn_only`` mode with a provider that
             advertises ``supports_native_structured_output_with_tools``
             (OpenAI/Azure), carry the schema natively on the loop calls so

@@ -4,13 +4,12 @@ Consumers of `final_turn_only` in streaming chat surfaces rely on two
 behaviors that were previously source-only knowledge. These tests ARE the
 contract — a refactor that breaks them breaks integrators:
 
-1. With ``final_turn_only=True``, ``astream()`` NEVER emits the structured
-   answer as content chunks — on any path. Non-single_pass: loop prose
-   streams, the synthesis call is non-streaming, and
-   ``StreamChunk(event="structured_synthesis_start")`` fires iff a synthesis
-   call is made. single_pass: content chunks are suppressed entirely (they
-   are the JSON envelope by construction), and the structured answer arrives
-   only on the terminal ``AgentResult``.
+1. With ``final_turn_only=True``: the SYNTHESIS call never streams
+   (``structured_synthesis_start`` fires iff it happens); ``single_pass``
+   suppresses content chunks entirely; and on the reuse path — where the
+   converged loop answer already streamed as ordinary loop chunks —
+   ``StreamChunk(event="structured_reuse")`` signals that those chunks WERE
+   the structured answer.
 2. ``should_finalize(messages, last_response_text)`` receives the run's
    conversation view at convergence, including this turn's TOOL messages
    with ``tool_name`` and ``tool_result`` populated.
@@ -25,12 +24,37 @@ import pytest
 
 from selectools import Agent, AgentConfig, StructuredOutputConfig, tool
 from selectools.types import AgentResult, Message, Role, StreamChunk, ToolCall
+from selectools.usage import UsageStats
 from tests.conftest import SharedFakeProvider
 
-from .test_structured_followups import (  # reuse the shared fakes
-    NativeWithToolsProvider,
-    _tool_call_message,
-)
+
+class NativeWithToolsProvider(SharedFakeProvider):
+    """Fake advertising tools+json_schema support; accepts response_format."""
+
+    supports_native_structured_output = True
+    supports_native_structured_output_with_tools = True
+
+    def complete(self, **kwargs: Any) -> "tuple[Message, UsageStats]":
+        kwargs.pop("response_format", None)
+        return super().complete(**kwargs)
+
+    async def acomplete(self, **kwargs: Any) -> "tuple[Message, UsageStats]":
+        kwargs.pop("response_format", None)
+        return await super().acomplete(**kwargs)
+
+    async def astream(self, **kwargs: Any):
+        kwargs.pop("response_format", None)
+        async for chunk in super().astream(**kwargs):
+            yield chunk
+
+
+def _tool_call_message() -> Message:
+    return Message(
+        role=Role.ASSISTANT,
+        content="",
+        tool_calls=[ToolCall(tool_name="lookup", parameters={"query": "x"}, id="tc1")],
+    )
+
 
 SCHEMA = {
     "type": "object",
@@ -112,11 +136,17 @@ class TestStreamingContract:
         chunks, _ = await _collect(agent, response_format=SCHEMA)
         assert sum(1 for c in chunks if c.event == "structured_synthesis_start") == 1
 
-        # Case B: reuse path (loop answer validates) -> no synthesis -> no event
+        # Case B: reuse path (loop answer validates) -> no synthesis event,
+        # but the structured_reuse signal fires — and the answer HAS already
+        # streamed as ordinary loop chunks (documented caveat, pinned honest).
         provider = SharedFakeProvider([_tool_call_message(), JSON_ANSWER])
         agent = _agent(provider)
-        chunks, _ = await _collect(agent, response_format=SCHEMA)
+        chunks, result = await _collect(agent, response_format=SCHEMA)
         assert all(c.event != "structured_synthesis_start" for c in chunks)
+        assert sum(1 for c in chunks if c.event == "structured_reuse") == 1
+        streamed = "".join(c.content or "" for c in chunks)
+        assert JSON_ANSWER in streamed, "reuse-path answer streams as loop output"
+        assert result is not None and result.parsed == {"answer": "42"}
 
         # Case C: single_pass -> no synthesis call -> no event
         provider = NativeWithToolsProvider([_tool_call_message(), JSON_ANSWER])
@@ -230,6 +260,40 @@ class TestToolResultFieldInvariant:
         assert len(tool_msgs) == 2
         for m in tool_msgs:
             assert m.tool_result is not None, f"{m.tool_name} missing tool_result"
+
+    def test_policy_denied_tool_messages_carry_tool_result(self) -> None:
+        from selectools.policy import ToolPolicy
+
+        first = Message(
+            role=Role.ASSISTANT,
+            content="",
+            tool_calls=[ToolCall(tool_name="lookup", parameters={"query": "x"}, id="t1")],
+        )
+        provider = SharedFakeProvider([first, "Done"])
+        agent = Agent(
+            [lookup],
+            provider=provider,
+            config=AgentConfig(model="fake-model", tool_policy=ToolPolicy(deny=["lookup"])),
+        )
+        agent.run("go")
+        tool_msgs = [m for m in agent._history if m.role == Role.TOOL]
+        assert tool_msgs, "the denial must still produce a TOOL message"
+        for m in tool_msgs:
+            assert m.tool_result is not None, "policy denials must populate tool_result"
+
+    def test_legacy_persisted_tool_messages_normalized_on_load(self) -> None:
+        """Sessions saved before v1.2.x stored tool_result=None on error
+        TOOL messages; from_dict must normalize so the contract holds for
+        restored histories."""
+        legacy = {
+            "role": "tool",
+            "content": "Error executing tool 'x': boom",
+            "tool_name": "x",
+            "tool_result": None,
+            "tool_call_id": "t1",
+        }
+        restored = Message.from_dict(legacy)
+        assert restored.tool_result == "Error executing tool 'x': boom"
 
     def test_error_tool_messages_also_carry_tool_result(self) -> None:
         @tool(description="Always fails.")
