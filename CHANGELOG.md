@@ -12,30 +12,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Public streaming + `should_finalize` contracts for `final_turn_only`
   (#174).** Previously source-only behaviors are now documented, stated in
   docstrings, and pinned by dedicated contract tests
-  (`tests/agent/test_structured_streaming_contract.py`):
-  - The synthesis call never streams — its JSON arrives only on the terminal
-    `AgentResult`; `structured_synthesis_start` fires iff a synthesis call is
-    made.
-  - New `StreamChunk(event="structured_reuse")`: fired when the converged
-    loop answer validates and is reused — the just-streamed loop chunks WERE
-    the structured answer, so chat surfaces can convert/retract the bubble.
-  - `should_finalize(messages, text)` message-view contract documented: TOOL
-    messages always carry `tool_name` and `tool_result`; `tool_call_id` only
-    for native tool-calling providers.
+  (`tests/agent/test_structured_streaming_contract.py`). The contract covers
+  all consumption surfaces: `astream()` chunks, the `stream_handler`
+  callback in `run()`/`arun()`, and the `selectools.serve` SSE stream:
+  - The synthesis turn never streams — not as chunks and not through
+    `stream_handler`; its JSON arrives only on the terminal `AgentResult`.
+    `structured_synthesis_start` fires once per run when the synthesis turn
+    begins (validation retries within the turn do not re-emit it).
+  - New `StreamChunk(event="structured_reuse")`: fired (outside
+    `single_pass`) when the converged loop answer validates and is reused —
+    the just-streamed loop chunks WERE the structured answer, so chat
+    surfaces can convert/retract the bubble.
+  - The serve SSE endpoint forwards content-free event chunks as
+    `{"type": "event", "event": ...}` records (previously dropped).
+  - `should_finalize(messages, text)` message-view contract documented:
+    executor-appended TOOL messages always carry `tool_name`;
+    `tool_result` carries the result text for successful executions and is
+    `None` for errors/policy denials — the supported discriminator for
+    "this tool produced a real result". `tool_call_id` only for native
+    tool-calling providers.
 
 ### Changed
 
-- **`single_pass` + `astream()` no longer streams the structured answer as
-  content chunks** — content is suppressed (it is the JSON envelope by
-  construction when the schema rides on every loop call); tool-call chunks
-  still stream. Migration: read the answer from `AgentResult.parsed` /
-  `.content` instead of accumulating content chunks. (#174)
-- **`Message.tool_result` is now always populated on TOOL messages** —
-  success, error, and policy-denial results all carry the text the model saw
-  (previously error/denial messages had `tool_result=None`). Sessions
-  persisted by older versions are normalized on load in `Message.from_dict`.
-  If you used `tool_result is None` to detect failed tools, match on the
-  `Error executing tool` / denial message text instead. (#174)
+- **`single_pass` structured output no longer streams the answer** (beta
+  surface): in `astream()` content chunks are suppressed and in
+  `run()`/`arun()` the `stream_handler` callback is not invoked for
+  single_pass loop turns or the synthesis turn — content on those calls is
+  the JSON envelope by construction. Tool-call chunks still stream
+  (including on providers without native async streaming, which previously
+  emitted no tool-call chunks at all). Migration: read the answer from
+  `AgentResult.parsed` / `.content` instead of accumulating streamed
+  content. (#174)
 
 ## [1.2.0] - 2026-07-14 — Tool-Boundary Guardrails Complete & Structured Synthesis Follow-ups
 

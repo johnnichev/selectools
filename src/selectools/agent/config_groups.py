@@ -216,18 +216,22 @@ class StructuredOutputConfig:
 
             ``messages`` contract (public, tested — issue #174): the run's
             conversation view at convergence, in chronological order —
-            prior history (when memory is configured, including restored
-            sessions), this turn's USER message(s), the ASSISTANT messages
+            prior history (when memory is configured), possible
+            ``Role.SYSTEM`` context injections (summaries, entity/knowledge
+            memory), this turn's USER message(s), the ASSISTANT messages
             that requested tools, and one ``Message(role=TOOL)`` per
-            executed tool. On every TOOL message, ``tool_name`` and
-            ``tool_result`` are ALWAYS populated (``tool_result`` equals
-            the result text the model saw — success, error, or policy
-            denial; legacy persisted messages are normalized on load).
-            ``tool_call_id`` is populated for native tool-calling providers
-            but is ``None`` for text-parsed tool calls — key by it only if
-            you know your provider supplies ids. Treat the messages as
-            read-only; mutating the list itself is harmless. Default: None
-            (always finalize, the v1.1 behavior).
+            executed tool. On executor-appended TOOL messages,
+            ``tool_name`` is always populated and ``tool_result`` carries
+            the result text for SUCCESSFUL executions while staying
+            ``None`` for errors and policy/coherence denials (whose
+            ``content`` carries the error text) — ``tool_result is not
+            None`` is the supported test for "this tool produced a real
+            result". Caller-seeded TOOL messages keep whatever fields the
+            caller set. ``tool_call_id`` is populated for native
+            tool-calling providers but is ``None`` for text-parsed tool
+            calls. Treat the messages as read-only; mutating the list
+            itself is harmless. Default: None (always finalize, the v1.1
+            behavior).
         single_pass: In ``final_turn_only`` mode with a provider that
             advertises ``supports_native_structured_output_with_tools``
             (OpenAI/Azure), carry the schema natively on the loop calls so

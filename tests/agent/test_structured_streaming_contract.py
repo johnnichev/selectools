@@ -11,8 +11,10 @@ contract — a refactor that breaks them breaks integrators:
    ``StreamChunk(event="structured_reuse")`` signals that those chunks WERE
    the structured answer.
 2. ``should_finalize(messages, last_response_text)`` receives the run's
-   conversation view at convergence, including this turn's TOOL messages
-   with ``tool_name`` and ``tool_result`` populated.
+   conversation view at convergence, including this turn's TOOL messages:
+   ``tool_name`` always populated; ``tool_result`` populated for successful
+   executions and ``None`` for errors/policy denials (the structural
+   failure discriminator).
 """
 
 from __future__ import annotations
@@ -148,11 +150,14 @@ class TestStreamingContract:
         assert JSON_ANSWER in streamed, "reuse-path answer streams as loop output"
         assert result is not None and result.parsed == {"answer": "42"}
 
-        # Case C: single_pass -> no synthesis call -> no event
+        # Case C: single_pass -> no synthesis call -> no synthesis event, and
+        # no structured_reuse either (content was suppressed; nothing
+        # streamed needs converting)
         provider = NativeWithToolsProvider([_tool_call_message(), JSON_ANSWER])
         agent = _agent(provider, single_pass=True)
         chunks, _ = await _collect(agent, response_format=SCHEMA)
         assert all(c.event != "structured_synthesis_start" for c in chunks)
+        assert all(c.event != "structured_reuse" for c in chunks)
 
     @pytest.mark.asyncio
     async def test_event_chunks_carry_no_content(self) -> None:
@@ -219,9 +224,9 @@ class TestShouldFinalizeMessagesContract:
 
 
 class TestToolResultFieldInvariant:
-    def test_every_tool_message_in_history_has_tool_result(self) -> None:
-        """The invariant behind the predicate contract: TOOL messages always
-        carry tool_result (defaulting to their content)."""
+    def test_every_successful_tool_message_has_tool_result(self) -> None:
+        """The invariant behind the predicate contract: successful executions
+        always populate tool_result; failures keep it None (tested below)."""
         first = Message(
             role=Role.ASSISTANT,
             content="",
@@ -279,21 +284,22 @@ class TestToolResultFieldInvariant:
         tool_msgs = [m for m in agent._history if m.role == Role.TOOL]
         assert tool_msgs, "the denial must still produce a TOOL message"
         for m in tool_msgs:
-            assert m.tool_result is not None, "policy denials must populate tool_result"
+            assert m.tool_result is None, "denials keep the None failure marker"
+            assert m.content, "the denial text lives on content"
 
-    def test_legacy_persisted_tool_messages_normalized_on_load(self) -> None:
-        """Sessions saved before v1.2.x stored tool_result=None on error
-        TOOL messages; from_dict must normalize so the contract holds for
-        restored histories."""
-        legacy = {
+    def test_from_dict_round_trip_preserves_none_marker(self) -> None:
+        """from_dict is @stable: the None failure marker must survive the
+        to_dict/from_dict round-trip unaltered (no silent rewriting)."""
+        persisted = {
             "role": "tool",
             "content": "Error executing tool 'x': boom",
             "tool_name": "x",
             "tool_result": None,
             "tool_call_id": "t1",
         }
-        restored = Message.from_dict(legacy)
-        assert restored.tool_result == "Error executing tool 'x': boom"
+        restored = Message.from_dict(persisted)
+        assert restored.tool_result is None
+        assert restored.to_dict()["tool_result"] is None
 
     def test_error_tool_messages_also_carry_tool_result(self) -> None:
         @tool(description="Always fails.")
@@ -311,4 +317,62 @@ class TestToolResultFieldInvariant:
         tool_msgs = [m for m in agent._history if m.role == Role.TOOL]
         assert tool_msgs
         for m in tool_msgs:
-            assert m.tool_result is not None, "error results must also populate tool_result"
+            assert m.tool_result is None, "errors keep the None failure marker"
+            assert "boom" in m.content, "the error text lives on content"
+
+
+class TestStreamHandlerSuppression:
+    """run()/arun() stream_handler is the second streaming surface — the
+    synthesis turn and single_pass loop turns must never feed it JSON."""
+
+    def _streaming_agent(self, provider: Any, **structured: Any) -> Agent:
+        return Agent(
+            [lookup],
+            provider=provider,
+            config=AgentConfig(
+                model="fake-model",
+                stream=True,  # the handler channel is only live in stream mode
+                structured_output=StructuredOutputConfig(final_turn_only=True, **structured),
+            ),
+        )
+
+    def test_run_synthesis_never_reaches_stream_handler(self) -> None:
+        seen: List[str] = []
+        # (SharedFakeProvider.stream() yields content only, so the scenario
+        # converges on the first turn and then synthesizes.)
+        provider = SharedFakeProvider(["prose answer", JSON_ANSWER])
+        agent = self._streaming_agent(provider)
+        result = agent.run("go", response_format=SCHEMA, stream_handler=seen.append)
+        assert result.parsed == {"answer": "42"}
+        assert any("prose answer" in t for t in seen), "loop prose still streams to handler"
+        assert not any(JSON_ANSWER in t for t in seen), "synthesis JSON leaked to handler"
+
+    @pytest.mark.asyncio
+    async def test_arun_single_pass_never_invokes_handler_with_content(self) -> None:
+        seen: List[str] = []
+        provider = NativeWithToolsProvider([_tool_call_message(), JSON_ANSWER])
+        agent = self._streaming_agent(provider, single_pass=True)
+        result = await agent.arun("go", response_format=SCHEMA, stream_handler=seen.append)
+        assert result.parsed == {"answer": "42"}
+        assert not any("answer" in t for t in seen), f"JSON leaked to handler: {seen!r}"
+
+
+class TestNonStreamingProviderFallback:
+    @pytest.mark.asyncio
+    async def test_single_pass_fallback_still_yields_tool_call_chunks(self) -> None:
+        """Providers without native async streaming route astream() through
+        the acomplete fallback; the contract's 'tool-call chunks still
+        stream' must hold there too."""
+
+        # NB: supports_streaming must go through the constructor —
+        # SharedFakeProvider.__init__ sets an instance attribute that would
+        # shadow a subclass class attribute.
+        provider = NativeWithToolsProvider(
+            [_tool_call_message(), JSON_ANSWER], supports_streaming=False
+        )
+        agent = _agent(provider, single_pass=True)
+        chunks, result = await _collect(agent, response_format=SCHEMA)
+        assert any(c.tool_calls for c in chunks), "fallback path must yield tool-call chunks"
+        streamed = "".join(c.content or "" for c in chunks)
+        assert "answer" not in streamed
+        assert result is not None and result.parsed == {"answer": "42"}

@@ -1681,8 +1681,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     "on_iteration_start", ctx.run_id, ctx.iteration, self._history
                 )
 
+                # The synthesis turn and single_pass loop turns carry the
+                # structured JSON — never feed it to the token callback
+                # (same contract as astream chunk suppression, #174).
+                _suppress_handler = ctx.structured_final_pending or ctx.single_pass_active
                 response_msg = self._call_provider(
-                    stream_handler=stream_handler,
+                    stream_handler=None if _suppress_handler else stream_handler,
                     trace=ctx.trace,
                     run_id=ctx.run_id,
                     **self._structured_call_kwargs(ctx),
@@ -2134,6 +2138,10 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         full_content = _response_content
                         if response_msg.tool_calls:
                             current_tool_calls = response_msg.tool_calls
+                            # Mirror the native-astream path: tool-call
+                            # activity always streams, even when content is
+                            # suppressed (single_pass contract, #174).
+                            yield StreamChunk(tool_calls=current_tool_calls)
                     else:
                         # BUG-33: wrap provider.astream() generator in aclosing so
                         # that a guardrail raise, validation failure, or caller
@@ -2542,8 +2550,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     "on_iteration_start", ctx.run_id, ctx.iteration, self._history
                 )
 
+                # The synthesis turn and single_pass loop turns carry the
+                # structured JSON — never feed it to the token callback
+                # (same contract as astream chunk suppression, #174).
+                _suppress_handler = ctx.structured_final_pending or ctx.single_pass_active
                 response_msg = await self._acall_provider(
-                    stream_handler=stream_handler,
+                    stream_handler=None if _suppress_handler else stream_handler,
                     trace=ctx.trace,
                     run_id=ctx.run_id,
                     **self._structured_call_kwargs(ctx),
