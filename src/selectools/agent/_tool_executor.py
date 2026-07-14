@@ -58,7 +58,6 @@ def _get_parallel_dispatch_executor() -> ThreadPoolExecutor:
 
 from .._async_utils import run_in_executor_copyctx
 from ..coherence import acheck_coherence, check_coherence
-from ..guardrails import GuardrailError
 from ..policy import ApprovalRequest, PolicyDecision, PolicyResult
 from ..security import screen_output as screen_tool_output
 from ..trace import StepType, TraceStep
@@ -862,6 +861,11 @@ class _ToolExecutorMixin:
             cached_entry = self._check_tool_cache(tool, parameters)
             if cached_entry is not None:
                 raw, compressed = cached_entry
+                # Guardrails run on cache hits too — an entry written before
+                # a guardrail was configured must not bypass the stage.
+                guarded = self._run_tool_result_guardrails(tool_name, raw, trace, run_ctx=run_ctx)
+                if guarded != raw:
+                    raw, compressed = guarded, None
                 return _Result(
                     tc, raw, False, 0.0, tool, 0, cached=True, cached_compressed=compressed
                 )
@@ -887,8 +891,10 @@ class _ToolExecutorMixin:
             try:
                 result = self._execute_tool_with_timeout(tool, parameters, chunk_cb)
                 result = self._screen_tool_result(tool_name, result)
-                result = self._run_tool_result_guardrails(tool_name, result, trace)
+                # Cache the pre-guardrail value: guardrails run at use time
+                # (fresh AND cached), so config changes apply retroactively.
                 self._store_tool_cache(tool, parameters, result)
+                result = self._run_tool_result_guardrails(tool_name, result, trace, run_ctx=run_ctx)
                 dur = time.time() - start
                 if run_id:
                     self._notify_observers(
@@ -900,10 +906,6 @@ class _ToolExecutorMixin:
                         dur * 1000,
                     )
                 return _Result(tc, result, False, dur, tool, chunk_counter["count"])
-            except GuardrailError:
-                # block action is a policy decision, not a tool failure —
-                # propagate like the other guardrail stages do.
-                raise
             except Exception as exc:
                 dur = time.time() - start
                 if run_id:
@@ -1109,6 +1111,13 @@ class _ToolExecutorMixin:
             cached_entry = self._check_tool_cache(tool, parameters)
             if cached_entry is not None:
                 raw, compressed = cached_entry
+                # Guardrails run on cache hits too — an entry written before
+                # a guardrail was configured must not bypass the stage.
+                guarded = await self._arun_tool_result_guardrails(
+                    tool_name, raw, trace, run_ctx=run_ctx
+                )
+                if guarded != raw:
+                    raw, compressed = guarded, None
                 return _Result(
                     tc, raw, False, 0.0, tool, 0, cached=True, cached_compressed=compressed
                 )
@@ -1136,8 +1145,12 @@ class _ToolExecutorMixin:
             try:
                 result = await self._aexecute_tool_with_timeout(tool, parameters, chunk_cb)
                 result = self._screen_tool_result(tool_name, result)
-                result = await self._arun_tool_result_guardrails(tool_name, result, trace)
+                # Cache the pre-guardrail value: guardrails run at use time
+                # (fresh AND cached), so config changes apply retroactively.
                 self._store_tool_cache(tool, parameters, result)
+                result = await self._arun_tool_result_guardrails(
+                    tool_name, result, trace, run_ctx=run_ctx
+                )
                 dur = time.time() - start
                 if run_id:
                     self._notify_observers(
@@ -1157,10 +1170,6 @@ class _ToolExecutorMixin:
                         dur * 1000,
                     )
                 return _Result(tc, result, False, dur, tool, chunk_counter["count"])
-            except GuardrailError:
-                # block action is a policy decision, not a tool failure —
-                # propagate like the other guardrail stages do.
-                raise
             except Exception as exc:
                 dur = time.time() - start
                 if run_id:
@@ -1448,6 +1457,13 @@ class _ToolExecutorMixin:
         cached_entry = self._check_tool_cache(tool, parameters)
         if cached_entry is not None:
             cached_raw, cached_compressed = cached_entry
+            # Guardrails run on cache hits too — an entry written before a
+            # guardrail was configured must not bypass the stage.
+            guarded = self._run_tool_result_guardrails(
+                tool_name, cached_raw, ctx.trace, run_ctx=ctx
+            )
+            if guarded != cached_raw:
+                cached_raw, cached_compressed = guarded, None
             ctx.trace.add(
                 TraceStep(
                     type=StepType.CACHE_HIT,
@@ -1486,15 +1502,15 @@ class _ToolExecutorMixin:
 
             result = self._execute_tool_with_timeout(tool, parameters, chunk_callback)
             result = self._screen_tool_result(tool_name, result)
-            result = self._run_tool_result_guardrails(tool_name, result, ctx.trace)
+            # Cache the pre-guardrail value: guardrails run at use time
+            # (fresh AND cached), so config changes apply retroactively.
+            self._store_tool_cache(tool, parameters, result)
+            result = self._run_tool_result_guardrails(tool_name, result, ctx.trace, run_ctx=ctx)
             duration = time.time() - start_time
 
             self._notify_observers(
                 "on_tool_end", ctx.run_id, call_id, tool_name, result, duration * 1000
             )
-
-            # Store in tool result cache
-            self._store_tool_cache(tool, parameters, result)
 
             ctx.trace.add(
                 TraceStep(
@@ -1528,10 +1544,6 @@ class _ToolExecutorMixin:
                     self.usage.tool_tokens.get(tool.name, 0) + parent_usage.total_tokens
                 )
 
-        except GuardrailError:
-            # block action is a policy decision, not a tool failure —
-            # propagate like the other guardrail stages do.
-            raise
         except Exception as exc:
             duration = time.time() - start_time
             self._notify_observers(
@@ -1689,6 +1701,13 @@ class _ToolExecutorMixin:
         cached_entry = self._check_tool_cache(tool, parameters)
         if cached_entry is not None:
             cached_raw, cached_compressed = cached_entry
+            # Guardrails run on cache hits too — an entry written before a
+            # guardrail was configured must not bypass the stage.
+            guarded = await self._arun_tool_result_guardrails(
+                tool_name, cached_raw, ctx.trace, run_ctx=ctx
+            )
+            if guarded != cached_raw:
+                cached_raw, cached_compressed = guarded, None
             ctx.trace.add(
                 TraceStep(
                     type=StepType.CACHE_HIT,
@@ -1730,7 +1749,12 @@ class _ToolExecutorMixin:
 
             result = await self._aexecute_tool_with_timeout(tool, parameters, chunk_callback)
             result = self._screen_tool_result(tool_name, result)
-            result = await self._arun_tool_result_guardrails(tool_name, result, ctx.trace)
+            # Cache the pre-guardrail value: guardrails run at use time
+            # (fresh AND cached), so config changes apply retroactively.
+            self._store_tool_cache(tool, parameters, result)
+            result = await self._arun_tool_result_guardrails(
+                tool_name, result, ctx.trace, run_ctx=ctx
+            )
             duration = time.time() - start_time
 
             self._notify_observers(
@@ -1739,9 +1763,6 @@ class _ToolExecutorMixin:
             await self._anotify_observers(
                 "on_tool_end", ctx.run_id, call_id, tool_name, result, duration * 1000
             )
-
-            # Store in tool result cache
-            self._store_tool_cache(tool, parameters, result)
 
             ctx.trace.add(
                 TraceStep(
@@ -1775,10 +1796,6 @@ class _ToolExecutorMixin:
                     self.usage.tool_tokens.get(tool.name, 0) + parent_usage.total_tokens
                 )
 
-        except GuardrailError:
-            # block action is a policy decision, not a tool failure —
-            # propagate like the other guardrail stages do.
-            raise
         except Exception as exc:
             duration = time.time() - start_time
             self._notify_observers(

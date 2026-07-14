@@ -111,6 +111,8 @@ User Message → Input Guardrails → LLM Call → Output Guardrails → Respons
 
 ## Tool-Args Guardrails
 
+**Since: v1.1.0**
+
 Output guardrails only inspect the model's free-text content. Anything the
 model carries via a **native tool call** — structured payloads, user-facing
 data inside arguments — never flows through them. The `tool_args` stage closes
@@ -147,6 +149,8 @@ by the text `ToolCallParser` fallback. It is fully opt-in: an empty
 
 ## Tool-Results Guardrails
 
+**Since: v1.2.0**
+
 `tool_args` gates what goes INTO a tool; `tool_results` gates what comes OUT.
 A tool that fetches web content, calls an external API, or retrieves RAG
 chunks returns text that flows straight back into the model's context — PII,
@@ -167,14 +171,27 @@ config = AgentConfig(
 
 - Tool results are plain strings, so guardrails receive them as-is (no JSON
   round-trip).
-- `rewrite` replaces the result the model sees; the sanitized value is also
-  what gets stored in the tool-result cache.
-- `block` raises `GuardrailError` and aborts the run — it is a policy
-  decision, not a tool failure, so it propagates instead of degrading into an
-  `Error executing tool` message the model keeps iterating on.
-- Runs after prompt-injection screening (`screen_tool_output`) and before
-  caching/compression, across single and parallel execution in `run()`,
-  `arun()`, and `astream()`.
+- `rewrite` replaces the result the model sees.
+- `block` aborts the run with a `GuardrailError` — but WITHOUT corrupting
+  conversation state: the blocked content is first replaced with a
+  `[Tool result blocked by guardrail ...]` marker so every tool_call gets a
+  TOOL result in history/memory (no dangling tool_call to 400 the next
+  turn), terminal observer events (`on_tool_end`) fire with the marker,
+  parallel siblings' results are recorded, and only then — once the whole
+  tool batch is processed — does the loop raise. The blocked content itself
+  never reaches the model, observers, or memory.
+- Guardrails run at **use time**: on fresh results after prompt-injection
+  screening, AND on every tool-result **cache hit** — so adding a guardrail
+  applies retroactively to entries cached before it existed. The cache
+  stores the pre-guardrail (screened) value.
+- Streaming caveat: tools that stream deliver chunks via `on_tool_chunk`
+  BEFORE the guardrail runs on the aggregated result. The model, history,
+  and cache only ever see the guarded value, but chunk-callback consumers
+  (e.g. a live UI) receive raw output — do not surface `on_tool_chunk`
+  content to end users if a `tool_results` guardrail is your only
+  containment.
+- Covers single and parallel execution in `run()`, `arun()`, and
+  `astream()`.
 
 Together the four stages close the loop: `input` and `output` gate the
 conversation surface, `tool_args` and `tool_results` gate both directions of

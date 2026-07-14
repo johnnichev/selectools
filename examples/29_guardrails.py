@@ -151,4 +151,29 @@ result = agent.ask("Search for something")
 print(f"  Response length capped: {len(result.content)} chars")
 
 
+# ── 7. Tool-boundary guardrails (v1.1/v1.2) ────────────────────────────
+
+print("\n" + "=" * 60)
+print("7. Tool-Boundary Guardrails (tool_args + tool_results)")
+print("=" * 60)
+
+pipeline = GuardrailsPipeline(
+    # Gate what goes INTO tools (v1.1.0): arguments are JSON-serialized
+    # and run through the chain before the tool executes.
+    tool_args=[PIIGuardrail(action=GuardrailAction.REWRITE)],
+    # Gate what comes OUT of tools (v1.2.0): return values are guarded
+    # before they re-enter the model context (fresh AND cached results).
+    tool_results=[LengthGuardrail(max_chars=2000, action=GuardrailAction.REWRITE)],
+)
+
+agent = Agent(
+    tools=[search],
+    provider=LocalProvider(),
+    config=AgentConfig(guardrails=pipeline, max_iterations=2),
+)
+
+result = agent.ask("Search for john@example.com")
+print("  Tool args were PII-redacted and tool results length-bounded.")
+
+
 print("\n✅ All guardrail examples complete!")

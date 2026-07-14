@@ -41,8 +41,11 @@ class GuardrailsPipeline:
             ``tool_args`` gates what goes INTO a tool, this gates what comes
             OUT (external API responses, retrieved chunks, oversized blobs).
             Tool results are plain strings, so guardrails receive them as-is;
-            ``rewrite`` replaces the result, ``block`` raises
-            :class:`GuardrailError` before the result reaches history.
+            ``rewrite`` replaces the result. ``block`` contains the content
+            (a blocked marker replaces it so history/memory stay coherent)
+            and the agent loop raises :class:`GuardrailError` once the tool
+            batch has been processed. Also applied to tool-result cache
+            hits.
     """
 
     input: List[Guardrail] = field(default_factory=list)
@@ -127,15 +130,11 @@ class GuardrailsPipeline:
         Raises:
             GuardrailError: If any guardrail with ``action=block`` fails.
         """
-        if not self.tool_results:
-            return result, None
         chain_result = self._run_chain(self.tool_results, result)
         return chain_result.content, chain_result.guardrail_name
 
     async def acheck_tool_result(self, result: str) -> Tuple[str, Optional[str]]:
         """Async version of :meth:`check_tool_result`."""
-        if not self.tool_results:
-            return result, None
         chain_result = await self._arun_chain(self.tool_results, result)
         return chain_result.content, chain_result.guardrail_name
 
