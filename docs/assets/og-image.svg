@@ -46,7 +46,7 @@
   <!-- v1.0 stable badge -->
   <rect x="510" y="237" width="152" height="40" rx="20" fill="none" stroke="#22d3ee" stroke-width="2"/>
   <text x="586" y="263" text-anchor="middle" font-family="'Plus Jakarta Sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
-        font-weight="700" font-size="19" fill="#22d3ee">v1.2 &#183; STABLE</text>
+        font-weight="700" font-size="19" fill="#22d3ee">v1.3 &#183; STABLE</text>
 
   <!-- Tagline -->
   <text x="80" y="318" font-family="'Plus Jakarta Sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"

@@ -64,7 +64,7 @@
   <rect x="788" y="438" width="10" height="20" fill="#22d3ee"/>
 
   <!-- Bottom-left meta -->
-  <text x="100" y="530" font-family="JetBrains Mono, ui-monospace, Menlo, monospace" font-size="12" fill="#64748b">v1.2.0 · Apache-2.0 · 9 providers · OpenAI · Anthropic · Gemini · Ollama · LiteLLM</text>
+  <text x="100" y="530" font-family="JetBrains Mono, ui-monospace, Menlo, monospace" font-size="12" fill="#64748b">v1.3.0 · Apache-2.0 · 9 providers · OpenAI · Anthropic · Gemini · Ollama · LiteLLM</text>
 
   <!-- Bottom-right wordmark glyph -->
   <text x="1095" y="528" text-anchor="end" font-family="JetBrains Mono, ui-monospace, Menlo, monospace" font-size="18" font-weight="700" fill="#22d3ee">[•] selectools</text>

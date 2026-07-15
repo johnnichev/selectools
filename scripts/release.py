@@ -68,6 +68,21 @@ class ReleaseManager:
         self.changelog_path.write_text("\n".join(lines))
         print(f"✓ Updated CHANGELOG.md with version {version}")
 
+    def sync_marketing_version(self) -> None:
+        """Bump README banner + landing + OG-card version strings to match.
+
+        The CI ``sync_marketing_version.py --check`` step fails the build on
+        drift, so this keeps a release from tripping its own gate. The OG
+        *PNG* still needs a manual re-render (``render_og_image.py``); the
+        script prints that reminder.
+        """
+        script = self.repo_root / "scripts" / "sync_marketing_version.py"
+        if not script.exists():
+            print("⚠ sync_marketing_version.py not found, skipping marketing sync")
+            return
+        subprocess.run([sys.executable, str(script)], cwd=self.repo_root, check=True)
+        print("✓ Synced marketing-surface version strings")
+
     def run_command(self, cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
         """Run a shell command"""
         print(f"  Running: {' '.join(cmd)}")
@@ -206,6 +221,7 @@ class ReleaseManager:
         try:
             self.update_version(new_version)
             self.update_changelog(new_version, message)
+            self.sync_marketing_version()
             self.git_commit(new_version, message)
             self.git_tag(new_version)
             self.git_push(new_version)

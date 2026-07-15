@@ -49,4 +49,5 @@ Every feature MUST update all of these:
 - CHANGELOG.md lives at repo root — must be copied into `docs/` before build
 - Examples gallery (`landing/examples/index.html`) must be regenerated when examples are added or edited: `python scripts/build_examples_gallery.py > landing/examples/index.html`
 - Hardcoded counts (model count, test count, example count) appear across many files — audit all
+- **Marketing version strings** (README banner, landing status bar/footer, OG-card badges) are synced from `pyproject.toml` by `scripts/sync_marketing_version.py`. CI runs it with `--check` and fails on drift; the release flow (`release.py`) runs the write mode. After it bumps the OG **SVG**, re-render the PNG: `uv run --with playwright python scripts/render_og_image.py`.
 - `docs/ARCHITECTURE.md` must be updated when adding new components
