@@ -16,7 +16,7 @@ An open-source project from **[NichevLabs](https://nichevlabs.com)**.
 
 **Multi-agent orchestration in plain Python.** Build agent graphs, compose pipelines with `|`, deploy with one command. No DSL, no compile step, no paid debugger. Works with OpenAI, Anthropic, Gemini, and Ollama.
 
-> 🎉 **selectools is 1.0 — stable.** The public API is frozen; `@stable` symbols carry a 2-minor compatibility promise. Python 3.10+. Latest: [v1.2](#whats-new-in-v12) — four-stage guardrails, native structured output, and observability events.
+> 🎉 **selectools is 1.0 — stable.** The public API is frozen; `@stable` symbols carry a 2-minor compatibility promise. Python 3.10+. Latest: [v1.3](#whats-new-in-v13) — tested public streaming contracts for structured-output chat agents.
 
 ### 3 Ways to Build
 
@@ -31,6 +31,17 @@ result = AgentGraph.chain(planner, writer, reviewer).run("Write a blog post")
 # 3. Deploy — 1 command
 # selectools serve agent.yaml
 ```
+
+## What's New in v1.3
+
+### v1.3.0 — Streaming Contracts
+
+Makes `final_turn_only` structured output safe to rely on in streaming chat agents. Behaviors that integrators previously had to learn from the source are now **documented, tested public contracts** — enforced on every consumption surface: `astream()` chunks, the `stream_handler` callback, and the `selectools.serve` SSE stream.
+
+- **The synthesis turn never streams** — its JSON arrives only on the terminal `AgentResult` (`.content` / `.parsed`), never as chunks or through `stream_handler`. `StreamChunk(event="structured_synthesis_start")` fires once when the synthesis turn begins so clients can show a pending state.
+- **`single_pass` no longer streams the structured answer** (*Changed*, `@beta` surface) — content is suppressed since it's the JSON envelope by construction; tool-call chunks still stream for activity display. Read the answer from `AgentResult.parsed`.
+- **New `StreamChunk(event="structured_reuse")`** — when the converged loop answer validates and is reused, the just-streamed chunks WERE the answer; this signal lets a chat surface convert or retract the bubble. The serve SSE endpoint forwards event chunks as `{"type": "event", ...}`.
+- **`should_finalize` message contract** — the predicate's `messages` view is documented: TOOL messages always carry `tool_name`, and `tool_result` holds the result text for successful runs while staying `None` for errors/denials (the supported failure discriminator).
 
 ## What's New in v1.2
 
