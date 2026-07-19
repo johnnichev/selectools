@@ -16,10 +16,10 @@ from typing import Optional
 from .._ssrf import validate_url as _validate_url
 from ..stability import stable
 from ..tools import tool
+from ._http import USER_AGENT
 
 _MAX_OUTPUT_BYTES = 10 * 1024  # 10 KB
 _DEFAULT_TIMEOUT = 15
-_USER_AGENT = "Mozilla/5.0 (compatible; selectools/0.21; +https://github.com/johnnichev/selectools)"
 
 
 def _truncate(text: str, max_bytes: int = _MAX_OUTPUT_BYTES) -> str:
@@ -67,7 +67,7 @@ def web_search(query: str, num_results: int = 5) -> str:
         encoded_query = urllib.parse.urlencode({"q": query})
         url = f"https://html.duckduckgo.com/html/?{encoded_query}"
 
-        req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(req, timeout=_DEFAULT_TIMEOUT) as resp:
             raw_html = resp.read().decode("utf-8", errors="replace")
 
@@ -149,7 +149,7 @@ def scrape_url(url: str, selector: Optional[str] = None) -> str:
         return ssrf_error
 
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(req, timeout=_DEFAULT_TIMEOUT) as resp:
             content_type = resp.headers.get("Content-Type", "")
             raw = resp.read().decode("utf-8", errors="replace")

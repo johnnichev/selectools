@@ -18,9 +18,9 @@ from typing import Any, Dict, Optional
 
 from ..stability import stable
 from ..tools import tool
+from ._http import DEFAULT_TIMEOUT
 
 _API_URL = "https://api.linear.app/graphql"
-_DEFAULT_TIMEOUT = 30
 _MISSING_DEP_ERROR = "Error: 'requests' library not installed. Run: pip install selectools[toolbox]"
 _MISSING_KEY_ERROR = (
     "Error: No Linear API key provided. Pass api_key or set the LINEAR_API_KEY env var."
@@ -46,7 +46,7 @@ def _graphql(api_key: str, query: str, variables: Dict[str, Any]) -> Any:
         _API_URL,
         headers={"Authorization": api_key, "Content-Type": "application/json"},
         data=json.dumps({"query": query, "variables": variables}),
-        timeout=_DEFAULT_TIMEOUT,
+        timeout=DEFAULT_TIMEOUT,
     )
     return response.status_code, response.json()
 

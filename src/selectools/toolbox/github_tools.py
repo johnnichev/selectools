@@ -17,10 +17,10 @@ from typing import Any
 
 from ..stability import stable
 from ..tools import tool
+from ._http import USER_AGENT
 
 _API_BASE = "https://api.github.com"
 _DEFAULT_TIMEOUT = 15
-_USER_AGENT = "Mozilla/5.0 (compatible; selectools/0.21; +https://github.com/johnnichev/selectools)"
 
 
 def _github_request(path: str, params: dict[str, str] | None = None) -> Any:
@@ -38,7 +38,7 @@ def _github_request(path: str, params: dict[str, str] | None = None) -> Any:
 
     headers: dict[str, str] = {
         "Accept": "application/vnd.github+json",
-        "User-Agent": _USER_AGENT,
+        "User-Agent": USER_AGENT,
     }
     token = os.environ.get("GITHUB_TOKEN", "")
     if token:
