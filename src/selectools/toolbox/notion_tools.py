@@ -19,10 +19,10 @@ from typing import Any, Dict, Optional
 
 from ..stability import stable
 from ..tools import tool
+from ._http import DEFAULT_TIMEOUT, format_api_error
 
 _API_BASE = "https://api.notion.com/v1"
 _NOTION_VERSION = "2022-06-28"
-_DEFAULT_TIMEOUT = 30
 _MISSING_DEP_ERROR = "Error: 'requests' library not installed. Run: pip install selectools[toolbox]"
 _MISSING_KEY_ERROR = (
     "Error: No Notion API key provided. Pass api_key or set the NOTION_API_KEY env var."
@@ -39,18 +39,6 @@ def _headers(api_key: str) -> Dict[str, str]:
 
 def _resolve_key(api_key: Optional[str]) -> str:
     return api_key or os.environ.get("NOTION_API_KEY", "")
-
-
-def _api_error(response: Any) -> str:
-    """Format a non-2xx Notion API response into a readable string."""
-    try:
-        payload = response.json()
-        message = payload.get("message", "")
-        code = payload.get("code", "")
-    except Exception:
-        message, code = "", ""
-    detail = f" ({code}: {message})" if code or message else ""
-    return f"Error: Notion API returned HTTP {response.status_code}{detail}"
 
 
 @stable
@@ -110,10 +98,10 @@ def notion_create_page(
             f"{_API_BASE}/pages",
             headers=_headers(key),
             data=json.dumps(payload),
-            timeout=_DEFAULT_TIMEOUT,
+            timeout=DEFAULT_TIMEOUT,
         )
         if response.status_code >= 400:
-            return _api_error(response)
+            return format_api_error("Notion", response)
 
         data = response.json()
         return f"Notion page created: '{title}' (id: {data.get('id', '?')}, url: {data.get('url', '?')})"
@@ -158,10 +146,10 @@ def notion_search(query: str, max_results: int = 5, api_key: Optional[str] = Non
             f"{_API_BASE}/search",
             headers=_headers(key),
             data=json.dumps({"query": query, "page_size": max_results}),
-            timeout=_DEFAULT_TIMEOUT,
+            timeout=DEFAULT_TIMEOUT,
         )
         if response.status_code >= 400:
-            return _api_error(response)
+            return format_api_error("Notion", response)
 
         results = response.json().get("results", [])
         if not results:
@@ -242,10 +230,10 @@ def notion_update_page(
             f"{_API_BASE}/pages/{page_id.strip()}",
             headers=_headers(key),
             data=json.dumps(payload),
-            timeout=_DEFAULT_TIMEOUT,
+            timeout=DEFAULT_TIMEOUT,
         )
         if response.status_code >= 400:
-            return _api_error(response)
+            return format_api_error("Notion", response)
 
         changes = []
         if title is not None:

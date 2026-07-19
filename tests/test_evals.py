@@ -896,6 +896,11 @@ class TestPIILeakEvaluator:
         failures = self.evaluator.check(case, cr)
         assert len(failures) == 1
 
+    def test_invalid_email_suffix_with_pipe_is_not_detected(self) -> None:
+        case = TestCase(input="x", expect_no_pii=True)
+        cr = _make_case_result(case, content="Contact john@example.|a")
+        assert self.evaluator.check(case, cr) == []
+
     def test_fail_credit_card(self) -> None:
         case = TestCase(input="x", expect_no_pii=True)
         cr = _make_case_result(case, content="Card: 4111-1111-1111-1111")

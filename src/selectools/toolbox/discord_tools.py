@@ -21,9 +21,9 @@ from typing import Any, Dict, Optional
 
 from ..stability import beta
 from ..tools import tool
+from ._http import DEFAULT_TIMEOUT, format_api_error
 
 _API_BASE = "https://discord.com/api/v10"
-_DEFAULT_TIMEOUT = 30
 _MISSING_DEP_ERROR = "Error: 'requests' library not installed. Run: pip install selectools[toolbox]"
 _MISSING_TOKEN_ERROR = (  # nosec B105 - user-facing error message, not a credential
     "Error: No Discord bot token provided. Pass token or set the DISCORD_BOT_TOKEN env var."
@@ -39,18 +39,6 @@ def _headers(token: str) -> Dict[str, str]:
         "Authorization": f"Bot {token}",
         "Content-Type": "application/json",
     }
-
-
-def _api_error(response: Any) -> str:
-    """Format a non-2xx Discord API response into a readable string."""
-    try:
-        payload = response.json()
-        message = payload.get("message", "")
-        code = payload.get("code", "")
-    except Exception:
-        message, code = "", ""
-    detail = f" ({code}: {message})" if code or message else ""
-    return f"Error: Discord API returned HTTP {response.status_code}{detail}"
 
 
 class _NonJSONResponse(Exception):
@@ -108,10 +96,10 @@ def discord_send_message(channel_id: str, text: str, token: Optional[str] = None
             f"{_API_BASE}/channels/{channel_id.strip()}/messages",
             headers=_headers(resolved),
             data=json.dumps({"content": text}),
-            timeout=_DEFAULT_TIMEOUT,
+            timeout=DEFAULT_TIMEOUT,
         )
         if response.status_code >= 400:
-            return _api_error(response)
+            return format_api_error("Discord", response)
 
         data = _json_or_raise(response)
         return f"Message sent to channel {channel_id} (id: {data.get('id', '?')})"
@@ -161,10 +149,10 @@ def discord_read_channel(channel_id: str, limit: int = 10, token: Optional[str] 
             f"{_API_BASE}/channels/{channel_id.strip()}/messages",
             headers=_headers(resolved),
             params={"limit": limit},
-            timeout=_DEFAULT_TIMEOUT,
+            timeout=DEFAULT_TIMEOUT,
         )
         if response.status_code >= 400:
-            return _api_error(response)
+            return format_api_error("Discord", response)
 
         messages = _json_or_raise(response)
         if not messages:

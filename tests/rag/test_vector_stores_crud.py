@@ -15,9 +15,11 @@ import tempfile
 from typing import List
 from unittest.mock import MagicMock, Mock, patch
 
+import numpy as np
 import pytest
 
 from selectools.rag import Document, SearchResult, VectorStore
+from selectools.rag.stores._numpy import cosine_numpy
 from selectools.rag.stores.memory import InMemoryVectorStore
 from selectools.rag.stores.sqlite import SQLiteVectorStore
 
@@ -73,6 +75,13 @@ def sample_documents() -> list[Document]:
 # ============================================================================
 # InMemoryVectorStore Tests
 # ============================================================================
+
+
+def test_cosine_numpy_handles_zero_norm_rows() -> None:
+    matrix = np.array([[1.0, 0.0], [0.0, 0.0]], dtype=np.float32)
+    query = np.array([1.0, 0.0], dtype=np.float32)
+
+    assert cosine_numpy(matrix, query).tolist() == pytest.approx([1.0, 0.0])
 
 
 class TestInMemoryVectorStore:
@@ -240,9 +249,8 @@ class TestInMemoryVectorStore:
         results = store.search([1.0] * 128, top_k=2)
 
         assert len(results) == 2
-        # Cosine similarity should be ~1.0 for identical vectors
-        assert results[0].score > 0.99
-        assert results[1].score > 0.99
+        assert results[0].score == pytest.approx(1.0)
+        assert results[1].score == pytest.approx(1.0)
 
     def test_top_k_limiting(self, mock_embedder: Mock) -> None:
         """Test that top_k properly limits results."""
@@ -277,6 +285,25 @@ class TestSQLiteVectorStore:
             assert store.embedder == mock_embedder
             assert store.db_path == db_path
             assert os.path.exists(db_path)
+        finally:
+            if os.path.exists(db_path):
+                os.remove(db_path)
+
+    def test_search_skips_zero_norm_embeddings(self, mock_embedder: Mock) -> None:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as f:
+            db_path = f.name
+
+        try:
+            store = SQLiteVectorStore(embedder=mock_embedder, db_path=db_path)
+            store.add_documents(
+                [Document(text="match", metadata={}), Document(text="zero", metadata={})],
+                embeddings=[[1.0, 0.0], [0.0, 0.0]],
+            )
+
+            results = store.search([1.0, 0.0], top_k=2)
+
+            assert [result.document.text for result in results] == ["match"]
+            assert results[0].score == pytest.approx(1.0)
         finally:
             if os.path.exists(db_path):
                 os.remove(db_path)

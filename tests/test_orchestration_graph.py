@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import pytest
 
 from selectools.exceptions import GraphExecutionError
-from selectools.orchestration.graph import AgentGraph, ErrorPolicy
+from selectools.orchestration.graph import AgentGraph, ErrorPolicy, _make_interrupt_checkpoint
 from selectools.orchestration.state import (
     STATE_KEY_LAST_OUTPUT,
     GraphEventType,
@@ -18,6 +20,21 @@ from selectools.orchestration.state import (
 # ------------------------------------------------------------------
 # Test helpers
 # ------------------------------------------------------------------
+
+
+class TestInterruptCheckpoint:
+    def test_uses_ephemeral_id_without_a_checkpoint_store(self) -> None:
+        state = GraphState.from_prompt("start")
+
+        assert _make_interrupt_checkpoint(None, "run-id", state, 3) == "run-id_3"
+
+    def test_persists_state_when_a_checkpoint_store_is_available(self) -> None:
+        state = GraphState.from_prompt("start")
+        store = MagicMock()
+        store.save.return_value = "checkpoint-id"
+
+        assert _make_interrupt_checkpoint(store, "run-id", state, 3) == "checkpoint-id"
+        store.save.assert_called_once_with("run-id", state, 3)
 
 
 def sync_fn_node(content: str):
