@@ -21,6 +21,7 @@ except ImportError as e:
     ) from e
 
 from ..vector_store import Document, SearchResult, VectorStore, _dedup_search_results
+from ._numpy import cosine_numpy
 
 
 @beta
@@ -204,7 +205,8 @@ class SQLiteVectorStore(VectorStore):
         if query_norm == 0:
             return []
 
-        results = []
+        documents = []
+        embeddings = []
         for row in rows:
             doc_id, text, metadata_json, embedding_json = row
             metadata = _safe_meta(metadata_json)
@@ -222,7 +224,15 @@ class SQLiteVectorStore(VectorStore):
             if doc_norm == 0:
                 continue
 
-            similarity = np.dot(embedding, query_vec) / (doc_norm * query_norm)
+            documents.append((text, metadata, embedding))
+            embeddings.append(embedding)
+
+        if not embeddings:
+            return []
+
+        similarities = cosine_numpy(np.array(embeddings, dtype=np.float32), query_vec)
+        results = []
+        for (text, metadata, embedding), similarity in zip(documents, similarities, strict=True):
             results.append(
                 SearchResult(
                     document=Document(text=text, metadata=metadata, embedding=embedding.tolist()),

@@ -72,6 +72,18 @@ if TYPE_CHECKING:
 _STATE_KEY_PENDING_INTERRUPT: str = "__pending_interrupt_key__"
 
 
+def _make_interrupt_checkpoint(
+    checkpoint_store: Optional["CheckpointStore"],
+    run_id: str,
+    state: GraphState,
+    step: int,
+) -> str:
+    """Persist an interrupted graph state or create its ephemeral checkpoint ID."""
+    if checkpoint_store:
+        return checkpoint_store.save(run_id, state, step)
+    return f"{run_id}_{step}"
+
+
 @stable
 class ErrorPolicy(str, Enum):
     """How the graph handles node execution errors.
@@ -672,10 +684,7 @@ class AgentGraph:
                         # parallel group through the same checkpoint/pause path
                         # used for non-parallel interrupts.
                         interrupt_key = state.metadata.get(_STATE_KEY_PENDING_INTERRUPT, "")
-                        if checkpoint_store:
-                            ckpt_id = checkpoint_store.save(run_id, state, step)
-                        else:
-                            ckpt_id = f"{run_id}_{step}"
+                        ckpt_id = _make_interrupt_checkpoint(checkpoint_store, run_id, state, step)
 
                         self._notify("on_graph_interrupt", run_id, current, ckpt_id)
                         self._trace_step(
@@ -714,10 +723,7 @@ class AgentGraph:
                         # non-subgraph interrupts. Mirrors the BUG-04 parallel
                         # interrupt propagation.
                         interrupt_key = state.metadata.get(_STATE_KEY_PENDING_INTERRUPT, "")
-                        if checkpoint_store:
-                            ckpt_id = checkpoint_store.save(run_id, state, step)
-                        else:
-                            ckpt_id = f"{run_id}_{step}"
+                        ckpt_id = _make_interrupt_checkpoint(checkpoint_store, run_id, state, step)
 
                         self._notify("on_graph_interrupt", run_id, current, ckpt_id)
                         self._trace_step(
@@ -759,10 +765,9 @@ class AgentGraph:
 
                             if interrupted:
                                 interrupt_key = state.metadata.get(_STATE_KEY_PENDING_INTERRUPT, "")
-                                if checkpoint_store:
-                                    ckpt_id = checkpoint_store.save(run_id, state, step)
-                                else:
-                                    ckpt_id = f"{run_id}_{step}"
+                                ckpt_id = _make_interrupt_checkpoint(
+                                    checkpoint_store, run_id, state, step
+                                )
 
                                 self._notify("on_graph_interrupt", run_id, current, ckpt_id)
                                 self._trace_step(
@@ -1002,10 +1007,7 @@ class AgentGraph:
                         # parallel group through the same checkpoint/pause
                         # path used for non-parallel interrupts.
                         interrupt_key = state.metadata.get(_STATE_KEY_PENDING_INTERRUPT, "")
-                        if checkpoint_store:
-                            ckpt_id = checkpoint_store.save(run_id, state, step)
-                        else:
-                            ckpt_id = f"{run_id}_{step}"
+                        ckpt_id = _make_interrupt_checkpoint(checkpoint_store, run_id, state, step)
                         self._notify("on_graph_interrupt", run_id, current, ckpt_id)
                         self._trace_step(
                             trace,
@@ -1037,10 +1039,7 @@ class AgentGraph:
                         # non-subgraph interrupts. Mirrors the BUG-04 parallel
                         # interrupt propagation.
                         interrupt_key = state.metadata.get(_STATE_KEY_PENDING_INTERRUPT, "")
-                        if checkpoint_store:
-                            ckpt_id = checkpoint_store.save(run_id, state, step)
-                        else:
-                            ckpt_id = f"{run_id}_{step}"
+                        ckpt_id = _make_interrupt_checkpoint(checkpoint_store, run_id, state, step)
                         self._notify("on_graph_interrupt", run_id, current, ckpt_id)
                         self._trace_step(
                             trace,
@@ -1075,10 +1074,7 @@ class AgentGraph:
 
                     if interrupted:
                         interrupt_key = state.metadata.get(_STATE_KEY_PENDING_INTERRUPT, "")
-                        if checkpoint_store:
-                            ckpt_id = checkpoint_store.save(run_id, state, step)
-                        else:
-                            ckpt_id = f"{run_id}_{step}"
+                        ckpt_id = _make_interrupt_checkpoint(checkpoint_store, run_id, state, step)
                         self._notify("on_graph_interrupt", run_id, current, ckpt_id)
                         self._trace_step(
                             trace,

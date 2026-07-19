@@ -24,6 +24,7 @@ from ..vector_store import (
     _dedup_search_results,
     _validate_filter,
 )
+from ._numpy import cosine_numpy
 
 
 @beta
@@ -161,14 +162,11 @@ class InMemoryVectorStore(VectorStore):
         # Compute cosine similarity on snapshot (no lock held during computation)
         query_vec = np.array(query_embedding, dtype=np.float32)
         query_norm = np.linalg.norm(query_vec)
-        doc_norms = np.linalg.norm(embeddings_snapshot, axis=1)
-
         # Avoid division by zero
         if query_norm == 0:
             return []
 
-        # Cosine similarity = dot product / (norm1 * norm2)
-        similarities = np.dot(embeddings_snapshot, query_vec) / (doc_norms * query_norm + 1e-8)
+        similarities = cosine_numpy(embeddings_snapshot, query_vec)
 
         # Over-fetch when filter or dedup is present to compensate for drops.
         fetch_k = min(top_k * 4, len(similarities)) if (filter or dedup) else top_k
