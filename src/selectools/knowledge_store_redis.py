@@ -13,8 +13,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from ._time import parse_iso
-from .knowledge import KnowledgeEntry
+from .knowledge import KnowledgeEntry, entry_from_jsonable, entry_to_jsonable
 from .stability import beta
 
 _logger = logging.getLogger(__name__)
@@ -56,36 +55,31 @@ class RedisKnowledgeStore:
 
     @staticmethod
     def _entry_to_dict(entry: KnowledgeEntry) -> Dict[str, str]:
-        return {
-            "id": entry.id,
-            "content": entry.content,
-            "category": entry.category,
-            "importance": str(entry.importance),
-            "persistent": "1" if entry.persistent else "0",
-            "ttl_days": str(entry.ttl_days) if entry.ttl_days is not None else "",
-            "created_at": entry.created_at.isoformat(),
-            "updated_at": entry.updated_at.isoformat(),
-            "metadata": json.dumps(entry.metadata),
-        }
+        """Flatten the shared mapping into the all-strings shape a Redis hash holds."""
+        data = entry_to_jsonable(entry)
+        data["importance"] = str(data["importance"])
+        data["persistent"] = "1" if data["persistent"] else "0"
+        data["ttl_days"] = "" if data["ttl_days"] is None else str(data["ttl_days"])
+        data["metadata"] = json.dumps(data["metadata"])
+        return {key: str(value) for key, value in data.items()}
 
     @staticmethod
     def _dict_to_entry(data: Dict[str, str]) -> KnowledgeEntry:
-        created_at = parse_iso(data["created_at"])
-        if created_at.tzinfo is None:
-            created_at = created_at.replace(tzinfo=timezone.utc)
-        updated_at = parse_iso(data["updated_at"])
-        if updated_at.tzinfo is None:
-            updated_at = updated_at.replace(tzinfo=timezone.utc)
-        return KnowledgeEntry(
-            id=data["id"],
-            content=data["content"],
-            category=data.get("category", "general"),
-            importance=float(data.get("importance", "0.5")),
-            persistent=data.get("persistent") == "1",
-            ttl_days=int(data["ttl_days"]) if data.get("ttl_days") else None,
-            created_at=created_at,
-            updated_at=updated_at,
-            metadata=json.loads(data.get("metadata", "{}")),
+        """Undo the string flattening, then defer to the shared deserializer.
+
+        Only the two fields the shared coercion cannot recover from a string
+        are pre-decoded: ``bool("0")`` is ``True``, and an absent ``ttl_days``
+        is stored as ``""`` rather than omitted.  ``importance`` and
+        ``metadata`` are left as strings — ``entry_from_jsonable`` coerces
+        both.
+        """
+        ttl_raw = data.get("ttl_days", "")
+        return entry_from_jsonable(
+            {
+                **data,
+                "persistent": data.get("persistent") == "1",
+                "ttl_days": ttl_raw if ttl_raw != "" else None,
+            }
         )
 
     # -- protocol methods --------------------------------------------------

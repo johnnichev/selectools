@@ -37,6 +37,7 @@ from typing import (
     Callable,
     Dict,
     List,
+    Mapping,
     Optional,
     Protocol,
     Sequence,
@@ -44,7 +45,7 @@ from typing import (
     runtime_checkable,
 )
 
-from ._time import parse_iso
+from ._time import ensure_aware, parse_iso
 from .knowledge_sanitizers import dedupe_against
 from .stability import beta, register_stability, stable
 
@@ -95,6 +96,78 @@ class KnowledgeEntry:
         if created.tzinfo is None:
             created = created.replace(tzinfo=timezone.utc)
         return datetime.now(timezone.utc) > created + timedelta(days=self.ttl_days)
+
+
+# ----------------------------------------------------------------------
+# Shared entry serialization
+# ----------------------------------------------------------------------
+
+_ENTRY_COLUMNS = (
+    "id",
+    "content",
+    "category",
+    "importance",
+    "persistent",
+    "ttl_days",
+    "created_at",
+    "updated_at",
+    "metadata",
+)
+"""Canonical field order, also the SQLite column order (see ``_init_db``)."""
+
+_COLUMN_LIST = ", ".join(_ENTRY_COLUMNS)
+_SELECT_ENTRY = f"SELECT {_COLUMN_LIST} FROM knowledge"  # nosec B608 - literal column names
+
+
+def entry_to_jsonable(entry: KnowledgeEntry) -> Dict[str, Any]:
+    """Render *entry* as the JSON-shaped mapping every backend serializes from.
+
+    ``metadata`` stays a dict so JSONB backends (Supabase) can hand it over
+    untouched; backends with a text column (SQLite, Redis, the JSONL file
+    store) ``json.dumps`` it themselves.
+    """
+    return {
+        "id": entry.id,
+        "content": entry.content,
+        "category": entry.category,
+        "importance": entry.importance,
+        "persistent": entry.persistent,
+        "ttl_days": entry.ttl_days,
+        "created_at": entry.created_at.isoformat(),
+        "updated_at": entry.updated_at.isoformat(),
+        "metadata": entry.metadata,
+    }
+
+
+def entry_from_jsonable(data: Mapping[str, Any]) -> KnowledgeEntry:
+    """Rebuild a ``KnowledgeEntry`` from a mapping produced by any backend.
+
+    Absent or ``NULL`` fields fall back to the dataclass default rather than
+    being passed through, so a nullable column reads identically on every
+    backend.  Values that are present but malformed raise (``float("high")``
+    → ``ValueError``): failing at the store boundary is clearer than the
+    ``TypeError`` a non-numeric ``importance`` would otherwise raise once it
+    reached a comparison in ``KnowledgeMemory.build_context``.
+    """
+    metadata = data.get("metadata")
+    if isinstance(metadata, str):
+        metadata = json.loads(metadata) if metadata else {}
+    elif metadata is None:
+        metadata = {}
+    category = data.get("category")
+    importance = data.get("importance")
+    ttl_days = data.get("ttl_days")
+    return KnowledgeEntry(
+        id=data["id"],
+        content=data["content"],
+        category="general" if category is None else category,
+        importance=0.5 if importance is None else float(importance),
+        persistent=bool(data.get("persistent", False)),
+        ttl_days=None if ttl_days is None else int(ttl_days),
+        created_at=ensure_aware(parse_iso(data["created_at"])),
+        updated_at=ensure_aware(parse_iso(data["updated_at"])),
+        metadata=metadata,
+    )
 
 
 # ======================================================================
@@ -290,27 +363,8 @@ class FileKnowledgeStore:
                 if not line:
                     continue
                 try:
-                    d = json.loads(line)
-                    created_at = parse_iso(d["created_at"])
-                    if created_at.tzinfo is None:
-                        created_at = created_at.replace(tzinfo=timezone.utc)
-                    updated_at = parse_iso(d["updated_at"])
-                    if updated_at.tzinfo is None:
-                        updated_at = updated_at.replace(tzinfo=timezone.utc)
-                    entries.append(
-                        KnowledgeEntry(
-                            id=d["id"],
-                            content=d["content"],
-                            category=d.get("category", "general"),
-                            importance=d.get("importance", 0.5),
-                            persistent=d.get("persistent", False),
-                            ttl_days=d.get("ttl_days"),
-                            created_at=created_at,
-                            updated_at=updated_at,
-                            metadata=d.get("metadata", {}),
-                        )
-                    )
-                except (json.JSONDecodeError, KeyError, ValueError):
+                    entries.append(entry_from_jsonable(json.loads(line)))
+                except (json.JSONDecodeError, KeyError, TypeError, ValueError):
                     continue
         return entries
 
@@ -318,18 +372,7 @@ class FileKnowledgeStore:
         tmp_path = self._entries_path + ".tmp"
         with open(tmp_path, "w", encoding="utf-8") as f:
             for e in entries:
-                d = {
-                    "id": e.id,
-                    "content": e.content,
-                    "category": e.category,
-                    "importance": e.importance,
-                    "persistent": e.persistent,
-                    "ttl_days": e.ttl_days,
-                    "created_at": e.created_at.isoformat(),
-                    "updated_at": e.updated_at.isoformat(),
-                    "metadata": e.metadata,
-                }
-                f.write(json.dumps(d) + "\n")
+                f.write(json.dumps(entry_to_jsonable(e)) + "\n")
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp_path, self._entries_path)
@@ -467,48 +510,35 @@ class SQLiteKnowledgeStore:
             )
 
     def _row_to_entry(self, row: tuple) -> KnowledgeEntry:
-        created_at = parse_iso(row[6])
-        if created_at.tzinfo is None:
-            created_at = created_at.replace(tzinfo=timezone.utc)
-        updated_at = parse_iso(row[7])
-        if updated_at.tzinfo is None:
-            updated_at = updated_at.replace(tzinfo=timezone.utc)
-        return KnowledgeEntry(
-            id=row[0],
-            content=row[1],
-            category=row[2],
-            importance=row[3],
-            persistent=bool(row[4]),
-            ttl_days=row[5],
-            created_at=created_at,
-            updated_at=updated_at,
-            metadata=json.loads(row[8]) if row[8] else {},
-        )
+        # strict=: queries select _COLUMN_LIST, so a length mismatch means the
+        # table drifted from _ENTRY_COLUMNS and must not be zipped silently.
+        return entry_from_jsonable(dict(zip(_ENTRY_COLUMNS, row, strict=True)))
 
     def save(self, entry: KnowledgeEntry) -> str:
+        data = entry_to_jsonable(entry)
         with self._lock, sqlite3.connect(self._db_path) as conn:
             conn.execute(
-                """INSERT OR REPLACE INTO knowledge
-                   (id, content, category, importance, persistent, ttl_days,
-                    created_at, updated_at, metadata)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                f"""INSERT OR REPLACE INTO knowledge ({_COLUMN_LIST})
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",  # nosec B608
                 (
-                    entry.id,
-                    entry.content,
-                    entry.category,
-                    entry.importance,
-                    int(entry.persistent),
-                    entry.ttl_days,
-                    entry.created_at.isoformat(),
-                    entry.updated_at.isoformat(),
-                    json.dumps(entry.metadata),
+                    data["id"],
+                    data["content"],
+                    data["category"],
+                    data["importance"],
+                    int(data["persistent"]),
+                    data["ttl_days"],
+                    data["created_at"],
+                    data["updated_at"],
+                    json.dumps(data["metadata"]),
                 ),
             )
         return entry.id
 
     def get(self, entry_id: str) -> Optional[KnowledgeEntry]:
         with sqlite3.connect(self._db_path) as conn:
-            row = conn.execute("SELECT * FROM knowledge WHERE id = ?", (entry_id,)).fetchone()
+            # Explicit column list, not SELECT *, so _row_to_entry's positional
+            # zip against _ENTRY_COLUMNS cannot silently misalign.
+            row = conn.execute(f"{_SELECT_ENTRY} WHERE id = ?", (entry_id,)).fetchone()
             return self._row_to_entry(row) if row else None
 
     def query(
@@ -532,7 +562,7 @@ class SQLiteKnowledgeStore:
         where = " AND ".join(clauses)
         # LIMIT is applied in Python after TTL filtering to avoid returning
         # fewer results than requested when expired entries are present.
-        sql = f"SELECT * FROM knowledge WHERE {where} ORDER BY importance DESC"  # nosec B608
+        sql = f"{_SELECT_ENTRY} WHERE {where} ORDER BY importance DESC"  # nosec B608
         with sqlite3.connect(self._db_path) as conn:
             rows = conn.execute(sql, params).fetchall()
         entries = [self._row_to_entry(r) for r in rows]
@@ -563,18 +593,13 @@ class SQLiteKnowledgeStore:
             for row_id, ttl, created, persistent in rows:
                 if persistent:
                     continue
+                created_dt = ensure_aware(parse_iso(created))
                 if ttl is not None:
-                    created_dt = parse_iso(created)
-                    if created_dt.tzinfo is None:
-                        created_dt = created_dt.replace(tzinfo=timezone.utc)
                     if now > created_dt + timedelta(days=ttl):
                         conn.execute("DELETE FROM knowledge WHERE id = ?", (row_id,))
                         removed += 1
                         continue
                 if max_age_days is not None:
-                    created_dt = parse_iso(created)
-                    if created_dt.tzinfo is None:
-                        created_dt = created_dt.replace(tzinfo=timezone.utc)
                     if now > created_dt + timedelta(days=max_age_days):
                         conn.execute("DELETE FROM knowledge WHERE id = ?", (row_id,))
                         removed += 1

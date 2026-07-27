@@ -273,3 +273,66 @@ class TestNaiveDatetimeRegression:
         naive_since = datetime(2020, 1, 1)  # no tzinfo
         results = store.query(since=naive_since)
         assert len(results) == 1
+
+
+class TestSharedSerialization:
+    """Issue #145 — Supabase rows go through the shared entry mapping."""
+
+    @staticmethod
+    def _inject(store: SupabaseKnowledgeStore, **overrides: Any) -> None:
+        row = {
+            "id": "injected",
+            "content": "test",
+            "category": "fact",
+            "importance": 0.7,
+            "persistent": False,
+            "ttl_days": None,
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "updated_at": "2026-01-01T00:00:00+00:00",
+            "metadata": {},
+        }
+        row.update(overrides)
+        store._client._tables.setdefault(store._table, []).append(row)
+
+    def test_row_written_uses_iso_timestamps_and_a_dict_metadata(
+        self, store: SupabaseKnowledgeStore
+    ) -> None:
+        """JSONB columns take a live dict; TIMESTAMPTZ takes an ISO string."""
+        store.save(_make_entry(id="shape", metadata={"k": "v"}))
+        row = next(r for r in store._client._tables[store._table] if r["id"] == "shape")
+
+        assert isinstance(row["created_at"], str)
+        assert isinstance(row["updated_at"], str)
+        assert row["metadata"] == {"k": "v"}
+        assert isinstance(row["persistent"], bool)
+
+    def test_importance_round_trips_as_float(self, store: SupabaseKnowledgeStore) -> None:
+        self._inject(store, importance="0.42")
+        entry = store.get("injected")
+
+        assert entry is not None
+        assert type(entry.importance) is float
+        assert entry.importance == 0.42
+
+    def test_null_importance_reads_as_default(self, store: SupabaseKnowledgeStore) -> None:
+        """Previously ``float(None)`` raised TypeError, swallowed into a None return."""
+        self._inject(store, importance=None)
+        entry = store.get("injected")
+
+        assert entry is not None
+        assert entry.importance == 0.5
+
+    def test_metadata_accepted_as_a_json_string(self, store: SupabaseKnowledgeStore) -> None:
+        """Some clients hand back JSONB already serialized."""
+        self._inject(store, metadata='{"k": "v"}')
+        entry = store.get("injected")
+
+        assert entry is not None
+        assert entry.metadata == {"k": "v"}
+
+    def test_full_round_trip_preserves_entry(self, store: SupabaseKnowledgeStore) -> None:
+        original = _make_entry(
+            id="full", ttl_days=9, persistent=True, metadata={"nested": {"n": 1}}
+        )
+        store.save(original)
+        assert store.get("full") == original

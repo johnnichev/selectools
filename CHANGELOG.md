@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`KnowledgeEntry.importance` now coerces to `float` on every backend
+  (#145).** `SQLiteKnowledgeStore._row_to_entry` omitted the `float(...)`
+  cast that Redis and Supabase applied, so a row whose `importance` was not
+  stored as `REAL` — legacy or externally-written data, which SQLite's column
+  affinity leaves as `TEXT` — came back as a `str` and only failed later, as
+  `TypeError: '>=' not supported between instances of 'str' and 'float'`
+  inside `KnowledgeMemory.build_context()`. A `NULL` `importance` now reads
+  as the schema's documented `DEFAULT 0.5` on all four backends (previously
+  `None` on SQLite, `0.5` on Redis, `TypeError` on Supabase), and a malformed
+  value raises at the store boundary where the offending row is identifiable.
+
+### Changed
+
+- **`KnowledgeEntry` serialization is shared across backends (#145).** The
+  9-field entry ↔ row/dict mapping was hand-rolled in `FileKnowledgeStore`,
+  `SQLiteKnowledgeStore`, `RedisKnowledgeStore`, and `SupabaseKnowledgeStore`
+  with drifting defaults and coercion; all four now go through
+  `entry_to_jsonable` / `entry_from_jsonable`, with Redis keeping a thin
+  string-coercion adapter for its all-strings hash format. No on-disk or
+  on-wire format changed, so existing stores keep loading.
+
 ## [1.3.0] - 2026-07-14 — Streaming Contracts
 
 Makes `final_turn_only` structured output safe to rely on across upgrades

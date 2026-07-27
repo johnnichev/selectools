@@ -368,3 +368,47 @@ class TestNaiveDatetimeRegression:
         naive_since = datetime(2020, 1, 1)  # no tzinfo
         results = store.query(since=naive_since)
         assert len(results) == 1
+
+
+class TestSharedSerialization:
+    """Issue #145 — Redis stays a thin string adapter over the shared mapping."""
+
+    def test_hash_wire_format_is_unchanged(self, store: RedisKnowledgeStore) -> None:
+        """A Redis hash holds strings only; existing keys must keep loading."""
+        store.save(_make_entry(id="wire", ttl_days=5, persistent=True, metadata={"k": "v"}))
+        raw = store._client.hgetall(store._entry_key("wire"))
+
+        assert all(isinstance(v, str) for v in raw.values())
+        assert raw["persistent"] == "1"
+        assert raw["ttl_days"] == "5"
+        assert raw["importance"] == "0.7"
+        assert raw["metadata"] == '{"k": "v"}'
+
+    def test_absent_ttl_days_is_stored_as_empty_string(self, store: RedisKnowledgeStore) -> None:
+        store.save(_make_entry(id="nottl", ttl_days=None))
+        raw = store._client.hgetall(store._entry_key("nottl"))
+
+        assert raw["ttl_days"] == ""
+        assert store.get("nottl").ttl_days is None
+
+    def test_persistent_false_round_trips(self, store: RedisKnowledgeStore) -> None:
+        """``bool("0")`` is True, so the adapter must decode the flag itself."""
+        store.save(_make_entry(id="notperm", persistent=False))
+        assert store._client.hgetall(store._entry_key("notperm"))["persistent"] == "0"
+        assert store.get("notperm").persistent is False
+
+    def test_importance_round_trips_as_float(self, store: RedisKnowledgeStore) -> None:
+        """Redis stores everything as text; importance must come back a float."""
+        store.save(_make_entry(id="imp", importance=0.42))
+        entry = store.get("imp")
+
+        assert entry is not None
+        assert type(entry.importance) is float
+        assert entry.importance == 0.42
+
+    def test_full_round_trip_preserves_entry(self, store: RedisKnowledgeStore) -> None:
+        original = _make_entry(
+            id="full", ttl_days=9, persistent=True, metadata={"nested": {"n": 1}}
+        )
+        store.save(original)
+        assert store.get("full") == original
