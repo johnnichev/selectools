@@ -8,13 +8,11 @@ Requires the ``supabase`` package::
 
 from __future__ import annotations
 
-import json
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
-from ._time import parse_iso
-from .knowledge import KnowledgeEntry
+from .knowledge import KnowledgeEntry, entry_from_jsonable, entry_to_jsonable
 from .stability import beta
 
 _logger = logging.getLogger(__name__)
@@ -49,51 +47,12 @@ class SupabaseKnowledgeStore:
         self._client = client
         self._table = table_name
 
-    # -- serialization -----------------------------------------------------
-
-    @staticmethod
-    def _entry_to_row(entry: KnowledgeEntry) -> Dict[str, Any]:
-        return {
-            "id": entry.id,
-            "content": entry.content,
-            "category": entry.category,
-            "importance": entry.importance,
-            "persistent": entry.persistent,
-            "ttl_days": entry.ttl_days,
-            "created_at": entry.created_at.isoformat(),
-            "updated_at": entry.updated_at.isoformat(),
-            "metadata": entry.metadata,
-        }
-
-    @staticmethod
-    def _row_to_entry(row: Dict[str, Any]) -> KnowledgeEntry:
-        metadata = row.get("metadata", {})
-        if isinstance(metadata, str):
-            metadata = json.loads(metadata)
-        created_at = parse_iso(row["created_at"])
-        if created_at.tzinfo is None:
-            created_at = created_at.replace(tzinfo=timezone.utc)
-        updated_at = parse_iso(row["updated_at"])
-        if updated_at.tzinfo is None:
-            updated_at = updated_at.replace(tzinfo=timezone.utc)
-        return KnowledgeEntry(
-            id=row["id"],
-            content=row["content"],
-            category=row.get("category", "general"),
-            importance=float(row.get("importance", 0.5)),
-            persistent=bool(row.get("persistent", False)),
-            ttl_days=row.get("ttl_days"),
-            created_at=created_at,
-            updated_at=updated_at,
-            metadata=metadata,
-        )
-
     # -- protocol methods --------------------------------------------------
 
     def save(self, entry: KnowledgeEntry) -> str:
         """Save or update an entry.  Returns the entry ID."""
         try:
-            row = self._entry_to_row(entry)
+            row = entry_to_jsonable(entry)
             self._client.table(self._table).upsert(row).execute()
             return entry.id
         except Exception as exc:
@@ -106,7 +65,7 @@ class SupabaseKnowledgeStore:
             response = self._client.table(self._table).select("*").eq("id", entry_id).execute()
             if not response.data:
                 return None
-            return self._row_to_entry(response.data[0])
+            return entry_from_jsonable(response.data[0])
         except Exception as exc:
             _logger.warning("SupabaseKnowledgeStore.get failed: %s", exc)
             return None
@@ -133,7 +92,7 @@ class SupabaseKnowledgeStore:
             builder = builder.order("importance", desc=True).limit(limit)
             response = builder.execute()
 
-            entries = [self._row_to_entry(row) for row in (response.data or [])]
+            entries = [entry_from_jsonable(row) for row in (response.data or [])]
             return [e for e in entries if not e.is_expired]
         except Exception as exc:
             _logger.warning("SupabaseKnowledgeStore.query failed: %s", exc)
@@ -173,7 +132,7 @@ class SupabaseKnowledgeStore:
             removed = 0
 
             for row in rows:
-                entry = self._row_to_entry(row)
+                entry = entry_from_jsonable(row)
                 should_remove = False
 
                 if entry.is_expired:

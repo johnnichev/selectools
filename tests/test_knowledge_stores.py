@@ -1,6 +1,8 @@
 """Tests for knowledge memory enhancement (R3) — stores, entries, eviction."""
 
+import json
 import os
+import sqlite3
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -10,6 +12,8 @@ from selectools.knowledge import (
     KnowledgeEntry,
     KnowledgeMemory,
     SQLiteKnowledgeStore,
+    entry_from_jsonable,
+    entry_to_jsonable,
 )
 
 
@@ -661,3 +665,265 @@ class TestEnforceMaxEntriesRegressions:
         assert "live-0" in live_contents
         assert "live-3" in live_contents
         assert len(live_entries) == 4
+
+
+# ======================================================================
+# Shared entry serialization (issue #145)
+# ======================================================================
+
+
+class TestEntrySerialization:
+    """entry_to_jsonable / entry_from_jsonable — the mapping all backends share."""
+
+    def test_round_trip_preserves_every_field(self):
+        original = KnowledgeEntry(
+            id="rt-1",
+            content="round trip",
+            category="fact",
+            importance=0.75,
+            persistent=True,
+            ttl_days=30,
+            metadata={"source": "test", "nested": {"n": 1}},
+        )
+        assert entry_from_jsonable(entry_to_jsonable(original)) == original
+
+    def test_to_jsonable_is_json_serializable(self):
+        """Timestamps come out as ISO strings; metadata stays a live dict."""
+        data = entry_to_jsonable(KnowledgeEntry(content="x", metadata={"k": "v"}))
+        assert isinstance(data["created_at"], str)
+        assert isinstance(data["updated_at"], str)
+        assert data["metadata"] == {"k": "v"}
+        json.dumps(data)
+
+    @pytest.mark.parametrize("raw", [0.9, "0.9", 1, "1"])
+    def test_importance_is_always_a_float(self, raw):
+        """Regression #145: every backend must coerce importance identically."""
+        entry = entry_from_jsonable(
+            {
+                "id": "i",
+                "content": "c",
+                "importance": raw,
+                "created_at": "2026-01-01T00:00:00+00:00",
+                "updated_at": "2026-01-01T00:00:00+00:00",
+            }
+        )
+        assert type(entry.importance) is float
+        assert entry.importance == float(raw)
+
+    def test_null_fields_fall_back_to_defaults(self):
+        """A NULL column must read as the schema default, not as None."""
+        entry = entry_from_jsonable(
+            {
+                "id": "n",
+                "content": "c",
+                "category": None,
+                "importance": None,
+                "persistent": None,
+                "ttl_days": None,
+                "metadata": None,
+                "created_at": "2026-01-01T00:00:00+00:00",
+                "updated_at": "2026-01-01T00:00:00+00:00",
+            }
+        )
+        assert entry.category == "general"
+        assert entry.importance == 0.5
+        assert entry.persistent is False
+        assert entry.ttl_days is None
+        assert entry.metadata == {}
+
+    def test_missing_optional_fields_fall_back_to_defaults(self):
+        entry = entry_from_jsonable(
+            {
+                "id": "m",
+                "content": "c",
+                "created_at": "2026-01-01T00:00:00+00:00",
+                "updated_at": "2026-01-01T00:00:00+00:00",
+            }
+        )
+        assert entry.category == "general"
+        assert entry.importance == 0.5
+        assert entry.persistent is False
+        assert entry.ttl_days is None
+        assert entry.metadata == {}
+
+    @pytest.mark.parametrize(
+        "raw,expected",
+        [({"k": "v"}, {"k": "v"}), ('{"k": "v"}', {"k": "v"}), ("", {}), (None, {})],
+    )
+    def test_metadata_accepts_dict_json_string_and_empty(self, raw, expected):
+        """JSONB backends pass a dict; text backends pass a (possibly empty) string."""
+        entry = entry_from_jsonable(
+            {
+                "id": "md",
+                "content": "c",
+                "metadata": raw,
+                "created_at": "2026-01-01T00:00:00+00:00",
+                "updated_at": "2026-01-01T00:00:00+00:00",
+            }
+        )
+        assert entry.metadata == expected
+
+    def test_naive_timestamps_are_normalized_to_utc(self):
+        entry = entry_from_jsonable(
+            {
+                "id": "tz",
+                "content": "c",
+                "created_at": "2026-01-01T00:00:00",
+                "updated_at": "2026-01-01T00:00:00",
+            }
+        )
+        assert entry.created_at.tzinfo is timezone.utc
+        assert entry.updated_at.tzinfo is timezone.utc
+
+    def test_z_suffixed_timestamps_are_accepted(self):
+        entry = entry_from_jsonable(
+            {
+                "id": "z",
+                "content": "c",
+                "created_at": "2026-01-01T00:00:00Z",
+                "updated_at": "2026-01-01T00:00:00Z",
+            }
+        )
+        assert entry.created_at == datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+    def test_malformed_importance_raises_at_the_boundary(self):
+        """Garbage must fail loudly here, not as a TypeError several frames later."""
+        with pytest.raises(ValueError):
+            entry_from_jsonable(
+                {
+                    "id": "bad",
+                    "content": "c",
+                    "importance": "high",
+                    "created_at": "2026-01-01T00:00:00+00:00",
+                    "updated_at": "2026-01-01T00:00:00+00:00",
+                }
+            )
+
+
+class TestSQLiteImportanceCoercion:
+    """Regression #145: SQLiteKnowledgeStore._row_to_entry skipped the float() cast."""
+
+    @staticmethod
+    def _insert_raw(db_path, entry_id, importance):
+        """Write a row directly, bypassing save(), the way legacy/external data arrives."""
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                "INSERT INTO knowledge VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    entry_id,
+                    "legacy row",
+                    "general",
+                    importance,
+                    0,
+                    None,
+                    "2026-01-01T00:00:00+00:00",
+                    "2026-01-01T00:00:00+00:00",
+                    "{}",
+                ),
+            )
+
+    def test_null_importance_reads_as_default(self, tmp_path):
+        """Previously: None from SQLite, 0.5 from Redis, TypeError from Supabase."""
+        db = str(tmp_path / "null_imp.db")
+        store = SQLiteKnowledgeStore(db)
+        self._insert_raw(db, "nul", None)
+
+        entry = store.get("nul")
+        assert entry is not None
+        assert type(entry.importance) is float
+        assert entry.importance == 0.5
+
+    def test_non_numeric_importance_raises_instead_of_returning_a_str(self, tmp_path):
+        """SQLite's REAL affinity keeps non-numeric text as TEXT.
+
+        Before the fix ``get()`` handed back the raw ``str``, which only blew up
+        later inside ``KnowledgeMemory.build_context()`` as ``TypeError: '>=' not
+        supported between instances of 'str' and 'float'``.  Redis and Supabase
+        already raised ValueError at the boundary.
+        """
+        db = str(tmp_path / "bad_imp.db")
+        store = SQLiteKnowledgeStore(db)
+        self._insert_raw(db, "bad", "high")
+
+        with pytest.raises(ValueError):
+            store.get("bad")
+
+    def test_corrupt_importance_surfaces_at_the_boundary_not_in_build_context(self, tmp_path):
+        """The end-to-end symptom reported in issue #145.
+
+        A non-numeric importance survives the ``importance >= ?`` filter (SQLite
+        sorts TEXT above REAL), so before the fix it reached ``build_context()``
+        as a ``str`` and blew up there with ``TypeError: '>=' not supported
+        between instances of 'str' and 'float'`` — a message that names neither
+        the store nor the offending row.  It now raises ``ValueError`` from the
+        store, where the bad value is.
+        """
+        db = str(tmp_path / "mixed.db")
+        store = SQLiteKnowledgeStore(db)
+        store.save(KnowledgeEntry(id="ok", content="normal", importance=0.6))
+        self._insert_raw(db, "bad", "high")
+
+        mem = KnowledgeMemory(directory=str(tmp_path / "mixed_mem"), store=store)
+        with pytest.raises(ValueError):
+            mem.build_context()
+
+    def test_build_context_unaffected_for_well_formed_rows(self, tmp_path):
+        db = str(tmp_path / "clean.db")
+        store = SQLiteKnowledgeStore(db)
+        store.save(KnowledgeEntry(id="hi", content="important thing", importance=0.9))
+        store.save(KnowledgeEntry(id="lo", content="minor thing", importance=0.2))
+
+        mem = KnowledgeMemory(directory=str(tmp_path / "clean_mem"), store=store)
+        context = mem.build_context()
+        assert "important thing" in context
+        assert "minor thing" in context
+        assert all(type(e.importance) is float for e in store.query())
+
+    def test_integer_importance_reads_back_as_float(self, tmp_path):
+        db = str(tmp_path / "int_imp.db")
+        store = SQLiteKnowledgeStore(db)
+        self._insert_raw(db, "one", 1)
+
+        entry = store.get("one")
+        assert entry is not None
+        assert type(entry.importance) is float
+        assert entry.importance == 1.0
+
+    def test_existing_rows_still_round_trip(self, tmp_path):
+        """The on-disk schema is unchanged, so rows written before the fix still load."""
+        db = str(tmp_path / "compat.db")
+        store = SQLiteKnowledgeStore(db)
+        original = KnowledgeEntry(
+            id="compat",
+            content="written the old way",
+            category="fact",
+            importance=0.8,
+            persistent=True,
+            ttl_days=7,
+            metadata={"a": 1},
+        )
+        store.save(original)
+
+        assert store.get("compat") == original
+
+    def test_file_store_importance_is_coerced(self, tmp_path):
+        """FileKnowledgeStore also skipped the cast; a JSONL string must coerce."""
+        store = FileKnowledgeStore(directory=str(tmp_path / "fks_imp"))
+        with open(store._entries_path, "w", encoding="utf-8") as f:
+            f.write(
+                json.dumps(
+                    {
+                        "id": "str-imp",
+                        "content": "from jsonl",
+                        "importance": "0.9",
+                        "created_at": "2026-01-01T00:00:00+00:00",
+                        "updated_at": "2026-01-01T00:00:00+00:00",
+                    }
+                )
+                + "\n"
+            )
+
+        entry = store.get("str-imp")
+        assert entry is not None
+        assert type(entry.importance) is float
+        assert entry.importance == 0.9
