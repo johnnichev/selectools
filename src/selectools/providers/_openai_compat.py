@@ -202,7 +202,7 @@ class _OpenAICompatibleBase(ABC):
         system_prompt: str,
         messages: List[Message],
         tools: List[Tool] | None = None,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
         response_format: Dict[str, Any] | None = None,
@@ -214,9 +214,10 @@ class _OpenAICompatibleBase(ABC):
         args: Dict[str, Any] = {
             "model": model_name,
             "messages": cast(Any, formatted),
-            "temperature": temperature,
             token_key: max_tokens,
         }
+        if temperature is not None:
+            args["temperature"] = temperature
         if timeout is not None:
             args["timeout"] = timeout
 
@@ -245,7 +246,7 @@ class _OpenAICompatibleBase(ABC):
         system_prompt: str,
         messages: List[Message],
         tools: List[Tool] | None = None,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
         response_format: Dict[str, Any] | None = None,
@@ -257,9 +258,10 @@ class _OpenAICompatibleBase(ABC):
         args: Dict[str, Any] = {
             "model": model_name,
             "messages": cast(Any, formatted),
-            "temperature": temperature,
             token_key: max_tokens,
         }
+        if temperature is not None:
+            args["temperature"] = temperature
         if timeout is not None:
             args["timeout"] = timeout
 
@@ -288,7 +290,7 @@ class _OpenAICompatibleBase(ABC):
         system_prompt: str,
         messages: List[Message],
         tools: List[Tool] | None = None,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
         response_format: Dict[str, Any] | None = None,
@@ -306,10 +308,11 @@ class _OpenAICompatibleBase(ABC):
         args: Dict[str, Any] = {
             "model": model_name,
             "messages": cast(Any, formatted),
-            "temperature": temperature,
             token_key: max_tokens,
             "stream": True,
         }
+        if temperature is not None:
+            args["temperature"] = temperature
         if timeout is not None:
             args["timeout"] = timeout
         if tools:
@@ -412,7 +415,7 @@ class _OpenAICompatibleBase(ABC):
         system_prompt: str,
         messages: List[Message],
         tools: List[Tool] | None = None,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
         response_format: Dict[str, Any] | None = None,
@@ -425,10 +428,11 @@ class _OpenAICompatibleBase(ABC):
         args: Dict[str, Any] = {
             "model": model_name,
             "messages": cast(Any, formatted),
-            "temperature": temperature,
             token_key: max_tokens,
             "stream": True,
         }
+        if temperature is not None:
+            args["temperature"] = temperature
         if timeout is not None:
             args["timeout"] = timeout
         if tools:

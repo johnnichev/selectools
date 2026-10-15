@@ -490,7 +490,7 @@ class RouterProvider:
         system_prompt: str,
         messages: list[Message],
         tools: list["Tool"] | None = None,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
     ) -> tuple[Message, "UsageStats"]:
@@ -523,7 +523,7 @@ class RouterProvider:
         system_prompt: str,
         messages: list[Message],
         tools: list["Tool"] | None = None,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
     ) -> tuple[Message, "UsageStats"]:
@@ -549,7 +549,7 @@ class RouterProvider:
         system_prompt: str,
         messages: list[Message],
         tools: list["Tool"] | None = None,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
     ) -> Iterable[Union[str, ToolCall, StreamEnd]]:
@@ -581,7 +581,7 @@ class RouterProvider:
         system_prompt: str,
         messages: list[Message],
         tools: list["Tool"] | None = None,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
     ) -> AsyncIterable[Union[str, ToolCall, StreamEnd]]:

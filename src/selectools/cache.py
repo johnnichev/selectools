@@ -244,7 +244,7 @@ class CacheKeyBuilder:
         system_prompt: str,
         messages: List["Message"],
         tools: Optional[List["Tool"]] = None,
-        temperature: float = 0.0,
+        temperature: Optional[float] = 0.0,
         response_format: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Return a deterministic hex-digest key for the given request params."""
