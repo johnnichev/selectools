@@ -23,7 +23,7 @@ from typing import (
 )
 
 from ..stability import stable
-from ..types import Message, ToolCall
+from ..types import Message, StreamEnd, ToolCall
 from .base import ProviderError
 
 if TYPE_CHECKING:
@@ -238,7 +238,7 @@ class FallbackProvider:
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> Iterable[Union[str, ToolCall]]:
+    ) -> Iterable[Union[str, ToolCall, StreamEnd]]:
         last_exc: Optional[Exception] = None
 
         for provider in self.providers:
@@ -250,7 +250,7 @@ class FallbackProvider:
 
             yielded_any = False
             try:
-                gen: Iterable[Union[str, ToolCall]] = provider.stream(
+                gen: Iterable[Union[str, ToolCall, StreamEnd]] = provider.stream(
                     model=model,
                     system_prompt=system_prompt,
                     messages=messages,
@@ -299,7 +299,7 @@ class FallbackProvider:
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> AsyncIterable[Union[str, ToolCall]]:
+    ) -> AsyncIterable[Union[str, ToolCall, StreamEnd]]:
         last_exc: Optional[Exception] = None
 
         for provider in self.providers:

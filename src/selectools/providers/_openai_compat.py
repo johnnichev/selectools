@@ -27,7 +27,7 @@ from typing import (
     cast,
 )
 
-from ..types import Message, Role, ToolCall
+from ..types import Message, Role, StreamEnd, ToolCall
 from ..usage import UsageStats
 from .base import ProviderError
 
@@ -59,7 +59,10 @@ def _parse_tool_args(raw: Optional[str]) -> Tuple[Dict[str, Any], Optional[str]]
         return parsed, None
     except json.JSONDecodeError as exc:
         preview = raw if len(raw) <= 200 else raw[:200] + "..."
-        return {}, f"invalid JSON ({exc.msg} at line {exc.lineno} col {exc.colno}): {preview}"
+        return (
+            {},
+            f"invalid JSON ({exc.msg} at line {exc.lineno} col {exc.colno}): {preview}",
+        )
 
 
 if TYPE_CHECKING:
@@ -149,11 +152,23 @@ class _OpenAICompatibleBase(ABC):
         return _parse_tool_args(tc.function.arguments)
 
     def _build_astream_args(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Allow subclasses to inject extra kwargs for ``astream()``.
+        """Allow subclasses to inject extra kwargs for ``stream()`` / ``astream()``.
 
         OpenAI adds ``stream_options`` for usage tracking; Ollama does not.
         """
         return args
+
+    @staticmethod
+    def _stream_usage_or(chunk: Any, current: Any) -> Any:
+        """Return the usage object carried by a choices-less chunk, else ``current``.
+
+        Only a usage with an integer ``prompt_tokens`` counts, so servers that
+        send ``usage: null`` (or nothing) never produce a bogus StreamEnd.
+        """
+        usage = getattr(chunk, "usage", None)
+        if isinstance(getattr(usage, "prompt_tokens", None), int):
+            return usage
+        return current
 
     def _map_response_format(self, schema: Dict[str, Any]) -> Dict[str, Any]:
         """Wrap a raw JSON Schema in the Chat Completions json_schema envelope."""
@@ -277,7 +292,7 @@ class _OpenAICompatibleBase(ABC):
         max_tokens: int = 1000,
         timeout: float | None = None,
         response_format: Dict[str, Any] | None = None,
-    ) -> Iterable[Union[str, ToolCall]]:
+    ) -> Iterable[Union[str, ToolCall, StreamEnd]]:
         """Stream response chunks with tool call support.
 
         Yields:
@@ -302,6 +317,8 @@ class _OpenAICompatibleBase(ABC):
         if response_format is not None:
             args["response_format"] = self._map_response_format(response_format)
 
+        args = self._build_astream_args(args)
+
         try:
             response = cast(Any, self._client.chat.completions.create(**args))
         except Exception as exc:  # noqa: BLE001
@@ -314,11 +331,15 @@ class _OpenAICompatibleBase(ABC):
                 raise self._wrap_error(exc, "streaming") from exc
 
         tool_call_deltas: Dict[int, Dict[str, Any]] = {}
+        stream_usage: Any = None
 
         try:
             for chunk in response:
                 try:
-                    delta = chunk.choices[0].delta if chunk.choices else None
+                    if not chunk.choices:
+                        stream_usage = self._stream_usage_or(chunk, stream_usage)
+                        continue
+                    delta = chunk.choices[0].delta
                     if not delta:
                         continue
 
@@ -381,6 +402,8 @@ class _OpenAICompatibleBase(ABC):
                     id=tc_data["id"],
                     parse_error=parse_error,
                 )
+        if stream_usage is not None:
+            yield StreamEnd(usage=self._usage_stats(stream_usage, model_name))
 
     async def astream(
         self,
@@ -393,7 +416,7 @@ class _OpenAICompatibleBase(ABC):
         max_tokens: int = 1000,
         timeout: float | None = None,
         response_format: Dict[str, Any] | None = None,
-    ) -> AsyncIterable[Union[str, ToolCall]]:
+    ) -> AsyncIterable[Union[str, ToolCall, StreamEnd]]:
         """Async streaming with native tool call support."""
         formatted = self._format_messages(system_prompt=system_prompt, messages=messages)
         model_name = model or self.default_model
@@ -428,11 +451,13 @@ class _OpenAICompatibleBase(ABC):
 
         # Track partial tool calls
         tool_call_deltas: Dict[int, Dict[str, Any]] = {}
+        stream_usage: Any = None
 
         try:
             async for chunk in response:
                 try:
                     if not chunk.choices:
+                        stream_usage = self._stream_usage_or(chunk, stream_usage)
                         continue
                     delta = chunk.choices[0].delta
 
@@ -495,6 +520,8 @@ class _OpenAICompatibleBase(ABC):
                     id=tc_info["id"],
                     parse_error=parse_error,
                 )
+        if stream_usage is not None:
+            yield StreamEnd(usage=self._usage_stats(stream_usage, model_name))
 
     # -- message formatting (identical for OpenAI and Ollama) -----------------
 
@@ -612,11 +639,21 @@ class _OpenAICompatibleBase(ABC):
                     )
                 )
 
-        usage = response.usage
+        return (
+            Message(
+                role=Role.ASSISTANT,
+                content=content or "",
+                tool_calls=tool_calls or None,
+            ),
+            self._usage_stats(response.usage, model_name),
+        )
+
+    def _usage_stats(self, usage: Any, model_name: str) -> UsageStats:
+        """Build UsageStats from an OpenAI-style ``usage`` object (None → zeros)."""
         # Cached input tokens (prompt-caching hits) are INCLUDED in
         # prompt_tokens but bill at the model's published cached rate.
         cached_tokens = self._cached_prompt_tokens(usage)
-        usage_stats = UsageStats(
+        return UsageStats(
             prompt_tokens=usage.prompt_tokens if usage else 0,
             completion_tokens=usage.completion_tokens if usage else 0,
             total_tokens=usage.total_tokens if usage else 0,
@@ -629,15 +666,6 @@ class _OpenAICompatibleBase(ABC):
             model=model_name,
             provider=self._get_provider_name(),
             cache_read_input_tokens=cached_tokens,
-        )
-
-        return (
-            Message(
-                role=Role.ASSISTANT,
-                content=content or "",
-                tool_calls=tool_calls or None,
-            ),
-            usage_stats,
         )
 
     # -- tool-call ID helpers -------------------------------------------------

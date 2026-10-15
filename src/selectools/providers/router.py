@@ -43,7 +43,7 @@ from typing import (
 from ..pricing import get_model_pricing
 from ..stability import beta, register_stability
 from ..token_estimation import estimate_tokens
-from ..types import Message, Role, ToolCall, text_content
+from ..types import Message, Role, StreamEnd, ToolCall, text_content
 from .fallback import FallbackProvider
 
 if TYPE_CHECKING:
@@ -233,10 +233,12 @@ class _TierBinding:
         )
         return result
 
-    def stream(self, *, model: str, **kwargs: Any) -> Iterable[Union[str, ToolCall]]:
+    def stream(self, *, model: str, **kwargs: Any) -> Iterable[Union[str, ToolCall, StreamEnd]]:
         return self.provider.stream(model=self._model(model), **kwargs)  # type: ignore[no-any-return]
 
-    def astream(self, *, model: str, **kwargs: Any) -> AsyncIterable[Union[str, ToolCall]]:
+    def astream(
+        self, *, model: str, **kwargs: Any
+    ) -> AsyncIterable[Union[str, ToolCall, StreamEnd]]:
         return self.provider.astream(model=self._model(model), **kwargs)  # type: ignore[no-any-return]
 
 
@@ -550,7 +552,7 @@ class RouterProvider:
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> Iterable[Union[str, ToolCall]]:
+    ) -> Iterable[Union[str, ToolCall, StreamEnd]]:
         """Stream a completion from the routed tier.
 
         This is a generator: routing and the ``on_route`` callback fire at
@@ -582,7 +584,7 @@ class RouterProvider:
         temperature: float = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> AsyncIterable[Union[str, ToolCall]]:
+    ) -> AsyncIterable[Union[str, ToolCall, StreamEnd]]:
         """Stream a completion asynchronously from the routed tier.
 
         This is an async generator: routing and the ``on_route`` callback
