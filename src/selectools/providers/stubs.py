@@ -34,7 +34,7 @@ class LocalProvider(Provider):
         system_prompt: str,
         messages: List[Message],
         tools: List[Any] | None = None,  # Type Any to avoid circular import dynamically
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
     ) -> tuple[Message, UsageStats]:
@@ -61,7 +61,7 @@ class LocalProvider(Provider):
         system_prompt: str,
         messages: List[Message],
         tools: List[Any] | None = None,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
     ) -> Iterable[Union[str, ToolCall]]:
@@ -86,7 +86,7 @@ class LocalProvider(Provider):
         system_prompt: str,
         messages: List[Message],
         tools: List[Any] | None = None,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
     ) -> tuple[Message, UsageStats]:
@@ -99,7 +99,7 @@ class LocalProvider(Provider):
         system_prompt: str,
         messages: List[Message],
         tools: List[Any] | None = None,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
     ) -> AsyncIterable[Union[str, ToolCall]]:

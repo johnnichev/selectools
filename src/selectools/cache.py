@@ -14,7 +14,16 @@ import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    Tuple,
+    runtime_checkable,
+)
 
 if TYPE_CHECKING:
     from .tools.base import Tool
@@ -235,7 +244,7 @@ class CacheKeyBuilder:
         system_prompt: str,
         messages: List["Message"],
         tools: Optional[List["Tool"]] = None,
-        temperature: float = 0.0,
+        temperature: Optional[float] = 0.0,
         response_format: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Return a deterministic hex-digest key for the given request params."""
@@ -250,6 +259,9 @@ class CacheKeyBuilder:
                     {"tool_name": tc.tool_name, "parameters": tc.parameters}
                     for tc in msg.tool_calls
                 ]
+            # Only keyed when set, so pre-existing cache entries stay valid.
+            if msg.provider_state is not None:
+                entry["provider_state"] = msg.provider_state
             messages_data.append(entry)
 
         tools_data: List[Dict[str, Any]] = []

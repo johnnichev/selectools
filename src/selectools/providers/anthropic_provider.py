@@ -161,7 +161,7 @@ class AnthropicProvider(Provider):
         model_name: str,
         system_prompt: str,
         payload: List[dict],
-        temperature: float,
+        temperature: float | None,
         max_tokens: int,
         tools: List[Tool] | None,
         timeout: float | None,
@@ -171,9 +171,10 @@ class AnthropicProvider(Provider):
             "model": model_name,
             "system": self._system_param(system_prompt),
             "messages": payload,
-            "temperature": temperature,
             "max_tokens": max_tokens,
         }
+        if temperature is not None:
+            request_args["temperature"] = temperature
 
         if stream:
             request_args["stream"] = True
@@ -248,7 +249,7 @@ class AnthropicProvider(Provider):
         system_prompt: str,
         messages: List[Message],
         tools: List[Tool] | None = None,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
     ) -> tuple[Message, UsageStats]:
@@ -314,7 +315,7 @@ class AnthropicProvider(Provider):
         system_prompt: str,
         messages: List[Message],
         tools: List[Tool] | None = None,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
     ) -> Iterable[Union[str, ToolCall]]:
@@ -604,7 +605,7 @@ class AnthropicProvider(Provider):
         system_prompt: str,
         messages: List[Message],
         tools: List[Tool] | None = None,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
     ) -> tuple[Message, UsageStats]:
@@ -658,7 +659,7 @@ class AnthropicProvider(Provider):
         system_prompt: str,
         messages: List[Message],
         tools: List[Tool] | None = None,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
     ) -> AsyncIterable[Union[str, ToolCall]]:

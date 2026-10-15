@@ -580,7 +580,10 @@ class TestSupervisorMagentic:
 
     def test_magentic_strategy_basic(self):
         """Magentic strategy runs and produces a result."""
-        from selectools.orchestration.supervisor import SupervisorAgent, SupervisorStrategy
+        from selectools.orchestration.supervisor import (
+            SupervisorAgent,
+            SupervisorStrategy,
+        )
 
         mock_agent = MagicMock()
         mock_result = MagicMock()
@@ -615,7 +618,10 @@ class TestSupervisorMagentic:
 
     def test_magentic_stall_replan(self):
         """Magentic replans after max_stalls not-progressing steps."""
-        from selectools.orchestration.supervisor import SupervisorAgent, SupervisorStrategy
+        from selectools.orchestration.supervisor import (
+            SupervisorAgent,
+            SupervisorStrategy,
+        )
 
         mock_agent = MagicMock()
         mock_result = MagicMock()
@@ -677,7 +683,10 @@ class TestSupervisorMagentic:
 
     def test_magentic_unknown_agent_fallback(self):
         """Magentic falls back to first agent when LLM picks unknown agent (line 540-541)."""
-        from selectools.orchestration.supervisor import SupervisorAgent, SupervisorStrategy
+        from selectools.orchestration.supervisor import (
+            SupervisorAgent,
+            SupervisorStrategy,
+        )
 
         mock_agent = MagicMock()
         mock_result = MagicMock()
@@ -727,7 +736,10 @@ class TestSupervisorRoundRobin:
 
     def test_round_robin_completes_on_signal(self):
         """Round-robin stops when output looks complete."""
-        from selectools.orchestration.supervisor import SupervisorAgent, SupervisorStrategy
+        from selectools.orchestration.supervisor import (
+            SupervisorAgent,
+            SupervisorStrategy,
+        )
 
         mock_agent = MagicMock()
         mock_result = MagicMock()
@@ -748,7 +760,10 @@ class TestSupervisorRoundRobin:
 
     def test_round_robin_max_rounds_limit(self):
         """Round-robin respects max_rounds."""
-        from selectools.orchestration.supervisor import SupervisorAgent, SupervisorStrategy
+        from selectools.orchestration.supervisor import (
+            SupervisorAgent,
+            SupervisorStrategy,
+        )
 
         mock_agent = MagicMock()
         mock_result = MagicMock()
@@ -772,7 +787,10 @@ class TestSupervisorDynamic:
 
     def test_dynamic_routing_done_signal(self):
         """Dynamic routing ends when planner says DONE."""
-        from selectools.orchestration.supervisor import SupervisorAgent, SupervisorStrategy
+        from selectools.orchestration.supervisor import (
+            SupervisorAgent,
+            SupervisorStrategy,
+        )
 
         mock_agent = MagicMock()
         mock_result = MagicMock()
@@ -793,7 +811,10 @@ class TestSupervisorDynamic:
 
     def test_dynamic_routing_unknown_agent_fallback(self):
         """Dynamic routing falls back to first agent for unknown name."""
-        from selectools.orchestration.supervisor import SupervisorAgent, SupervisorStrategy
+        from selectools.orchestration.supervisor import (
+            SupervisorAgent,
+            SupervisorStrategy,
+        )
 
         mock_agent = MagicMock()
         mock_result = MagicMock()
@@ -815,7 +836,10 @@ class TestSupervisorDynamic:
 
     def test_dynamic_routing_empty_response(self):
         """Dynamic routing ends when planner returns empty string."""
-        from selectools.orchestration.supervisor import SupervisorAgent, SupervisorStrategy
+        from selectools.orchestration.supervisor import (
+            SupervisorAgent,
+            SupervisorStrategy,
+        )
 
         mock_agent = MagicMock()
         provider = RecordingProvider(responses=[""])
@@ -835,7 +859,10 @@ class TestSupervisorPlanAndExecute:
 
     def test_plan_and_execute_empty_plan(self):
         """Empty plan returns empty GraphResult (line 340-350)."""
-        from selectools.orchestration.supervisor import SupervisorAgent, SupervisorStrategy
+        from selectools.orchestration.supervisor import (
+            SupervisorAgent,
+            SupervisorStrategy,
+        )
 
         # All agent names in plan are invalid
         provider = RecordingProvider(
@@ -853,7 +880,10 @@ class TestSupervisorPlanAndExecute:
 
     def test_plan_and_execute_invalid_json(self):
         """Invalid JSON plan falls back to registration order."""
-        from selectools.orchestration.supervisor import SupervisorAgent, SupervisorStrategy
+        from selectools.orchestration.supervisor import (
+            SupervisorAgent,
+            SupervisorStrategy,
+        )
 
         # Use a real agent with LocalProvider for graph execution
         real_agent = Agent(
@@ -884,7 +914,10 @@ class TestSupervisorStreaming:
 
     def test_astream_builds_round_robin_graph(self):
         """astream() builds a streaming graph and yields events."""
-        from selectools.orchestration.supervisor import SupervisorAgent, SupervisorStrategy
+        from selectools.orchestration.supervisor import (
+            SupervisorAgent,
+            SupervisorStrategy,
+        )
 
         mock_agent = MagicMock()
         mock_result = MagicMock()
@@ -1680,7 +1713,8 @@ class TestProviderCallerCacheKey:
             result = await agent._astreaming_call(stream_handler=lambda c: chunks.append(c))
             return result
 
-        text, tool_calls = asyncio.run(_run())
+        text, tool_calls, stream_end = asyncio.run(_run())
+        assert stream_end is None
         assert text == "chunk1chunk2"
         assert tool_calls == []
         assert chunks == ["chunk1", "chunk2"]
@@ -1786,7 +1820,10 @@ class TestTokenEstimation:
 
         msgs = [Message(role=Role.USER, content="hello world")]
         result = estimate_run_tokens(
-            messages=msgs, tools=[echo_tool], system_prompt="You are helpful.", model="gpt-4o"
+            messages=msgs,
+            tools=[echo_tool],
+            system_prompt="You are helpful.",
+            model="gpt-4o",
         )
         assert result.total_tokens > 0
         assert result.system_tokens > 0

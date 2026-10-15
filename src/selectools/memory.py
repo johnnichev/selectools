@@ -255,6 +255,7 @@ class ConversationMemory:
                 if msg.content_parts
                 else msg.content_parts
             ),
+            provider_state=copy.deepcopy(msg.provider_state),
         )
         # image_base64 is init=False so replace() resets it to None;
         # restore it from the original.

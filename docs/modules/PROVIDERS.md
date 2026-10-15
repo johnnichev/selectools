@@ -81,7 +81,7 @@ print(result.content)
 
 ```python
 from typing import Protocol, runtime_checkable, List, Optional, Union, AsyncGenerator
-from ..types import Message, ToolCall
+from ..types import Message, StreamEnd, ToolCall
 from ..tools import Tool
 from ..usage import UsageStats
 
@@ -100,7 +100,7 @@ class Provider(Protocol):
         system_prompt: str,
         messages: List[Message],
         tools: Optional[List[Tool]] = None,  # Native tool calling
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,     # None = send no temperature
         max_tokens: int = 1000,
         timeout: float | None = None,
     ) -> tuple[Message, UsageStats]:
@@ -112,7 +112,7 @@ class Provider(Protocol):
         ...
 
     def stream(self, *, model, system_prompt, messages, **kwargs):
-        """Yield assistant text chunks (no usage stats)."""
+        """Yield text chunks / ToolCalls, optionally ending with a StreamEnd."""
         ...
 
     async def acomplete(
@@ -122,7 +122,7 @@ class Provider(Protocol):
         system_prompt: str,
         messages: List[Message],
         tools: Optional[List[Tool]] = None,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
     ) -> tuple[Message, UsageStats]:
@@ -136,15 +136,16 @@ class Provider(Protocol):
         system_prompt: str,
         messages: List[Message],
         tools: Optional[List[Tool]] = None,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> AsyncGenerator[Union[str, ToolCall], None]:
+    ) -> AsyncGenerator[Union[str, ToolCall, StreamEnd], None]:
         """Async streaming with native tool call support.
 
         Yields:
             str: Text content deltas
             ToolCall: Complete tool call objects when ready
+            StreamEnd: Optional final item carrying usage and provider_state
         """
         ...
 ```
@@ -153,9 +154,40 @@ class Provider(Protocol):
 
 1. **Sync Methods**: `complete()` and `stream()` must be implemented
 2. **Return Types**: `complete()` returns `(Message, UsageStats)` — Message may contain `tool_calls`
-3. **Streaming**: `stream()` yields strings; `astream()` yields `Union[str, ToolCall]`
+3. **Streaming**: `stream()` and `astream()` yield `Union[str, ToolCall, StreamEnd]`
 4. **Native Tool Calling**: Pass `tools` parameter for provider-native function calling
 5. **Async**: Recommended for performance; `acomplete()` and `astream()`
+6. **Temperature**: `None` means "do not send a temperature" (reasoning models reject one). `0.0` is a real value and must still be sent
+
+### StreamEnd and `Message.provider_state` (v1.4.0)
+
+Generators cannot return a value to the loop that consumes them, so streamed
+turns used to reach `on_llm_end` with `None` usage and never counted toward
+`agent.usage`. A provider can now yield one `StreamEnd` as its final item:
+
+```python
+from selectools.types import StreamEnd
+
+def stream(self, *, model, system_prompt, messages, **kwargs):
+    for delta in self._api_stream(...):
+        yield delta.text
+    yield StreamEnd(
+        usage=UsageStats(prompt_tokens=..., completion_tokens=..., model=model, provider=self.name),
+        provider_state={"items": [...]},   # optional, opaque, JSON-safe
+    )
+```
+
+`usage` is added to the agent's totals, passed to `on_llm_end` / `on_usage`,
+and recorded on the `LLM_CALL` trace step. `provider_state` is copied onto the
+assistant `Message` the agent assembles, exactly as if `complete()` had
+returned `Message(..., provider_state=...)`.
+
+`Message.provider_state` is for stateless APIs that must replay their own
+output items (for example encrypted reasoning items between an assistant
+message and its function calls) on the next request. The agent carries it
+through the tool loop, memory copies, `to_dict()` / `from_dict()`, and the
+cache key. Providers that don't understand a payload simply ignore it; only the
+provider that wrote it should read it back in `_format_messages()`.
 
 ---
 
@@ -1156,3 +1188,4 @@ Both observers implement the standard `AgentObserver` protocol and can be compos
 | 17 | [`17_rag_multi_provider.py`](https://github.com/johnnichev/selectools/blob/main/examples/17_rag_multi_provider.py) | RAG across multiple provider backends |
 | 25 | [`25_provider_fallback.py`](https://github.com/johnnichev/selectools/blob/main/examples/25_provider_fallback.py) | FallbackProvider with circuit breaker failover |
 | 102 | [`102_router_provider.py`](https://github.com/johnnichev/selectools/blob/main/examples/102_router_provider.py) | RouterProvider cost-optimized tier routing (offline) |
+| 115 | [`115_stream_end_provider.py`](https://github.com/johnnichev/selectools/blob/main/examples/115_stream_end_provider.py) | StreamEnd: usage + provider_state from a streaming provider (offline) |
