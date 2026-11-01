@@ -81,7 +81,7 @@ def generate_image(
         # size is a user-provided str; the SDK accepts the standard size strings
         # at runtime but types the param as a Literal, so mypy can't verify it.
         response = client.images.generate(model=model, prompt=prompt, size=size, n=1)  # type: ignore[call-overload]
-        data = response.data[0] if getattr(response, "data", None) else None
+        data = response.data[0] if response.data else None
         if data is None:
             return "Error: OpenAI returned no image data."
 
@@ -91,7 +91,7 @@ def generate_image(
         if b64:
             # Decode BEFORE creating the temp file so a malformed payload
             # (binascii.Error) does not leave an orphaned 0-byte file on disk.
-            data = base64.b64decode(b64)
+            image_bytes = base64.b64decode(b64)
             if output_path and output_path.strip():
                 destination = Path(output_path.strip())
                 destination.parent.mkdir(parents=True, exist_ok=True)
@@ -101,7 +101,7 @@ def generate_image(
                 )
                 handle.close()
                 destination = Path(handle.name)
-            destination.write_bytes(data)
+            destination.write_bytes(image_bytes)
             return f"Image generated with {model} and saved to {destination}"
         if url:
             return f"Image generated with {model}: {url}"

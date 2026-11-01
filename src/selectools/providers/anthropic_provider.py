@@ -171,8 +171,8 @@ class AnthropicProvider(Provider):
             "model": model_name,
             "system": self._system_param(system_prompt),
             "messages": payload,
-            "temperature": temperature,
             "max_tokens": max_tokens,
+            "extra_body": {"temperature": temperature},
         }
 
         if stream:

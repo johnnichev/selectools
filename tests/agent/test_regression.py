@@ -4400,3 +4400,29 @@ def test_bug34_structured_retry_honors_retry_budget_beyond_max_iterations():
     )
     assert result.parsed is not None
     assert result.parsed.answer == "42"
+
+
+# ---- anthropic 1.x: `temperature` removed from messages.create() ----
+# anthropic>=1.0 dropped `temperature` from the `messages.create` signature,
+# so passing it as a kwarg raises TypeError before any request is sent. API
+# version 2023-06-01 (sent by anthropic<2) still honours it in the body, so
+# AnthropicProvider routes it through `extra_body`. Wire-level coverage
+# against the real SDK lives in tests/providers/test_sdk_compat.py.
+
+
+def test_anthropic_sdk_v1_temperature_sent_via_extra_body():
+    """temperature must not be a top-level messages.create kwarg."""
+    from selectools.providers.anthropic_provider import AnthropicProvider
+
+    provider = object.__new__(AnthropicProvider)
+    args = provider._build_request_args(
+        model_name="claude-sonnet-4-6",
+        system_prompt="sys",
+        payload=[{"role": "user", "content": [{"type": "text", "text": "hi"}]}],
+        temperature=0.0,
+        max_tokens=10,
+        tools=None,
+        timeout=None,
+    )
+    assert "temperature" not in args, "anthropic>=1.0 raises TypeError on temperature="
+    assert args["extra_body"] == {"temperature": 0.0}, "0.0 must survive (falsy trap)"

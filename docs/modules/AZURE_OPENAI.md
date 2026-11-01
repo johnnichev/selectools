@@ -45,7 +45,7 @@ print(agent.run("What time is it?").content)
 
 ## Install
 
-No new dependencies. Azure support uses the same `openai>=1.30.0` package that
+No new dependencies. Azure support uses the same `openai>=1.45.0` package that
 ships as a core selectools dependency.
 
 ```bash

@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Support openai 2.x and anthropic 1.x.** Core dependency ranges are now
+  `openai>=1.45.0,<3.0.0` (was `>=1.30.0,<2.0.0`) and
+  `anthropic>=0.28.0,<2.0.0` (was `>=0.28.0,<1.0.0`), so selectools installs
+  alongside projects that need the current SDK majors. openai 2.0's only
+  breaking change is in the Responses API, which selectools does not use.
+  The openai floor moves to 1.45.0 because that is the first release whose
+  `chat.completions.create()` accepts `max_completion_tokens`, which
+  `OpenAIProvider` sends for GPT-5.x/o-series models (including the default
+  `gpt-5-mini`); on 1.30–1.44 those calls already failed with `TypeError`.
+
+### Fixed
+
+- **`AnthropicProvider` on anthropic 1.x.** anthropic 1.0 removed
+  `temperature` from the `messages.create()` signature, so every call raised
+  `TypeError`. The provider now sends it via `extra_body`, which produces the
+  same request body on 0.x and 1.x (API version 2023-06-01). anthropic 2.x
+  (API version 2026-10-21) rejects `temperature` outright and stays
+  unsupported for now. New wire-level tests
+  (`tests/providers/test_sdk_compat.py`) drive the real SDK clients through
+  a mock HTTP transport so signature changes like this one fail CI.
+
 ## [1.3.0] - 2026-07-14 — Streaming Contracts
 
 Makes `final_turn_only` structured output safe to rely on across upgrades
