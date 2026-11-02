@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-02 — StreamEnd, Provider State & New SDK Majors
+
+Streamed turns now report usage and can carry opaque provider state for
+verbatim replay (#182); `temperature` becomes optional for reasoning models;
+and the supported SDK ranges widen to openai 2.x/3.x and anthropic 1.x.
+
 ### Added
 
 - **`StreamEnd`: usage and provider state at the end of a native stream

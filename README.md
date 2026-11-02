@@ -16,7 +16,7 @@ An open-source project from **[NichevLabs](https://nichevlabs.com)**.
 
 **Multi-agent orchestration in plain Python.** Build agent graphs, compose pipelines with `|`, deploy with one command. No DSL, no compile step, no paid debugger. Works with OpenAI, Anthropic, Gemini, and Ollama.
 
-> 🎉 **selectools is 1.0 — stable.** The public API is frozen; `@stable` symbols carry a 2-minor compatibility promise. Python 3.10+. Latest: [v1.3](#whats-new-in-v13) — tested public streaming contracts for structured-output chat agents.
+> 🎉 **selectools is 1.0 — stable.** The public API is frozen; `@stable` symbols carry a 2-minor compatibility promise. Python 3.10+. Latest: [v1.4](#whats-new-in-v14) — streamed usage and provider state via `StreamEnd`, optional `temperature`, and support for openai 2.x/3.x and anthropic 1.x.
 
 ### 3 Ways to Build
 
@@ -31,6 +31,15 @@ result = AgentGraph.chain(planner, writer, reviewer).run("Write a blog post")
 # 3. Deploy — 1 command
 # selectools serve agent.yaml
 ```
+
+## What's New in v1.4
+
+### v1.4.0 — StreamEnd, Provider State & New SDK Majors
+
+- **`StreamEnd`** — providers may yield one `selectools.types.StreamEnd` as the last item of `stream()` / `astream()`. Its `usage` is counted into `agent.usage`, passed to `on_llm_end` / `on_usage`, and recorded on the `LLM_CALL` trace step (streamed turns previously reached `on_llm_end` with `None` usage). The agent consumes the item, so consumers matching on `str` / `ToolCall` are unaffected. The OpenAI provider emits it on both `stream()` and `astream()`. (#182)
+- **`Message.provider_state`** — an opaque, JSON-safe dict a provider attaches to an assistant message to replay that turn verbatim on the next request (stateless Responses-style APIs with encrypted reasoning items). Carried through the tool loop, `ConversationMemory`, `to_dict()` / `from_dict()`, and the cache key.
+- **Optional `temperature`** (*Changed*) — `None` on `AgentConfig` or any provider method means "send no temperature", which reasoning models require. The default stays `0.0`, so existing output is unchanged.
+- **SDK ranges** (*Changed*) — `openai>=1.55.3,<4` and `anthropic>=0.40.0,<2`. The new majors are drop-in for the surface selectools uses; the Anthropic provider now sends `temperature` via `extra_body`, since anthropic 1.0 removed it from `messages.create()`. anthropic 2.x is not supported yet: its API version rejects any `temperature`.
 
 ## What's New in v1.3
 
