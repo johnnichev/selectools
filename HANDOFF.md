@@ -1,5 +1,12 @@
 # Session Handoff
 
+## 2026-10-15 — #182 StreamEnd / provider_state / Optional temperature
+
+Branch `feat/stream-end-provider-state` (draft PR open). Items 1-3 of #182
+shipped with tests, docs, example 115, changelog under `[Unreleased]`. No
+version bump yet. Item 5 (native Responses provider) is still open on #182.
+
+
 ## What I Was Doing (2026-06-15)
 
 Big session: zero-tech-debt sweep (PR #127), **v0.28.0 Hardening Sweep** release,

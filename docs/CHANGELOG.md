@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`StreamEnd`: usage and provider state at the end of a native stream
+  (#182).** Providers may yield one `selectools.types.StreamEnd` as the last
+  item of `stream()` / `astream()`. Its `usage` is counted into `agent.usage`,
+  passed to `on_llm_end` / `on_usage`, and recorded on the `LLM_CALL` trace
+  step; before this, every streamed turn reached `on_llm_end` with `None`
+  usage and was missing from the totals. Its `provider_state` is copied onto
+  the assistant `Message` the agent assembles from chunks. The agent consumes
+  the item; consumers that pattern-match on `str` / `ToolCall` are unaffected.
+  The OpenAI provider now emits it from the usage chunk it already requested
+  on `astream()`, and requests it on `stream()` too.
+- **`Message.provider_state`** — an opaque, JSON-safe dict a provider attaches
+  to an assistant message so it can replay that turn verbatim on the next
+  request (stateless Responses-style APIs with encrypted reasoning items).
+  Carried through the tool loop, `ConversationMemory` copies,
+  `to_dict()` / `from_dict()`, and the cache key. Replaces smuggling such
+  state through `ToolCall.thought_signature`.
+
+### Changed
+
+- **`temperature` is `Optional[float]` on `AgentConfig` and every provider
+  method.** `None` means "send no temperature", which reasoning models
+  require; the OpenAI-compatible and Anthropic providers omit the field
+  instead of relying on the 400-and-retry fallback. The default stays `0.0`,
+  so no existing output changes.
+- Streamed turns on `run()` / `arun()` now record an `LLM_CALL` trace step
+  (previously only `astream()` did).
+
 ## [1.3.0] - 2026-07-14 — Streaming Contracts
 
 Makes `final_turn_only` structured output safe to rely on across upgrades

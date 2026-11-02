@@ -4,10 +4,17 @@ Provider abstraction for model-agnostic tool calling.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, AsyncIterable, Iterable, Protocol, Union, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    AsyncIterable,
+    Iterable,
+    Protocol,
+    Union,
+    runtime_checkable,
+)
 
 from ..stability import register_stability, stable
-from ..types import Message, ToolCall
+from ..types import Message, StreamEnd, ToolCall
 
 if TYPE_CHECKING:
     from ..tools.base import Tool
@@ -39,7 +46,7 @@ class Provider(Protocol):
         system_prompt: str,
         messages: list[Message],
         tools: list["Tool"] | None = None,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
     ) -> tuple[Message, "UsageStats"]:
@@ -58,18 +65,20 @@ class Provider(Protocol):
         system_prompt: str,
         messages: list[Message],
         tools: list["Tool"] | None = None,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> Iterable[Union[str, "ToolCall"]]:
+    ) -> Iterable[Union[str, "ToolCall", "StreamEnd"]]:
         """
         Yield assistant text chunks and ToolCall objects for providers that support streaming.
 
         Implementations should raise ProviderError if streaming is not supported
         or fails.
 
-        Note: Streaming methods do not return usage stats due to Python generator
-        limitations. Use complete() if you need usage tracking.
+        A provider may yield a single ``StreamEnd`` as the final item to report
+        the call's usage and attach ``provider_state`` to the assistant message
+        the agent assembles. The agent consumes it; it is never surfaced as a
+        chunk. Providers that yield nothing of the kind leave usage unreported.
         """
         ...
 
@@ -81,7 +90,7 @@ class Provider(Protocol):
         system_prompt: str,
         messages: list[Message],
         tools: list["Tool"] | None = None,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
     ) -> tuple[Message, "UsageStats"]:
@@ -103,10 +112,10 @@ class Provider(Protocol):
         system_prompt: str,
         messages: list[Message],
         tools: list["Tool"] | None = None,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         max_tokens: int = 1000,
         timeout: float | None = None,
-    ) -> AsyncIterable[Union[str, ToolCall]]:
+    ) -> AsyncIterable[Union[str, ToolCall, StreamEnd]]:
         """
         Async streaming with native tool call support.
 
@@ -115,10 +124,8 @@ class Provider(Protocol):
         treats the return value as ``AsyncIterable`` rather than
         ``Coroutine[..., AsyncIterable[...]]``.
 
-        Yields text chunks (str) or full ToolCall objects as they become ready.
-
-        Note: Async streaming methods do not return usage stats due to Python
-        async generator limitations. Use acomplete() if you need usage tracking.
+        Yields text chunks (str) or full ToolCall objects as they become ready,
+        optionally followed by one ``StreamEnd`` (see ``stream()``).
         """
         ...
 

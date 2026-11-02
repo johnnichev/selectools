@@ -54,6 +54,7 @@ class AgentConfig:
     Attributes:
         model: Model identifier to use (e.g., "gpt-5-mini", "claude-sonnet-4-6").
         temperature: LLM temperature (0.0 = deterministic, higher = more creative). Default: 0.0.
+            None sends no temperature at all, which reasoning models require.
         max_tokens: Maximum tokens in LLM response. Default: 1000.
         max_iterations: Maximum tool-calling iterations before stopping. Default: 6.
         verbose: Print detailed logs for debugging. Default: False.
@@ -140,7 +141,7 @@ class AgentConfig:
     # here would be sent to EVERY provider — e.g. an OpenAI model id reaching
     # the Anthropic API and 404-ing on every call.
     model: Optional[str] = None
-    temperature: float = 0.0
+    temperature: Optional[float] = 0.0
     max_tokens: int = 1000
     max_iterations: int = 6
     verbose: bool = False

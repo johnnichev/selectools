@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`StreamEnd`: usage and provider state at the end of a native stream
+  (#182).** Providers may yield one `selectools.types.StreamEnd` as the last
+  item of `stream()` / `astream()`. Its `usage` is counted into `agent.usage`,
+  passed to `on_llm_end` / `on_usage`, and recorded on the `LLM_CALL` trace
+  step; before this, every streamed turn reached `on_llm_end` with `None`
+  usage and was missing from the totals. Its `provider_state` is copied onto
+  the assistant `Message` the agent assembles from chunks. The agent consumes
+  the item; consumers that pattern-match on `str` / `ToolCall` are unaffected.
+  The OpenAI provider now emits it from the usage chunk it already requested
+  on `astream()`, and requests it on `stream()` too.
+- **`Message.provider_state`** — an opaque, JSON-safe dict a provider attaches
+  to an assistant message so it can replay that turn verbatim on the next
+  request (stateless Responses-style APIs with encrypted reasoning items).
+  Carried through the tool loop, `ConversationMemory` copies,
+  `to_dict()` / `from_dict()`, and the cache key. Replaces smuggling such
+  state through `ToolCall.thought_signature`.
+
+### Changed
+
+- **`temperature` is `Optional[float]` on `AgentConfig` and every provider
+  method.** `None` means "send no temperature", which reasoning models
+  require; the OpenAI-compatible and Anthropic providers omit the field
+  instead of relying on the 400-and-retry fallback. The default stays `0.0`,
+  so no existing output changes.
+- Streamed turns on `run()` / `arun()` now record an `LLM_CALL` trace step
+  (previously only `astream()` did).
+- **Supported SDK ranges are now `openai>=1.55.3,<4` and
+  `anthropic>=0.40.0,<2`** (previously `>=1.30,<2` and `>=0.28,<1`). The new
+  majors are drop-in for the surface selectools uses (`chat.completions`,
+  `embeddings`, `images`, `messages`); their breaking changes are the `httpx`
+  to `httpx2` swap (only matters if you hand `httpx` objects to the SDK
+  clients) and, for anthropic 1.0, the removal of `temperature` / `top_p` /
+  `top_k` from the `messages.create()` signature. The floors were raised
+  because the old ones never resolved to a working install: with httpx 0.28
+  (which a fresh resolve picks) `openai<1.55.3` and `anthropic<0.40` fail at
+  client construction with `unexpected keyword argument 'proxies'`.
+  anthropic 2.x stays unsupported: it sends API version `2026-10-21`, which
+  returns 400 for any `temperature` (even the default), and the provider
+  sends `temperature=0.0` by default.
+- The Anthropic provider now sends `temperature` through `extra_body` instead
+  of as a keyword argument, so a non-`None` temperature no longer raises
+  `TypeError` (surfaced as `ProviderError`) on anthropic >= 1.0. The request
+  JSON is identical on every supported SDK version. New wire-level tests
+  (`tests/providers/test_sdk_compat.py`, from #184) drive the real SDK
+  clients through a mock HTTP transport so signature drift like this fails
+  CI, and pin the Anthropic API version the installed SDK sends.
+
 ## [1.3.0] - 2026-07-14 — Streaming Contracts
 
 Makes `final_turn_only` structured output safe to rely on across upgrades

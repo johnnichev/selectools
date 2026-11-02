@@ -14,11 +14,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol
 
 from selectools.results import Artifact
-from selectools.stability import stable
+from selectools.stability import beta, stable
 
 if TYPE_CHECKING:
     from selectools.trace import AgentTrace
-    from selectools.usage import AgentUsage
+    from selectools.usage import AgentUsage, UsageStats
 
 
 @stable
@@ -146,6 +146,12 @@ class Message:
                      contract in StructuredOutputConfig, #174). Caller-built
                      TOOL messages may leave it unset.
         image_base64: Auto-populated base64-encoded image data (not set via __init__).
+        provider_state: Opaque, JSON-safe payload a provider attaches to an
+                        ASSISTANT message so it can replay that turn verbatim
+                        on the next request (for example encrypted reasoning
+                        items on a stateless Responses-style API). Providers
+                        that do not know the payload ignore it. Round-trips
+                        through to_dict()/from_dict() and memory copies.
 
     Example:
         >>> # Simple user message
@@ -174,6 +180,7 @@ class Message:
     tool_calls: Optional[List["ToolCall"]] = None
     tool_call_id: Optional[str] = None
     content_parts: Optional[List[ContentPart]] = None
+    provider_state: Optional[Dict[str, Any]] = None
     image_base64: Optional[str] = field(init=False, default=None)
 
     def __post_init__(self) -> None:
@@ -222,6 +229,7 @@ class Message:
                 if self.content_parts
                 else None
             ),
+            "provider_state": self.provider_state,
         }
 
     @classmethod
@@ -240,6 +248,7 @@ class Message:
         msg.tool_name = data.get("tool_name")
         msg.tool_result = data.get("tool_result")
         msg.tool_call_id = data.get("tool_call_id")
+        msg.provider_state = data.get("provider_state")
         raw_calls = data.get("tool_calls")
         if raw_calls:
             msg.tool_calls = [
@@ -409,6 +418,29 @@ class StreamChunk:
     role: Role = Role.ASSISTANT
     tool_calls: Optional[List[ToolCall]] = None
     event: Optional[str] = None
+
+
+@beta
+@dataclass
+class StreamEnd:
+    """
+    Terminal item a provider may yield last from ``stream()`` / ``astream()``.
+
+    Generators cannot return a value to a ``for`` loop, so without this the
+    agent had no usage for streamed turns and no way for a provider to attach
+    ``Message.provider_state`` to the assistant message the agent assembles
+    from chunks. The agent consumes it (it is never surfaced as a chunk);
+    consumers that pattern-match on ``str`` / ``ToolCall`` ignore it.
+
+    Attributes:
+        usage: Token usage for the streamed call, counted into the agent's
+               totals and passed to ``on_llm_end`` / ``on_usage``.
+        provider_state: Opaque payload copied onto the assembled ASSISTANT
+               message (see ``Message.provider_state``).
+    """
+
+    usage: Optional["UsageStats"] = None
+    provider_state: Optional[Dict[str, Any]] = None
 
 
 # StreamHandler is intentionally NOT @runtime_checkable, so the class-level

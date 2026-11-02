@@ -31,10 +31,11 @@ from .._async_utils import aclosing, run_in_executor_copyctx
 from ..cache import CacheKeyBuilder
 from ..providers.base import ProviderError
 from ..trace import StepType, TraceStep
-from ..types import Message, Role, ToolCall
+from ..types import Message, Role, StreamEnd, ToolCall
 
 if TYPE_CHECKING:
     from ..trace import AgentTrace
+    from ..usage import UsageStats
 
 
 class _ProviderCallerMixin:
@@ -137,19 +138,14 @@ class _ProviderCallerMixin:
                     )
 
                 if self.config.stream and getattr(self.provider, "supports_streaming", False):
-                    response_text, streamed_tool_calls = self._streaming_call(
+                    response_text, streamed_tool_calls, stream_end = self._streaming_call(
                         stream_handler=stream_handler,
                         response_format=response_format,
                         tools=effective_tools,
                         system_prompt=effective_system_prompt,
                     )
-                    if run_id:
-                        self._notify_observers("on_llm_end", run_id, response_text, None)
-                    return Message(
-                        role=Role.ASSISTANT,
-                        content=response_text,
-                        tool_calls=streamed_tool_calls or None,
-                    )
+                    self._settle_stream(run_id, trace, call_start, response_text, stream_end)
+                    return self._streamed_message(response_text, streamed_tool_calls, stream_end)
 
                 response_msg, usage_stats = self.provider.complete(
                     model=self._effective_model,
@@ -240,7 +236,49 @@ class _ProviderCallerMixin:
                 )
             )
         return Message(
-            role=Role.ASSISTANT, content=f"Provider error: {last_error or 'unknown error'}"
+            role=Role.ASSISTANT,
+            content=f"Provider error: {last_error or 'unknown error'}",
+        )
+
+    def _settle_stream(
+        self,
+        run_id: Optional[str],
+        trace: Optional[AgentTrace],
+        call_start: float,
+        response_text: str,
+        stream_end: Optional[StreamEnd],
+    ) -> Optional[UsageStats]:
+        """Count a streamed turn's usage, notify sync observers, record the trace step."""
+        usage = stream_end.usage if stream_end is not None else None
+        if usage is not None:
+            self.usage.add_usage(usage, tool_name=None)
+        if run_id:
+            self._notify_observers("on_llm_end", run_id, response_text, usage)
+            if usage is not None:
+                self._notify_observers("on_usage", run_id, usage)
+        if trace is not None:
+            trace.add(
+                TraceStep(
+                    type=StepType.LLM_CALL,
+                    duration_ms=(time.time() - call_start) * 1000,
+                    model=self._effective_model,
+                    prompt_tokens=usage.prompt_tokens if usage is not None else None,
+                    completion_tokens=(usage.completion_tokens if usage is not None else None),
+                    cost_usd=usage.cost_usd if usage is not None else None,
+                    summary=f"{self._effective_model} → {len(response_text)} chars (stream)",
+                )
+            )
+        return usage
+
+    @staticmethod
+    def _streamed_message(
+        text: str, tool_calls: List[ToolCall], stream_end: Optional[StreamEnd]
+    ) -> Message:
+        return Message(
+            role=Role.ASSISTANT,
+            content=text,
+            tool_calls=tool_calls or None,
+            provider_state=(stream_end.provider_state if stream_end is not None else None),
         )
 
     def _streaming_call(
@@ -249,7 +287,7 @@ class _ProviderCallerMixin:
         response_format: Optional[Dict[str, Any]] = None,
         tools: Optional[List[Any]] = None,
         system_prompt: Optional[str] = None,
-    ) -> Tuple[str, List[ToolCall]]:
+    ) -> Tuple[str, List[ToolCall], Optional[StreamEnd]]:
         if not getattr(self.provider, "supports_streaming", False):
             raise ProviderError(f"Provider {self.provider.name} does not support streaming.")
 
@@ -258,9 +296,10 @@ class _ProviderCallerMixin:
             provider_extra["response_format"] = response_format
         aggregated: List[str] = []
         tool_calls: List[ToolCall] = []
+        stream_end: Optional[StreamEnd] = None
         for chunk in self.provider.stream(
             model=self._effective_model,
-            system_prompt=self._system_prompt if system_prompt is None else system_prompt,
+            system_prompt=(self._system_prompt if system_prompt is None else system_prompt),
             messages=self._history,
             tools=self.tools if tools is None else tools,
             temperature=self.config.temperature,
@@ -275,8 +314,10 @@ class _ProviderCallerMixin:
                         stream_handler(chunk)
             elif isinstance(chunk, ToolCall):
                 tool_calls.append(chunk)
+            elif isinstance(chunk, StreamEnd):
+                stream_end = chunk
 
-        return "".join(aggregated), tool_calls
+        return "".join(aggregated), tool_calls, stream_end
 
     def _is_rate_limit_error(self, message: str) -> bool:
         lowered = message.lower()
@@ -402,20 +443,20 @@ class _ProviderCallerMixin:
                     )
 
                 if self.config.stream and getattr(self.provider, "supports_streaming", False):
-                    response_text, streamed_tool_calls = await self._astreaming_call(
+                    response_text, streamed_tool_calls, stream_end = await self._astreaming_call(
                         stream_handler=stream_handler,
                         response_format=response_format,
                         tools=effective_tools,
                         system_prompt=effective_system_prompt,
                     )
-                    if run_id:
-                        self._notify_observers("on_llm_end", run_id, response_text, None)
-                        await self._anotify_observers("on_llm_end", run_id, response_text, None)
-                    return Message(
-                        role=Role.ASSISTANT,
-                        content=response_text,
-                        tool_calls=streamed_tool_calls or None,
+                    usage = self._settle_stream(
+                        run_id, trace, call_start, response_text, stream_end
                     )
+                    if run_id:
+                        await self._anotify_observers("on_llm_end", run_id, response_text, usage)
+                        if usage is not None:
+                            await self._anotify_observers("on_usage", run_id, usage)
+                    return self._streamed_message(response_text, streamed_tool_calls, stream_end)
 
                 # Check if provider has async support
                 if hasattr(self.provider, "acomplete") and getattr(
@@ -541,7 +582,8 @@ class _ProviderCallerMixin:
                 )
             )
         return Message(
-            role=Role.ASSISTANT, content=f"Provider error: {last_error or 'unknown error'}"
+            role=Role.ASSISTANT,
+            content=f"Provider error: {last_error or 'unknown error'}",
         )
 
     async def _astreaming_call(
@@ -550,7 +592,7 @@ class _ProviderCallerMixin:
         response_format: Optional[Dict[str, Any]] = None,
         tools: Optional[List[Any]] = None,
         system_prompt: Optional[str] = None,
-    ) -> Tuple[str, List[ToolCall]]:
+    ) -> Tuple[str, List[ToolCall], Optional[StreamEnd]]:
         """Async version of _streaming_call."""
         if not getattr(self.provider, "supports_streaming", False):
             raise ProviderError(f"Provider {self.provider.name} does not support streaming.")
@@ -562,6 +604,7 @@ class _ProviderCallerMixin:
         effective_system_prompt = self._system_prompt if system_prompt is None else system_prompt
         aggregated: List[str] = []
         tool_calls: List[ToolCall] = []
+        stream_end: Optional[StreamEnd] = None
 
         if hasattr(self.provider, "astream") and getattr(self.provider, "supports_async", False):
             # BUG-33: wrap in aclosing so stream_handler exceptions or caller
@@ -586,6 +629,8 @@ class _ProviderCallerMixin:
                                 stream_handler(chunk)
                     elif isinstance(chunk, ToolCall):
                         tool_calls.append(chunk)
+                    elif isinstance(chunk, StreamEnd):
+                        stream_end = chunk
         else:
             # Sync-generator fallback: wrap in closing() so a stream_handler
             # exception or caller disconnect deterministically closes the
@@ -612,5 +657,7 @@ class _ProviderCallerMixin:
                                 stream_handler(chunk)
                     elif isinstance(chunk, ToolCall):
                         tool_calls.append(chunk)
+                    elif isinstance(chunk, StreamEnd):
+                        stream_end = chunk
 
-        return "".join(aggregated), tool_calls
+        return "".join(aggregated), tool_calls, stream_end

@@ -12,7 +12,17 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, AsyncGenerator, Callable, Dict, List, Optional, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncGenerator,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Union,
+    cast,
+)
 
 from .._async_utils import aclosing, run_in_executor_copyctx
 from ..analytics import AgentAnalytics
@@ -33,7 +43,7 @@ from ..structured import (
 )
 from ..tools import Tool
 from ..trace import AgentTrace, StepType, TraceStep
-from ..types import AgentResult, Message, Role, StreamChunk, ToolCall
+from ..types import AgentResult, Message, Role, StreamChunk, StreamEnd, ToolCall
 from ..usage import AgentUsage, UsageStats
 from ._lifecycle import _LifecycleMixin
 from ._memory_manager import _MemoryManagerMixin
@@ -442,7 +452,9 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     structured_cfg.single_pass
                     and native_supported
                     and getattr(
-                        self.provider, "supports_native_structured_output_with_tools", False
+                        self.provider,
+                        "supports_native_structured_output_with_tools",
+                        False,
                     )
                 ):
                     native_structured = True
@@ -1000,7 +1012,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         if run_id:
             self._emit_guardrail_trips(run_id, stage, list(exc.prior_trips))
             self._notify_observers(
-                "on_guardrail_triggered", run_id, stage, exc.guardrail_name, "block", exc.reason
+                "on_guardrail_triggered",
+                run_id,
+                stage,
+                exc.guardrail_name,
+                "block",
+                exc.reason,
             )
 
     async def _ahandle_guardrail_block(
@@ -1018,7 +1035,12 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     "on_guardrail_triggered", run_id, stage, name, action, None
                 )
             await self._anotify_observers(
-                "on_guardrail_triggered", run_id, stage, exc.guardrail_name, "block", exc.reason
+                "on_guardrail_triggered",
+                run_id,
+                stage,
+                exc.guardrail_name,
+                "block",
+                exc.reason,
             )
 
     def _run_input_guardrails(
@@ -1103,7 +1125,10 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
         ctx.structured_extra_turns = 1
         self._history.append(Message(role=Role.ASSISTANT, content=response_text))
         self._history.append(
-            Message(role=Role.USER, content=build_final_turn_request(ctx.response_schema or {}))
+            Message(
+                role=Role.USER,
+                content=build_final_turn_request(ctx.response_schema or {}),
+            )
         )
 
     def _validate_loop_answer(self, ctx: _RunContext, response_text: str) -> Optional[Any]:
@@ -1633,7 +1658,10 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 warn_streaming_planning_skip(self)
             else:
                 planned = run_with_planning(
-                    self, messages, response_format=response_format, parent_run_id=parent_run_id
+                    self,
+                    messages,
+                    response_format=response_format,
+                    parent_run_id=parent_run_id,
                 )
                 if planned is not None:
                     return planned
@@ -1674,7 +1702,11 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         old_model = self._effective_model
                         self._current_model = selected
                         self._notify_observers(
-                            "on_model_switch", ctx.run_id, ctx.iteration, old_model, selected
+                            "on_model_switch",
+                            ctx.run_id,
+                            ctx.iteration,
+                            old_model,
+                            selected,
                         )
 
                 self._notify_observers(
@@ -1706,7 +1738,10 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     elif decision == "synthesize":
                         self._begin_structured_final_turn(ctx, response_text)
                         self._notify_observers(
-                            "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                            "on_iteration_end",
+                            ctx.run_id,
+                            ctx.iteration,
+                            response_text or "",
                         )
                         continue
                     # "reuse": the converged answer already validates — fall
@@ -1767,15 +1802,25 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                                 )
                                 continue
 
-                    final_response = Message(role=Role.ASSISTANT, content=response_text)
+                    final_response = Message(
+                        role=Role.ASSISTANT,
+                        content=response_text,
+                        provider_state=response_msg.provider_state,
+                    )
                     self._notify_observers(
-                        "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                        "on_iteration_end",
+                        ctx.run_id,
+                        ctx.iteration,
+                        response_text or "",
                     )
                     return self._finalize_run(ctx, final_response, parsed=parsed)
 
                 if self.config.routing_only and tool_calls_to_execute:
                     self._notify_observers(
-                        "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                        "on_iteration_end",
+                        ctx.run_id,
+                        ctx.iteration,
+                        response_text or "",
                     )
                     _result = AgentResult(
                         message=response_msg,
@@ -1838,7 +1883,10 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 if ctx.terminal_tool_result is not None:
                     final_response = Message(role=Role.ASSISTANT, content=ctx.terminal_tool_result)
                     self._notify_observers(
-                        "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                        "on_iteration_end",
+                        ctx.run_id,
+                        ctx.iteration,
+                        response_text or "",
                     )
                     return self._finalize_run(ctx, final_response)
 
@@ -2001,7 +2049,10 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 if self.config.cancellation_token and self.config.cancellation_token.is_cancelled:
                     _result = self._build_cancelled_result(ctx)
                     await self._anotify_observers(
-                        "on_cancelled", ctx.run_id, ctx.iteration, "Agent run was cancelled"
+                        "on_cancelled",
+                        ctx.run_id,
+                        ctx.iteration,
+                        "Agent run was cancelled",
                     )
                     await self._anotify_observers("on_run_end", ctx.run_id, _result)
                     yield _result
@@ -2031,10 +2082,18 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         old_model = self._effective_model
                         self._current_model = selected
                         self._notify_observers(
-                            "on_model_switch", ctx.run_id, ctx.iteration, old_model, selected
+                            "on_model_switch",
+                            ctx.run_id,
+                            ctx.iteration,
+                            old_model,
+                            selected,
                         )
                         await self._anotify_observers(
-                            "on_model_switch", ctx.run_id, ctx.iteration, old_model, selected
+                            "on_model_switch",
+                            ctx.run_id,
+                            ctx.iteration,
+                            old_model,
+                            selected,
                         )
 
                 self._notify_observers(
@@ -2069,6 +2128,8 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     suppress_content = ctx.single_pass_active
                     full_content = ""
                     current_tool_calls: List[ToolCall] = []
+                    turn_usage: Optional[UsageStats] = None
+                    stream_end: Optional[StreamEnd] = None
 
                     has_astream = (
                         hasattr(self.provider, "astream")
@@ -2125,6 +2186,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                             )
                         if _usage:
                             self.usage.add_usage(_usage, tool_name=None)
+                            turn_usage = _usage
                         _response_content = response_msg.content or ""
                         self._notify_observers("on_llm_end", ctx.run_id, _response_content, _usage)
                         await self._anotify_observers(
@@ -2169,15 +2231,30 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                                 elif isinstance(item, ToolCall):
                                     current_tool_calls.append(item)
                                     yield StreamChunk(tool_calls=[item])
+                                elif isinstance(item, StreamEnd):
+                                    stream_end = item
 
-                        self._notify_observers("on_llm_end", ctx.run_id, full_content, None)
-                        await self._anotify_observers("on_llm_end", ctx.run_id, full_content, None)
+                        turn_usage = stream_end.usage if stream_end is not None else None
+                        if turn_usage is not None:
+                            self.usage.add_usage(turn_usage, tool_name=None)
+                        self._notify_observers("on_llm_end", ctx.run_id, full_content, turn_usage)
+                        await self._anotify_observers(
+                            "on_llm_end", ctx.run_id, full_content, turn_usage
+                        )
+                        if turn_usage is not None:
+                            self._notify_observers("on_usage", ctx.run_id, turn_usage)
+                            await self._anotify_observers("on_usage", ctx.run_id, turn_usage)
 
                     ctx.trace.add(
                         TraceStep(
                             type=StepType.LLM_CALL,
                             duration_ms=(time.time() - llm_start) * 1000,
                             model=self._effective_model,
+                            prompt_tokens=(turn_usage.prompt_tokens if turn_usage else None),
+                            completion_tokens=(
+                                turn_usage.completion_tokens if turn_usage else None
+                            ),
+                            cost_usd=turn_usage.cost_usd if turn_usage else None,
                             summary=f"{self._effective_model} → {len(full_content)} chars (stream)",
                         )
                     )
@@ -2186,6 +2263,7 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         role=Role.ASSISTANT,
                         content=full_content,
                         tool_calls=current_tool_calls or None,
+                        provider_state=(stream_end.provider_state if stream_end else None),
                     )
 
                 # Use async _process_response for non-blocking output guardrails
@@ -2212,10 +2290,16 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     elif decision == "synthesize":
                         self._begin_structured_final_turn(ctx, response_text)
                         self._notify_observers(
-                            "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                            "on_iteration_end",
+                            ctx.run_id,
+                            ctx.iteration,
+                            response_text or "",
                         )
                         await self._anotify_observers(
-                            "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                            "on_iteration_end",
+                            ctx.run_id,
+                            ctx.iteration,
+                            response_text or "",
                         )
                         # Signal clients that a (non-streamed) synthesis call
                         # is starting so they can render a pending state.
@@ -2287,12 +2371,22 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                                 )
                                 continue
 
-                    final_response = Message(role=Role.ASSISTANT, content=response_text)
+                    final_response = Message(
+                        role=Role.ASSISTANT,
+                        content=response_text,
+                        provider_state=response_msg.provider_state,
+                    )
                     self._notify_observers(
-                        "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                        "on_iteration_end",
+                        ctx.run_id,
+                        ctx.iteration,
+                        response_text or "",
                     )
                     await self._anotify_observers(
-                        "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                        "on_iteration_end",
+                        ctx.run_id,
+                        ctx.iteration,
+                        response_text or "",
                     )
                     _result = self._finalize_run(ctx, final_response, parsed=parsed)
                     await self._anotify_observers("on_run_end", ctx.run_id, _result)
@@ -2301,10 +2395,16 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
 
                 if self.config.routing_only:
                     self._notify_observers(
-                        "on_iteration_end", ctx.run_id, ctx.iteration, full_content or ""
+                        "on_iteration_end",
+                        ctx.run_id,
+                        ctx.iteration,
+                        full_content or "",
                     )
                     await self._anotify_observers(
-                        "on_iteration_end", ctx.run_id, ctx.iteration, full_content or ""
+                        "on_iteration_end",
+                        ctx.run_id,
+                        ctx.iteration,
+                        full_content or "",
                     )
                     _result = AgentResult(
                         message=response_msg,
@@ -2369,10 +2469,16 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 if ctx.terminal_tool_result is not None:
                     final_response = Message(role=Role.ASSISTANT, content=ctx.terminal_tool_result)
                     self._notify_observers(
-                        "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                        "on_iteration_end",
+                        ctx.run_id,
+                        ctx.iteration,
+                        response_text or "",
                     )
                     await self._anotify_observers(
-                        "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                        "on_iteration_end",
+                        ctx.run_id,
+                        ctx.iteration,
+                        response_text or "",
                     )
                     _result = self._finalize_run(ctx, final_response)
                     await self._anotify_observers("on_run_end", ctx.run_id, _result)
@@ -2383,7 +2489,10 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 if self.config.cancellation_token and self.config.cancellation_token.is_cancelled:
                     _result = self._build_cancelled_result(ctx)
                     await self._anotify_observers(
-                        "on_cancelled", ctx.run_id, ctx.iteration, "Agent run was cancelled"
+                        "on_cancelled",
+                        ctx.run_id,
+                        ctx.iteration,
+                        "Agent run was cancelled",
                     )
                     await self._anotify_observers("on_run_end", ctx.run_id, _result)
                     yield _result
@@ -2454,7 +2563,10 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 warn_streaming_planning_skip(self)
             else:
                 planned = await arun_with_planning(
-                    self, messages, response_format=response_format, parent_run_id=parent_run_id
+                    self,
+                    messages,
+                    response_format=response_format,
+                    parent_run_id=parent_run_id,
                 )
                 if planned is not None:
                     return planned
@@ -2537,10 +2649,18 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                         old_model = self._effective_model
                         self._current_model = selected
                         self._notify_observers(
-                            "on_model_switch", ctx.run_id, ctx.iteration, old_model, selected
+                            "on_model_switch",
+                            ctx.run_id,
+                            ctx.iteration,
+                            old_model,
+                            selected,
                         )
                         await self._anotify_observers(
-                            "on_model_switch", ctx.run_id, ctx.iteration, old_model, selected
+                            "on_model_switch",
+                            ctx.run_id,
+                            ctx.iteration,
+                            old_model,
+                            selected,
                         )
 
                 self._notify_observers(
@@ -2577,10 +2697,16 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                     elif decision == "synthesize":
                         self._begin_structured_final_turn(ctx, response_text)
                         self._notify_observers(
-                            "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                            "on_iteration_end",
+                            ctx.run_id,
+                            ctx.iteration,
+                            response_text or "",
                         )
                         await self._anotify_observers(
-                            "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                            "on_iteration_end",
+                            ctx.run_id,
+                            ctx.iteration,
+                            response_text or "",
                         )
                         continue
                     # "reuse": the converged answer already validates — fall
@@ -2647,12 +2773,22 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                                 )
                                 continue
 
-                    final_response = Message(role=Role.ASSISTANT, content=response_text)
+                    final_response = Message(
+                        role=Role.ASSISTANT,
+                        content=response_text,
+                        provider_state=response_msg.provider_state,
+                    )
                     self._notify_observers(
-                        "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                        "on_iteration_end",
+                        ctx.run_id,
+                        ctx.iteration,
+                        response_text or "",
                     )
                     await self._anotify_observers(
-                        "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                        "on_iteration_end",
+                        ctx.run_id,
+                        ctx.iteration,
+                        response_text or "",
                     )
                     _result = self._finalize_run(ctx, final_response, parsed=parsed)
                     await self._anotify_observers("on_run_end", ctx.run_id, _result)
@@ -2660,10 +2796,16 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
 
                 if self.config.routing_only and tool_calls_to_execute:
                     self._notify_observers(
-                        "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                        "on_iteration_end",
+                        ctx.run_id,
+                        ctx.iteration,
+                        response_text or "",
                     )
                     await self._anotify_observers(
-                        "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                        "on_iteration_end",
+                        ctx.run_id,
+                        ctx.iteration,
+                        response_text or "",
                     )
                     _result = AgentResult(
                         message=response_msg,
@@ -2727,10 +2869,16 @@ class Agent(_ToolExecutorMixin, _ProviderCallerMixin, _LifecycleMixin, _MemoryMa
                 if ctx.terminal_tool_result is not None:
                     final_response = Message(role=Role.ASSISTANT, content=ctx.terminal_tool_result)
                     self._notify_observers(
-                        "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                        "on_iteration_end",
+                        ctx.run_id,
+                        ctx.iteration,
+                        response_text or "",
                     )
                     await self._anotify_observers(
-                        "on_iteration_end", ctx.run_id, ctx.iteration, response_text or ""
+                        "on_iteration_end",
+                        ctx.run_id,
+                        ctx.iteration,
+                        response_text or "",
                     )
                     _result = self._finalize_run(ctx, final_response)
                     await self._anotify_observers("on_run_end", ctx.run_id, _result)

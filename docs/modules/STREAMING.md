@@ -174,10 +174,17 @@ The last item yielded by `astream()` is always an `AgentResult`. It carries:
 
 ### Provider Protocol
 
-Providers implement `astream()` yielding `Union[str, ToolCall]`:
+Providers implement `astream()` yielding `Union[str, ToolCall, StreamEnd]`:
 
 - **Text deltas** — Raw `str` chunks (token-by-token)
 - **Tool calls** — Complete `ToolCall` objects when ready (native function calling)
+- **Stream end** (v1.4.0) — At most one `StreamEnd` as the last item. It carries
+  the call's `usage` (counted into `agent.usage`, passed to `on_llm_end` /
+  `on_usage`, and recorded on the `LLM_CALL` trace step) and an optional
+  `provider_state` dict the agent copies onto the assistant `Message` it
+  assembles from the chunks. The agent consumes it; it never appears as a
+  `StreamChunk`. Providers that don't yield it behave as before: `on_llm_end`
+  receives `None` usage for streamed turns.
 
 ```mermaid
 graph LR
@@ -186,7 +193,12 @@ graph LR
     P --> C["yield 'world' (str)"]
     P --> D["yield ToolCall(...) (tool invocation)"]
     P --> E["yield '!' (str)"]
+    P --> F["yield StreamEnd(usage=..., provider_state=...)"]
 ```
+
+The built-in OpenAI provider yields `StreamEnd` from the usage chunk it
+requests via `stream_options.include_usage`, on both `stream()` and
+`astream()`.
 
 ### Fallback Chain
 
