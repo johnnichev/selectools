@@ -174,7 +174,12 @@ class AnthropicProvider(Provider):
             "max_tokens": max_tokens,
         }
         if temperature is not None:
-            request_args["temperature"] = temperature
+            # anthropic>=1.0 dropped ``temperature`` (and ``top_p`` / ``top_k``)
+            # from the ``messages.create`` signature: passing it as a keyword is
+            # a ``TypeError``. The API still accepts the field, so send it via
+            # ``extra_body``, which every supported SDK version merges into the
+            # request JSON verbatim.
+            request_args["extra_body"] = {"temperature": temperature}
 
         if stream:
             request_args["stream"] = True

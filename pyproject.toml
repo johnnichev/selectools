@@ -12,8 +12,8 @@ license = "Apache-2.0"
 authors = [{name = "John Nichev", email = "johnnichev@gmail.com"}]
 maintainers = [{name = "NichevLabs", email = "support@nichevlabs.com"}]
 dependencies = [
-    "openai>=1.30.0,<2.0.0",
-    "anthropic>=0.28.0,<1.0.0",
+    "openai>=1.55.3,<4.0.0",
+    "anthropic>=0.40.0,<3.0.0",
     "google-genai>=1.0.0",
     "numpy>=1.24.0,<3.0.0",
 ]

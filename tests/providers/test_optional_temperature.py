@@ -172,7 +172,12 @@ def test_anthropic_request_omits_temperature_when_none() -> None:
         )
 
     assert "temperature" not in args(None)
-    assert args(0.0)["temperature"] == 0.0
+    assert "extra_body" not in args(None)
+    # anthropic>=1.0 removed ``temperature`` from the ``messages.create``
+    # signature (passing it is a TypeError), so it travels in ``extra_body``,
+    # which every supported SDK version merges into the request JSON as-is.
+    assert "temperature" not in args(0.0)
+    assert args(0.0)["extra_body"] == {"temperature": 0.0}
 
 
 def test_gemini_config_leaves_temperature_unset_when_none() -> None:

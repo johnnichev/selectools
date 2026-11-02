@@ -43,8 +43,8 @@ These are always installed with `pip install selectools`.
 
 | Package | Required version | Notes |
 |---------|-----------------|-------|
-| `openai` | `>=1.30.0, <2.0.0` | OpenAI provider + all OpenAI-compatible endpoints (Ollama, Azure) |
-| `anthropic` | `>=0.28.0, <1.0.0` | Anthropic provider |
+| `openai` | `>=1.55.3, <4.0.0` | OpenAI provider + all OpenAI-compatible endpoints (Ollama, Azure) |
+| `anthropic` | `>=0.40.0, <3.0.0` | Anthropic provider |
 | `google-genai` | `>=1.0.0` | Gemini provider |
 | `numpy` | `>=1.24.0, <3.0.0` | Vector operations in RAG |
 
